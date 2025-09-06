@@ -593,6 +593,9 @@ export const SimpleTabletop = () => {
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
+      
+      // Redraw canvas to clear ghost token and path
+      redrawCanvas();
     }
   };
 
