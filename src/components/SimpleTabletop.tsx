@@ -1043,6 +1043,21 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
       
+      // Find the region being dragged
+      const draggedRegion = regions.find(r => r.id === draggedRegionId);
+      if (draggedRegion) {
+        const deltaX = newX - draggedRegion.x;
+        const deltaY = newY - draggedRegion.y;
+        
+        // Move tokens that are inside this region
+        tokens.forEach(token => {
+          if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
+              token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
+            updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
+          }
+        });
+      }
+      
       setRegions(prev => prev.map(region => 
         region.id === draggedRegionId 
           ? { ...region, x: newX, y: newY }
