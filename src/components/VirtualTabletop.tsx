@@ -22,6 +22,8 @@ export const VirtualTabletop = () => {
   const [gridType, setGridType] = useState<GridType>('square');
   const [gridSize, setGridSize] = useState(40);
   const [isGridVisible, setIsGridVisible] = useState(true);
+  const [gridColor, setGridColor] = useState('#ffffff');
+  const [gridOpacity, setGridOpacity] = useState(80);
   
   const { 
     sessionId, 
@@ -137,7 +139,7 @@ export const VirtualTabletop = () => {
       enforceLayerOrder(fabricCanvas);
       updateAllTokenLabels();
     }
-  }, [fabricCanvas, gridRenderer, gridType, gridSize, isGridVisible]);
+  }, [fabricCanvas, gridRenderer, gridType, gridSize, isGridVisible, gridColor, gridOpacity]);
 
   // Update labels when visibility settings change
   useEffect(() => {
@@ -238,7 +240,8 @@ export const VirtualTabletop = () => {
     if (!renderer) return;
     
     const viewport = getCurrentViewport(canvas);
-    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.6)');
+    const gridColorWithOpacity = `rgba(${parseInt(gridColor.slice(1, 3), 16)}, ${parseInt(gridColor.slice(3, 5), 16)}, ${parseInt(gridColor.slice(5, 7), 16)}, ${gridOpacity / 100})`;
+    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, gridColorWithOpacity);
   };
 
   // Old grid functions removed - now using efficient grid system
@@ -862,9 +865,13 @@ export const VirtualTabletop = () => {
             gridType={gridType}
             gridSize={gridSize}
             isGridVisible={isGridVisible}
+            gridColor={gridColor}
+            gridOpacity={gridOpacity}
             onGridTypeChange={setGridType}
             onGridSizeChange={setGridSize}
             onGridVisibilityChange={setIsGridVisible}
+            onGridColorChange={setGridColor}
+            onGridOpacityChange={setGridOpacity}
             onAddToken={addTokenToCanvas}
             onColorChange={handleTokenColorChange}
             onUpdateCanvas={handleCanvasUpdate}

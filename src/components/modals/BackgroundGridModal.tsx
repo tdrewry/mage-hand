@@ -21,18 +21,26 @@ interface BackgroundGridModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fabricCanvas: FabricCanvas | null;
+  gridColor: string;
+  gridOpacity: number;
+  onGridColorChange: (color: string) => void;
+  onGridOpacityChange: (opacity: number) => void;
 }
 
-export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: BackgroundGridModalProps) => {
+export const BackgroundGridModal = ({ 
+  open, 
+  onOpenChange, 
+  fabricCanvas,
+  gridColor,
+  gridOpacity,
+  onGridColorChange,
+  onGridOpacityChange
+}: BackgroundGridModalProps) => {
   // Background state
   const [backgroundColor, setBackgroundColor] = useState('#1a1a1a'); // RGB(26,26,26)
   const [backgroundOpacity, setBackgroundOpacity] = useState(100);
   const [backgroundImage, setBackgroundImage] = useState('');
   const [backgroundRepeat, setBackgroundRepeat] = useState<'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y'>('no-repeat');
-  
-  // Grid state
-  const [gridColor, setGridColor] = useState('#444444');
-  const [gridOpacity, setGridOpacity] = useState(50);
 
   const applyBackgroundColor = () => {
     if (!fabricCanvas) return;
@@ -259,7 +267,7 @@ export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: Backgr
                 <Input
                   type="color"
                   value={gridColor}
-                  onChange={(e) => setGridColor(e.target.value)}
+                  onChange={(e) => onGridColorChange(e.target.value)}
                   className="w-16 h-8 p-1"
                 />
                 <span className="text-xs text-muted-foreground flex items-center">
@@ -275,7 +283,7 @@ export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: Backgr
               </Label>
               <Slider
                 value={[gridOpacity]}
-                onValueChange={(value) => setGridOpacity(value[0])}
+                onValueChange={(value) => onGridOpacityChange(value[0])}
                 max={100}
                 step={1}
                 className="w-full"

@@ -60,20 +60,15 @@ export function renderSquareGrid(
   renderer: GridRenderer, 
   size: number, 
   viewport: Viewport, 
-  color: string = 'rgba(255, 255, 255, 0.2)'
+  color: string = 'rgba(255, 255, 255, 0.8)'
 ): void {
   const { ctx, canvas } = renderer;
-  
-  console.log('renderSquareGrid called:', { size, viewport, color, canvasSize: { width: canvas.width, height: canvas.height } });
   
   // Fill background first
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  if (size <= 0) {
-    console.log('Invalid grid size:', size);
-    return;
-  }
+  if (size <= 0) return;
   
   // Calculate visible area with padding
   const padding = size * 10; // Extra lines beyond visible area
@@ -88,12 +83,10 @@ export function renderSquareGrid(
   const startY = Math.floor(visibleTop / size) * size;
   const endY = Math.ceil((visibleTop + visibleHeight) / size) * size;
   
-  console.log('Grid bounds:', { startX, endX, startY, endY, lineCount: { vertical: (endX - startX) / size, horizontal: (endY - startY) / size } });
-  
   // Set up drawing style
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1, 1 / viewport.zoom); // Ensure minimum line width
-  ctx.globalAlpha = Math.min(1, Math.max(0.3, viewport.zoom * 0.5 + 0.3)); // Better visibility
+  ctx.globalAlpha = 1.0; // Use full opacity, let color handle transparency
   
   // Begin path for all lines (much more efficient)
   ctx.beginPath();
@@ -114,8 +107,6 @@ export function renderSquareGrid(
   
   // Draw all lines at once
   ctx.stroke();
-  
-  console.log('Square grid lines drawn');
   
   // Update last viewport
   renderer.lastViewport = { ...viewport };
@@ -159,7 +150,7 @@ export function renderHexGrid(
   // Set up drawing style
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1, 1 / viewport.zoom);
-  ctx.globalAlpha = Math.min(1, Math.max(0.3, viewport.zoom * 0.5 + 0.3));
+  ctx.globalAlpha = 1.0; // Use full opacity, let color handle transparency
   ctx.fillStyle = 'transparent';
   
   // Draw each hex
@@ -213,12 +204,9 @@ export function renderGrid(
   size: number,
   viewport: Viewport,
   visible: boolean = true,
-  color: string = 'rgba(255, 255, 255, 0.3)' // Increased opacity for better visibility
+  color: string = 'rgba(255, 255, 255, 0.8)'
 ): void {
-  console.log('renderGrid called:', { type, size, viewport, visible, color });
-  
   if (!visible || type === 'none') {
-    console.log('Grid not visible or type is none, filling background');
     // Fill with background color when grid is hidden
     renderer.ctx.fillStyle = '#1a1a1a';
     renderer.ctx.fillRect(0, 0, renderer.canvas.width, renderer.canvas.height);
@@ -227,11 +215,8 @@ export function renderGrid(
   
   // Only redraw if viewport changed significantly
   if (!hasViewportChanged(renderer, viewport)) {
-    console.log('Viewport unchanged, skipping grid redraw');
     return;
   }
-  
-  console.log('Drawing grid:', type, 'size:', size);
   
   switch (type) {
     case 'square':
@@ -241,8 +226,6 @@ export function renderGrid(
       renderHexGrid(renderer, size, viewport, color);
       break;
   }
-  
-  console.log('Grid rendering completed');
 }
 
 // Snap to grid based on type

@@ -13,9 +13,13 @@ interface FloatingMenuProps {
   gridType: string;
   gridSize: number;
   isGridVisible: boolean;
+  gridColor: string;
+  gridOpacity: number;
   onGridTypeChange: (type: any) => void;
   onGridSizeChange: (size: number) => void;
   onGridVisibilityChange: (visible: boolean) => void;
+  onGridColorChange: (color: string) => void;
+  onGridOpacityChange: (opacity: number) => void;
   onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void;
   onColorChange?: (tokenId: string, color: string) => void;
   onUpdateCanvas?: () => void;
@@ -26,9 +30,13 @@ export const FloatingMenu = ({
   gridType,
   gridSize,
   isGridVisible,
+  gridColor,
+  gridOpacity,
   onGridTypeChange,
   onGridSizeChange,
   onGridVisibilityChange,
+  onGridColorChange,
+  onGridOpacityChange,
   onAddToken,
   onColorChange,
   onUpdateCanvas,
@@ -109,6 +117,10 @@ export const FloatingMenu = ({
         open={activeModal === 'background'}
         onOpenChange={(open) => setActiveModal(open ? 'background' : null)}
         fabricCanvas={fabricCanvas}
+        gridColor={gridColor}
+        gridOpacity={gridOpacity}
+        onGridColorChange={onGridColorChange}
+        onGridOpacityChange={onGridOpacityChange}
       />
 
       <VisibilityModal
