@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,15 +13,17 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Palette, Image, Grid3X3, Upload } from 'lucide-react';
-import { Canvas as FabricCanvas, FabricImage, Rect } from 'fabric';
+import { Palette, Image } from 'lucide-react';
+import { Canvas as FabricCanvas, FabricImage } from 'fabric';
 import { toast } from 'sonner';
 
-interface BackgroundGridControlsProps {
+interface BackgroundGridModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   fabricCanvas: FabricCanvas | null;
 }
 
-export const BackgroundGridControls = ({ fabricCanvas }: BackgroundGridControlsProps) => {
+export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: BackgroundGridModalProps) => {
   // Background state
   const [backgroundColor, setBackgroundColor] = useState('#1a1a1a');
   const [backgroundOpacity, setBackgroundOpacity] = useState(100);
@@ -138,14 +147,18 @@ export const BackgroundGridControls = ({ fabricCanvas }: BackgroundGridControlsP
   };
 
   return (
-    <Card className="m-4 bg-card border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-card-foreground flex items-center gap-2">
-          <Palette className="h-4 w-4" />
-          Background & Grid
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Background & Grid
+          </DialogTitle>
+          <DialogDescription>
+            Customize the background and grid appearance
+          </DialogDescription>
+        </DialogHeader>
+        
         <Tabs defaultValue="background" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-muted">
             <TabsTrigger value="background" className="text-xs">Background</TabsTrigger>
@@ -264,7 +277,7 @@ export const BackgroundGridControls = ({ fabricCanvas }: BackgroundGridControlsP
             </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };

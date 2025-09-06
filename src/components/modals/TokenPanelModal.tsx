@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Upload, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface TokenPanelProps {
+interface TokenPanelModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void;
 }
 
-export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
+export const TokenPanelModal = ({ open, onOpenChange, onAddToken }: TokenPanelModalProps) => {
   const [urlInput, setUrlInput] = useState('');
   const [gridWidth, setGridWidth] = useState(1);
   const [gridHeight, setGridHeight] = useState(1);
@@ -26,6 +34,7 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
           onAddToken(result, 100, 100, gridWidth, gridHeight);
           setGridWidth(1);
           setGridHeight(1);
+          onOpenChange(false);
         };
         reader.readAsDataURL(file);
       } else {
@@ -40,6 +49,7 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
       setUrlInput('');
       setGridWidth(1);
       setGridHeight(1);
+      onOpenChange(false);
     } else {
       toast.error('Please enter a valid URL');
     }
@@ -82,22 +92,30 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
       onAddToken(dataUrl, 100, 100, gridWidth, gridHeight, randomColor);
       setGridWidth(1);
       setGridHeight(1);
+      onOpenChange(false);
     }
   };
 
   return (
-    <Card className="m-4 bg-card border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-card-foreground">Tokens</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Add Tokens
+          </DialogTitle>
+          <DialogDescription>
+            Add tokens to your tabletop from files or URLs
+          </DialogDescription>
+        </DialogHeader>
+        
         <Tabs defaultValue="upload" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-muted">
             <TabsTrigger value="upload" className="text-xs">Upload</TabsTrigger>
             <TabsTrigger value="url" className="text-xs">URL</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="upload" className="space-y-3 mt-3">
+          <TabsContent value="upload" className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label htmlFor="grid-width" className="text-xs text-muted-foreground">
@@ -155,7 +173,7 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
             </Button>
           </TabsContent>
           
-          <TabsContent value="url" className="space-y-3 mt-3">
+          <TabsContent value="url" className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label htmlFor="grid-width-url" className="text-xs text-muted-foreground">
@@ -213,7 +231,7 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
             </Button>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };

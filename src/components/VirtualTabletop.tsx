@@ -1,12 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text } from 'fabric';
 import { Toolbar } from './Toolbar';
-import { GridControls } from './GridControls';
-import { TokenPanel } from './TokenPanel';
-import { MapControls } from './MapControls';
-import { VisibilityControls } from './VisibilityControls';
-import { BackgroundGridControls } from './BackgroundGridControls';
 import { TokenContextMenu } from './TokenContextMenu';
+import { FloatingMenu } from './FloatingMenu';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 
@@ -519,41 +515,36 @@ export const VirtualTabletop = () => {
       <Toolbar sessionId={sessionId} fabricCanvas={fabricCanvas} />
       
       <div className="flex-1 flex">
-        {/* Left Panel */}
-        <div className="w-64 bg-card border-r border-border flex flex-col">
-          <GridControls
-            gridType={gridType}
-            gridSize={gridSize}
-            isGridVisible={isGridVisible}
-            onGridTypeChange={setGridType}
-            onGridSizeChange={setGridSize}
-            onGridVisibilityChange={setIsGridVisible}
-          />
-          
-          <TokenPanel onAddToken={addTokenToCanvas} />
-          
-          <VisibilityControls />
-          
-          <BackgroundGridControls fabricCanvas={fabricCanvas} />
-          
-          <MapControls fabricCanvas={fabricCanvas} />
-        </div>
-
-        {/* Main Canvas Area */}
-        <div className="flex-1 p-4">
-          <TokenContextMenu 
-            tokenId={selectedTokenIds[0] || ''}
-            onColorChange={handleTokenColorChange}
-            onUpdateCanvas={handleCanvasUpdate}
-          >
+        {/* Main Canvas Area - Full Width */}
+        <TokenContextMenu 
+          tokenId={selectedTokenIds[0] || ''}
+          onColorChange={handleTokenColorChange}
+          onUpdateCanvas={handleCanvasUpdate}
+        >
+          <div className="flex-1 p-4 relative">
+            {/* Floating Menu */}
+            <FloatingMenu
+              fabricCanvas={fabricCanvas}
+              gridType={gridType}
+              gridSize={gridSize}
+              isGridVisible={isGridVisible}
+              onGridTypeChange={setGridType}
+              onGridSizeChange={setGridSize}
+              onGridVisibilityChange={setIsGridVisible}
+              onAddToken={addTokenToCanvas}
+              onColorChange={handleTokenColorChange}
+              onUpdateCanvas={handleCanvasUpdate}
+            />
+            
+            {/* Canvas */}
             <div className="canvas-container rounded-lg overflow-hidden shadow-lg">
               <canvas 
                 ref={canvasRef} 
                 className="max-w-full max-h-full"
               />
             </div>
-          </TokenContextMenu>
-        </div>
+          </div>
+        </TokenContextMenu>
       </div>
     </div>
   );
