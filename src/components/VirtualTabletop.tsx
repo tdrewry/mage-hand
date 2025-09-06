@@ -63,13 +63,14 @@ export const VirtualTabletop = () => {
     // Set grid canvas background and add test pattern
     const gridCtx = gridCanvas.getContext('2d');
     if (gridCtx) {
+      console.log('🎨 Grid context obtained, drawing test pattern...');
       // Fill background
       gridCtx.fillStyle = '#1a1a1a';
       gridCtx.fillRect(0, 0, viewportWidth, viewportHeight);
       
-      // Add simple test pattern to verify canvas is working
-      gridCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-      gridCtx.lineWidth = 3;
+      // Add VERY visible test pattern 
+      gridCtx.strokeStyle = 'rgba(255, 0, 0, 1.0)'; // Bright red
+      gridCtx.lineWidth = 5;
       gridCtx.beginPath();
       gridCtx.moveTo(0, 0);
       gridCtx.lineTo(viewportWidth, viewportHeight);
@@ -77,9 +78,18 @@ export const VirtualTabletop = () => {
       gridCtx.lineTo(0, viewportHeight);
       gridCtx.stroke();
       
-      // Add a white rectangle in center
+      // Add a bright white rectangle in center
       gridCtx.fillStyle = 'white';
-      gridCtx.fillRect(viewportWidth/2 - 50, viewportHeight/2 - 50, 100, 100);
+      gridCtx.fillRect(viewportWidth/2 - 100, viewportHeight/2 - 100, 200, 200);
+      
+      // Add text to verify canvas is working
+      gridCtx.fillStyle = 'red';
+      gridCtx.font = '24px Arial';
+      gridCtx.fillText('GRID CANVAS TEST', 100, 100);
+      
+      console.log('✅ Test pattern drawn on grid canvas');
+    } else {
+      console.error('❌ Failed to get grid canvas context!');
     }
     
     const renderer = createGridRenderer(gridCanvas);
@@ -237,11 +247,31 @@ export const VirtualTabletop = () => {
 
   // Update grid display using new efficient system
   const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
-    if (!renderer) return;
+    if (!renderer) {
+      console.log('❌ No renderer available for grid display');
+      return;
+    }
     
     const viewport = getCurrentViewport(canvas);
+    console.log('📊 Grid render call:', { 
+      viewport, 
+      gridType, 
+      gridSize, 
+      isGridVisible, 
+      gridColor, 
+      gridOpacity,
+      canvasSize: { width: renderer.canvas.width, height: renderer.canvas.height }
+    });
+    
     const gridColorWithOpacity = `rgba(${parseInt(gridColor.slice(1, 3), 16)}, ${parseInt(gridColor.slice(3, 5), 16)}, ${parseInt(gridColor.slice(5, 7), 16)}, ${gridOpacity / 100})`;
+    console.log('🎨 Grid color calculated:', gridColorWithOpacity);
+    
     renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, gridColorWithOpacity);
+    
+    // Force a test draw to verify canvas is working
+    renderer.ctx.fillStyle = 'red';
+    renderer.ctx.fillRect(50, 50, 100, 100);
+    console.log('🔴 Red test square drawn at 50,50');
   };
 
   // Old grid functions removed - now using efficient grid system
@@ -886,7 +916,8 @@ export const VirtualTabletop = () => {
                 background: '#1a1a1a',
                 position: 'absolute',
                 top: 0,
-                left: 0
+                left: 0,
+                border: '2px solid red' // Debug border to see canvas bounds
               }}
             />
           </div>
@@ -900,7 +931,8 @@ export const VirtualTabletop = () => {
                 background: 'transparent',
                 position: 'absolute',
                 top: 0,
-                left: 0
+                left: 0,
+                border: '2px solid blue' // Debug border to see canvas bounds
               }}
             />
           </div>
