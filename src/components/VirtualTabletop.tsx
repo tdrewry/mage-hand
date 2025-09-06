@@ -6,6 +6,7 @@ import { TokenPanel } from './TokenPanel';
 import { MapControls } from './MapControls';
 import { VisibilityControls } from './VisibilityControls';
 import { BackgroundGridControls } from './BackgroundGridControls';
+import { TokenContextMenu } from './TokenContextMenu';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 
@@ -23,13 +24,15 @@ export const VirtualTabletop = () => {
     tokens, 
     addToken, 
     updateTokenPosition, 
-    updateTokenLabel, 
+    updateTokenLabel,
+    updateTokenColor,
     selectedTokenIds, 
     setSelectedTokens, 
     tokenVisibility,
     labelVisibility, 
     currentPlayerId, 
-    players 
+    players,
+    removeToken 
   } = useSessionStore();
 
   useEffect(() => {
@@ -100,15 +103,41 @@ export const VirtualTabletop = () => {
       }
     };
 
+    const handleSelectionCreated = (e: any) => {
+      const selectedObjects = fabricCanvas.getActiveObjects();
+      const tokenIds = selectedObjects
+        .filter((obj: any) => obj.tokenId)
+        .map((obj: any) => obj.tokenId);
+      setSelectedTokens(tokenIds);
+    };
+
+    const handleSelectionUpdated = (e: any) => {
+      const selectedObjects = fabricCanvas.getActiveObjects();
+      const tokenIds = selectedObjects
+        .filter((obj: any) => obj.tokenId)
+        .map((obj: any) => obj.tokenId);
+      setSelectedTokens(tokenIds);
+    };
+
+    const handleSelectionCleared = () => {
+      setSelectedTokens([]);
+    };
+
     fabricCanvas.on('object:moving', handleObjectMoving);
     fabricCanvas.on('object:modified', handleObjectMoved);
+    fabricCanvas.on('selection:created', handleSelectionCreated);
+    fabricCanvas.on('selection:updated', handleSelectionUpdated);
+    fabricCanvas.on('selection:cleared', handleSelectionCleared);
 
     return () => {
       fabricCanvas.off('object:moving', handleObjectMoving);
       fabricCanvas.off('object:modified', handleObjectMoved);
+      fabricCanvas.off('selection:created', handleSelectionCreated);
+      fabricCanvas.off('selection:updated', handleSelectionUpdated);
+      fabricCanvas.off('selection:cleared', handleSelectionCleared);
       clearTimeout(moveTimeout);
     };
-  }, [fabricCanvas, gridType, gridSize, updateTokenPosition]);
+  }, [fabricCanvas, gridType, gridSize, updateTokenPosition, setSelectedTokens]);
 
   const drawGrid = (canvas: FabricCanvas, type: GridType, size: number, visible: boolean) => {
     // Remove existing grid
@@ -228,6 +257,14 @@ export const VirtualTabletop = () => {
       (img as any).tokenId = tokenId;
       (img as any).isMap = false; // Ensure it's not marked as a map
       
+      // Store original image for color changes
+      (img as any).originalElement = img.getElement();
+      
+      // Apply initial color if provided
+      if (color) {
+        applyTokenColor(img, color);
+      }
+      
       // Calculate pixel dimensions based on grid size
       const maxPixelWidth = gridWidth * gridSize;
       const maxPixelHeight = gridHeight * gridSize;
@@ -312,6 +349,49 @@ export const VirtualTabletop = () => {
     canvas.renderAll();
   };
 
+  // Apply color tint to token
+  const applyTokenColor = (fabricObject: any, color: string) => {
+    if (!fabricObject) return;
+    
+    // Create a colored overlay using filters or direct manipulation
+    fabricObject.set({
+      backgroundColor: color,
+      // You could also use filters for more advanced color manipulation
+    });
+  };
+
+  // Handle token color changes from context menu
+  const handleTokenColorChange = (tokenId: string, color: string) => {
+    if (!fabricCanvas) return;
+    
+    // Find the fabric object
+    const objects = fabricCanvas.getObjects();
+    const tokenObject = objects.find((obj: any) => obj.tokenId === tokenId);
+    
+    if (tokenObject) {
+      applyTokenColor(tokenObject, color);
+      fabricCanvas.renderAll();
+    }
+    
+    // Update store
+    updateTokenColor(tokenId, color);
+  };
+
+  // Handle canvas updates after token operations
+  const handleCanvasUpdate = () => {
+    if (fabricCanvas) {
+      enforceLayerOrder(fabricCanvas);
+      fabricCanvas.renderAll();
+    }
+  };
+
+  // Wrap tokens in context menu
+  const wrapTokenWithContextMenu = (tokenObject: any, tokenId: string) => {
+    // This is a conceptual wrapper - in practice, we'll handle this differently
+    // since Fabric.js objects can't be directly wrapped with React components
+    return tokenObject;
+  };
+
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Header Toolbar */}
@@ -340,12 +420,18 @@ export const VirtualTabletop = () => {
 
         {/* Main Canvas Area */}
         <div className="flex-1 p-4">
-          <div className="canvas-container rounded-lg overflow-hidden shadow-lg">
-            <canvas 
-              ref={canvasRef} 
-              className="max-w-full max-h-full"
-            />
-          </div>
+          <TokenContextMenu 
+            tokenId={selectedTokenIds[0] || ''}
+            onColorChange={handleTokenColorChange}
+            onUpdateCanvas={handleCanvasUpdate}
+          >
+            <div className="canvas-container rounded-lg overflow-hidden shadow-lg">
+              <canvas 
+                ref={canvasRef} 
+                className="max-w-full max-h-full"
+              />
+            </div>
+          </TokenContextMenu>
         </div>
       </div>
     </div>

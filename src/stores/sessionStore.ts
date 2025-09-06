@@ -35,6 +35,7 @@ export interface SessionState {
   addToken: (token: Token) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
+  updateTokenColor: (tokenId: string, color: string) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   setSelectedTokens: (tokenIds: string[]) => void;
@@ -99,6 +100,13 @@ export const useSessionStore = create<SessionState>()(
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, label } : token
+          ),
+        })),
+
+      updateTokenColor: (tokenId, color) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, color } : token
           ),
         })),
 
