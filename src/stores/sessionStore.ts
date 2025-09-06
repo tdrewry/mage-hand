@@ -21,7 +21,8 @@ export interface Player {
   isConnected: boolean;
 }
 
-export type LabelVisibility = 'show' | 'hide' | 'selected' | 'owned';
+export type TokenVisibility = 'all' | 'owned' | 'dm-only';
+export type LabelVisibility = 'show' | 'hide' | 'selected';
 
 export interface SessionState {
   sessionId: string;
@@ -29,6 +30,7 @@ export interface SessionState {
   players: Player[];
   currentPlayerId: string;
   selectedTokenIds: string[];
+  tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
   addToken: (token: Token) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
@@ -36,6 +38,7 @@ export interface SessionState {
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   setSelectedTokens: (tokenIds: string[]) => void;
+  setTokenVisibility: (visibility: TokenVisibility) => void;
   setLabelVisibility: (visibility: LabelVisibility) => void;
   addPlayer: (player: Player) => void;
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
@@ -50,6 +53,7 @@ export const useSessionStore = create<SessionState>()(
       players: [],
       currentPlayerId: '',
       selectedTokenIds: [],
+      tokenVisibility: 'all',
       labelVisibility: 'show',
       
       addToken: (token) =>
@@ -77,7 +81,15 @@ export const useSessionStore = create<SessionState>()(
             // Clear old data if storage is full
             if (error instanceof Error && error.message.includes('quota')) {
               localStorage.clear();
-              set({ tokens: [], sessionId: state.sessionId, players: [], currentPlayerId: '', selectedTokenIds: [], labelVisibility: 'show' });
+              set({ 
+                tokens: [], 
+                sessionId: state.sessionId, 
+                players: [], 
+                currentPlayerId: '', 
+                selectedTokenIds: [], 
+                tokenVisibility: 'all',
+                labelVisibility: 'show' 
+              });
             }
           }
         }
@@ -105,6 +117,9 @@ export const useSessionStore = create<SessionState>()(
 
       setSelectedTokens: (tokenIds) =>
         set({ selectedTokenIds: tokenIds }),
+
+      setTokenVisibility: (visibility) =>
+        set({ tokenVisibility: visibility }),
 
       setLabelVisibility: (visibility) =>
         set({ labelVisibility: visibility }),
@@ -163,6 +178,7 @@ export const useSessionStore = create<SessionState>()(
         sessionId: state.sessionId,
         players: state.players,
         currentPlayerId: state.currentPlayerId,
+        tokenVisibility: state.tokenVisibility,
         labelVisibility: state.labelVisibility,
       }),
     }

@@ -4,7 +4,7 @@ import { Toolbar } from './Toolbar';
 import { GridControls } from './GridControls';
 import { TokenPanel } from './TokenPanel';
 import { MapControls } from './MapControls';
-import { LabelControls } from './LabelControls';
+import { VisibilityControls } from './VisibilityControls';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 
@@ -17,7 +17,19 @@ export const VirtualTabletop = () => {
   const [gridSize, setGridSize] = useState(40);
   const [isGridVisible, setIsGridVisible] = useState(true);
   
-  const { sessionId, tokens, addToken, updateTokenPosition, updateTokenLabel, selectedTokenIds, setSelectedTokens, labelVisibility, currentPlayerId, players } = useSessionStore();
+  const { 
+    sessionId, 
+    tokens, 
+    addToken, 
+    updateTokenPosition, 
+    updateTokenLabel, 
+    selectedTokenIds, 
+    setSelectedTokens, 
+    tokenVisibility,
+    labelVisibility, 
+    currentPlayerId, 
+    players 
+  } = useSessionStore();
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -275,7 +287,7 @@ export const VirtualTabletop = () => {
           
           <TokenPanel onAddToken={addTokenToCanvas} />
           
-          <LabelControls />
+          <VisibilityControls />
           
           <MapControls fabricCanvas={fabricCanvas} />
         </div>
