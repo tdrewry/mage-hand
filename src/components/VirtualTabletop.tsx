@@ -5,6 +5,7 @@ import { GridControls } from './GridControls';
 import { TokenPanel } from './TokenPanel';
 import { MapControls } from './MapControls';
 import { VisibilityControls } from './VisibilityControls';
+import { BackgroundGridControls } from './BackgroundGridControls';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 
@@ -48,6 +49,9 @@ export const VirtualTabletop = () => {
     
     // Draw initial grid
     drawGrid(canvas, gridType, gridSize, isGridVisible);
+    
+    // Ensure proper layer ordering: background -> grid -> map -> tokens
+    enforceLayerOrder(canvas);
 
     toast.success('Virtual Tabletop Ready!');
 
@@ -60,6 +64,7 @@ export const VirtualTabletop = () => {
   useEffect(() => {
     if (fabricCanvas) {
       drawGrid(fabricCanvas, gridType, gridSize, isGridVisible);
+      enforceLayerOrder(fabricCanvas);
     }
   }, [fabricCanvas, gridType, gridSize, isGridVisible]);
 
@@ -257,6 +262,7 @@ export const VirtualTabletop = () => {
       });
 
       fabricCanvas.add(img);
+      enforceLayerOrder(fabricCanvas);
       fabricCanvas.renderAll();
       
       // Add to store with error handling
@@ -284,6 +290,28 @@ export const VirtualTabletop = () => {
     });
   };
 
+  // Enforce layer ordering: background -> grid -> map -> tokens
+  const enforceLayerOrder = (canvas: FabricCanvas) => {
+    const objects = canvas.getObjects();
+    
+    // Group objects by type
+    const backgrounds = objects.filter((obj: any) => obj.isBackground);
+    const grids = objects.filter((obj: any) => obj.isGrid);
+    const maps = objects.filter((obj: any) => obj.isMap);
+    const tokens = objects.filter((obj: any) => obj.tokenId);
+    const others = objects.filter((obj: any) => !obj.isBackground && !obj.isGrid && !obj.isMap && !obj.tokenId);
+    
+    // Clear and re-add in correct order
+    canvas.clear();
+    
+    // Add in order: background, grid, map, tokens, others
+    [...backgrounds, ...grids, ...maps, ...tokens, ...others].forEach(obj => {
+      canvas.add(obj);
+    });
+    
+    canvas.renderAll();
+  };
+
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Header Toolbar */}
@@ -304,6 +332,8 @@ export const VirtualTabletop = () => {
           <TokenPanel onAddToken={addTokenToCanvas} />
           
           <VisibilityControls />
+          
+          <BackgroundGridControls fabricCanvas={fabricCanvas} />
           
           <MapControls fabricCanvas={fabricCanvas} />
         </div>
