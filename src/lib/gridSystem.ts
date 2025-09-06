@@ -42,17 +42,17 @@ export function createGridRenderer(canvas: HTMLCanvasElement): GridRenderer | nu
   };
 }
 
-// Check if viewport has changed significantly (optimization)
-export function hasViewportChanged(renderer: GridRenderer, viewport: Viewport, threshold: number = 50): boolean {
+// Check if viewport has changed enough to warrant redraw
+export function hasViewportChanged(renderer: GridRenderer, viewport: Viewport, threshold: number = 20): boolean {
   if (!renderer.lastViewport) return true;
   
   const last = renderer.lastViewport;
-  const dx = Math.abs(viewport.x - last.x);
-  const dy = Math.abs(viewport.y - last.y);
-  const dzoom = Math.abs(viewport.zoom - last.zoom);
+  const deltaX = Math.abs(viewport.x - last.x);
+  const deltaY = Math.abs(viewport.y - last.y);
+  const deltaZoom = Math.abs(viewport.zoom - last.zoom);
   
-  return dx > threshold || dy > threshold || dzoom > 0.1 || 
-         viewport.width !== last.width || viewport.height !== last.height;
+  // More permissive thresholds for better responsiveness
+  return deltaX > threshold || deltaY > threshold || deltaZoom > 0.01;
 }
 
 // Render square grid efficiently
@@ -231,15 +231,19 @@ export function renderGrid(
   visible: boolean = true,
   color: string = 'rgba(255, 255, 255, 0.8)'
 ): void {
+  // Always fill background first
+  renderer.ctx.fillStyle = '#1a1a1a';
+  renderer.ctx.fillRect(0, 0, renderer.canvas.width, renderer.canvas.height);
+  
   if (!visible || type === 'none') {
-    // Fill with background color when grid is hidden
-    renderer.ctx.fillStyle = '#1a1a1a';
-    renderer.ctx.fillRect(0, 0, renderer.canvas.width, renderer.canvas.height);
+    // Update viewport even when not drawing grid
+    renderer.lastViewport = { ...viewport };
     return;
   }
   
-  // Only redraw if viewport changed significantly
-  if (!hasViewportChanged(renderer, viewport)) {
+  // Always redraw for hex grids to ensure they show, be more selective for square grids
+  const shouldRedraw = type === 'hex' || hasViewportChanged(renderer, viewport);
+  if (!shouldRedraw) {
     return;
   }
   

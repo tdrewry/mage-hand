@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text, Point } from 'fabric';
 import { Toolbar } from './Toolbar';
 import { TokenContextManager } from './TokenContextManager';
@@ -219,14 +219,14 @@ export const VirtualTabletop = () => {
   };
 
   // Update grid display using new efficient system
-  const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
+  const updateGridDisplay = useCallback((canvas: FabricCanvas, renderer: GridRenderer) => {
     if (!renderer) return;
     
     const viewport = getCurrentViewport(canvas);
     const gridColorWithOpacity = `rgba(${parseInt(gridColor.slice(1, 3), 16)}, ${parseInt(gridColor.slice(3, 5), 16)}, ${parseInt(gridColor.slice(5, 7), 16)}, ${gridOpacity / 100})`;
     
     renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, gridColorWithOpacity);
-  };
+  }, [gridType, gridSize, isGridVisible, gridColor, gridOpacity]);
 
   // Old grid functions removed - now using efficient grid system
 
