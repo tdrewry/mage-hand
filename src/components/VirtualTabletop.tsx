@@ -58,6 +58,24 @@ export const VirtualTabletop = () => {
     gridCanvas.width = viewportWidth;
     gridCanvas.height = viewportHeight;
     
+    // Set grid canvas background to match Fabric.js canvas and add test pattern
+    const gridCtx = gridCanvas.getContext('2d');
+    if (gridCtx) {
+      // Fill background
+      gridCtx.fillStyle = '#1a1a1a';
+      gridCtx.fillRect(0, 0, viewportWidth, viewportHeight);
+      
+      // Add simple test pattern to verify canvas is working
+      gridCtx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+      gridCtx.lineWidth = 2;
+      gridCtx.beginPath();
+      gridCtx.moveTo(0, 0);
+      gridCtx.lineTo(viewportWidth, viewportHeight);
+      gridCtx.moveTo(viewportWidth, 0);
+      gridCtx.lineTo(0, viewportHeight);
+      gridCtx.stroke();
+    }
+    
     const renderer = createGridRenderer(gridCanvas);
     if (!renderer) {
       console.error('Failed to create grid renderer');
@@ -216,7 +234,8 @@ export const VirtualTabletop = () => {
     if (!renderer) return;
     
     const viewport = getCurrentViewport(canvas);
-    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.2)');
+    console.log('Grid render viewport:', viewport); // Debug output
+    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.5)');
   };
 
   // Old grid functions removed - now using efficient grid system

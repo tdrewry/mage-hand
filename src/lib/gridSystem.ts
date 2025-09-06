@@ -64,8 +64,9 @@ export function renderSquareGrid(
 ): void {
   const { ctx, canvas } = renderer;
   
-  // Clear the canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Fill background first
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   if (size <= 0) return;
   
@@ -84,22 +85,22 @@ export function renderSquareGrid(
   
   // Set up drawing style
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1 / viewport.zoom; // Scale line width with zoom
-  ctx.globalAlpha = Math.min(1, viewport.zoom * 0.5 + 0.3); // Fade out when zoomed out
+  ctx.lineWidth = Math.max(1, 1 / viewport.zoom); // Ensure minimum line width
+  ctx.globalAlpha = Math.min(1, Math.max(0.3, viewport.zoom * 0.5 + 0.3)); // Better visibility
   
   // Begin path for all lines (much more efficient)
   ctx.beginPath();
   
   // Vertical lines
   for (let x = startX; x <= endX; x += size) {
-    const screenX = (x - viewport.x) * viewport.zoom;
+    const screenX = (x - viewport.x) * viewport.zoom + viewport.width / 2;
     ctx.moveTo(screenX, 0);
     ctx.lineTo(screenX, canvas.height);
   }
   
   // Horizontal lines  
   for (let y = startY; y <= endY; y += size) {
-    const screenY = (y - viewport.y) * viewport.zoom;
+    const screenY = (y - viewport.y) * viewport.zoom + viewport.height / 2;
     ctx.moveTo(0, screenY);
     ctx.lineTo(canvas.width, screenY);
   }
@@ -120,8 +121,9 @@ export function renderHexGrid(
 ): void {
   const { ctx, canvas } = renderer;
   
-  // Clear the canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Fill background first
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   if (size <= 0) return;
   
@@ -147,8 +149,8 @@ export function renderHexGrid(
   
   // Set up drawing style
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1 / viewport.zoom;
-  ctx.globalAlpha = Math.min(1, viewport.zoom * 0.5 + 0.3);
+  ctx.lineWidth = Math.max(1, 1 / viewport.zoom);
+  ctx.globalAlpha = Math.min(1, Math.max(0.3, viewport.zoom * 0.5 + 0.3));
   ctx.fillStyle = 'transparent';
   
   // Draw each hex
@@ -160,14 +162,14 @@ export function renderHexGrid(
     // Convert world coordinates to screen coordinates
     ctx.beginPath();
     const firstCorner = corners[0];
-    const screenX1 = (firstCorner.x + viewport.x) * viewport.zoom;
-    const screenY1 = (firstCorner.y + viewport.y) * viewport.zoom;
+    const screenX1 = (firstCorner.x - viewport.x) * viewport.zoom + viewport.width / 2;
+    const screenY1 = (firstCorner.y - viewport.y) * viewport.zoom + viewport.height / 2;
     ctx.moveTo(screenX1, screenY1);
     
     for (let i = 1; i < corners.length; i++) {
       const corner = corners[i];
-      const screenX = (corner.x + viewport.x) * viewport.zoom;
-      const screenY = (corner.y + viewport.y) * viewport.zoom;
+      const screenX = (corner.x - viewport.x) * viewport.zoom + viewport.width / 2;
+      const screenY = (corner.y - viewport.y) * viewport.zoom + viewport.height / 2;
       ctx.lineTo(screenX, screenY);
     }
     
@@ -202,10 +204,12 @@ export function renderGrid(
   size: number,
   viewport: Viewport,
   visible: boolean = true,
-  color: string = 'rgba(255, 255, 255, 0.2)'
+  color: string = 'rgba(255, 255, 255, 0.3)' // Increased opacity for better visibility
 ): void {
   if (!visible || type === 'none') {
-    renderer.ctx.clearRect(0, 0, renderer.canvas.width, renderer.canvas.height);
+    // Fill with background color when grid is hidden
+    renderer.ctx.fillStyle = '#1a1a1a';
+    renderer.ctx.fillRect(0, 0, renderer.canvas.width, renderer.canvas.height);
     return;
   }
   
