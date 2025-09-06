@@ -28,6 +28,8 @@ export const SimpleTabletop = () => {
   const [isDraggingToken, setIsDraggingToken] = useState(false);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [dragPath, setDragPath] = useState<{ x: number, y: number }[]>([]);
 
   const {
     sessionId,
@@ -162,7 +164,122 @@ export const SimpleTabletop = () => {
     });
   };
 
-  // Function to draw a single token
+  // Function to draw drag ghost and path
+  const drawDragGhostAndPath = (ctx: CanvasRenderingContext2D) => {
+    if (!draggedTokenId) return;
+    
+    const draggedToken = tokens.find(t => t.id === draggedTokenId);
+    if (!draggedToken) return;
+    
+    // Draw ghost token at original position
+    drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
+    
+    // Draw drag path
+    drawDragPath(ctx, draggedToken);
+  };
+
+  // Function to draw a ghost token (semi-transparent version)
+  const drawGhostToken = (ctx: CanvasRenderingContext2D, x: number, y: number, token: any) => {
+    const tokenSize = 40;
+    
+    // Save context to restore alpha
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    
+    // Draw ghost token circle
+    ctx.fillStyle = token.color || '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x, y, tokenSize / 2, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Draw ghost border
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]); // Dashed border
+    ctx.stroke();
+    ctx.setLineDash([]); // Reset line dash
+    
+    // Draw ghost label
+    if (token.label) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${12 / transform.zoom}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(token.label, x, y);
+    }
+    
+    ctx.restore();
+  };
+
+  // Function to draw drag path
+  const drawDragPath = (ctx: CanvasRenderingContext2D, token: any) => {
+    // For free movement: draw straight line from start to current position
+    // TODO: For grid movement, this will use grid-based pathfinding algorithms
+    
+    ctx.save();
+    
+    // Draw path line
+    ctx.strokeStyle = token.color || '#ffffff';
+    ctx.lineWidth = 3 / transform.zoom;
+    ctx.globalAlpha = 0.6;
+    
+    // Simple straight line for free movement
+    ctx.beginPath();
+    ctx.moveTo(dragStartPos.x, dragStartPos.y);
+    ctx.lineTo(token.x, token.y);
+    ctx.stroke();
+    
+    // Draw path points if we have a detailed path
+    if (dragPath.length > 1) {
+      ctx.fillStyle = token.color || '#ffffff';
+      ctx.globalAlpha = 0.4;
+      
+      dragPath.forEach((point, index) => {
+        if (index === 0 || index === dragPath.length - 1) return; // Skip start and end
+        
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 2 / transform.zoom, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+    
+    // Draw direction arrow at current position
+    drawDirectionArrow(ctx, dragStartPos, { x: token.x, y: token.y }, token.color || '#ffffff');
+    
+    ctx.restore();
+  };
+
+  // Function to draw direction arrow
+  const drawDirectionArrow = (ctx: CanvasRenderingContext2D, from: { x: number, y: number }, to: { x: number, y: number }, color: string) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < 10) return; // Too close to draw arrow
+    
+    const angle = Math.atan2(dy, dx);
+    const arrowLength = 15 / transform.zoom;
+    const arrowAngle = Math.PI / 6; // 30 degrees
+    
+    ctx.save();
+    ctx.translate(to.x, to.y);
+    ctx.rotate(angle);
+    
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.globalAlpha = 0.8;
+    
+    // Draw arrow head
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-arrowLength, -arrowLength * Math.tan(arrowAngle));
+    ctx.lineTo(-arrowLength, arrowLength * Math.tan(arrowAngle));
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+  };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const tokenSize = 40;
     const isSelected = selectedTokenIds.includes(token.id);
@@ -408,6 +525,10 @@ export const SimpleTabletop = () => {
           y: worldPos.y - clickedToken.y
         });
         
+        // Store original position for ghost and path
+        setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
+        setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+        
         // If token not selected, select it
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
@@ -443,6 +564,13 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
       
+      // Add point to drag path (sample every few pixels for smoother path)
+      const lastPoint = dragPath[dragPath.length - 1];
+      const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
+      if (distance > 10) { // Sample every 10 world units
+        setDragPath(prev => [...prev, { x: newX, y: newY }]);
+      }
+      
       // Update token position in store
       updateTokenPosition(draggedTokenId, newX, newY);
       
@@ -458,6 +586,8 @@ export const SimpleTabletop = () => {
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
+      setDragStartPos({ x: 0, y: 0 });
+      setDragPath([]);
     }
   };
 
