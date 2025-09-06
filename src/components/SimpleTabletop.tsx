@@ -1,30 +1,31 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Toolbar } from './Toolbar';
-import { MapManager } from './MapManager';
-import { FloatingMenu } from './FloatingMenu';
-import { TokenContextManager } from './TokenContextManager';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { createGridRenderer, renderGrid, GridType } from '../lib/gridSystem';
+import { renderMapGrids } from '../lib/mapGridSystem';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Plus, Map } from 'lucide-react';
 
-export const SimpleTabletop = () => {
+interface SimpleTabletopProps {
+  onOpenTokenPanel: () => void;
+  onOpenMapControls: () => void;
+  onOpenBackgroundGrid: () => void;
+  onOpenGridControls: () => void;
+  onOpenVisibilityModal: () => void;
+  onOpenLayerStack: () => void;
+}
+
+export const SimpleTabletop: React.FC<SimpleTabletopProps> = ({
+  onOpenTokenPanel,
+  onOpenMapControls,
+  onOpenBackgroundGrid,
+  onOpenGridControls,
+  onOpenVisibilityModal,
+  onOpenLayerStack,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [showMapManager, setShowMapManager] = useState(false);
-  
-  // Pan and zoom state
-  const [transform, setTransform] = useState({
-    x: 0,
-    y: 0,
-    zoom: 1
-  });
-  
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
-  
-  // Token interaction state
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
@@ -45,28 +46,7 @@ export const SimpleTabletop = () => {
     gridSize: number;
   }
   
-  const { maps, getVisibleMaps, getActiveRegionAt, addRegion: storeAddRegion, updateRegion: storeUpdateRegion, removeRegion: storeRemoveRegion, selectedMapId } = useMapStore();
-
-  // Get regions from the selected map
-  const currentMapId = selectedMapId || 'default-map';
-  const currentMap = maps.find(m => m.id === currentMapId);
-  // Helper function to convert GridRegion to Region for compatibility
-  const convertToLocalRegion = (gridRegion: any): Region => {
-    return {
-      id: gridRegion.id,
-      x: gridRegion.bounds.x,
-      y: gridRegion.bounds.y,
-      width: gridRegion.bounds.width,
-      height: gridRegion.bounds.height,
-      selected: selectedRegionId === gridRegion.id,
-      color: gridRegion.gridColor,
-      gridType: gridRegion.gridType === 'none' ? 'default' : gridRegion.gridType,
-      gridSize: gridRegion.gridSize
-    };
-  };
-
-  // Convert regions for local use
-  const localRegions = regions.map(convertToLocalRegion);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
@@ -85,7 +65,7 @@ export const SimpleTabletop = () => {
     currentPlayerId,
   } = useSessionStore();
 
-  const { maps, getVisibleMaps, getActiveRegionAt, addRegion, updateRegion, removeRegion, selectedMapId } = useMapStore();
+  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -103,30 +83,26 @@ export const SimpleTabletop = () => {
     };
   };
 
-  // Hit test for tokens
-  const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
-    const tokenSize = 20; // Half of token diameter (40)
-    
-    // Check tokens in reverse order (top to bottom)
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      const token = tokens[i];
-      const distance = Math.sqrt(
-        Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
-      );
-      
-      if (distance <= tokenSize) {
-        return token;
-      }
-    }
-    
-    return null;
-  };
+  const [transform, setTransform] = useState({
+    x: 400,
+    y: 300,
+    zoom: 1
+  });
 
-  // Hit test for regions
-  const getRegionAtPosition = (worldX: number, worldY: number): Region | null => {
-    // Check regions in reverse order (top to bottom)
-    for (let i = localRegions.length - 1; i >= 0; i--) {
-      const region = localRegions[i];
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+
+  // Grid settings
+  const [gridType, setGridType] = useState<GridType>('square');
+  const [gridSize, setGridSize] = useState(40);
+  const [gridVisible, setGridVisible] = useState(true);
+
+  // Get the clicked region
+  const getClickedRegion = (worldX: number, worldY: number): Region | null => {
+    // Check from top to bottom (reverse order for proper layering)
+    for (let i = regions.length - 1; i >= 0; i--) {
+      const region = regions[i];
       if (worldX >= region.x && worldX <= region.x + region.width &&
           worldY >= region.y && worldY <= region.y + region.height) {
         return region;
@@ -148,107 +124,99 @@ export const SimpleTabletop = () => {
     
     // Check edge handles
     if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'n';
-    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'e';
     if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 's';
     if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'w';
+    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'e';
     
     return null;
   };
-  const redrawCanvas = () => {
-    if (!canvasRef.current) return;
-    
+
+  // Get the clicked token
+  const getClickedToken = (worldX: number, worldY: number) => {
+    const tokenSize = 40;
+    return tokens.find(token => {
+      const dx = worldX - token.x;
+      const dy = worldY - token.y;
+      return Math.sqrt(dx * dx + dy * dy) <= tokenSize / 2;
+    });
+  };
+
+  // Function to redraw canvas
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Save context
+
+    // Save context for transformations
     ctx.save();
-    
-    // Apply transform
+
+    // Apply pan and zoom transformations
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.zoom, transform.zoom);
-    
-    // Draw dark background
-    const viewWidth = canvas.width / transform.zoom;
-    const viewHeight = canvas.height / transform.zoom;
-    const viewX = -transform.x / transform.zoom;
-    const viewY = -transform.y / transform.zoom;
-    
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
-    
-    // Draw grid
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1 / transform.zoom; // Keep line width consistent
-    
-    const gridSize = 40;
-    const startX = Math.floor((viewX - 1000) / gridSize) * gridSize;
-    const endX = Math.ceil((viewX + viewWidth + 1000) / gridSize) * gridSize;
-    const startY = Math.floor((viewY - 1000) / gridSize) * gridSize;
-    const endY = Math.ceil((viewY + viewHeight + 1000) / gridSize) * gridSize;
-    
-    // Vertical lines
-    for (let x = startX; x <= endX; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-      ctx.stroke();
-    }
-    
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-      ctx.stroke();
-    }
-    
-    // Draw tokens that are in viewport
-    const visibleTokens: any[] = [];
-    const offScreenTokens: any[] = [];
-    
-    tokens.forEach(token => {
-      const tokenSize = 40; // Default token size
-      const tokenLeft = token.x - tokenSize / 2;
-      const tokenRight = token.x + tokenSize / 2;
-      const tokenTop = token.y - tokenSize / 2;
-      const tokenBottom = token.y + tokenSize / 2;
-      
-      // Check if token is in viewport
-      if (tokenRight >= viewX && tokenLeft <= viewX + viewWidth &&
-          tokenBottom >= viewY && tokenTop <= viewY + viewHeight) {
-        visibleTokens.push(token);
-      } else {
-        offScreenTokens.push(token);
+
+    // Draw grid if visible
+    if (gridVisible) {
+      const renderer = createGridRenderer(canvas);
+      if (renderer) {
+        const viewport = {
+          x: -transform.x / transform.zoom,
+          y: -transform.y / transform.zoom,
+          zoom: transform.zoom,
+          width: canvas.width / transform.zoom,
+          height: canvas.height / transform.zoom
+        };
+
+        // Render main grid
+        renderGrid(renderer, gridType, gridSize, viewport, gridVisible);
+        
+        // Render map-based grids
+        const visibleMaps = getVisibleMaps();
+        renderMapGrids(renderer, visibleMaps, viewport);
       }
-    });
-    
+    }
+
+    // Restore context for UI elements that should not be transformed
+    ctx.restore();
+
+    // Apply transformation again for game objects
+    ctx.save();
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.zoom, transform.zoom);
+
     // Draw regions
-    regions.forEach(region => {
-      drawRegion(ctx, region);
-    });
-    
-    // Draw visible tokens
-    visibleTokens.forEach(token => {
+    drawRegions(ctx);
+
+    // Draw tokens
+    tokens.forEach(token => {
       drawToken(ctx, token);
     });
-    
-    // Draw ghost token and drag path if dragging
-    if (isDraggingToken && draggedTokenId) {
-      drawDragGhostAndPath(ctx);
-    }
-    
-    // Restore context before drawing off-screen indicators
+
+    // Draw drag ghost and path
+    drawDragGhostAndPath(ctx);
+
+    // Restore context
     ctx.restore();
-    
-    // Draw off-screen token indicators
+
+    // Draw off-screen indicators (in screen space)
+    const viewX = -transform.x / transform.zoom;
+    const viewY = -transform.y / transform.zoom;
+    const viewWidth = canvas.width / transform.zoom;
+    const viewHeight = canvas.height / transform.zoom;
+
+    const offScreenTokens = tokens.filter(token => 
+      token.x < viewX || token.x > viewX + viewWidth ||
+      token.y < viewY || token.y > viewY + viewHeight
+    );
+
     offScreenTokens.forEach(token => {
       drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
     });
-  };
+  }, [transform, tokens, regions, selectedTokenIds, draggedTokenId, dragPath, gridType, gridSize, gridVisible, isDraggingToken, getVisibleMaps]);
 
   // Function to draw drag ghost and path
   const drawDragGhostAndPath = (ctx: CanvasRenderingContext2D) => {
@@ -258,40 +226,21 @@ export const SimpleTabletop = () => {
     if (!draggedToken) return;
     
     // Draw ghost token at original position
-    drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
-    
-    // Draw drag path
-    drawDragPath(ctx, draggedToken);
-  };
-
-  // Function to draw a ghost token (semi-transparent version)
-  const drawGhostToken = (ctx: CanvasRenderingContext2D, x: number, y: number, token: any) => {
-    const tokenSize = 40;
-    
-    // Save context to restore alpha
     ctx.save();
     ctx.globalAlpha = 0.3;
     
-    // Draw ghost token circle
-    ctx.fillStyle = token.color || '#ffffff';
+    // Draw original position with dashed circle
+    ctx.strokeStyle = draggedToken.color || '#ffffff';
+    ctx.lineWidth = 3 / transform.zoom;
+    ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.arc(x, y, tokenSize / 2, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Draw ghost border
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2 / transform.zoom;
-    ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]); // Dashed border
+    ctx.arc(dragStartPos.x, dragStartPos.y, 20, 0, 2 * Math.PI);
     ctx.stroke();
-    ctx.setLineDash([]); // Reset line dash
+    ctx.setLineDash([]);
     
-    // Draw ghost label
-    if (token.label) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `${12 / transform.zoom}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(token.label, x, y);
+    // Draw movement path if it exists
+    if (dragPath.length > 1) {
+      drawDragPath(ctx, draggedToken);
     }
     
     ctx.restore();
@@ -305,57 +254,26 @@ export const SimpleTabletop = () => {
     const gridSize = 40; // Grid unit size in pixels
     
     ctx.save();
-    
-    // Calculate distance in grid units
-    const dx = token.x - dragStartPos.x;
-    const dy = token.y - dragStartPos.y;
-    const distancePixels = Math.sqrt(dx * dx + dy * dy);
-    const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
-    
-    // Draw path line
     ctx.strokeStyle = token.color || '#ffffff';
-    ctx.lineWidth = 3 / transform.zoom;
-    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.globalAlpha = 0.8;
     
-    // Simple straight line for free movement
-    ctx.beginPath();
-    ctx.moveTo(dragStartPos.x, dragStartPos.y);
-    ctx.lineTo(token.x, token.y);
-    ctx.stroke();
-    
-    // Draw distance text at midpoint of line
-    if (distancePixels > 10) { // Only show if line is long enough
-      const midX = (dragStartPos.x + token.x) / 2;
-      const midY = (dragStartPos.y + token.y) / 2;
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.globalAlpha = 0.9;
-      ctx.font = `${14 / transform.zoom}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      // Add background to text for better readability
-      const textMetrics = ctx.measureText(`${distanceGridUnits} units`);
-      const textWidth = textMetrics.width;
-      const textHeight = 14 / transform.zoom;
-      
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(midX - textWidth / 2 - 4 / transform.zoom, midY - textHeight / 2, textWidth + 8 / transform.zoom, textHeight);
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${distanceGridUnits} units`, midX, midY);
-    }
-    
-    // Draw path points if we have a detailed path
     if (dragPath.length > 1) {
-      ctx.fillStyle = token.color || '#ffffff';
-      ctx.globalAlpha = 0.4;
+      // Draw path line
+      ctx.beginPath();
+      ctx.moveTo(dragPath[0].x, dragPath[0].y);
       
-      // Calculate total path distance
+      for (let i = 1; i < dragPath.length; i++) {
+        ctx.lineTo(dragPath[i].x, dragPath[i].y);
+      }
+      
+      ctx.stroke();
+      
+      // Calculate path distance
       let pathDistance = 0;
       for (let i = 1; i < dragPath.length; i++) {
-        const dx = dragPath[i].x - dragPath[i - 1].x;
-        const dy = dragPath[i].y - dragPath[i - 1].y;
+        const dx = dragPath[i].x - dragPath[i-1].x;
+        const dy = dragPath[i].y - dragPath[i-1].y;
         pathDistance += Math.sqrt(dx * dx + dy * dy);
       }
       const pathDistanceGridUnits = (pathDistance / gridSize).toFixed(2);
@@ -369,208 +287,43 @@ export const SimpleTabletop = () => {
         ctx.fill();
       });
       
-      // Draw path distance text near the end of the path
-      if (dragPath.length > 2 && pathDistance > 10) {
-        const endPoint = dragPath[dragPath.length - 1];
-        const secondLastPoint = dragPath[dragPath.length - 2];
-        
-        // Position text farther offset from the end point to avoid token overlap
-        const offsetX = 40 / transform.zoom;
-        const offsetY = -40 / transform.zoom;
-        const textX = endPoint.x + offsetX;
-        const textY = endPoint.y + offsetY;
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 0.9;
-        ctx.font = `${12 / transform.zoom}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Add background to text for better readability
-        const pathText = `Path: ${pathDistanceGridUnits}`;
-        const textMetrics = ctx.measureText(pathText);
-        const textWidth = textMetrics.width;
-        const textHeight = 12 / transform.zoom;
-        
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(textX - textWidth / 2 - 3 / transform.zoom, textY - textHeight / 2, textWidth + 6 / transform.zoom, textHeight);
-        
-        ctx.fillStyle = token.color || '#ffffff';
-        ctx.fillText(pathText, textX, textY);
-      }
+      // Draw distance label at current position
+      const currentPos = dragPath[dragPath.length - 1];
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1 / transform.zoom;
+      ctx.font = `${12 / transform.zoom}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      const text = `${pathDistanceGridUnits} units`;
+      ctx.strokeText(text, currentPos.x, currentPos.y - 25 / transform.zoom);
+      ctx.fillText(text, currentPos.x, currentPos.y - 25 / transform.zoom);
     }
-    
-    // Draw direction arrow at current position
-    drawDirectionArrow(ctx, dragStartPos, { x: token.x, y: token.y }, token.color || '#ffffff');
-    
-    ctx.restore();
-  };
-
-  // Function to draw direction arrow
-  const drawDirectionArrow = (ctx: CanvasRenderingContext2D, from: { x: number, y: number }, to: { x: number, y: number }, color: string) => {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance < 10) return; // Too close to draw arrow
-    
-    const angle = Math.atan2(dy, dx);
-    const arrowLength = 15 / transform.zoom;
-    const arrowAngle = Math.PI / 6; // 30 degrees
-    
-    ctx.save();
-    ctx.translate(to.x, to.y);
-    ctx.rotate(angle);
-    
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = 2 / transform.zoom;
-    ctx.globalAlpha = 0.8;
-    
-    // Draw arrow head
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-arrowLength, -arrowLength * Math.tan(arrowAngle));
-    ctx.lineTo(-arrowLength, arrowLength * Math.tan(arrowAngle));
-    ctx.closePath();
-    ctx.fill();
     
     ctx.restore();
   };
 
   // Function to draw regions
-  const drawRegion = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const isSelected = region.selected;
-    
-    // Draw region background
-    ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
-    ctx.fillRect(region.x, region.y, region.width, region.height);
-    
-    // Draw region-specific grid
-    if (region.gridType !== 'default') {
-      drawRegionGrid(ctx, region);
-    }
-    
-    // Draw region border
-    ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
-    ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
-    ctx.strokeRect(region.x, region.y, region.width, region.height);
-    
-    // Draw selection handles if selected
-    if (isSelected) {
-      drawRegionHandles(ctx, region);
-    }
-    
-    // Draw grid type label
-    if (region.gridType !== 'default') {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `${10 / transform.zoom}px Arial`;
+  const drawRegions = (ctx: CanvasRenderingContext2D) => {
+    regions.forEach(region => {
+      // Draw region boundary
+      ctx.strokeStyle = region.selected ? '#22c55e' : '#4f46e5';
+      ctx.lineWidth = (region.selected ? 3 : 2) / transform.zoom;
+      ctx.strokeRect(region.x, region.y, region.width, region.height);
+      
+      // Draw region handles if selected
+      if (region.selected) {
+        drawRegionHandles(ctx, region);
+      }
+      
+      // Draw region label
+      ctx.fillStyle = '#4f46e5';
+      ctx.font = `${14 / transform.zoom}px Arial`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      ctx.fillText(
-        region.gridType.toUpperCase(), 
-        region.x + 4 / transform.zoom, 
-        region.y + 4 / transform.zoom
-      );
-    }
-  };
-
-  // Function to draw grid within a region
-  const drawRegionGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
-    ctx.save();
-    
-    // Clip to region bounds
-    ctx.beginPath();
-    ctx.rect(region.x, region.y, region.width, region.height);
-    ctx.clip();
-    
-    ctx.strokeStyle = region.gridType === 'square' ? '#4f46e5' : '#06b6d4';
-    ctx.lineWidth = 1 / transform.zoom;
-    ctx.globalAlpha = 0.6;
-    
-    if (region.gridType === 'square') {
-      drawSquareGrid(ctx, region);
-    } else if (region.gridType === 'hex') {
-      drawHexGrid(ctx, region);
-    }
-    
-    ctx.restore();
-  };
-
-  // Function to draw square grid within region
-  const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const gridSize = region.gridSize;
-    const startX = Math.ceil(region.x / gridSize) * gridSize;
-    const endX = region.x + region.width;
-    const startY = Math.ceil(region.y / gridSize) * gridSize;
-    const endY = region.y + region.height;
-    
-    // Vertical lines
-    for (let x = startX; x <= endX; x += gridSize) {
-      if (x > region.x && x < region.x + region.width) {
-        ctx.beginPath();
-        ctx.moveTo(x, region.y);
-        ctx.lineTo(x, region.y + region.height);
-        ctx.stroke();
-      }
-    }
-    
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      if (y > region.y && y < region.y + region.height) {
-        ctx.beginPath();
-        ctx.moveTo(region.x, y);
-        ctx.lineTo(region.x + region.width, y);
-        ctx.stroke();
-      }
-    }
-  };
-
-  // Function to draw hex grid within region
-  const drawHexGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const hexRadius = region.gridSize / 2;
-    const hexWidth = hexRadius * 2;
-    const hexHeight = hexRadius * Math.sqrt(3);
-    
-    // Calculate number of hexes that fit
-    const cols = Math.ceil(region.width / (hexWidth * 0.75)) + 1;
-    const rows = Math.ceil(region.height / hexHeight) + 1;
-    
-    // Starting position aligned to region
-    const startX = region.x;
-    const startY = region.y;
-    
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        // Calculate hex center position
-        const hexX = startX + col * (hexWidth * 0.75) + hexRadius;
-        const hexY = startY + row * hexHeight + hexRadius + (col % 2) * (hexHeight / 2);
-        
-        // Only draw if hex center is within or near region bounds
-        if (hexX >= region.x - hexRadius && hexX <= region.x + region.width + hexRadius &&
-            hexY >= region.y - hexRadius && hexY <= region.y + region.height + hexRadius) {
-          drawHexagon(ctx, hexX, hexY, hexRadius);
-        }
-      }
-    }
-  };
-
-  // Function to draw a single hexagon (flat-top orientation)
-  const drawHexagon = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number) => {
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      // Flat-top hexagon: start at right point and go clockwise
-      const angle = (i * Math.PI) / 3;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.closePath();
-    ctx.stroke();
+      ctx.fillText(`${region.gridType} (${region.gridSize}px)`, region.x + 5, region.y - 20 / transform.zoom);
+    });
   };
 
   // Function to draw region resize handles
@@ -580,44 +333,35 @@ export const SimpleTabletop = () => {
     
     ctx.fillStyle = '#4f46e5';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1 / transform.zoom;
+    ctx.lineWidth = 2 / transform.zoom;
     
     // Corner handles
-    const corners = [
-      { x: x, y: y }, // nw
-      { x: x + width, y: y }, // ne
-      { x: x, y: y + height }, // sw
-      { x: x + width, y: y + height }, // se
+    const handles = [
+      { x: x, y: y }, // top-left
+      { x: x + width, y: y }, // top-right
+      { x: x, y: y + height }, // bottom-left
+      { x: x + width, y: y + height }, // bottom-right
+      { x: x + width/2, y: y }, // top-center
+      { x: x + width/2, y: y + height }, // bottom-center
+      { x: x, y: y + height/2 }, // left-center
+      { x: x + width, y: y + height/2 }, // right-center
     ];
     
-    // Edge handles
-    const edges = [
-      { x: x + width/2, y: y }, // n
-      { x: x + width, y: y + height/2 }, // e
-      { x: x + width/2, y: y + height }, // s
-      { x: x, y: y + height/2 }, // w
-    ];
-    
-    [...corners, ...edges].forEach(handle => {
+    handles.forEach(handle => {
       ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
       ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
     });
   };
 
-  // Function to add a new region
-  const addRegion = () => {
-    const regionId = `region-${Date.now()}`;
-    const centerX = -transform.x / transform.zoom;
-    const centerY = -transform.y / transform.zoom;
-    
+  const addNewRegion = (x: number, y: number, width: number = 200, height: number = 200) => {
     const newRegion: Region = {
-      id: regionId,
-      x: centerX - 10, // 20 units wide
-      y: centerY - 20, // 40 units tall
-      width: 20,
-      height: 40,
+      id: `region_${Date.now()}`,
+      x,
+      y,
+      width,
+      height,
       selected: false,
-      color: 'rgba(100, 150, 200, 0.3)',
+      color: '#4f46e5',
       gridType: 'default',
       gridSize: 40  // Match main canvas grid size
     };
@@ -669,72 +413,55 @@ export const SimpleTabletop = () => {
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
-    const margin = 10; // Distance from edge
-    const indicatorSize = 8;
-    const indicatorLength = 20;
-    
-    // Transform token position to screen coordinates
-    const tokenScreenX = token.x * transform.zoom + transform.x;
-    const tokenScreenY = token.y * transform.zoom + transform.y;
-    
-    // Calculate center of viewport
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    
-    // Calculate direction vector from viewport center to token
-    const dirX = tokenScreenX - centerX;
-    const dirY = tokenScreenY - centerY;
-    const distance = Math.sqrt(dirX * dirX + dirY * dirY);
+
+    // Calculate the direction from viewport center to token
+    const viewCenterX = viewX + viewWidth / 2;
+    const viewCenterY = viewY + viewHeight / 2;
+    const dx = token.x - viewCenterX;
+    const dy = token.y - viewCenterY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance === 0) return;
     
     // Normalize direction
-    const normalizedX = dirX / distance;
-    const normalizedY = dirY / distance;
+    const dirX = dx / distance;
+    const dirY = dy / distance;
     
     // Find intersection with viewport edge
+    const margin = 20; // Distance from edge
     let edgeX, edgeY;
     
-    // Calculate intersection with viewport boundaries
-    const leftDist = Math.abs(centerX - margin) / Math.abs(normalizedX);
-    const rightDist = Math.abs(canvas.width - centerX - margin) / Math.abs(normalizedX);
-    const topDist = Math.abs(centerY - margin) / Math.abs(normalizedY);
-    const bottomDist = Math.abs(canvas.height - centerY - margin) / Math.abs(normalizedY);
+    // Calculate intersection with viewport rectangle
+    const t1 = (viewX + margin - viewCenterX) / dirX;
+    const t2 = (viewX + viewWidth - margin - viewCenterX) / dirX;
+    const t3 = (viewY + margin - viewCenterY) / dirY;
+    const t4 = (viewY + viewHeight - margin - viewCenterY) / dirY;
     
-    const minDist = Math.min(
-      normalizedX < 0 ? leftDist : rightDist,
-      normalizedY < 0 ? topDist : bottomDist
-    );
+    const validTs = [t1, t2, t3, t4].filter(t => t > 0);
+    const minT = Math.min(...validTs);
     
-    edgeX = centerX + normalizedX * minDist;
-    edgeY = centerY + normalizedY * minDist;
+    edgeX = viewCenterX + dirX * minT;
+    edgeY = viewCenterY + dirY * minT;
     
-    // Clamp to viewport bounds
-    edgeX = Math.max(margin, Math.min(canvas.width - margin, edgeX));
-    edgeY = Math.max(margin, Math.min(canvas.height - margin, edgeY));
+    // Convert to screen coordinates
+    const screenPos = worldToScreen(edgeX, edgeY);
     
-    // Draw indicator rectangle
+    // Draw indicator
+    ctx.save();
     ctx.fillStyle = token.color || '#ffffff';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     
-    // Calculate angle for pointing
-    const angle = Math.atan2(normalizedY, normalizedX);
+    // Draw arrow pointing towards the token
+    const arrowSize = 8;
+    ctx.translate(screenPos.x, screenPos.y);
+    ctx.rotate(Math.atan2(dy, dx));
     
-    ctx.save();
-    ctx.translate(edgeX, edgeY);
-    ctx.rotate(angle);
-    
-    // Draw pointing rectangle
-    ctx.fillRect(-indicatorLength / 2, -indicatorSize / 2, indicatorLength, indicatorSize);
-    ctx.strokeRect(-indicatorLength / 2, -indicatorSize / 2, indicatorLength, indicatorSize);
-    
-    // Draw arrow tip
     ctx.beginPath();
-    ctx.moveTo(indicatorLength / 2, 0);
-    ctx.lineTo(indicatorLength / 2 + 6, -4);
-    ctx.lineTo(indicatorLength / 2 + 6, 4);
+    ctx.moveTo(arrowSize, 0);
+    ctx.lineTo(-arrowSize, -arrowSize);
+    ctx.lineTo(-arrowSize/2, 0);
+    ctx.lineTo(-arrowSize, arrowSize);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -742,139 +469,49 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 80;
-
-    // Initial draw
-    redrawCanvas();
-
-    toast.success('Pan/Zoom Tabletop Ready! Controls: Left-click=select, Shift+click=add token, Right-click=pan, Scroll=zoom, Right-click token=menu');
-
-    const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight - 80;
-      redrawCanvas();
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  // Redraw when transform, tokens, or regions change
-  useEffect(() => {
-    redrawCanvas();
-  }, [transform, tokens, regions]);
-
-  // Add click handler to place tokens or select them
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button === 0 && !isPanning && !isDraggingToken) { // Left click and not panning/dragging
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      
-      // Convert screen coordinates to world coordinates
-      const worldPos = screenToWorld(clickX, clickY);
-      
-      // Check if we clicked on a token first (tokens are on top)
-      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-      
-      if (clickedToken) {
-        // Token selection logic
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl+click: toggle selection
-          setSelectedTokenIds(prev => 
-            prev.includes(clickedToken.id)
-              ? prev.filter(id => id !== clickedToken.id)
-              : [...prev, clickedToken.id]
-          );
-        } else {
-          // Normal click: select only this token
-          setSelectedTokenIds([clickedToken.id]);
-        }
-      } else if (clickedRegion) {
-        // Region selection logic
-        setRegions(prev => prev.map(r => ({ ...r, selected: r.id === clickedRegion.id })));
-        setSelectedRegionId(clickedRegion.id);
-        setSelectedTokenIds([]); // Deselect tokens when selecting region
-      } else {
-        // Clicked on empty space: deselect all or add token
-        if (e.shiftKey) {
-          // Shift+click: add token at clicked position
-          addTokenToCanvas('', worldPos.x, worldPos.y);
-        } else {
-          // Normal click: deselect all
-          setSelectedTokenIds([]);
-          setRegions(prev => prev.map(r => ({ ...r, selected: false })));
-          setSelectedRegionId(null);
-        }
-      }
-    }
+  // Handle region updates
+  const updateRegion = (id: string, updates: Partial<Region>) => {
+    setRegions(prev => prev.map(region => 
+      region.id === id ? { ...region, ...updates } : region
+    ));
   };
 
-  // Handle right-click context menu for tokens and regions
-  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const selectRegion = (id: string | null) => {
+    setRegions(prev => prev.map(region => ({
+      ...region,
+      selected: region.id === id
+    })));
+    setSelectedRegionId(id);
+  };
+
+  // Right-click context menu for regions
+  const showRegionContextMenu = (e: React.MouseEvent, region: Region) => {
     e.preventDefault();
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    
-    // Convert screen coordinates to world coordinates
-    const worldPos = screenToWorld(clickX, clickY);
-    
-    // Check if we right-clicked on a token first (tokens are on top)
-    const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-    const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-    
-    if (clickedToken) {
-      // Dispatch custom event for TokenContextManager
-      const event = new CustomEvent('showTokenContextMenu', {
-        detail: {
-          tokenId: clickedToken.id,
-          x: e.clientX,
-          y: e.clientY
-        }
-      });
-      window.dispatchEvent(event);
-    } else if (clickedRegion) {
-      // Show region context menu
-      showRegionContextMenu(e.clientX, e.clientY, clickedRegion);
-    }
-  };
-
-  // Function to show region context menu
-  const showRegionContextMenu = (x: number, y: number, region: Region) => {
-    // Remove any existing context menu
-    const existingMenu = document.querySelector('.region-context-menu');
-    if (existingMenu) {
-      document.body.removeChild(existingMenu);
-    }
-    
+    // Create context menu
     const menu = document.createElement('div');
-    menu.className = 'region-context-menu fixed z-50 bg-popover border border-border rounded-md shadow-lg p-1';
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
+    menu.className = 'fixed bg-background border border-border rounded-md shadow-lg z-50 py-2';
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    
+    const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'default') => {
+      setRegions(prev => prev.map(region => 
+        region.id === regionId ? { ...region, gridType } : region
+      ));
+      toast.success(`Grid type set to ${gridType}`);
+    };
+
+    const deleteRegion = (regionId: string) => {
+      setRegions(prev => prev.filter(region => region.id !== regionId));
+      toast.success('Region deleted');
+    };
     
     const menuItems = [
       { 
-        label: 'No Grid', 
+        label: 'Default Grid', 
         icon: '📐', 
-        action: () => setRegionGridType(region.id, 'none'),
-        active: region.gridType === 'none'
+        action: () => setRegionGridType(region.id, 'default'),
+        active: region.gridType === 'default'
       },
       { 
         label: 'Square Grid', 
@@ -919,84 +556,122 @@ export const SimpleTabletop = () => {
       }
     };
     
-    setTimeout(() => {
-      document.addEventListener('click', removeMenu);
-    }, 100);
+    setTimeout(() => document.addEventListener('click', removeMenu), 0);
   };
 
-  // Function to set region grid type
-  const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'default') => {
-    setRegions(prev => prev.map(region => 
-      region.id === regionId 
-        ? { ...region, gridType }
-        : region
-    ));
-    toast.success(`Region grid set to ${gridType}`);
-  };
+  // Handle canvas resize
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // Function to delete region
-  const deleteRegion = (regionId: string) => {
-    setRegions(prev => prev.filter(region => region.id !== regionId));
-    if (selectedRegionId === regionId) {
-      setSelectedRegionId(null);
-    }
-    toast.success('Region deleted');
-  };
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      redrawCanvas();
+    };
 
-  // Mouse event handlers
+    // Initial size
+    resizeCanvas();
+
+    // Listen for resize events
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(canvas);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [redrawCanvas]);
+
+  // Redraw when dependencies change
+  useEffect(() => {
+    redrawCanvas();
+  }, [redrawCanvas]);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const worldPos = screenToWorld(mouseX, mouseY);
-    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const worldPos = screenToWorld(x, y);
+
     if (e.button === 2) { // Right click
-      e.preventDefault();
       setIsPanning(true);
-      setLastPanPoint({ x: e.clientX, y: e.clientY });
+      setPanStart({ x: e.clientX, y: e.clientY });
+      setLastPanPoint({ x: transform.x, y: transform.y });
     } else if (e.button === 0) { // Left click
-      // Check what we're clicking on for dragging (tokens first, then regions)
-      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+      // Check for region interactions first
+      const clickedRegion = getClickedRegion(worldPos.x, worldPos.y);
+      
+      if (clickedRegion) {
+        // Check for resize handles
+        if (clickedRegion.selected) {
+          const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
+          if (handle) {
+            setIsResizingRegion(true);
+            setResizeHandle(handle);
+            setDraggedRegionId(clickedRegion.id);
+            return;
+          }
+        }
+        
+        // Select region and potentially start dragging
+        selectRegion(clickedRegion.id);
+        setIsDraggingRegion(true);
+        setDraggedRegionId(clickedRegion.id);
+        setRegionDragOffset({
+          x: worldPos.x - clickedRegion.x,
+          y: worldPos.y - clickedRegion.y
+        });
+        return;
+      } else {
+        // Deselect regions if clicking empty space
+        selectRegion(null);
+      }
+
+      // Check for token interactions
+      const clickedToken = getClickedToken(worldPos.x, worldPos.y);
       
       if (clickedToken) {
-        setIsDraggingToken(true);
-        setDraggedTokenId(clickedToken.id);
-        setDragOffset({
-          x: worldPos.x - clickedToken.x,
-          y: worldPos.y - clickedToken.y
-        });
-        
-        // Store original position for ghost and path
-        setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
-        setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
-        
-        // If token not selected, select it
-        if (!selectedTokenIds.includes(clickedToken.id)) {
-          setSelectedTokenIds([clickedToken.id]);
-        }
-      } else if (clickedRegion && clickedRegion.selected) {
-        // Check if we're clicking on a resize handle
-        const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
-        
-        if (handle) {
-          setIsResizingRegion(true);
-          setResizeHandle(handle);
-          setDraggedRegionId(clickedRegion.id);
+        // Token interaction
+        if (e.ctrlKey || e.metaKey) {
+          // Multi-select
+          setSelectedTokenIds(prev => 
+            prev.includes(clickedToken.id) 
+              ? prev.filter(id => id !== clickedToken.id)
+              : [...prev, clickedToken.id]
+          );
         } else {
-          // Start dragging the region
-          setIsDraggingRegion(true);
-          setDraggedRegionId(clickedRegion.id);
-          setRegionDragOffset({
-            x: worldPos.x - clickedRegion.x,
-            y: worldPos.y - clickedRegion.y
+          // Single select and drag
+          setSelectedTokenIds([clickedToken.id]);
+          setIsDraggingToken(true);
+          setDraggedTokenId(clickedToken.id);
+          setDragOffset({
+            x: worldPos.x - clickedToken.x,
+            y: worldPos.y - clickedToken.y
           });
+          setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
+          setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+
+          // Dispatch custom event for token context menu
+          window.dispatchEvent(new CustomEvent('showTokenContextMenu', {
+            detail: {
+              tokenId: clickedToken.id,
+              x: e.clientX,
+              y: e.clientY
+            }
+          }));
         }
       } else {
-        handleCanvasClick(e);
+        // Empty space click - deselect all
+        setSelectedTokenIds([]);
+        
+        // Add region if holding Shift
+        if (e.shiftKey) {
+          addNewRegion(worldPos.x, worldPos.y);
+        }
       }
     }
   };
@@ -1004,108 +679,95 @@ export const SimpleTabletop = () => {
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
+
     if (isPanning) {
-      const deltaX = e.clientX - lastPanPoint.x;
-      const deltaY = e.clientY - lastPanPoint.y;
-      
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
       setTransform(prev => ({
         ...prev,
-        x: prev.x + deltaX,
-        y: prev.y + deltaY
+        x: lastPanPoint.x + deltaX,
+        y: lastPanPoint.y + deltaY
       }));
-      
-      setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (isDraggingToken && draggedTokenId) {
-      // Token dragging
-      const worldPos = screenToWorld(mouseX, mouseY);
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const worldPos = screenToWorld(x, y);
+      
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
       
-      // Add point to drag path (sample every few pixels for smoother path)
-      const lastPoint = dragPath[dragPath.length - 1];
-      const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
-      if (distance > 10) { // Sample every 10 world units
-        setDragPath(prev => [...prev, { x: newX, y: newY }]);
-      }
-      
-      // Update token position in store
       updateTokenPosition(draggedTokenId, newX, newY);
-      
-      // Force immediate redraw for smooth dragging feedback
-      redrawCanvas();
+      setDragPath(prev => [...prev, { x: newX, y: newY }]);
     } else if (isDraggingRegion && draggedRegionId) {
-      // Region dragging
-      const worldPos = screenToWorld(mouseX, mouseY);
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const worldPos = screenToWorld(x, y);
+      
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
       
-      setRegions(prev => prev.map(region => 
-        region.id === draggedRegionId 
-          ? { ...region, x: newX, y: newY }
-          : region
-      ));
-      
-      redrawCanvas();
+      updateRegion(draggedRegionId, { x: newX, y: newY });
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
-      // Region resizing
-      const worldPos = screenToWorld(mouseX, mouseY);
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const worldPos = screenToWorld(x, y);
       
-      setRegions(prev => prev.map(region => {
-        if (region.id !== draggedRegionId) return region;
-        
-        const { x, y, width, height } = region;
-        let newRegion = { ...region };
-        
-        switch (resizeHandle) {
-          case 'nw':
-            newRegion.x = worldPos.x;
-            newRegion.y = worldPos.y;
-            newRegion.width = width + (x - worldPos.x);
-            newRegion.height = height + (y - worldPos.y);
-            break;
-          case 'ne':
-            newRegion.y = worldPos.y;
-            newRegion.width = worldPos.x - x;
-            newRegion.height = height + (y - worldPos.y);
-            break;
-          case 'sw':
-            newRegion.x = worldPos.x;
-            newRegion.width = width + (x - worldPos.x);
-            newRegion.height = worldPos.y - y;
-            break;
-          case 'se':
-            newRegion.width = worldPos.x - x;
-            newRegion.height = worldPos.y - y;
-            break;
-          case 'n':
-            newRegion.y = worldPos.y;
-            newRegion.height = height + (y - worldPos.y);
-            break;
-          case 'e':
-            newRegion.width = worldPos.x - x;
-            break;
-          case 's':
-            newRegion.height = worldPos.y - y;
-            break;
-          case 'w':
-            newRegion.x = worldPos.x;
-            newRegion.width = width + (x - worldPos.x);
-            break;
-        }
-        
-        // Ensure minimum size
-        newRegion.width = Math.max(10, newRegion.width);
-        newRegion.height = Math.max(10, newRegion.height);
-        
-        return newRegion;
-      }));
+      const region = regions.find(r => r.id === draggedRegionId);
+      if (!region) return;
       
-      redrawCanvas();
+      let newX = region.x;
+      let newY = region.y;
+      let newWidth = region.width;
+      let newHeight = region.height;
+      
+      const minSize = 50;
+      
+      switch (resizeHandle) {
+        case 'nw':
+          newWidth = Math.max(minSize, region.x + region.width - worldPos.x);
+          newHeight = Math.max(minSize, region.y + region.height - worldPos.y);
+          newX = region.x + region.width - newWidth;
+          newY = region.y + region.height - newHeight;
+          break;
+        case 'ne':
+          newWidth = Math.max(minSize, worldPos.x - region.x);
+          newHeight = Math.max(minSize, region.y + region.height - worldPos.y);
+          newY = region.y + region.height - newHeight;
+          break;
+        case 'sw':
+          newWidth = Math.max(minSize, region.x + region.width - worldPos.x);
+          newHeight = Math.max(minSize, worldPos.y - region.y);
+          newX = region.x + region.width - newWidth;
+          break;
+        case 'se':
+          newWidth = Math.max(minSize, worldPos.x - region.x);
+          newHeight = Math.max(minSize, worldPos.y - region.y);
+          break;
+        case 'n':
+          newHeight = Math.max(minSize, region.y + region.height - worldPos.y);
+          newY = region.y + region.height - newHeight;
+          break;
+        case 's':
+          newHeight = Math.max(minSize, worldPos.y - region.y);
+          break;
+        case 'w':
+          newWidth = Math.max(minSize, region.x + region.width - worldPos.x);
+          newX = region.x + region.width - newWidth;
+          break;
+        case 'e':
+          newWidth = Math.max(minSize, worldPos.x - region.x);
+          break;
+      }
+      
+      updateRegion(draggedRegionId, { 
+        x: newX, 
+        y: newY, 
+        width: newWidth, 
+        height: newHeight 
+      });
     }
   };
 
@@ -1134,15 +796,12 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
       
-      // Stop region interactions
       setIsDraggingRegion(false);
-      setIsResizingRegion(false);
       setDraggedRegionId(null);
       setRegionDragOffset({ x: 0, y: 0 });
-      setResizeHandle(null);
       
-      // Redraw canvas to clear ghost token and path
-      redrawCanvas();
+      setIsResizingRegion(false);
+      setResizeHandle(null);
     }
   };
 
@@ -1151,38 +810,49 @@ export const SimpleTabletop = () => {
     
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    
+
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
-    
+
     // Zoom towards mouse position
-    const zoomRatio = newZoom / transform.zoom;
-    const newX = mouseX - (mouseX - transform.x) * zoomRatio;
-    const newY = mouseY - (mouseY - transform.y) * zoomRatio;
+    const worldPosBeforeZoom = screenToWorld(mouseX, mouseY);
     
-    setTransform({
-      x: newX,
-      y: newY,
-      zoom: newZoom
+    setTransform(prev => {
+      const newTransform = { ...prev, zoom: newZoom };
+      const worldPosAfterZoom = {
+        x: (mouseX - newTransform.x) / newZoom,
+        y: (mouseY - newTransform.y) / newZoom
+      };
+      
+      return {
+        ...newTransform,
+        x: newTransform.x + (worldPosAfterZoom.x - worldPosBeforeZoom.x) * newZoom,
+        y: newTransform.y + (worldPosAfterZoom.y - worldPosBeforeZoom.y) * newZoom
+      };
     });
   };
 
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    handleCanvasContextMenu(e);
-  };
+    e.preventDefault();
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // Token manipulation functions for FloatingMenu
-  const handleTokenColorChange = (tokenId: string, color: string) => {
-    updateTokenColor(tokenId, color);
-    toast.success('Token color updated');
-  };
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const worldPos = screenToWorld(x, y);
 
-  const handleCanvasUpdate = () => {
-    // Canvas automatically redraws when tokens change
+    // Check if right-clicking on a region
+    const clickedRegion = getClickedRegion(worldPos.x, worldPos.y);
+    if (clickedRegion) {
+      showRegionContextMenu(e, clickedRegion);
+      return;
+    }
   };
 
   const addTokenToCanvas = async (imageUrl: string, x?: number, y?: number) => {
@@ -1226,44 +896,51 @@ export const SimpleTabletop = () => {
     }
   };
 
+  const handleTokenColorChange = (tokenId: string, color: string) => {
+    updateTokenColor(tokenId, color);
+  };
+
   return (
-    <div className="w-full h-screen bg-surface flex flex-col relative">
+    <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <Toolbar 
-        sessionId={sessionId} 
-        addTokenToCanvas={addTokenToCanvas}
-      />
-      
-      {/* Map Manager Button */}
-      <div className="absolute top-4 right-4 z-10">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setShowMapManager(true)}
-          className="flex items-center gap-2"
-        >
-          <Settings className="w-4 h-4" />
-          Maps
-        </Button>
+      <div className="flex items-center justify-between p-2 bg-muted border-b">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGridVisible(!gridVisible)}
+            className={gridVisible ? 'bg-accent' : ''}
+          >
+            {gridVisible ? '🔲' : '⬜'} Grid
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGridType(gridType === 'square' ? 'hex' : 'square')}
+          >
+            {gridType === 'square' ? '⬜' : '⬢'} {gridType}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenGridControls()}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          Zoom: {Math.round(transform.zoom * 100)}% | Shift+Click: Add Region | Right-click: Pan
+        </div>
       </div>
 
-      {/* Add Region Button */}
-      <div className="absolute top-16 right-4 z-10">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addRegion}
-          className="flex items-center gap-2"
-        >
-          Add Region
-        </Button>
-      </div>
-
-      {/* Main Canvas Container */}
+      {/* Canvas Container */}
       <div className="flex-1 relative overflow-hidden">
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
+          className="w-full h-full"
           style={{ 
             background: 'hsl(var(--surface))',
             cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : 'default'
@@ -1276,35 +953,26 @@ export const SimpleTabletop = () => {
         />
       </div>
 
-      {/* Floating Menu */}
-      <FloatingMenu
-        fabricCanvas={null}
-        gridType="square"
-        gridSize={40}
-        isGridVisible={true}
-        gridColor="#333"
-        gridOpacity={80}
-        onGridTypeChange={() => {}}
-        onGridSizeChange={() => {}}
-        onGridVisibilityChange={() => {}}
-        onGridColorChange={() => {}}
-        onGridOpacityChange={() => {}}
-        onAddToken={addTokenToCanvas}
-        onColorChange={handleTokenColorChange}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
-
-      {/* Token Context Manager */}
-      <TokenContextManager
-        fabricCanvas={null}
-        onColorChange={handleTokenColorChange}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
-
-      {/* Map Manager Modal */}
-      {showMapManager && (
-        <MapManager onClose={() => setShowMapManager(false)} />
-      )}
+      {/* Floating Menu - Simplified without Fabric.js dependencies */}
+      <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => addTokenToCanvas('/placeholder.svg', -transform.x / transform.zoom, -transform.y / transform.zoom)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Token
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenMapControls}
+        >
+          <Map className="h-4 w-4 mr-2" />
+          Maps
+        </Button>
+      </div>
     </div>
   );
 };
