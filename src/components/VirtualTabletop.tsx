@@ -3,16 +3,19 @@ import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text, Point
 import { Toolbar } from './Toolbar';
 import { TokenContextManager } from './TokenContextManager';
 import { FloatingMenu } from './FloatingMenu';
+import { MapManager } from './MapManager';
 import { useSessionStore } from '../stores/sessionStore';
+import { useMapStore } from '../stores/mapStore';
 import { toast } from 'sonner';
 import { 
   GridType, 
   createGridRenderer, 
-  renderGrid, 
-  snapToGrid as snapToNewGrid, 
   GridRenderer, 
   Viewport 
 } from '../lib/gridSystem';
+import { renderMapGrids, snapToMapGrid } from '../lib/mapGridSystem';
+import { Button } from './ui/button';
+import { Settings } from 'lucide-react';
 
 export const VirtualTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -122,7 +125,7 @@ export const VirtualTabletop = () => {
       enforceLayerOrder(fabricCanvas);
       updateAllTokenLabels();
     }
-  }, [fabricCanvas, gridRenderer, gridType, gridSize, isGridVisible, gridColor, gridOpacity]);
+  }, [fabricCanvas, gridRenderer, updateGridDisplay]);
 
   // Update labels when visibility settings change
   useEffect(() => {
@@ -140,9 +143,10 @@ export const VirtualTabletop = () => {
     const handleObjectMoving = (e: any) => {
       const obj = e.target;
       if (obj.tokenId) {
-        // Snap to grid if enabled
-        if (gridType !== 'none') {
-          const snappedPos = snapToNewGrid(obj.left, obj.top, gridSize, gridType);
+        // Snap to grid based on active region
+        const activeRegion = getActiveRegionAt(obj.left, obj.top);
+        if (activeRegion) {
+          const snappedPos = snapToMapGrid(obj.left, obj.top, activeRegion);
           obj.set({
             left: snappedPos.x,
             top: snappedPos.y,
@@ -218,15 +222,18 @@ export const VirtualTabletop = () => {
     };
   };
 
-  // Update grid display using new efficient system
-  const updateGridDisplay = useCallback((canvas: FabricCanvas, renderer: GridRenderer) => {
-    if (!renderer) return;
-    
-    const viewport = getCurrentViewport(canvas);
-    const gridColorWithOpacity = `rgba(${parseInt(gridColor.slice(1, 3), 16)}, ${parseInt(gridColor.slice(3, 5), 16)}, ${parseInt(gridColor.slice(5, 7), 16)}, ${gridOpacity / 100})`;
-    
-    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, gridColorWithOpacity);
-  }, [gridType, gridSize, isGridVisible, gridColor, gridOpacity]);
+  // Helper function to get current viewport for grid rendering
+  const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
+    const vpt = canvas.viewportTransform;
+    const zoom = canvas.getZoom();
+    return {
+      x: -vpt[4] / zoom,
+      y: -vpt[5] / zoom,
+      zoom: zoom,
+      width: canvas.width || 1200,
+      height: canvas.height || 800
+    };
+  };
 
   // Old grid functions removed - now using efficient grid system
 
@@ -801,19 +808,30 @@ export const VirtualTabletop = () => {
       
       {/* Full-Screen Map Canvas */}
       <div className="flex-1 relative overflow-hidden">
+        {/* Map Manager Button - Upper Right */}
+        <Button
+          onClick={() => setShowMapManager(!showMapManager)}
+          className="absolute top-4 right-4 z-30"
+          variant="secondary"
+          size="sm"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Maps
+        </Button>
+
         {/* Floating Menu - Positioned at upper left of map */}
         <FloatingMenu
           fabricCanvas={fabricCanvas}
-          gridType={gridType}
-          gridSize={gridSize}
-          isGridVisible={isGridVisible}
-          gridColor={gridColor}
-          gridOpacity={gridOpacity}
-          onGridTypeChange={setGridType}
-          onGridSizeChange={setGridSize}
-          onGridVisibilityChange={setIsGridVisible}
-          onGridColorChange={setGridColor}
-          onGridOpacityChange={setGridOpacity}
+          gridType={'none' as GridType} // Disabled since we use map-based grids now
+          gridSize={40}
+          isGridVisible={true}
+          gridColor={'#ffffff'}
+          gridOpacity={80}
+          onGridTypeChange={() => {}} // Disabled
+          onGridSizeChange={() => {}} // Disabled
+          onGridVisibilityChange={() => {}} // Disabled
+          onGridColorChange={() => {}} // Disabled
+          onGridOpacityChange={() => {}} // Disabled
           onAddToken={addTokenToCanvas}
           onColorChange={handleTokenColorChange}
           onUpdateCanvas={handleCanvasUpdate}
@@ -839,6 +857,11 @@ export const VirtualTabletop = () => {
           }}
         />
       </div>
+      
+      {/* Map Manager Modal */}
+      {showMapManager && (
+        <MapManager onClose={() => setShowMapManager(false)} />
+      )}
       
       {/* Token Context Manager - Handles right-click menus */}
       <TokenContextManager
