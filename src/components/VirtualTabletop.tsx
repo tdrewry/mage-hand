@@ -619,6 +619,10 @@ export const VirtualTabletop = () => {
     let isDragging = false;
     let lastPosX = 0;
     let lastPosY = 0;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let rightMouseDown = false;
+    const dragThreshold = 5; // Minimum pixels to consider it a drag vs click
 
     // Mouse wheel zoom
     canvas.on('mouse:wheel', (opt) => {
@@ -643,43 +647,79 @@ export const VirtualTabletop = () => {
       opt.e.stopPropagation();
     });
 
-    // Pan on alt+drag or middle mouse drag
+    // Right mouse button pan and context menu handling
     canvas.on('mouse:down', (opt) => {
       const evt = opt.e as MouseEvent;
-      if (evt.altKey || evt.button === 1) { // Alt key or middle mouse
-        isDragging = true;
-        canvas.selection = false;
+      if (evt.button === 2) { // Right mouse button
+        rightMouseDown = true;
+        dragStartX = evt.clientX;
+        dragStartY = evt.clientY;
         lastPosX = evt.clientX;
         lastPosY = evt.clientY;
-        canvas.setCursor('grabbing');
+        
+        // Prevent default context menu
         evt.preventDefault();
+        evt.stopPropagation();
       }
     });
 
     canvas.on('mouse:move', (opt) => {
-      if (isDragging) {
-        const evt = opt.e as MouseEvent;
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += evt.clientX - lastPosX;
-          vpt[5] += evt.clientY - lastPosY;
-          canvas.requestRenderAll();
-          lastPosX = evt.clientX;
-          lastPosY = evt.clientY;
-          
-          // Redraw grid to show new visible area
-          drawGrid(canvas, gridType, gridSize, isGridVisible);
+      const evt = opt.e as MouseEvent;
+      
+      if (rightMouseDown) {
+        const deltaX = Math.abs(evt.clientX - dragStartX);
+        const deltaY = Math.abs(evt.clientY - dragStartY);
+        
+        // Start dragging if we've moved beyond threshold
+        if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+          isDragging = true;
+          canvas.selection = false;
+          canvas.setCursor('grabbing');
         }
+        
+        if (isDragging) {
+          const vpt = canvas.viewportTransform;
+          if (vpt) {
+            vpt[4] += evt.clientX - lastPosX;
+            vpt[5] += evt.clientY - lastPosY;
+            canvas.requestRenderAll();
+            lastPosX = evt.clientX;
+            lastPosY = evt.clientY;
+            
+            // Redraw grid to show new visible area
+            drawGrid(canvas, gridType, gridSize, isGridVisible);
+          }
+        }
+        
         evt.preventDefault();
+        evt.stopPropagation();
       }
     });
 
-    canvas.on('mouse:up', () => {
-      if (isDragging) {
-        isDragging = false;
-        canvas.selection = true;
-        canvas.setCursor('default');
+    canvas.on('mouse:up', (opt) => {
+      const evt = opt.e as MouseEvent;
+      
+      if (rightMouseDown && evt.button === 2) {
+        if (isDragging) {
+          // Was dragging - end pan mode
+          isDragging = false;
+          canvas.selection = true;
+          canvas.setCursor('default');
+        } else {
+          // Was a click without drag - let context menu handle it
+          // The TokenContextMenu component will handle the right-click context menu
+        }
+        
+        rightMouseDown = false;
+        evt.preventDefault();
+        evt.stopPropagation();
       }
+    });
+
+    // Disable browser context menu on canvas
+    canvas.wrapperEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      return false;
     });
 
     // Keyboard shortcuts for zoom
