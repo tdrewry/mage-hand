@@ -1,7 +1,7 @@
-import { VirtualTabletop } from '../components/VirtualTabletop';
+import { PaperTabletop } from '../components/PaperTabletop';
 
 const Index = () => {
-  return <VirtualTabletop />;
+  return <PaperTabletop />;
 };
 
 export default Index;

@@ -9,11 +9,12 @@ import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 
 interface ToolbarProps {
-  sessionId: string;
+  sessionId?: string;
   fabricCanvas?: FabricCanvas | null;
+  addTokenToCanvas?: (imageUrl: string, x?: number, y?: number) => void | Promise<void>;
 }
 
-export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
+export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
   const { tokens, clearAllTokens } = useSessionStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   
@@ -63,7 +64,7 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
           
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
-              Session: {sessionId.slice(0, 8)}
+              Session: {sessionId?.slice(0, 8) || 'paper-demo'}
             </Badge>
             <Badge variant="secondary" className="text-xs">
               Tokens: {tokens.length}
