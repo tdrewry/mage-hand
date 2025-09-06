@@ -1273,14 +1273,8 @@ export const SimpleTabletop = () => {
       {/* Floating Menu */}
       <FloatingMenu
         fabricCanvas={null}
-        gridType="square"
-        gridSize={40}
-        isGridVisible={true}
         gridColor="#333"
         gridOpacity={80}
-        onGridTypeChange={() => {}}
-        onGridSizeChange={() => {}}
-        onGridVisibilityChange={() => {}}
         onGridColorChange={() => {}}
         onGridOpacityChange={() => {}}
         onAddToken={addTokenToCanvas}

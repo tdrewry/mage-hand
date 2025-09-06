@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Plus, Palette, Eye, Map, Settings } from 'lucide-react';
-import { GridControlsModal } from './modals/GridControlsModal';
+import { Plus, Palette, Eye, Map, Settings } from 'lucide-react';
 import { TokenPanelModal } from './modals/TokenPanelModal';
 import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { VisibilityModal } from './modals/VisibilityModal';
@@ -10,14 +9,8 @@ import { Canvas as FabricCanvas } from 'fabric';
 
 interface FloatingMenuProps {
   fabricCanvas: FabricCanvas | null;
-  gridType: string;
-  gridSize: number;
-  isGridVisible: boolean;
   gridColor: string;
   gridOpacity: number;
-  onGridTypeChange: (type: any) => void;
-  onGridSizeChange: (size: number) => void;
-  onGridVisibilityChange: (visible: boolean) => void;
   onGridColorChange: (color: string) => void;
   onGridOpacityChange: (opacity: number) => void;
   onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void;
@@ -27,14 +20,8 @@ interface FloatingMenuProps {
 
 export const FloatingMenu = ({
   fabricCanvas,
-  gridType,
-  gridSize,
-  isGridVisible,
   gridColor,
   gridOpacity,
-  onGridTypeChange,
-  onGridSizeChange,
-  onGridVisibilityChange,
   onGridColorChange,
   onGridOpacityChange,
   onAddToken,
@@ -44,12 +31,6 @@ export const FloatingMenu = ({
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const menuItems = [
-    {
-      id: 'grid',
-      icon: Grid3X3,
-      label: 'Grid',
-      color: 'bg-blue-500 hover:bg-blue-600',
-    },
     {
       id: 'tokens',
       icon: Plus,
@@ -96,17 +77,6 @@ export const FloatingMenu = ({
       </div>
 
       {/* Modals */}
-      <GridControlsModal
-        open={activeModal === 'grid'}
-        onOpenChange={(open) => setActiveModal(open ? 'grid' : null)}
-        gridType={gridType}
-        gridSize={gridSize}
-        isGridVisible={isGridVisible}
-        onGridTypeChange={onGridTypeChange}
-        onGridSizeChange={onGridSizeChange}
-        onGridVisibilityChange={onGridVisibilityChange}
-      />
-
       <TokenPanelModal
         open={activeModal === 'tokens'}
         onOpenChange={(open) => setActiveModal(open ? 'tokens' : null)}
