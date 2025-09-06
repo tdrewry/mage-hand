@@ -53,6 +53,9 @@ export const VirtualTabletop = () => {
     // Draw initial grid
     drawGrid(canvas, gridType, gridSize, isGridVisible);
     
+    // Load existing tokens from store onto canvas
+    loadStoredTokensOntoCanvas(canvas);
+    
     // Ensure proper layer ordering: background -> grid -> map -> tokens
     enforceLayerOrder(canvas);
 
@@ -521,6 +524,71 @@ export const VirtualTabletop = () => {
 
     tokens.forEach(token => {
       updateTokenLabelVisibility(token.id);
+    });
+  };
+
+  // Load stored tokens onto canvas
+  const loadStoredTokensOntoCanvas = (canvas: FabricCanvas) => {
+    tokens.forEach(token => {
+      loadTokenOntoCanvas(canvas, token);
+    });
+  };
+
+  // Load a single token onto canvas from store data
+  const loadTokenOntoCanvas = (canvas: FabricCanvas, token: any) => {
+    FabricImage.fromURL(token.imageUrl).then((img) => {
+      // Set token properties
+      (img as any).tokenId = token.id;
+      (img as any).isMap = false;
+      
+      // Apply stored color if available
+      if (token.color) {
+        applyTokenColor(img, token.color);
+      }
+      
+      // Calculate dimensions based on grid size
+      const maxPixelWidth = token.gridWidth * gridSize;
+      const maxPixelHeight = token.gridHeight * gridSize;
+      
+      // Get image natural dimensions
+      const imgWidth = img.width || 100;
+      const imgHeight = img.height || 100;
+      
+      // Calculate scale to fit within bounds while maintaining aspect ratio
+      const scaleX = maxPixelWidth / imgWidth;
+      const scaleY = maxPixelHeight / imgHeight;
+      const scale = Math.min(scaleX, scaleY);
+      
+      // Calculate final dimensions
+      const finalWidth = imgWidth * scale;
+      const finalHeight = imgHeight * scale;
+      
+      // Center the image within the token bounds if needed
+      const offsetX = (maxPixelWidth - finalWidth) / 2;
+      const offsetY = (maxPixelHeight - finalHeight) / 2;
+      
+      img.set({
+        left: token.x + offsetX,
+        top: token.y + offsetY,
+        scaleX: scale,
+        scaleY: scale,
+        hasControls: true,
+        hasBorders: true,
+        borderColor: 'hsl(var(--token-selection))',
+        cornerColor: 'hsl(var(--accent))',
+        lockRotation: false,
+      });
+
+      canvas.add(img);
+      
+      // Create label for the token
+      const tokenBottom = token.y + finalHeight;
+      createTokenLabel(token.id, token.x, tokenBottom + 5, token.label || token.name, token.color || '#FFFFFF');
+      
+      canvas.renderAll();
+    }).catch((error) => {
+      console.error('Failed to load stored token:', error);
+      toast.error(`Failed to load token: ${token.name}`);
     });
   };
 

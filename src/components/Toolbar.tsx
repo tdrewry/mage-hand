@@ -14,13 +14,30 @@ interface ToolbarProps {
 }
 
 export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
-  const { tokens } = useSessionStore();
+  const { tokens, clearAllTokens } = useSessionStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
     navigator.clipboard.writeText(url);
     toast.success('Session URL copied to clipboard!');
+  };
+
+  const clearTokens = () => {
+    // Clear tokens from canvas
+    if (fabricCanvas) {
+      const objects = fabricCanvas.getObjects();
+      objects.forEach((obj: any) => {
+        if (obj.tokenId || obj.isTokenLabel) {
+          fabricCanvas.remove(obj);
+        }
+      });
+      fabricCanvas.renderAll();
+    }
+    
+    // Clear from store
+    clearAllTokens();
+    toast.success('All tokens cleared!');
   };
 
   const clearStorage = () => {
@@ -77,6 +94,16 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
           >
             <Users className="h-4 w-4 mr-2" />
             Players (1)
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={clearTokens}
+            className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
+            title="Clear all tokens from map and storage"
+          >
+            Clear Tokens
           </Button>
           
           <Button 

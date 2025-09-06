@@ -38,6 +38,7 @@ export interface SessionState {
   updateTokenColor: (tokenId: string, color: string) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
+  clearAllTokens: () => void;
   setSelectedTokens: (tokenIds: string[]) => void;
   setTokenVisibility: (visibility: TokenVisibility) => void;
   setLabelVisibility: (visibility: LabelVisibility) => void;
@@ -122,6 +123,12 @@ export const useSessionStore = create<SessionState>()(
           tokens: state.tokens.filter((token) => token.id !== tokenId),
           selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
         })),
+
+      clearAllTokens: () =>
+        set({ 
+          tokens: [], 
+          selectedTokenIds: [] 
+        }),
 
       setSelectedTokens: (tokenIds) =>
         set({ selectedTokenIds: tokenIds }),
