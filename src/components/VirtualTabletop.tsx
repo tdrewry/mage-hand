@@ -624,10 +624,16 @@ export const VirtualTabletop = () => {
     let rightMouseDown = false;
     const dragThreshold = 5; // Minimum pixels to consider it a drag vs click
 
-    // Mouse wheel zoom
+    // Optimized mouse wheel zoom with grid hiding
     canvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
       let zoom = canvas.getZoom();
+      
+      // Hide grid during zooming for better performance
+      const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
+      gridObjects.forEach((obj: any) => {
+        obj.visible = false;
+      });
       
       // Zoom limits
       const minZoom = 0.1;
@@ -640,8 +646,15 @@ export const VirtualTabletop = () => {
       const point = new Point(opt.e.offsetX, opt.e.offsetY);
       canvas.zoomToPoint(point, zoom);
       
-      // Redraw grid at new zoom level
-      drawGrid(canvas, gridType, gridSize, isGridVisible);
+      // Use debounced grid redraw for smooth zooming
+      clearTimeout((window as any).gridRedrawTimeout);
+      (window as any).gridRedrawTimeout = setTimeout(() => {
+        gridObjects.forEach((obj: any) => {
+          obj.visible = true;
+        });
+        drawGrid(canvas, gridType, gridSize, isGridVisible);
+        canvas.renderAll();
+      }, 100);
       
       opt.e.preventDefault();
       opt.e.stopPropagation();
@@ -818,6 +831,12 @@ export const VirtualTabletop = () => {
           isDragging = true;
           canvas.selection = false;
           canvas.setCursor('grabbing');
+          
+          // Hide grid during panning for better performance
+          const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
+          gridObjects.forEach((obj: any) => {
+            obj.visible = false;
+          });
         }
         
         if (isDragging) {
@@ -826,7 +845,10 @@ export const VirtualTabletop = () => {
             vpt[4] += e.clientX - lastPosX;
             vpt[5] += e.clientY - lastPosY;
             canvas.setViewportTransform(vpt);
-            canvas.renderAll();
+            // Use requestAnimationFrame for smoother rendering
+            requestAnimationFrame(() => {
+              canvas.renderAll();
+            });
           }
         }
         
@@ -844,6 +866,16 @@ export const VirtualTabletop = () => {
           isDragging = false;
           canvas.selection = true;
           canvas.setCursor('default');
+          
+          // Show grid again after panning and redraw it
+          const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
+          gridObjects.forEach((obj: any) => {
+            obj.visible = true;
+          });
+          
+          // Redraw the grid at new position
+          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          canvas.renderAll();
         } else if (target && (target as any).tokenId) {
           // Trigger context menu via custom event
           window.dispatchEvent(new CustomEvent('showTokenContextMenu', {
