@@ -22,21 +22,23 @@ export const VirtualTabletop = () => {
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [gridRenderer, setGridRenderer] = useState<GridRenderer | null>(null);
-  const [gridType, setGridType] = useState<GridType>('square');
-  const [gridSize, setGridSize] = useState(40);
-  const [isGridVisible, setIsGridVisible] = useState(true);
-  const [gridColor, setGridColor] = useState('#ffffff');
-  const [gridOpacity, setGridOpacity] = useState(80);
-  
-  const { 
-    sessionId, 
-    tokens, 
-    addToken, 
-    updateTokenPosition, 
-    updateTokenLabel,
-    updateTokenColor,
-    selectedTokenIds, 
-    setSelectedTokens, 
+
+  const {
+    sessionId,
+    tokens,
+    gridType,
+    gridSize,
+    isGridVisible,
+    gridColor,
+    gridOpacity,
+    updateTokenPosition,
+    setGridType,
+    setGridSize,
+    setIsGridVisible,
+    setGridColor,
+    setGridOpacity,
+    setSelectedTokens,
+    selectedTokenIds,
     tokenVisibility,
     labelVisibility, 
     currentPlayerId, 
@@ -207,23 +209,17 @@ export const VirtualTabletop = () => {
       fabricCanvas.off('selection:cleared', handleSelectionCleared);
       clearTimeout(moveTimeout);
     };
-  }, [fabricCanvas, gridType, gridSize, updateTokenPosition, setSelectedTokens]);
+  }, [fabricCanvas, updateTokenPosition, setSelectedTokens, getActiveRegionAt]);
 
-  // Helper function to get current viewport for grid rendering
-  const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
-    const vpt = canvas.viewportTransform;
-    const zoom = canvas.getZoom();
-    return {
-      x: -vpt[4] / zoom,
-      y: -vpt[5] / zoom,
-      zoom: zoom,
-      width: canvas.width || 1200,
-      height: canvas.height || 800
-    };
-  };
+  // Update grid when settings change
+  useEffect(() => {
+    if (fabricCanvas && gridRenderer) {
+      updateGridDisplay(fabricCanvas, gridRenderer);
+      enforceLayerOrder(fabricCanvas);
+      updateAllTokenLabels();
+    }
+  }, [fabricCanvas, gridRenderer, updateGridDisplay]);
 
-  // Helper function to get current viewport for grid rendering
-  const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
     const vpt = canvas.viewportTransform;
     const zoom = canvas.getZoom();
     return {
@@ -858,11 +854,6 @@ export const VirtualTabletop = () => {
         />
       </div>
       
-      {/* Map Manager Modal */}
-      {showMapManager && (
-        <MapManager onClose={() => setShowMapManager(false)} />
-      )}
-      
       {/* Token Context Manager - Handles right-click menus */}
       <TokenContextManager
         fabricCanvas={fabricCanvas}
@@ -872,3 +863,5 @@ export const VirtualTabletop = () => {
     </div>
   );
 };
+
+export default VirtualTabletop;
