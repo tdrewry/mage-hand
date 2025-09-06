@@ -538,26 +538,29 @@ export const VirtualTabletop = () => {
           onColorChange={handleTokenColorChange}
           onUpdateCanvas={handleCanvasUpdate}
         >
-          {/* Floating Menu - Positioned at upper left of map */}
-          <FloatingMenu
-            fabricCanvas={fabricCanvas}
-            gridType={gridType}
-            gridSize={gridSize}
-            isGridVisible={isGridVisible}
-            onGridTypeChange={setGridType}
-            onGridSizeChange={setGridSize}
-            onGridVisibilityChange={setIsGridVisible}
-            onAddToken={addTokenToCanvas}
-            onColorChange={handleTokenColorChange}
-            onUpdateCanvas={handleCanvasUpdate}
-          />
-          
-          {/* Full-Screen Canvas Container */}
-          <div className="absolute inset-0 canvas-container">
-            <canvas 
-              ref={canvasRef} 
-              className="w-full h-full block"
+          {/* Single container wrapping all children for ContextMenuTrigger */}
+          <div className="relative w-full h-full">
+            {/* Floating Menu - Positioned at upper left of map */}
+            <FloatingMenu
+              fabricCanvas={fabricCanvas}
+              gridType={gridType}
+              gridSize={gridSize}
+              isGridVisible={isGridVisible}
+              onGridTypeChange={setGridType}
+              onGridSizeChange={setGridSize}
+              onGridVisibilityChange={setIsGridVisible}
+              onAddToken={addTokenToCanvas}
+              onColorChange={handleTokenColorChange}
+              onUpdateCanvas={handleCanvasUpdate}
             />
+            
+            {/* Full-Screen Canvas Container */}
+            <div className="absolute inset-0 canvas-container">
+              <canvas 
+                ref={canvasRef} 
+                className="w-full h-full block"
+              />
+            </div>
           </div>
         </TokenContextMenu>
       </div>
