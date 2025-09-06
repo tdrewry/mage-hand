@@ -270,6 +270,16 @@ export const SimpleTabletop = () => {
       ctx.fillStyle = token.color || '#ffffff';
       ctx.globalAlpha = 0.4;
       
+      // Calculate total path distance
+      let pathDistance = 0;
+      for (let i = 1; i < dragPath.length; i++) {
+        const dx = dragPath[i].x - dragPath[i - 1].x;
+        const dy = dragPath[i].y - dragPath[i - 1].y;
+        pathDistance += Math.sqrt(dx * dx + dy * dy);
+      }
+      const pathDistanceGridUnits = (pathDistance / gridSize).toFixed(2);
+      
+      // Draw path points
       dragPath.forEach((point, index) => {
         if (index === 0 || index === dragPath.length - 1) return; // Skip start and end
         
@@ -277,6 +287,36 @@ export const SimpleTabletop = () => {
         ctx.arc(point.x, point.y, 2 / transform.zoom, 0, 2 * Math.PI);
         ctx.fill();
       });
+      
+      // Draw path distance text near the end of the path
+      if (dragPath.length > 2 && pathDistance > 10) {
+        const endPoint = dragPath[dragPath.length - 1];
+        const secondLastPoint = dragPath[dragPath.length - 2];
+        
+        // Position text slightly offset from the end point
+        const offsetX = 20 / transform.zoom;
+        const offsetY = -20 / transform.zoom;
+        const textX = endPoint.x + offsetX;
+        const textY = endPoint.y + offsetY;
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.9;
+        ctx.font = `${12 / transform.zoom}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Add background to text for better readability
+        const pathText = `Path: ${pathDistanceGridUnits}`;
+        const textMetrics = ctx.measureText(pathText);
+        const textWidth = textMetrics.width;
+        const textHeight = 12 / transform.zoom;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(textX - textWidth / 2 - 3 / transform.zoom, textY - textHeight / 2, textWidth + 6 / transform.zoom, textHeight);
+        
+        ctx.fillStyle = token.color || '#ffffff';
+        ctx.fillText(pathText, textX, textY);
+      }
     }
     
     // Draw direction arrow at current position
