@@ -83,7 +83,146 @@ export const SimpleTabletop = () => {
       ctx.stroke();
     }
     
-    // Restore context
+    // Draw tokens that are in viewport
+    const visibleTokens: any[] = [];
+    const offScreenTokens: any[] = [];
+    
+    tokens.forEach(token => {
+      const tokenSize = 40; // Default token size
+      const tokenLeft = token.x - tokenSize / 2;
+      const tokenRight = token.x + tokenSize / 2;
+      const tokenTop = token.y - tokenSize / 2;
+      const tokenBottom = token.y + tokenSize / 2;
+      
+      // Check if token is in viewport
+      if (tokenRight >= viewX && tokenLeft <= viewX + viewWidth &&
+          tokenBottom >= viewY && tokenTop <= viewY + viewHeight) {
+        visibleTokens.push(token);
+      } else {
+        offScreenTokens.push(token);
+      }
+    });
+    
+    // Draw visible tokens
+    visibleTokens.forEach(token => {
+      drawToken(ctx, token);
+    });
+    
+    // Restore context before drawing off-screen indicators
+    ctx.restore();
+    
+    // Draw off-screen token indicators
+    offScreenTokens.forEach(token => {
+      drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
+    });
+  };
+
+  // Function to draw a single token
+  const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
+    const tokenSize = 40;
+    
+    // Draw token circle background
+    ctx.fillStyle = token.color || '#ffffff';
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, tokenSize / 2, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Draw token border
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.stroke();
+    
+    // Draw token label
+    if (token.label) {
+      ctx.fillStyle = '#000000';
+      ctx.font = `${12 / transform.zoom}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(token.label, token.x, token.y);
+    }
+  };
+
+  // Function to draw off-screen token indicator
+  const drawOffScreenIndicator = (
+    ctx: CanvasRenderingContext2D, 
+    token: any, 
+    viewX: number, 
+    viewY: number, 
+    viewWidth: number, 
+    viewHeight: number
+  ) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const margin = 10; // Distance from edge
+    const indicatorSize = 8;
+    const indicatorLength = 20;
+    
+    // Transform token position to screen coordinates
+    const tokenScreenX = token.x * transform.zoom + transform.x;
+    const tokenScreenY = token.y * transform.zoom + transform.y;
+    
+    // Calculate center of viewport
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    // Calculate direction vector from viewport center to token
+    const dirX = tokenScreenX - centerX;
+    const dirY = tokenScreenY - centerY;
+    const distance = Math.sqrt(dirX * dirX + dirY * dirY);
+    
+    if (distance === 0) return;
+    
+    // Normalize direction
+    const normalizedX = dirX / distance;
+    const normalizedY = dirY / distance;
+    
+    // Find intersection with viewport edge
+    let edgeX, edgeY;
+    
+    // Calculate intersection with viewport boundaries
+    const leftDist = Math.abs(centerX - margin) / Math.abs(normalizedX);
+    const rightDist = Math.abs(canvas.width - centerX - margin) / Math.abs(normalizedX);
+    const topDist = Math.abs(centerY - margin) / Math.abs(normalizedY);
+    const bottomDist = Math.abs(canvas.height - centerY - margin) / Math.abs(normalizedY);
+    
+    const minDist = Math.min(
+      normalizedX < 0 ? leftDist : rightDist,
+      normalizedY < 0 ? topDist : bottomDist
+    );
+    
+    edgeX = centerX + normalizedX * minDist;
+    edgeY = centerY + normalizedY * minDist;
+    
+    // Clamp to viewport bounds
+    edgeX = Math.max(margin, Math.min(canvas.width - margin, edgeX));
+    edgeY = Math.max(margin, Math.min(canvas.height - margin, edgeY));
+    
+    // Draw indicator rectangle
+    ctx.fillStyle = token.color || '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    
+    // Calculate angle for pointing
+    const angle = Math.atan2(normalizedY, normalizedX);
+    
+    ctx.save();
+    ctx.translate(edgeX, edgeY);
+    ctx.rotate(angle);
+    
+    // Draw pointing rectangle
+    ctx.fillRect(-indicatorLength / 2, -indicatorSize / 2, indicatorLength, indicatorSize);
+    ctx.strokeRect(-indicatorLength / 2, -indicatorSize / 2, indicatorLength, indicatorSize);
+    
+    // Draw arrow tip
+    ctx.beginPath();
+    ctx.moveTo(indicatorLength / 2, 0);
+    ctx.lineTo(indicatorLength / 2 + 6, -4);
+    ctx.lineTo(indicatorLength / 2 + 6, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
     ctx.restore();
   };
 
@@ -117,12 +256,33 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [transform]);
 
+  // Add click handler to place tokens
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button === 0 && !isPanning) { // Left click and not panning
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      
+      // Convert screen coordinates to world coordinates
+      const worldX = (clickX - transform.x) / transform.zoom;
+      const worldY = (clickY - transform.y) / transform.zoom;
+      
+      // Add token at clicked position
+      addTokenToCanvas('', worldX, worldY);
+    }
+  };
+
   // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 2) { // Right click
       e.preventDefault();
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
+    } else if (e.button === 0) { // Left click
+      handleCanvasClick(e);
     }
   };
 
@@ -176,22 +336,30 @@ export const SimpleTabletop = () => {
     e.preventDefault(); // Prevent browser context menu
   };
 
-  const addTokenToCanvas = async (imageUrl: string, x: number = 100, y: number = 100) => {
+  const addTokenToCanvas = async (imageUrl: string, x?: number, y?: number) => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Use mouse position if coordinates not provided
+    const tokenX = x ?? 200;
+    const tokenY = y ?? 200;
+    
+    // Generate a random color for the token
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
     
     try {
       // Add to store
       addToken({
         id: tokenId,
         imageUrl,
-        x,
-        y,
+        x: tokenX,
+        y: tokenY,
         name: `Token ${tokenId.slice(-8)}`,
         gridWidth: 1,
         gridHeight: 1,
-        label: `Token ${tokenId.slice(-8)}`,
+        label: `T${tokenId.slice(-4)}`,
         ownerId: currentPlayerId,
-        color: '#ffffff'
+        color: randomColor
       });
 
       toast.success('Token added to map');
