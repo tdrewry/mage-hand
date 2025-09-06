@@ -650,16 +650,20 @@ export const VirtualTabletop = () => {
     // Right mouse button pan and context menu handling
     canvas.on('mouse:down', (opt) => {
       const evt = opt.e as MouseEvent;
+      console.log('Canvas mouse:down', { button: evt.button, target: opt.target, hasTokenId: !!(opt.target as any)?.tokenId });
+      
       if (evt.button === 2) { // Right mouse button
         const target = opt.target;
         
         // If clicking on a token, don't start panning - let context menu handle it
         if (target && (target as any).tokenId) {
+          console.log('Right-click on token:', (target as any).tokenId);
           // Store the clicked token for context menu
           setSelectedTokens([(target as any).tokenId]);
           return;
         }
         
+        console.log('Starting right-click pan mode');
         // Otherwise, start panning
         rightMouseDown = true;
         dragStartX = evt.clientX;
@@ -677,17 +681,20 @@ export const VirtualTabletop = () => {
       const evt = opt.e as MouseEvent;
       
       if (rightMouseDown) {
+        console.log('Mouse move during right mouse down');
         const deltaX = Math.abs(evt.clientX - dragStartX);
         const deltaY = Math.abs(evt.clientY - dragStartY);
         
         // Start dragging if we've moved beyond threshold
         if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+          console.log('Starting drag mode');
           isDragging = true;
           canvas.selection = false;
           canvas.setCursor('grabbing');
         }
         
         if (isDragging) {
+          console.log('Panning map');
           const vpt = canvas.viewportTransform;
           if (vpt) {
             vpt[4] += evt.clientX - lastPosX;
@@ -708,29 +715,21 @@ export const VirtualTabletop = () => {
 
     canvas.on('mouse:up', (opt) => {
       const evt = opt.e as MouseEvent;
+      console.log('Canvas mouse:up', { button: evt.button, rightMouseDown, isDragging, target: opt.target });
       
       if (rightMouseDown && evt.button === 2) {
         const target = opt.target;
         
         if (isDragging) {
+          console.log('Ending pan mode');
           // Was dragging - end pan mode
           isDragging = false;
           canvas.selection = true;
           canvas.setCursor('default');
         } else if (target && (target as any).tokenId) {
-          // Was a click on a token - trigger context menu
-          const tokenElement = document.querySelector(`[data-token-id="${(target as any).tokenId}"]`);
-          if (tokenElement) {
-            // Create and dispatch a synthetic right-click event
-            const contextEvent = new MouseEvent('contextmenu', {
-              bubbles: true,
-              cancelable: true,
-              clientX: evt.clientX,
-              clientY: evt.clientY,
-              button: 2
-            });
-            tokenElement.dispatchEvent(contextEvent);
-          }
+          console.log('Showing context menu for token:', (target as any).tokenId);
+          // Was a click on a token - trigger context menu manually
+          // Let's use a simpler approach - just set a flag and let TokenContextManager handle it
         }
         
         rightMouseDown = false;

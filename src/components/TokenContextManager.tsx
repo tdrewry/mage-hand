@@ -55,7 +55,10 @@ export const TokenContextManager = ({
       const evt = opt.e as MouseEvent;
       const target = opt.target;
       
+      console.log('TokenContextManager - mouse:up', { button: evt.button, target, hasTokenId: !!(target as any)?.tokenId });
+      
       if (evt.button === 2 && target && (target as any).tokenId) {
+        console.log('TokenContextManager - Showing context menu for token:', (target as any).tokenId);
         evt.preventDefault();
         evt.stopPropagation();
         
