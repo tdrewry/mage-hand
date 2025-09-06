@@ -293,9 +293,9 @@ export const SimpleTabletop = () => {
         const endPoint = dragPath[dragPath.length - 1];
         const secondLastPoint = dragPath[dragPath.length - 2];
         
-        // Position text slightly offset from the end point
-        const offsetX = 20 / transform.zoom;
-        const offsetY = -20 / transform.zoom;
+        // Position text farther offset from the end point to avoid token overlap
+        const offsetX = 40 / transform.zoom;
+        const offsetY = -40 / transform.zoom;
         const textX = endPoint.x + offsetX;
         const textY = endPoint.y + offsetY;
         
