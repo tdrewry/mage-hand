@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon } from 'fabric';
+import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text } from 'fabric';
 import { Toolbar } from './Toolbar';
 import { GridControls } from './GridControls';
 import { TokenPanel } from './TokenPanel';
@@ -68,8 +68,16 @@ export const VirtualTabletop = () => {
     if (fabricCanvas) {
       drawGrid(fabricCanvas, gridType, gridSize, isGridVisible);
       enforceLayerOrder(fabricCanvas);
+      updateAllTokenLabels();
     }
   }, [fabricCanvas, gridType, gridSize, isGridVisible]);
+
+  // Update labels when visibility settings change
+  useEffect(() => {
+    if (fabricCanvas) {
+      updateAllTokenLabels();
+    }
+  }, [fabricCanvas, labelVisibility, selectedTokenIds, tokens]);
 
   // Handle token movement with throttling
   useEffect(() => {
@@ -88,6 +96,8 @@ export const VirtualTabletop = () => {
             top: snappedPos.y,
           });
         }
+        // Update label position
+        updateTokenLabelPosition(obj.tokenId, obj.left, obj.top + (obj.height || 50) + 5);
       }
     };
 
@@ -98,6 +108,7 @@ export const VirtualTabletop = () => {
         clearTimeout(moveTimeout);
         moveTimeout = setTimeout(() => {
           updateTokenPosition(obj.tokenId, obj.left, obj.top);
+          updateTokenLabelPosition(obj.tokenId, obj.left, obj.top + (obj.height || 50) + 5);
           toast.info('Token moved', { duration: 1000 });
         }, 100); // Only update after 100ms of no movement
       }
@@ -299,6 +310,10 @@ export const VirtualTabletop = () => {
       });
 
       fabricCanvas.add(img);
+      
+      // Create label for the token
+      createTokenLabel(tokenId, x, y + finalHeight + 5, `Token ${tokenId.slice(-8)}`, color || '#FFFFFF');
+      
       enforceLayerOrder(fabricCanvas);
       fabricCanvas.renderAll();
       
@@ -336,13 +351,16 @@ export const VirtualTabletop = () => {
     const grids = objects.filter((obj: any) => obj.isGrid);
     const maps = objects.filter((obj: any) => obj.isMap);
     const tokens = objects.filter((obj: any) => obj.tokenId);
-    const others = objects.filter((obj: any) => !obj.isBackground && !obj.isGrid && !obj.isMap && !obj.tokenId);
+    const labels = objects.filter((obj: any) => obj.isTokenLabel);
+    const others = objects.filter((obj: any) => 
+      !obj.isBackground && !obj.isGrid && !obj.isMap && !obj.tokenId && !obj.isTokenLabel
+    );
     
     // Clear and re-add in correct order
     canvas.clear();
     
-    // Add in order: background, grid, map, tokens, others
-    [...backgrounds, ...grids, ...maps, ...tokens, ...others].forEach(obj => {
+    // Add in order: background, grid, map, tokens, labels, others
+    [...backgrounds, ...grids, ...maps, ...tokens, ...labels, ...others].forEach(obj => {
       canvas.add(obj);
     });
     
@@ -390,6 +408,95 @@ export const VirtualTabletop = () => {
     // This is a conceptual wrapper - in practice, we'll handle this differently
     // since Fabric.js objects can't be directly wrapped with React components
     return tokenObject;
+  };
+
+  // Create label for token
+  const createTokenLabel = (tokenId: string, x: number, y: number, labelText: string, color: string) => {
+    if (!fabricCanvas) return;
+
+    // Remove existing label for this token
+    const existingLabel = fabricCanvas.getObjects().find((obj: any) => 
+      obj.isTokenLabel && obj.tokenId === tokenId
+    );
+    if (existingLabel) {
+      fabricCanvas.remove(existingLabel);
+    }
+
+    // Create new text label
+    const label = new Text(labelText, {
+      left: x,
+      top: y,
+      fontSize: 12,
+      fill: color,
+      fontFamily: 'Arial',
+      textAlign: 'center',
+      selectable: false,
+      evented: false,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      padding: 4,
+    });
+
+    // Mark as token label
+    (label as any).isTokenLabel = true;
+    (label as any).tokenId = tokenId;
+
+    fabricCanvas.add(label);
+    updateTokenLabelVisibility(tokenId);
+  };
+
+  // Update label position when token moves
+  const updateTokenLabelPosition = (tokenId: string, x: number, y: number) => {
+    if (!fabricCanvas) return;
+
+    const label = fabricCanvas.getObjects().find((obj: any) => 
+      obj.isTokenLabel && obj.tokenId === tokenId
+    );
+    
+    if (label) {
+      label.set({ left: x, top: y });
+      fabricCanvas.renderAll();
+    }
+  };
+
+  // Update label visibility based on settings
+  const updateTokenLabelVisibility = (tokenId: string) => {
+    if (!fabricCanvas) return;
+
+    const token = tokens.find(t => t.id === tokenId);
+    const label = fabricCanvas.getObjects().find((obj: any) => 
+      obj.isTokenLabel && obj.tokenId === tokenId
+    );
+    
+    if (!label || !token) return;
+
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    const isDM = currentPlayer?.role === 'dm';
+
+    let shouldShow = false;
+
+    switch (labelVisibility) {
+      case 'show':
+        shouldShow = true;
+        break;
+      case 'hide':
+        shouldShow = false;
+        break;
+      case 'selected':
+        shouldShow = selectedTokenIds.includes(tokenId);
+        break;
+    }
+
+    label.set({ visible: shouldShow });
+    fabricCanvas.renderAll();
+  };
+
+  // Update all token labels
+  const updateAllTokenLabels = () => {
+    if (!fabricCanvas) return;
+
+    tokens.forEach(token => {
+      updateTokenLabelVisibility(token.id);
+    });
   };
 
   return (

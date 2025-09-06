@@ -85,6 +85,7 @@ export const TokenContextMenu = ({
       updateTokenLabel(token.id, labelValue);
     });
     setShowLabelModal(false);
+    onUpdateCanvas?.();
     toast.success(`Label updated for ${targetTokens.length} token(s)`);
   };
 
