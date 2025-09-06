@@ -115,7 +115,7 @@ export const SimpleTabletop = () => {
 
   // Get resize handle at position for a region
   const getResizeHandle = (region: Region, worldX: number, worldY: number): string | null => {
-    const handleSize = 8 / transform.zoom;
+    const handleSize = Math.max(12, 16 / transform.zoom); // Larger hit area than visual size
     const { x, y, width, height } = region;
     
     // Check corner handles
@@ -553,12 +553,12 @@ export const SimpleTabletop = () => {
 
   // Function to draw region resize handles
   const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const handleSize = 6 / transform.zoom;
+    const handleSize = Math.max(8, 12 / transform.zoom); // Larger handles, minimum 8px
     const { x, y, width, height } = region;
     
     ctx.fillStyle = '#4f46e5';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1 / transform.zoom;
+    ctx.lineWidth = Math.max(1, 2 / transform.zoom); // Thicker border
     
     // Corner handles
     const corners = [
