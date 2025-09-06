@@ -258,7 +258,7 @@ export const VirtualTabletop = () => {
         hasBorders: true,
         borderColor: 'hsl(var(--token-selection))',
         cornerColor: 'hsl(var(--accent))',
-        lockRotation: true, // Prevent accidental rotation
+        lockRotation: false, // Allow rotation
       });
 
       fabricCanvas.add(img);
