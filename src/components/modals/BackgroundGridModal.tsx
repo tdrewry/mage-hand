@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,7 @@ interface BackgroundGridModalProps {
 
 export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: BackgroundGridModalProps) => {
   // Background state
-  const [backgroundColor, setBackgroundColor] = useState('#1a1a1a');
+  const [backgroundColor, setBackgroundColor] = useState('#1a1a1a'); // RGB(26,26,26)
   const [backgroundOpacity, setBackgroundOpacity] = useState(100);
   const [backgroundImage, setBackgroundImage] = useState('');
   const [backgroundRepeat, setBackgroundRepeat] = useState<'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y'>('no-repeat');
@@ -42,6 +42,16 @@ export const BackgroundGridModal = ({ open, onOpenChange, fabricCanvas }: Backgr
     fabricCanvas.renderAll();
     toast.success('Background color applied');
   };
+
+  // Apply default background color on modal open
+  useEffect(() => {
+    if (open && fabricCanvas && fabricCanvas.backgroundColor === '#1a1a1a') {
+      // Only set if canvas is still using the default color
+      const rgba = hexToRgba(backgroundColor, backgroundOpacity / 100);
+      fabricCanvas.backgroundColor = rgba;
+      fabricCanvas.renderAll();
+    }
+  }, [open, fabricCanvas]);
 
   const applyBackgroundImage = () => {
     if (!fabricCanvas || !backgroundImage.trim()) return;

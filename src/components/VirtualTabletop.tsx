@@ -41,7 +41,7 @@ export const VirtualTabletop = () => {
     const canvas = new FabricCanvas(canvasRef.current, {
       width: viewportWidth,
       height: viewportHeight,
-      backgroundColor: 'hsl(var(--canvas-background))',
+      backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
     });
 
     // Configure canvas for gaming
