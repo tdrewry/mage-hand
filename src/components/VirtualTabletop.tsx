@@ -222,17 +222,33 @@ export const VirtualTabletop = () => {
       // Ensure the tokenId is properly attached to the fabric object
       (img as any).tokenId = tokenId;
       (img as any).isMap = false; // Ensure it's not marked as a map
+      
       // Calculate pixel dimensions based on grid size
-      const pixelWidth = gridWidth * gridSize;
-      const pixelHeight = gridHeight * gridSize;
+      const maxPixelWidth = gridWidth * gridSize;
+      const maxPixelHeight = gridHeight * gridSize;
+      
+      // Get image natural dimensions
+      const imgWidth = img.width || 100;
+      const imgHeight = img.height || 100;
+      
+      // Calculate scale to fit within bounds while maintaining aspect ratio
+      const scaleX = maxPixelWidth / imgWidth;
+      const scaleY = maxPixelHeight / imgHeight;
+      const scale = Math.min(scaleX, scaleY); // Use smaller scale to maintain aspect ratio
+      
+      // Calculate final dimensions
+      const finalWidth = imgWidth * scale;
+      const finalHeight = imgHeight * scale;
+      
+      // Center the image within the token bounds if it doesn't fill completely
+      const offsetX = (maxPixelWidth - finalWidth) / 2;
+      const offsetY = (maxPixelHeight - finalHeight) / 2;
       
       img.set({
-        left: x,
-        top: y,
-        width: pixelWidth,
-        height: pixelHeight,
-        scaleX: 1,
-        scaleY: 1,
+        left: x + offsetX,
+        top: y + offsetY,
+        scaleX: scale,
+        scaleY: scale,
         hasControls: true,
         hasBorders: true,
         borderColor: 'hsl(var(--token-selection))',
