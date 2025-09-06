@@ -506,38 +506,41 @@ export const SimpleTabletop = () => {
 
   // Function to draw hex grid within region
   const drawHexGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const hexSize = region.gridSize / 2;
-    const hexWidth = hexSize * Math.sqrt(3);
-    const hexHeight = hexSize * 2;
-    const vertSpacing = hexHeight * 0.75;
+    const hexRadius = region.gridSize / 2;
+    const hexWidth = hexRadius * 2;
+    const hexHeight = hexRadius * Math.sqrt(3);
     
-    const startCol = Math.floor(region.x / hexWidth);
-    const endCol = Math.ceil((region.x + region.width) / hexWidth);
-    const startRow = Math.floor(region.y / vertSpacing);
-    const endRow = Math.ceil((region.y + region.height) / vertSpacing);
+    // Calculate number of hexes that fit
+    const cols = Math.ceil(region.width / (hexWidth * 0.75)) + 1;
+    const rows = Math.ceil(region.height / hexHeight) + 1;
     
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startCol; col <= endCol; col++) {
-        const offsetX = (row % 2) * (hexWidth / 2);
-        const x = col * hexWidth + offsetX;
-        const y = row * vertSpacing;
+    // Starting position aligned to region
+    const startX = region.x;
+    const startY = region.y;
+    
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        // Calculate hex center position
+        const hexX = startX + col * (hexWidth * 0.75) + hexRadius;
+        const hexY = startY + row * hexHeight + hexRadius + (col % 2) * (hexHeight / 2);
         
-        // Only draw if hex center is within region bounds
-        if (x >= region.x - hexWidth/2 && x <= region.x + region.width + hexWidth/2 &&
-            y >= region.y - hexHeight/2 && y <= region.y + region.height + hexHeight/2) {
-          drawHexagon(ctx, x, y, hexSize);
+        // Only draw if hex center is within or near region bounds
+        if (hexX >= region.x - hexRadius && hexX <= region.x + region.width + hexRadius &&
+            hexY >= region.y - hexRadius && hexY <= region.y + region.height + hexRadius) {
+          drawHexagon(ctx, hexX, hexY, hexRadius);
         }
       }
     }
   };
 
-  // Function to draw a single hexagon
-  const drawHexagon = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number) => {
+  // Function to draw a single hexagon (pointy-top orientation)
+  const drawHexagon = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number) => {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI) / 3;
-      const x = centerX + size * Math.cos(angle);
-      const y = centerY + size * Math.sin(angle);
+      // Pointy-top hexagon: start at top point and go clockwise
+      const angle = (i * Math.PI) / 3 - Math.PI / 2;
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -594,7 +597,7 @@ export const SimpleTabletop = () => {
       selected: false,
       color: 'rgba(100, 150, 200, 0.3)',
       gridType: 'default',
-      gridSize: 20
+      gridSize: 40  // Match main canvas grid size
     };
     
     setRegions(prev => [...prev, newRegion]);
