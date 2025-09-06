@@ -717,31 +717,44 @@ export const VirtualTabletop = () => {
       const evt = opt.e as MouseEvent;
       console.log('Canvas mouse:up', { button: evt.button, rightMouseDown, isDragging, target: opt.target });
       
-      if (rightMouseDown && evt.button === 2) {
-        const target = opt.target;
+      // Handle right mouse button up
+      if (evt.button === 2) {
+        console.log('Right mouse up detected, rightMouseDown:', rightMouseDown);
         
-        if (isDragging) {
-          console.log('Ending pan mode');
-          // Was dragging - end pan mode
-          isDragging = false;
-          canvas.selection = true;
-          canvas.setCursor('default');
-        } else if (target && (target as any).tokenId) {
-          console.log('Showing context menu for token:', (target as any).tokenId);
-          // Was a click on a token - trigger context menu manually
-          // Let's use a simpler approach - just set a flag and let TokenContextManager handle it
+        if (rightMouseDown) {
+          const target = opt.target;
+          
+          if (isDragging) {
+            console.log('Ending pan mode');
+            // Was dragging - end pan mode
+            isDragging = false;
+            canvas.selection = true;
+            canvas.setCursor('default');
+          } else if (target && (target as any).tokenId) {
+            console.log('Showing context menu for token:', (target as any).tokenId);
+            // Was a click on a token - trigger context menu manually
+            // Let's use a simpler approach - just set a flag and let TokenContextManager handle it
+          }
+          
+          rightMouseDown = false;
+          evt.preventDefault();
+          evt.stopPropagation();
         }
-        
-        rightMouseDown = false;
-        evt.preventDefault();
-        evt.stopPropagation();
       }
     });
 
-    // Disable browser context menu on canvas
-    canvas.wrapperEl.addEventListener('contextmenu', (e) => {
+    // Add more aggressive right-click detection
+    canvas.upperCanvasEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      return false;
+      e.stopPropagation();
+      console.log('Context menu prevented');
+    });
+    
+    canvas.upperCanvasEl.addEventListener('mousedown', (e) => {
+      console.log('Raw mousedown:', { button: e.button, which: e.which });
+      if (e.button === 2 || e.which === 3) {
+        console.log('RIGHT CLICK DETECTED ON CANVAS!');
+      }
     });
 
     // Keyboard shortcuts for zoom
