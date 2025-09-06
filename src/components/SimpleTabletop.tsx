@@ -591,15 +591,23 @@ export const SimpleTabletop = () => {
   // Function to add a new region
   const addRegion = () => {
     const regionId = `region-${Date.now()}`;
-    const centerX = -transform.x / transform.zoom;
-    const centerY = -transform.y / transform.zoom;
+    
+    // Get canvas dimensions to calculate viewport center
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const viewportCenterX = (canvas.width / 2 - transform.x) / transform.zoom;
+    const viewportCenterY = (canvas.height / 2 - transform.y) / transform.zoom;
+    
+    // Create region with reasonable size (200x200 units) centered in viewport
+    const regionSize = 200;
     
     const newRegion: Region = {
       id: regionId,
-      x: centerX - 10, // 20 units wide
-      y: centerY - 20, // 40 units tall
-      width: 20,
-      height: 40,
+      x: viewportCenterX - regionSize / 2,
+      y: viewportCenterY - regionSize / 2,
+      width: regionSize,
+      height: regionSize,
       selected: false,
       color: 'rgba(100, 150, 200, 0.3)',
       gridType: 'free',
@@ -609,7 +617,7 @@ export const SimpleTabletop = () => {
     };
     
     setRegions(prev => [...prev, newRegion]);
-    toast.success('Region added');
+    toast.success('Region added to viewport center');
   };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const tokenSize = 40;
