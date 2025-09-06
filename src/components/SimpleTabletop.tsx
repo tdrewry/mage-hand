@@ -305,10 +305,10 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
-  // Redraw when transform changes
+  // Redraw when transform or tokens change
   useEffect(() => {
     redrawCanvas();
-  }, [transform]);
+  }, [transform, tokens]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -445,6 +445,9 @@ export const SimpleTabletop = () => {
       
       // Update token position in store
       updateTokenPosition(draggedTokenId, newX, newY);
+      
+      // Force immediate redraw for smooth dragging feedback
+      redrawCanvas();
     }
   };
 
