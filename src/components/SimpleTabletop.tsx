@@ -221,7 +221,15 @@ export const SimpleTabletop = () => {
     // For free movement: draw straight line from start to current position
     // TODO: For grid movement, this will use grid-based pathfinding algorithms
     
+    const gridSize = 40; // Grid unit size in pixels
+    
     ctx.save();
+    
+    // Calculate distance in grid units
+    const dx = token.x - dragStartPos.x;
+    const dy = token.y - dragStartPos.y;
+    const distancePixels = Math.sqrt(dx * dx + dy * dy);
+    const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
     
     // Draw path line
     ctx.strokeStyle = token.color || '#ffffff';
@@ -233,6 +241,29 @@ export const SimpleTabletop = () => {
     ctx.moveTo(dragStartPos.x, dragStartPos.y);
     ctx.lineTo(token.x, token.y);
     ctx.stroke();
+    
+    // Draw distance text at midpoint of line
+    if (distancePixels > 10) { // Only show if line is long enough
+      const midX = (dragStartPos.x + token.x) / 2;
+      const midY = (dragStartPos.y + token.y) / 2;
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.font = `${14 / transform.zoom}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Add background to text for better readability
+      const textMetrics = ctx.measureText(`${distanceGridUnits} units`);
+      const textWidth = textMetrics.width;
+      const textHeight = 14 / transform.zoom;
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(midX - textWidth / 2 - 4 / transform.zoom, midY - textHeight / 2, textWidth + 8 / transform.zoom, textHeight);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`${distanceGridUnits} units`, midX, midY);
+    }
     
     // Draw path points if we have a detailed path
     if (dragPath.length > 1) {
