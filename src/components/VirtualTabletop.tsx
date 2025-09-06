@@ -34,9 +34,13 @@ export const VirtualTabletop = () => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    // Calculate full viewport canvas size
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight - 80; // Account for toolbar height
+
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 1200,
-      height: 800,
+      width: viewportWidth,
+      height: viewportHeight,
       backgroundColor: 'hsl(var(--canvas-background))',
     });
 
@@ -54,7 +58,18 @@ export const VirtualTabletop = () => {
 
     toast.success('Virtual Tabletop Ready!');
 
+    // Handle window resize for responsive canvas
+    const handleResize = () => {
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight - 80;
+      canvas.setDimensions({ width: newWidth, height: newHeight });
+      canvas.renderAll();
+    };
+
+    window.addEventListener('resize', handleResize);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
       canvas.dispose();
     };
   }, []);
@@ -510,39 +525,39 @@ export const VirtualTabletop = () => {
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col">
-      {/* Header Toolbar */}
-      <Toolbar sessionId={sessionId} fabricCanvas={fabricCanvas} />
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Header Toolbar - Minimal overlay style */}
+      <div className="relative z-40">
+        <Toolbar sessionId={sessionId} fabricCanvas={fabricCanvas} />
+      </div>
       
-      <div className="flex-1 flex">
-        {/* Main Canvas Area - Full Width */}
+      {/* Full-Screen Map Canvas */}
+      <div className="flex-1 relative">
         <TokenContextMenu 
           tokenId={selectedTokenIds[0] || ''}
           onColorChange={handleTokenColorChange}
           onUpdateCanvas={handleCanvasUpdate}
         >
-          <div className="flex-1 p-4 relative">
-            {/* Floating Menu */}
-            <FloatingMenu
-              fabricCanvas={fabricCanvas}
-              gridType={gridType}
-              gridSize={gridSize}
-              isGridVisible={isGridVisible}
-              onGridTypeChange={setGridType}
-              onGridSizeChange={setGridSize}
-              onGridVisibilityChange={setIsGridVisible}
-              onAddToken={addTokenToCanvas}
-              onColorChange={handleTokenColorChange}
-              onUpdateCanvas={handleCanvasUpdate}
+          {/* Floating Menu - Positioned at upper left of map */}
+          <FloatingMenu
+            fabricCanvas={fabricCanvas}
+            gridType={gridType}
+            gridSize={gridSize}
+            isGridVisible={isGridVisible}
+            onGridTypeChange={setGridType}
+            onGridSizeChange={setGridSize}
+            onGridVisibilityChange={setIsGridVisible}
+            onAddToken={addTokenToCanvas}
+            onColorChange={handleTokenColorChange}
+            onUpdateCanvas={handleCanvasUpdate}
+          />
+          
+          {/* Full-Screen Canvas Container */}
+          <div className="absolute inset-0 canvas-container">
+            <canvas 
+              ref={canvasRef} 
+              className="w-full h-full block"
             />
-            
-            {/* Canvas */}
-            <div className="canvas-container rounded-lg overflow-hidden shadow-lg">
-              <canvas 
-                ref={canvasRef} 
-                className="max-w-full max-h-full"
-              />
-            </div>
           </div>
         </TokenContextMenu>
       </div>

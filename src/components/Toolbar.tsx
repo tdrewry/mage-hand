@@ -30,7 +30,7 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
   };
 
   return (
-    <div className="bg-card border-b border-border p-3">
+    <div className="bg-card/95 backdrop-blur-sm border-b border-border p-3 relative z-50">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">

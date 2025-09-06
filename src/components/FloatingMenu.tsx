@@ -70,8 +70,8 @@ export const FloatingMenu = ({
 
   return (
     <>
-      {/* Floating Menu */}
-      <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-3">
+      {/* Floating Menu - Upper Left Corner */}
+      <div className="fixed left-4 top-20 z-50 flex flex-col gap-3">
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           return (
