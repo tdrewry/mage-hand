@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';
+import { FloatingMenu } from './FloatingMenu';
+import { TokenContextManager } from './TokenContextManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { toast } from 'sonner';
@@ -20,17 +22,60 @@ export const SimpleTabletop = () => {
   
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+  
+  // Token interaction state
+  const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
+  const [isDraggingToken, setIsDraggingToken] = useState(false);
+  const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const {
     sessionId,
     tokens,
     addToken,
+    updateTokenPosition,
+    updateTokenLabel,
+    updateTokenColor,
+    removeToken,
     currentPlayerId,
   } = useSessionStore();
 
   const { maps, getVisibleMaps } = useMapStore();
 
-  // Function to redraw the canvas
+  // Helper function to convert screen coordinates to world coordinates
+  const screenToWorld = (screenX: number, screenY: number) => {
+    return {
+      x: (screenX - transform.x) / transform.zoom,
+      y: (screenY - transform.y) / transform.zoom
+    };
+  };
+
+  // Helper function to convert world coordinates to screen coordinates
+  const worldToScreen = (worldX: number, worldY: number) => {
+    return {
+      x: worldX * transform.zoom + transform.x,
+      y: worldY * transform.zoom + transform.y
+    };
+  };
+
+  // Hit test for tokens
+  const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
+    const tokenSize = 20; // Half of token diameter (40)
+    
+    // Check tokens in reverse order (top to bottom)
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const token = tokens[i];
+      const distance = Math.sqrt(
+        Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
+      );
+      
+      if (distance <= tokenSize) {
+        return token;
+      }
+    }
+    
+    return null;
+  };
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
     
@@ -120,6 +165,15 @@ export const SimpleTabletop = () => {
   // Function to draw a single token
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const tokenSize = 40;
+    const isSelected = selectedTokenIds.includes(token.id);
+    
+    // Draw selection highlight
+    if (isSelected) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, (tokenSize / 2) + 4, 0, 2 * Math.PI);
+      ctx.fill();
+    }
     
     // Draw token circle background
     ctx.fillStyle = token.color || '#ffffff';
@@ -128,8 +182,8 @@ export const SimpleTabletop = () => {
     ctx.fill();
     
     // Draw token border
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2 / transform.zoom;
+    ctx.strokeStyle = isSelected ? '#ffffff' : '#000000';
+    ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
     ctx.stroke();
     
     // Draw token label
@@ -236,7 +290,7 @@ export const SimpleTabletop = () => {
     // Initial draw
     redrawCanvas();
 
-    toast.success('Pan/Zoom Tabletop Ready! Right-click drag to pan, scroll to zoom.');
+    toast.success('Pan/Zoom Tabletop Ready! Controls: Left-click=select, Shift+click=add token, Right-click=pan, Scroll=zoom, Right-click token=menu');
 
     const handleResize = () => {
       canvas.width = window.innerWidth;
@@ -256,9 +310,9 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [transform]);
 
-  // Add click handler to place tokens
+  // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button === 0 && !isPanning) { // Left click and not panning
+    if (e.button === 0 && !isPanning && !isDraggingToken) { // Left click and not panning/dragging
       const canvas = canvasRef.current;
       if (!canvas) return;
       
@@ -267,26 +321,111 @@ export const SimpleTabletop = () => {
       const clickY = e.clientY - rect.top;
       
       // Convert screen coordinates to world coordinates
-      const worldX = (clickX - transform.x) / transform.zoom;
-      const worldY = (clickY - transform.y) / transform.zoom;
+      const worldPos = screenToWorld(clickX, clickY);
       
-      // Add token at clicked position
-      addTokenToCanvas('', worldX, worldY);
+      // Check if we clicked on a token
+      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      
+      if (clickedToken) {
+        // Token selection logic
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+click: toggle selection
+          setSelectedTokenIds(prev => 
+            prev.includes(clickedToken.id)
+              ? prev.filter(id => id !== clickedToken.id)
+              : [...prev, clickedToken.id]
+          );
+        } else {
+          // Normal click: select only this token
+          setSelectedTokenIds([clickedToken.id]);
+        }
+      } else {
+        // Clicked on empty space: deselect all or add token
+        if (e.shiftKey) {
+          // Shift+click: add token at clicked position
+          addTokenToCanvas('', worldPos.x, worldPos.y);
+        } else {
+          // Normal click: deselect all
+          setSelectedTokenIds([]);
+        }
+      }
+    }
+  };
+
+  // Handle right-click context menu for tokens
+  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Convert screen coordinates to world coordinates
+    const worldPos = screenToWorld(clickX, clickY);
+    
+    // Check if we right-clicked on a token
+    const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+    
+    if (clickedToken) {
+      // Dispatch custom event for TokenContextManager
+      const event = new CustomEvent('showTokenContextMenu', {
+        detail: {
+          tokenId: clickedToken.id,
+          x: e.clientX,
+          y: e.clientY
+        }
+      });
+      window.dispatchEvent(event);
     }
   };
 
   // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const worldPos = screenToWorld(mouseX, mouseY);
+    
     if (e.button === 2) { // Right click
       e.preventDefault();
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (e.button === 0) { // Left click
-      handleCanvasClick(e);
+      // Check if we're clicking on a token for dragging
+      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      
+      if (clickedToken) {
+        setIsDraggingToken(true);
+        setDraggedTokenId(clickedToken.id);
+        setDragOffset({
+          x: worldPos.x - clickedToken.x,
+          y: worldPos.y - clickedToken.y
+        });
+        
+        // If token not selected, select it
+        if (!selectedTokenIds.includes(clickedToken.id)) {
+          setSelectedTokenIds([clickedToken.id]);
+        }
+      } else {
+        handleCanvasClick(e);
+      }
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
     if (isPanning) {
       const deltaX = e.clientX - lastPanPoint.x;
       const deltaY = e.clientY - lastPanPoint.y;
@@ -298,12 +437,24 @@ export const SimpleTabletop = () => {
       }));
       
       setLastPanPoint({ x: e.clientX, y: e.clientY });
+    } else if (isDraggingToken && draggedTokenId) {
+      // Token dragging
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const newX = worldPos.x - dragOffset.x;
+      const newY = worldPos.y - dragOffset.y;
+      
+      // Update token position in store
+      updateTokenPosition(draggedTokenId, newX, newY);
     }
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 2) { // Right click
       setIsPanning(false);
+    } else if (e.button === 0) { // Left click
+      setIsDraggingToken(false);
+      setDraggedTokenId(null);
+      setDragOffset({ x: 0, y: 0 });
     }
   };
 
@@ -333,15 +484,25 @@ export const SimpleTabletop = () => {
   };
 
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.preventDefault(); // Prevent browser context menu
+    handleCanvasContextMenu(e);
+  };
+
+  // Token manipulation functions for FloatingMenu
+  const handleTokenColorChange = (tokenId: string, color: string) => {
+    updateTokenColor(tokenId, color);
+    toast.success('Token color updated');
+  };
+
+  const handleCanvasUpdate = () => {
+    // Canvas automatically redraws when tokens change
   };
 
   const addTokenToCanvas = async (imageUrl: string, x?: number, y?: number) => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Use mouse position if coordinates not provided
-    const tokenX = x ?? 200;
-    const tokenY = y ?? 200;
+    // Use provided coordinates or default to center of viewport
+    const tokenX = x ?? (-transform.x / transform.zoom);
+    const tokenY = y ?? (-transform.y / transform.zoom);
     
     // Generate a random color for the token
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
@@ -397,7 +558,7 @@ export const SimpleTabletop = () => {
           className="absolute inset-0 w-full h-full"
           style={{ 
             background: 'hsl(var(--surface))',
-            cursor: isPanning ? 'grabbing' : 'grab'
+            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : 'default'
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -406,6 +567,31 @@ export const SimpleTabletop = () => {
           onContextMenu={handleContextMenu}
         />
       </div>
+
+      {/* Floating Menu */}
+      <FloatingMenu
+        fabricCanvas={null}
+        gridType="square"
+        gridSize={40}
+        isGridVisible={true}
+        gridColor="#333"
+        gridOpacity={80}
+        onGridTypeChange={() => {}}
+        onGridSizeChange={() => {}}
+        onGridVisibilityChange={() => {}}
+        onGridColorChange={() => {}}
+        onGridOpacityChange={() => {}}
+        onAddToken={addTokenToCanvas}
+        onColorChange={handleTokenColorChange}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
+
+      {/* Token Context Manager */}
+      <TokenContextManager
+        fabricCanvas={null}
+        onColorChange={handleTokenColorChange}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
 
       {/* Map Manager Modal */}
       {showMapManager && (
