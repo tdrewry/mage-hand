@@ -288,16 +288,25 @@ export function snapToMapGrid(x: number, y: number, regions: { map: GameMap; reg
       };
       
     case 'hex':
-      // Create hex layout with origin at region bounds
+      // Create hex layout using same coordinate system as rendering
       const layout = createHexLayout(region.gridSize, POINTY_TOP);
-      layout.origin = { x: region.bounds.x, y: region.bounds.y };
       
       // Convert to hex coordinates and round to nearest hex center
       const hex = pixelToHex(layout, { x, y });
       const roundedHex = hexRound(hex);
       
       // Convert back to pixel coordinates (will be at hex center)
-      return hexToPixel(layout, roundedHex);
+      const snappedPoint = hexToPixel(layout, roundedHex);
+      
+      // Ensure the snapped point is within region bounds
+      if (snappedPoint.x >= region.bounds.x && 
+          snappedPoint.x <= region.bounds.x + region.bounds.width &&
+          snappedPoint.y >= region.bounds.y && 
+          snappedPoint.y <= region.bounds.y + region.bounds.height) {
+        return snappedPoint;
+      }
+      
+      return { x, y }; // Don't snap if result would be outside region
       
     default:
       return { x, y };
