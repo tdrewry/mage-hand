@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text, Point } from 'fabric';
 import { Toolbar } from './Toolbar';
-import { TokenContextMenu } from './TokenContextMenu';
+import { TokenContextManager } from './TokenContextManager';
 import { FloatingMenu } from './FloatingMenu';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
@@ -651,6 +651,16 @@ export const VirtualTabletop = () => {
     canvas.on('mouse:down', (opt) => {
       const evt = opt.e as MouseEvent;
       if (evt.button === 2) { // Right mouse button
+        const target = opt.target;
+        
+        // If clicking on a token, don't start panning - let context menu handle it
+        if (target && (target as any).tokenId) {
+          // Store the clicked token for context menu
+          setSelectedTokens([(target as any).tokenId]);
+          return;
+        }
+        
+        // Otherwise, start panning
         rightMouseDown = true;
         dragStartX = evt.clientX;
         dragStartY = evt.clientY;
@@ -700,14 +710,27 @@ export const VirtualTabletop = () => {
       const evt = opt.e as MouseEvent;
       
       if (rightMouseDown && evt.button === 2) {
+        const target = opt.target;
+        
         if (isDragging) {
           // Was dragging - end pan mode
           isDragging = false;
           canvas.selection = true;
           canvas.setCursor('default');
-        } else {
-          // Was a click without drag - let context menu handle it
-          // The TokenContextMenu component will handle the right-click context menu
+        } else if (target && (target as any).tokenId) {
+          // Was a click on a token - trigger context menu
+          const tokenElement = document.querySelector(`[data-token-id="${(target as any).tokenId}"]`);
+          if (tokenElement) {
+            // Create and dispatch a synthetic right-click event
+            const contextEvent = new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              clientX: evt.clientX,
+              clientY: evt.clientY,
+              button: 2
+            });
+            tokenElement.dispatchEvent(contextEvent);
+          }
         }
         
         rightMouseDown = false;
@@ -766,37 +789,38 @@ export const VirtualTabletop = () => {
       
       {/* Full-Screen Map Canvas */}
       <div className="flex-1 relative">
-        <TokenContextMenu 
-          tokenId={selectedTokenIds[0] || ''}
-          onColorChange={handleTokenColorChange}
-          onUpdateCanvas={handleCanvasUpdate}
-        >
-          {/* Single container wrapping all children for ContextMenuTrigger */}
-          <div className="relative w-full h-full">
-            {/* Floating Menu - Positioned at upper left of map */}
-            <FloatingMenu
-              fabricCanvas={fabricCanvas}
-              gridType={gridType}
-              gridSize={gridSize}
-              isGridVisible={isGridVisible}
-              onGridTypeChange={setGridType}
-              onGridSizeChange={setGridSize}
-              onGridVisibilityChange={setIsGridVisible}
-              onAddToken={addTokenToCanvas}
-              onColorChange={handleTokenColorChange}
-              onUpdateCanvas={handleCanvasUpdate}
+        {/* Single container for the canvas */}
+        <div className="relative w-full h-full">
+          {/* Floating Menu - Positioned at upper left of map */}
+          <FloatingMenu
+            fabricCanvas={fabricCanvas}
+            gridType={gridType}
+            gridSize={gridSize}
+            isGridVisible={isGridVisible}
+            onGridTypeChange={setGridType}
+            onGridSizeChange={setGridSize}
+            onGridVisibilityChange={setIsGridVisible}
+            onAddToken={addTokenToCanvas}
+            onColorChange={handleTokenColorChange}
+            onUpdateCanvas={handleCanvasUpdate}
+          />
+          
+          {/* Full-Screen Canvas Container */}
+          <div className="absolute inset-0 canvas-container">
+            <canvas 
+              ref={canvasRef} 
+              className="w-full h-full block"
             />
-            
-            {/* Full-Screen Canvas Container */}
-            <div className="absolute inset-0 canvas-container">
-              <canvas 
-                ref={canvasRef} 
-                className="w-full h-full block"
-              />
-            </div>
           </div>
-        </TokenContextMenu>
+        </div>
       </div>
+      
+      {/* Token Context Manager - Handles right-click menus */}
+      <TokenContextManager
+        fabricCanvas={fabricCanvas}
+        onColorChange={handleTokenColorChange}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
     </div>
   );
 };
