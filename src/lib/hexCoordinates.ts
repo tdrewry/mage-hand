@@ -145,31 +145,50 @@ export function createHexLayout(size: number, orientation: HexOrientation = POIN
   };
 }
 
-// Get all hexes in a rectangular region
+// Get all hexes in a rectangular region - improved algorithm for better coverage
 export function hexesInRectangle(layout: HexLayout, left: number, top: number, width: number, height: number): HexCoordinate[] {
   const hexes: HexCoordinate[] = [];
   
-  // Convert rectangle corners to hex coordinates
-  const topLeft = pixelToHex(layout, { x: left, y: top });
-  const bottomRight = pixelToHex(layout, { x: left + width, y: top + height });
+  // Add extra padding to ensure complete coverage
+  const padding = Math.max(layout.size.x, layout.size.y) * 1.5;
+  const expandedLeft = left - padding;
+  const expandedTop = top - padding;
+  const expandedWidth = width + padding * 2;
+  const expandedHeight = height + padding * 2;
   
-  // Round to get integer bounds
-  const minQ = Math.floor(Math.min(topLeft.q, bottomRight.q)) - 1;
-  const maxQ = Math.ceil(Math.max(topLeft.q, bottomRight.q)) + 1;
-  const minR = Math.floor(Math.min(topLeft.r, bottomRight.r)) - 1;
-  const maxR = Math.ceil(Math.max(topLeft.r, bottomRight.r)) + 1;
+  // Convert corners and center to hex coordinates to get better bounds
+  const corners = [
+    pixelToHex(layout, { x: expandedLeft, y: expandedTop }),
+    pixelToHex(layout, { x: expandedLeft + expandedWidth, y: expandedTop }),
+    pixelToHex(layout, { x: expandedLeft, y: expandedTop + expandedHeight }),
+    pixelToHex(layout, { x: expandedLeft + expandedWidth, y: expandedTop + expandedHeight }),
+    pixelToHex(layout, { x: expandedLeft + expandedWidth/2, y: expandedTop + expandedHeight/2 })
+  ];
   
-  // Generate hexes in the region
+  // Find the bounds that encompass all corners
+  let minQ = Math.floor(corners[0].q);
+  let maxQ = Math.ceil(corners[0].q);
+  let minR = Math.floor(corners[0].r);
+  let maxR = Math.ceil(corners[0].r);
+  
+  corners.forEach(corner => {
+    minQ = Math.min(minQ, Math.floor(corner.q));
+    maxQ = Math.max(maxQ, Math.ceil(corner.q));
+    minR = Math.min(minR, Math.floor(corner.r));
+    maxR = Math.max(maxR, Math.ceil(corner.r));
+  });
+  
+  // Add extra buffer for edge cases
+  minQ -= 2;
+  maxQ += 2;
+  minR -= 2;
+  maxR += 2;
+  
+  // Generate all hexes in the expanded bounds
   for (let q = minQ; q <= maxQ; q++) {
     for (let r = minR; r <= maxR; r++) {
       const hex = { q, r, s: -q - r };
-      const pixel = hexToPixel(layout, hex);
-      
-        // Check if hex center is within extended bounds (with some padding)
-        if (pixel.x >= left - layout.size.x * 2 && pixel.x <= left + width + layout.size.x * 2 &&
-            pixel.y >= top - layout.size.y * 2 && pixel.y <= top + height + layout.size.y * 2) {
-          hexes.push(hex);
-        }
+      hexes.push(hex);
     }
   }
   

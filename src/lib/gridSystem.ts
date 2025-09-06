@@ -134,12 +134,10 @@ export function renderHexGrid(
   
   if (size <= 0) return;
   
-  // Create hex layout if not exists or size changed
-  if (!renderer.hexLayout || renderer.hexLayout.size.x !== size) {
-    renderer.hexLayout = createHexLayout(size, POINTY_TOP);
-  }
-  
-  const layout = renderer.hexLayout;
+  // Create hex layout matching the snapping system exactly
+  const layout = createHexLayout(size, POINTY_TOP);
+  // Store layout for reuse
+  renderer.hexLayout = layout;
   
   // Calculate visible world coordinates
   const worldLeft = viewport.x;
@@ -147,14 +145,14 @@ export function renderHexGrid(
   const worldRight = worldLeft + (viewport.width / viewport.zoom);
   const worldBottom = worldTop + (viewport.height / viewport.zoom);
   
-  // Extend the grid slightly beyond visible area for smooth panning
-  const padding = size * 2;
+  // Extend the grid beyond visible area for smooth panning
+  const padding = size * 3;
   const hexLeft = worldLeft - padding;
   const hexTop = worldTop - padding;
   const hexWidth = (worldRight - worldLeft) + padding * 2;
   const hexHeight = (worldBottom - worldTop) + padding * 2;
   
-  // Get all hexes in the visible area
+  // Get all hexes in the visible area using improved algorithm
   const hexes = hexesInRectangle(layout, hexLeft, hexTop, hexWidth, hexHeight);
   
   // Set up drawing style
@@ -169,28 +167,16 @@ export function renderHexGrid(
     
     if (corners.length === 0) return;
     
-    // Convert world coordinates to screen coordinates
+    // Convert world coordinates to screen coordinates and draw hex
     ctx.beginPath();
+    
+    // Start with first corner
     const firstCorner = corners[0];
     const screenX1 = (firstCorner.x - worldLeft) * viewport.zoom;
     const screenY1 = (firstCorner.y - worldTop) * viewport.zoom;
-    
-    // Only draw if at least one corner is on screen
-    let hasVisibleCorner = false;
-    for (const corner of corners) {
-      const screenX = (corner.x - worldLeft) * viewport.zoom;
-      const screenY = (corner.y - worldTop) * viewport.zoom;
-      if (screenX >= -size && screenX <= canvas.width + size && 
-          screenY >= -size && screenY <= canvas.height + size) {
-        hasVisibleCorner = true;
-        break;
-      }
-    }
-    
-    if (!hasVisibleCorner) return;
-    
     ctx.moveTo(screenX1, screenY1);
     
+    // Draw to remaining corners
     for (let i = 1; i < corners.length; i++) {
       const corner = corners[i];
       const screenX = (corner.x - worldLeft) * viewport.zoom;
