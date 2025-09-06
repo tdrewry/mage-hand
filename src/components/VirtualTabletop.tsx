@@ -933,57 +933,46 @@ export const VirtualTabletop = () => {
       </div>
       
       {/* Full-Screen Map Canvas */}
-      <div className="flex-1 relative">
-        {/* Single container for the canvas */}
-        <div className="relative w-full h-full">
-          {/* Floating Menu - Positioned at upper left of map */}
-          <FloatingMenu
-            fabricCanvas={fabricCanvas}
-            gridType={gridType}
-            gridSize={gridSize}
-            isGridVisible={isGridVisible}
-            gridColor={gridColor}
-            gridOpacity={gridOpacity}
-            onGridTypeChange={setGridType}
-            onGridSizeChange={setGridSize}
-            onGridVisibilityChange={setIsGridVisible}
-            onGridColorChange={setGridColor}
-            onGridOpacityChange={setGridOpacity}
-            onAddToken={addTokenToCanvas}
-            onColorChange={handleTokenColorChange}
-            onUpdateCanvas={handleCanvasUpdate}
-          />
-          
-          {/* Background Grid Canvas */}
-          <div className="absolute inset-0" style={{ zIndex: 1 }}>
-            <canvas 
-              ref={gridCanvasRef}
-              className="w-full h-full block"
-              style={{ 
-                background: '#1a1a1a',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                border: '2px solid red' // Debug border to see canvas bounds
-              }}
-            />
-          </div>
-          
-          {/* Full-Screen Canvas Container */}
-          <div className="absolute inset-0 canvas-container" style={{ zIndex: 2 }}>
-            <canvas 
-              ref={canvasRef} 
-              className="w-full h-full block"
-              style={{ 
-                background: 'transparent',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                border: '2px solid blue' // Debug border to see canvas bounds
-              }}
-            />
-          </div>
-        </div>
+      <div className="flex-1 relative overflow-hidden">
+        {/* Floating Menu - Positioned at upper left of map */}
+        <FloatingMenu
+          fabricCanvas={fabricCanvas}
+          gridType={gridType}
+          gridSize={gridSize}
+          isGridVisible={isGridVisible}
+          gridColor={gridColor}
+          gridOpacity={gridOpacity}
+          onGridTypeChange={setGridType}
+          onGridSizeChange={setGridSize}
+          onGridVisibilityChange={setIsGridVisible}
+          onGridColorChange={setGridColor}
+          onGridOpacityChange={setGridOpacity}
+          onAddToken={addTokenToCanvas}
+          onColorChange={handleTokenColorChange}
+          onUpdateCanvas={handleCanvasUpdate}
+        />
+        
+        {/* Background Grid Canvas */}
+        <canvas 
+          ref={gridCanvasRef}
+          className="absolute inset-0 w-full h-full"
+          style={{ 
+            zIndex: 1,
+            background: '#1a1a1a',
+            border: '2px solid red' // Debug border to see canvas bounds
+          }}
+        />
+        
+        {/* Foreground Fabric Canvas */}
+        <canvas 
+          ref={canvasRef} 
+          className="absolute inset-0 w-full h-full"
+          style={{ 
+            zIndex: 2,
+            background: 'transparent',
+            border: '2px solid blue' // Debug border to see canvas bounds
+          }}
+        />
       </div>
       
       {/* Token Context Manager - Handles right-click menus */}
