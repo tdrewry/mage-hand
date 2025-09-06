@@ -507,13 +507,12 @@ export const SimpleTabletop = () => {
   // Function to draw hex grid within region
   const drawHexGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
     const hexRadius = region.gridSize / 2;
-    const hexWidth = hexRadius * Math.sqrt(3); // Width of flat-top hex
-    const hexHeight = hexRadius * 2; // Height of flat-top hex
-    const rowSpacing = hexHeight * 0.75; // Vertical spacing between rows
+    const hexWidth = hexRadius * 2;
+    const hexHeight = hexRadius * Math.sqrt(3);
     
     // Calculate number of hexes that fit
-    const cols = Math.ceil(region.width / hexWidth) + 1;
-    const rows = Math.ceil(region.height / rowSpacing) + 1;
+    const cols = Math.ceil(region.width / (hexWidth * 0.75)) + 1;
+    const rows = Math.ceil(region.height / hexHeight) + 1;
     
     // Starting position aligned to region
     const startX = region.x;
@@ -522,9 +521,8 @@ export const SimpleTabletop = () => {
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         // Calculate hex center position
-        // For flat-top hexagons, odd rows are offset horizontally
-        const hexX = startX + col * hexWidth + hexWidth/2 + (row % 2) * (hexWidth / 2);
-        const hexY = startY + row * rowSpacing + hexRadius;
+        const hexX = startX + col * (hexWidth * 0.75) + hexRadius;
+        const hexY = startY + row * hexHeight + hexRadius + (col % 2) * (hexHeight / 2);
         
         // Only draw if hex center is within or near region bounds
         if (hexX >= region.x - hexRadius && hexX <= region.x + region.width + hexRadius &&
