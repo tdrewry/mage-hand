@@ -96,8 +96,9 @@ export const VirtualTabletop = () => {
             top: snappedPos.y,
           });
         }
-        // Update label position
-        updateTokenLabelPosition(obj.tokenId, obj.left, obj.top + (obj.height || 50) + 5);
+        // Update label position - calculate bottom edge properly
+        const tokenBottom = obj.top + (obj.height * obj.scaleY);
+        updateTokenLabelPosition(obj.tokenId, obj.left, tokenBottom + 5);
       }
     };
 
@@ -108,7 +109,9 @@ export const VirtualTabletop = () => {
         clearTimeout(moveTimeout);
         moveTimeout = setTimeout(() => {
           updateTokenPosition(obj.tokenId, obj.left, obj.top);
-          updateTokenLabelPosition(obj.tokenId, obj.left, obj.top + (obj.height || 50) + 5);
+          // Update label position - calculate bottom edge properly
+          const tokenBottom = obj.top + (obj.height * obj.scaleY);
+          updateTokenLabelPosition(obj.tokenId, obj.left, tokenBottom + 5);
           toast.info('Token moved', { duration: 1000 });
         }, 100); // Only update after 100ms of no movement
       }
@@ -311,8 +314,9 @@ export const VirtualTabletop = () => {
 
       fabricCanvas.add(img);
       
-      // Create label for the token
-      createTokenLabel(tokenId, x, y + finalHeight + 5, `Token ${tokenId.slice(-8)}`, color || '#FFFFFF');
+      // Create label for the token - position at bottom edge
+      const tokenBottom = y + finalHeight;
+      createTokenLabel(tokenId, x, tokenBottom + 5, `Token ${tokenId.slice(-8)}`, color || '#FFFFFF');
       
       enforceLayerOrder(fabricCanvas);
       fabricCanvas.renderAll();
@@ -344,6 +348,8 @@ export const VirtualTabletop = () => {
 
   // Enforce layer ordering: background -> grid -> map -> tokens
   const enforceLayerOrder = (canvas: FabricCanvas) => {
+    if (!canvas || !canvas.getObjects) return; // Safety check
+    
     const objects = canvas.getObjects();
     
     // Group objects by type
@@ -356,8 +362,8 @@ export const VirtualTabletop = () => {
       !obj.isBackground && !obj.isGrid && !obj.isMap && !obj.tokenId && !obj.isTokenLabel
     );
     
-    // Clear and re-add in correct order
-    canvas.clear();
+    // Remove all objects first
+    objects.forEach(obj => canvas.remove(obj));
     
     // Add in order: background, grid, map, tokens, labels, others
     [...backgrounds, ...grids, ...maps, ...tokens, ...labels, ...others].forEach(obj => {
@@ -452,8 +458,16 @@ export const VirtualTabletop = () => {
       obj.isTokenLabel && obj.tokenId === tokenId
     );
     
-    if (label) {
-      label.set({ left: x, top: y });
+    const token = fabricCanvas.getObjects().find((obj: any) => 
+      obj.tokenId === tokenId && !obj.isTokenLabel
+    );
+    
+    if (label && token) {
+      // Center the label horizontally relative to token
+      const tokenWidth = (token.width || 100) * (token.scaleX || 1);
+      const labelWidth = label.width || 0;
+      const centeredX = x + (tokenWidth / 2) - (labelWidth / 2);
+      label.set({ left: centeredX, top: y });
       fabricCanvas.renderAll();
     }
   };
