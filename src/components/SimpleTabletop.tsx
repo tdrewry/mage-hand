@@ -1098,6 +1098,8 @@ export const SimpleTabletop = () => {
         const token = tokens.find(t => t.id === draggedTokenId);
         if (token) {
           console.log('Token position:', token.x, token.y);
+          console.log('All maps and regions:', maps);
+          
           // Find the active region at token position
           const activeRegion = getActiveRegionAt(token.x, token.y);
           console.log('Active region:', activeRegion);

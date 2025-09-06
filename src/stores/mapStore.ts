@@ -195,18 +195,25 @@ export const useMapStore = create<MapStore>()(
             y >= map.bounds.y &&
             y <= map.bounds.y + map.bounds.height
           ) {
-            // Find the topmost visible region at this point
-            const region = map.regions
+            // Find the smallest visible region at this point (most specific)
+            const matchingRegions = map.regions
               .filter((region) => region.visible)
-              .find((region) =>
+              .filter((region) =>
                 x >= region.bounds.x &&
                 x <= region.bounds.x + region.bounds.width &&
                 y >= region.bounds.y &&
                 y <= region.bounds.y + region.bounds.height
               );
 
-            if (region) {
-              return { map, region };
+            if (matchingRegions.length > 0) {
+              // Sort by area (smallest first) to get the most specific region
+              const smallestRegion = matchingRegions.sort((a, b) => {
+                const areaA = a.bounds.width * a.bounds.height;
+                const areaB = b.bounds.width * b.bounds.height;
+                return areaA - areaB;
+              })[0];
+
+              return { map, region: smallestRegion };
             }
           }
         }
