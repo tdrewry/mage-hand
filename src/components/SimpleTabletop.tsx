@@ -155,6 +155,11 @@ export const SimpleTabletop = () => {
       drawToken(ctx, token);
     });
     
+    // Draw ghost token and drag path if dragging
+    if (isDraggingToken && draggedTokenId) {
+      drawDragGhostAndPath(ctx);
+    }
+    
     // Restore context before drawing off-screen indicators
     ctx.restore();
     
