@@ -30,6 +30,25 @@ export const SimpleTabletop = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragPath, setDragPath] = useState<{ x: number, y: number }[]>([]);
+  
+  // Region state
+  interface Region {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    selected: boolean;
+    color: string;
+  }
+  
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [isDraggingRegion, setIsDraggingRegion] = useState(false);
+  const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
+  const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
+  const [isResizingRegion, setIsResizingRegion] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
 
   const {
     sessionId,
@@ -75,6 +94,39 @@ export const SimpleTabletop = () => {
         return token;
       }
     }
+    
+    return null;
+  };
+
+  // Hit test for regions
+  const getRegionAtPosition = (worldX: number, worldY: number): Region | null => {
+    // Check regions in reverse order (top to bottom)
+    for (let i = regions.length - 1; i >= 0; i--) {
+      const region = regions[i];
+      if (worldX >= region.x && worldX <= region.x + region.width &&
+          worldY >= region.y && worldY <= region.y + region.height) {
+        return region;
+      }
+    }
+    return null;
+  };
+
+  // Get resize handle at position for a region
+  const getResizeHandle = (region: Region, worldX: number, worldY: number): string | null => {
+    const handleSize = 8 / transform.zoom;
+    const { x, y, width, height } = region;
+    
+    // Check corner handles
+    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'nw';
+    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'ne';
+    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'sw';
+    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'se';
+    
+    // Check edge handles
+    if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'n';
+    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'e';
+    if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 's';
+    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'w';
     
     return null;
   };
@@ -148,6 +200,11 @@ export const SimpleTabletop = () => {
       } else {
         offScreenTokens.push(token);
       }
+    });
+    
+    // Draw regions
+    regions.forEach(region => {
+      drawRegion(ctx, region);
     });
     
     // Draw visible tokens
@@ -356,6 +413,76 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
   };
+
+  // Function to draw regions
+  const drawRegion = (ctx: CanvasRenderingContext2D, region: Region) => {
+    const isSelected = region.selected;
+    
+    // Draw region background
+    ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
+    ctx.fillRect(region.x, region.y, region.width, region.height);
+    
+    // Draw region border
+    ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
+    ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
+    ctx.strokeRect(region.x, region.y, region.width, region.height);
+    
+    // Draw selection handles if selected
+    if (isSelected) {
+      drawRegionHandles(ctx, region);
+    }
+  };
+
+  // Function to draw region resize handles
+  const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: Region) => {
+    const handleSize = 6 / transform.zoom;
+    const { x, y, width, height } = region;
+    
+    ctx.fillStyle = '#4f46e5';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1 / transform.zoom;
+    
+    // Corner handles
+    const corners = [
+      { x: x, y: y }, // nw
+      { x: x + width, y: y }, // ne
+      { x: x, y: y + height }, // sw
+      { x: x + width, y: y + height }, // se
+    ];
+    
+    // Edge handles
+    const edges = [
+      { x: x + width/2, y: y }, // n
+      { x: x + width, y: y + height/2 }, // e
+      { x: x + width/2, y: y + height }, // s
+      { x: x, y: y + height/2 }, // w
+    ];
+    
+    [...corners, ...edges].forEach(handle => {
+      ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+      ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+    });
+  };
+
+  // Function to add a new region
+  const addRegion = () => {
+    const regionId = `region-${Date.now()}`;
+    const centerX = -transform.x / transform.zoom;
+    const centerY = -transform.y / transform.zoom;
+    
+    const newRegion: Region = {
+      id: regionId,
+      x: centerX - 10, // 20 units wide
+      y: centerY - 20, // 40 units tall
+      width: 20,
+      height: 40,
+      selected: false,
+      color: 'rgba(100, 150, 200, 0.3)'
+    };
+    
+    setRegions(prev => [...prev, newRegion]);
+    toast.success('Region added');
+  };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const tokenSize = 40;
     const isSelected = selectedTokenIds.includes(token.id);
@@ -498,10 +625,10 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
-  // Redraw when transform or tokens change
+  // Redraw when transform, tokens, or regions change
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens]);
+  }, [transform, tokens, regions]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -516,8 +643,9 @@ export const SimpleTabletop = () => {
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
       
-      // Check if we clicked on a token
+      // Check if we clicked on a token first (tokens are on top)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
         // Token selection logic
@@ -532,6 +660,11 @@ export const SimpleTabletop = () => {
           // Normal click: select only this token
           setSelectedTokenIds([clickedToken.id]);
         }
+      } else if (clickedRegion) {
+        // Region selection logic
+        setRegions(prev => prev.map(r => ({ ...r, selected: r.id === clickedRegion.id })));
+        setSelectedRegionId(clickedRegion.id);
+        setSelectedTokenIds([]); // Deselect tokens when selecting region
       } else {
         // Clicked on empty space: deselect all or add token
         if (e.shiftKey) {
@@ -540,6 +673,8 @@ export const SimpleTabletop = () => {
         } else {
           // Normal click: deselect all
           setSelectedTokenIds([]);
+          setRegions(prev => prev.map(r => ({ ...r, selected: false })));
+          setSelectedRegionId(null);
         }
       }
     }
@@ -590,8 +725,9 @@ export const SimpleTabletop = () => {
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (e.button === 0) { // Left click
-      // Check if we're clicking on a token for dragging
+      // Check what we're clicking on for dragging (tokens first, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
         setIsDraggingToken(true);
@@ -608,6 +744,23 @@ export const SimpleTabletop = () => {
         // If token not selected, select it
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
+        }
+      } else if (clickedRegion && clickedRegion.selected) {
+        // Check if we're clicking on a resize handle
+        const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
+        
+        if (handle) {
+          setIsResizingRegion(true);
+          setResizeHandle(handle);
+          setDraggedRegionId(clickedRegion.id);
+        } else {
+          // Start dragging the region
+          setIsDraggingRegion(true);
+          setDraggedRegionId(clickedRegion.id);
+          setRegionDragOffset({
+            x: worldPos.x - clickedRegion.x,
+            y: worldPos.y - clickedRegion.y
+          });
         }
       } else {
         handleCanvasClick(e);
@@ -652,6 +805,74 @@ export const SimpleTabletop = () => {
       
       // Force immediate redraw for smooth dragging feedback
       redrawCanvas();
+    } else if (isDraggingRegion && draggedRegionId) {
+      // Region dragging
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const newX = worldPos.x - regionDragOffset.x;
+      const newY = worldPos.y - regionDragOffset.y;
+      
+      setRegions(prev => prev.map(region => 
+        region.id === draggedRegionId 
+          ? { ...region, x: newX, y: newY }
+          : region
+      ));
+      
+      redrawCanvas();
+    } else if (isResizingRegion && draggedRegionId && resizeHandle) {
+      // Region resizing
+      const worldPos = screenToWorld(mouseX, mouseY);
+      
+      setRegions(prev => prev.map(region => {
+        if (region.id !== draggedRegionId) return region;
+        
+        const { x, y, width, height } = region;
+        let newRegion = { ...region };
+        
+        switch (resizeHandle) {
+          case 'nw':
+            newRegion.x = worldPos.x;
+            newRegion.y = worldPos.y;
+            newRegion.width = width + (x - worldPos.x);
+            newRegion.height = height + (y - worldPos.y);
+            break;
+          case 'ne':
+            newRegion.y = worldPos.y;
+            newRegion.width = worldPos.x - x;
+            newRegion.height = height + (y - worldPos.y);
+            break;
+          case 'sw':
+            newRegion.x = worldPos.x;
+            newRegion.width = width + (x - worldPos.x);
+            newRegion.height = worldPos.y - y;
+            break;
+          case 'se':
+            newRegion.width = worldPos.x - x;
+            newRegion.height = worldPos.y - y;
+            break;
+          case 'n':
+            newRegion.y = worldPos.y;
+            newRegion.height = height + (y - worldPos.y);
+            break;
+          case 'e':
+            newRegion.width = worldPos.x - x;
+            break;
+          case 's':
+            newRegion.height = worldPos.y - y;
+            break;
+          case 'w':
+            newRegion.x = worldPos.x;
+            newRegion.width = width + (x - worldPos.x);
+            break;
+        }
+        
+        // Ensure minimum size
+        newRegion.width = Math.max(10, newRegion.width);
+        newRegion.height = Math.max(10, newRegion.height);
+        
+        return newRegion;
+      }));
+      
+      redrawCanvas();
     }
   };
 
@@ -664,6 +885,13 @@ export const SimpleTabletop = () => {
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
+      
+      // Stop region interactions
+      setIsDraggingRegion(false);
+      setIsResizingRegion(false);
+      setDraggedRegionId(null);
+      setRegionDragOffset({ x: 0, y: 0 });
+      setResizeHandle(null);
       
       // Redraw canvas to clear ghost token and path
       redrawCanvas();
@@ -760,6 +988,18 @@ export const SimpleTabletop = () => {
         >
           <Settings className="w-4 h-4" />
           Maps
+        </Button>
+      </div>
+
+      {/* Add Region Button */}
+      <div className="absolute top-16 right-4 z-10">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addRegion}
+          className="flex items-center gap-2"
+        >
+          Add Region
         </Button>
       </div>
 
