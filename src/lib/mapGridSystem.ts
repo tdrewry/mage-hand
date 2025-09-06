@@ -260,17 +260,43 @@ export function snapToMapGrid(x: number, y: number, regions: { map: GameMap; reg
   
   const { region } = regions;
   
+  // Check if the point is within the region bounds
+  if (x < region.bounds.x || x > region.bounds.x + region.bounds.width ||
+      y < region.bounds.y || y > region.bounds.y + region.bounds.height) {
+    return { x, y }; // Don't snap if outside the region
+  }
+  
   switch (region.gridType) {
     case 'square':
+      // Snap to grid cell centers, not intersections
+      // Convert to region-local coordinates
+      const localX = x - region.bounds.x;
+      const localY = y - region.bounds.y;
+      
+      // Snap to center of grid cells
+      const gridCellX = Math.floor(localX / region.gridSize);
+      const gridCellY = Math.floor(localY / region.gridSize);
+      
+      // Calculate center of the grid cell
+      const centerX = (gridCellX + 0.5) * region.gridSize;
+      const centerY = (gridCellY + 0.5) * region.gridSize;
+      
+      // Convert back to world coordinates
       return {
-        x: Math.round(x / region.gridSize) * region.gridSize,
-        y: Math.round(y / region.gridSize) * region.gridSize,
+        x: centerX + region.bounds.x,
+        y: centerY + region.bounds.y,
       };
       
     case 'hex':
+      // Create hex layout with origin at region bounds
       const layout = createHexLayout(region.gridSize, POINTY_TOP);
+      layout.origin = { x: region.bounds.x, y: region.bounds.y };
+      
+      // Convert to hex coordinates and round to nearest hex center
       const hex = pixelToHex(layout, { x, y });
       const roundedHex = hexRound(hex);
+      
+      // Convert back to pixel coordinates (will be at hex center)
       return hexToPixel(layout, roundedHex);
       
     default:
