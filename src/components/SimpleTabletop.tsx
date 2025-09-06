@@ -1094,15 +1094,22 @@ export const SimpleTabletop = () => {
     } else if (e.button === 0) { // Left click
       // Handle token snapping on drag end
       if (isDraggingToken && draggedTokenId) {
+        console.log('Token drag ended, checking for snapping...');
         const token = tokens.find(t => t.id === draggedTokenId);
         if (token) {
+          console.log('Token position:', token.x, token.y);
           // Find the active region at token position
           const activeRegion = getActiveRegionAt(token.x, token.y);
+          console.log('Active region:', activeRegion);
           
           // Apply grid snapping if token is in a region with grid
           if (activeRegion && activeRegion.region.gridType !== 'none') {
+            console.log('Applying snapping for grid type:', activeRegion.region.gridType);
             const snappedPos = snapToMapGrid(token.x, token.y, activeRegion);
+            console.log('Snapped position:', snappedPos);
             updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+          } else {
+            console.log('No snapping applied - no region or grid type is none');
           }
         }
       }
@@ -1172,11 +1179,17 @@ export const SimpleTabletop = () => {
     let tokenY = y ?? (-transform.y / transform.zoom);
     
     // Apply grid snapping for new tokens
+    console.log('Adding new token at:', tokenX, tokenY);
     const activeRegion = getActiveRegionAt(tokenX, tokenY);
+    console.log('Active region for new token:', activeRegion);
     if (activeRegion && activeRegion.region.gridType !== 'none') {
+      console.log('Applying snapping for new token, grid type:', activeRegion.region.gridType);
       const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
+      console.log('New token snapped position:', snappedPos);
       tokenX = snappedPos.x;
       tokenY = snappedPos.y;
+    } else {
+      console.log('No snapping for new token - no region or grid type is none');
     }
     
     // Generate a random color for the token
