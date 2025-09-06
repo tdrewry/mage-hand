@@ -44,8 +44,10 @@ export const SimpleTabletop = () => {
     height: number;
     selected: boolean;
     color: string;
-    gridType: 'square' | 'hex' | 'default';
+    gridType: 'square' | 'hex' | 'free';
     gridSize: number;
+    gridScale: number; // Decimal multiplier for grid size (1 = default)
+    gridSnapping: boolean; // Per-region snapping toggle
   }
   
   const [regions, setRegions] = useState<Region[]>([]);
@@ -429,7 +431,7 @@ export const SimpleTabletop = () => {
     ctx.fillRect(region.x, region.y, region.width, region.height);
     
     // Draw region-specific grid
-    if (region.gridType !== 'default') {
+    if (region.gridType !== 'free') {
       drawRegionGrid(ctx, region);
     }
     
@@ -444,13 +446,13 @@ export const SimpleTabletop = () => {
     }
     
     // Draw grid type label
-    if (region.gridType !== 'default') {
+    if (region.gridType !== 'free') {
       ctx.fillStyle = '#ffffff';
       ctx.font = `${10 / transform.zoom}px Arial`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(
-        region.gridType.toUpperCase(), 
+        `${region.gridType.toUpperCase()} ${region.gridScale}x`, 
         region.x + 4 / transform.zoom, 
         region.y + 4 / transform.zoom
       );
@@ -600,8 +602,10 @@ export const SimpleTabletop = () => {
       height: 40,
       selected: false,
       color: 'rgba(100, 150, 200, 0.3)',
-      gridType: 'default',
-      gridSize: 40  // Match main canvas grid size
+      gridType: 'free',
+      gridSize: 40,  // Match main canvas grid size
+      gridScale: 1.0, // Default scale
+      gridSnapping: false // Default to disabled per-region
     };
     
     setRegions(prev => [...prev, newRegion]);
@@ -853,10 +857,10 @@ export const SimpleTabletop = () => {
     
     const menuItems = [
       { 
-        label: 'Default Grid', 
+        label: 'Free Grid', 
         icon: '📐', 
-        action: () => setRegionGridType(region.id, 'default'),
-        active: region.gridType === 'default'
+        action: () => setRegionGridType(region.id, 'free'),
+        active: region.gridType === 'free'
       },
       { 
         label: 'Square Grid', 
@@ -907,13 +911,26 @@ export const SimpleTabletop = () => {
   };
 
   // Function to set region grid type
-  const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'default') => {
+  const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'free') => {
     setRegions(prev => prev.map(region => 
       region.id === regionId 
         ? { ...region, gridType }
         : region
     ));
     toast.success(`Region grid set to ${gridType}`);
+  };
+
+  // Function to toggle region snapping
+  const toggleRegionSnapping = (regionId: string) => {
+    setRegions(prev => prev.map(region => 
+      region.id === regionId 
+        ? { ...region, gridSnapping: !region.gridSnapping }
+        : region
+    ));
+    
+    const region = regions.find(r => r.id === regionId);
+    const newState = region ? !region.gridSnapping : false;
+    toast.success(`Region snapping ${newState ? 'enabled' : 'disabled'}`);
   };
 
   // Function to delete region
@@ -1107,14 +1124,31 @@ export const SimpleTabletop = () => {
           const activeRegion = getActiveRegionAt(token.x, token.y);
           console.log('Active region:', activeRegion);
           
-          // Apply grid snapping if enabled and token is in a region with grid
-          if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
-            console.log('Applying snapping for grid type:', activeRegion.region.gridType);
+          // Apply grid snapping based on world and region settings
+          const shouldSnapToWorld = isGridSnappingEnabled && (!activeRegion || activeRegion.region.gridType === 'none');
+          const shouldSnapToRegion = activeRegion && activeRegion.region.gridType !== 'none';
+          
+          // Find local region at token position for region-specific snapping
+          const localRegion = regions.find(r => 
+            token.x >= r.x && token.x <= r.x + r.width &&
+            token.y >= r.y && token.y <= r.y + r.height &&
+            r.gridType !== 'free'
+          );
+          
+          if (localRegion && localRegion.gridSnapping) {
+            console.log('Applying local region snapping for grid type:', localRegion.gridType);
+            // For local regions, we'll use basic grid snapping with their scale
+            const gridSize = localRegion.gridSize * localRegion.gridScale;
+            const snappedX = Math.round(token.x / gridSize) * gridSize;
+            const snappedY = Math.round(token.y / gridSize) * gridSize;
+            updateTokenPosition(draggedTokenId, snappedX, snappedY);
+          } else if (shouldSnapToWorld && activeRegion && activeRegion.region.gridType !== 'none') {
+            console.log('Applying world snapping for grid type:', activeRegion.region.gridType);
             const snappedPos = snapToMapGrid(token.x, token.y, activeRegion);
             console.log('Snapped position:', snappedPos);
             updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
           } else {
-            console.log('No snapping applied - snapping disabled or no region or grid type is none');
+            console.log('No snapping applied');
           }
         }
       }
@@ -1183,18 +1217,32 @@ export const SimpleTabletop = () => {
     let tokenX = x ?? (-transform.x / transform.zoom);
     let tokenY = y ?? (-transform.y / transform.zoom);
     
-    // Apply grid snapping for new tokens if enabled
+    // Apply grid snapping for new tokens based on world and region settings
     console.log('Adding new token at:', tokenX, tokenY);
     const activeRegion = getActiveRegionAt(tokenX, tokenY);
     console.log('Active region for new token:', activeRegion);
-    if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
-      console.log('Applying snapping for new token, grid type:', activeRegion.region.gridType);
+    
+    // Find local region at token position for region-specific snapping
+    const localRegion = regions.find(r => 
+      tokenX >= r.x && tokenX <= r.x + r.width &&
+      tokenY >= r.y && tokenY <= r.y + r.height &&
+      r.gridType !== 'free'
+    );
+    
+    if (localRegion && localRegion.gridSnapping) {
+      console.log('Applying local region snapping for new token, grid type:', localRegion.gridType);
+      const gridSize = localRegion.gridSize * localRegion.gridScale;
+      tokenX = Math.round(tokenX / gridSize) * gridSize;
+      tokenY = Math.round(tokenY / gridSize) * gridSize;
+      console.log('New token snapped to local region:', tokenX, tokenY);
+    } else if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
+      console.log('Applying world snapping for new token, grid type:', activeRegion.region.gridType);
       const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
       console.log('New token snapped position:', snappedPos);
       tokenX = snappedPos.x;
       tokenY = snappedPos.y;
     } else {
-      console.log('No snapping for new token - snapping disabled or no region or grid type is none');
+      console.log('No snapping for new token');
     }
     
     // Generate a random color for the token
@@ -1265,9 +1313,40 @@ export const SimpleTabletop = () => {
           className="flex items-center gap-2"
         >
           <Grid3X3 className="w-4 h-4" />
-          Snap {isGridSnappingEnabled ? 'On' : 'Off'}
+          World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
         </Button>
       </div>
+
+      {/* Per-Region Snap Button (shows when region is selected) */}
+      {selectedRegionId && (() => {
+        const selectedRegion = regions.find(r => r.id === selectedRegionId);
+        if (!selectedRegion) return null;
+        
+        const screenPos = worldToScreen(
+          selectedRegion.x + selectedRegion.width + 10, 
+          selectedRegion.y - 10
+        );
+        
+        return (
+          <div 
+            className="absolute z-20" 
+            style={{ 
+              left: `${screenPos.x}px`, 
+              top: `${screenPos.y}px` 
+            }}
+          >
+            <Button
+              variant={selectedRegion.gridSnapping ? "default" : "outline"}
+              size="sm"
+              onClick={() => toggleRegionSnapping(selectedRegionId)}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Grid3X3 className="w-3 h-3" />
+              {selectedRegion.gridSnapping ? 'On' : 'Off'}
+            </Button>
+          </div>
+        );
+      })()}
 
       {/* Main Canvas Container */}
       <div className="flex-1 relative overflow-hidden">
@@ -1276,7 +1355,7 @@ export const SimpleTabletop = () => {
           className="absolute inset-0 w-full h-full"
           style={{ 
             background: 'hsl(var(--surface))',
-            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : 'default'
+            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : 'auto'
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
