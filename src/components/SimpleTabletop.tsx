@@ -5,6 +5,7 @@ import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
+import { snapToMapGrid } from '../lib/mapGridSystem';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings } from 'lucide-react';
@@ -63,7 +64,7 @@ export const SimpleTabletop = () => {
     currentPlayerId,
   } = useSessionStore();
 
-  const { maps, getVisibleMaps } = useMapStore();
+  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -115,7 +116,7 @@ export const SimpleTabletop = () => {
 
   // Get resize handle at position for a region
   const getResizeHandle = (region: Region, worldX: number, worldY: number): string | null => {
-    const handleSize = 8 / transform.zoom;
+    const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
     
     // Check corner handles
@@ -553,7 +554,7 @@ export const SimpleTabletop = () => {
 
   // Function to draw region resize handles
   const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: Region) => {
-    const handleSize = 6 / transform.zoom;
+    const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
     
     ctx.fillStyle = '#4f46e5';
@@ -1091,6 +1092,21 @@ export const SimpleTabletop = () => {
     if (e.button === 2) { // Right click
       setIsPanning(false);
     } else if (e.button === 0) { // Left click
+      // Handle token snapping on drag end
+      if (isDraggingToken && draggedTokenId) {
+        const token = tokens.find(t => t.id === draggedTokenId);
+        if (token) {
+          // Find the active region at token position
+          const activeRegion = getActiveRegionAt(token.x, token.y);
+          
+          // Apply grid snapping if token is in a region with grid
+          if (activeRegion && activeRegion.region.gridType !== 'none') {
+            const snappedPos = snapToMapGrid(token.x, token.y, activeRegion);
+            updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+          }
+        }
+      }
+      
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
@@ -1152,8 +1168,16 @@ export const SimpleTabletop = () => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Use provided coordinates or default to center of viewport
-    const tokenX = x ?? (-transform.x / transform.zoom);
-    const tokenY = y ?? (-transform.y / transform.zoom);
+    let tokenX = x ?? (-transform.x / transform.zoom);
+    let tokenY = y ?? (-transform.y / transform.zoom);
+    
+    // Apply grid snapping for new tokens
+    const activeRegion = getActiveRegionAt(tokenX, tokenY);
+    if (activeRegion && activeRegion.region.gridType !== 'none') {
+      const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
+      tokenX = snappedPos.x;
+      tokenY = snappedPos.y;
+    }
     
     // Generate a random color for the token
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
