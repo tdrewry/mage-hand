@@ -1,17 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2 } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Layers } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { LayerStackModal } from './LayerStackModal';
+import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 
 interface ToolbarProps {
   sessionId: string;
+  fabricCanvas?: FabricCanvas | null;
 }
 
-export const Toolbar = ({ sessionId }: ToolbarProps) => {
+export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
   const { tokens } = useSessionStore();
+  const [layerModalOpen, setLayerModalOpen] = useState(false);
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
@@ -69,6 +73,16 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
           <Button 
             variant="outline" 
             size="sm"
+            onClick={() => setLayerModalOpen(true)}
+            className="text-foreground border-border hover:bg-secondary"
+            title="Manage layers"
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
             className="text-foreground border-border hover:bg-secondary"
           >
             <Settings className="h-4 w-4" />
@@ -85,6 +99,12 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
           </Button>
         </div>
       </div>
+      
+      <LayerStackModal 
+        open={layerModalOpen}
+        onOpenChange={setLayerModalOpen}
+        fabricCanvas={fabricCanvas}
+      />
     </div>
   );
 };

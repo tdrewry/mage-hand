@@ -208,6 +208,7 @@ export const VirtualTabletop = () => {
       
       // Ensure the tokenId is properly attached to the fabric object
       (img as any).tokenId = tokenId;
+      (img as any).isMap = false; // Ensure it's not marked as a map
       
       img.set({
         left: x,
@@ -247,7 +248,7 @@ export const VirtualTabletop = () => {
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Header Toolbar */}
-      <Toolbar sessionId={sessionId} />
+      <Toolbar sessionId={sessionId} fabricCanvas={fabricCanvas} />
       
       <div className="flex-1 flex">
         {/* Left Panel */}
