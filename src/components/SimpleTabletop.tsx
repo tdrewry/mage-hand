@@ -1,34 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Point } from 'paper';
 import { Toolbar } from './Toolbar';
-import { FloatingMenu } from './FloatingMenu';
 import { MapManager } from './MapManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { toast } from 'sonner';
-import { PaperMapSystem } from '../lib/paperMapSystem';
 import { Button } from './ui/button';
 import { Settings } from 'lucide-react';
 
-export const PaperTabletop = () => {
+export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [mapSystem, setMapSystem] = useState<PaperMapSystem | null>(null);
   const [showMapManager, setShowMapManager] = useState(false);
 
   const {
     sessionId,
     tokens,
     addToken,
-    updateTokenPosition,
-    updateTokenLabel,
-    updateTokenColor,
-    selectedTokenIds,
-    setSelectedTokens,
-    tokenVisibility,
-    labelVisibility,
     currentPlayerId,
-    players,
-    removeToken
   } = useSessionStore();
 
   const { maps, getVisibleMaps } = useMapStore();
@@ -40,92 +27,56 @@ export const PaperTabletop = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight - 80;
 
-    const system = new PaperMapSystem(canvas);
-    setMapSystem(system);
-
-    // Load existing maps
-    loadMaps(system);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     
-    // Load existing tokens
-    loadTokens(system);
+    // Simple dark background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw a simple grid
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    
+    const gridSize = 40;
+    
+    // Vertical lines
+    for (let x = 0; x < canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let y = 0; y < canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
 
-    toast.success('Paper.js Tabletop Ready!');
+    toast.success('Simple Tabletop Ready!');
 
     const handleResize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight - 80;
+      // Redraw on resize
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      system.dispose();
     };
   }, []);
 
-  const loadMaps = async (system: PaperMapSystem) => {
-    const visibleMaps = getVisibleMaps();
-    
-    for (const map of visibleMaps) {
-      try {
-        await system.addMap({
-          id: map.id,
-          name: map.name,
-          imageUrl: map.imageUrl,
-          bounds: map.bounds,
-          zIndex: map.zIndex
-        });
-
-        // Add regions
-        for (const region of map.regions) {
-          if (region.visible && region.gridType !== 'none') {
-            system.addMapRegion(map.id, {
-              id: region.id,
-              bounds: region.bounds,
-              gridType: region.gridType as 'square' | 'hex',
-              gridSize: region.gridSize,
-              gridColor: region.gridColor,
-              gridOpacity: region.gridOpacity
-            });
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to load map ${map.name}:`, error);
-      }
-    }
-  };
-
-  const loadTokens = async (system: PaperMapSystem) => {
-    for (const token of tokens) {
-      try {
-        await system.addToken({
-          id: token.id,
-          imageUrl: token.imageUrl,
-          position: new Point(token.x, token.y),
-          label: token.label,
-          color: token.color
-        });
-      } catch (error) {
-        console.warn(`Failed to load token ${token.name}:`, error);
-      }
-    }
-  };
-
   const addTokenToCanvas = async (imageUrl: string, x: number = 100, y: number = 100) => {
-    if (!mapSystem) return;
-
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      await mapSystem.addToken({
-        id: tokenId,
-        imageUrl,
-        position: new Point(x, y),
-        label: `Token ${tokenId.slice(-8)}`,
-        color: '#ffffff'
-      });
-
       // Add to store
       addToken({
         id: tokenId,
@@ -145,18 +96,6 @@ export const PaperTabletop = () => {
       console.error('Failed to add token:', error);
       toast.error('Failed to add token');
     }
-  };
-
-  const handleTokenColorChange = (tokenId: string, color: string) => {
-    // Update in store
-    updateTokenColor(tokenId, color);
-    
-    // TODO: Update Paper.js token color
-    toast.info('Token color updated');
-  };
-
-  const handleCanvasUpdate = () => {
-    // Paper.js handles this automatically
   };
 
   return (
@@ -184,7 +123,7 @@ export const PaperTabletop = () => {
       <div className="flex-1 relative overflow-hidden">
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full cursor-crosshair"
           style={{ background: 'hsl(var(--surface))' }}
         />
       </div>
@@ -197,4 +136,4 @@ export const PaperTabletop = () => {
   );
 };
 
-export default PaperTabletop;
+export default SimpleTabletop;

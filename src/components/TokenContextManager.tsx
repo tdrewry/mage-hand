@@ -47,7 +47,7 @@ export const TokenContextManager = ({
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [contextTokenId, setContextTokenId] = useState<string>('');
 
-  // Listen for custom event from VirtualTabletop
+  // Listen for custom event from PaperTabletop
   useEffect(() => {
     const handleTokenContextEvent = (event: any) => {
       const { tokenId, x, y } = event.detail;
