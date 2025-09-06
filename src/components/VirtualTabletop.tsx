@@ -776,14 +776,87 @@ export const VirtualTabletop = () => {
       if (e.button === 2 || e.which === 3) {
         console.log('DOM RIGHT CLICK DETECTED!');
         
-        // Manually trigger Fabric.js right-click handling
+        // Get the Fabric.js target and pointer
         const pointer = canvas.getPointer(e);
-        const fabricEvent = {
-          e: e,
-          target: canvas.findTarget(e),
-          pointer: pointer
-        };
-        console.log('Manually triggering Fabric event:', fabricEvent);
+        const target = canvas.findTarget(e);
+        
+        console.log('Right-click target analysis:', { target, pointer, hasTokenId: !!(target as any)?.tokenId });
+        
+        // Handle right-click logic directly here since Fabric.js events aren't working
+        if (target && (target as any).tokenId) {
+          console.log('Right-click on token:', (target as any).tokenId);
+          // Store the clicked token for context menu
+          setSelectedTokens([(target as any).tokenId]);
+          // Don't start panning
+          return;
+        }
+        
+        // Start panning for right-click on empty space
+        console.log('Starting right-click pan mode');
+        rightMouseDown = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        lastPosX = e.clientX;
+        lastPosY = e.clientY;
+        isDragging = false;
+        
+        canvas.defaultCursor = 'grab';
+        canvas.setCursor('grab');
+        
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // Add DOM-based mousemove and mouseup for right-click panning
+    canvas.upperCanvasEl.addEventListener('mousemove', (e) => {
+      if (rightMouseDown) {
+        const deltaX = Math.abs(e.clientX - dragStartX);
+        const deltaY = Math.abs(e.clientY - dragStartY);
+        
+        if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+          isDragging = true;
+          canvas.selection = false;
+          canvas.setCursor('grabbing');
+        }
+        
+        if (isDragging) {
+          const vpt = canvas.viewportTransform;
+          if (vpt) {
+            vpt[4] += e.clientX - lastPosX;
+            vpt[5] += e.clientY - lastPosY;
+            canvas.setViewportTransform(vpt);
+            canvas.renderAll();
+          }
+        }
+        
+        lastPosX = e.clientX;
+        lastPosY = e.clientY;
+        e.preventDefault();
+      }
+    });
+    
+    canvas.upperCanvasEl.addEventListener('mouseup', (e) => {
+      if ((e.button === 2 || e.which === 3) && rightMouseDown) {
+        const target = canvas.findTarget(e);
+        
+        if (isDragging) {
+          isDragging = false;
+          canvas.selection = true;
+          canvas.setCursor('default');
+        } else if (target && (target as any).tokenId) {
+          // Trigger context menu via custom event
+          window.dispatchEvent(new CustomEvent('showTokenContextMenu', {
+            detail: { 
+              tokenId: (target as any).tokenId, 
+              x: e.clientX, 
+              y: e.clientY 
+            }
+          }));
+        }
+        
+        rightMouseDown = false;
+        e.preventDefault();
       }
     });
 

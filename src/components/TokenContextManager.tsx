@@ -47,7 +47,23 @@ export const TokenContextManager = ({
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [contextTokenId, setContextTokenId] = useState<string>('');
 
-  // Listen for right-clicks on tokens
+  // Listen for custom event from VirtualTabletop
+  useEffect(() => {
+    const handleTokenContextEvent = (event: any) => {
+      const { tokenId, x, y } = event.detail;
+      console.log('TokenContextManager received custom event:', { tokenId, x, y });
+      setContextTokenId(tokenId);
+      showTokenContextMenu(x, y, tokenId);
+    };
+
+    window.addEventListener('showTokenContextMenu', handleTokenContextEvent);
+    
+    return () => {
+      window.removeEventListener('showTokenContextMenu', handleTokenContextEvent);
+    };
+  }, []);
+
+  // Legacy Fabric.js event listener (keeping as fallback)
   useEffect(() => {
     if (!fabricCanvas) return;
 
