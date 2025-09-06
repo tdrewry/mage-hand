@@ -19,9 +19,17 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        
+        // Gaming-specific colors
+        canvas: {
+          background: "hsl(var(--canvas-background))",
+          border: "hsl(var(--canvas-border))",
+        },
+        
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -47,6 +55,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        
+        // Gaming status colors
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        
+        // VTT-specific colors
+        grid: "hsl(var(--grid-color))",
+        "token-selection": "hsl(var(--token-selection))",
+        "hover-highlight": "hsl(var(--hover-highlight))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

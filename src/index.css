@@ -2,39 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* D20PRO Virtual Tabletop Design System - Gaming optimized dark theme */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Core gaming theme - dark backgrounds for reduced eye strain */
+    --background: 220 26% 8%;
+    --foreground: 220 9% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Map and canvas areas */
+    --canvas-background: 220 20% 12%;
+    --canvas-border: 220 15% 20%;
+    
+    /* UI panels and cards */
+    --card: 220 20% 10%;
+    --card-foreground: 220 9% 92%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 20% 10%;
+    --popover-foreground: 220 9% 92%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary gaming accent - bright blue for interactive elements */
+    --primary: 215 80% 55%;
+    --primary-foreground: 220 9% 95%;
+    --primary-glow: 215 80% 65%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - muted blue for secondary actions */
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 220 9% 85%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted elements - darker for toolbars and inactive areas */
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 9% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - bright teal for highlights and selections */
+    --accent: 180 75% 45%;
+    --accent-foreground: 220 9% 95%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Gaming specific colors */
+    --grid-color: 220 15% 25%;
+    --token-selection: 180 75% 45%;
+    --hover-highlight: 215 80% 45%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Status colors */
+    --success: 120 60% 50%;
+    --warning: 45 85% 55%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 220 9% 95%;
+
+    /* Borders and inputs - subtle but visible */
+    --border: 220 15% 20%;
+    --input: 220 15% 18%;
+    --ring: 215 80% 55%;
 
     --radius: 0.5rem;
 
@@ -55,42 +73,54 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /* Enhanced dark mode for gaming - deeper contrast */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 220 26% 6%;
+    --foreground: 220 9% 97%;
+    
+    --canvas-background: 220 20% 8%;
+    --canvas-border: 220 15% 15%;
+    
+    --card: 220 20% 8%;
+    --card-foreground: 220 9% 94%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --popover: 220 20% 8%;
+    --popover-foreground: 220 9% 94%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --primary: 215 85% 60%;
+    --primary-foreground: 220 9% 97%;
+    --primary-glow: 215 85% 70%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 15% 12%;
+    --secondary-foreground: 220 9% 90%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --muted: 220 15% 10%;
+    --muted-foreground: 220 9% 70%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 180 80% 50%;
+    --accent-foreground: 220 9% 97%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --grid-color: 220 15% 20%;
+    --token-selection: 180 80% 50%;
+    --hover-highlight: 215 85% 50%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 120 65% 55%;
+    --warning: 45 90% 60%;
+    --destructive: 0 80% 60%;
+    --destructive-foreground: 220 9% 97%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 220 15% 15%;
+    --input: 220 15% 12%;
+    --ring: 215 85% 60%;
+
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 220 9% 92%;
+    --sidebar-primary: 215 80% 55%;
+    --sidebar-primary-foreground: 220 9% 97%;
+    --sidebar-accent: 220 15% 12%;
+    --sidebar-accent-foreground: 220 9% 90%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-ring: 215 80% 55%;
   }
 }
 
@@ -100,6 +130,49 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Gaming-specific utility classes */
+  .canvas-container {
+    @apply bg-canvas-background border border-canvas-border;
+  }
+  
+  .grid-overlay {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  
+  .token-selected {
+    filter: drop-shadow(0 0 8px hsl(var(--token-selection)));
+  }
+  
+  .dragging {
+    cursor: grabbing !important;
+    opacity: 0.8;
+  }
+
+  /* Smooth transitions for gaming interactions */
+  .transition-gaming {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Custom scrollbars for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-accent;
   }
 }
