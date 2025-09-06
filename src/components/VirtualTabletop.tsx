@@ -40,11 +40,24 @@ export const VirtualTabletop = () => {
   } = useSessionStore();
 
   useEffect(() => {
-    if (!canvasRef.current || !gridCanvasRef.current) return;
+    console.log('VirtualTabletop useEffect starting...', { 
+      canvasRef: canvasRef.current, 
+      gridCanvasRef: gridCanvasRef.current 
+    });
+    
+    if (!canvasRef.current || !gridCanvasRef.current) {
+      console.log('Missing canvas refs!', {
+        canvasRef: !!canvasRef.current,
+        gridCanvasRef: !!gridCanvasRef.current
+      });
+      return;
+    }
 
     // Calculate full viewport canvas size
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 80; // Account for toolbar height
+    
+    console.log('Viewport dimensions:', { viewportWidth, viewportHeight });
 
     // Setup main Fabric.js canvas
     const canvas = new FabricCanvas(canvasRef.current, {
@@ -52,28 +65,46 @@ export const VirtualTabletop = () => {
       height: viewportHeight,
       backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
     });
+    
+    console.log('Fabric.js canvas created:', canvas);
 
     // Setup background grid canvas
     const gridCanvas = gridCanvasRef.current;
     gridCanvas.width = viewportWidth;
     gridCanvas.height = viewportHeight;
     
+    console.log('Grid canvas setup:', {
+      width: gridCanvas.width,
+      height: gridCanvas.height,
+      clientWidth: gridCanvas.clientWidth,
+      clientHeight: gridCanvas.clientHeight
+    });
+    
     // Set grid canvas background to match Fabric.js canvas and add test pattern
     const gridCtx = gridCanvas.getContext('2d');
     if (gridCtx) {
+      console.log('Grid context obtained, drawing test pattern...');
       // Fill background
       gridCtx.fillStyle = '#1a1a1a';
       gridCtx.fillRect(0, 0, viewportWidth, viewportHeight);
       
       // Add simple test pattern to verify canvas is working
-      gridCtx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-      gridCtx.lineWidth = 2;
+      gridCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+      gridCtx.lineWidth = 3;
       gridCtx.beginPath();
       gridCtx.moveTo(0, 0);
       gridCtx.lineTo(viewportWidth, viewportHeight);
       gridCtx.moveTo(viewportWidth, 0);
       gridCtx.lineTo(0, viewportHeight);
       gridCtx.stroke();
+      
+      // Add a white rectangle in center
+      gridCtx.fillStyle = 'white';
+      gridCtx.fillRect(viewportWidth/2 - 50, viewportHeight/2 - 50, 100, 100);
+      
+      console.log('Test pattern drawn successfully');
+    } else {
+      console.error('Failed to get grid canvas context!');
     }
     
     const renderer = createGridRenderer(gridCanvas);
@@ -81,6 +112,7 @@ export const VirtualTabletop = () => {
       console.error('Failed to create grid renderer');
       return;
     }
+    console.log('Grid renderer created:', renderer);
 
     // Configure canvas for gaming with pan/zoom
     canvas.selection = true;
@@ -93,6 +125,7 @@ export const VirtualTabletop = () => {
     setGridRenderer(renderer);
     
     // Draw initial grid
+    console.log('Drawing initial grid...');
     updateGridDisplay(canvas, renderer);
     
     // Load existing tokens from store onto canvas
@@ -231,11 +264,15 @@ export const VirtualTabletop = () => {
 
   // Update grid display using new efficient system
   const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
-    if (!renderer) return;
+    if (!renderer) {
+      console.log('No renderer available for grid display');
+      return;
+    }
     
     const viewport = getCurrentViewport(canvas);
-    console.log('Grid render viewport:', viewport); // Debug output
+    console.log('Grid render viewport:', viewport, 'Grid settings:', { gridType, gridSize, isGridVisible });
     renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.5)');
+    console.log('Grid render completed');
   };
 
   // Old grid functions removed - now using efficient grid system
