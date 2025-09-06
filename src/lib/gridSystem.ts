@@ -70,39 +70,46 @@ export function renderSquareGrid(
   
   if (size <= 0) return;
   
-  // Calculate visible area with padding
-  const padding = size * 10; // Extra lines beyond visible area
-  const visibleLeft = viewport.x - padding;
-  const visibleTop = viewport.y - padding;
-  const visibleWidth = viewport.width / viewport.zoom + padding * 2;
-  const visibleHeight = viewport.height / viewport.zoom + padding * 2;
+  // Calculate the world coordinates that are visible on screen
+  // Fabric.js viewport transform: [zoom, 0, 0, zoom, panX, panY]
+  const worldLeft = viewport.x;
+  const worldTop = viewport.y;
+  const worldRight = worldLeft + (viewport.width / viewport.zoom);
+  const worldBottom = worldTop + (viewport.height / viewport.zoom);
   
-  // Calculate grid boundaries aligned to grid
-  const startX = Math.floor(visibleLeft / size) * size;
-  const endX = Math.ceil((visibleLeft + visibleWidth) / size) * size;
-  const startY = Math.floor(visibleTop / size) * size;
-  const endY = Math.ceil((visibleTop + visibleHeight) / size) * size;
+  // Extend the grid slightly beyond visible area for smooth panning
+  const padding = size * 2;
+  const gridLeft = Math.floor((worldLeft - padding) / size) * size;
+  const gridRight = Math.ceil((worldRight + padding) / size) * size;
+  const gridTop = Math.floor((worldTop - padding) / size) * size;
+  const gridBottom = Math.ceil((worldBottom + padding) / size) * size;
   
   // Set up drawing style
   ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, 1 / viewport.zoom); // Ensure minimum line width
-  ctx.globalAlpha = 1.0; // Use full opacity, let color handle transparency
+  ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom); // Scale line width with zoom
+  ctx.globalAlpha = 1.0;
   
-  // Begin path for all lines (much more efficient)
+  // Begin path for all lines
   ctx.beginPath();
   
-  // Vertical lines
-  for (let x = startX; x <= endX; x += size) {
-    const screenX = (x - viewport.x) * viewport.zoom + viewport.width / 2;
-    ctx.moveTo(screenX, 0);
-    ctx.lineTo(screenX, canvas.height);
+  // Draw vertical lines
+  for (let x = gridLeft; x <= gridRight; x += size) {
+    // Convert world coordinate to screen coordinate
+    const screenX = (x - worldLeft) * viewport.zoom;
+    if (screenX >= -1 && screenX <= canvas.width + 1) { // Only draw if on screen
+      ctx.moveTo(screenX, 0);
+      ctx.lineTo(screenX, canvas.height);
+    }
   }
   
-  // Horizontal lines  
-  for (let y = startY; y <= endY; y += size) {
-    const screenY = (y - viewport.y) * viewport.zoom + viewport.height / 2;
-    ctx.moveTo(0, screenY);
-    ctx.lineTo(canvas.width, screenY);
+  // Draw horizontal lines  
+  for (let y = gridTop; y <= gridBottom; y += size) {
+    // Convert world coordinate to screen coordinate
+    const screenY = (y - worldTop) * viewport.zoom;
+    if (screenY >= -1 && screenY <= canvas.height + 1) { // Only draw if on screen
+      ctx.moveTo(0, screenY);
+      ctx.lineTo(canvas.width, screenY);
+    }
   }
   
   // Draw all lines at once
@@ -134,23 +141,26 @@ export function renderHexGrid(
   
   const layout = renderer.hexLayout;
   
-  // Update layout origin to match viewport
-  layout.origin = { x: -viewport.x, y: -viewport.y };
+  // Calculate visible world coordinates
+  const worldLeft = viewport.x;
+  const worldTop = viewport.y;
+  const worldRight = worldLeft + (viewport.width / viewport.zoom);
+  const worldBottom = worldTop + (viewport.height / viewport.zoom);
   
-  // Calculate visible world area
-  const padding = size * 3; // Extra hexes beyond visible area
-  const worldLeft = viewport.x - padding;
-  const worldTop = viewport.y - padding;
-  const worldWidth = viewport.width / viewport.zoom + padding * 2;
-  const worldHeight = viewport.height / viewport.zoom + padding * 2;
+  // Extend the grid slightly beyond visible area for smooth panning
+  const padding = size * 2;
+  const hexLeft = worldLeft - padding;
+  const hexTop = worldTop - padding;
+  const hexWidth = (worldRight - worldLeft) + padding * 2;
+  const hexHeight = (worldBottom - worldTop) + padding * 2;
   
   // Get all hexes in the visible area
-  const hexes = hexesInRectangle(layout, worldLeft, worldTop, worldWidth, worldHeight);
+  const hexes = hexesInRectangle(layout, hexLeft, hexTop, hexWidth, hexHeight);
   
   // Set up drawing style
   ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, 1 / viewport.zoom);
-  ctx.globalAlpha = 1.0; // Use full opacity, let color handle transparency
+  ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom);
+  ctx.globalAlpha = 1.0;
   ctx.fillStyle = 'transparent';
   
   // Draw each hex
@@ -162,14 +172,29 @@ export function renderHexGrid(
     // Convert world coordinates to screen coordinates
     ctx.beginPath();
     const firstCorner = corners[0];
-    const screenX1 = (firstCorner.x - viewport.x) * viewport.zoom + viewport.width / 2;
-    const screenY1 = (firstCorner.y - viewport.y) * viewport.zoom + viewport.height / 2;
+    const screenX1 = (firstCorner.x - worldLeft) * viewport.zoom;
+    const screenY1 = (firstCorner.y - worldTop) * viewport.zoom;
+    
+    // Only draw if at least one corner is on screen
+    let hasVisibleCorner = false;
+    for (const corner of corners) {
+      const screenX = (corner.x - worldLeft) * viewport.zoom;
+      const screenY = (corner.y - worldTop) * viewport.zoom;
+      if (screenX >= -size && screenX <= canvas.width + size && 
+          screenY >= -size && screenY <= canvas.height + size) {
+        hasVisibleCorner = true;
+        break;
+      }
+    }
+    
+    if (!hasVisibleCorner) return;
+    
     ctx.moveTo(screenX1, screenY1);
     
     for (let i = 1; i < corners.length; i++) {
       const corner = corners[i];
-      const screenX = (corner.x - viewport.x) * viewport.zoom + viewport.width / 2;
-      const screenY = (corner.y - viewport.y) * viewport.zoom + viewport.height / 2;
+      const screenX = (corner.x - worldLeft) * viewport.zoom;
+      const screenY = (corner.y - worldTop) * viewport.zoom;
       ctx.lineTo(screenX, screenY);
     }
     
