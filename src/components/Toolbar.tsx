@@ -25,7 +25,11 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
 
   const clearStorage = () => {
     localStorage.clear();
-    toast.success('Storage cleared! Reload page to start fresh.');
+    // Also clear the Zustand store
+    const { getState } = useSessionStore;
+    const state = getState();
+    state.tokens.length = 0; // Clear tokens array
+    toast.success('Storage and tokens cleared! Reload page to start fresh.');
     setTimeout(() => window.location.reload(), 1000);
   };
 
@@ -46,6 +50,11 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
             </Badge>
             <Badge variant="secondary" className="text-xs">
               Tokens: {tokens.length}
+              {tokens.length > 0 && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  (actual count)
+                </span>
+              )}
             </Badge>
           </div>
         </div>
