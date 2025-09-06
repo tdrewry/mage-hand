@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text } from 'fabric';
+import { Canvas as FabricCanvas, Circle, FabricImage, Line, Polygon, Text, Point } from 'fabric';
 import { Toolbar } from './Toolbar';
 import { TokenContextMenu } from './TokenContextMenu';
 import { FloatingMenu } from './FloatingMenu';
@@ -44,9 +44,12 @@ export const VirtualTabletop = () => {
       backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
     });
 
-    // Configure canvas for gaming
+    // Configure canvas for gaming with pan/zoom
     canvas.selection = true;
     canvas.preserveObjectStacking = true;
+    
+    // Enable zoom and pan functionality
+    setupCanvasControls(canvas);
 
     setFabricCanvas(canvas);
     
@@ -177,26 +180,42 @@ export const VirtualTabletop = () => {
       return;
     }
 
+    // Get current zoom and viewport transform
+    const zoom = canvas.getZoom();
+    const vpt = canvas.viewportTransform;
     const canvasWidth = canvas.width || 1200;
     const canvasHeight = canvas.height || 800;
+    
+    // Calculate visible area with some padding
+    const padding = 1000; // Extra grid lines beyond visible area
+    const visibleLeft = -vpt[4] / zoom - padding;
+    const visibleTop = -vpt[5] / zoom - padding;
+    const visibleWidth = canvasWidth / zoom + padding * 2;
+    const visibleHeight = canvasHeight / zoom + padding * 2;
 
     if (type === 'square') {
-      drawSquareGrid(canvas, size, canvasWidth, canvasHeight);
+      drawSquareGrid(canvas, size, visibleLeft, visibleTop, visibleWidth, visibleHeight);
     } else if (type === 'hex') {
-      drawHexGrid(canvas, size, canvasWidth, canvasHeight);
+      drawHexGrid(canvas, size, visibleLeft, visibleTop, visibleWidth, visibleHeight);
     }
 
     canvas.renderAll();
   };
 
-  const drawSquareGrid = (canvas: FabricCanvas, size: number, width: number, height: number) => {
+  const drawSquareGrid = (canvas: FabricCanvas, size: number, left: number, top: number, width: number, height: number) => {
     const gridColor = 'hsl(var(--grid-color))';
     
+    // Calculate grid boundaries aligned to grid
+    const startX = Math.floor(left / size) * size;
+    const endX = Math.ceil((left + width) / size) * size;
+    const startY = Math.floor(top / size) * size;
+    const endY = Math.ceil((top + height) / size) * size;
+    
     // Vertical lines
-    for (let x = 0; x <= width; x += size) {
-      const line = new Line([x, 0, x, height], {
+    for (let x = startX; x <= endX; x += size) {
+      const line = new Line([x, startY, x, endY], {
         stroke: gridColor,
-        strokeWidth: 1,
+        strokeWidth: 1 / canvas.getZoom(), // Scale stroke with zoom
         selectable: false,
         evented: false,
         isGrid: true,
@@ -205,10 +224,10 @@ export const VirtualTabletop = () => {
     }
 
     // Horizontal lines
-    for (let y = 0; y <= height; y += size) {
-      const line = new Line([0, y, width, y], {
+    for (let y = startY; y <= endY; y += size) {
+      const line = new Line([startX, y, endX, y], {
         stroke: gridColor,
-        strokeWidth: 1,
+        strokeWidth: 1 / canvas.getZoom(), // Scale stroke with zoom
         selectable: false,
         evented: false,
         isGrid: true,
@@ -217,28 +236,31 @@ export const VirtualTabletop = () => {
     }
   };
 
-  const drawHexGrid = (canvas: FabricCanvas, size: number, width: number, height: number) => {
+  const drawHexGrid = (canvas: FabricCanvas, size: number, left: number, top: number, width: number, height: number) => {
     const gridColor = 'hsl(var(--grid-color))';
     const hexWidth = size * Math.sqrt(3);
     const hexHeight = size * 2;
     const vertSpacing = hexHeight * 0.75;
 
-    for (let row = 0; row * vertSpacing < height + hexHeight; row++) {
-      for (let col = 0; col * hexWidth < width + hexWidth; col++) {
+    // Calculate hex grid boundaries
+    const startCol = Math.floor(left / hexWidth);
+    const endCol = Math.ceil((left + width) / hexWidth);
+    const startRow = Math.floor(top / vertSpacing);
+    const endRow = Math.ceil((top + height) / vertSpacing);
+
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
         const offsetX = (row % 2) * (hexWidth / 2);
         const centerX = col * hexWidth + offsetX + hexWidth / 2;
         const centerY = row * vertSpacing + hexHeight / 2;
 
-        if (centerX > -hexWidth/2 && centerX < width + hexWidth/2 && 
-            centerY > -hexHeight/2 && centerY < height + hexHeight/2) {
-          const hex = createHexagon(centerX, centerY, size, gridColor);
-          canvas.add(hex);
-        }
+        const hex = createHexagon(centerX, centerY, size, gridColor, canvas.getZoom());
+        canvas.add(hex);
       }
     }
   };
 
-  const createHexagon = (centerX: number, centerY: number, radius: number, color: string) => {
+  const createHexagon = (centerX: number, centerY: number, radius: number, color: string, zoom: number) => {
     const points = [];
     for (let i = 0; i < 6; i++) {
       const angle = (i * Math.PI) / 3;
@@ -250,7 +272,7 @@ export const VirtualTabletop = () => {
     return new Polygon(points, {
       fill: 'transparent',
       stroke: color,
-      strokeWidth: 1,
+      strokeWidth: 1 / zoom, // Scale stroke with zoom
       selectable: false,
       evented: false,
       isGrid: true,
@@ -590,6 +612,109 @@ export const VirtualTabletop = () => {
       console.error('Failed to load stored token:', error);
       toast.error(`Failed to load token: ${token.name}`);
     });
+  };
+
+  // Setup canvas pan and zoom controls
+  const setupCanvasControls = (canvas: FabricCanvas) => {
+    let isDragging = false;
+    let lastPosX = 0;
+    let lastPosY = 0;
+
+    // Mouse wheel zoom
+    canvas.on('mouse:wheel', (opt) => {
+      const delta = opt.e.deltaY;
+      let zoom = canvas.getZoom();
+      
+      // Zoom limits
+      const minZoom = 0.1;
+      const maxZoom = 5;
+      
+      zoom *= 0.999 ** delta;
+      zoom = Math.min(Math.max(zoom, minZoom), maxZoom);
+      
+      // Zoom towards mouse position
+      const point = new Point(opt.e.offsetX, opt.e.offsetY);
+      canvas.zoomToPoint(point, zoom);
+      
+      // Redraw grid at new zoom level
+      drawGrid(canvas, gridType, gridSize, isGridVisible);
+      
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+    });
+
+    // Pan on alt+drag or middle mouse drag
+    canvas.on('mouse:down', (opt) => {
+      const evt = opt.e as MouseEvent;
+      if (evt.altKey || evt.button === 1) { // Alt key or middle mouse
+        isDragging = true;
+        canvas.selection = false;
+        lastPosX = evt.clientX;
+        lastPosY = evt.clientY;
+        canvas.setCursor('grabbing');
+        evt.preventDefault();
+      }
+    });
+
+    canvas.on('mouse:move', (opt) => {
+      if (isDragging) {
+        const evt = opt.e as MouseEvent;
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          vpt[4] += evt.clientX - lastPosX;
+          vpt[5] += evt.clientY - lastPosY;
+          canvas.requestRenderAll();
+          lastPosX = evt.clientX;
+          lastPosY = evt.clientY;
+          
+          // Redraw grid to show new visible area
+          drawGrid(canvas, gridType, gridSize, isGridVisible);
+        }
+        evt.preventDefault();
+      }
+    });
+
+    canvas.on('mouse:up', () => {
+      if (isDragging) {
+        isDragging = false;
+        canvas.selection = true;
+        canvas.setCursor('default');
+      }
+    });
+
+    // Keyboard shortcuts for zoom
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '0') {
+          // Reset zoom
+          canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          e.preventDefault();
+        } else if (e.key === '=' || e.key === '+') {
+          // Zoom in
+          let zoom = canvas.getZoom();
+          zoom = Math.min(zoom * 1.1, 5);
+          const center = canvas.getCenter();
+          canvas.zoomToPoint(new Point(center.left, center.top), zoom);
+          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          e.preventDefault();
+        } else if (e.key === '-') {
+          // Zoom out
+          let zoom = canvas.getZoom();
+          zoom = Math.max(zoom / 1.1, 0.1);
+          const center = canvas.getCenter();
+          canvas.zoomToPoint(new Point(center.left, center.top), zoom);
+          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          e.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   };
 
   return (
