@@ -650,9 +650,16 @@ export const VirtualTabletop = () => {
     // Right mouse button pan and context menu handling
     canvas.on('mouse:down', (opt) => {
       const evt = opt.e as MouseEvent;
-      console.log('Canvas mouse:down', { button: evt.button, target: opt.target, hasTokenId: !!(opt.target as any)?.tokenId });
+      console.log('FABRIC mouse:down', { 
+        button: evt.button, 
+        which: evt.which,
+        type: evt.type,
+        target: opt.target, 
+        hasTokenId: !!(opt.target as any)?.tokenId,
+        originalEvent: evt
+      });
       
-      if (evt.button === 2) { // Right mouse button
+      if (evt.button === 2 || evt.which === 3) { // Try both properties
         const target = opt.target;
         
         // If clicking on a token, don't start panning - let context menu handle it
@@ -715,10 +722,18 @@ export const VirtualTabletop = () => {
 
     canvas.on('mouse:up', (opt) => {
       const evt = opt.e as MouseEvent;
-      console.log('Canvas mouse:up', { button: evt.button, rightMouseDown, isDragging, target: opt.target });
+      console.log('FABRIC mouse:up', { 
+        button: evt.button, 
+        which: evt.which,
+        type: evt.type,
+        rightMouseDown, 
+        isDragging, 
+        target: opt.target,
+        originalEvent: evt
+      });
       
       // Handle right mouse button up
-      if (evt.button === 2) {
+      if (evt.button === 2 || evt.which === 3) {
         console.log('Right mouse up detected, rightMouseDown:', rightMouseDown);
         
         if (rightMouseDown) {
@@ -751,9 +766,24 @@ export const VirtualTabletop = () => {
     });
     
     canvas.upperCanvasEl.addEventListener('mousedown', (e) => {
-      console.log('Raw mousedown:', { button: e.button, which: e.which });
+      console.log('DOM mousedown:', { 
+        button: e.button, 
+        which: e.which, 
+        type: e.type,
+        target: e.target,
+        currentTarget: e.currentTarget
+      });
       if (e.button === 2 || e.which === 3) {
-        console.log('RIGHT CLICK DETECTED ON CANVAS!');
+        console.log('DOM RIGHT CLICK DETECTED!');
+        
+        // Manually trigger Fabric.js right-click handling
+        const pointer = canvas.getPointer(e);
+        const fabricEvent = {
+          e: e,
+          target: canvas.findTarget(e),
+          pointer: pointer
+        };
+        console.log('Manually triggering Fabric event:', fabricEvent);
       }
     });
 
