@@ -45,7 +45,28 @@ export const SimpleTabletop = () => {
     gridSize: number;
   }
   
-  const [regions, setRegions] = useState<Region[]>([]);
+  const { maps, getVisibleMaps, getActiveRegionAt, addRegion: storeAddRegion, updateRegion: storeUpdateRegion, removeRegion: storeRemoveRegion, selectedMapId } = useMapStore();
+
+  // Get regions from the selected map
+  const currentMapId = selectedMapId || 'default-map';
+  const currentMap = maps.find(m => m.id === currentMapId);
+  // Helper function to convert GridRegion to Region for compatibility
+  const convertToLocalRegion = (gridRegion: any): Region => {
+    return {
+      id: gridRegion.id,
+      x: gridRegion.bounds.x,
+      y: gridRegion.bounds.y,
+      width: gridRegion.bounds.width,
+      height: gridRegion.bounds.height,
+      selected: selectedRegionId === gridRegion.id,
+      color: gridRegion.gridColor,
+      gridType: gridRegion.gridType === 'none' ? 'default' : gridRegion.gridType,
+      gridSize: gridRegion.gridSize
+    };
+  };
+
+  // Convert regions for local use
+  const localRegions = regions.map(convertToLocalRegion);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
@@ -64,7 +85,7 @@ export const SimpleTabletop = () => {
     currentPlayerId,
   } = useSessionStore();
 
-  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+  const { maps, getVisibleMaps, getActiveRegionAt, addRegion, updateRegion, removeRegion, selectedMapId } = useMapStore();
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -104,8 +125,8 @@ export const SimpleTabletop = () => {
   // Hit test for regions
   const getRegionAtPosition = (worldX: number, worldY: number): Region | null => {
     // Check regions in reverse order (top to bottom)
-    for (let i = regions.length - 1; i >= 0; i--) {
-      const region = regions[i];
+    for (let i = localRegions.length - 1; i >= 0; i--) {
+      const region = localRegions[i];
       if (worldX >= region.x && worldX <= region.x + region.width &&
           worldY >= region.y && worldY <= region.y + region.height) {
         return region;
@@ -850,10 +871,10 @@ export const SimpleTabletop = () => {
     
     const menuItems = [
       { 
-        label: 'Default Grid', 
+        label: 'No Grid', 
         icon: '📐', 
-        action: () => setRegionGridType(region.id, 'default'),
-        active: region.gridType === 'default'
+        action: () => setRegionGridType(region.id, 'none'),
+        active: region.gridType === 'none'
       },
       { 
         label: 'Square Grid', 
@@ -1094,24 +1115,15 @@ export const SimpleTabletop = () => {
     } else if (e.button === 0) { // Left click
       // Handle token snapping on drag end
       if (isDraggingToken && draggedTokenId) {
-        console.log('Token drag ended, checking for snapping...');
         const token = tokens.find(t => t.id === draggedTokenId);
         if (token) {
-          console.log('Token position:', token.x, token.y);
-          console.log('All maps and regions:', maps);
-          
           // Find the active region at token position
           const activeRegion = getActiveRegionAt(token.x, token.y);
-          console.log('Active region:', activeRegion);
           
           // Apply grid snapping if token is in a region with grid
           if (activeRegion && activeRegion.region.gridType !== 'none') {
-            console.log('Applying snapping for grid type:', activeRegion.region.gridType);
             const snappedPos = snapToMapGrid(token.x, token.y, activeRegion);
-            console.log('Snapped position:', snappedPos);
             updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
-          } else {
-            console.log('No snapping applied - no region or grid type is none');
           }
         }
       }
@@ -1181,17 +1193,11 @@ export const SimpleTabletop = () => {
     let tokenY = y ?? (-transform.y / transform.zoom);
     
     // Apply grid snapping for new tokens
-    console.log('Adding new token at:', tokenX, tokenY);
     const activeRegion = getActiveRegionAt(tokenX, tokenY);
-    console.log('Active region for new token:', activeRegion);
     if (activeRegion && activeRegion.region.gridType !== 'none') {
-      console.log('Applying snapping for new token, grid type:', activeRegion.region.gridType);
       const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
-      console.log('New token snapped position:', snappedPos);
       tokenX = snappedPos.x;
       tokenY = snappedPos.y;
-    } else {
-      console.log('No snapping for new token - no region or grid type is none');
     }
     
     // Generate a random color for the token
