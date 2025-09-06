@@ -8,7 +8,7 @@ import { useMapStore } from '../stores/mapStore';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Grid3X3 } from 'lucide-react';
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +31,9 @@ export const SimpleTabletop = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragPath, setDragPath] = useState<{ x: number, y: number }[]>([]);
+  
+  // Grid snapping toggle (default disabled)
+  const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
   
   // Region state
   interface Region {
@@ -1104,14 +1107,14 @@ export const SimpleTabletop = () => {
           const activeRegion = getActiveRegionAt(token.x, token.y);
           console.log('Active region:', activeRegion);
           
-          // Apply grid snapping if token is in a region with grid
-          if (activeRegion && activeRegion.region.gridType !== 'none') {
+          // Apply grid snapping if enabled and token is in a region with grid
+          if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
             console.log('Applying snapping for grid type:', activeRegion.region.gridType);
             const snappedPos = snapToMapGrid(token.x, token.y, activeRegion);
             console.log('Snapped position:', snappedPos);
             updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
           } else {
-            console.log('No snapping applied - no region or grid type is none');
+            console.log('No snapping applied - snapping disabled or no region or grid type is none');
           }
         }
       }
@@ -1180,18 +1183,18 @@ export const SimpleTabletop = () => {
     let tokenX = x ?? (-transform.x / transform.zoom);
     let tokenY = y ?? (-transform.y / transform.zoom);
     
-    // Apply grid snapping for new tokens
+    // Apply grid snapping for new tokens if enabled
     console.log('Adding new token at:', tokenX, tokenY);
     const activeRegion = getActiveRegionAt(tokenX, tokenY);
     console.log('Active region for new token:', activeRegion);
-    if (activeRegion && activeRegion.region.gridType !== 'none') {
+    if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
       console.log('Applying snapping for new token, grid type:', activeRegion.region.gridType);
       const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
       console.log('New token snapped position:', snappedPos);
       tokenX = snappedPos.x;
       tokenY = snappedPos.y;
     } else {
-      console.log('No snapping for new token - no region or grid type is none');
+      console.log('No snapping for new token - snapping disabled or no region or grid type is none');
     }
     
     // Generate a random color for the token
@@ -1250,6 +1253,19 @@ export const SimpleTabletop = () => {
           className="flex items-center gap-2"
         >
           Add Region
+        </Button>
+      </div>
+
+      {/* Grid Snapping Toggle */}
+      <div className="absolute top-28 right-4 z-10">
+        <Button
+          variant={isGridSnappingEnabled ? "default" : "outline"}
+          size="sm"
+          onClick={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+          className="flex items-center gap-2"
+        >
+          <Grid3X3 className="w-4 h-4" />
+          Snap {isGridSnappingEnabled ? 'On' : 'Off'}
         </Button>
       </div>
 
