@@ -40,24 +40,11 @@ export const VirtualTabletop = () => {
   } = useSessionStore();
 
   useEffect(() => {
-    console.log('VirtualTabletop useEffect starting...', { 
-      canvasRef: canvasRef.current, 
-      gridCanvasRef: gridCanvasRef.current 
-    });
-    
-    if (!canvasRef.current || !gridCanvasRef.current) {
-      console.log('Missing canvas refs!', {
-        canvasRef: !!canvasRef.current,
-        gridCanvasRef: !!gridCanvasRef.current
-      });
-      return;
-    }
+    if (!canvasRef.current || !gridCanvasRef.current) return;
 
     // Calculate full viewport canvas size
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 80; // Account for toolbar height
-    
-    console.log('Viewport dimensions:', { viewportWidth, viewportHeight });
 
     // Setup main Fabric.js canvas
     const canvas = new FabricCanvas(canvasRef.current, {
@@ -65,25 +52,15 @@ export const VirtualTabletop = () => {
       height: viewportHeight,
       backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
     });
-    
-    console.log('Fabric.js canvas created:', canvas);
 
     // Setup background grid canvas
     const gridCanvas = gridCanvasRef.current;
     gridCanvas.width = viewportWidth;
     gridCanvas.height = viewportHeight;
     
-    console.log('Grid canvas setup:', {
-      width: gridCanvas.width,
-      height: gridCanvas.height,
-      clientWidth: gridCanvas.clientWidth,
-      clientHeight: gridCanvas.clientHeight
-    });
-    
-    // Set grid canvas background to match Fabric.js canvas and add test pattern
+    // Set grid canvas background and add test pattern
     const gridCtx = gridCanvas.getContext('2d');
     if (gridCtx) {
-      console.log('Grid context obtained, drawing test pattern...');
       // Fill background
       gridCtx.fillStyle = '#1a1a1a';
       gridCtx.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -101,10 +78,6 @@ export const VirtualTabletop = () => {
       // Add a white rectangle in center
       gridCtx.fillStyle = 'white';
       gridCtx.fillRect(viewportWidth/2 - 50, viewportHeight/2 - 50, 100, 100);
-      
-      console.log('Test pattern drawn successfully');
-    } else {
-      console.error('Failed to get grid canvas context!');
     }
     
     const renderer = createGridRenderer(gridCanvas);
@@ -112,7 +85,6 @@ export const VirtualTabletop = () => {
       console.error('Failed to create grid renderer');
       return;
     }
-    console.log('Grid renderer created:', renderer);
 
     // Configure canvas for gaming with pan/zoom
     canvas.selection = true;
@@ -125,7 +97,6 @@ export const VirtualTabletop = () => {
     setGridRenderer(renderer);
     
     // Draw initial grid
-    console.log('Drawing initial grid...');
     updateGridDisplay(canvas, renderer);
     
     // Load existing tokens from store onto canvas
@@ -264,15 +235,10 @@ export const VirtualTabletop = () => {
 
   // Update grid display using new efficient system
   const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
-    if (!renderer) {
-      console.log('No renderer available for grid display');
-      return;
-    }
+    if (!renderer) return;
     
     const viewport = getCurrentViewport(canvas);
-    console.log('Grid render viewport:', viewport, 'Grid settings:', { gridType, gridSize, isGridVisible });
-    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.5)');
-    console.log('Grid render completed');
+    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.6)');
   };
 
   // Old grid functions removed - now using efficient grid system
@@ -904,11 +870,31 @@ export const VirtualTabletop = () => {
             onUpdateCanvas={handleCanvasUpdate}
           />
           
+          {/* Background Grid Canvas */}
+          <div className="absolute inset-0" style={{ zIndex: 1 }}>
+            <canvas 
+              ref={gridCanvasRef}
+              className="w-full h-full block"
+              style={{ 
+                background: '#1a1a1a',
+                position: 'absolute',
+                top: 0,
+                left: 0
+              }}
+            />
+          </div>
+          
           {/* Full-Screen Canvas Container */}
-          <div className="absolute inset-0 canvas-container">
+          <div className="absolute inset-0 canvas-container" style={{ zIndex: 2 }}>
             <canvas 
               ref={canvasRef} 
               className="w-full h-full block"
+              style={{ 
+                background: 'transparent',
+                position: 'absolute',
+                top: 0,
+                left: 0
+              }}
             />
           </div>
         </div>
