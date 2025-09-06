@@ -9,14 +9,36 @@ export interface Token {
   y: number;
   gridWidth: number;  // Width in grid units
   gridHeight: number; // Height in grid units
+  label: string;      // Editable label/name
+  ownerId?: string;   // Player who owns this token
+  color?: string;     // Token color (for default tokens)
 }
+
+export interface Player {
+  id: string;
+  name: string;
+  role: 'dm' | 'player';
+  isConnected: boolean;
+}
+
+export type LabelVisibility = 'show' | 'hide' | 'selected' | 'owned';
 
 export interface SessionState {
   sessionId: string;
   tokens: Token[];
+  players: Player[];
+  currentPlayerId: string;
+  selectedTokenIds: string[];
+  labelVisibility: LabelVisibility;
   addToken: (token: Token) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
+  updateTokenLabel: (tokenId: string, label: string) => void;
+  setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
+  setSelectedTokens: (tokenIds: string[]) => void;
+  setLabelVisibility: (visibility: LabelVisibility) => void;
+  addPlayer: (player: Player) => void;
+  setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
   initializeSession: (sessionId?: string) => void;
 }
 
@@ -25,6 +47,10 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
       sessionId: '',
       tokens: [],
+      players: [],
+      currentPlayerId: '',
+      selectedTokenIds: [],
+      labelVisibility: 'show',
       
       addToken: (token) =>
         set((state) => ({
@@ -51,23 +77,76 @@ export const useSessionStore = create<SessionState>()(
             // Clear old data if storage is full
             if (error instanceof Error && error.message.includes('quota')) {
               localStorage.clear();
-              set({ tokens: [], sessionId: state.sessionId });
+              set({ tokens: [], sessionId: state.sessionId, players: [], currentPlayerId: '', selectedTokenIds: [], labelVisibility: 'show' });
             }
           }
         }
       },
+
+      updateTokenLabel: (tokenId, label) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, label } : token
+          ),
+        })),
+
+      setTokenOwner: (tokenId, ownerId) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, ownerId } : token
+          ),
+        })),
       
       removeToken: (tokenId) =>
         set((state) => ({
           tokens: state.tokens.filter((token) => token.id !== tokenId),
+          selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
         })),
+
+      setSelectedTokens: (tokenIds) =>
+        set({ selectedTokenIds: tokenIds }),
+
+      setLabelVisibility: (visibility) =>
+        set({ labelVisibility: visibility }),
+
+      addPlayer: (player) =>
+        set((state) => ({
+          players: [...state.players.filter(p => p.id !== player.id), player],
+        })),
+
+      setCurrentPlayer: (playerId, role) => {
+        set((state) => {
+          const existingPlayer = state.players.find(p => p.id === playerId);
+          const updatedPlayers = existingPlayer 
+            ? state.players.map(p => p.id === playerId ? { ...p, role, isConnected: true } : p)
+            : [...state.players, { id: playerId, name: `${role === 'dm' ? 'DM' : 'Player'} ${playerId.slice(-4)}`, role, isConnected: true }];
+          
+          return {
+            currentPlayerId: playerId,
+            players: updatedPlayers,
+          };
+        });
+      },
       
       initializeSession: (sessionId) => {
         const urlParams = new URLSearchParams(window.location.search);
         const urlSessionId = urlParams.get('session');
         const finalSessionId = sessionId || urlSessionId || generateSessionId();
         
-        set({ sessionId: finalSessionId });
+        // Generate or get current player ID
+        let currentPlayerId = localStorage.getItem('vtt-player-id');
+        if (!currentPlayerId) {
+          currentPlayerId = generateSessionId();
+          localStorage.setItem('vtt-player-id', currentPlayerId);
+        }
+        
+        set({ 
+          sessionId: finalSessionId,
+          currentPlayerId,
+        });
+        
+        // Set default role as DM for now (can be changed later)
+        get().setCurrentPlayer(currentPlayerId, 'dm');
         
         // Update URL if needed
         if (!urlSessionId || urlSessionId !== finalSessionId) {
@@ -82,6 +161,9 @@ export const useSessionStore = create<SessionState>()(
       partialize: (state) => ({
         tokens: state.tokens,
         sessionId: state.sessionId,
+        players: state.players,
+        currentPlayerId: state.currentPlayerId,
+        labelVisibility: state.labelVisibility,
       }),
     }
   )

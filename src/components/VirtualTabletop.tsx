@@ -4,6 +4,7 @@ import { Toolbar } from './Toolbar';
 import { GridControls } from './GridControls';
 import { TokenPanel } from './TokenPanel';
 import { MapControls } from './MapControls';
+import { LabelControls } from './LabelControls';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 
@@ -16,7 +17,7 @@ export const VirtualTabletop = () => {
   const [gridSize, setGridSize] = useState(40);
   const [isGridVisible, setIsGridVisible] = useState(true);
   
-  const { sessionId, tokens, addToken, updateTokenPosition } = useSessionStore();
+  const { sessionId, tokens, addToken, updateTokenPosition, updateTokenLabel, selectedTokenIds, setSelectedTokens, labelVisibility, currentPlayerId, players } = useSessionStore();
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -200,7 +201,7 @@ export const VirtualTabletop = () => {
     return { x, y };
   };
 
-  const addTokenToCanvas = (imageUrl: string, x: number = 100, y: number = 100, gridWidth: number = 1, gridHeight: number = 1) => {
+  const addTokenToCanvas = (imageUrl: string, x: number = 100, y: number = 100, gridWidth: number = 1, gridHeight: number = 1, color?: string) => {
     if (!fabricCanvas) return;
 
     FabricImage.fromURL(imageUrl).then((img) => {
@@ -240,6 +241,9 @@ export const VirtualTabletop = () => {
           name: `Token ${tokenId.slice(-8)}`,
           gridWidth,
           gridHeight,
+          label: `Token ${tokenId.slice(-8)}`,
+          ownerId: currentPlayerId,
+          color,
         });
         toast.success('Token added to map');
       } catch (error) {
@@ -270,6 +274,8 @@ export const VirtualTabletop = () => {
           />
           
           <TokenPanel onAddToken={addTokenToCanvas} />
+          
+          <LabelControls />
           
           <MapControls fabricCanvas={fabricCanvas} />
         </div>

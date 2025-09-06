@@ -8,7 +8,7 @@ import { Plus, Upload, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TokenPanelProps {
-  onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number) => void;
+  onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void;
 }
 
 export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
@@ -46,22 +46,40 @@ export const TokenPanel = ({ onAddToken }: TokenPanelProps) => {
   };
 
   const addDefaultToken = () => {
+    // Generate random bright color (avoiding black)
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+      '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+      '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+    ];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    
     // Create a simple colored circle as default token
     const canvas = document.createElement('canvas');
     canvas.width = 100;
     canvas.height = 100;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = 'hsl(var(--primary))';
+      // Draw main circle
+      ctx.fillStyle = randomColor;
       ctx.beginPath();
       ctx.arc(50, 50, 40, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = 'hsl(var(--primary-foreground))';
-      ctx.lineWidth = 4;
+      
+      // Draw border
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // Draw inner highlight
+      ctx.strokeStyle = randomColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(50, 50, 37, 0, 2 * Math.PI);
       ctx.stroke();
       
       const dataUrl = canvas.toDataURL();
-      onAddToken(dataUrl, 100, 100, gridWidth, gridHeight);
+      onAddToken(dataUrl, 100, 100, gridWidth, gridHeight, randomColor);
       setGridWidth(1);
       setGridHeight(1);
     }
