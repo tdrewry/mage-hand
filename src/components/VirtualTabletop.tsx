@@ -42,96 +42,34 @@ export const VirtualTabletop = () => {
   } = useSessionStore();
 
   useEffect(() => {
-    console.log('🚀 VirtualTabletop useEffect starting...');
-    
-    if (!canvasRef.current || !gridCanvasRef.current) {
-      console.error('❌ Missing canvas refs!', {
-        canvasRef: !!canvasRef.current,
-        gridCanvasRef: !!gridCanvasRef.current
-      });
-      return;
-    }
+    if (!canvasRef.current || !gridCanvasRef.current) return;
 
     // Calculate full viewport canvas size
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 80; // Account for toolbar height
-    
-    console.log('📐 Viewport dimensions:', { viewportWidth, viewportHeight });
 
-    // Setup main Fabric.js canvas with debugging
-    console.log('🎨 Setting up Fabric.js canvas...');
+    // Setup main Fabric.js canvas
     const canvas = new FabricCanvas(canvasRef.current, {
       width: viewportWidth,
       height: viewportHeight,
       backgroundColor: 'transparent', // Make transparent to see grid behind
     });
-    
-    console.log('✅ Fabric.js canvas created:', {
-      width: canvas.width,
-      height: canvas.height,
-      element: canvasRef.current
-    });
 
-    // Setup background grid canvas with debugging
-    console.log('🎨 Setting up grid canvas...');
+    // Setup background grid canvas
     const gridCanvas = gridCanvasRef.current;
-    
-    // Log canvas element before sizing
-    console.log('📦 Grid canvas element before setup:', {
-      element: gridCanvas,
-      clientWidth: gridCanvas.clientWidth,
-      clientHeight: gridCanvas.clientHeight,
-      offsetWidth: gridCanvas.offsetWidth,
-      offsetHeight: gridCanvas.offsetHeight
-    });
-    
     gridCanvas.width = viewportWidth;
     gridCanvas.height = viewportHeight;
     
-    console.log('📦 Grid canvas setup complete:', {
-      width: gridCanvas.width,
-      height: gridCanvas.height,
-      clientWidth: gridCanvas.clientWidth,
-      clientHeight: gridCanvas.clientHeight
-    });
-    
-    // Set grid canvas background and add test pattern
+    // Set grid canvas background
     const gridCtx = gridCanvas.getContext('2d');
     if (gridCtx) {
-      console.log('🎨 Grid context obtained, drawing test pattern...');
       // Fill background
       gridCtx.fillStyle = '#1a1a1a';
       gridCtx.fillRect(0, 0, viewportWidth, viewportHeight);
-      
-      // Add VERY visible test pattern 
-      gridCtx.strokeStyle = 'rgba(255, 0, 0, 1.0)'; // Bright red
-      gridCtx.lineWidth = 5;
-      gridCtx.beginPath();
-      gridCtx.moveTo(0, 0);
-      gridCtx.lineTo(viewportWidth, viewportHeight);
-      gridCtx.moveTo(viewportWidth, 0);
-      gridCtx.lineTo(0, viewportHeight);
-      gridCtx.stroke();
-      
-      // Add a bright white rectangle in center
-      gridCtx.fillStyle = 'white';
-      gridCtx.fillRect(viewportWidth/2 - 100, viewportHeight/2 - 100, 200, 200);
-      
-      // Add text to verify canvas is working
-      gridCtx.fillStyle = 'red';
-      gridCtx.font = '24px Arial';
-      gridCtx.fillText('GRID CANVAS TEST', 100, 100);
-      
-      console.log('✅ Test pattern drawn on grid canvas');
-    } else {
-      console.error('❌ Failed to get grid canvas context!');
     }
     
     const renderer = createGridRenderer(gridCanvas);
-    if (!renderer) {
-      console.error('Failed to create grid renderer');
-      return;
-    }
+    if (!renderer) return;
 
     // Configure canvas for gaming with pan/zoom
     canvas.selection = true;
@@ -271,18 +209,6 @@ export const VirtualTabletop = () => {
   const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
     const vpt = canvas.viewportTransform;
     const zoom = canvas.getZoom();
-    console.log('🔍 Viewport calculation:', {
-      vpt,
-      zoom,
-      canvasDimensions: { width: canvas.width, height: canvas.height },
-      calculated: {
-        x: -vpt[4] / zoom,
-        y: -vpt[5] / zoom,
-        zoom: zoom,
-        width: canvas.width || 1200,
-        height: canvas.height || 800
-      }
-    });
     return {
       x: -vpt[4] / zoom,
       y: -vpt[5] / zoom,
@@ -294,31 +220,12 @@ export const VirtualTabletop = () => {
 
   // Update grid display using new efficient system
   const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
-    if (!renderer) {
-      console.log('❌ No renderer available for grid display');
-      return;
-    }
+    if (!renderer) return;
     
     const viewport = getCurrentViewport(canvas);
-    console.log('📊 Grid render call:', { 
-      viewport, 
-      gridType, 
-      gridSize, 
-      isGridVisible, 
-      gridColor, 
-      gridOpacity,
-      canvasSize: { width: renderer.canvas.width, height: renderer.canvas.height }
-    });
-    
     const gridColorWithOpacity = `rgba(${parseInt(gridColor.slice(1, 3), 16)}, ${parseInt(gridColor.slice(3, 5), 16)}, ${parseInt(gridColor.slice(5, 7), 16)}, ${gridOpacity / 100})`;
-    console.log('🎨 Grid color calculated:', gridColorWithOpacity);
     
     renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, gridColorWithOpacity);
-    
-    // Force a test draw to verify canvas is working
-    renderer.ctx.fillStyle = 'red';
-    renderer.ctx.fillRect(50, 50, 100, 100);
-    console.log('🔴 Red test square drawn at 50,50');
   };
 
   // Old grid functions removed - now using efficient grid system
@@ -675,27 +582,17 @@ export const VirtualTabletop = () => {
     // Right mouse button pan and context menu handling
     canvas.on('mouse:down', (opt) => {
       const evt = opt.e as MouseEvent;
-      console.log('FABRIC mouse:down', { 
-        button: evt.button, 
-        which: evt.which,
-        type: evt.type,
-        target: opt.target, 
-        hasTokenId: !!(opt.target as any)?.tokenId,
-        originalEvent: evt
-      });
       
       if (evt.button === 2 || evt.which === 3) { // Try both properties
         const target = opt.target;
         
         // If clicking on a token, don't start panning - let context menu handle it
         if (target && (target as any).tokenId) {
-          console.log('Right-click on token:', (target as any).tokenId);
           // Store the clicked token for context menu
           setSelectedTokens([(target as any).tokenId]);
           return;
         }
         
-        console.log('Starting right-click pan mode');
         // Otherwise, start panning
         rightMouseDown = true;
         dragStartX = evt.clientX;
@@ -713,20 +610,17 @@ export const VirtualTabletop = () => {
       const evt = opt.e as MouseEvent;
       
       if (rightMouseDown) {
-        console.log('Mouse move during right mouse down');
         const deltaX = Math.abs(evt.clientX - dragStartX);
         const deltaY = Math.abs(evt.clientY - dragStartY);
         
         // Start dragging if we've moved beyond threshold
         if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
-          console.log('Starting drag mode');
           isDragging = true;
           canvas.selection = false;
           canvas.setCursor('grabbing');
         }
         
         if (isDragging) {
-          console.log('Panning map');
           const vpt = canvas.viewportTransform;
           if (vpt) {
             vpt[4] += evt.clientX - lastPosX;
@@ -747,31 +641,18 @@ export const VirtualTabletop = () => {
 
     canvas.on('mouse:up', (opt) => {
       const evt = opt.e as MouseEvent;
-      console.log('FABRIC mouse:up', { 
-        button: evt.button, 
-        which: evt.which,
-        type: evt.type,
-        rightMouseDown, 
-        isDragging, 
-        target: opt.target,
-        originalEvent: evt
-      });
       
       // Handle right mouse button up
       if (evt.button === 2 || evt.which === 3) {
-        console.log('Right mouse up detected, rightMouseDown:', rightMouseDown);
-        
         if (rightMouseDown) {
           const target = opt.target;
           
           if (isDragging) {
-            console.log('Ending pan mode');
             // Was dragging - end pan mode
             isDragging = false;
             canvas.selection = true;
             canvas.setCursor('default');
           } else if (target && (target as any).tokenId) {
-            console.log('Showing context menu for token:', (target as any).tokenId);
             // Was a click on a token - trigger context menu manually
             // Let's use a simpler approach - just set a flag and let TokenContextManager handle it
           }
@@ -787,29 +668,16 @@ export const VirtualTabletop = () => {
     canvas.upperCanvasEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Context menu prevented');
     });
     
     canvas.upperCanvasEl.addEventListener('mousedown', (e) => {
-      console.log('DOM mousedown:', { 
-        button: e.button, 
-        which: e.which, 
-        type: e.type,
-        target: e.target,
-        currentTarget: e.currentTarget
-      });
       if (e.button === 2 || e.which === 3) {
-        console.log('DOM RIGHT CLICK DETECTED!');
-        
         // Get the Fabric.js target and pointer
         const pointer = canvas.getPointer(e);
         const target = canvas.findTarget(e);
         
-        console.log('Right-click target analysis:', { target, pointer, hasTokenId: !!(target as any)?.tokenId });
-        
         // Handle right-click logic directly here since Fabric.js events aren't working
         if (target && (target as any).tokenId) {
-          console.log('Right-click on token:', (target as any).tokenId);
           // Store the clicked token for context menu
           setSelectedTokens([(target as any).tokenId]);
           // Don't start panning
@@ -817,7 +685,6 @@ export const VirtualTabletop = () => {
         }
         
         // Start panning for right-click on empty space
-        console.log('Starting right-click pan mode');
         rightMouseDown = true;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
@@ -958,8 +825,7 @@ export const VirtualTabletop = () => {
           className="absolute inset-0 w-full h-full"
           style={{ 
             zIndex: 1,
-            background: '#1a1a1a',
-            border: '2px solid red' // Debug border to see canvas bounds
+            background: '#1a1a1a'
           }}
         />
         
@@ -969,8 +835,7 @@ export const VirtualTabletop = () => {
           className="absolute inset-0 w-full h-full"
           style={{ 
             zIndex: 2,
-            background: 'transparent',
-            border: '2px solid blue' // Debug border to see canvas bounds
+            background: 'transparent'
           }}
         />
       </div>
