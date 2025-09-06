@@ -42,23 +42,58 @@ export const VirtualTabletop = () => {
   } = useSessionStore();
 
   useEffect(() => {
-    if (!canvasRef.current || !gridCanvasRef.current) return;
+    console.log('🚀 VirtualTabletop useEffect starting...');
+    
+    if (!canvasRef.current || !gridCanvasRef.current) {
+      console.error('❌ Missing canvas refs!', {
+        canvasRef: !!canvasRef.current,
+        gridCanvasRef: !!gridCanvasRef.current
+      });
+      return;
+    }
 
     // Calculate full viewport canvas size
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 80; // Account for toolbar height
+    
+    console.log('📐 Viewport dimensions:', { viewportWidth, viewportHeight });
 
-    // Setup main Fabric.js canvas
+    // Setup main Fabric.js canvas with debugging
+    console.log('🎨 Setting up Fabric.js canvas...');
     const canvas = new FabricCanvas(canvasRef.current, {
       width: viewportWidth,
       height: viewportHeight,
-      backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
+      backgroundColor: 'transparent', // Make transparent to see grid behind
+    });
+    
+    console.log('✅ Fabric.js canvas created:', {
+      width: canvas.width,
+      height: canvas.height,
+      element: canvasRef.current
     });
 
-    // Setup background grid canvas
+    // Setup background grid canvas with debugging
+    console.log('🎨 Setting up grid canvas...');
     const gridCanvas = gridCanvasRef.current;
+    
+    // Log canvas element before sizing
+    console.log('📦 Grid canvas element before setup:', {
+      element: gridCanvas,
+      clientWidth: gridCanvas.clientWidth,
+      clientHeight: gridCanvas.clientHeight,
+      offsetWidth: gridCanvas.offsetWidth,
+      offsetHeight: gridCanvas.offsetHeight
+    });
+    
     gridCanvas.width = viewportWidth;
     gridCanvas.height = viewportHeight;
+    
+    console.log('📦 Grid canvas setup complete:', {
+      width: gridCanvas.width,
+      height: gridCanvas.height,
+      clientWidth: gridCanvas.clientWidth,
+      clientHeight: gridCanvas.clientHeight
+    });
     
     // Set grid canvas background and add test pattern
     const gridCtx = gridCanvas.getContext('2d');
@@ -236,6 +271,18 @@ export const VirtualTabletop = () => {
   const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
     const vpt = canvas.viewportTransform;
     const zoom = canvas.getZoom();
+    console.log('🔍 Viewport calculation:', {
+      vpt,
+      zoom,
+      canvasDimensions: { width: canvas.width, height: canvas.height },
+      calculated: {
+        x: -vpt[4] / zoom,
+        y: -vpt[5] / zoom,
+        zoom: zoom,
+        width: canvas.width || 1200,
+        height: canvas.height || 800
+      }
+    });
     return {
       x: -vpt[4] / zoom,
       y: -vpt[5] / zoom,
