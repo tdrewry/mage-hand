@@ -40,6 +40,8 @@ export const SimpleTabletop = () => {
     height: number;
     selected: boolean;
     color: string;
+    gridType: 'square' | 'hex' | 'default';
+    gridSize: number;
   }
   
   const [regions, setRegions] = useState<Region[]>([]);
@@ -422,6 +424,11 @@ export const SimpleTabletop = () => {
     ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
     ctx.fillRect(region.x, region.y, region.width, region.height);
     
+    // Draw region-specific grid
+    if (region.gridType !== 'default') {
+      drawRegionGrid(ctx, region);
+    }
+    
     // Draw region border
     ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
     ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
@@ -431,6 +438,114 @@ export const SimpleTabletop = () => {
     if (isSelected) {
       drawRegionHandles(ctx, region);
     }
+    
+    // Draw grid type label
+    if (region.gridType !== 'default') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${10 / transform.zoom}px Arial`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(
+        region.gridType.toUpperCase(), 
+        region.x + 4 / transform.zoom, 
+        region.y + 4 / transform.zoom
+      );
+    }
+  };
+
+  // Function to draw grid within a region
+  const drawRegionGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+    ctx.save();
+    
+    // Clip to region bounds
+    ctx.beginPath();
+    ctx.rect(region.x, region.y, region.width, region.height);
+    ctx.clip();
+    
+    ctx.strokeStyle = region.gridType === 'square' ? '#4f46e5' : '#06b6d4';
+    ctx.lineWidth = 1 / transform.zoom;
+    ctx.globalAlpha = 0.6;
+    
+    if (region.gridType === 'square') {
+      drawSquareGrid(ctx, region);
+    } else if (region.gridType === 'hex') {
+      drawHexGrid(ctx, region);
+    }
+    
+    ctx.restore();
+  };
+
+  // Function to draw square grid within region
+  const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+    const gridSize = region.gridSize;
+    const startX = Math.ceil(region.x / gridSize) * gridSize;
+    const endX = region.x + region.width;
+    const startY = Math.ceil(region.y / gridSize) * gridSize;
+    const endY = region.y + region.height;
+    
+    // Vertical lines
+    for (let x = startX; x <= endX; x += gridSize) {
+      if (x > region.x && x < region.x + region.width) {
+        ctx.beginPath();
+        ctx.moveTo(x, region.y);
+        ctx.lineTo(x, region.y + region.height);
+        ctx.stroke();
+      }
+    }
+    
+    // Horizontal lines
+    for (let y = startY; y <= endY; y += gridSize) {
+      if (y > region.y && y < region.y + region.height) {
+        ctx.beginPath();
+        ctx.moveTo(region.x, y);
+        ctx.lineTo(region.x + region.width, y);
+        ctx.stroke();
+      }
+    }
+  };
+
+  // Function to draw hex grid within region
+  const drawHexGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+    const hexSize = region.gridSize / 2;
+    const hexWidth = hexSize * Math.sqrt(3);
+    const hexHeight = hexSize * 2;
+    const vertSpacing = hexHeight * 0.75;
+    
+    const startCol = Math.floor(region.x / hexWidth);
+    const endCol = Math.ceil((region.x + region.width) / hexWidth);
+    const startRow = Math.floor(region.y / vertSpacing);
+    const endRow = Math.ceil((region.y + region.height) / vertSpacing);
+    
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
+        const offsetX = (row % 2) * (hexWidth / 2);
+        const x = col * hexWidth + offsetX;
+        const y = row * vertSpacing;
+        
+        // Only draw if hex center is within region bounds
+        if (x >= region.x - hexWidth/2 && x <= region.x + region.width + hexWidth/2 &&
+            y >= region.y - hexHeight/2 && y <= region.y + region.height + hexHeight/2) {
+          drawHexagon(ctx, x, y, hexSize);
+        }
+      }
+    }
+  };
+
+  // Function to draw a single hexagon
+  const drawHexagon = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, size: number) => {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (i * Math.PI) / 3;
+      const x = centerX + size * Math.cos(angle);
+      const y = centerY + size * Math.sin(angle);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
   };
 
   // Function to draw region resize handles
@@ -477,7 +592,9 @@ export const SimpleTabletop = () => {
       width: 20,
       height: 40,
       selected: false,
-      color: 'rgba(100, 150, 200, 0.3)'
+      color: 'rgba(100, 150, 200, 0.3)',
+      gridType: 'default',
+      gridSize: 20
     };
     
     setRegions(prev => [...prev, newRegion]);
@@ -680,7 +797,7 @@ export const SimpleTabletop = () => {
     }
   };
 
-  // Handle right-click context menu for tokens
+  // Handle right-click context menu for tokens and regions
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     
@@ -694,8 +811,9 @@ export const SimpleTabletop = () => {
     // Convert screen coordinates to world coordinates
     const worldPos = screenToWorld(clickX, clickY);
     
-    // Check if we right-clicked on a token
+    // Check if we right-clicked on a token first (tokens are on top)
     const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+    const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
     
     if (clickedToken) {
       // Dispatch custom event for TokenContextManager
@@ -707,7 +825,97 @@ export const SimpleTabletop = () => {
         }
       });
       window.dispatchEvent(event);
+    } else if (clickedRegion) {
+      // Show region context menu
+      showRegionContextMenu(e.clientX, e.clientY, clickedRegion);
     }
+  };
+
+  // Function to show region context menu
+  const showRegionContextMenu = (x: number, y: number, region: Region) => {
+    // Remove any existing context menu
+    const existingMenu = document.querySelector('.region-context-menu');
+    if (existingMenu) {
+      document.body.removeChild(existingMenu);
+    }
+    
+    const menu = document.createElement('div');
+    menu.className = 'region-context-menu fixed z-50 bg-popover border border-border rounded-md shadow-lg p-1';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    
+    const menuItems = [
+      { 
+        label: 'Default Grid', 
+        icon: '📐', 
+        action: () => setRegionGridType(region.id, 'default'),
+        active: region.gridType === 'default'
+      },
+      { 
+        label: 'Square Grid', 
+        icon: '⬜', 
+        action: () => setRegionGridType(region.id, 'square'),
+        active: region.gridType === 'square'
+      },
+      { 
+        label: 'Hex Grid', 
+        icon: '⬢', 
+        action: () => setRegionGridType(region.id, 'hex'),
+        active: region.gridType === 'hex'
+      },
+      { 
+        label: 'Delete Region', 
+        icon: '🗑️', 
+        action: () => deleteRegion(region.id), 
+        danger: true 
+      }
+    ];
+    
+    menuItems.forEach(item => {
+      const menuItem = document.createElement('div');
+      menuItem.className = `px-3 py-2 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${
+        item.danger ? 'text-destructive' : ''
+      } ${item.active ? 'bg-accent font-medium' : ''}`;
+      menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}${item.active ? ' ✓' : ''}`;
+      menuItem.onclick = () => {
+        item.action();
+        document.body.removeChild(menu);
+      };
+      menu.appendChild(menuItem);
+    });
+    
+    document.body.appendChild(menu);
+    
+    // Remove menu when clicking outside
+    const removeMenu = (e: MouseEvent) => {
+      if (!menu.contains(e.target as Node)) {
+        document.body.removeChild(menu);
+        document.removeEventListener('click', removeMenu);
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('click', removeMenu);
+    }, 100);
+  };
+
+  // Function to set region grid type
+  const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'default') => {
+    setRegions(prev => prev.map(region => 
+      region.id === regionId 
+        ? { ...region, gridType }
+        : region
+    ));
+    toast.success(`Region grid set to ${gridType}`);
+  };
+
+  // Function to delete region
+  const deleteRegion = (regionId: string) => {
+    setRegions(prev => prev.filter(region => region.id !== regionId));
+    if (selectedRegionId === regionId) {
+      setSelectedRegionId(null);
+    }
+    toast.success('Region deleted');
   };
 
   // Mouse event handlers
