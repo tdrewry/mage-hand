@@ -200,7 +200,7 @@ export const VirtualTabletop = () => {
     return { x, y };
   };
 
-  const addTokenToCanvas = (imageUrl: string, x: number = 100, y: number = 100) => {
+  const addTokenToCanvas = (imageUrl: string, x: number = 100, y: number = 100, gridWidth: number = 1, gridHeight: number = 1) => {
     if (!fabricCanvas) return;
 
     FabricImage.fromURL(imageUrl).then((img) => {
@@ -209,12 +209,17 @@ export const VirtualTabletop = () => {
       // Ensure the tokenId is properly attached to the fabric object
       (img as any).tokenId = tokenId;
       (img as any).isMap = false; // Ensure it's not marked as a map
+      // Calculate pixel dimensions based on grid size
+      const pixelWidth = gridWidth * gridSize;
+      const pixelHeight = gridHeight * gridSize;
       
       img.set({
         left: x,
         top: y,
-        scaleX: 0.5,
-        scaleY: 0.5,
+        width: pixelWidth,
+        height: pixelHeight,
+        scaleX: 1,
+        scaleY: 1,
         hasControls: true,
         hasBorders: true,
         borderColor: 'hsl(var(--token-selection))',
@@ -233,6 +238,8 @@ export const VirtualTabletop = () => {
           x,
           y,
           name: `Token ${tokenId.slice(-8)}`,
+          gridWidth,
+          gridHeight,
         });
         toast.success('Token added to map');
       } catch (error) {

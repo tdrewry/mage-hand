@@ -7,6 +7,8 @@ export interface Token {
   imageUrl: string;
   x: number;
   y: number;
+  gridWidth: number;  // Width in grid units
+  gridHeight: number; // Height in grid units
 }
 
 export interface SessionState {
