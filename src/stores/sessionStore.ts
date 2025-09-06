@@ -29,12 +29,31 @@ export const useSessionStore = create<SessionState>()(
           tokens: [...state.tokens, token],
         })),
       
-      updateTokenPosition: (tokenId, x, y) =>
-        set((state) => ({
-          tokens: state.tokens.map((token) =>
-            token.id === tokenId ? { ...token, x, y } : token
-          ),
-        })),
+      updateTokenPosition: (tokenId, x, y) => {
+        // Throttle position updates to prevent localStorage overflow
+        const state = get();
+        const existingToken = state.tokens.find(t => t.id === tokenId);
+        
+        // Only update if position actually changed significantly (avoid micro-movements)
+        if (!existingToken || 
+            Math.abs(existingToken.x - x) > 2 || 
+            Math.abs(existingToken.y - y) > 2) {
+          try {
+            set((state) => ({
+              tokens: state.tokens.map((token) =>
+                token.id === tokenId ? { ...token, x, y } : token
+              ),
+            }));
+          } catch (error) {
+            console.warn('Failed to update token position:', error);
+            // Clear old data if storage is full
+            if (error instanceof Error && error.message.includes('quota')) {
+              localStorage.clear();
+              set({ tokens: [], sessionId: state.sessionId });
+            }
+          }
+        }
+      },
       
       removeToken: (tokenId) =>
         set((state) => ({

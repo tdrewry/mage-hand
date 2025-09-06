@@ -50,9 +50,11 @@ export const VirtualTabletop = () => {
     }
   }, [fabricCanvas, gridType, gridSize, isGridVisible]);
 
-  // Handle token movement
+  // Handle token movement with throttling
   useEffect(() => {
     if (!fabricCanvas) return;
+
+    let moveTimeout: NodeJS.Timeout;
 
     const handleObjectMoving = (e: any) => {
       const obj = e.target;
@@ -71,8 +73,12 @@ export const VirtualTabletop = () => {
     const handleObjectMoved = (e: any) => {
       const obj = e.target;
       if (obj.tokenId) {
-        updateTokenPosition(obj.tokenId, obj.left, obj.top);
-        toast.info('Token moved');
+        // Throttle position updates to prevent storage overflow
+        clearTimeout(moveTimeout);
+        moveTimeout = setTimeout(() => {
+          updateTokenPosition(obj.tokenId, obj.left, obj.top);
+          toast.info('Token moved', { duration: 1000 });
+        }, 100); // Only update after 100ms of no movement
       }
     };
 
@@ -82,6 +88,7 @@ export const VirtualTabletop = () => {
     return () => {
       fabricCanvas.off('object:moving', handleObjectMoving);
       fabricCanvas.off('object:modified', handleObjectMoved);
+      clearTimeout(moveTimeout);
     };
   }, [fabricCanvas, gridType, gridSize, updateTokenPosition]);
 
@@ -197,30 +204,42 @@ export const VirtualTabletop = () => {
     if (!fabricCanvas) return;
 
     FabricImage.fromURL(imageUrl).then((img) => {
-      const tokenId = Date.now().toString();
+      const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Ensure the tokenId is properly attached to the fabric object
+      (img as any).tokenId = tokenId;
+      
       img.set({
         left: x,
         top: y,
         scaleX: 0.5,
         scaleY: 0.5,
-        tokenId,
         hasControls: true,
         hasBorders: true,
         borderColor: 'hsl(var(--token-selection))',
         cornerColor: 'hsl(var(--accent))',
-      } as any);
+        lockRotation: true, // Prevent accidental rotation
+      });
 
       fabricCanvas.add(img);
-      addToken({
-        id: tokenId,
-        imageUrl,
-        x,
-        y,
-        name: `Token ${tokenId}`,
-      });
+      fabricCanvas.renderAll();
       
-      toast.success('Token added to map');
-    }).catch(() => {
+      // Add to store with error handling
+      try {
+        addToken({
+          id: tokenId,
+          imageUrl,
+          x,
+          y,
+          name: `Token ${tokenId.slice(-8)}`,
+        });
+        toast.success('Token added to map');
+      } catch (error) {
+        console.error('Failed to save token:', error);
+        toast.error('Token added but not saved - storage full');
+      }
+    }).catch((error) => {
+      console.error('Token load error:', error);
       toast.error('Failed to load token image');
     });
   };

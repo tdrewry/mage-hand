@@ -2,17 +2,27 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2 } from 'lucide-react';
+import { useSessionStore } from '../stores/sessionStore';
+import { toast } from 'sonner';
 
 interface ToolbarProps {
   sessionId: string;
 }
 
 export const Toolbar = ({ sessionId }: ToolbarProps) => {
+  const { tokens } = useSessionStore();
+  
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
     navigator.clipboard.writeText(url);
-    // Toast handled by parent component
+    toast.success('Session URL copied to clipboard!');
+  };
+
+  const clearStorage = () => {
+    localStorage.clear();
+    toast.success('Storage cleared! Reload page to start fresh.');
+    setTimeout(() => window.location.reload(), 1000);
   };
 
   return (
@@ -29,6 +39,9 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs">
               Session: {sessionId.slice(0, 8)}
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              Tokens: {tokens.length}
             </Badge>
           </div>
         </div>
@@ -59,6 +72,16 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
             className="text-foreground border-border hover:bg-secondary"
           >
             <Settings className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={clearStorage}
+            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+            title="Clear storage if experiencing issues"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
