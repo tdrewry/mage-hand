@@ -5,12 +5,20 @@ import { TokenContextManager } from './TokenContextManager';
 import { FloatingMenu } from './FloatingMenu';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
-
-export type GridType = 'square' | 'hex' | 'none';
+import { 
+  GridType, 
+  createGridRenderer, 
+  renderGrid, 
+  snapToGrid as snapToNewGrid, 
+  GridRenderer, 
+  Viewport 
+} from '../lib/gridSystem';
 
 export const VirtualTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  const [gridRenderer, setGridRenderer] = useState<GridRenderer | null>(null);
   const [gridType, setGridType] = useState<GridType>('square');
   const [gridSize, setGridSize] = useState(40);
   const [isGridVisible, setIsGridVisible] = useState(true);
@@ -32,29 +40,42 @@ export const VirtualTabletop = () => {
   } = useSessionStore();
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !gridCanvasRef.current) return;
 
     // Calculate full viewport canvas size
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - 80; // Account for toolbar height
 
+    // Setup main Fabric.js canvas
     const canvas = new FabricCanvas(canvasRef.current, {
       width: viewportWidth,
       height: viewportHeight,
       backgroundColor: '#1a1a1a', // Default to RGB(26,26,26) to match UI
     });
 
+    // Setup background grid canvas
+    const gridCanvas = gridCanvasRef.current;
+    gridCanvas.width = viewportWidth;
+    gridCanvas.height = viewportHeight;
+    
+    const renderer = createGridRenderer(gridCanvas);
+    if (!renderer) {
+      console.error('Failed to create grid renderer');
+      return;
+    }
+
     // Configure canvas for gaming with pan/zoom
     canvas.selection = true;
     canvas.preserveObjectStacking = true;
     
     // Enable zoom and pan functionality
-    setupCanvasControls(canvas);
+    setupCanvasControls(canvas, renderer);
 
     setFabricCanvas(canvas);
+    setGridRenderer(renderer);
     
     // Draw initial grid
-    drawGrid(canvas, gridType, gridSize, isGridVisible);
+    updateGridDisplay(canvas, renderer);
     
     // Load existing tokens from store onto canvas
     loadStoredTokensOntoCanvas(canvas);
@@ -69,6 +90,13 @@ export const VirtualTabletop = () => {
       const newWidth = window.innerWidth;
       const newHeight = window.innerHeight - 80;
       canvas.setDimensions({ width: newWidth, height: newHeight });
+      
+      // Resize grid canvas
+      gridCanvas.width = newWidth;
+      gridCanvas.height = newHeight;
+      
+      // Redraw grid
+      updateGridDisplay(canvas, renderer);
       canvas.renderAll();
     };
 
@@ -82,12 +110,12 @@ export const VirtualTabletop = () => {
 
   // Update grid when settings change
   useEffect(() => {
-    if (fabricCanvas) {
-      drawGrid(fabricCanvas, gridType, gridSize, isGridVisible);
+    if (fabricCanvas && gridRenderer) {
+      updateGridDisplay(fabricCanvas, gridRenderer);
       enforceLayerOrder(fabricCanvas);
       updateAllTokenLabels();
     }
-  }, [fabricCanvas, gridType, gridSize, isGridVisible]);
+  }, [fabricCanvas, gridRenderer, gridType, gridSize, isGridVisible]);
 
   // Update labels when visibility settings change
   useEffect(() => {
@@ -107,7 +135,7 @@ export const VirtualTabletop = () => {
       if (obj.tokenId) {
         // Snap to grid if enabled
         if (gridType !== 'none') {
-          const snappedPos = snapToGrid(obj.left, obj.top, gridSize, gridType);
+          const snappedPos = snapToNewGrid(obj.left, obj.top, gridSize, gridType);
           obj.set({
             left: snappedPos.x,
             top: snappedPos.y,
@@ -170,132 +198,28 @@ export const VirtualTabletop = () => {
     };
   }, [fabricCanvas, gridType, gridSize, updateTokenPosition, setSelectedTokens]);
 
-  const drawGrid = (canvas: FabricCanvas, type: GridType, size: number, visible: boolean) => {
-    // Remove existing grid
-    const existingGrid = canvas.getObjects().filter((obj: any) => obj.isGrid);
-    existingGrid.forEach(obj => canvas.remove(obj));
-
-    if (!visible || type === 'none') {
-      canvas.renderAll();
-      return;
-    }
-
-    // Get current zoom and viewport transform
-    const zoom = canvas.getZoom();
+  // Helper function to get current viewport for grid rendering
+  const getCurrentViewport = (canvas: FabricCanvas): Viewport => {
     const vpt = canvas.viewportTransform;
-    const canvasWidth = canvas.width || 1200;
-    const canvasHeight = canvas.height || 800;
+    const zoom = canvas.getZoom();
+    return {
+      x: -vpt[4] / zoom,
+      y: -vpt[5] / zoom,
+      zoom: zoom,
+      width: canvas.width || 1200,
+      height: canvas.height || 800
+    };
+  };
+
+  // Update grid display using new efficient system
+  const updateGridDisplay = (canvas: FabricCanvas, renderer: GridRenderer) => {
+    if (!renderer) return;
     
-    // Calculate visible area with some padding
-    const padding = 1000; // Extra grid lines beyond visible area
-    const visibleLeft = -vpt[4] / zoom - padding;
-    const visibleTop = -vpt[5] / zoom - padding;
-    const visibleWidth = canvasWidth / zoom + padding * 2;
-    const visibleHeight = canvasHeight / zoom + padding * 2;
-
-    if (type === 'square') {
-      drawSquareGrid(canvas, size, visibleLeft, visibleTop, visibleWidth, visibleHeight);
-    } else if (type === 'hex') {
-      drawHexGrid(canvas, size, visibleLeft, visibleTop, visibleWidth, visibleHeight);
-    }
-
-    canvas.renderAll();
+    const viewport = getCurrentViewport(canvas);
+    renderGrid(renderer, gridType, gridSize, viewport, isGridVisible, 'rgba(255, 255, 255, 0.2)');
   };
 
-  const drawSquareGrid = (canvas: FabricCanvas, size: number, left: number, top: number, width: number, height: number) => {
-    const gridColor = 'hsl(var(--grid-color))';
-    
-    // Calculate grid boundaries aligned to grid
-    const startX = Math.floor(left / size) * size;
-    const endX = Math.ceil((left + width) / size) * size;
-    const startY = Math.floor(top / size) * size;
-    const endY = Math.ceil((top + height) / size) * size;
-    
-    // Vertical lines
-    for (let x = startX; x <= endX; x += size) {
-      const line = new Line([x, startY, x, endY], {
-        stroke: gridColor,
-        strokeWidth: 1 / canvas.getZoom(), // Scale stroke with zoom
-        selectable: false,
-        evented: false,
-        isGrid: true,
-      } as any);
-      canvas.add(line);
-    }
-
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += size) {
-      const line = new Line([startX, y, endX, y], {
-        stroke: gridColor,
-        strokeWidth: 1 / canvas.getZoom(), // Scale stroke with zoom
-        selectable: false,
-        evented: false,
-        isGrid: true,
-      } as any);
-      canvas.add(line);
-    }
-  };
-
-  const drawHexGrid = (canvas: FabricCanvas, size: number, left: number, top: number, width: number, height: number) => {
-    const gridColor = 'hsl(var(--grid-color))';
-    const hexWidth = size * Math.sqrt(3);
-    const hexHeight = size * 2;
-    const vertSpacing = hexHeight * 0.75;
-
-    // Calculate hex grid boundaries
-    const startCol = Math.floor(left / hexWidth);
-    const endCol = Math.ceil((left + width) / hexWidth);
-    const startRow = Math.floor(top / vertSpacing);
-    const endRow = Math.ceil((top + height) / vertSpacing);
-
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startCol; col <= endCol; col++) {
-        const offsetX = (row % 2) * (hexWidth / 2);
-        const centerX = col * hexWidth + offsetX + hexWidth / 2;
-        const centerY = row * vertSpacing + hexHeight / 2;
-
-        const hex = createHexagon(centerX, centerY, size, gridColor, canvas.getZoom());
-        canvas.add(hex);
-      }
-    }
-  };
-
-  const createHexagon = (centerX: number, centerY: number, radius: number, color: string, zoom: number) => {
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI) / 3;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      points.push({ x, y });
-    }
-
-    return new Polygon(points, {
-      fill: 'transparent',
-      stroke: color,
-      strokeWidth: 1 / zoom, // Scale stroke with zoom
-      selectable: false,
-      evented: false,
-      isGrid: true,
-    } as any);
-  };
-
-  const snapToGrid = (x: number, y: number, size: number, type: GridType) => {
-    if (type === 'square') {
-      return {
-        x: Math.round(x / size) * size,
-        y: Math.round(y / size) * size,
-      };
-    } else if (type === 'hex') {
-      // Simplified hex snapping - can be improved
-      const hexWidth = size * Math.sqrt(3);
-      const hexHeight = size * 2;
-      return {
-        x: Math.round(x / hexWidth) * hexWidth,
-        y: Math.round(y / (hexHeight * 0.75)) * (hexHeight * 0.75),
-      };
-    }
-    return { x, y };
-  };
+  // Old grid functions removed - now using efficient grid system
 
   const addTokenToCanvas = (imageUrl: string, x: number = 100, y: number = 100, gridWidth: number = 1, gridHeight: number = 1, color?: string) => {
     if (!fabricCanvas) return;
@@ -382,27 +306,26 @@ export const VirtualTabletop = () => {
     });
   };
 
-  // Enforce layer ordering: background -> grid -> map -> tokens
+  // Enforce layer ordering: background -> map -> tokens -> labels (grid is now separate canvas)
   const enforceLayerOrder = (canvas: FabricCanvas) => {
     if (!canvas || !canvas.getObjects) return; // Safety check
     
     const objects = canvas.getObjects();
     
-    // Group objects by type
+    // Group objects by type (no more grid objects)
     const backgrounds = objects.filter((obj: any) => obj.isBackground);
-    const grids = objects.filter((obj: any) => obj.isGrid);
     const maps = objects.filter((obj: any) => obj.isMap);
     const tokens = objects.filter((obj: any) => obj.tokenId);
     const labels = objects.filter((obj: any) => obj.isTokenLabel);
     const others = objects.filter((obj: any) => 
-      !obj.isBackground && !obj.isGrid && !obj.isMap && !obj.tokenId && !obj.isTokenLabel
+      !obj.isBackground && !obj.isMap && !obj.tokenId && !obj.isTokenLabel
     );
     
     // Remove all objects first
     objects.forEach(obj => canvas.remove(obj));
     
-    // Add in order: background, grid, map, tokens, labels, others
-    [...backgrounds, ...grids, ...maps, ...tokens, ...labels, ...others].forEach(obj => {
+    // Add in order: background, map, tokens, labels, others
+    [...backgrounds, ...maps, ...tokens, ...labels, ...others].forEach(obj => {
       canvas.add(obj);
     });
     
@@ -615,7 +538,7 @@ export const VirtualTabletop = () => {
   };
 
   // Setup canvas pan and zoom controls
-  const setupCanvasControls = (canvas: FabricCanvas) => {
+  const setupCanvasControls = (canvas: FabricCanvas, renderer: GridRenderer) => {
     let isDragging = false;
     let lastPosX = 0;
     let lastPosY = 0;
@@ -624,16 +547,10 @@ export const VirtualTabletop = () => {
     let rightMouseDown = false;
     const dragThreshold = 5; // Minimum pixels to consider it a drag vs click
 
-    // Optimized mouse wheel zoom with grid hiding
+    // Optimized mouse wheel zoom
     canvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
       let zoom = canvas.getZoom();
-      
-      // Hide grid during zooming for better performance
-      const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
-      gridObjects.forEach((obj: any) => {
-        obj.visible = false;
-      });
       
       // Zoom limits
       const minZoom = 0.1;
@@ -646,15 +563,8 @@ export const VirtualTabletop = () => {
       const point = new Point(opt.e.offsetX, opt.e.offsetY);
       canvas.zoomToPoint(point, zoom);
       
-      // Use debounced grid redraw for smooth zooming
-      clearTimeout((window as any).gridRedrawTimeout);
-      (window as any).gridRedrawTimeout = setTimeout(() => {
-        gridObjects.forEach((obj: any) => {
-          obj.visible = true;
-        });
-        drawGrid(canvas, gridType, gridSize, isGridVisible);
-        canvas.renderAll();
-      }, 100);
+      // Update grid immediately - no debouncing needed with new system
+      updateGridDisplay(canvas, renderer);
       
       opt.e.preventDefault();
       opt.e.stopPropagation();
@@ -724,7 +634,7 @@ export const VirtualTabletop = () => {
             lastPosY = evt.clientY;
             
             // Redraw grid to show new visible area
-            drawGrid(canvas, gridType, gridSize, isGridVisible);
+            updateGridDisplay(canvas, renderer);
           }
         }
         
@@ -831,12 +741,6 @@ export const VirtualTabletop = () => {
           isDragging = true;
           canvas.selection = false;
           canvas.setCursor('grabbing');
-          
-          // Hide grid during panning for better performance
-          const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
-          gridObjects.forEach((obj: any) => {
-            obj.visible = false;
-          });
         }
         
         if (isDragging) {
@@ -845,10 +749,9 @@ export const VirtualTabletop = () => {
             vpt[4] += e.clientX - lastPosX;
             vpt[5] += e.clientY - lastPosY;
             canvas.setViewportTransform(vpt);
-            // Use requestAnimationFrame for smoother rendering
-            requestAnimationFrame(() => {
-              canvas.renderAll();
-            });
+            // Update grid immediately - efficient system handles it smoothly
+            updateGridDisplay(canvas, renderer);
+            canvas.renderAll();
           }
         }
         
@@ -867,14 +770,7 @@ export const VirtualTabletop = () => {
           canvas.selection = true;
           canvas.setCursor('default');
           
-          // Show grid again after panning and redraw it
-          const gridObjects = canvas.getObjects().filter((obj: any) => obj.isGridLine);
-          gridObjects.forEach((obj: any) => {
-            obj.visible = true;
-          });
-          
-          // Redraw the grid at new position
-          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          // Grid is automatically updated during panning, no need to redraw
           canvas.renderAll();
         } else if (target && (target as any).tokenId) {
           // Trigger context menu via custom event
@@ -898,7 +794,7 @@ export const VirtualTabletop = () => {
         if (e.key === '0') {
           // Reset zoom
           canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          updateGridDisplay(canvas, renderer);
           e.preventDefault();
         } else if (e.key === '=' || e.key === '+') {
           // Zoom in
@@ -906,7 +802,7 @@ export const VirtualTabletop = () => {
           zoom = Math.min(zoom * 1.1, 5);
           const center = canvas.getCenter();
           canvas.zoomToPoint(new Point(center.left, center.top), zoom);
-          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          updateGridDisplay(canvas, renderer);
           e.preventDefault();
         } else if (e.key === '-') {
           // Zoom out
@@ -914,7 +810,7 @@ export const VirtualTabletop = () => {
           zoom = Math.max(zoom / 1.1, 0.1);
           const center = canvas.getCenter();
           canvas.zoomToPoint(new Point(center.left, center.top), zoom);
-          drawGrid(canvas, gridType, gridSize, isGridVisible);
+          updateGridDisplay(canvas, renderer);
           e.preventDefault();
         }
       }
