@@ -2150,7 +2150,10 @@ export const SimpleTabletop = () => {
       // Clear grouped tokens and temp positions
       setGroupedTokens([]);
       setTempTokenPositions(undefined);
-    } else if (isRotatingRegion && draggedRegionId) {
+    }
+    
+    // Handle rotation completion
+    if (isRotatingRegion && draggedRegionId) {
       // Apply final rotation to region and tokens
       if (tempRegionRotation[draggedRegionId]) {
         const rotationDelta = tempRegionRotation[draggedRegionId];
@@ -2159,20 +2162,13 @@ export const SimpleTabletop = () => {
         });
       }
       
-      // Apply final token positions to store
-      if (tempTokenPositions) {
-        Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
-          updateTokenPosition(tokenId, position.x, position.y);
-        });
-      }
-      
       // Clear rotation state
       setIsRotatingRegion(false);
-      setGroupedTokens([]);
-      setTempTokenPositions(undefined);
       setTempRegionRotation({});
-      
-      // Stop region interactions
+    }
+    
+    // Reset all region drag states (runs for both normal drag and rotation)
+    if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
       setDraggedRegionId(null);
