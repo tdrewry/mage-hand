@@ -423,7 +423,7 @@ export const SimpleTabletop = () => {
   const getResizeHandle = (region: CanvasRegion, worldX: number, worldY: number): string | null => {
     if (region.regionType === 'path' && region.pathPoints) {
       // For path regions, check if clicking on a control node
-      const handleSize = 12 / transform.zoom;
+      const handleSize = 20 / transform.zoom; // Increased hitbox size
       
       for (let i = 0; i < region.pathPoints.length; i++) {
         const point = region.pathPoints[i];
@@ -438,8 +438,8 @@ export const SimpleTabletop = () => {
       
       return null;
     } else {
-      // Rectangle region resize handles
-      const handleSize = 12 / transform.zoom;
+      // Rectangle region resize handles  
+      const handleSize = 20 / transform.zoom; // Increased hitbox size
       const { x, y, width, height } = region;
       
       // Check corner handles
@@ -1217,7 +1217,7 @@ export const SimpleTabletop = () => {
 
   // Function to check if mouse is over rotation handle
   const isOverRotationHandle = (mouseX: number, mouseY: number, region: CanvasRegion) => {
-    const handleSize = 12 / transform.zoom;
+    const handleSize = 20 / transform.zoom; // Increased hitbox size
     const rotationHandleDistance = 30 / transform.zoom;
     const rotationX = region.x + region.width / 2;
     const rotationY = region.y - rotationHandleDistance;
@@ -1230,7 +1230,7 @@ export const SimpleTabletop = () => {
   const drawPathHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.pathPoints || region.pathPoints.length === 0) return;
     
-    const handleSize = 12 / transform.zoom;
+    const handleSize = 12 / transform.zoom; // Visual size (hitbox is larger - see getResizeHandle)
     
     ctx.fillStyle = '#ff6b6b';
     ctx.strokeStyle = '#ffffff';
