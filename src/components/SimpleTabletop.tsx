@@ -1804,9 +1804,9 @@ export const SimpleTabletop = () => {
       // Find the region being dragged
       const draggedRegion = regions.find(r => r.id === draggedRegionId);
       if (draggedRegion) {
-        // Calculate movement delta
-        const deltaX = newX - regionDragOffset.x;
-        const deltaY = newY - regionDragOffset.y;
+        // Calculate movement delta from original region position
+        const deltaX = newX - draggedRegion.x;
+        const deltaY = newY - draggedRegion.y;
         
         // Update temporary positions for preview (avoid store updates during drag)
         const newTempPositions: {[tokenId: string]: {x: number, y: number}} = {};
