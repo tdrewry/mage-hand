@@ -2042,6 +2042,7 @@ export const SimpleTabletop = () => {
       
       // Clear grouped tokens and temp positions
       setGroupedTokens([]);
+      setTempTokenPositions(undefined);
       
       // Stop region interactions
       setIsDraggingRegion(false);
