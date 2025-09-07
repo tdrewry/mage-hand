@@ -205,32 +205,31 @@ function renderSquareGridRegion(
   ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom);
   ctx.beginPath();
   
-  // Draw grid lines that create cells where tokens will snap to centers
-  // Grid cells start at minX, minY and tokens snap to cell centers
-  // So grid lines should form boundaries around those snap positions
+  // Draw grid lines that create cells where tokens snap to centers
+  // Tokens snap to cell centers, so grid lines form cell boundaries
   
-  // Vertical lines (create columns) - offset by half gridSize to center the cells on snap points
+  // Vertical lines (create columns)
   for (let col = 0; col <= cellsX; col++) {
-    const worldX = minX + (col * gridSize) - (gridSize * 0.5);
+    const worldX = minX + (col * gridSize);
     const screenX = (worldX - viewport.x) * viewport.zoom;
     
     if (screenX >= 0 && screenX <= renderer.canvas.width) {
-      const screenTop = (minY - (gridSize * 0.5) - viewport.y) * viewport.zoom;
-      const screenBottom = (Math.min(minY + (cellsY * gridSize) - (gridSize * 0.5), maxY) - viewport.y) * viewport.zoom;
+      const screenTop = (minY - viewport.y) * viewport.zoom;
+      const screenBottom = (Math.min(minY + (cellsY * gridSize), maxY) - viewport.y) * viewport.zoom;
       
       ctx.moveTo(screenX, screenTop);
       ctx.lineTo(screenX, screenBottom);
     }
   }
   
-  // Horizontal lines (create rows) - offset by half gridSize to center the cells on snap points
+  // Horizontal lines (create rows)
   for (let row = 0; row <= cellsY; row++) {
-    const worldY = minY + (row * gridSize) - (gridSize * 0.5);
+    const worldY = minY + (row * gridSize);
     const screenY = (worldY - viewport.y) * viewport.zoom;
     
     if (screenY >= 0 && screenY <= renderer.canvas.height) {
-      const screenLeft = (minX - (gridSize * 0.5) - viewport.x) * viewport.zoom;
-      const screenRight = (Math.min(minX + (cellsX * gridSize) - (gridSize * 0.5), maxX) - viewport.x) * viewport.zoom;
+      const screenLeft = (minX - viewport.x) * viewport.zoom;
+      const screenRight = (Math.min(minX + (cellsX * gridSize), maxX) - viewport.x) * viewport.zoom;
       
       ctx.moveTo(screenLeft, screenY);
       ctx.lineTo(screenRight, screenY);
