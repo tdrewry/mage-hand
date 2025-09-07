@@ -196,16 +196,22 @@ export const SimpleTabletop = () => {
       // Small/Medium (1x1): Single hex
       occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
     } else if (gridWidth === 2 && gridHeight === 2) {
-      // Large (2x2): Center + 2 adjacent hexes (3 total)
+      // Large (2x2): Center + 2 adjacent hexes (3 total) in proper D&D pattern
       occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
       
-      // Add 2 adjacent hexes (we'll use right and bottom-right for consistency)
-      const adjacentOffsets = [[1, 0], [0, 1]]; // Right and bottom-right neighbors
+      // Use proper hex neighbor directions for flat-top hexagons
+      // In a flat-top hex grid, the 6 directions are: E, SE, SW, W, NW, NE
+      // For Large creatures, we typically use 2 adjacent hexes
+      const adjacentOffsets = [
+        [1, 0],  // East (right)
+        [0, 1]   // Southeast (down-right for even cols, down-left for odd cols)
+      ];
       
       adjacentOffsets.forEach(([dCol, dRow]) => {
         const neighborCol = centerHex.col + dCol;
         const neighborRow = centerHex.row + dRow;
         
+        // Adjust for hex grid offset pattern (even/odd column offset)
         const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
         const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
         
