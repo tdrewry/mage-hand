@@ -6,6 +6,16 @@ import { TokenContextManager } from './TokenContextManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { snapToMapGrid } from '../lib/mapGridSystem';
+import { 
+  HexCoordinate, 
+  HexLayout, 
+  POINTY_TOP, 
+  createHexLayout, 
+  pixelToHex, 
+  hexToPixel, 
+  hexRound,
+  hexCorners 
+} from '../lib/hexCoordinates';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3 } from 'lucide-react';
@@ -34,6 +44,9 @@ export const SimpleTabletop = () => {
   
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
+  
+  // Hex highlighting state for token movement
+  const [highlightedHexes, setHighlightedHexes] = useState<{regionId: string, hexes: {q: number, r: number, s: number}[]}[]>([]);
   
   // Region state
   interface Region {
@@ -117,6 +130,49 @@ export const SimpleTabletop = () => {
       }
     }
     return null;
+  };
+
+  // Calculate which hex(es) a token occupies in a given region
+  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region): HexCoordinate[] => {
+    if (region.gridType !== 'hex') return [];
+    
+    const tokenSize = 40; // Token diameter
+    const gridSize = region.gridSize * region.gridScale;
+    
+    // Create hex layout for this region
+    const hexLayout: HexLayout = {
+      orientation: POINTY_TOP,
+      size: { x: gridSize, y: gridSize },
+      origin: { x: region.x, y: region.y }
+    };
+    
+    // Convert token center position to hex coordinates
+    const centerHex = pixelToHex(hexLayout, { x: tokenX, y: tokenY });
+    const roundedHex = hexRound(centerHex);
+    
+    // For simplicity, assume tokens occupy a single hex for now
+    // In the future, we could expand this to handle larger tokens
+    return [roundedHex];
+  };
+
+  // Update highlighted hexes based on token position
+  const updateHexHighlights = (tokenX: number, tokenY: number) => {
+    const newHighlights: {regionId: string, hexes: HexCoordinate[]}[] = [];
+    
+    regions.forEach(region => {
+      if (region.gridType === 'hex') {
+        // Check if token is within this region
+        if (tokenX >= region.x && tokenX <= region.x + region.width &&
+            tokenY >= region.y && tokenY <= region.y + region.height) {
+          const occupiedHexes = calculateTokenHexOccupancy(tokenX, tokenY, region);
+          if (occupiedHexes.length > 0) {
+            newHighlights.push({ regionId: region.id, hexes: occupiedHexes });
+          }
+        }
+      }
+    });
+    
+    setHighlightedHexes(newHighlights);
   };
 
   // Get resize handle at position for a region
@@ -219,6 +275,9 @@ export const SimpleTabletop = () => {
     visibleTokens.forEach(token => {
       drawToken(ctx, token);
     });
+    
+    // Draw highlighted hexes (if any)
+    drawHighlightedHexes(ctx);
     
     // Draw ghost token and drag path if dragging
     if (isDraggingToken && draggedTokenId) {
@@ -477,6 +536,47 @@ export const SimpleTabletop = () => {
     } else if (region.gridType === 'hex') {
       drawHexGrid(ctx, region);
     }
+    
+    ctx.restore();
+  };
+
+  // Function to draw highlighted hexes
+  const drawHighlightedHexes = (ctx: CanvasRenderingContext2D) => {
+    if (highlightedHexes.length === 0) return;
+    
+    ctx.save();
+    
+    highlightedHexes.forEach(regionHighlight => {
+      const region = regions.find(r => r.id === regionHighlight.regionId);
+      if (!region || region.gridType !== 'hex') return;
+      
+      const gridSize = region.gridSize * region.gridScale;
+      const hexLayout: HexLayout = {
+        orientation: POINTY_TOP,
+        size: { x: gridSize, y: gridSize },
+        origin: { x: region.x, y: region.y }
+      };
+      
+      regionHighlight.hexes.forEach(hex => {
+        // Get the corners of this hex
+        const corners = hexCorners(hexLayout, hex);
+        
+        // Draw filled hex highlight
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // Yellow highlight
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) {
+          ctx.lineTo(corners[i].x, corners[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw hex border highlight
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.stroke();
+      });
+    });
     
     ctx.restore();
   };
@@ -1039,6 +1139,9 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
       
+      // Update hex highlights based on token position
+      updateHexHighlights(newX, newY);
+      
       // Add point to drag path (sample every few pixels for smoother path)
       const lastPoint = dragPath[dragPath.length - 1];
       const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
@@ -1195,6 +1298,9 @@ export const SimpleTabletop = () => {
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
+      
+      // Clear hex highlights
+      setHighlightedHexes([]);
       
       // Stop region interactions
       setIsDraggingRegion(false);
