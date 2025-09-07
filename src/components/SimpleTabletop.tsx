@@ -571,6 +571,9 @@ export const SimpleTabletop = () => {
       drawRegion(ctx, region);
     });
     
+    // Draw highlighted grids (if any) - below tokens in z-order
+    drawHighlightedGrids(ctx);
+    
     // Draw visible tokens
     visibleTokens.forEach(token => {
       // Use temporary position if available (during region drag)
@@ -578,9 +581,6 @@ export const SimpleTabletop = () => {
       const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
       drawToken(ctx, renderToken);
     });
-    
-    // Draw highlighted grids (if any)
-    drawHighlightedGrids(ctx);
     
     // Draw current path being drawn
     if (pathDrawingMode === 'drawing' && currentPath.length > 0) {
@@ -1170,6 +1170,9 @@ export const SimpleTabletop = () => {
     highlightedGrids.forEach(regionHighlight => {
       const region = regions.find(r => r.id === regionHighlight.regionId);
       if (!region) return;
+      
+      // Skip highlights for region being dragged
+      if (isDraggingRegion && draggedRegionId === region.id) return;
       
       // Draw highlighted hexes
       regionHighlight.hexes.forEach(hex => {
