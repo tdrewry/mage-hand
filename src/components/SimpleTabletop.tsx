@@ -2620,7 +2620,7 @@ export const SimpleTabletop = () => {
       />
       
       {/* Map Manager Button */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-20 right-4 z-10">
         <Button
           variant="secondary"
           size="sm"
@@ -2633,7 +2633,7 @@ export const SimpleTabletop = () => {
       </div>
 
       {/* Add Region Button */}
-      <div className="absolute top-16 right-4 z-10">
+      <div className="absolute top-32 right-4 z-10">
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -2657,7 +2657,7 @@ export const SimpleTabletop = () => {
       </div>
 
       {/* Grid Snapping Toggle */}
-      <div className="absolute top-28 right-4 z-10">
+      <div className="absolute top-44 right-4 z-10">
         <Button
           variant={isGridSnappingEnabled ? "default" : "outline"}
           size="sm"
