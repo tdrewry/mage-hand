@@ -74,6 +74,9 @@ export const SimpleTabletop = () => {
   const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
   const [isResizingRegion, setIsResizingRegion] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  
+  // Track tokens moved by region drag to prevent individual snapping
+  const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
 
   const {
     sessionId,
@@ -1411,12 +1414,17 @@ export const SimpleTabletop = () => {
         const deltaY = newY - draggedRegion.y;
         
         // Move tokens that are inside this region
+        const tokensToMove: string[] = [];
         tokens.forEach(token => {
           if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
               token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
+            tokensToMove.push(token.id);
             updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
           }
         });
+        
+        // Store which tokens were moved by region drag to prevent individual snapping
+        setTokensMovedByRegion(tokensToMove);
       }
       
       setRegions(prev => prev.map(region => 
@@ -1502,7 +1510,7 @@ export const SimpleTabletop = () => {
       setIsPanning(false);
     } else if (e.button === 0) { // Left click
       // Handle token snapping on drag end
-      if (isDraggingToken && draggedTokenId) {
+      if (isDraggingToken && draggedTokenId && !tokensMovedByRegion.includes(draggedTokenId)) {
         const token = tokens.find(t => t.id === draggedTokenId);
         if (token) {
           // Find local region at token position (our local regions in SimpleTabletop)
@@ -1565,6 +1573,9 @@ export const SimpleTabletop = () => {
       setDraggedRegionId(null);
       setRegionDragOffset({ x: 0, y: 0 });
       setResizeHandle(null);
+      
+      // Clear tokens moved by region tracking
+      setTokensMovedByRegion([]);
       
       // Redraw canvas to clear ghost token and path
       redrawCanvas();
