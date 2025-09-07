@@ -77,6 +77,16 @@ export const SimpleTabletop = () => {
   const [isResizingRegion, setIsResizingRegion] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   
+  // Local drag state to avoid excessive store updates
+  const [dragPreview, setDragPreview] = useState<{
+    regionId: string;
+    pathPoints?: Array<{ x: number; y: number }>;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  } | null>(null);
+  
   // Path drawing state
   const [pathDrawingMode, setPathDrawingMode] = useState<'none' | 'drawing' | 'editing'>('none');
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
@@ -766,12 +776,25 @@ export const SimpleTabletop = () => {
   const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const isSelected = region.selected;
     
-    if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+    // Check if this region has a drag preview
+    const preview = dragPreview?.regionId === region.id ? dragPreview : null;
+    
+    // Use preview data if available, otherwise use region data
+    const effectiveRegion = preview ? {
+      ...region,
+      x: preview.x ?? region.x,
+      y: preview.y ?? region.y,
+      width: preview.width ?? region.width,
+      height: preview.height ?? region.height,
+      pathPoints: preview.pathPoints ?? region.pathPoints
+    } : region;
+    
+    if (effectiveRegion.regionType === 'path' && effectiveRegion.pathPoints && effectiveRegion.pathPoints.length > 2) {
       // Handle path region rendering
-      drawPathRegion(ctx, region, isSelected);
+      drawPathRegion(ctx, effectiveRegion, isSelected);
     } else {
       // Handle rectangle region rendering
-      drawRectangleRegion(ctx, region, isSelected);
+      drawRectangleRegion(ctx, effectiveRegion, isSelected);
     }
   };
 
@@ -1264,11 +1287,6 @@ export const SimpleTabletop = () => {
     const radius = tokenSize / 2;
     const isSelected = selectedTokenIds.includes(token.id);
     
-    // Debug logging for first token
-    if (tokens.length > 0 && token.id === tokens[0].id) {
-      console.log('Drawing token:', token.id, 'gridWidth:', token.gridWidth, 'gridHeight:', token.gridHeight, 'tokenSize:', tokenSize, 'radius:', radius);
-    }
-    
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -1750,7 +1768,7 @@ export const SimpleTabletop = () => {
       // Force immediate redraw for smooth dragging feedback
       redrawCanvas();
     } else if (isDraggingRegion && draggedRegionId) {
-      // Region dragging
+      // Region dragging - move tokens in real-time for smooth preview
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
@@ -1759,17 +1777,17 @@ export const SimpleTabletop = () => {
       const draggedRegion = regions.find(r => r.id === draggedRegionId);
       if (draggedRegion) {
         if (draggedRegion.regionType === 'path' && draggedRegion.pathPoints) {
-          // Handle path region dragging
+          // Handle path region dragging preview
           const deltaX = newX - draggedRegion.x;
           const deltaY = newY - draggedRegion.y;
           
-          // Update path points
+          // Update preview path points
           const newPathPoints = draggedRegion.pathPoints.map(point => ({
             x: point.x + deltaX,
             y: point.y + deltaY
           }));
           
-          // Move tokens that are inside this path region
+          // Move tokens that are inside this path region in real-time
           const tokensToMove: string[] = [];
           tokens.forEach(token => {
             if (isPointInRegion(token.x, token.y, draggedRegion)) {
@@ -1781,21 +1799,27 @@ export const SimpleTabletop = () => {
           // Store which tokens were moved by region drag
           setTokensMovedByRegion(tokensToMove);
           
-          // Update the region with new bounds and path points
+          // Update token highlights immediately after moving tokens
+          if (tokensToMove.length > 0) {
+            updateAllTokenHighlights();
+          }
+          
+          // Update local preview state
           const newBounds = getPolygonBounds(newPathPoints);
-          updateRegion(draggedRegionId, { 
-            x: newBounds.x, 
-            y: newBounds.y, 
+          setDragPreview({
+            regionId: draggedRegionId,
+            pathPoints: newPathPoints,
+            x: newBounds.x,
+            y: newBounds.y,
             width: newBounds.width,
-            height: newBounds.height,
-            pathPoints: newPathPoints 
+            height: newBounds.height
           });
         } else {
-          // Handle rectangle region dragging (existing logic)
+          // Handle rectangle region dragging preview
           const deltaX = newX - draggedRegion.x;
           const deltaY = newY - draggedRegion.y;
           
-          // Move tokens that are inside this region
+          // Move tokens that are inside this region in real-time
           const tokensToMove: string[] = [];
           tokens.forEach(token => {
             if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
@@ -1805,39 +1829,52 @@ export const SimpleTabletop = () => {
             }
           });
           
-          // Store which tokens were moved by region drag to prevent individual snapping
+          // Store which tokens were moved by region drag
           setTokensMovedByRegion(tokensToMove);
           
-          updateRegion(draggedRegionId, { x: newX, y: newY });
+          // Update token highlights immediately after moving tokens
+          if (tokensToMove.length > 0) {
+            updateAllTokenHighlights();
+          }
+          
+          setDragPreview({
+            regionId: draggedRegionId,
+            x: newX,
+            y: newY,
+            width: draggedRegion.width,
+            height: draggedRegion.height
+          });
         }
       }
       
-      redrawCanvas();
+      // Use requestAnimationFrame for smooth rendering
+      requestAnimationFrame(() => redrawCanvas());
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
-      // Region resizing or path node editing
+      // Region resizing or path node editing - use preview for smooth updates
       const worldPos = screenToWorld(mouseX, mouseY);
       
       const targetRegion = regions.find(r => r.id === draggedRegionId);
       if (targetRegion) {
         if (targetRegion.regionType === 'path' && resizeHandle.startsWith('node-') && targetRegion.pathPoints) {
-          // Handle path node editing
+          // Handle path node editing preview
           const nodeIndex = parseInt(resizeHandle.split('-')[1]);
           if (nodeIndex >= 0 && nodeIndex < targetRegion.pathPoints.length) {
             const newPathPoints = [...targetRegion.pathPoints];
             newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
             
-            // Recalculate bounds after node movement
+            // Update preview with new path points
             const newBounds = getPolygonBounds(newPathPoints);
-            updateRegion(draggedRegionId, {
+            setDragPreview({
+              regionId: draggedRegionId,
+              pathPoints: newPathPoints,
               x: newBounds.x,
               y: newBounds.y,
               width: newBounds.width,
-              height: newBounds.height,
-              pathPoints: newPathPoints
+              height: newBounds.height
             });
           }
         } else {
-          // Handle rectangle region resizing (existing logic)
+          // Handle rectangle region resizing preview
           const { x, y, width, height } = targetRegion;
           let updates: Partial<CanvasRegion> = {};
           
@@ -1882,11 +1919,19 @@ export const SimpleTabletop = () => {
           if (updates.width !== undefined) updates.width = Math.max(10, updates.width);
           if (updates.height !== undefined) updates.height = Math.max(10, updates.height);
           
-          updateRegion(draggedRegionId, updates);
+          // Update preview state
+          setDragPreview({
+            regionId: draggedRegionId,
+            x: updates.x ?? targetRegion.x,
+            y: updates.y ?? targetRegion.y,
+            width: updates.width ?? targetRegion.width,
+            height: updates.height ?? targetRegion.height
+          });
         }
       }
       
-      redrawCanvas();
+      // Use requestAnimationFrame for smooth rendering
+      requestAnimationFrame(() => redrawCanvas());
     } else {
       // Mouse hover - show grid highlights for potential token placement
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -1966,12 +2011,38 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
       
+      // Apply drag preview changes to store when drag ends (regions only, tokens already moved)
+      if (dragPreview && draggedRegionId) {
+        const draggedRegion = regions.find(r => r.id === draggedRegionId);
+        if (draggedRegion) {
+          if (draggedRegion.regionType === 'path' && dragPreview.pathPoints) {
+            // Update the region with final position (tokens already moved during drag)
+            updateRegion(draggedRegionId, {
+              x: dragPreview.x,
+              y: dragPreview.y,
+              width: dragPreview.width,
+              height: dragPreview.height,
+              pathPoints: dragPreview.pathPoints
+            });
+          } else {
+            // Update the region with final position (tokens already moved during drag)
+            updateRegion(draggedRegionId, {
+              x: dragPreview.x,
+              y: dragPreview.y,
+              width: dragPreview.width,
+              height: dragPreview.height
+            });
+          }
+        }
+      }
+      
       // Stop region interactions
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
       setDraggedRegionId(null);
       setRegionDragOffset({ x: 0, y: 0 });
       setResizeHandle(null);
+      setDragPreview(null);
       
       // Clear tokens moved by region tracking
       setTokensMovedByRegion([]);
