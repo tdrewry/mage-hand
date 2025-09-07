@@ -924,10 +924,11 @@ export const SimpleTabletop = () => {
     ctx.save();
     
     // Apply rotation if present
-    if (region.rotation && region.rotation !== 0) {
+    const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
+    if (effectiveRotation !== 0) {
       const centerX = region.x + region.width / 2;
       const centerY = region.y + region.height / 2;
-      const angle = (region.rotation * Math.PI) / 180;
+      const angle = (effectiveRotation * Math.PI) / 180;
       
       ctx.translate(centerX, centerY);
       ctx.rotate(angle);
@@ -955,9 +956,10 @@ export const SimpleTabletop = () => {
     
     // Apply rotation again for border drawing
     if (region.rotation && region.rotation !== 0) {
+      const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
       const centerX = region.x + region.width / 2;
       const centerY = region.y + region.height / 2;
-      const angle = (region.rotation * Math.PI) / 180;
+      const angle = (effectiveRotation * Math.PI) / 180;
       
       ctx.translate(centerX, centerY);
       ctx.rotate(angle);
