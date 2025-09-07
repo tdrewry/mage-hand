@@ -45,8 +45,12 @@ export const SimpleTabletop = () => {
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
   
-  // Hex highlighting state for token movement
-  const [highlightedHexes, setHighlightedHexes] = useState<{regionId: string, hexes: {hexX: number, hexY: number, radius: number}[]}[]>([]);
+  // Grid highlighting state for token movement (supports both hex and square grids)
+  const [highlightedGrids, setHighlightedGrids] = useState<{
+    regionId: string, 
+    hexes: {hexX: number, hexY: number, radius: number}[],
+    squares: {gridX: number, gridY: number, size: number}[]
+  }[]>([]);
   
   // Region state
   interface Region {
@@ -83,6 +87,11 @@ export const SimpleTabletop = () => {
   } = useSessionStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+
+  // Update highlights whenever tokens or regions change
+  useEffect(() => {
+    updateAllTokenHighlights();
+  }, [tokens, regions]); // Re-run when tokens positions change or regions change
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -176,24 +185,77 @@ export const SimpleTabletop = () => {
     return closestHex ? [closestHex] : [];
   };
 
-  // Update highlighted hexes based on token position
-  const updateHexHighlights = (tokenX: number, tokenY: number) => {
-    const newHighlights: {regionId: string, hexes: {hexX: number, hexY: number, radius: number}[]}[] = [];
+  // Calculate which square grid cell a token occupies
+  const calculateTokenSquareOccupancy = (tokenX: number, tokenY: number, region: Region): {gridX: number, gridY: number, size: number}[] => {
+    if (region.gridType !== 'square') return [];
+    
+    const gridSize = region.gridSize;
+    
+    // Calculate which grid cell the token center is in
+    const relativeX = tokenX - region.x;
+    const relativeY = tokenY - region.y;
+    const gridCol = Math.floor(relativeX / gridSize);
+    const gridRow = Math.floor(relativeY / gridSize);
+    
+    // Calculate the center of that grid cell
+    const gridCenterX = region.x + (gridCol * gridSize) + (gridSize / 2);
+    const gridCenterY = region.y + (gridRow * gridSize) + (gridSize / 2);
+    
+    return [{ gridX: gridCenterX, gridY: gridCenterY, size: gridSize }];
+  };
+
+  // Update highlighted grids based on token position
+  const updateGridHighlights = (tokenX: number, tokenY: number) => {
+    const newHighlights: {regionId: string, hexes: {hexX: number, hexY: number, radius: number}[], squares: {gridX: number, gridY: number, size: number}[]}[] = [];
     
     regions.forEach(region => {
-      if (region.gridType === 'hex') {
+      if (region.gridType === 'hex' || region.gridType === 'square') {
         // Check if token is within this region
         if (tokenX >= region.x && tokenX <= region.x + region.width &&
             tokenY >= region.y && tokenY <= region.y + region.height) {
-          const occupiedHexes = calculateTokenHexOccupancy(tokenX, tokenY, region);
-          if (occupiedHexes.length > 0) {
-            newHighlights.push({ regionId: region.id, hexes: occupiedHexes });
+          const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(tokenX, tokenY, region) : [];
+          const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(tokenX, tokenY, region) : [];
+          
+          if (occupiedHexes.length > 0 || occupiedSquares.length > 0) {
+            newHighlights.push({ regionId: region.id, hexes: occupiedHexes, squares: occupiedSquares });
           }
         }
       }
     });
     
-    setHighlightedHexes(newHighlights);
+    setHighlightedGrids(newHighlights);
+  };
+
+  // Update highlights for all tokens in regions with visible grids
+  const updateAllTokenHighlights = () => {
+    const newHighlights: {regionId: string, hexes: {hexX: number, hexY: number, radius: number}[], squares: {gridX: number, gridY: number, size: number}[]}[] = [];
+    
+    // Check each token against each region
+    tokens.forEach(token => {
+      regions.forEach(region => {
+        if (region.gridType === 'hex' || region.gridType === 'square') { // Grid is visible when not 'free'
+          // Check if token is within this region
+          if (token.x >= region.x && token.x <= region.x + region.width &&
+              token.y >= region.y && token.y <= region.y + region.height) {
+            const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(token.x, token.y, region) : [];
+            const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(token.x, token.y, region) : [];
+            
+            if (occupiedHexes.length > 0 || occupiedSquares.length > 0) {
+              // Check if this region already has highlights
+              const existingRegionHighlight = newHighlights.find(h => h.regionId === region.id);
+              if (existingRegionHighlight) {
+                existingRegionHighlight.hexes.push(...occupiedHexes);
+                existingRegionHighlight.squares.push(...occupiedSquares);
+              } else {
+                newHighlights.push({ regionId: region.id, hexes: occupiedHexes, squares: occupiedSquares });
+              }
+            }
+          }
+        }
+      });
+    });
+    
+    setHighlightedGrids(newHighlights);
   };
 
   // Get resize handle at position for a region
@@ -297,8 +359,8 @@ export const SimpleTabletop = () => {
       drawToken(ctx, token);
     });
     
-    // Draw highlighted hexes (if any)
-    drawHighlightedHexes(ctx);
+    // Draw highlighted grids (if any)
+    drawHighlightedGrids(ctx);
     
     // Draw ghost token and drag path if dragging
     if (isDraggingToken && draggedTokenId) {
@@ -561,18 +623,18 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw highlighted hexes
-  const drawHighlightedHexes = (ctx: CanvasRenderingContext2D) => {
-    if (highlightedHexes.length === 0) return;
+  // Function to draw highlighted grids
+  const drawHighlightedGrids = (ctx: CanvasRenderingContext2D) => {
+    if (highlightedGrids.length === 0) return;
     
     ctx.save();
     
-    highlightedHexes.forEach(regionHighlight => {
+    highlightedGrids.forEach(regionHighlight => {
       const region = regions.find(r => r.id === regionHighlight.regionId);
-      if (!region || region.gridType !== 'hex') return;
+      if (!region) return;
       
+      // Draw highlighted hexes
       regionHighlight.hexes.forEach(hex => {
-        // Draw highlighted hex using the same drawing function as the grid
         ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // Yellow highlight
         ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
         ctx.lineWidth = 3 / transform.zoom;
@@ -593,6 +655,18 @@ export const SimpleTabletop = () => {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+      });
+      
+      // Draw highlighted squares
+      regionHighlight.squares.forEach(square => {
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // Yellow highlight
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+        ctx.lineWidth = 3 / transform.zoom;
+        
+        // Draw filled square centered on grid cell
+        const halfSize = square.size / 2;
+        ctx.fillRect(square.gridX - halfSize, square.gridY - halfSize, square.size, square.size);
+        ctx.strokeRect(square.gridX - halfSize, square.gridY - halfSize, square.size, square.size);
       });
     });
     
@@ -1157,8 +1231,8 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
       
-      // Update hex highlights based on token position
-      updateHexHighlights(newX, newY);
+      // Update grid highlights based on token position
+      updateGridHighlights(newX, newY);
       
       // Add point to drag path (sample every few pixels for smoother path)
       const lastPoint = dragPath[dragPath.length - 1];
@@ -1317,8 +1391,8 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
       
-      // Clear hex highlights
-      setHighlightedHexes([]);
+      // Update highlights for all tokens after drag ends
+      updateAllTokenHighlights();
       
       // Stop region interactions
       setIsDraggingRegion(false);
