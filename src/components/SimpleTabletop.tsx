@@ -2637,7 +2637,11 @@ export const SimpleTabletop = () => {
             <RegionTransformControls
               transformMode={transformMode}
               onTransformModeChange={setTransformMode}
-              position={getRegionBounds(selectedRegion)}
+              position={(() => {
+                const bounds = getRegionBounds(selectedRegion);
+                const screenPos = worldToScreen(bounds.x, bounds.y);
+                return { x: screenPos.x, y: screenPos.y };
+              })()}
             />
           </div>
         );
