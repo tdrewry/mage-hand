@@ -352,9 +352,8 @@ export const SimpleTabletop = () => {
     
     regions.forEach(region => {
       if (region.gridType === 'hex' || region.gridType === 'square') {
-        // Check if token is within this region
-        if (tokenX >= region.x && tokenX <= region.x + region.width &&
-            tokenY >= region.y && tokenY <= region.y + region.height) {
+        // Check if token is within this region (use proper shape detection)
+        if (isPointInRegion(tokenX, tokenY, region)) {
           const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(tokenX, tokenY, region, gridWidth, gridHeight) : [];
           const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(tokenX, tokenY, region, gridWidth, gridHeight) : [];
           
@@ -376,9 +375,8 @@ export const SimpleTabletop = () => {
     tokens.forEach(token => {
       regions.forEach(region => {
         if (region.gridType === 'hex' || region.gridType === 'square') { // Always calculate token highlights for grid regions
-          // Check if token is within this region
-          if (token.x >= region.x && token.x <= region.x + region.width &&
-              token.y >= region.y && token.y <= region.y + region.height) {
+          // Check if token is within this region (use proper shape detection)
+          if (isPointInRegion(token.x, token.y, region)) {
             const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(token.x, token.y, region) : [];
             const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(token.x, token.y, region) : [];
             
@@ -402,22 +400,41 @@ export const SimpleTabletop = () => {
 
   // Get resize handle at position for a region
   const getResizeHandle = (region: CanvasRegion, worldX: number, worldY: number): string | null => {
-    const handleSize = 12 / transform.zoom;
-    const { x, y, width, height } = region;
-    
-    // Check corner handles
-    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'nw';
-    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'ne';
-    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'sw';
-    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'se';
-    
-    // Check edge handles
-    if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'n';
-    if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'e';
-    if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 's';
-    if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'w';
-    
-    return null;
+    if (region.regionType === 'path' && region.pathPoints) {
+      // For path regions, check if clicking on a control node
+      const handleSize = 12 / transform.zoom;
+      
+      for (let i = 0; i < region.pathPoints.length; i++) {
+        const point = region.pathPoints[i];
+        const distance = Math.sqrt(
+          Math.pow(worldX - point.x, 2) + Math.pow(worldY - point.y, 2)
+        );
+        
+        if (distance <= handleSize / 2) {
+          return `node-${i}`;
+        }
+      }
+      
+      return null;
+    } else {
+      // Rectangle region resize handles
+      const handleSize = 12 / transform.zoom;
+      const { x, y, width, height } = region;
+      
+      // Check corner handles
+      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'nw';
+      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'ne';
+      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'sw';
+      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 'se';
+      
+      // Check edge handles
+      if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - y) <= handleSize) return 'n';
+      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'e';
+      if (Math.abs(worldX - (x + width/2)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return 's';
+      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height/2)) <= handleSize) return 'w';
+      
+      return null;
+    }
   };
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
@@ -749,6 +766,83 @@ export const SimpleTabletop = () => {
   const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const isSelected = region.selected;
     
+    if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+      // Handle path region rendering
+      drawPathRegion(ctx, region, isSelected);
+    } else {
+      // Handle rectangle region rendering
+      drawRectangleRegion(ctx, region, isSelected);
+    }
+  };
+
+  // Function to draw path regions
+  const drawPathRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean) => {
+    ctx.save();
+    
+    // Create path for clipping and filling
+    ctx.beginPath();
+    if (region.pathPoints && region.pathPoints.length > 0) {
+      ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+      for (let i = 1; i < region.pathPoints.length; i++) {
+        ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+      }
+      ctx.closePath();
+    }
+    
+    // Fill background
+    if (region.backgroundImage) {
+      ctx.clip();
+      drawRegionBackground(ctx, region);
+      ctx.restore();
+      ctx.save();
+      // Recreate path for stroke
+      ctx.beginPath();
+      if (region.pathPoints && region.pathPoints.length > 0) {
+        ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+        for (let i = 1; i < region.pathPoints.length; i++) {
+          ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+        }
+        ctx.closePath();
+      }
+    } else {
+      // Draw solid color background
+      ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
+      ctx.fill();
+    }
+    
+    // Draw path outline
+    ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
+    ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // Draw region-specific grid (only if visible)
+    if (region.gridType !== 'free' && region.gridVisible) {
+      drawRegionGrid(ctx, region);
+    }
+    
+    // Draw selection handles if selected (control nodes for paths)
+    if (isSelected) {
+      drawPathHandles(ctx, region);
+    }
+    
+    // Draw grid type label
+    if (region.gridType !== 'free' && region.pathPoints && region.pathPoints.length > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${10 / transform.zoom}px Arial`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(
+        `${region.gridType.toUpperCase()} ${region.gridScale}x`, 
+        region.pathPoints[0].x + 4 / transform.zoom, 
+        region.pathPoints[0].y + 4 / transform.zoom
+      );
+    }
+  };
+
+  // Function to draw rectangle regions
+  const drawRectangleRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean) => {
     ctx.save();
     
     // Clip to region bounds
@@ -1018,7 +1112,7 @@ export const SimpleTabletop = () => {
     ctx.stroke();
   };
 
-  // Function to draw region resize handles
+  // Function to draw region resize handles (for rectangle regions)
   const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
@@ -1046,6 +1140,35 @@ export const SimpleTabletop = () => {
     [...corners, ...edges].forEach(handle => {
       ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
       ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+    });
+  };
+
+  // Function to draw path control nodes (for path regions)
+  const drawPathHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+    if (!region.pathPoints || region.pathPoints.length === 0) return;
+    
+    const handleSize = 12 / transform.zoom;
+    
+    ctx.fillStyle = '#ff6b6b';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / transform.zoom;
+    
+    region.pathPoints.forEach((point, index) => {
+      // Draw control node as circle
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, handleSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      
+      // Draw node index for clarity
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${8 / transform.zoom}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(index.toString(), point.x, point.y);
+      
+      // Reset fill style for next node
+      ctx.fillStyle = '#ff6b6b';
     });
   };
 
@@ -1560,10 +1683,20 @@ export const SimpleTabletop = () => {
           // Start dragging the region
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
-          setRegionDragOffset({
-            x: worldPos.x - clickedRegion.x,
-            y: worldPos.y - clickedRegion.y
-          });
+          
+          if (clickedRegion.regionType === 'path' && clickedRegion.pathPoints) {
+            // For path regions, use the bounding box origin as reference
+            setRegionDragOffset({
+              x: worldPos.x - clickedRegion.x,
+              y: worldPos.y - clickedRegion.y
+            });
+          } else {
+            // For rectangle regions, use the top-left corner
+            setRegionDragOffset({
+              x: worldPos.x - clickedRegion.x,
+              y: worldPos.y - clickedRegion.y
+            });
+          }
         }
       } else {
         handleCanvasClick(e);
@@ -1625,77 +1758,132 @@ export const SimpleTabletop = () => {
       // Find the region being dragged
       const draggedRegion = regions.find(r => r.id === draggedRegionId);
       if (draggedRegion) {
-        const deltaX = newX - draggedRegion.x;
-        const deltaY = newY - draggedRegion.y;
-        
-        // Move tokens that are inside this region
-        const tokensToMove: string[] = [];
-        tokens.forEach(token => {
-          if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
-              token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
-            tokensToMove.push(token.id);
-            updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
-          }
-        });
-        
-        // Store which tokens were moved by region drag to prevent individual snapping
-        setTokensMovedByRegion(tokensToMove);
+        if (draggedRegion.regionType === 'path' && draggedRegion.pathPoints) {
+          // Handle path region dragging
+          const deltaX = newX - draggedRegion.x;
+          const deltaY = newY - draggedRegion.y;
+          
+          // Update path points
+          const newPathPoints = draggedRegion.pathPoints.map(point => ({
+            x: point.x + deltaX,
+            y: point.y + deltaY
+          }));
+          
+          // Move tokens that are inside this path region
+          const tokensToMove: string[] = [];
+          tokens.forEach(token => {
+            if (isPointInRegion(token.x, token.y, draggedRegion)) {
+              tokensToMove.push(token.id);
+              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
+            }
+          });
+          
+          // Store which tokens were moved by region drag
+          setTokensMovedByRegion(tokensToMove);
+          
+          // Update the region with new bounds and path points
+          const newBounds = getPolygonBounds(newPathPoints);
+          updateRegion(draggedRegionId, { 
+            x: newBounds.x, 
+            y: newBounds.y, 
+            width: newBounds.width,
+            height: newBounds.height,
+            pathPoints: newPathPoints 
+          });
+        } else {
+          // Handle rectangle region dragging (existing logic)
+          const deltaX = newX - draggedRegion.x;
+          const deltaY = newY - draggedRegion.y;
+          
+          // Move tokens that are inside this region
+          const tokensToMove: string[] = [];
+          tokens.forEach(token => {
+            if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
+                token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
+              tokensToMove.push(token.id);
+              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
+            }
+          });
+          
+          // Store which tokens were moved by region drag to prevent individual snapping
+          setTokensMovedByRegion(tokensToMove);
+          
+          updateRegion(draggedRegionId, { x: newX, y: newY });
+        }
       }
-      
-      updateRegion(draggedRegionId, { x: newX, y: newY });
       
       redrawCanvas();
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
-      // Region resizing
+      // Region resizing or path node editing
       const worldPos = screenToWorld(mouseX, mouseY);
       
       const targetRegion = regions.find(r => r.id === draggedRegionId);
       if (targetRegion) {
-        const { x, y, width, height } = targetRegion;
-        let updates: Partial<CanvasRegion> = {};
-        
-        switch (resizeHandle) {
-          case 'nw':
-            updates.x = worldPos.x;
-            updates.y = worldPos.y;
-            updates.width = width + (x - worldPos.x);
-            updates.height = height + (y - worldPos.y);
-            break;
-          case 'ne':
-            updates.y = worldPos.y;
-            updates.width = worldPos.x - x;
-            updates.height = height + (y - worldPos.y);
-            break;
-          case 'sw':
-            updates.x = worldPos.x;
-            updates.width = width + (x - worldPos.x);
-            updates.height = worldPos.y - y;
-            break;
-          case 'se':
-            updates.width = worldPos.x - x;
-            updates.height = worldPos.y - y;
-            break;
-          case 'n':
-            updates.y = worldPos.y;
-            updates.height = height + (y - worldPos.y);
-            break;
-          case 'e':
-            updates.width = worldPos.x - x;
-            break;
-          case 's':
-            updates.height = worldPos.y - y;
-            break;
-          case 'w':
-            updates.x = worldPos.x;
-            updates.width = width + (x - worldPos.x);
-            break;
+        if (targetRegion.regionType === 'path' && resizeHandle.startsWith('node-') && targetRegion.pathPoints) {
+          // Handle path node editing
+          const nodeIndex = parseInt(resizeHandle.split('-')[1]);
+          if (nodeIndex >= 0 && nodeIndex < targetRegion.pathPoints.length) {
+            const newPathPoints = [...targetRegion.pathPoints];
+            newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
+            
+            // Recalculate bounds after node movement
+            const newBounds = getPolygonBounds(newPathPoints);
+            updateRegion(draggedRegionId, {
+              x: newBounds.x,
+              y: newBounds.y,
+              width: newBounds.width,
+              height: newBounds.height,
+              pathPoints: newPathPoints
+            });
+          }
+        } else {
+          // Handle rectangle region resizing (existing logic)
+          const { x, y, width, height } = targetRegion;
+          let updates: Partial<CanvasRegion> = {};
+          
+          switch (resizeHandle) {
+            case 'nw':
+              updates.x = worldPos.x;
+              updates.y = worldPos.y;
+              updates.width = width + (x - worldPos.x);
+              updates.height = height + (y - worldPos.y);
+              break;
+            case 'ne':
+              updates.y = worldPos.y;
+              updates.width = worldPos.x - x;
+              updates.height = height + (y - worldPos.y);
+              break;
+            case 'sw':
+              updates.x = worldPos.x;
+              updates.width = width + (x - worldPos.x);
+              updates.height = worldPos.y - y;
+              break;
+            case 'se':
+              updates.width = worldPos.x - x;
+              updates.height = worldPos.y - y;
+              break;
+            case 'n':
+              updates.y = worldPos.y;
+              updates.height = height + (y - worldPos.y);
+              break;
+            case 'e':
+              updates.width = worldPos.x - x;
+              break;
+            case 's':
+              updates.height = worldPos.y - y;
+              break;
+            case 'w':
+              updates.x = worldPos.x;
+              updates.width = width + (x - worldPos.x);
+              break;
+          }
+          
+          // Ensure minimum size
+          if (updates.width !== undefined) updates.width = Math.max(10, updates.width);
+          if (updates.height !== undefined) updates.height = Math.max(10, updates.height);
+          
+          updateRegion(draggedRegionId, updates);
         }
-        
-        // Ensure minimum size
-        if (updates.width !== undefined) updates.width = Math.max(10, updates.width);
-        if (updates.height !== undefined) updates.height = Math.max(10, updates.height);
-        
-        updateRegion(draggedRegionId, updates);
       }
       
       redrawCanvas();
@@ -1724,20 +1912,25 @@ export const SimpleTabletop = () => {
         const token = tokens.find(t => t.id === draggedTokenId);
         if (token) {
           // Find local region at token position (our local regions in SimpleTabletop)
-          const localRegion = regions.find(r => 
-            token.x >= r.x && token.x <= r.x + r.width &&
-            token.y >= r.y && token.y <= r.y + r.height
-          );
+          const localRegion = regions.find(r => isPointInRegion(token.x, token.y, r));
           
           // Priority 1: Local region snapping (if region exists and has snapping enabled)
           if (localRegion && localRegion.gridSnapping && localRegion.gridType !== 'free') {
             // Convert local region to map region format for snapping
-            const regionPoints = [
-              { x: localRegion.x, y: localRegion.y },
-              { x: localRegion.x + localRegion.width, y: localRegion.y },
-              { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
-              { x: localRegion.x, y: localRegion.y + localRegion.height }
-            ];
+            let regionPoints: Array<{ x: number; y: number }>;
+            
+            if (localRegion.regionType === 'path' && localRegion.pathPoints) {
+              regionPoints = localRegion.pathPoints;
+            } else {
+              // Rectangle region
+              regionPoints = [
+                { x: localRegion.x, y: localRegion.y },
+                { x: localRegion.x + localRegion.width, y: localRegion.y },
+                { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+                { x: localRegion.x, y: localRegion.y + localRegion.height }
+              ];
+            }
+            
             const regionForSnap = {
               map: {} as any, // Not used in snapping logic
               region: {
@@ -1841,20 +2034,25 @@ export const SimpleTabletop = () => {
     
     // Find local region at token position for region-specific snapping
     const localRegion = regions.find(r => 
-      tokenX >= r.x && tokenX <= r.x + r.width &&
-      tokenY >= r.y && tokenY <= r.y + r.height &&
-      r.gridType !== 'free'
+      isPointInRegion(tokenX, tokenY, r) && r.gridType !== 'free'
     );
     
     if (localRegion && localRegion.gridSnapping) {
       console.log('Applying local region snapping for new token, grid type:', localRegion.gridType);
       // Convert local region to map region format for snapping
-      const regionPoints = [
-        { x: localRegion.x, y: localRegion.y },
-        { x: localRegion.x + localRegion.width, y: localRegion.y },
-        { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
-        { x: localRegion.x, y: localRegion.y + localRegion.height }
-      ];
+      let regionPoints: Array<{ x: number; y: number }>;
+      
+      if (localRegion.regionType === 'path' && localRegion.pathPoints) {
+        regionPoints = localRegion.pathPoints;
+      } else {
+        // Rectangle region
+        regionPoints = [
+          { x: localRegion.x, y: localRegion.y },
+          { x: localRegion.x + localRegion.width, y: localRegion.y },
+          { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+          { x: localRegion.x, y: localRegion.y + localRegion.height }
+        ];
+      }
       const regionForSnap = {
         map: {} as any, // Not used in snapping logic
         region: {
