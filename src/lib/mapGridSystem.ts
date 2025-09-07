@@ -206,28 +206,31 @@ function renderSquareGridRegion(
   ctx.beginPath();
   
   // Draw grid lines that create cells where tokens will snap to centers
-  // Vertical lines (create columns)
+  // Grid cells start at minX, minY and tokens snap to cell centers
+  // So grid lines should form boundaries around those snap positions
+  
+  // Vertical lines (create columns) - offset by half gridSize to center the cells on snap points
   for (let col = 0; col <= cellsX; col++) {
-    const worldX = minX + (col * gridSize);
+    const worldX = minX + (col * gridSize) - (gridSize * 0.5);
     const screenX = (worldX - viewport.x) * viewport.zoom;
     
     if (screenX >= 0 && screenX <= renderer.canvas.width) {
-      const screenTop = (minY - viewport.y) * viewport.zoom;
-      const screenBottom = (Math.min(minY + (cellsY * gridSize), maxY) - viewport.y) * viewport.zoom;
+      const screenTop = (minY - (gridSize * 0.5) - viewport.y) * viewport.zoom;
+      const screenBottom = (Math.min(minY + (cellsY * gridSize) - (gridSize * 0.5), maxY) - viewport.y) * viewport.zoom;
       
       ctx.moveTo(screenX, screenTop);
       ctx.lineTo(screenX, screenBottom);
     }
   }
   
-  // Horizontal lines (create rows)
+  // Horizontal lines (create rows) - offset by half gridSize to center the cells on snap points
   for (let row = 0; row <= cellsY; row++) {
-    const worldY = minY + (row * gridSize);
+    const worldY = minY + (row * gridSize) - (gridSize * 0.5);
     const screenY = (worldY - viewport.y) * viewport.zoom;
     
     if (screenY >= 0 && screenY <= renderer.canvas.height) {
-      const screenLeft = (minX - viewport.x) * viewport.zoom;
-      const screenRight = (Math.min(minX + (cellsX * gridSize), maxX) - viewport.x) * viewport.zoom;
+      const screenLeft = (minX - (gridSize * 0.5) - viewport.x) * viewport.zoom;
+      const screenRight = (Math.min(minX + (cellsX * gridSize) - (gridSize * 0.5), maxX) - viewport.x) * viewport.zoom;
       
       ctx.moveTo(screenLeft, screenY);
       ctx.lineTo(screenRight, screenY);
