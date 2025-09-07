@@ -17,9 +17,10 @@ import {
   hexRound,
   hexCorners 
 } from '../lib/hexCoordinates';
+import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from '../utils/pathUtils';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3, Eye } from 'lucide-react';
+import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 
 export const SimpleTabletop = () => {
@@ -75,6 +76,11 @@ export const SimpleTabletop = () => {
   const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
   const [isResizingRegion, setIsResizingRegion] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  
+  // Path drawing state
+  const [pathDrawingMode, setPathDrawingMode] = useState<'none' | 'drawing' | 'editing'>('none');
+  const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
+  const [editingVertexIndex, setEditingVertexIndex] = useState<number | null>(null);
   
   // Track tokens moved by region drag to prevent individual snapping
   const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
@@ -502,6 +508,39 @@ export const SimpleTabletop = () => {
     // Draw highlighted grids (if any)
     drawHighlightedGrids(ctx);
     
+    // Draw current path being drawn
+    if (pathDrawingMode === 'drawing' && currentPath.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([5, 5]);
+      
+      if (currentPath.length === 1) {
+        // Draw first point
+        ctx.fillStyle = '#ff6b6b';
+        ctx.beginPath();
+        ctx.arc(currentPath[0].x, currentPath[0].y, 4 / transform.zoom, 0, 2 * Math.PI);
+        ctx.fill();
+      } else {
+        // Draw path lines
+        ctx.beginPath();
+        ctx.moveTo(currentPath[0].x, currentPath[0].y);
+        for (let i = 1; i < currentPath.length; i++) {
+          ctx.lineTo(currentPath[i].x, currentPath[i].y);
+        }
+        ctx.stroke();
+        
+        // Draw vertices
+        ctx.fillStyle = '#ff6b6b';
+        currentPath.forEach(point => {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 4 / transform.zoom, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      }
+      ctx.restore();
+    }
+    
     // Draw ghost token and drag path if dragging
     if (isDraggingToken && draggedTokenId) {
       drawDragGhostAndPath(ctx);
@@ -824,10 +863,22 @@ export const SimpleTabletop = () => {
   const drawRegionGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     ctx.save();
     
-    // Clip to region bounds
-    ctx.beginPath();
-    ctx.rect(region.x, region.y, region.width, region.height);
-    ctx.clip();
+    // Clip to region bounds - handle both rectangle and path regions
+    if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+      // Clip to path shape
+      ctx.beginPath();
+      ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+      for (let i = 1; i < region.pathPoints.length; i++) {
+        ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+      }
+      ctx.closePath();
+      ctx.clip();
+    } else {
+      // Clip to rectangle bounds
+      ctx.beginPath();
+      ctx.rect(region.x, region.y, region.width, region.height);
+      ctx.clip();
+    }
     
     ctx.strokeStyle = region.gridType === 'square' ? '#4f46e5' : '#06b6d4';
     ctx.lineWidth = 1 / transform.zoom;
@@ -1025,12 +1076,65 @@ export const SimpleTabletop = () => {
       gridSize: 40,  // Match main canvas grid size
       gridScale: 1.0, // Default scale
       gridSnapping: false, // Default to disabled per-region
-      gridVisible: true // Default to visible
+      gridVisible: true, // Default to visible
+      regionType: 'rectangle' // Default to rectangle
     };
     
     addRegion(newRegion);
     toast.success('Region added to viewport center');
   };
+
+  // Function to start path drawing mode
+  const startPathDrawing = () => {
+    setPathDrawingMode('drawing');
+    setCurrentPath([]);
+    toast.info('Click to start drawing path. Double-click to finish.');
+  };
+
+  // Function to finish path drawing and create region
+  const finishPathDrawing = () => {
+    if (currentPath.length < 3) {
+      toast.error('Path must have at least 3 points');
+      setPathDrawingMode('none');
+      setCurrentPath([]);
+      return;
+    }
+
+    const bounds = getPolygonBounds(currentPath);
+    const newRegion: CanvasRegion = {
+      id: `path-region-${Date.now()}`,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      selected: false,
+      color: 'rgba(100, 150, 200, 0.3)',
+      gridType: 'free',
+      gridSize: 40,
+      gridScale: 1.0,
+      gridSnapping: false,
+      gridVisible: true,
+      regionType: 'path',
+      pathPoints: [...currentPath]
+    };
+
+    addRegion(newRegion);
+    setPathDrawingMode('none');
+    setCurrentPath([]);
+    toast.success('Path region created');
+  };
+
+  // Function to check if point is in any region (supports both rect and path)
+  const isPointInRegion = (x: number, y: number, region: CanvasRegion): boolean => {
+    if (region.regionType === 'path' && region.pathPoints) {
+      return isPointInPolygon({ x, y }, region.pathPoints);
+    } else {
+      // Rectangle region (default behavior)
+      return x >= region.x && x <= region.x + region.width && 
+             y >= region.y && y <= region.y + region.height;
+    }
+  };
+
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const baseTokenSize = 40; // Base size for 1x1 token
     // Use the larger dimension for circular token radius
@@ -1403,6 +1507,28 @@ export const SimpleTabletop = () => {
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (e.button === 0) { // Left click
+      // Handle path drawing mode
+      if (pathDrawingMode === 'drawing') {
+        // Add point to current path
+        setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+        redrawCanvas();
+        return;
+      }
+      
+      // Handle path editing mode
+      if (pathDrawingMode === 'editing' && selectedRegionId) {
+        const selectedRegion = regions.find(r => r.id === selectedRegionId);
+        if (selectedRegion && selectedRegion.regionType === 'path' && selectedRegion.pathPoints) {
+          // Check if clicking on a vertex
+          const vertexIndex = findNearestVertex(worldPos, selectedRegion.pathPoints);
+          if (vertexIndex !== null) {
+            setEditingVertexIndex(vertexIndex);
+            redrawCanvas();
+            return;
+          }
+        }
+      }
+      
       // Check what we're clicking on for dragging (tokens first, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
@@ -1801,14 +1927,26 @@ export const SimpleTabletop = () => {
 
       {/* Add Region Button */}
       <div className="absolute top-16 right-4 z-10">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addNewRegion}
-          className="flex items-center gap-2"
-        >
-          Add Region
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addNewRegion}
+            className="flex items-center gap-2"
+          >
+            <Square className="w-4 h-4" />
+            Add Region
+          </Button>
+          <Button
+            variant={pathDrawingMode === 'drawing' ? "default" : "outline"}
+            size="sm"
+            onClick={pathDrawingMode === 'drawing' ? finishPathDrawing : startPathDrawing}
+            className="flex items-center gap-2"
+          >
+            <Pen className="w-4 h-4" />
+            {pathDrawingMode === 'drawing' ? 'Finish Path' : 'Draw Path'}
+          </Button>
+        </div>
       </div>
 
       {/* Grid Snapping Toggle */}
@@ -1875,11 +2013,12 @@ export const SimpleTabletop = () => {
           className="absolute inset-0 w-full h-full"
           style={{ 
             background: 'hsl(var(--surface))',
-            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : 'auto'
+            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : pathDrawingMode === 'drawing' ? 'crosshair' : 'auto'
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onDoubleClick={() => pathDrawingMode === 'drawing' && finishPathDrawing()}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
         />
