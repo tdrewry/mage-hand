@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import paper from 'paper';
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,6 +95,10 @@ export const SimpleTabletop = () => {
   
   // Track tokens moved by region drag to prevent individual snapping
   const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
+  
+  // Paper.js group for region dragging
+  const [regionDragGroup, setRegionDragGroup] = useState<paper.Group | null>(null);
+  const paperScopeRef = useRef<paper.PaperScope | null>(null);
 
   const {
     sessionId,
@@ -112,6 +117,23 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     updateAllTokenHighlights();
   }, [tokens, regions]); // Re-run when tokens positions change or regions change
+
+  // Initialize Paper.js
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Create a new Paper.js scope for this canvas
+    const scope = new paper.PaperScope();
+    scope.setup(canvas);
+    paperScopeRef.current = scope;
+
+    return () => {
+      if (paperScopeRef.current) {
+        paperScopeRef.current.project.clear();
+      }
+    };
+  }, []);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -1698,7 +1720,7 @@ export const SimpleTabletop = () => {
           setResizeHandle(handle);
           setDraggedRegionId(clickedRegion.id);
         } else {
-          // Start dragging the region
+          // Start dragging the region - create Paper.js group
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
           
@@ -1714,6 +1736,59 @@ export const SimpleTabletop = () => {
               x: worldPos.x - clickedRegion.x,
               y: worldPos.y - clickedRegion.y
             });
+          }
+          
+          // Create Paper.js group for all items in region
+          if (paperScopeRef.current) {
+            const group = new paperScopeRef.current.Group();
+            
+            // Find tokens inside region
+            const tokensInRegion: string[] = [];
+            tokens.forEach(token => {
+              if (isPointInRegion(token.x, token.y, clickedRegion)) {
+                tokensInRegion.push(token.id);
+                
+                // Create Paper.js representation of token
+                const tokenSize = 40; // Base token size
+                const tokenItem = new paperScopeRef.current.Path.Circle({
+                  center: [token.x, token.y],
+                  radius: tokenSize / 2,
+                  fillColor: token.color || '#ff0000'
+                });
+                tokenItem.data = { tokenId: token.id, type: 'token' };
+                group.addChild(tokenItem);
+                
+                // Create Paper.js representation of token highlights if they exist
+                const tokenHighlights = highlightedGrids.find(h => h.regionId === clickedRegion.id);
+                if (tokenHighlights) {
+                  tokenHighlights.hexes.forEach(hex => {
+                    const hexItem = new paperScopeRef.current.Path.RegularPolygon({
+                      center: [hex.hexX, hex.hexY],
+                      sides: 6,
+                      radius: hex.radius,
+                      strokeColor: '#ffff00',
+                      strokeWidth: 2
+                    });
+                    hexItem.data = { tokenId: token.id, type: 'highlight' };
+                    group.addChild(hexItem);
+                  });
+                  
+                  tokenHighlights.squares.forEach(square => {
+                    const squareItem = new paperScopeRef.current.Path.Rectangle({
+                      center: [square.gridX, square.gridY],
+                      size: [square.size, square.size],
+                      strokeColor: '#ffff00',
+                      strokeWidth: 2
+                    });
+                    squareItem.data = { tokenId: token.id, type: 'highlight' };
+                    group.addChild(squareItem);
+                  });
+                }
+              }
+            });
+            
+            setTokensMovedByRegion(tokensInRegion);
+            setRegionDragGroup(group);
           }
         }
       } else {
@@ -1776,74 +1851,43 @@ export const SimpleTabletop = () => {
       // Find the region being dragged
       const draggedRegion = regions.find(r => r.id === draggedRegionId);
       if (draggedRegion) {
-        if (draggedRegion.regionType === 'path' && draggedRegion.pathPoints) {
-          // Handle path region dragging preview
-          const deltaX = newX - draggedRegion.x;
-          const deltaY = newY - draggedRegion.y;
+        // Use Paper.js group for smooth dragging
+        if (regionDragGroup && paperScopeRef.current) {
+          const deltaX = newX - regionDragOffset.x;
+          const deltaY = newY - regionDragOffset.y;
           
-          // Update preview path points
-          const newPathPoints = draggedRegion.pathPoints.map(point => ({
-            x: point.x + deltaX,
-            y: point.y + deltaY
-          }));
+          // Move the entire group
+          regionDragGroup.translate(new paperScopeRef.current.Point(deltaX, deltaY));
           
-          // Move tokens that are inside this path region in real-time
-          const tokensToMove: string[] = [];
-          tokens.forEach(token => {
-            if (isPointInRegion(token.x, token.y, draggedRegion)) {
-              tokensToMove.push(token.id);
-              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
-            }
-          });
-          
-          // Store which tokens were moved by region drag
-          setTokensMovedByRegion(tokensToMove);
-          
-          // Update token highlights immediately after moving tokens
-          if (tokensToMove.length > 0) {
-            updateAllTokenHighlights();
+          if (draggedRegion.regionType === 'path' && draggedRegion.pathPoints) {
+            // Update path points for preview
+            const newPathPoints = draggedRegion.pathPoints.map(point => ({
+              x: point.x + deltaX,
+              y: point.y + deltaY
+            }));
+            
+            const newBounds = getPolygonBounds(newPathPoints);
+            setDragPreview({
+              regionId: draggedRegionId,
+              pathPoints: newPathPoints,
+              x: newBounds.x,
+              y: newBounds.y,
+              width: newBounds.width,
+              height: newBounds.height
+            });
+          } else {
+            // Update rectangle preview
+            setDragPreview({
+              regionId: draggedRegionId,
+              x: newX,
+              y: newY,
+              width: draggedRegion.width,
+              height: draggedRegion.height
+            });
           }
           
-          // Update local preview state
-          const newBounds = getPolygonBounds(newPathPoints);
-          setDragPreview({
-            regionId: draggedRegionId,
-            pathPoints: newPathPoints,
-            x: newBounds.x,
-            y: newBounds.y,
-            width: newBounds.width,
-            height: newBounds.height
-          });
-        } else {
-          // Handle rectangle region dragging preview
-          const deltaX = newX - draggedRegion.x;
-          const deltaY = newY - draggedRegion.y;
-          
-          // Move tokens that are inside this region in real-time
-          const tokensToMove: string[] = [];
-          tokens.forEach(token => {
-            if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
-                token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
-              tokensToMove.push(token.id);
-              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
-            }
-          });
-          
-          // Store which tokens were moved by region drag
-          setTokensMovedByRegion(tokensToMove);
-          
-          // Update token highlights immediately after moving tokens
-          if (tokensToMove.length > 0) {
-            updateAllTokenHighlights();
-          }
-          
-          setDragPreview({
-            regionId: draggedRegionId,
-            x: newX,
-            y: newY,
-            width: draggedRegion.width,
-            height: draggedRegion.height
-          });
+          // Update region drag offset for next mouse move
+          setRegionDragOffset({ x: newX, y: newY });
         }
       }
       
@@ -2011,12 +2055,21 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
       
-      // Apply drag preview changes to store when drag ends (regions only, tokens already moved)
-      if (dragPreview && draggedRegionId) {
+      // Ungroup Paper.js items and apply changes to store
+      if (regionDragGroup && dragPreview && draggedRegionId) {
         const draggedRegion = regions.find(r => r.id === draggedRegionId);
         if (draggedRegion) {
+          // Update token positions in store based on their Paper.js positions
+          regionDragGroup.children.forEach((child: any) => {
+            if (child.data && child.data.tokenId) {
+              const tokenId = child.data.tokenId;
+              const tokenCenter = child.bounds.center;
+              updateTokenPosition(tokenId, tokenCenter.x, tokenCenter.y);
+            }
+          });
+          
+          // Update region in store
           if (draggedRegion.regionType === 'path' && dragPreview.pathPoints) {
-            // Update the region with final position (tokens already moved during drag)
             updateRegion(draggedRegionId, {
               x: dragPreview.x,
               y: dragPreview.y,
@@ -2025,7 +2078,6 @@ export const SimpleTabletop = () => {
               pathPoints: dragPreview.pathPoints
             });
           } else {
-            // Update the region with final position (tokens already moved during drag)
             updateRegion(draggedRegionId, {
               x: dragPreview.x,
               y: dragPreview.y,
@@ -2033,6 +2085,13 @@ export const SimpleTabletop = () => {
               height: dragPreview.height
             });
           }
+          
+          // Ungroup the items - remove children from group and delete group
+          regionDragGroup.children.forEach((child: any) => {
+            child.remove();
+          });
+          regionDragGroup.remove();
+          setRegionDragGroup(null);
         }
       }
       
