@@ -148,8 +148,7 @@ export const SimpleTabletop = () => {
     // Check regions in reverse order (top to bottom)
     for (let i = regions.length - 1; i >= 0; i--) {
       const region = regions[i];
-      if (worldX >= region.x && worldX <= region.x + region.width &&
-          worldY >= region.y && worldY <= region.y + region.height) {
+      if (isPointInRegion(worldX, worldY, region)) {
         return region;
       }
     }
