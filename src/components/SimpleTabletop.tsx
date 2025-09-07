@@ -923,6 +923,17 @@ export const SimpleTabletop = () => {
   const drawRectangleRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean) => {
     ctx.save();
     
+    // Apply rotation if present
+    if (region.rotation && region.rotation !== 0) {
+      const centerX = region.x + region.width / 2;
+      const centerY = region.y + region.height / 2;
+      const angle = (region.rotation * Math.PI) / 180;
+      
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+      ctx.translate(-centerX, -centerY);
+    }
+    
     // Clip to region bounds
     ctx.beginPath();
     ctx.rect(region.x, region.y, region.width, region.height);
@@ -939,6 +950,20 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
+    // Save again for border and handles drawing with rotation
+    ctx.save();
+    
+    // Apply rotation again for border drawing
+    if (region.rotation && region.rotation !== 0) {
+      const centerX = region.x + region.width / 2;
+      const centerY = region.y + region.height / 2;
+      const angle = (region.rotation * Math.PI) / 180;
+      
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+      ctx.translate(-centerX, -centerY);
+    }
+    
     // Draw region-specific grid (only if visible)
     if (region.gridType !== 'free' && region.gridVisible) {
       drawRegionGrid(ctx, region);
@@ -948,18 +973,6 @@ export const SimpleTabletop = () => {
     ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
     ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
     ctx.strokeRect(region.x, region.y, region.width, region.height);
-    
-    // Draw selection handles if selected
-    if (isSelected) {
-      drawRegionHandles(ctx, region);
-      
-      // Draw transformation handles based on mode
-      if (transformMode === 'scale') {
-        drawScaleHandles(ctx, region);
-      } else if (transformMode === 'rotate') {
-        drawRotationHandles(ctx, region);
-      }
-    }
     
     // Draw grid type label
     if (region.gridType !== 'free') {
@@ -972,6 +985,20 @@ export const SimpleTabletop = () => {
         region.x + 4 / transform.zoom, 
         region.y + 4 / transform.zoom
       );
+    }
+    
+    ctx.restore();
+    
+    // Draw selection handles if selected (without rotation)
+    if (isSelected) {
+      drawRegionHandles(ctx, region);
+      
+      // Draw transformation handles based on mode
+      if (transformMode === 'scale') {
+        drawScaleHandles(ctx, region);
+      } else if (transformMode === 'rotate') {
+        drawRotationHandles(ctx, region);
+      }
     }
   };
 
