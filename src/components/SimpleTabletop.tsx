@@ -2134,6 +2134,16 @@ export const SimpleTabletop = () => {
         // Update temporary region rotation
         setTempRegionRotation({ [draggedRegionId]: rotationDelta });
         
+        // Create drag preview for the region to maintain visibility during rotation
+        setDragPreview({
+          regionId: draggedRegionId,
+          x: draggedRegion.x,
+          y: draggedRegion.y,
+          width: draggedRegion.width,
+          height: draggedRegion.height,
+          pathPoints: draggedRegion.pathPoints
+        });
+        
         // Rotate all grouped tokens around region center
         const newTempPositions: {[tokenId: string]: {x: number, y: number}} = {};
         groupedTokens.forEach(groupedToken => {
