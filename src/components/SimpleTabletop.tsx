@@ -100,6 +100,11 @@ export const SimpleTabletop = () => {
   
   // Temporary token positions during region drag to avoid store updates
   const [tempTokenPositions, setTempTokenPositions] = useState<{[tokenId: string]: {x: number, y: number}}>();
+  
+  // Rotation state
+  const [isRotatingRegion, setIsRotatingRegion] = useState(false);
+  const [rotationStartAngle, setRotationStartAngle] = useState(0);
+  const [tempRegionRotation, setTempRegionRotation] = useState<{[regionId: string]: number}>({});
 
   const {
     sessionId,
@@ -1155,28 +1160,70 @@ export const SimpleTabletop = () => {
     
     ctx.fillStyle = '#4f46e5';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1 / transform.zoom;
+    ctx.lineWidth = 2 / transform.zoom;
     
-    // Corner handles
-    const corners = [
-      { x: x, y: y }, // nw
-      { x: x + width, y: y }, // ne
-      { x: x, y: y + height }, // sw
-      { x: x + width, y: y + height }, // se
+    // Draw resize handles at corners and edges
+    const handles = [
+      { x: x, y: y }, // top-left
+      { x: x + width / 2, y: y }, // top-center
+      { x: x + width, y: y }, // top-right
+      { x: x + width, y: y + height / 2 }, // right-center
+      { x: x + width, y: y + height }, // bottom-right
+      { x: x + width / 2, y: y + height }, // bottom-center
+      { x: x, y: y + height }, // bottom-left
+      { x: x, y: y + height / 2 }, // left-center
     ];
     
-    // Edge handles
-    const edges = [
-      { x: x + width/2, y: y }, // n
-      { x: x + width, y: y + height/2 }, // e
-      { x: x + width/2, y: y + height }, // s
-      { x: x, y: y + height/2 }, // w
-    ];
-    
-    [...corners, ...edges].forEach(handle => {
-      ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
-      ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+    handles.forEach(handle => {
+      ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
+      ctx.strokeRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
     });
+    
+    // Draw rotation handle - positioned above the region
+    const rotationHandleDistance = 30 / transform.zoom;
+    const rotationX = x + width / 2;
+    const rotationY = y - rotationHandleDistance;
+    
+    // Draw connection line from region to rotation handle
+    ctx.strokeStyle = '#4f46e5';
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.beginPath();
+    ctx.moveTo(x + width / 2, y);
+    ctx.lineTo(rotationX, rotationY);
+    ctx.stroke();
+    
+    // Draw rotation handle (circular)
+    ctx.fillStyle = '#10b981'; // Different color for rotation handle
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(rotationX, rotationY, handleSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  // Function to draw path control handles (for path regions)
+  const calculateAngle = (centerX: number, centerY: number, pointX: number, pointY: number) => {
+    return Math.atan2(pointY - centerY, pointX - centerX) * (180 / Math.PI);
+  };
+
+  // Helper function to rotate a point around a center
+  const rotatePoint = (px: number, py: number, cx: number, cy: number, angle: number) => {
+    const cos = Math.cos(angle * Math.PI / 180);
+    const sin = Math.sin(angle * Math.PI / 180);
+    const nx = (cos * (px - cx)) + (sin * (py - cy)) + cx;
+    const ny = (cos * (py - cy)) - (sin * (px - cx)) + cy;
+    return { x: nx, y: ny };
+  };
+
+  // Function to check if mouse is over rotation handle
+  const isOverRotationHandle = (mouseX: number, mouseY: number, region: CanvasRegion) => {
+    const handleSize = 12 / transform.zoom;
+    const rotationHandleDistance = 30 / transform.zoom;
+    const rotationX = region.x + region.width / 2;
+    const rotationY = region.y - rotationHandleDistance;
+    
+    const distance = Math.sqrt((mouseX - rotationX) ** 2 + (mouseY - rotationY) ** 2);
+    return distance <= handleSize;
   };
 
   // Function to draw path control nodes (for path regions)
@@ -1703,8 +1750,33 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedRegion && clickedRegion.selected) {
+        // Check if we're clicking on a rotation handle first
+        if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
+          setIsRotatingRegion(true);
+          setDraggedRegionId(clickedRegion.id);
+          
+          // Calculate starting angle from region center to mouse
+          const centerX = clickedRegion.x + clickedRegion.width / 2;
+          const centerY = clickedRegion.y + clickedRegion.height / 2;
+          setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+          
+          // Group tokens inside the region for rotation
+          const tokensInRegion: {tokenId: string, startX: number, startY: number}[] = [];
+          tokens.forEach(token => {
+            if (isPointInRegion(token.x, token.y, clickedRegion)) {
+              tokensInRegion.push({
+                tokenId: token.id,
+                startX: token.x,
+                startY: token.y
+              });
+            }
+          });
+          
+          setGroupedTokens(tokensInRegion);
+        }
         // Check if we're clicking on a resize handle
-        const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
+        else {
+          const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
         
         if (handle) {
           setIsResizingRegion(true);
@@ -1743,6 +1815,7 @@ export const SimpleTabletop = () => {
           
           setGroupedTokens(tokensInRegion);
           setTokensMovedByRegion(tokensInRegion.map(t => t.tokenId));
+        }
         }
       } else {
         handleCanvasClick(e);
@@ -1843,6 +1916,40 @@ export const SimpleTabletop = () => {
             height: draggedRegion.height
           });
         }
+      }
+      
+      // Use requestAnimationFrame for smooth rendering
+      requestAnimationFrame(() => redrawCanvas());
+    } else if (isRotatingRegion && draggedRegionId) {
+      // Region rotation - rotate tokens around region center
+      const worldPos = screenToWorld(mouseX, mouseY);
+      
+      // Find the region being rotated
+      const draggedRegion = regions.find(r => r.id === draggedRegionId);
+      if (draggedRegion) {
+        const centerX = draggedRegion.x + draggedRegion.width / 2;
+        const centerY = draggedRegion.y + draggedRegion.height / 2;
+        
+        // Calculate current angle from center to mouse
+        const currentAngle = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
+        const rotationDelta = currentAngle - rotationStartAngle;
+        
+        // Update temporary region rotation
+        setTempRegionRotation({ [draggedRegionId]: rotationDelta });
+        
+        // Rotate all grouped tokens around region center
+        const newTempPositions: {[tokenId: string]: {x: number, y: number}} = {};
+        groupedTokens.forEach(groupedToken => {
+          const rotatedPos = rotatePoint(
+            groupedToken.startX, 
+            groupedToken.startY, 
+            centerX, 
+            centerY, 
+            rotationDelta
+          );
+          newTempPositions[groupedToken.tokenId] = { x: rotatedPos.x, y: rotatedPos.y };
+        });
+        setTempTokenPositions(newTempPositions);
       }
       
       // Use requestAnimationFrame for smooth rendering
@@ -2043,6 +2150,27 @@ export const SimpleTabletop = () => {
       // Clear grouped tokens and temp positions
       setGroupedTokens([]);
       setTempTokenPositions(undefined);
+    } else if (isRotatingRegion && draggedRegionId) {
+      // Apply final rotation to region and tokens
+      if (tempRegionRotation[draggedRegionId]) {
+        const rotationDelta = tempRegionRotation[draggedRegionId];
+        updateRegion(draggedRegionId, { 
+          rotation: (regions.find(r => r.id === draggedRegionId)?.rotation || 0) + rotationDelta 
+        });
+      }
+      
+      // Apply final token positions to store
+      if (tempTokenPositions) {
+        Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
+          updateTokenPosition(tokenId, position.x, position.y);
+        });
+      }
+      
+      // Clear rotation state
+      setIsRotatingRegion(false);
+      setGroupedTokens([]);
+      setTempTokenPositions(undefined);
+      setTempRegionRotation({});
       
       // Stop region interactions
       setIsDraggingRegion(false);
