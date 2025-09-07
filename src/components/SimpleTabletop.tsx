@@ -1768,7 +1768,7 @@ export const SimpleTabletop = () => {
       // Force immediate redraw for smooth dragging feedback
       redrawCanvas();
     } else if (isDraggingRegion && draggedRegionId) {
-      // Region dragging - use local state for smooth preview
+      // Region dragging - move tokens in real-time for smooth preview
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
@@ -1787,6 +1787,23 @@ export const SimpleTabletop = () => {
             y: point.y + deltaY
           }));
           
+          // Move tokens that are inside this path region in real-time
+          const tokensToMove: string[] = [];
+          tokens.forEach(token => {
+            if (isPointInRegion(token.x, token.y, draggedRegion)) {
+              tokensToMove.push(token.id);
+              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
+            }
+          });
+          
+          // Store which tokens were moved by region drag
+          setTokensMovedByRegion(tokensToMove);
+          
+          // Update token highlights immediately after moving tokens
+          if (tokensToMove.length > 0) {
+            updateAllTokenHighlights();
+          }
+          
           // Update local preview state
           const newBounds = getPolygonBounds(newPathPoints);
           setDragPreview({
@@ -1799,6 +1816,27 @@ export const SimpleTabletop = () => {
           });
         } else {
           // Handle rectangle region dragging preview
+          const deltaX = newX - draggedRegion.x;
+          const deltaY = newY - draggedRegion.y;
+          
+          // Move tokens that are inside this region in real-time
+          const tokensToMove: string[] = [];
+          tokens.forEach(token => {
+            if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
+                token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
+              tokensToMove.push(token.id);
+              updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
+            }
+          });
+          
+          // Store which tokens were moved by region drag
+          setTokensMovedByRegion(tokensToMove);
+          
+          // Update token highlights immediately after moving tokens
+          if (tokensToMove.length > 0) {
+            updateAllTokenHighlights();
+          }
+          
           setDragPreview({
             regionId: draggedRegionId,
             x: newX,
@@ -1973,25 +2011,12 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
       
-      // Apply drag preview changes to store when drag ends
+      // Apply drag preview changes to store when drag ends (regions only, tokens already moved)
       if (dragPreview && draggedRegionId) {
         const draggedRegion = regions.find(r => r.id === draggedRegionId);
         if (draggedRegion) {
           if (draggedRegion.regionType === 'path' && dragPreview.pathPoints) {
-            // Apply path region changes and move tokens
-            const deltaX = (dragPreview.x ?? 0) - draggedRegion.x;
-            const deltaY = (dragPreview.y ?? 0) - draggedRegion.y;
-            
-            // Move tokens that are inside this path region
-            const tokensToMove: string[] = [];
-            tokens.forEach(token => {
-              if (isPointInRegion(token.x, token.y, draggedRegion)) {
-                tokensToMove.push(token.id);
-                updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
-              }
-            });
-            
-            // Update the region with final position
+            // Update the region with final position (tokens already moved during drag)
             updateRegion(draggedRegionId, {
               x: dragPreview.x,
               y: dragPreview.y,
@@ -2000,21 +2025,7 @@ export const SimpleTabletop = () => {
               pathPoints: dragPreview.pathPoints
             });
           } else {
-            // Apply rectangle region changes and move tokens
-            const deltaX = (dragPreview.x ?? 0) - draggedRegion.x;
-            const deltaY = (dragPreview.y ?? 0) - draggedRegion.y;
-            
-            // Move tokens that are inside this region
-            const tokensToMove: string[] = [];
-            tokens.forEach(token => {
-              if (token.x >= draggedRegion.x && token.x <= draggedRegion.x + draggedRegion.width &&
-                  token.y >= draggedRegion.y && token.y <= draggedRegion.y + draggedRegion.height) {
-                tokensToMove.push(token.id);
-                updateTokenPosition(token.id, token.x + deltaX, token.y + deltaY);
-              }
-            });
-            
-            // Update the region with final position
+            // Update the region with final position (tokens already moved during drag)
             updateRegion(draggedRegionId, {
               x: dragPreview.x,
               y: dragPreview.y,
