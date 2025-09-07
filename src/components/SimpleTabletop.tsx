@@ -1595,27 +1595,23 @@ export const SimpleTabletop = () => {
           
           // Priority 1: Local region snapping (if region exists and has snapping enabled)
           if (localRegion && localRegion.gridSnapping && localRegion.gridType !== 'free') {
-            const gridSize = localRegion.gridSize * localRegion.gridScale;
-            
-            // Calculate snapping relative to region origin for proper grid alignment
-            const relativeX = token.x - localRegion.x;
-            const relativeY = token.y - localRegion.y;
-            
-            if (localRegion.gridType === 'square') {
-              const snappedRelativeX = Math.round(relativeX / gridSize) * gridSize;
-              const snappedRelativeY = Math.round(relativeY / gridSize) * gridSize;
-              const snappedX = localRegion.x + snappedRelativeX;
-              const snappedY = localRegion.y + snappedRelativeY;
-              updateTokenPosition(draggedTokenId, snappedX, snappedY);
-            } else if (localRegion.gridType === 'hex') {
-              // For hex grids, we'll implement proper hex snapping later
-              // For now, fallback to square grid behavior
-              const snappedRelativeX = Math.round(relativeX / gridSize) * gridSize;
-              const snappedRelativeY = Math.round(relativeY / gridSize) * gridSize;
-              const snappedX = localRegion.x + snappedRelativeX;
-              const snappedY = localRegion.y + snappedRelativeY;
-              updateTokenPosition(draggedTokenId, snappedX, snappedY);
-            }
+            // Convert local region to map region format for snapping
+            const regionPoints = [
+              { x: localRegion.x, y: localRegion.y },
+              { x: localRegion.x + localRegion.width, y: localRegion.y },
+              { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+              { x: localRegion.x, y: localRegion.y + localRegion.height }
+            ];
+            const regionForSnap = {
+              map: {} as any, // Not used in snapping logic
+              region: {
+                gridType: localRegion.gridType,
+                gridSize: localRegion.gridSize * localRegion.gridScale,
+                points: regionPoints
+              } as any
+            };
+            const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
+            updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
           }
           // Priority 2: World space snapping (only if not in a region and world snapping is enabled)
           else if (isGridSnappingEnabled && !localRegion) {
@@ -1716,10 +1712,25 @@ export const SimpleTabletop = () => {
     
     if (localRegion && localRegion.gridSnapping) {
       console.log('Applying local region snapping for new token, grid type:', localRegion.gridType);
-      const gridSize = localRegion.gridSize * localRegion.gridScale;
-      tokenX = Math.round(tokenX / gridSize) * gridSize;
-      tokenY = Math.round(tokenY / gridSize) * gridSize;
-      console.log('New token snapped to local region:', tokenX, tokenY);
+      // Convert local region to map region format for snapping
+      const regionPoints = [
+        { x: localRegion.x, y: localRegion.y },
+        { x: localRegion.x + localRegion.width, y: localRegion.y },
+        { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+        { x: localRegion.x, y: localRegion.y + localRegion.height }
+      ];
+      const regionForSnap = {
+        map: {} as any, // Not used in snapping logic
+        region: {
+          gridType: localRegion.gridType,
+          gridSize: localRegion.gridSize * localRegion.gridScale,
+          points: regionPoints
+        } as any
+      };
+      const snappedPos = snapToMapGrid(tokenX, tokenY, regionForSnap);
+      console.log('New token snapped to local region:', snappedPos);
+      tokenX = snappedPos.x;
+      tokenY = snappedPos.y;
     } else if (isGridSnappingEnabled && activeRegion && activeRegion.region.gridType !== 'none') {
       console.log('Applying world snapping for new token, grid type:', activeRegion.region.gridType);
       const snappedPos = snapToMapGrid(tokenX, tokenY, activeRegion);
