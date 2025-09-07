@@ -711,9 +711,23 @@ export const SimpleTabletop = () => {
   const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const isSelected = region.selected;
     
-    // Draw region background
-    ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
-    ctx.fillRect(region.x, region.y, region.width, region.height);
+    ctx.save();
+    
+    // Clip to region bounds
+    ctx.beginPath();
+    ctx.rect(region.x, region.y, region.width, region.height);
+    ctx.clip();
+    
+    // Draw background image if available
+    if (region.backgroundImage) {
+      drawRegionBackground(ctx, region);
+    } else {
+      // Draw solid color background
+      ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
+      ctx.fillRect(region.x, region.y, region.width, region.height);
+    }
+    
+    ctx.restore();
     
     // Draw region-specific grid
     if (region.gridType !== 'free') {
@@ -742,6 +756,57 @@ export const SimpleTabletop = () => {
         region.y + 4 / transform.zoom
       );
     }
+  };
+
+  // Function to draw region background image
+  const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+    if (!region.backgroundImage) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      const { x, y, width, height } = region;
+      const offsetX = region.backgroundOffsetX || 0;
+      const offsetY = region.backgroundOffsetY || 0;
+      const repeat = region.backgroundRepeat || 'no-repeat';
+      
+      ctx.save();
+      
+      // Create pattern based on repeat mode
+      let pattern: CanvasPattern | null = null;
+      switch (repeat) {
+        case 'repeat':
+          pattern = ctx.createPattern(img, 'repeat');
+          break;
+        case 'repeat-x':
+          pattern = ctx.createPattern(img, 'repeat-x');
+          break;
+        case 'repeat-y':
+          pattern = ctx.createPattern(img, 'repeat-y');
+          break;
+        case 'no-repeat':
+        default:
+          pattern = ctx.createPattern(img, 'no-repeat');
+          break;
+      }
+      
+      if (pattern) {
+        // Apply offset to the pattern
+        const transform = new DOMMatrix();
+        transform.translateSelf(x + offsetX, y + offsetY);
+        pattern.setTransform(transform);
+        
+        ctx.fillStyle = pattern;
+        ctx.fillRect(x, y, width, height);
+      }
+      
+      ctx.restore();
+      
+      // Redraw canvas to show the updated background
+      requestAnimationFrame(() => redrawCanvas());
+    };
+    
+    // Set source to trigger loading
+    img.src = region.backgroundImage;
   };
 
   // Function to draw grid within a region
