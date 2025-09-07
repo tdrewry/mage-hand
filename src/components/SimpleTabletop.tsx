@@ -111,16 +111,21 @@ export const SimpleTabletop = () => {
 
   // Hit test for tokens
   const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
-    const tokenSize = 20; // Half of token diameter (40)
+    const baseTokenSize = 40; // Base size for 1x1 token
     
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i];
+      // Calculate actual token size based on grid dimensions
+      const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
+      const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
+      const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      
       const distance = Math.sqrt(
         Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
       );
       
-      if (distance <= tokenSize) {
+      if (distance <= maxRadius) {
         return token;
       }
     }
@@ -332,13 +337,16 @@ export const SimpleTabletop = () => {
     // Draw tokens that are in viewport
     const visibleTokens: any[] = [];
     const offScreenTokens: any[] = [];
+    const baseTokenSize = 40; // Base size for 1x1 token
     
     tokens.forEach(token => {
-      const tokenSize = 40; // Default token size
-      const tokenLeft = token.x - tokenSize / 2;
-      const tokenRight = token.x + tokenSize / 2;
-      const tokenTop = token.y - tokenSize / 2;
-      const tokenBottom = token.y + tokenSize / 2;
+      // Calculate actual token size based on grid dimensions
+      const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
+      const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
+      const tokenLeft = token.x - tokenWidth / 2;
+      const tokenRight = token.x + tokenWidth / 2;
+      const tokenTop = token.y - tokenHeight / 2;
+      const tokenBottom = token.y + tokenHeight / 2;
       
       // Check if token is in viewport
       if (tokenRight >= viewX && tokenLeft <= viewX + viewWidth &&
@@ -392,23 +400,33 @@ export const SimpleTabletop = () => {
 
   // Function to draw a ghost token (semi-transparent version)
   const drawGhostToken = (ctx: CanvasRenderingContext2D, x: number, y: number, token: any) => {
-    const tokenSize = 40;
+    const baseTokenSize = 40; // Base size for 1x1 token
+    const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
+    const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
     
     // Save context to restore alpha
     ctx.save();
     ctx.globalAlpha = 0.3;
     
-    // Draw ghost token circle
+    // Draw ghost token rectangle
     ctx.fillStyle = token.color || '#ffffff';
-    ctx.beginPath();
-    ctx.arc(x, y, tokenSize / 2, 0, 2 * Math.PI);
-    ctx.fill();
+    ctx.fillRect(
+      x - tokenWidth / 2, 
+      y - tokenHeight / 2, 
+      tokenWidth, 
+      tokenHeight
+    );
     
     // Draw ghost border
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2 / transform.zoom;
     ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]); // Dashed border
-    ctx.stroke();
+    ctx.strokeRect(
+      x - tokenWidth / 2, 
+      y - tokenHeight / 2, 
+      tokenWidth, 
+      tokenHeight
+    );
     ctx.setLineDash([]); // Reset line dash
     
     // Draw ghost label
@@ -812,27 +830,40 @@ export const SimpleTabletop = () => {
     toast.success('Region added to viewport center');
   };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
-    const tokenSize = 40;
+    const baseTokenSize = 40; // Base size for 1x1 token
+    const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
+    const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
     const isSelected = selectedTokenIds.includes(token.id);
     
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.beginPath();
-      ctx.arc(token.x, token.y, (tokenSize / 2) + 4, 0, 2 * Math.PI);
-      ctx.fill();
+      ctx.fillRect(
+        token.x - tokenWidth / 2 - 4, 
+        token.y - tokenHeight / 2 - 4, 
+        tokenWidth + 8, 
+        tokenHeight + 8
+      );
     }
     
-    // Draw token circle background
+    // Draw token rectangle/square based on grid size
     ctx.fillStyle = token.color || '#ffffff';
-    ctx.beginPath();
-    ctx.arc(token.x, token.y, tokenSize / 2, 0, 2 * Math.PI);
-    ctx.fill();
+    ctx.fillRect(
+      token.x - tokenWidth / 2, 
+      token.y - tokenHeight / 2, 
+      tokenWidth, 
+      tokenHeight
+    );
     
     // Draw token border
     ctx.strokeStyle = isSelected ? '#ffffff' : '#000000';
     ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
-    ctx.stroke();
+    ctx.strokeRect(
+      token.x - tokenWidth / 2, 
+      token.y - tokenHeight / 2, 
+      tokenWidth, 
+      tokenHeight
+    );
     
     // Draw token label
     if (token.label) {
