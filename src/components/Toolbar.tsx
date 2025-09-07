@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Share2, Settings, Users, Map, Trash2, Layers } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useRegionStore } from '../stores/regionStore';
 import { LayerStackModal } from './LayerStackModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ interface ToolbarProps {
 
 export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
   const { tokens, clearAllTokens } = useSessionStore();
+  const { regions, clearRegions } = useRegionStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   
   const shareSession = () => {
@@ -39,6 +41,11 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
     // Clear from store
     clearAllTokens();
     toast.success('All tokens cleared!');
+  };
+
+  const clearAllRegions = () => {
+    clearRegions();
+    toast.success('All regions cleared!');
   };
 
   const clearStorage = () => {
@@ -74,6 +81,9 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
                 </span>
               )}
             </Badge>
+            <Badge variant="secondary" className="text-xs">
+              Regions: {regions.length}
+            </Badge>
           </div>
         </div>
 
@@ -105,6 +115,16 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
             title="Clear all tokens from map and storage"
           >
             Clear Tokens
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={clearAllRegions}
+            className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
+            title="Clear all regions from map and storage"
+          >
+            Clear Regions
           </Button>
           
           <Button 
