@@ -2392,14 +2392,18 @@ export const SimpleTabletop = () => {
               y: dragPreview.y,
               width: dragPreview.width,
               height: dragPreview.height,
-              pathPoints: dragPreview.pathPoints
+              pathPoints: dragPreview.pathPoints,
+              // Preserve rotation when dragging
+              rotation: draggedRegion.rotation
             });
           } else {
             updateRegion(draggedRegionId, {
               x: dragPreview.x,
               y: dragPreview.y,
               width: dragPreview.width,
-              height: dragPreview.height
+              height: dragPreview.height,
+              // Preserve rotation when dragging
+              rotation: draggedRegion.rotation
             });
           }
         }
