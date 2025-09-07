@@ -19,7 +19,7 @@ import {
 } from '../lib/hexCoordinates';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3 } from 'lucide-react';
+import { Settings, Grid3X3, Eye } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 
 export const SimpleTabletop = () => {
@@ -370,7 +370,7 @@ export const SimpleTabletop = () => {
     // Check each token against each region
     tokens.forEach(token => {
       regions.forEach(region => {
-        if (region.gridType === 'hex' || region.gridType === 'square') { // Grid is visible when not 'free'
+        if (region.gridVisible && (region.gridType === 'hex' || region.gridType === 'square')) { // Grid is visible when enabled and not 'free'
           // Check if token is within this region
           if (token.x >= region.x && token.x <= region.x + region.width &&
               token.y >= region.y && token.y <= region.y + region.height) {
@@ -1024,7 +1024,8 @@ export const SimpleTabletop = () => {
       gridType: 'free',
       gridSize: 40,  // Match main canvas grid size
       gridScale: 1.0, // Default scale
-      gridSnapping: false // Default to disabled per-region
+      gridSnapping: false, // Default to disabled per-region
+      gridVisible: true // Default to visible
     };
     
     addRegion(newRegion);
@@ -1365,6 +1366,16 @@ export const SimpleTabletop = () => {
       const newState = !targetRegion.gridSnapping;
       updateRegion(regionId, { gridSnapping: newState });
       toast.success(`Region snapping ${newState ? 'enabled' : 'disabled'}`);
+    }
+  };
+
+  // Function to toggle region grid visibility
+  const toggleRegionGridVisibility = (regionId: string) => {
+    const targetRegion = regions.find(r => r.id === regionId);
+    if (targetRegion) {
+      const newState = !targetRegion.gridVisible;
+      updateRegion(regionId, { gridVisible: newState });
+      toast.success(`Region grid ${newState ? 'shown' : 'hidden'}`);
     }
   };
 
@@ -1831,15 +1842,28 @@ export const SimpleTabletop = () => {
               top: `${screenPos.y}px` 
             }}
           >
-            <Button
-              variant={selectedRegion.gridSnapping ? "default" : "outline"}
-              size="sm"
-              onClick={() => toggleRegionSnapping(selectedRegionId)}
-              className="flex items-center gap-1 text-xs"
-            >
-              <Grid3X3 className="w-3 h-3" />
-              {selectedRegion.gridSnapping ? 'On' : 'Off'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant={selectedRegion.gridSnapping ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleRegionSnapping(selectedRegionId)}
+                className="flex items-center gap-1 text-xs"
+              >
+                <Grid3X3 className="w-3 h-3" />
+                Snap {selectedRegion.gridSnapping ? 'On' : 'Off'}
+              </Button>
+              {selectedRegion.gridType !== 'free' && (
+                <Button
+                  variant={selectedRegion.gridVisible ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleRegionGridVisibility(selectedRegionId)}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <Eye className="w-3 h-3" />
+                  Grid {selectedRegion.gridVisible ? 'On' : 'Off'}
+                </Button>
+              )}
+            </div>
           </div>
         );
       })()}
