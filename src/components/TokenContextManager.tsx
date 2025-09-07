@@ -112,7 +112,10 @@ export const TokenContextManager = ({
       menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}`;
       menuItem.onclick = () => {
         item.action();
-        document.body.removeChild(menu);
+        // Safe menu removal
+        if (document.body.contains(menu)) {
+          document.body.removeChild(menu);
+        }
       };
       menu.appendChild(menuItem);
     });
@@ -122,7 +125,10 @@ export const TokenContextManager = ({
     // Remove menu when clicking outside
     const removeMenu = (e: MouseEvent) => {
       if (!menu.contains(e.target as Node)) {
-        document.body.removeChild(menu);
+        // Safe menu removal
+        if (document.body.contains(menu)) {
+          document.body.removeChild(menu);
+        }
         document.removeEventListener('click', removeMenu);
       }
     };

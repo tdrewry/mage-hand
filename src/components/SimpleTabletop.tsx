@@ -852,9 +852,9 @@ export const SimpleTabletop = () => {
 
   // Function to show region context menu
   const showRegionContextMenu = (x: number, y: number, region: Region) => {
-    // Remove any existing context menu
+    // Remove any existing context menu safely
     const existingMenu = document.querySelector('.region-context-menu');
-    if (existingMenu) {
+    if (existingMenu && document.body.contains(existingMenu)) {
       document.body.removeChild(existingMenu);
     }
     
@@ -898,7 +898,10 @@ export const SimpleTabletop = () => {
       menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}${item.active ? ' ✓' : ''}`;
       menuItem.onclick = () => {
         item.action();
-        document.body.removeChild(menu);
+        // Safe menu removal
+        if (document.body.contains(menu)) {
+          document.body.removeChild(menu);
+        }
       };
       menu.appendChild(menuItem);
     });
@@ -908,7 +911,10 @@ export const SimpleTabletop = () => {
     // Remove menu when clicking outside
     const removeMenu = (e: MouseEvent) => {
       if (!menu.contains(e.target as Node)) {
-        document.body.removeChild(menu);
+        // Safe menu removal
+        if (document.body.contains(menu)) {
+          document.body.removeChild(menu);
+        }
         document.removeEventListener('click', removeMenu);
       }
     };
