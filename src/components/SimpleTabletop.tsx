@@ -1,3 +1,15 @@
+/**
+ * CRITICAL DEPENDENCY NOTICE:
+ * This component relies on the following packages that are ESSENTIAL to functionality:
+ * - zustand: State management for all stores (sessionStore, mapStore, regionStore)
+ * - fabric: Canvas library (preserved for future Paper.js-like functionality)
+ * - @radix-ui/react-*: All modal dialogs and UI components
+ * - tailwindcss: Entire styling system
+ * - lucide-react: All icons used throughout the component
+ * 
+ * DO NOT REMOVE these dependencies without consulting DEPENDENCIES.md
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';

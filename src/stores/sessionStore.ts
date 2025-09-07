@@ -1,3 +1,9 @@
+/**
+ * CRITICAL DEPENDENCY: zustand
+ * This store is the core state management system for the entire application.
+ * Removing zustand would require a complete rewrite of state management.
+ * See DEPENDENCIES.md for details.
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
