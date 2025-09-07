@@ -2414,13 +2414,13 @@ export const SimpleTabletop = () => {
 
       {/* Main Canvas Container */}
       <div className="flex-1 relative overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{ 
-            background: 'hsl(var(--surface))',
-            cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : pathDrawingMode === 'drawing' ? 'crosshair' : 'auto'
-          }}
+         <canvas
+           ref={canvasRef}
+           className="absolute inset-0 w-full h-full"
+           style={{ 
+             background: 'hsl(var(--canvas-background))',
+             cursor: isPanning ? 'grabbing' : isDraggingToken ? 'move' : pathDrawingMode === 'drawing' ? 'crosshair' : 'auto'
+           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
