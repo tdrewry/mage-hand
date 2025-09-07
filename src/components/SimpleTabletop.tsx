@@ -147,7 +147,7 @@ export const SimpleTabletop = () => {
   };
 
   // Calculate which hex(es) a token occupies in a given region using the existing hex grid system
-  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region): {hexX: number, hexY: number, radius: number}[] => {
+  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region, gridWidth: number = 1, gridHeight: number = 1): {hexX: number, hexY: number, radius: number}[] => {
     if (region.gridType !== 'hex') return [];
     
     const hexRadius = region.gridSize / 2;
@@ -162,7 +162,7 @@ export const SimpleTabletop = () => {
     const startX = region.x;
     const startY = region.y;
     
-    let closestHex: {hexX: number, hexY: number, radius: number} | null = null;
+    let centerHex: {hexX: number, hexY: number, radius: number, col: number, row: number} | null = null;
     let closestDistance = Infinity;
     
     // Find the closest hex center to the token position
@@ -181,36 +181,87 @@ export const SimpleTabletop = () => {
           
           if (distance < closestDistance) {
             closestDistance = distance;
-            closestHex = { hexX, hexY, radius: hexRadius };
+            centerHex = { hexX, hexY, radius: hexRadius, col, row };
           }
         }
       }
     }
     
-    return closestHex ? [closestHex] : [];
+    if (!centerHex) return [];
+    
+    const occupiedHexes: {hexX: number, hexY: number, radius: number}[] = [];
+    
+    // Always include the center hex
+    occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
+    
+    // For larger tokens, add neighboring hexes
+    const maxDimension = Math.max(gridWidth, gridHeight);
+    if (maxDimension > 1) {
+      // Hex neighbor directions (relative column and row offsets)
+      const directions = [
+        [1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1] // Standard hex neighbors
+      ];
+      
+      const neighborsNeeded = Math.min(6, (maxDimension - 1) * 2); // Max 6 neighbors for hex
+      
+      for (let i = 0; i < neighborsNeeded; i++) {
+        const [dCol, dRow] = directions[i];
+        const neighborCol = centerHex.col + dCol;
+        const neighborRow = centerHex.row + dRow;
+        
+        const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
+        const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
+        
+        // Verify neighbor is within region bounds
+        if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
+            neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
+          occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
+        }
+      }
+    }
+    
+    return occupiedHexes;
   };
 
-  // Calculate which square grid cell a token occupies
-  const calculateTokenSquareOccupancy = (tokenX: number, tokenY: number, region: Region): {gridX: number, gridY: number, size: number}[] => {
+  // Calculate which square grid cells a token occupies
+  const calculateTokenSquareOccupancy = (tokenX: number, tokenY: number, region: Region, gridWidth: number = 1, gridHeight: number = 1): {gridX: number, gridY: number, size: number}[] => {
     if (region.gridType !== 'square') return [];
     
     const gridSize = region.gridSize;
+    const occupiedSquares: {gridX: number, gridY: number, size: number}[] = [];
     
     // Calculate which grid cell the token center is in
     const relativeX = tokenX - region.x;
     const relativeY = tokenY - region.y;
-    const gridCol = Math.floor(relativeX / gridSize);
-    const gridRow = Math.floor(relativeY / gridSize);
+    const centerCol = Math.floor(relativeX / gridSize);
+    const centerRow = Math.floor(relativeY / gridSize);
     
-    // Calculate the center of that grid cell
-    const gridCenterX = region.x + (gridCol * gridSize) + (gridSize / 2);
-    const gridCenterY = region.y + (gridRow * gridSize) + (gridSize / 2);
+    // Calculate the top-left corner of the token's grid area
+    const startCol = centerCol - Math.floor((gridWidth - 1) / 2);
+    const startRow = centerRow - Math.floor((gridHeight - 1) / 2);
     
-    return [{ gridX: gridCenterX, gridY: gridCenterY, size: gridSize }];
+    // Add all grid cells occupied by the token
+    for (let row = 0; row < gridHeight; row++) {
+      for (let col = 0; col < gridWidth; col++) {
+        const gridCol = startCol + col;
+        const gridRow = startRow + row;
+        
+        const gridCenterX = region.x + (gridCol + 0.5) * gridSize;
+        const gridCenterY = region.y + (gridRow + 0.5) * gridSize;
+        
+        // Verify grid cell is within region bounds
+        if (gridCenterX >= region.x && gridCenterX <= region.x + region.width &&
+            gridCenterY >= region.y && gridCenterY <= region.y + region.height) {
+          occupiedSquares.push({ gridX: gridCenterX, gridY: gridCenterY, size: gridSize });
+        }
+      }
+    }
+    
+    return occupiedSquares;
   };
 
-  // Update highlighted grids based on token position
-  const updateGridHighlights = (tokenX: number, tokenY: number) => {
+  // Update highlighted grids based on token position and size
+  const updateGridHighlights = (tokenX: number, tokenY: number, gridWidth: number = 1, gridHeight: number = 1) => {
     const newHighlights: {regionId: string, hexes: {hexX: number, hexY: number, radius: number}[], squares: {gridX: number, gridY: number, size: number}[]}[] = [];
     
     regions.forEach(region => {
@@ -218,8 +269,8 @@ export const SimpleTabletop = () => {
         // Check if token is within this region
         if (tokenX >= region.x && tokenX <= region.x + region.width &&
             tokenY >= region.y && tokenY <= region.y + region.height) {
-          const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(tokenX, tokenY, region) : [];
-          const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(tokenX, tokenY, region) : [];
+          const occupiedHexes = region.gridType === 'hex' ? calculateTokenHexOccupancy(tokenX, tokenY, region, gridWidth, gridHeight) : [];
+          const occupiedSquares = region.gridType === 'square' ? calculateTokenSquareOccupancy(tokenX, tokenY, region, gridWidth, gridHeight) : [];
           
           if (occupiedHexes.length > 0 || occupiedSquares.length > 0) {
             newHighlights.push({ regionId: region.id, hexes: occupiedHexes, squares: occupiedSquares });
@@ -1250,8 +1301,13 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
       
-      // Update grid highlights based on token position
-      updateGridHighlights(newX, newY);
+      // Get the dragged token to access its size
+      const draggedToken = tokens.find(t => t.id === draggedTokenId);
+      const tokenGridWidth = draggedToken?.gridWidth || 1;
+      const tokenGridHeight = draggedToken?.gridHeight || 1;
+      
+      // Update grid highlights based on token position and size
+      updateGridHighlights(newX, newY, tokenGridWidth, tokenGridHeight);
       
       // Add point to drag path (sample every few pixels for smoother path)
       const lastPoint = dragPath[dragPath.length - 1];
@@ -1348,6 +1404,19 @@ export const SimpleTabletop = () => {
       }));
       
       redrawCanvas();
+    } else {
+      // Mouse hover - show grid highlights for potential token placement
+      const worldPos = screenToWorld(mouseX, mouseY);
+      
+      // Only show highlights if Shift key is held (indicating token placement mode)
+      if (e.shiftKey) {
+        // Use default 1x1 size for new token placement, or get size from active token in toolbar
+        // For now, use 1x1 as default
+        updateGridHighlights(worldPos.x, worldPos.y, 1, 1);
+      } else {
+        // Clear highlights when not in placement mode
+        setHighlightedGrids([]);
+      }
     }
   };
 
