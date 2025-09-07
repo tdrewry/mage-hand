@@ -97,6 +97,9 @@ export const SimpleTabletop = () => {
   
   // Grouped dragging state - simpler approach without Paper.js
   const [groupedTokens, setGroupedTokens] = useState<{tokenId: string, startX: number, startY: number}[]>([]);
+  
+  // Temporary token positions during region drag to avoid store updates
+  const [tempTokenPositions, setTempTokenPositions] = useState<{[tokenId: string]: {x: number, y: number}}>();
 
   const {
     sessionId,
@@ -507,20 +510,24 @@ export const SimpleTabletop = () => {
     const baseTokenSize = 40; // Base size for 1x1 token
     
     tokens.forEach(token => {
+      // Use temporary position if available (during region drag)
+      const tempPos = tempTokenPositions?.[token.id];
+      const checkToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+      
       // Use the larger dimension for circular token radius
-      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+      const tokenSize = Math.max(checkToken.gridWidth || 1, checkToken.gridHeight || 1) * baseTokenSize;
       const radius = tokenSize / 2;
-      const tokenLeft = token.x - radius;
-      const tokenRight = token.x + radius;
-      const tokenTop = token.y - radius;
-      const tokenBottom = token.y + radius;
+      const tokenLeft = checkToken.x - radius;
+      const tokenRight = checkToken.x + radius;
+      const tokenTop = checkToken.y - radius;
+      const tokenBottom = checkToken.y + radius;
       
       // Check if token is in viewport
       if (tokenRight >= viewX && tokenLeft <= viewX + viewWidth &&
           tokenBottom >= viewY && tokenTop <= viewY + viewHeight) {
-        visibleTokens.push(token);
+        visibleTokens.push(checkToken);
       } else {
-        offScreenTokens.push(token);
+        offScreenTokens.push(checkToken);
       }
     });
     
@@ -531,7 +538,10 @@ export const SimpleTabletop = () => {
     
     // Draw visible tokens
     visibleTokens.forEach(token => {
-      drawToken(ctx, token);
+      // Use temporary position if available (during region drag)
+      const tempPos = tempTokenPositions?.[token.id];
+      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+      drawToken(ctx, renderToken);
     });
     
     // Draw highlighted grids (if any)
@@ -1798,17 +1808,14 @@ export const SimpleTabletop = () => {
         const deltaX = newX - regionDragOffset.x;
         const deltaY = newY - regionDragOffset.y;
         
-        // Move all grouped tokens together
+        // Update temporary positions for preview (avoid store updates during drag)
+        const newTempPositions: {[tokenId: string]: {x: number, y: number}} = {};
         groupedTokens.forEach(groupedToken => {
           const newTokenX = groupedToken.startX + deltaX;
           const newTokenY = groupedToken.startY + deltaY;
-          updateTokenPosition(groupedToken.tokenId, newTokenX, newTokenY);
+          newTempPositions[groupedToken.tokenId] = { x: newTokenX, y: newTokenY };
         });
-        
-        // Update token highlights immediately after moving tokens
-        if (groupedTokens.length > 0) {
-          updateAllTokenHighlights();
-        }
+        setTempTokenPositions(newTempPositions);
         
         if (draggedRegion.regionType === 'path' && draggedRegion.pathPoints) {
           // Update path points for preview
@@ -2026,7 +2033,14 @@ export const SimpleTabletop = () => {
         }
       }
       
-      // Clear grouped tokens
+      // Apply final token positions to store (only once at the end)
+      if (tempTokenPositions) {
+        Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
+          updateTokenPosition(tokenId, position.x, position.y);
+        });
+      }
+      
+      // Clear grouped tokens and temp positions
       setGroupedTokens([]);
       
       // Stop region interactions
