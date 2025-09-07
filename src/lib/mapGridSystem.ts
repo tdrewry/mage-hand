@@ -122,6 +122,12 @@ function renderGridRegion(
 ): void {
   if (region.gridType === 'none') return;
   
+  const { ctx } = renderer;
+  
+  // First render the filled polygon region
+  renderRegionBackground(renderer, region, viewport);
+  
+  // Then render the grid overlay
   const gridColor = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${region.gridOpacity / 100})`;
   
   switch (region.gridType) {
@@ -132,6 +138,41 @@ function renderGridRegion(
       renderHexGridRegion(renderer, region, viewport, gridColor);
       break;
   }
+}
+
+function renderRegionBackground(
+  renderer: GridRenderer,
+  region: GridRegion,
+  viewport: Viewport
+): void {
+  const { ctx } = renderer;
+  
+  if (region.points.length < 3) return; // Need at least 3 points for a polygon
+  
+  // Convert region color to rgba with opacity
+  const fillColor = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${Math.min(region.gridOpacity / 100 * 0.3, 0.3)})`;
+  
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${Math.min(region.gridOpacity / 100 * 0.8, 0.8)})`;
+  ctx.lineWidth = Math.max(1, 2 / viewport.zoom);
+  
+  // Draw the filled polygon
+  ctx.beginPath();
+  const firstPoint = region.points[0];
+  const screenX1 = (firstPoint.x - viewport.x) * viewport.zoom;
+  const screenY1 = (firstPoint.y - viewport.y) * viewport.zoom;
+  ctx.moveTo(screenX1, screenY1);
+  
+  for (let i = 1; i < region.points.length; i++) {
+    const point = region.points[i];
+    const screenX = (point.x - viewport.x) * viewport.zoom;
+    const screenY = (point.y - viewport.y) * viewport.zoom;
+    ctx.lineTo(screenX, screenY);
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 function renderSquareGridRegion(
