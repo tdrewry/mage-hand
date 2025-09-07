@@ -203,40 +203,44 @@ function renderSquareGridRegion(
   // Set up drawing
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom);
-  ctx.beginPath();
   
-  // Draw grid lines that create cells where tokens snap to centers
-  // Tokens snap to cell centers, so grid lines form cell boundaries
-  
-  // Vertical lines (create columns)
-  for (let col = 0; col <= cellsX; col++) {
-    const worldX = minX + (col * gridSize);
-    const screenX = (worldX - viewport.x) * viewport.zoom;
-    
-    if (screenX >= 0 && screenX <= renderer.canvas.width) {
-      const screenTop = (minY - viewport.y) * viewport.zoom;
-      const screenBottom = (Math.min(minY + (cellsY * gridSize), maxY) - viewport.y) * viewport.zoom;
+  // Draw each individual square cell that falls within the region polygon
+  for (let row = 0; row < cellsY; row++) {
+    for (let col = 0; col < cellsX; col++) {
+      // Calculate cell center position (where tokens snap to)
+      const centerX = minX + (col + 0.5) * gridSize;
+      const centerY = minY + (row + 0.5) * gridSize;
       
-      ctx.moveTo(screenX, screenTop);
-      ctx.lineTo(screenX, screenBottom);
+      // Check if cell center is within the polygon region
+      if (!isPointInPolygon(centerX, centerY, region.points)) {
+        continue;
+      }
+      
+      // Calculate cell boundaries
+      const cellLeft = minX + (col * gridSize);
+      const cellTop = minY + (row * gridSize);
+      const cellRight = cellLeft + gridSize;
+      const cellBottom = cellTop + gridSize;
+      
+      // Convert to screen coordinates
+      const screenLeft = (cellLeft - viewport.x) * viewport.zoom;
+      const screenTop = (cellTop - viewport.y) * viewport.zoom;
+      const screenWidth = gridSize * viewport.zoom;
+      const screenHeight = gridSize * viewport.zoom;
+      
+      // Only draw if cell is visible on screen
+      if (screenLeft < renderer.canvas.width && 
+          screenLeft + screenWidth > 0 && 
+          screenTop < renderer.canvas.height && 
+          screenTop + screenHeight > 0) {
+        
+        // Draw the square cell
+        ctx.beginPath();
+        ctx.rect(screenLeft, screenTop, screenWidth, screenHeight);
+        ctx.stroke();
+      }
     }
   }
-  
-  // Horizontal lines (create rows)
-  for (let row = 0; row <= cellsY; row++) {
-    const worldY = minY + (row * gridSize);
-    const screenY = (worldY - viewport.y) * viewport.zoom;
-    
-    if (screenY >= 0 && screenY <= renderer.canvas.height) {
-      const screenLeft = (minX - viewport.x) * viewport.zoom;
-      const screenRight = (Math.min(minX + (cellsX * gridSize), maxX) - viewport.x) * viewport.zoom;
-      
-      ctx.moveTo(screenLeft, screenY);
-      ctx.lineTo(screenRight, screenY);
-    }
-  }
-  
-  ctx.stroke();
 }
 
 function renderHexGridRegion(
