@@ -190,65 +190,47 @@ function renderSquareGridRegion(
   const minY = Math.min(...region.points.map(p => p.y));
   const maxY = Math.max(...region.points.map(p => p.y));
   
-  // Calculate visible grid area within region bounds
-  const viewLeft = viewport.x;
-  const viewRight = viewport.x + (viewport.width / viewport.zoom);
-  const viewTop = viewport.y;
-  const viewBottom = viewport.y + (viewport.height / viewport.zoom);
+  // Calculate grid bounds in local coordinates (relative to minX, minY)
+  const localWidth = maxX - minX;
+  const localHeight = maxY - minY;
   
-  // Find intersection of polygon bounds and viewport
-  const left = Math.max(minX, viewLeft);
-  const right = Math.min(maxX, viewRight);
-  const top = Math.max(minY, viewTop);
-  const bottom = Math.min(maxY, viewBottom);
+  // Calculate how many grid cells fit in each dimension
+  const cellsX = Math.floor(localWidth / gridSize);
+  const cellsY = Math.floor(localHeight / gridSize);
   
-  if (left >= right || top >= bottom) return; // No intersection
-  
-  // Calculate grid lines relative to region's local coordinate system
-  // Use the first point as the origin to maintain consistent grid pattern when region moves
-  const originX = region.points[0].x;
-  const originY = region.points[0].y;
-  
-  // Calculate grid offset relative to origin
-  const offsetX = originX % gridSize;
-  const offsetY = originY % gridSize;
-  
-  // Calculate grid lines starting from region bounds but aligned to local origin
-  const startX = Math.floor((minX - offsetX) / gridSize) * gridSize + offsetX;
-  const endX = Math.ceil((maxX - offsetX) / gridSize) * gridSize + offsetX;
-  const startY = Math.floor((minY - offsetY) / gridSize) * gridSize + offsetY;
-  const endY = Math.ceil((maxY - offsetY) / gridSize) * gridSize + offsetY;
+  if (cellsX <= 0 || cellsY <= 0) return; // No complete cells
   
   // Set up drawing
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom);
   ctx.beginPath();
   
-  // Vertical lines
-  for (let x = startX; x <= endX; x += gridSize) {
-    if (x >= minX && x <= maxX) {
-      const screenX = (x - viewport.x) * viewport.zoom;
-      const screenTop = (Math.max(minY, viewTop) - viewport.y) * viewport.zoom;
-      const screenBottom = (Math.min(maxY, viewBottom) - viewport.y) * viewport.zoom;
+  // Draw grid lines that create cells where tokens will snap to centers
+  // Vertical lines (create columns)
+  for (let col = 0; col <= cellsX; col++) {
+    const worldX = minX + (col * gridSize);
+    const screenX = (worldX - viewport.x) * viewport.zoom;
+    
+    if (screenX >= 0 && screenX <= renderer.canvas.width) {
+      const screenTop = (minY - viewport.y) * viewport.zoom;
+      const screenBottom = (Math.min(minY + (cellsY * gridSize), maxY) - viewport.y) * viewport.zoom;
       
-      if (screenX >= 0 && screenX <= renderer.canvas.width) {
-        ctx.moveTo(screenX, screenTop);
-        ctx.lineTo(screenX, screenBottom);
-      }
+      ctx.moveTo(screenX, screenTop);
+      ctx.lineTo(screenX, screenBottom);
     }
   }
   
-  // Horizontal lines
-  for (let y = startY; y <= endY; y += gridSize) {
-    if (y >= minY && y <= maxY) {
-      const screenY = (y - viewport.y) * viewport.zoom;
-      const screenLeft = (Math.max(minX, viewLeft) - viewport.x) * viewport.zoom;
-      const screenRight = (Math.min(maxX, viewRight) - viewport.x) * viewport.zoom;
+  // Horizontal lines (create rows)
+  for (let row = 0; row <= cellsY; row++) {
+    const worldY = minY + (row * gridSize);
+    const screenY = (worldY - viewport.y) * viewport.zoom;
+    
+    if (screenY >= 0 && screenY <= renderer.canvas.height) {
+      const screenLeft = (minX - viewport.x) * viewport.zoom;
+      const screenRight = (Math.min(minX + (cellsX * gridSize), maxX) - viewport.x) * viewport.zoom;
       
-      if (screenY >= 0 && screenY <= renderer.canvas.height) {
-        ctx.moveTo(screenLeft, screenY);
-        ctx.lineTo(screenRight, screenY);
-      }
+      ctx.moveTo(screenLeft, screenY);
+      ctx.lineTo(screenRight, screenY);
     }
   }
   
