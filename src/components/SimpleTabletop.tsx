@@ -20,10 +20,13 @@ import {
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3 } from 'lucide-react';
+import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showMapManager, setShowMapManager] = useState(false);
+  const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
+  const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   
   // Pan and zoom state
   const [transform, setTransform] = useState({
@@ -1206,6 +1209,14 @@ export const SimpleTabletop = () => {
     
     const menuItems = [
       { 
+        label: 'Edit Background', 
+        icon: '🖼️', 
+        action: () => {
+          setSelectedRegionForEdit(region);
+          setIsRegionBackgroundModalOpen(true);
+        }
+      },
+      { 
         label: 'Free Grid', 
         icon: '📐', 
         action: () => setRegionGridType(region.id, 'free'),
@@ -1786,6 +1797,14 @@ export const SimpleTabletop = () => {
       {showMapManager && (
         <MapManager onClose={() => setShowMapManager(false)} />
       )}
+
+      {/* Region Background Modal */}
+      <RegionBackgroundModal
+        open={isRegionBackgroundModalOpen}
+        onOpenChange={setIsRegionBackgroundModalOpen}
+        region={selectedRegionForEdit}
+        onUpdateRegion={updateRegion}
+      />
     </div>
   );
 };

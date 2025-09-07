@@ -13,6 +13,10 @@ export interface CanvasRegion {
   gridSize: number;
   gridScale: number; // Decimal multiplier for grid size (1 = default)
   gridSnapping: boolean; // Per-region snapping toggle
+  backgroundImage?: string; // URL or data URI for background texture
+  backgroundRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
+  backgroundOffsetX?: number; // Offset for background alignment
+  backgroundOffsetY?: number; // Offset for background alignment
 }
 
 interface RegionStore {
