@@ -2639,8 +2639,11 @@ export const SimpleTabletop = () => {
               onTransformModeChange={setTransformMode}
               position={(() => {
                 const bounds = getRegionBounds(selectedRegion);
-                const screenPos = worldToScreen(bounds.x, bounds.y);
-                return { x: screenPos.x, y: screenPos.y };
+                // Use center of the region bounds, positioned above the region
+                const centerX = bounds.centerX;
+                const topY = bounds.y;
+                const screenPos = worldToScreen(centerX, topY);
+                return { x: screenPos.x - 75, y: screenPos.y }; // Offset to center the controls
               })()}
             />
           </div>
