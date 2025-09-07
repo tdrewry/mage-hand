@@ -46,7 +46,7 @@ export const SimpleTabletop = () => {
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
   
   // Hex highlighting state for token movement
-  const [highlightedHexes, setHighlightedHexes] = useState<{regionId: string, hexes: {q: number, r: number, s: number}[]}[]>([]);
+  const [highlightedHexes, setHighlightedHexes] = useState<{regionId: string, hexes: {hexX: number, hexY: number, radius: number}[]}[]>([]);
   
   // Region state
   interface Region {
@@ -132,32 +132,53 @@ export const SimpleTabletop = () => {
     return null;
   };
 
-  // Calculate which hex(es) a token occupies in a given region
-  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region): HexCoordinate[] => {
+  // Calculate which hex(es) a token occupies in a given region using the existing hex grid system
+  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region): {hexX: number, hexY: number, radius: number}[] => {
     if (region.gridType !== 'hex') return [];
     
-    const tokenSize = 40; // Token diameter
-    const gridSize = region.gridSize * region.gridScale;
+    const hexRadius = region.gridSize / 2;
+    const hexWidth = hexRadius * 2;
+    const hexHeight = hexRadius * Math.sqrt(3);
     
-    // Create hex layout for this region
-    const hexLayout: HexLayout = {
-      orientation: POINTY_TOP,
-      size: { x: gridSize, y: gridSize },
-      origin: { x: region.x, y: region.y }
-    };
+    // Calculate number of hexes that fit (same as drawHexGrid)
+    const cols = Math.ceil(region.width / (hexWidth * 0.75)) + 1;
+    const rows = Math.ceil(region.height / hexHeight) + 1;
     
-    // Convert token center position to hex coordinates
-    const centerHex = pixelToHex(hexLayout, { x: tokenX, y: tokenY });
-    const roundedHex = hexRound(centerHex);
+    // Starting position aligned to region (same as drawHexGrid)
+    const startX = region.x;
+    const startY = region.y;
     
-    // For simplicity, assume tokens occupy a single hex for now
-    // In the future, we could expand this to handle larger tokens
-    return [roundedHex];
+    let closestHex: {hexX: number, hexY: number, radius: number} | null = null;
+    let closestDistance = Infinity;
+    
+    // Find the closest hex center to the token position
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        // Calculate hex center position (same formula as drawHexGrid)
+        const hexX = startX + col * (hexWidth * 0.75) + hexRadius;
+        const hexY = startY + row * hexHeight + hexRadius + (col % 2) * (hexHeight / 2);
+        
+        // Only check hexes within or near region bounds
+        if (hexX >= region.x - hexRadius && hexX <= region.x + region.width + hexRadius &&
+            hexY >= region.y - hexRadius && hexY <= region.y + region.height + hexRadius) {
+          
+          // Calculate distance from token to hex center
+          const distance = Math.sqrt((tokenX - hexX) ** 2 + (tokenY - hexY) ** 2);
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestHex = { hexX, hexY, radius: hexRadius };
+          }
+        }
+      }
+    }
+    
+    return closestHex ? [closestHex] : [];
   };
 
   // Update highlighted hexes based on token position
   const updateHexHighlights = (tokenX: number, tokenY: number) => {
-    const newHighlights: {regionId: string, hexes: HexCoordinate[]}[] = [];
+    const newHighlights: {regionId: string, hexes: {hexX: number, hexY: number, radius: number}[]}[] = [];
     
     regions.forEach(region => {
       if (region.gridType === 'hex') {
@@ -550,30 +571,27 @@ export const SimpleTabletop = () => {
       const region = regions.find(r => r.id === regionHighlight.regionId);
       if (!region || region.gridType !== 'hex') return;
       
-      const gridSize = region.gridSize * region.gridScale;
-      const hexLayout: HexLayout = {
-        orientation: POINTY_TOP,
-        size: { x: gridSize, y: gridSize },
-        origin: { x: region.x, y: region.y }
-      };
-      
       regionHighlight.hexes.forEach(hex => {
-        // Get the corners of this hex
-        const corners = hexCorners(hexLayout, hex);
-        
-        // Draw filled hex highlight
+        // Draw highlighted hex using the same drawing function as the grid
         ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; // Yellow highlight
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+        ctx.lineWidth = 3 / transform.zoom;
+        
+        // Draw filled hexagon
         ctx.beginPath();
-        ctx.moveTo(corners[0].x, corners[0].y);
-        for (let i = 1; i < corners.length; i++) {
-          ctx.lineTo(corners[i].x, corners[i].y);
+        for (let i = 0; i < 6; i++) {
+          // Flat-top hexagon: start at right point and go clockwise (same as drawHexagon)
+          const angle = (i * Math.PI) / 3;
+          const x = hex.hexX + hex.radius * Math.cos(angle);
+          const y = hex.hexY + hex.radius * Math.sin(angle);
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
         }
         ctx.closePath();
         ctx.fill();
-        
-        // Draw hex border highlight
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-        ctx.lineWidth = 2 / transform.zoom;
         ctx.stroke();
       });
     });
