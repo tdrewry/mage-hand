@@ -758,57 +758,66 @@ export const SimpleTabletop = () => {
     }
   };
 
+  // Image cache to prevent re-loading images on every redraw
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
   // Function to draw region background image
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
     
-    // Check if image is already loaded in a cache-like approach
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
+    let img = imageCache.current.get(region.backgroundImage);
     
-    // Try to draw immediately if image loads synchronously from cache
-    const drawBackground = () => {
-      const { x, y, width, height } = region;
-      const offsetX = region.backgroundOffsetX || 0;
-      const offsetY = region.backgroundOffsetY || 0;
-      const repeat = region.backgroundRepeat || 'no-repeat';
+    if (!img) {
+      // Create and cache new image
+      img = new Image();
+      img.crossOrigin = 'anonymous';
+      imageCache.current.set(region.backgroundImage, img);
       
-      if (repeat === 'no-repeat') {
-        // For no-repeat, just draw the image once at the offset position
-        ctx.drawImage(
-          img, 
-          x + offsetX, 
-          y + offsetY,
-          Math.min(img.width, width),
-          Math.min(img.height, height)
-        );
-      } else {
-        // For repeat patterns, use createPattern
-        const pattern = ctx.createPattern(img, repeat);
-        if (pattern) {
-          // Apply offset to the pattern
-          const matrix = new DOMMatrix();
-          matrix.translateSelf(offsetX, offsetY);
-          pattern.setTransform(matrix);
-          
-          ctx.fillStyle = pattern;
-          ctx.fillRect(x, y, width, height);
-        }
-      }
-    };
-    
-    // If image is already complete (cached), draw immediately
-    if (img.complete && img.naturalHeight !== 0) {
-      drawBackground();
-    } else {
-      // Otherwise, wait for load and redraw
+      // Only set up onload for new images
       img.onload = () => {
-        drawBackground();
-        requestAnimationFrame(() => redrawCanvas());
+        // Don't trigger another full redraw, just mark canvas as dirty
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          const rect = canvas.getBoundingClientRect();
+          const devicePixelRatio = window.devicePixelRatio || 1;
+          redrawCanvas();
+        }
       };
+      
+      img.src = region.backgroundImage;
+      return; // Image not ready yet
     }
     
-    img.src = region.backgroundImage;
+    // Only draw if image is fully loaded
+    if (!img.complete || img.naturalHeight === 0) return;
+    
+    const { x, y, width, height } = region;
+    const offsetX = region.backgroundOffsetX || 0;
+    const offsetY = region.backgroundOffsetY || 0;
+    const repeat = region.backgroundRepeat || 'no-repeat';
+    
+    if (repeat === 'no-repeat') {
+      // For no-repeat, just draw the image once at the offset position
+      ctx.drawImage(
+        img, 
+        x + offsetX, 
+        y + offsetY,
+        Math.min(img.width, width),
+        Math.min(img.height, height)
+      );
+    } else {
+      // For repeat patterns, use createPattern
+      const pattern = ctx.createPattern(img, repeat);
+      if (pattern) {
+        // Apply offset to the pattern
+        const matrix = new DOMMatrix();
+        matrix.translateSelf(offsetX, offsetY);
+        pattern.setTransform(matrix);
+        
+        ctx.fillStyle = pattern;
+        ctx.fillRect(x, y, width, height);
+      }
+    }
   };
 
   // Function to draw grid within a region
