@@ -1217,7 +1217,7 @@ export const SimpleTabletop = () => {
 
   // Function to check if mouse is over rotation handle
   const isOverRotationHandle = (mouseX: number, mouseY: number, region: CanvasRegion) => {
-    const handleSize = 20 / transform.zoom; // Increased hitbox size
+    const handleSize = 30 / transform.zoom; // Further increased hitbox size
     const rotationHandleDistance = 30 / transform.zoom;
     const rotationX = region.x + region.width / 2;
     const rotationY = region.y - rotationHandleDistance;
@@ -1521,6 +1521,12 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedRegion) {
+        // Check if clicking on rotation handle of an already selected region
+        if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
+          // Don't deselect if clicking on rotation handle - let it handle rotation
+          return;
+        }
+        
         // Region selection logic
         clearSelection();
         selectRegion(clickedRegion.id);
