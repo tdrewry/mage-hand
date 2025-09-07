@@ -2439,16 +2439,29 @@ export const SimpleTabletop = () => {
     // Handle transformation end
     if (isTransforming && draggedRegionId && dragPreview) {
       // Apply the transformation to the actual region
-      const updates = {
-        x: dragPreview.x,
-        y: dragPreview.y,
-        width: dragPreview.width,
-        height: dragPreview.height,
-        pathPoints: dragPreview.pathPoints,
-        ...(dragPreview.pathPoints ? { regionType: 'path' as const } : {})
-      };
-      
-      updateRegion(draggedRegionId, updates);
+      const targetRegion = regions.find(r => r.id === draggedRegionId);
+      if (targetRegion) {
+        const updates = {
+          x: dragPreview.x,
+          y: dragPreview.y,
+          width: dragPreview.width,
+          height: dragPreview.height,
+          pathPoints: dragPreview.pathPoints,
+          ...(dragPreview.pathPoints ? { regionType: 'path' as const } : {}),
+          // Preserve all other existing properties
+          rotation: targetRegion.rotation,
+          gridScale: targetRegion.gridScale,
+          gridSnapping: targetRegion.gridSnapping,
+          gridVisible: targetRegion.gridVisible,
+          backgroundImage: targetRegion.backgroundImage,
+          backgroundRepeat: targetRegion.backgroundRepeat,
+          backgroundOffsetX: targetRegion.backgroundOffsetX,
+          backgroundOffsetY: targetRegion.backgroundOffsetY,
+          rotationCenter: targetRegion.rotationCenter
+        };
+        
+        updateRegion(draggedRegionId, updates);
+      }
       
       // Clear transformation state
       setIsTransforming(false);
