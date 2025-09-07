@@ -5,6 +5,7 @@ import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
+import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { 
   HexCoordinate, 
@@ -52,22 +53,19 @@ export const SimpleTabletop = () => {
     squares: {gridX: number, gridY: number, size: number}[]
   }[]>([]);
   
-  // Region state
-  interface Region {
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    selected: boolean;
-    color: string;
-    gridType: 'square' | 'hex' | 'free';
-    gridSize: number;
-    gridScale: number; // Decimal multiplier for grid size (1 = default)
-    gridSnapping: boolean; // Per-region snapping toggle
-  }
-  
-  const [regions, setRegions] = useState<Region[]>([]);
+  // Use persistent region store
+  const { 
+    regions, 
+    addRegion, 
+    updateRegion, 
+    removeRegion, 
+    clearRegions,
+    setRegions,
+    selectRegion,
+    deselectRegion,
+    clearSelection,
+    getSelectedRegions
+  } = useRegionStore();
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
@@ -137,7 +135,7 @@ export const SimpleTabletop = () => {
   };
 
   // Hit test for regions
-  const getRegionAtPosition = (worldX: number, worldY: number): Region | null => {
+  const getRegionAtPosition = (worldX: number, worldY: number): CanvasRegion | null => {
     // Check regions in reverse order (top to bottom)
     for (let i = regions.length - 1; i >= 0; i--) {
       const region = regions[i];
@@ -150,7 +148,7 @@ export const SimpleTabletop = () => {
   };
 
   // Calculate which hex(es) a token occupies using D&D hex grid patterns
-  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region, gridWidth: number = 1, gridHeight: number = 1): {hexX: number, hexY: number, radius: number}[] => {
+  const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: CanvasRegion, gridWidth: number = 1, gridHeight: number = 1): {hexX: number, hexY: number, radius: number}[] => {
     if (region.gridType !== 'hex') return [];
     
     const hexRadius = region.gridSize / 2;
@@ -304,7 +302,7 @@ export const SimpleTabletop = () => {
   };
 
   // Calculate which square grid cells a token occupies
-  const calculateTokenSquareOccupancy = (tokenX: number, tokenY: number, region: Region, gridWidth: number = 1, gridHeight: number = 1): {gridX: number, gridY: number, size: number}[] => {
+  const calculateTokenSquareOccupancy = (tokenX: number, tokenY: number, region: CanvasRegion, gridWidth: number = 1, gridHeight: number = 1): {gridX: number, gridY: number, size: number}[] => {
     if (region.gridType !== 'square') return [];
     
     const gridSize = region.gridSize;
@@ -395,7 +393,7 @@ export const SimpleTabletop = () => {
   };
 
   // Get resize handle at position for a region
-  const getResizeHandle = (region: Region, worldX: number, worldY: number): string | null => {
+  const getResizeHandle = (region: CanvasRegion, worldX: number, worldY: number): string | null => {
     const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
     
@@ -707,7 +705,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw regions
-  const drawRegion = (ctx: CanvasRenderingContext2D, region: Region) => {
+  const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const isSelected = region.selected;
     
     // Draw region background
@@ -744,7 +742,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw grid within a region
-  const drawRegionGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+  const drawRegionGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     ctx.save();
     
     // Clip to region bounds
@@ -816,7 +814,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw square grid within region
-  const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+  const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const gridSize = region.gridSize;
     const startX = Math.ceil(region.x / gridSize) * gridSize;
     const endX = region.x + region.width;
@@ -845,7 +843,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw hex grid within region
-  const drawHexGrid = (ctx: CanvasRenderingContext2D, region: Region) => {
+  const drawHexGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const hexRadius = region.gridSize / 2;
     const hexWidth = hexRadius * 2;
     const hexHeight = hexRadius * Math.sqrt(3);
@@ -892,7 +890,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw region resize handles
-  const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: Region) => {
+  const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
     
@@ -923,7 +921,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to add a new region
-  const addRegion = () => {
+  const addNewRegion = () => {
     const regionId = `region-${Date.now()}`;
     
     // Get canvas dimensions to calculate viewport center
@@ -936,7 +934,7 @@ export const SimpleTabletop = () => {
     // Create region with reasonable size (200x200 units) centered in viewport
     const regionSize = 200;
     
-    const newRegion: Region = {
+    const newRegion: CanvasRegion = {
       id: regionId,
       x: viewportCenterX - regionSize / 2,
       y: viewportCenterY - regionSize / 2,
@@ -950,7 +948,7 @@ export const SimpleTabletop = () => {
       gridSnapping: false // Default to disabled per-region
     };
     
-    setRegions(prev => [...prev, newRegion]);
+    addRegion(newRegion);
     toast.success('Region added to viewport center');
   };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
@@ -1140,7 +1138,8 @@ export const SimpleTabletop = () => {
         }
       } else if (clickedRegion) {
         // Region selection logic
-        setRegions(prev => prev.map(r => ({ ...r, selected: r.id === clickedRegion.id })));
+        clearSelection();
+        selectRegion(clickedRegion.id);
         setSelectedRegionId(clickedRegion.id);
         setSelectedTokenIds([]); // Deselect tokens when selecting region
       } else {
@@ -1151,7 +1150,7 @@ export const SimpleTabletop = () => {
         } else {
           // Normal click: deselect all
           setSelectedTokenIds([]);
-          setRegions(prev => prev.map(r => ({ ...r, selected: false })));
+          clearSelection();
           setSelectedRegionId(null);
         }
       }
@@ -1193,7 +1192,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to show region context menu
-  const showRegionContextMenu = (x: number, y: number, region: Region) => {
+  const showRegionContextMenu = (x: number, y: number, region: CanvasRegion) => {
     // Remove any existing context menu safely
     const existingMenu = document.querySelector('.region-context-menu');
     if (existingMenu && document.body.contains(existingMenu)) {
@@ -1227,7 +1226,7 @@ export const SimpleTabletop = () => {
       { 
         label: 'Delete Region', 
         icon: '🗑️', 
-        action: () => deleteRegion(region.id), 
+        action: () => deleteSelectedRegion(region.id), 
         danger: true 
       }
     ];
@@ -1268,30 +1267,23 @@ export const SimpleTabletop = () => {
 
   // Function to set region grid type
   const setRegionGridType = (regionId: string, gridType: 'square' | 'hex' | 'free') => {
-    setRegions(prev => prev.map(region => 
-      region.id === regionId 
-        ? { ...region, gridType }
-        : region
-    ));
+    updateRegion(regionId, { gridType });
     toast.success(`Region grid set to ${gridType}`);
   };
 
   // Function to toggle region snapping
   const toggleRegionSnapping = (regionId: string) => {
-    setRegions(prev => prev.map(region => 
-      region.id === regionId 
-        ? { ...region, gridSnapping: !region.gridSnapping }
-        : region
-    ));
-    
-    const region = regions.find(r => r.id === regionId);
-    const newState = region ? !region.gridSnapping : false;
-    toast.success(`Region snapping ${newState ? 'enabled' : 'disabled'}`);
+    const targetRegion = regions.find(r => r.id === regionId);
+    if (targetRegion) {
+      const newState = !targetRegion.gridSnapping;
+      updateRegion(regionId, { gridSnapping: newState });
+      toast.success(`Region snapping ${newState ? 'enabled' : 'disabled'}`);
+    }
   };
 
   // Function to delete region
-  const deleteRegion = (regionId: string) => {
-    setRegions(prev => prev.filter(region => region.id !== regionId));
+  const deleteSelectedRegion = (regionId: string) => {
+    removeRegion(regionId);
     if (selectedRegionId === regionId) {
       setSelectedRegionId(null);
     }
@@ -1427,66 +1419,61 @@ export const SimpleTabletop = () => {
         setTokensMovedByRegion(tokensToMove);
       }
       
-      setRegions(prev => prev.map(region => 
-        region.id === draggedRegionId 
-          ? { ...region, x: newX, y: newY }
-          : region
-      ));
+      updateRegion(draggedRegionId, { x: newX, y: newY });
       
       redrawCanvas();
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
       // Region resizing
       const worldPos = screenToWorld(mouseX, mouseY);
       
-      setRegions(prev => prev.map(region => {
-        if (region.id !== draggedRegionId) return region;
-        
-        const { x, y, width, height } = region;
-        let newRegion = { ...region };
+      const targetRegion = regions.find(r => r.id === draggedRegionId);
+      if (targetRegion) {
+        const { x, y, width, height } = targetRegion;
+        let updates: Partial<CanvasRegion> = {};
         
         switch (resizeHandle) {
           case 'nw':
-            newRegion.x = worldPos.x;
-            newRegion.y = worldPos.y;
-            newRegion.width = width + (x - worldPos.x);
-            newRegion.height = height + (y - worldPos.y);
+            updates.x = worldPos.x;
+            updates.y = worldPos.y;
+            updates.width = width + (x - worldPos.x);
+            updates.height = height + (y - worldPos.y);
             break;
           case 'ne':
-            newRegion.y = worldPos.y;
-            newRegion.width = worldPos.x - x;
-            newRegion.height = height + (y - worldPos.y);
+            updates.y = worldPos.y;
+            updates.width = worldPos.x - x;
+            updates.height = height + (y - worldPos.y);
             break;
           case 'sw':
-            newRegion.x = worldPos.x;
-            newRegion.width = width + (x - worldPos.x);
-            newRegion.height = worldPos.y - y;
+            updates.x = worldPos.x;
+            updates.width = width + (x - worldPos.x);
+            updates.height = worldPos.y - y;
             break;
           case 'se':
-            newRegion.width = worldPos.x - x;
-            newRegion.height = worldPos.y - y;
+            updates.width = worldPos.x - x;
+            updates.height = worldPos.y - y;
             break;
           case 'n':
-            newRegion.y = worldPos.y;
-            newRegion.height = height + (y - worldPos.y);
+            updates.y = worldPos.y;
+            updates.height = height + (y - worldPos.y);
             break;
           case 'e':
-            newRegion.width = worldPos.x - x;
+            updates.width = worldPos.x - x;
             break;
           case 's':
-            newRegion.height = worldPos.y - y;
+            updates.height = worldPos.y - y;
             break;
           case 'w':
-            newRegion.x = worldPos.x;
-            newRegion.width = width + (x - worldPos.x);
+            updates.x = worldPos.x;
+            updates.width = width + (x - worldPos.x);
             break;
         }
         
         // Ensure minimum size
-        newRegion.width = Math.max(10, newRegion.width);
-        newRegion.height = Math.max(10, newRegion.height);
+        if (updates.width !== undefined) updates.width = Math.max(10, updates.width);
+        if (updates.height !== undefined) updates.height = Math.max(10, updates.height);
         
-        return newRegion;
-      }));
+        updateRegion(draggedRegionId, updates);
+      }
       
       redrawCanvas();
     } else {
@@ -1708,7 +1695,7 @@ export const SimpleTabletop = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={addRegion}
+          onClick={addNewRegion}
           className="flex items-center gap-2"
         >
           Add Region
