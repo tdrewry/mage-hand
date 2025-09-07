@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
-import { RegionTransformControls, type TransformMode } from './RegionTransformControls';
+import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { 
   generateTransformHandles, 
   getRotationCenterHandle, 
@@ -2592,62 +2592,24 @@ export const SimpleTabletop = () => {
         </Button>
       </div>
 
-      {/* Per-Region Snap Button (shows when region is selected) */}
+      {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
+      
+      {/* Region Control Panel */}
       {selectedRegionId && (() => {
         const selectedRegion = regions.find(r => r.id === selectedRegionId);
         if (!selectedRegion) return null;
         
-        const screenPos = worldToScreen(
-          selectedRegion.x + selectedRegion.width + 10, 
-          selectedRegion.y - 10
-        );
-        
         return (
-          <div 
-            className="absolute z-20" 
-            style={{ 
-              left: `${screenPos.x}px`, 
-              top: `${screenPos.y}px` 
-            }}
-          >
-            <div className="flex gap-2">
-              <Button
-                variant={selectedRegion.gridSnapping ? "default" : "outline"}
-                size="sm"
-                onClick={() => toggleRegionSnapping(selectedRegionId)}
-                className="flex items-center gap-1 text-xs"
-              >
-                <Grid3X3 className="w-3 h-3" />
-                Snap {selectedRegion.gridSnapping ? 'On' : 'Off'}
-              </Button>
-              {selectedRegion.gridType !== 'free' && (
-                <Button
-                  variant={selectedRegion.gridVisible ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleRegionGridVisibility(selectedRegionId)}
-                  className="flex items-center gap-1 text-xs"
-                >
-                  <Eye className="w-3 h-3" />
-                  Grid {selectedRegion.gridVisible ? 'On' : 'Off'}
-                </Button>
-              )}
-            </div>
-            
-            {/* Transformation Controls */}
-            <div
-              className="absolute z-20"
-              style={{
-                left: `${worldToScreen(selectedRegion.x + selectedRegion.width / 2, selectedRegion.y - 60).x - 75}px`,
-                top: `${worldToScreen(selectedRegion.x + selectedRegion.width / 2, selectedRegion.y - 60).y}px`
-              }}
-            >
-              <RegionTransformControls
-                transformMode={transformMode}
-                onTransformModeChange={setTransformMode}
-                position={{ x: 0, y: 0 }} // Position is handled by the parent div
-              />
-            </div>
-          </div>
+          <RegionControlPanel
+            region={selectedRegion}
+            transformMode={transformMode}
+            onTransformModeChange={setTransformMode}
+            onUpdateRegion={updateRegion}
+            onDeleteRegion={deleteSelectedRegion}
+            onClose={() => setSelectedRegionId(null)}
+            onToggleSnapping={toggleRegionSnapping}
+            onToggleGridVisibility={toggleRegionGridVisibility}
+          />
         );
       })()}
 
