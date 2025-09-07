@@ -370,7 +370,7 @@ export const SimpleTabletop = () => {
     // Check each token against each region
     tokens.forEach(token => {
       regions.forEach(region => {
-        if (region.gridVisible && (region.gridType === 'hex' || region.gridType === 'square')) { // Grid is visible when enabled and not 'free'
+        if (region.gridType === 'hex' || region.gridType === 'square') { // Always calculate token highlights for grid regions
           // Check if token is within this region
           if (token.x >= region.x && token.x <= region.x + region.width &&
               token.y >= region.y && token.y <= region.y + region.height) {
@@ -729,8 +729,8 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
-    // Draw region-specific grid
-    if (region.gridType !== 'free') {
+    // Draw region-specific grid (only if visible)
+    if (region.gridType !== 'free' && region.gridVisible) {
       drawRegionGrid(ctx, region);
     }
     
