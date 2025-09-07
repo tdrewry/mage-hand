@@ -4,12 +4,7 @@ import { persist } from 'zustand/middleware';
 export interface GridRegion {
   id: string;
   name: string;
-  bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  points: Array<{ x: number; y: number }>; // Polygon points instead of bounds
   gridType: 'square' | 'hex' | 'none';
   gridSize: number;
   gridColor: string;
@@ -70,7 +65,12 @@ const createDefaultMap = (): GameMap => ({
     {
       id: 'default-region',
       name: 'Main Area',
-      bounds: { x: 0, y: 0, width: 2000, height: 2000 },
+      points: [
+        { x: 0, y: 0 },
+        { x: 2000, y: 0 },
+        { x: 2000, y: 2000 },
+        { x: 0, y: 2000 }
+      ], // Rectangle as polygon
       gridType: 'square',
       gridSize: 40,
       gridColor: '#ffffff',
@@ -198,18 +198,13 @@ export const useMapStore = create<MapStore>()(
             // Find the smallest visible region at this point (most specific)
             const matchingRegions = map.regions
               .filter((region) => region.visible)
-              .filter((region) =>
-                x >= region.bounds.x &&
-                x <= region.bounds.x + region.bounds.width &&
-                y >= region.bounds.y &&
-                y <= region.bounds.y + region.bounds.height
-              );
+              .filter((region) => isPointInPolygon(x, y, region.points));
 
             if (matchingRegions.length > 0) {
               // Sort by area (smallest first) to get the most specific region
               const smallestRegion = matchingRegions.sort((a, b) => {
-                const areaA = a.bounds.width * a.bounds.height;
-                const areaB = b.bounds.width * b.bounds.height;
+                const areaA = calculatePolygonArea(a.points);
+                const areaB = calculatePolygonArea(b.points);
                 return areaA - areaB;
               })[0];
 
@@ -230,7 +225,29 @@ export const useMapStore = create<MapStore>()(
     }),
     {
       name: 'map-store',
-      version: 1,
+      version: 2, // Increment version for polygon migration
     }
   )
 );
+
+// Utility functions for polygon operations
+function isPointInPolygon(x: number, y: number, points: Array<{ x: number; y: number }>): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    if (((points[i].y > y) !== (points[j].y > y)) &&
+        (x < (points[j].x - points[i].x) * (y - points[i].y) / (points[j].y - points[i].y) + points[i].x)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function calculatePolygonArea(points: Array<{ x: number; y: number }>): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return Math.abs(area / 2);
+}

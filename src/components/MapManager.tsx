@@ -68,7 +68,12 @@ export const MapManager: React.FC<MapManagerProps> = ({ onClose }) => {
       zIndex: maps.length,
       regions: [{
         name: 'Main Region',
-        bounds: { x: 0, y: 0, width: 1600, height: 1200 },
+        points: [
+          { x: 0, y: 0 },
+          { x: 1600, y: 0 },
+          { x: 1600, y: 1200 },
+          { x: 0, y: 1200 }
+        ],
         gridType: 'square' as const,
         gridSize: 40,
         gridColor: '#ffffff',
@@ -86,12 +91,12 @@ export const MapManager: React.FC<MapManagerProps> = ({ onClose }) => {
 
     addRegion(mapId, {
       name: newRegionName,
-      bounds: { 
-        x: map.bounds.x + 100, 
-        y: map.bounds.y + 100, 
-        width: 400, 
-        height: 400 
-      },
+      points: [
+        { x: map.bounds.x + 100, y: map.bounds.y + 100 },
+        { x: map.bounds.x + 500, y: map.bounds.y + 100 },
+        { x: map.bounds.x + 500, y: map.bounds.y + 500 },
+        { x: map.bounds.x + 100, y: map.bounds.y + 500 }
+      ],
       gridType: 'square',
       gridSize: 40,
       gridColor: '#ffffff',
@@ -368,51 +373,10 @@ export const MapManager: React.FC<MapManagerProps> = ({ onClose }) => {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <Label>X</Label>
-                            <Input
-                              type="number"
-                              value={region.bounds.x}
-                              onChange={(e) => updateRegion(selectedMap.id, region.id, {
-                                bounds: { ...region.bounds, x: parseInt(e.target.value) || 0 }
-                              })}
-                              className="h-6"
-                            />
-                          </div>
-                          <div>
-                            <Label>Y</Label>
-                            <Input
-                              type="number"
-                              value={region.bounds.y}
-                              onChange={(e) => updateRegion(selectedMap.id, region.id, {
-                                bounds: { ...region.bounds, y: parseInt(e.target.value) || 0 }
-                              })}
-                              className="h-6"
-                            />
-                          </div>
-                          <div>
-                            <Label>Width</Label>
-                            <Input
-                              type="number"
-                              value={region.bounds.width}
-                              onChange={(e) => updateRegion(selectedMap.id, region.id, {
-                                bounds: { ...region.bounds, width: parseInt(e.target.value) || 0 }
-                              })}
-                              className="h-6"
-                            />
-                          </div>
-                          <div>
-                            <Label>Height</Label>
-                            <Input
-                              type="number"
-                              value={region.bounds.height}
-                              onChange={(e) => updateRegion(selectedMap.id, region.id, {
-                                bounds: { ...region.bounds, height: parseInt(e.target.value) || 0 }
-                              })}
-                              className="h-6"
-                            />
-                          </div>
+                        <div className="text-xs text-muted-foreground">
+                          Polygon shape: {region.points.length} points
+                          <br />
+                          <span className="text-xs">Edit polygon points in advanced mode</span>
                         </div>
                       </div>
                     ))}

@@ -340,13 +340,13 @@ export const SimpleTabletop = () => {
     const baseTokenSize = 40; // Base size for 1x1 token
     
     tokens.forEach(token => {
-      // Calculate actual token size based on grid dimensions
-      const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
-      const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
-      const tokenLeft = token.x - tokenWidth / 2;
-      const tokenRight = token.x + tokenWidth / 2;
-      const tokenTop = token.y - tokenHeight / 2;
-      const tokenBottom = token.y + tokenHeight / 2;
+      // Use the larger dimension for circular token radius
+      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+      const radius = tokenSize / 2;
+      const tokenLeft = token.x - radius;
+      const tokenRight = token.x + radius;
+      const tokenTop = token.y - radius;
+      const tokenBottom = token.y + radius;
       
       // Check if token is in viewport
       if (tokenRight >= viewX && tokenLeft <= viewX + viewWidth &&
@@ -401,32 +401,25 @@ export const SimpleTabletop = () => {
   // Function to draw a ghost token (semi-transparent version)
   const drawGhostToken = (ctx: CanvasRenderingContext2D, x: number, y: number, token: any) => {
     const baseTokenSize = 40; // Base size for 1x1 token
-    const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
-    const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
+    // Use the larger dimension for circular token radius
+    const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+    const radius = tokenSize / 2;
     
     // Save context to restore alpha
     ctx.save();
     ctx.globalAlpha = 0.3;
     
-    // Draw ghost token rectangle
+    // Draw ghost token circle
     ctx.fillStyle = token.color || '#ffffff';
-    ctx.fillRect(
-      x - tokenWidth / 2, 
-      y - tokenHeight / 2, 
-      tokenWidth, 
-      tokenHeight
-    );
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.fill();
     
     // Draw ghost border
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2 / transform.zoom;
     ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]); // Dashed border
-    ctx.strokeRect(
-      x - tokenWidth / 2, 
-      y - tokenHeight / 2, 
-      tokenWidth, 
-      tokenHeight
-    );
+    ctx.stroke();
     ctx.setLineDash([]); // Reset line dash
     
     // Draw ghost label
@@ -831,39 +824,34 @@ export const SimpleTabletop = () => {
   };
   const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
     const baseTokenSize = 40; // Base size for 1x1 token
-    const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
-    const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
+    // Use the larger dimension for circular token radius
+    const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+    const radius = tokenSize / 2;
     const isSelected = selectedTokenIds.includes(token.id);
+    
+    // Debug logging for first token
+    if (tokens.length > 0 && token.id === tokens[0].id) {
+      console.log('Drawing token:', token.id, 'gridWidth:', token.gridWidth, 'gridHeight:', token.gridHeight, 'tokenSize:', tokenSize, 'radius:', radius);
+    }
     
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.fillRect(
-        token.x - tokenWidth / 2 - 4, 
-        token.y - tokenHeight / 2 - 4, 
-        tokenWidth + 8, 
-        tokenHeight + 8
-      );
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 4, 0, 2 * Math.PI);
+      ctx.fill();
     }
     
-    // Draw token rectangle/square based on grid size
+    // Draw token circle
     ctx.fillStyle = token.color || '#ffffff';
-    ctx.fillRect(
-      token.x - tokenWidth / 2, 
-      token.y - tokenHeight / 2, 
-      tokenWidth, 
-      tokenHeight
-    );
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+    ctx.fill();
     
     // Draw token border
     ctx.strokeStyle = isSelected ? '#ffffff' : '#000000';
     ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
-    ctx.strokeRect(
-      token.x - tokenWidth / 2, 
-      token.y - tokenHeight / 2, 
-      tokenWidth, 
-      tokenHeight
-    );
+    ctx.stroke();
     
     // Draw token label
     if (token.label) {
