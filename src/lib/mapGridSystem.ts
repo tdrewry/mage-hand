@@ -204,11 +204,16 @@ function renderSquareGridRegion(
   
   if (left >= right || top >= bottom) return; // No intersection
   
-  // Calculate grid lines within the polygon bounds
-  const startX = Math.floor(minX / gridSize) * gridSize;
-  const endX = Math.ceil(maxX / gridSize) * gridSize;
-  const startY = Math.floor(minY / gridSize) * gridSize;
-  const endY = Math.ceil(maxY / gridSize) * gridSize;
+  // Calculate grid lines relative to region bounds (not world space)
+  const regionWidth = maxX - minX;
+  const regionHeight = maxY - minY;
+  const gridCols = Math.ceil(regionWidth / gridSize);
+  const gridRows = Math.ceil(regionHeight / gridSize);
+  
+  const startX = minX;
+  const endX = minX + (gridCols * gridSize);
+  const startY = minY;
+  const endY = minY + (gridRows * gridSize);
   
   // Set up drawing
   ctx.strokeStyle = color;
