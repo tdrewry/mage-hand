@@ -1438,6 +1438,27 @@ export const SimpleTabletop = () => {
   const isPointInRegion = (x: number, y: number, region: CanvasRegion): boolean => {
     if (region.regionType === 'path' && region.pathPoints) {
       return isPointInPolygon({ x, y }, region.pathPoints);
+    } else if (region.rotation && region.rotation !== 0) {
+      // Handle rotated rectangle regions by converting to rotated corners
+      const centerX = region.x + region.width / 2;
+      const centerY = region.y + region.height / 2;
+      const angle = (region.rotation * Math.PI) / 180;
+      
+      // Create corner points of the rectangle
+      const corners = [
+        { x: region.x, y: region.y },
+        { x: region.x + region.width, y: region.y },
+        { x: region.x + region.width, y: region.y + region.height },
+        { x: region.x, y: region.y + region.height }
+      ];
+      
+      // Rotate corners around center
+      const rotatedCorners = corners.map(corner => ({
+        x: centerX + (corner.x - centerX) * Math.cos(angle) - (corner.y - centerY) * Math.sin(angle),
+        y: centerY + (corner.x - centerX) * Math.sin(angle) + (corner.y - centerY) * Math.cos(angle)
+      }));
+      
+      return isPointInPolygon({ x, y }, rotatedCorners);
     } else {
       // Rectangle region (default behavior)
       return x >= region.x && x <= region.x + region.width && 
