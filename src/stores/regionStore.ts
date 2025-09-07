@@ -23,8 +23,9 @@ export interface CanvasRegion {
   regionType?: 'rectangle' | 'path'; // Type of region
   pathPoints?: { x: number; y: number }[]; // Path vertices for free-form regions
   
-  // Rotation support
+  // Transformation support
   rotation?: number; // Rotation angle in degrees
+  rotationCenter?: { x: number; y: number }; // Custom rotation center
 }
 
 interface RegionStore {

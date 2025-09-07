@@ -34,6 +34,18 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import { RegionTransformControls, type TransformMode } from './RegionTransformControls';
+import { 
+  generateTransformHandles, 
+  getRotationCenterHandle, 
+  hitTestTransformHandle,
+  scaleRegion,
+  rotateRegion,
+  calculateScaleFromDrag,
+  calculateRotationFromDrag,
+  getRegionBounds,
+  type TransformHandle 
+} from '../lib/regionTransforms';
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,6 +73,12 @@ export const SimpleTabletop = () => {
   
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
+  
+  // Region transformation state
+  const [transformMode, setTransformMode] = useState<'move' | 'scale' | 'rotate'>('move');
+  const [isTransforming, setIsTransforming] = useState(false);
+  const [transformHandle, setTransformHandle] = useState<string | null>(null);
+  const [rotationCenter, setRotationCenter] = useState<{ x: number; y: number } | null>(null);
   
   // Grid highlighting state for token movement (supports both hex and square grids)
   const [highlightedGrids, setHighlightedGrids] = useState<{
@@ -878,6 +896,13 @@ export const SimpleTabletop = () => {
     // Draw selection handles if selected (control nodes for paths)
     if (isSelected) {
       drawPathHandles(ctx, region);
+      
+      // Draw transformation handles based on mode
+      if (transformMode === 'scale') {
+        drawScaleHandles(ctx, region);
+      } else if (transformMode === 'rotate') {
+        drawRotationHandles(ctx, region);
+      }
     }
     
     // Draw grid type label
@@ -927,6 +952,13 @@ export const SimpleTabletop = () => {
     // Draw selection handles if selected
     if (isSelected) {
       drawRegionHandles(ctx, region);
+      
+      // Draw transformation handles based on mode
+      if (transformMode === 'scale') {
+        drawScaleHandles(ctx, region);
+      } else if (transformMode === 'rotate') {
+        drawRotationHandles(ctx, region);
+      }
     }
     
     // Draw grid type label
@@ -941,6 +973,67 @@ export const SimpleTabletop = () => {
         region.y + 4 / transform.zoom
       );
     }
+  };
+
+  // Function to draw scale handles for a region
+  const drawScaleHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+    const handles = generateTransformHandles(region);
+    const scaleHandles = handles.filter(h => h.type !== 'rotate');
+    
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 1 / transform.zoom;
+    
+    scaleHandles.forEach(handle => {
+      const size = handle.size / transform.zoom;
+      ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size);
+      ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size);
+    });
+    
+    ctx.restore();
+  };
+
+  // Function to draw rotation handles for a region
+  const drawRotationHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+    const handles = generateTransformHandles(region);
+    const rotateHandle = handles.find(h => h.type === 'rotate');
+    const centerHandle = getRotationCenterHandle(region, rotationCenter);
+    
+    if (!rotateHandle) return;
+    
+    ctx.save();
+    
+    // Draw rotation handle (circle)
+    ctx.fillStyle = '#ff6b6b';
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 1 / transform.zoom;
+    ctx.beginPath();
+    ctx.arc(rotateHandle.x, rotateHandle.y, rotateHandle.size / transform.zoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw center handle (diamond)
+    ctx.fillStyle = '#4ecdc4';
+    ctx.strokeStyle = '#333333';
+    ctx.save();
+    ctx.translate(centerHandle.x, centerHandle.y);
+    ctx.rotate(Math.PI / 4);
+    const size = centerHandle.size / transform.zoom;
+    ctx.fillRect(-size / 2, -size / 2, size, size);
+    ctx.strokeRect(-size / 2, -size / 2, size, size);
+    ctx.restore();
+    
+    // Draw line from center to rotation handle
+    ctx.strokeStyle = '#666666';
+    ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]);
+    ctx.beginPath();
+    ctx.moveTo(centerHandle.x, centerHandle.y);
+    ctx.lineTo(rotateHandle.x, rotateHandle.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    ctx.restore();
   };
 
   // Image cache to prevent re-loading images on every redraw
@@ -1747,9 +1840,47 @@ export const SimpleTabletop = () => {
         }
       }
       
-      // Check what we're clicking on for dragging (tokens first, then regions)
+      // Check what we're clicking on for dragging (tokens first, then regions, then transform handles)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+      
+      // Check for transformation handles on selected regions first
+      if (selectedRegionId && transformMode !== 'move') {
+        const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
+        if (selectedRegion) {
+          if (transformMode === 'scale') {
+            const handles = generateTransformHandles(selectedRegion);
+            const scaleHandles = handles.filter(h => h.type !== 'rotate');
+            const hitHandle = hitTestTransformHandle(worldPos, scaleHandles);
+            
+            if (hitHandle) {
+              setIsTransforming(true);
+              setTransformHandle(hitHandle.type);
+              setDraggedRegionId(selectedRegion.id);
+              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
+              return;
+            }
+          } else if (transformMode === 'rotate') {
+            const handles = generateTransformHandles(selectedRegion);
+            const rotateHandle = handles.find(h => h.type === 'rotate');
+            const centerHandle = getRotationCenterHandle(selectedRegion, rotationCenter);
+            
+            if (rotateHandle && hitTestTransformHandle(worldPos, [rotateHandle])) {
+              setIsTransforming(true);
+              setTransformHandle('rotate');
+              setDraggedRegionId(selectedRegion.id);
+              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
+              return;
+            } else if (hitTestTransformHandle(worldPos, [centerHandle])) {
+              setIsTransforming(true);
+              setTransformHandle('center');
+              setDraggedRegionId(selectedRegion.id);
+              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
+              return;
+            }
+          }
+        }
+      }
       
       if (clickedToken) {
         setIsDraggingToken(true);
@@ -1972,6 +2103,62 @@ export const SimpleTabletop = () => {
       
       // Use requestAnimationFrame for smooth rendering
       requestAnimationFrame(() => redrawCanvas());
+    } else if (isTransforming && draggedRegionId && transformHandle) {
+      // Handle transformation operations
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const targetRegion = regions.find(r => r.id === draggedRegionId);
+      
+      if (targetRegion) {
+        if (transformMode === 'scale' && transformHandle !== 'rotate' && transformHandle !== 'center') {
+          // Calculate scale transformation
+          const bounds = getRegionBounds(targetRegion);
+          const dragStart = regionDragOffset;
+          const dragDelta = {
+            x: worldPos.x - dragStart.x,
+            y: worldPos.y - dragStart.y
+          };
+          
+          const { scaleX, scaleY, anchor } = calculateScaleFromDrag(
+            { x: 0, y: 0, type: transformHandle as any, size: 8 },
+            dragDelta,
+            bounds
+          );
+          
+          const scaleUpdates = scaleRegion(targetRegion, scaleX, scaleY, anchor);
+          
+          // Update preview
+          setDragPreview({
+            regionId: draggedRegionId,
+            ...scaleUpdates
+          });
+          
+        } else if (transformMode === 'rotate') {
+          if (transformHandle === 'center') {
+            // Moving rotation center
+            setRotationCenter({ x: worldPos.x, y: worldPos.y });
+          } else if (transformHandle === 'rotate') {
+            // Rotating around center
+            const center = rotationCenter || getRegionBounds(targetRegion);
+            const dragStart = regionDragOffset;
+            
+            const rotationAngle = calculateRotationFromDrag(
+              center,
+              worldPos,
+              { x: dragStart.x, y: dragStart.y }
+            );
+            
+            const rotateUpdates = rotateRegion(targetRegion, rotationAngle, center);
+            
+            // Update preview
+            setDragPreview({
+              regionId: draggedRegionId,
+              ...rotateUpdates
+            });
+          }
+        }
+      }
+      
+      requestAnimationFrame(() => redrawCanvas());
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
       // Region resizing or path node editing - use preview for smooth updates
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -2185,10 +2372,35 @@ export const SimpleTabletop = () => {
       setTempRegionRotation({});
     }
     
-    // Reset all region drag states (runs for both normal drag and rotation)
-    if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
+    // Handle transformation end
+    if (isTransforming && draggedRegionId && dragPreview) {
+      // Apply the transformation to the actual region
+      const updates = {
+        x: dragPreview.x,
+        y: dragPreview.y,
+        width: dragPreview.width,
+        height: dragPreview.height,
+        pathPoints: dragPreview.pathPoints,
+        ...(dragPreview.pathPoints ? { regionType: 'path' as const } : {})
+      };
+      
+      updateRegion(draggedRegionId, updates);
+      
+      // Clear transformation state
+      setIsTransforming(false);
+      setTransformHandle(null);
+      setDragPreview(null);
+      setDraggedRegionId(null);
+      
+      toast.success(`Region ${transformMode}d successfully`);
+    }
+    
+    // Reset all region drag states (runs for normal drag, rotation, and transformation)
+    if (isDraggingRegion || isRotatingRegion || isResizingRegion || isTransforming) {
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
+      setIsTransforming(false);
+      setTransformHandle(null);
       setDraggedRegionId(null);
       setRegionDragOffset({ x: 0, y: 0 });
       setResizeHandle(null);
@@ -2420,6 +2632,13 @@ export const SimpleTabletop = () => {
                 </Button>
               )}
             </div>
+            
+            {/* Transformation Controls */}
+            <RegionTransformControls
+              transformMode={transformMode}
+              onTransformModeChange={setTransformMode}
+              position={getRegionBounds(selectedRegion)}
+            />
           </div>
         );
       })()}
