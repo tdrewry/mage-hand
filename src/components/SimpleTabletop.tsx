@@ -1214,14 +1214,30 @@ export const SimpleTabletop = () => {
   // Function to draw square grid within region
   const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const gridSize = region.gridSize;
-    const startX = Math.ceil(region.x / gridSize) * gridSize;
-    const endX = region.x + region.width;
-    const startY = Math.ceil(region.y / gridSize) * gridSize;
-    const endY = region.y + region.height;
     
-    // Vertical lines
-    for (let x = startX; x <= endX; x += gridSize) {
-      if (x > region.x && x < region.x + region.width) {
+    // Save context for local transformations
+    ctx.save();
+    
+    // Apply rotation if present (same as region rotation logic)
+    const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
+    if (effectiveRotation !== 0) {
+      const centerX = region.x + region.width / 2;
+      const centerY = region.y + region.height / 2;
+      const angle = (effectiveRotation * Math.PI) / 180;
+      
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+      ctx.translate(-centerX, -centerY);
+    }
+    
+    // Calculate grid lines in local region space (starting from region origin)
+    const cols = Math.ceil(region.width / gridSize);
+    const rows = Math.ceil(region.height / gridSize);
+    
+    // Draw vertical lines
+    for (let col = 0; col <= cols; col++) {
+      const x = region.x + col * gridSize;
+      if (x <= region.x + region.width) {
         ctx.beginPath();
         ctx.moveTo(x, region.y);
         ctx.lineTo(x, region.y + region.height);
@@ -1229,15 +1245,18 @@ export const SimpleTabletop = () => {
       }
     }
     
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      if (y > region.y && y < region.y + region.height) {
+    // Draw horizontal lines
+    for (let row = 0; row <= rows; row++) {
+      const y = region.y + row * gridSize;
+      if (y <= region.y + region.height) {
         ctx.beginPath();
         ctx.moveTo(region.x, y);
         ctx.lineTo(region.x + region.width, y);
         ctx.stroke();
       }
     }
+    
+    ctx.restore();
   };
 
   // Function to draw hex grid within region
