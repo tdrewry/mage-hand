@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface ToolbarProps {
   sessionId?: string;
   fabricCanvas?: FabricCanvas | null;
-  addTokenToCanvas?: (imageUrl: string, x?: number, y?: number) => void | Promise<void>;
+  addTokenToCanvas?: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void | Promise<void>;
 }
 
 export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {

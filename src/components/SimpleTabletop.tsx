@@ -1445,7 +1445,7 @@ export const SimpleTabletop = () => {
     // Canvas automatically redraws when tokens change
   };
 
-  const addTokenToCanvas = async (imageUrl: string, x?: number, y?: number) => {
+  const addTokenToCanvas = async (imageUrl: string, x?: number, y?: number, gridWidth: number = 1, gridHeight: number = 1, color?: string) => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Use provided coordinates or default to center of viewport
@@ -1480,9 +1480,9 @@ export const SimpleTabletop = () => {
       console.log('No snapping for new token');
     }
     
-    // Generate a random color for the token
+    // Use provided color or generate a random one
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const tokenColor = color || colors[Math.floor(Math.random() * colors.length)];
     
     try {
       // Add to store
@@ -1492,11 +1492,11 @@ export const SimpleTabletop = () => {
         x: tokenX,
         y: tokenY,
         name: `Token ${tokenId.slice(-8)}`,
-        gridWidth: 1,
-        gridHeight: 1,
+        gridWidth: gridWidth,
+        gridHeight: gridHeight,
         label: `T${tokenId.slice(-4)}`,
         ownerId: currentPlayerId,
-        color: randomColor
+        color: tokenColor
       });
 
       toast.success('Token added to map');
