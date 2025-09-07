@@ -146,7 +146,7 @@ export const SimpleTabletop = () => {
     return null;
   };
 
-  // Calculate which hex(es) a token occupies in a given region using the existing hex grid system
+  // Calculate which hex(es) a token occupies using D&D hex grid patterns
   const calculateTokenHexOccupancy = (tokenX: number, tokenY: number, region: Region, gridWidth: number = 1, gridHeight: number = 1): {hexX: number, hexY: number, radius: number}[] => {
     if (region.gridType !== 'hex') return [];
     
@@ -191,32 +191,99 @@ export const SimpleTabletop = () => {
     
     const occupiedHexes: {hexX: number, hexY: number, radius: number}[] = [];
     
-    // Always include the center hex
-    occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
-    
-    // For larger tokens, add neighboring hexes
-    const maxDimension = Math.max(gridWidth, gridHeight);
-    if (maxDimension > 1) {
-      // Hex neighbor directions (relative column and row offsets)
-      const directions = [
-        [1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1] // Standard hex neighbors
-      ];
+    // D&D hex patterns based on creature size
+    if (gridWidth === 1 && gridHeight === 1) {
+      // Small/Medium (1x1): Single hex
+      occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
+    } else if (gridWidth === 2 && gridHeight === 2) {
+      // Large (2x2): Center + 2 adjacent hexes (3 total)
+      occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
       
-      const neighborsNeeded = Math.min(6, (maxDimension - 1) * 2); // Max 6 neighbors for hex
+      // Add 2 adjacent hexes (we'll use right and bottom-right for consistency)
+      const adjacentOffsets = [[1, 0], [0, 1]]; // Right and bottom-right neighbors
       
-      for (let i = 0; i < neighborsNeeded; i++) {
-        const [dCol, dRow] = directions[i];
+      adjacentOffsets.forEach(([dCol, dRow]) => {
         const neighborCol = centerHex.col + dCol;
         const neighborRow = centerHex.row + dRow;
         
         const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
         const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
         
-        // Verify neighbor is within region bounds
         if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
             neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
           occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
         }
+      });
+    } else if (gridWidth === 3 && gridHeight === 3) {
+      // Huge (3x3): Center + all 6 neighbors (7 total)
+      occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
+      
+      // All 6 hex neighbors
+      const allNeighbors = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+      
+      allNeighbors.forEach(([dCol, dRow]) => {
+        const neighborCol = centerHex.col + dCol;
+        const neighborRow = centerHex.row + dRow;
+        
+        const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
+        const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
+        
+        if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
+            neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
+          occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
+        }
+      });
+    } else if (gridWidth === 4 && gridHeight === 4) {
+      // Gargantuan (4x4): Center + 6 neighbors + 6 more hexes (19 total in flower pattern)
+      occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
+      
+      // First ring: 6 neighbors
+      const firstRing = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+      // Second ring: additional hexes for gargantuan
+      const secondRing = [[2, 0], [1, 1], [-1, 2], [-2, 1], [-1, -1], [1, -2], [2, -1], [0, 2], [-2, 0], [0, -2], [1, 2], [-1, -2]];
+      
+      [...firstRing, ...secondRing].forEach(([dCol, dRow]) => {
+        const neighborCol = centerHex.col + dCol;
+        const neighborRow = centerHex.row + dRow;
+        
+        const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
+        const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
+        
+        if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
+            neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
+          occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
+        }
+      });
+    } else {
+      // For non-square sizes or larger sizes, use a more flexible approach
+      // This handles rectangular creatures or sizes > 4x4
+      occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
+      
+      const maxDimension = Math.max(gridWidth, gridHeight);
+      const rings = Math.ceil(maxDimension / 2);
+      
+      for (let ring = 1; ring < rings; ring++) {
+        const ringOffsets = [];
+        // Generate hex ring offsets (this is a simplified approach)
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const dCol = Math.round(ring * Math.cos(angle));
+          const dRow = Math.round(ring * Math.sin(angle));
+          ringOffsets.push([dCol, dRow]);
+        }
+        
+        ringOffsets.forEach(([dCol, dRow]) => {
+          const neighborCol = centerHex.col + dCol;
+          const neighborRow = centerHex.row + dRow;
+          
+          const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
+          const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
+          
+          if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
+              neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
+            occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
+          }
+        });
       }
     }
     
