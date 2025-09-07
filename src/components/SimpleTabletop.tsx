@@ -762,50 +762,52 @@ export const SimpleTabletop = () => {
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
     
+    // Check if image is already loaded in a cache-like approach
     const img = new Image();
-    img.onload = () => {
+    img.crossOrigin = 'anonymous';
+    
+    // Try to draw immediately if image loads synchronously from cache
+    const drawBackground = () => {
       const { x, y, width, height } = region;
       const offsetX = region.backgroundOffsetX || 0;
       const offsetY = region.backgroundOffsetY || 0;
       const repeat = region.backgroundRepeat || 'no-repeat';
       
-      ctx.save();
-      
-      // Create pattern based on repeat mode
-      let pattern: CanvasPattern | null = null;
-      switch (repeat) {
-        case 'repeat':
-          pattern = ctx.createPattern(img, 'repeat');
-          break;
-        case 'repeat-x':
-          pattern = ctx.createPattern(img, 'repeat-x');
-          break;
-        case 'repeat-y':
-          pattern = ctx.createPattern(img, 'repeat-y');
-          break;
-        case 'no-repeat':
-        default:
-          pattern = ctx.createPattern(img, 'no-repeat');
-          break;
+      if (repeat === 'no-repeat') {
+        // For no-repeat, just draw the image once at the offset position
+        ctx.drawImage(
+          img, 
+          x + offsetX, 
+          y + offsetY,
+          Math.min(img.width, width),
+          Math.min(img.height, height)
+        );
+      } else {
+        // For repeat patterns, use createPattern
+        const pattern = ctx.createPattern(img, repeat);
+        if (pattern) {
+          // Apply offset to the pattern
+          const matrix = new DOMMatrix();
+          matrix.translateSelf(offsetX, offsetY);
+          pattern.setTransform(matrix);
+          
+          ctx.fillStyle = pattern;
+          ctx.fillRect(x, y, width, height);
+        }
       }
-      
-      if (pattern) {
-        // Apply offset to the pattern
-        const transform = new DOMMatrix();
-        transform.translateSelf(x + offsetX, y + offsetY);
-        pattern.setTransform(transform);
-        
-        ctx.fillStyle = pattern;
-        ctx.fillRect(x, y, width, height);
-      }
-      
-      ctx.restore();
-      
-      // Redraw canvas to show the updated background
-      requestAnimationFrame(() => redrawCanvas());
     };
     
-    // Set source to trigger loading
+    // If image is already complete (cached), draw immediately
+    if (img.complete && img.naturalHeight !== 0) {
+      drawBackground();
+    } else {
+      // Otherwise, wait for load and redraw
+      img.onload = () => {
+        drawBackground();
+        requestAnimationFrame(() => redrawCanvas());
+      };
+    }
+    
     img.src = region.backgroundImage;
   };
 
