@@ -2634,27 +2634,19 @@ export const SimpleTabletop = () => {
             </div>
             
             {/* Transformation Controls */}
-            <RegionTransformControls
-              transformMode={transformMode}
-              onTransformModeChange={setTransformMode}
-              position={(() => {
-                const bounds = getRegionBounds(selectedRegion);
-                
-                // Convert bounds corners to screen coordinates to find screen bounds
-                const topLeft = worldToScreen(bounds.x, bounds.y);
-                const bottomRight = worldToScreen(bounds.x + bounds.width, bounds.y + bounds.height);
-                
-                // Calculate screen center
-                const screenCenterX = (topLeft.x + bottomRight.x) / 2;
-                const screenTopY = topLeft.y;
-                
-                // Position controls above the region
-                return { 
-                  x: screenCenterX - 75, // Center horizontally (controls ~150px wide)
-                  y: screenTopY - 50     // Position above region
-                };
-              })()}
-            />
+            <div
+              className="absolute z-20"
+              style={{
+                left: `${worldToScreen(selectedRegion.x + selectedRegion.width / 2, selectedRegion.y - 60).x - 75}px`,
+                top: `${worldToScreen(selectedRegion.x + selectedRegion.width / 2, selectedRegion.y - 60).y}px`
+              }}
+            >
+              <RegionTransformControls
+                transformMode={transformMode}
+                onTransformModeChange={setTransformMode}
+                position={{ x: 0, y: 0 }} // Position is handled by the parent div
+              />
+            </div>
           </div>
         );
       })()}

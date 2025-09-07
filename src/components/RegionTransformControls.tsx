@@ -18,13 +18,7 @@ export const RegionTransformControls: React.FC<RegionTransformControlsProps> = (
   className = ''
 }) => {
   return (
-    <div
-      className={`absolute z-20 flex gap-1 bg-background/90 backdrop-blur-sm border rounded-lg p-1 shadow-lg ${className}`}
-      style={{
-        left: position.x,
-        top: position.y - 50, // Position above the region
-      }}
-    >
+    <div className={`flex gap-1 bg-background/90 backdrop-blur-sm border rounded-lg p-1 shadow-lg ${className}`}>
       <Button
         variant={transformMode === 'move' ? 'default' : 'outline'}
         size="sm"
