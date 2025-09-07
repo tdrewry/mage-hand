@@ -196,30 +196,34 @@ export const SimpleTabletop = () => {
       // Small/Medium (1x1): Single hex
       occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
     } else if (gridWidth === 2 && gridHeight === 2) {
-      // Large (2x2): Center + 2 adjacent hexes (3 total) in proper D&D pattern
+      // Large (2x2): EXACTLY 3 hexes total according to D&D rules
+      console.log('Calculating 2x2 hex pattern - should be exactly 3 hexes');
+      
+      // Center hex
       occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
       
-      // Use proper hex neighbor directions for flat-top hexagons
-      // In a flat-top hex grid, the 6 directions are: E, SE, SW, W, NW, NE
-      // For Large creatures, we typically use 2 adjacent hexes
-      const adjacentOffsets = [
-        [1, 0],  // East (right)
-        [0, 1]   // Southeast (down-right for even cols, down-left for odd cols)
+      // For a Large creature, add exactly 2 specific adjacent hexes
+      // Pattern should be center + 2 adjacent forming a triangle
+      const largeCreatureOffsets = [
+        [1, 0],   // Right neighbor  
+        [-1, 1]   // Bottom-left neighbor (creates proper triangle)
       ];
       
-      adjacentOffsets.forEach(([dCol, dRow]) => {
+      largeCreatureOffsets.forEach(([dCol, dRow]) => {
         const neighborCol = centerHex.col + dCol;
         const neighborRow = centerHex.row + dRow;
         
-        // Adjust for hex grid offset pattern (even/odd column offset)
         const neighborHexX = startX + neighborCol * (hexWidth * 0.75) + hexRadius;
         const neighborHexY = startY + neighborRow * hexHeight + hexRadius + (neighborCol % 2) * (hexHeight / 2);
         
         if (neighborHexX >= region.x - hexRadius && neighborHexX <= region.x + region.width + hexRadius &&
             neighborHexY >= region.y - hexRadius && neighborHexY <= region.y + region.height + hexRadius) {
           occupiedHexes.push({ hexX: neighborHexX, hexY: neighborHexY, radius: hexRadius });
+          console.log(`Added Large creature hex at col:${neighborCol}, row:${neighborRow}`);
         }
       });
+      
+      console.log(`Large creature total hexes: ${occupiedHexes.length} (should be 3)`);
     } else if (gridWidth === 3 && gridHeight === 3) {
       // Huge (3x3): Center + all 6 neighbors (7 total)
       occupiedHexes.push({ hexX: centerHex.hexX, hexY: centerHex.hexY, radius: hexRadius });
