@@ -104,7 +104,9 @@ export const hitTestTransformHandle = (
       Math.pow(point.x - handle.x, 2) + Math.pow(point.y - handle.y, 2)
     );
     
-    if (distance <= handle.size) {
+    // Use 1.5x the handle size for more generous hit detection
+    // This ensures the full visual handle area is clickable, especially at edges
+    if (distance <= handle.size * 1.5) {
       return handle;
     }
   }
