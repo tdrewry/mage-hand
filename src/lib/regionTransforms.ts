@@ -58,19 +58,20 @@ export const getRegionBounds = (region: CanvasRegion): RegionBounds => {
 export const generateTransformHandles = (region: CanvasRegion): TransformHandle[] => {
   const bounds = getRegionBounds(region);
   const handleSize = 8;
+  const inset = handleSize / 2; // Shift handles inward so they're fully inside the region
   
   return [
-    // Corner handles for scaling
-    { x: bounds.x, y: bounds.y, type: 'nw', size: handleSize },
-    { x: bounds.x + bounds.width, y: bounds.y, type: 'ne', size: handleSize },
-    { x: bounds.x, y: bounds.y + bounds.height, type: 'sw', size: handleSize },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height, type: 'se', size: handleSize },
+    // Corner handles for scaling - shifted inward by half handle size
+    { x: bounds.x + inset, y: bounds.y + inset, type: 'nw', size: handleSize },
+    { x: bounds.x + bounds.width - inset, y: bounds.y + inset, type: 'ne', size: handleSize },
+    { x: bounds.x + inset, y: bounds.y + bounds.height - inset, type: 'sw', size: handleSize },
+    { x: bounds.x + bounds.width - inset, y: bounds.y + bounds.height - inset, type: 'se', size: handleSize },
     
-    // Edge handles for scaling
-    { x: bounds.centerX, y: bounds.y, type: 'n', size: handleSize },
-    { x: bounds.x + bounds.width, y: bounds.centerY, type: 'e', size: handleSize },
-    { x: bounds.centerX, y: bounds.y + bounds.height, type: 's', size: handleSize },
-    { x: bounds.x, y: bounds.centerY, type: 'w', size: handleSize },
+    // Edge handles for scaling - shifted inward by half handle size
+    { x: bounds.centerX, y: bounds.y + inset, type: 'n', size: handleSize },
+    { x: bounds.x + bounds.width - inset, y: bounds.centerY, type: 'e', size: handleSize },
+    { x: bounds.centerX, y: bounds.y + bounds.height - inset, type: 's', size: handleSize },
+    { x: bounds.x + inset, y: bounds.centerY, type: 'w', size: handleSize },
     
     // Rotation handle (above the region)
     { x: bounds.centerX, y: bounds.y - 30, type: 'rotate', size: 10 }
