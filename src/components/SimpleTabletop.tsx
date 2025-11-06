@@ -1615,9 +1615,9 @@ export const SimpleTabletop = () => {
       finalPath = simplifyPath(finalPath, 10.0);
     }
     
-    // Generate Bezier control points for smooth curves
-    const bezierControls = generateBezierControlPoints(finalPath);
-    const bounds = getBezierBounds(finalPath, bezierControls);
+    // Generate Bezier control points for smooth curves (only in freehand mode)
+    const bezierControls = pathDrawingType === 'freehand' ? generateBezierControlPoints(finalPath) : undefined;
+    const bounds = bezierControls ? getBezierBounds(finalPath, bezierControls) : getPolygonBounds(finalPath);
     const newRegion: CanvasRegion = {
       id: `path-region-${Date.now()}`,
       x: bounds.x,
@@ -2534,11 +2534,11 @@ export const SimpleTabletop = () => {
             const newPathPoints = [...targetRegion.pathPoints];
             newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
             
-            // Regenerate Bezier control points for smooth curves
-            const newBezierControls = generateBezierControlPoints(newPathPoints);
+            // Regenerate Bezier control points for smooth curves (only if region has them)
+            const newBezierControls = targetRegion.bezierControlPoints ? generateBezierControlPoints(newPathPoints) : undefined;
             
             // Update preview with new path points
-            const newBounds = getBezierBounds(newPathPoints, newBezierControls);
+            const newBounds = newBezierControls ? getBezierBounds(newPathPoints, newBezierControls) : getPolygonBounds(newPathPoints);
             setDragPreview({
               regionId: draggedRegionId,
               pathPoints: newPathPoints,
