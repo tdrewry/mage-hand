@@ -1662,10 +1662,10 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
-  // Redraw when transform, tokens, or regions change
+  // Redraw when transform, tokens, regions, or path changes
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens, regions]);
+  }, [transform, tokens, regions, currentPath]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1892,9 +1892,8 @@ export const SimpleTabletop = () => {
     } else if (e.button === 0) { // Left click
       // Handle path drawing mode
       if (pathDrawingMode === 'drawing') {
-        // Add point to current path
+        // Add point to current path (redraw will happen automatically via useEffect)
         setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
-        redrawCanvas();
         return;
       }
       
