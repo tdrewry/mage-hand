@@ -1208,12 +1208,34 @@ export const SimpleTabletop = () => {
     
     // Clip to region bounds - handle both rectangle and path regions
     if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-      // Clip to path shape
+      // Clip to path shape using Bezier curves if available
       ctx.beginPath();
       ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-      for (let i = 1; i < region.pathPoints.length; i++) {
-        ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+      
+      // Use Bezier curves if control points exist and smoothing is enabled
+      if (region.bezierControlPoints && region.bezierControlPoints.length > 0 && region.smoothing !== false) {
+        for (let i = 0; i < region.pathPoints.length - 1; i++) {
+          const p1 = region.pathPoints[i];
+          const p2 = region.pathPoints[i + 1];
+          const controls = region.bezierControlPoints[i];
+          
+          if (controls) {
+            ctx.bezierCurveTo(
+              controls.cp1.x, controls.cp1.y,
+              controls.cp2.x, controls.cp2.y,
+              p2.x, p2.y
+            );
+          } else {
+            ctx.lineTo(p2.x, p2.y);
+          }
+        }
+      } else {
+        // Fallback to straight lines for polygon paths
+        for (let i = 1; i < region.pathPoints.length; i++) {
+          ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+        }
       }
+      
       ctx.closePath();
       ctx.clip();
     } else {
