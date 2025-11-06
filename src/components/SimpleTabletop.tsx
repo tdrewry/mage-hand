@@ -2535,8 +2535,9 @@ export const SimpleTabletop = () => {
             const newPathPoints = [...targetRegion.pathPoints];
             newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
             
-            // Regenerate Bezier control points for smooth curves (only if region has them)
-            const newBezierControls = targetRegion.bezierControlPoints ? generateBezierControlPoints(newPathPoints) : undefined;
+            // Keep existing Bezier control points without regenerating them
+            // This allows manual editing of control points after initial smoothing
+            const newBezierControls = targetRegion.bezierControlPoints;
             
             // Update preview with new path points
             const newBounds = newBezierControls ? getBezierBounds(newPathPoints, newBezierControls) : getPolygonBounds(newPathPoints);
