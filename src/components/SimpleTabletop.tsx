@@ -2108,11 +2108,8 @@ export const SimpleTabletop = () => {
         }
       }
       
-      // Check what we're clicking on for dragging (tokens first, then regions, then transform handles)
-      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-      
-      // Check for transformation handles on selected regions first
+      // PRIORITY 1: Check for transformation handles on selected regions FIRST
+      // This prevents deselection when clicking handles outside the shape boundary
       if (selectedRegionId && transformMode !== 'move') {
         const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
         if (selectedRegion) {
@@ -2149,6 +2146,10 @@ export const SimpleTabletop = () => {
           }
         }
       }
+      
+      // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then regions)
+      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
         setIsDraggingToken(true);
