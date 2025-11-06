@@ -2732,13 +2732,18 @@ export const SimpleTabletop = () => {
       if (dragPreview && draggedRegionId) {
         const draggedRegion = regions.find(r => r.id === draggedRegionId);
         if (draggedRegion) {
-          // Update region in store
+          // Update region in store with recalculated bounds for grid
           if (draggedRegion.regionType === 'path' && dragPreview.pathPoints) {
+            // Recalculate bounds to ensure grid is properly updated
+            const finalBounds = dragPreview.bezierControlPoints 
+              ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
+              : getPolygonBounds(dragPreview.pathPoints);
+            
             updateRegion(draggedRegionId, {
-              x: dragPreview.x,
-              y: dragPreview.y,
-              width: dragPreview.width,
-              height: dragPreview.height,
+              x: finalBounds.x,
+              y: finalBounds.y,
+              width: finalBounds.width,
+              height: finalBounds.height,
               pathPoints: dragPreview.pathPoints,
               bezierControlPoints: dragPreview.bezierControlPoints,
               // Preserve rotation when dragging
@@ -2789,11 +2794,25 @@ export const SimpleTabletop = () => {
       // Apply the transformation to the actual region
       const targetRegion = regions.find(r => r.id === draggedRegionId);
       if (targetRegion) {
-        const updates = {
+        // Recalculate final bounds to ensure grid alignment is correct
+        let finalBounds = {
           x: dragPreview.x,
           y: dragPreview.y,
           width: dragPreview.width,
-          height: dragPreview.height,
+          height: dragPreview.height
+        };
+        
+        if (dragPreview.pathPoints) {
+          finalBounds = dragPreview.bezierControlPoints 
+            ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
+            : getPolygonBounds(dragPreview.pathPoints);
+        }
+        
+        const updates = {
+          x: finalBounds.x,
+          y: finalBounds.y,
+          width: finalBounds.width,
+          height: finalBounds.height,
           pathPoints: dragPreview.pathPoints,
           bezierControlPoints: dragPreview.bezierControlPoints,
           ...(dragPreview.pathPoints ? { regionType: 'path' as const } : {}),
