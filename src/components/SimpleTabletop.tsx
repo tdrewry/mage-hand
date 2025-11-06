@@ -2115,30 +2115,12 @@ export const SimpleTabletop = () => {
         if (selectedRegion) {
           // Check for resize/anchor/bezier handles
           const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
-          console.log('Handle check:', { handle, regionType: selectedRegion.regionType, hasPathPoints: !!selectedRegion.pathPoints });
           if (handle) {
-            console.log('Handle detected:', handle);
-            if (handle.startsWith('cp-')) {
-              // Bezier control point
-              const [, segmentStr, cpStr] = handle.split('-');
-              const segmentIndex = parseInt(segmentStr);
-              const isFirst = cpStr === '1';
-              setEditingControlPointIndex({ segmentIndex, isFirst });
-              redrawCanvas();
-              return;
-            } else if (handle.startsWith('node-')) {
-              // Anchor point
-              const vertexIndex = parseInt(handle.split('-')[1]);
-              setEditingVertexIndex(vertexIndex);
-              redrawCanvas();
-              return;
-            } else {
-              // Rectangle resize handle
-              setIsResizingRegion(true);
-              setResizeHandle(handle);
-              setDraggedRegionId(selectedRegion.id);
-              return;
-            }
+            // All handles (node, cp, and resize) use the same resizing mechanism
+            setIsResizingRegion(true);
+            setResizeHandle(handle);
+            setDraggedRegionId(selectedRegion.id);
+            return;
           }
           
           // Check for rotation handle
