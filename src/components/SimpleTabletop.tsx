@@ -2115,7 +2115,9 @@ export const SimpleTabletop = () => {
         if (selectedRegion) {
           // Check for resize/anchor/bezier handles
           const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
+          console.log('Handle check:', { handle, regionType: selectedRegion.regionType, hasPathPoints: !!selectedRegion.pathPoints });
           if (handle) {
+            console.log('Handle detected:', handle);
             if (handle.startsWith('cp-')) {
               // Bezier control point
               const [, segmentStr, cpStr] = handle.split('-');
