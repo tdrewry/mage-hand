@@ -461,8 +461,8 @@ export const SimpleTabletop = () => {
     if (region.regionType === 'path' && region.pathPoints) {
       const handleSize = 20 / transform.zoom; // Increased hitbox size
       
-      // Check Bezier control points first (smaller, higher priority) - only if smoothing is enabled
-      if (region.bezierControlPoints && region.smoothing !== false) {
+      // Check Bezier control points first (smaller, higher priority)
+      if (region.bezierControlPoints) {
         for (let i = 0; i < region.bezierControlPoints.length; i++) {
           const controls = region.bezierControlPoints[i];
           
@@ -2609,7 +2609,7 @@ export const SimpleTabletop = () => {
               height: newBounds.height
             });
           }
-        } else if (targetRegion.regionType === 'path' && resizeHandle.startsWith('cp-') && targetRegion.bezierControlPoints && targetRegion.smoothing !== false) {
+        } else if (targetRegion.regionType === 'path' && resizeHandle.startsWith('cp-') && targetRegion.bezierControlPoints) {
           // Handle Bezier control point editing
           const parts = resizeHandle.split('-');
           const segmentIndex = parseInt(parts[1]);
