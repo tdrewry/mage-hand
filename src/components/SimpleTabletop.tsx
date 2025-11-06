@@ -2555,11 +2555,47 @@ export const SimpleTabletop = () => {
           const nodeIndex = parseInt(resizeHandle.split('-')[1]);
           if (nodeIndex >= 0 && nodeIndex < targetRegion.pathPoints.length) {
             const newPathPoints = [...targetRegion.pathPoints];
+            const oldPoint = targetRegion.pathPoints[nodeIndex];
             newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
             
-            // Keep existing Bezier control points without regenerating them
-            // This allows manual editing of control points after initial smoothing
-            const newBezierControls = targetRegion.bezierControlPoints;
+            // Calculate delta for moving control points
+            const deltaX = worldPos.x - oldPoint.x;
+            const deltaY = worldPos.y - oldPoint.y;
+            
+            let newBezierControls = targetRegion.bezierControlPoints;
+            
+            // If smoothing is enabled (default), recalculate smoothing
+            if (targetRegion.smoothing !== false) {
+              newBezierControls = generateBezierControlPoints(newPathPoints);
+            } 
+            // If smoothing is disabled, move associated control points with the anchor
+            else if (targetRegion.bezierControlPoints) {
+              newBezierControls = [...targetRegion.bezierControlPoints];
+              
+              // Move control points associated with this anchor
+              // For node i: update cp1 of segment i and cp2 of segment i-1
+              if (nodeIndex < newBezierControls.length) {
+                // Update cp1 of the segment starting at this node
+                newBezierControls[nodeIndex] = {
+                  ...newBezierControls[nodeIndex],
+                  cp1: {
+                    x: newBezierControls[nodeIndex].cp1.x + deltaX,
+                    y: newBezierControls[nodeIndex].cp1.y + deltaY
+                  }
+                };
+              }
+              
+              if (nodeIndex > 0 && nodeIndex - 1 < newBezierControls.length) {
+                // Update cp2 of the segment ending at this node
+                newBezierControls[nodeIndex - 1] = {
+                  ...newBezierControls[nodeIndex - 1],
+                  cp2: {
+                    x: newBezierControls[nodeIndex - 1].cp2.x + deltaX,
+                    y: newBezierControls[nodeIndex - 1].cp2.y + deltaY
+                  }
+                };
+              }
+            }
             
             // Update preview with new path points
             const newBounds = newBezierControls ? getBezierBounds(newPathPoints, newBezierControls) : getPolygonBounds(newPathPoints);
