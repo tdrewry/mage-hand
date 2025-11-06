@@ -30,7 +30,8 @@ import {
   hexCorners 
 } from '../lib/hexCoordinates';
 import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from '../utils/pathUtils';
-import { simplifyPath, smoothPath, pathToCurve } from '../utils/pathSimplification';
+import { simplifyPath } from '../utils/pathSimplification';
+import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUtils';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
@@ -112,6 +113,7 @@ export const SimpleTabletop = () => {
   const [dragPreview, setDragPreview] = useState<{
     regionId: string;
     pathPoints?: Array<{ x: number; y: number }>;
+    bezierControlPoints?: Array<{ cp1: { x: number; y: number }; cp2: { x: number; y: number } }>;
     x?: number;
     y?: number;
     width?: number;
@@ -123,6 +125,7 @@ export const SimpleTabletop = () => {
   const [pathDrawingType, setPathDrawingType] = useState<'polygon' | 'freehand'>('polygon');
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [editingVertexIndex, setEditingVertexIndex] = useState<number | null>(null);
+  const [editingControlPointIndex, setEditingControlPointIndex] = useState<{ segmentIndex: number; isFirst: boolean } | null>(null);
   const [isFreehandDrawing, setIsFreehandDrawing] = useState(false);
   const [lastFreehandPoint, setLastFreehandPoint] = useState<{ x: number; y: number } | null>(null);
   
@@ -456,9 +459,34 @@ export const SimpleTabletop = () => {
   // Get resize handle at position for a region
   const getResizeHandle = (region: CanvasRegion, worldX: number, worldY: number): string | null => {
     if (region.regionType === 'path' && region.pathPoints) {
-      // For path regions, check if clicking on a control node
       const handleSize = 20 / transform.zoom; // Increased hitbox size
       
+      // Check Bezier control points first (smaller, higher priority)
+      if (region.bezierControlPoints) {
+        for (let i = 0; i < region.bezierControlPoints.length; i++) {
+          const controls = region.bezierControlPoints[i];
+          
+          // Check first control point
+          const distCp1 = Math.sqrt(
+            Math.pow(worldX - controls.cp1.x, 2) + Math.pow(worldY - controls.cp1.y, 2)
+          );
+          if (distCp1 <= handleSize / 3) {
+            return `cp-${i}-1`;
+          }
+          
+          // Check second control point
+          if (i < region.pathPoints.length - 1) {
+            const distCp2 = Math.sqrt(
+              Math.pow(worldX - controls.cp2.x, 2) + Math.pow(worldY - controls.cp2.y, 2)
+            );
+            if (distCp2 <= handleSize / 3) {
+              return `cp-${i}-2`;
+            }
+          }
+        }
+      }
+      
+      // Then check anchor points
       for (let i = 0; i < region.pathPoints.length; i++) {
         const point = region.pathPoints[i];
         const distance = Math.sqrt(
@@ -838,7 +866,8 @@ export const SimpleTabletop = () => {
       y: preview.y ?? region.y,
       width: preview.width ?? region.width,
       height: preview.height ?? region.height,
-      pathPoints: preview.pathPoints ?? region.pathPoints
+      pathPoints: preview.pathPoints ?? region.pathPoints,
+      bezierControlPoints: preview.bezierControlPoints ?? region.bezierControlPoints
     } : region;
     
     if (effectiveRegion.regionType === 'path' && effectiveRegion.pathPoints && effectiveRegion.pathPoints.length > 2) {
@@ -858,8 +887,29 @@ export const SimpleTabletop = () => {
     ctx.beginPath();
     if (region.pathPoints && region.pathPoints.length > 0) {
       ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-      for (let i = 1; i < region.pathPoints.length; i++) {
-        ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+      
+      // Draw Bezier curves if control points exist
+      if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
+        for (let i = 0; i < region.pathPoints.length - 1; i++) {
+          const p1 = region.pathPoints[i];
+          const p2 = region.pathPoints[i + 1];
+          const controls = region.bezierControlPoints[i];
+          
+          if (controls) {
+            ctx.bezierCurveTo(
+              controls.cp1.x, controls.cp1.y,
+              controls.cp2.x, controls.cp2.y,
+              p2.x, p2.y
+            );
+          } else {
+            ctx.lineTo(p2.x, p2.y);
+          }
+        }
+      } else {
+        // Fallback to straight lines
+        for (let i = 1; i < region.pathPoints.length; i++) {
+          ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+        }
       }
       ctx.closePath();
     }
@@ -874,8 +924,29 @@ export const SimpleTabletop = () => {
       ctx.beginPath();
       if (region.pathPoints && region.pathPoints.length > 0) {
         ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-        for (let i = 1; i < region.pathPoints.length; i++) {
-          ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+        
+        // Draw Bezier curves if control points exist
+        if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
+          for (let i = 0; i < region.pathPoints.length - 1; i++) {
+            const p1 = region.pathPoints[i];
+            const p2 = region.pathPoints[i + 1];
+            const controls = region.bezierControlPoints[i];
+            
+            if (controls) {
+              ctx.bezierCurveTo(
+                controls.cp1.x, controls.cp1.y,
+                controls.cp2.x, controls.cp2.y,
+                p2.x, p2.y
+              );
+            } else {
+              ctx.lineTo(p2.x, p2.y);
+            }
+          }
+        } else {
+          // Fallback to straight lines
+          for (let i = 1; i < region.pathPoints.length; i++) {
+            ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+          }
         }
         ctx.closePath();
       }
@@ -1390,8 +1461,59 @@ export const SimpleTabletop = () => {
   const drawPathHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.pathPoints || region.pathPoints.length === 0) return;
     
-    const handleSize = 12 / transform.zoom; // Visual size (hitbox is larger - see getResizeHandle)
+    const handleSize = 12 / transform.zoom;
     
+    // Draw Bezier control handles if they exist
+    if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
+      ctx.strokeStyle = '#666666';
+      ctx.lineWidth = 1 / transform.zoom;
+      ctx.setLineDash([3 / transform.zoom, 3 / transform.zoom]);
+      
+      // Draw control handle lines and control points
+      region.pathPoints.forEach((point, index) => {
+        if (index < region.bezierControlPoints!.length) {
+          const controls = region.bezierControlPoints![index];
+          
+          // Draw lines from anchor to control points
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(controls.cp1.x, controls.cp1.y);
+          ctx.stroke();
+          
+          if (index < region.pathPoints!.length - 1) {
+            const nextPoint = region.pathPoints![index + 1];
+            ctx.beginPath();
+            ctx.moveTo(nextPoint.x, nextPoint.y);
+            ctx.lineTo(controls.cp2.x, controls.cp2.y);
+            ctx.stroke();
+          }
+          
+          // Draw control point handles (small circles)
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#4ecdc4';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 / transform.zoom;
+          
+          ctx.beginPath();
+          ctx.arc(controls.cp1.x, controls.cp1.y, handleSize / 3, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          
+          if (index < region.pathPoints!.length - 1) {
+            ctx.beginPath();
+            ctx.arc(controls.cp2.x, controls.cp2.y, handleSize / 3, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+          }
+          
+          ctx.setLineDash([3 / transform.zoom, 3 / transform.zoom]);
+        }
+      });
+      
+      ctx.setLineDash([]);
+    }
+    
+    // Draw anchor points
     ctx.fillStyle = '#ff6b6b';
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2 / transform.zoom;
@@ -1472,18 +1594,16 @@ export const SimpleTabletop = () => {
       return;
     }
 
-    // Simplify and smooth the path if it's freehand
+    // Simplify the path if it's freehand
     let finalPath = currentPath;
     if (pathDrawingType === 'freehand') {
-      // First aggressively simplify to reduce point count (higher epsilon = fewer points)
-      finalPath = simplifyPath(currentPath, 10.0);
-      // Then convert to smooth curves using Catmull-Rom splines
-      finalPath = pathToCurve(finalPath, 0.5, 8);
-      // Final simplification to remove redundant curve points
-      finalPath = simplifyPath(finalPath, 3.0);
+      // Aggressively simplify to get key anchor points
+      finalPath = simplifyPath(currentPath, 15.0);
     }
-
-    const bounds = getPolygonBounds(finalPath);
+    
+    // Generate Bezier control points for smooth curves
+    const bezierControls = generateBezierControlPoints(finalPath);
+    const bounds = getBezierBounds(finalPath, bezierControls);
     const newRegion: CanvasRegion = {
       id: `path-region-${Date.now()}`,
       x: bounds.x,
@@ -1498,7 +1618,8 @@ export const SimpleTabletop = () => {
       gridSnapping: false,
       gridVisible: true,
       regionType: 'path',
-      pathPoints: [...finalPath]
+      pathPoints: [...finalPath],
+      bezierControlPoints: bezierControls
     };
 
     addRegion(newRegion);
@@ -1933,7 +2054,37 @@ export const SimpleTabletop = () => {
       if (pathDrawingMode === 'editing' && selectedRegionId) {
         const selectedRegion = regions.find(r => r.id === selectedRegionId);
         if (selectedRegion && selectedRegion.regionType === 'path' && selectedRegion.pathPoints) {
-          // Check if clicking on a vertex
+          // Check if clicking on a Bezier control point first
+          if (selectedRegion.bezierControlPoints) {
+            const tolerance = 15 / transform.zoom;
+            for (let i = 0; i < selectedRegion.bezierControlPoints.length; i++) {
+              const controls = selectedRegion.bezierControlPoints[i];
+              
+              // Check first control point
+              const distCp1 = Math.sqrt(
+                (worldPos.x - controls.cp1.x) ** 2 + (worldPos.y - controls.cp1.y) ** 2
+              );
+              if (distCp1 <= tolerance) {
+                setEditingControlPointIndex({ segmentIndex: i, isFirst: true });
+                redrawCanvas();
+                return;
+              }
+              
+              // Check second control point
+              if (i < selectedRegion.pathPoints.length - 1) {
+                const distCp2 = Math.sqrt(
+                  (worldPos.x - controls.cp2.x) ** 2 + (worldPos.y - controls.cp2.y) ** 2
+                );
+                if (distCp2 <= tolerance) {
+                  setEditingControlPointIndex({ segmentIndex: i, isFirst: false });
+                  redrawCanvas();
+                  return;
+                }
+              }
+            }
+          }
+          
+          // Check if clicking on an anchor point
           const vertexIndex = findNearestVertex(worldPos, selectedRegion.pathPoints);
           if (vertexIndex !== null) {
             setEditingVertexIndex(vertexIndex);
@@ -2299,11 +2450,47 @@ export const SimpleTabletop = () => {
             const newPathPoints = [...targetRegion.pathPoints];
             newPathPoints[nodeIndex] = { x: worldPos.x, y: worldPos.y };
             
+            // Regenerate Bezier control points for smooth curves
+            const newBezierControls = generateBezierControlPoints(newPathPoints);
+            
             // Update preview with new path points
-            const newBounds = getPolygonBounds(newPathPoints);
+            const newBounds = getBezierBounds(newPathPoints, newBezierControls);
             setDragPreview({
               regionId: draggedRegionId,
               pathPoints: newPathPoints,
+              bezierControlPoints: newBezierControls,
+              x: newBounds.x,
+              y: newBounds.y,
+              width: newBounds.width,
+              height: newBounds.height
+            });
+          }
+        } else if (targetRegion.regionType === 'path' && resizeHandle.startsWith('cp-') && targetRegion.bezierControlPoints) {
+          // Handle Bezier control point editing
+          const parts = resizeHandle.split('-');
+          const segmentIndex = parseInt(parts[1]);
+          const isFirst = parts[2] === '1';
+          
+          if (segmentIndex >= 0 && segmentIndex < targetRegion.bezierControlPoints.length) {
+            const newBezierControls = [...targetRegion.bezierControlPoints];
+            if (isFirst) {
+              newBezierControls[segmentIndex] = {
+                ...newBezierControls[segmentIndex],
+                cp1: { x: worldPos.x, y: worldPos.y }
+              };
+            } else {
+              newBezierControls[segmentIndex] = {
+                ...newBezierControls[segmentIndex],
+                cp2: { x: worldPos.x, y: worldPos.y }
+              };
+            }
+            
+            // Update preview with new control points
+            const newBounds = getBezierBounds(targetRegion.pathPoints!, newBezierControls);
+            setDragPreview({
+              regionId: draggedRegionId,
+              pathPoints: targetRegion.pathPoints,
+              bezierControlPoints: newBezierControls,
               x: newBounds.x,
               y: newBounds.y,
               width: newBounds.width,
@@ -2467,6 +2654,7 @@ export const SimpleTabletop = () => {
               width: dragPreview.width,
               height: dragPreview.height,
               pathPoints: dragPreview.pathPoints,
+              bezierControlPoints: dragPreview.bezierControlPoints,
               // Preserve rotation when dragging
               rotation: draggedRegion.rotation
             });
@@ -2521,6 +2709,7 @@ export const SimpleTabletop = () => {
           width: dragPreview.width,
           height: dragPreview.height,
           pathPoints: dragPreview.pathPoints,
+          bezierControlPoints: dragPreview.bezierControlPoints,
           ...(dragPreview.pathPoints ? { regionType: 'path' as const } : {}),
           // Preserve all other existing properties
           rotation: targetRegion.rotation,

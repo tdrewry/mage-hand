@@ -22,6 +22,7 @@ export interface CanvasRegion {
   // Path-based region support
   regionType?: 'rectangle' | 'path'; // Type of region
   pathPoints?: { x: number; y: number }[]; // Path vertices for free-form regions
+  bezierControlPoints?: { cp1: { x: number; y: number }; cp2: { x: number; y: number } }[]; // Bezier control points for each segment
   
   // Transformation support
   rotation?: number; // Rotation angle in degrees
