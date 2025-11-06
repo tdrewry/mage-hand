@@ -30,6 +30,7 @@ import {
   hexCorners 
 } from '../lib/hexCoordinates';
 import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from '../utils/pathUtils';
+import { simplifyPath, smoothPath } from '../utils/pathSimplification';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
@@ -119,8 +120,10 @@ export const SimpleTabletop = () => {
   
   // Path drawing state
   const [pathDrawingMode, setPathDrawingMode] = useState<'none' | 'drawing' | 'editing'>('none');
+  const [pathDrawingType, setPathDrawingType] = useState<'polygon' | 'freehand'>('polygon');
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [editingVertexIndex, setEditingVertexIndex] = useState<number | null>(null);
+  const [isFreehandDrawing, setIsFreehandDrawing] = useState(false);
   
   // Track tokens moved by region drag to prevent individual snapping
   const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
@@ -1446,10 +1449,15 @@ export const SimpleTabletop = () => {
   };
 
   // Function to start path drawing mode
-  const startPathDrawing = () => {
+  const startPathDrawing = (type: 'polygon' | 'freehand' = 'polygon') => {
     setPathDrawingMode('drawing');
+    setPathDrawingType(type);
     setCurrentPath([]);
-    toast.info('Click to start drawing path. Double-click to finish.');
+    if (type === 'polygon') {
+      toast.info('Click to add points. Double-click to finish.');
+    } else {
+      toast.info('Click and drag to draw freehand. Release to finish.');
+    }
   };
 
   // Function to finish path drawing and create region
@@ -1458,10 +1466,20 @@ export const SimpleTabletop = () => {
       toast.error('Path must have at least 3 points');
       setPathDrawingMode('none');
       setCurrentPath([]);
+      setIsFreehandDrawing(false);
       return;
     }
 
-    const bounds = getPolygonBounds(currentPath);
+    // Simplify and smooth the path if it's freehand
+    let finalPath = currentPath;
+    if (pathDrawingType === 'freehand') {
+      // First smooth the path slightly
+      finalPath = smoothPath(currentPath, 3);
+      // Then simplify to reduce point count
+      finalPath = simplifyPath(finalPath, 3.0);
+    }
+
+    const bounds = getPolygonBounds(finalPath);
     const newRegion: CanvasRegion = {
       id: `path-region-${Date.now()}`,
       x: bounds.x,
@@ -1476,12 +1494,14 @@ export const SimpleTabletop = () => {
       gridSnapping: false,
       gridVisible: true,
       regionType: 'path',
-      pathPoints: [...currentPath]
+      pathPoints: [...finalPath]
     };
 
     addRegion(newRegion);
     setPathDrawingMode('none');
+    setPathDrawingType('polygon');
     setCurrentPath([]);
+    setIsFreehandDrawing(false);
     toast.success('Path region created');
   };
 
@@ -1892,9 +1912,16 @@ export const SimpleTabletop = () => {
     } else if (e.button === 0) { // Left click
       // Handle path drawing mode
       if (pathDrawingMode === 'drawing') {
-        // Add point to current path (redraw will happen automatically via useEffect)
-        setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
-        return;
+        if (pathDrawingType === 'polygon') {
+          // Polygon mode: Add point on click
+          setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+          return;
+        } else {
+          // Freehand mode: Start drawing on mouse down
+          setIsFreehandDrawing(true);
+          setCurrentPath([{ x: worldPos.x, y: worldPos.y }]);
+          return;
+        }
       }
       
       // Handle path editing mode
@@ -2050,6 +2077,13 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+    
+    // Handle freehand drawing
+    if (isFreehandDrawing && pathDrawingMode === 'drawing' && pathDrawingType === 'freehand') {
+      const worldPos = screenToWorld(mouseX, mouseY);
+      setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+      return;
+    }
     
     if (isPanning) {
       const deltaX = e.clientX - lastPanPoint.x;
@@ -2340,6 +2374,13 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Handle freehand drawing completion
+    if (isFreehandDrawing && pathDrawingMode === 'drawing' && pathDrawingType === 'freehand') {
+      setIsFreehandDrawing(false);
+      finishPathDrawing();
+      return;
+    }
+
     if (e.button === 2) { // Right click
       setIsPanning(false);
     } else if (e.button === 0) { // Left click
@@ -2666,13 +2707,24 @@ export const SimpleTabletop = () => {
             Add Region
           </Button>
           <Button
-            variant={pathDrawingMode === 'drawing' ? "default" : "outline"}
+            variant={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? "default" : "outline"}
             size="sm"
-            onClick={pathDrawingMode === 'drawing' ? finishPathDrawing : startPathDrawing}
+            onClick={() => pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? finishPathDrawing() : startPathDrawing('polygon')}
             className="flex items-center gap-2"
+            disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
           >
             <Pen className="w-4 h-4" />
-            {pathDrawingMode === 'drawing' ? 'Finish Path' : 'Draw Path'}
+            {pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? 'Finish Polygon' : 'Draw Polygon'}
+          </Button>
+          <Button
+            variant={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand' ? "default" : "outline"}
+            size="sm"
+            onClick={() => startPathDrawing('freehand')}
+            className="flex items-center gap-2"
+            disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+          >
+            <Pen className="w-4 h-4" />
+            Draw Freehand
           </Button>
         </div>
       </div>
@@ -2723,7 +2775,7 @@ export const SimpleTabletop = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onDoubleClick={() => pathDrawingMode === 'drawing' && finishPathDrawing()}
+          onDoubleClick={() => pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' && finishPathDrawing()}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
         />
