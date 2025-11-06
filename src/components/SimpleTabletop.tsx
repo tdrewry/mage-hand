@@ -2108,8 +2108,63 @@ export const SimpleTabletop = () => {
         }
       }
       
-      // PRIORITY 1: Check for transformation handles on selected regions FIRST
+      // PRIORITY 1: Check for ANY handle on selected region first
       // This prevents deselection when clicking handles outside the shape boundary
+      if (selectedRegionId) {
+        const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
+        if (selectedRegion) {
+          // Check for resize/anchor/bezier handles
+          const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
+          if (handle) {
+            if (handle.startsWith('cp-')) {
+              // Bezier control point
+              const [, segmentStr, cpStr] = handle.split('-');
+              const segmentIndex = parseInt(segmentStr);
+              const isFirst = cpStr === '1';
+              setEditingControlPointIndex({ segmentIndex, isFirst });
+              redrawCanvas();
+              return;
+            } else if (handle.startsWith('node-')) {
+              // Anchor point
+              const vertexIndex = parseInt(handle.split('-')[1]);
+              setEditingVertexIndex(vertexIndex);
+              redrawCanvas();
+              return;
+            } else {
+              // Rectangle resize handle
+              setIsResizingRegion(true);
+              setResizeHandle(handle);
+              setDraggedRegionId(selectedRegion.id);
+              return;
+            }
+          }
+          
+          // Check for rotation handle
+          if (isOverRotationHandle(worldPos.x, worldPos.y, selectedRegion)) {
+            setIsRotatingRegion(true);
+            setDraggedRegionId(selectedRegion.id);
+            const centerX = selectedRegion.x + selectedRegion.width / 2;
+            const centerY = selectedRegion.y + selectedRegion.height / 2;
+            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+            
+            // Group tokens for rotation
+            const tokensInRegion: {tokenId: string, startX: number, startY: number}[] = [];
+            tokens.forEach(token => {
+              if (isPointInRegion(token.x, token.y, selectedRegion)) {
+                tokensInRegion.push({
+                  tokenId: token.id,
+                  startX: token.x,
+                  startY: token.y
+                });
+              }
+            });
+            setGroupedTokens(tokensInRegion);
+            return;
+          }
+        }
+      }
+      
+      // PRIORITY 2: Check for transformation handles on selected regions
       if (selectedRegionId && transformMode !== 'move') {
         const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
         if (selectedRegion) {
