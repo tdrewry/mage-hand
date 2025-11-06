@@ -124,6 +124,7 @@ export const SimpleTabletop = () => {
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [editingVertexIndex, setEditingVertexIndex] = useState<number | null>(null);
   const [isFreehandDrawing, setIsFreehandDrawing] = useState(false);
+  const [lastFreehandPoint, setLastFreehandPoint] = useState<{ x: number; y: number } | null>(null);
   
   // Track tokens moved by region drag to prevent individual snapping
   const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
@@ -1467,6 +1468,7 @@ export const SimpleTabletop = () => {
       setPathDrawingMode('none');
       setCurrentPath([]);
       setIsFreehandDrawing(false);
+      setLastFreehandPoint(null);
       return;
     }
 
@@ -1474,9 +1476,9 @@ export const SimpleTabletop = () => {
     let finalPath = currentPath;
     if (pathDrawingType === 'freehand') {
       // First smooth the path slightly
-      finalPath = smoothPath(currentPath, 3);
-      // Then simplify to reduce point count
-      finalPath = simplifyPath(finalPath, 3.0);
+      finalPath = smoothPath(currentPath, 5);
+      // Then aggressively simplify to reduce point count (higher epsilon = fewer points)
+      finalPath = simplifyPath(finalPath, 8.0);
     }
 
     const bounds = getPolygonBounds(finalPath);
@@ -1502,6 +1504,7 @@ export const SimpleTabletop = () => {
     setPathDrawingType('polygon');
     setCurrentPath([]);
     setIsFreehandDrawing(false);
+    setLastFreehandPoint(null);
     toast.success('Path region created');
   };
 
@@ -1689,7 +1692,6 @@ export const SimpleTabletop = () => {
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    console.log('handleCanvasClick', { pathDrawingMode, isDraggingToken, isPanning });
     if (e.button === 0 && !isPanning && !isDraggingToken) { // Left click and not panning/dragging
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -1719,7 +1721,6 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedRegion) {
-        console.log('Clicked region:', clickedRegion.id, 'isSelected:', clickedRegion.selected);
         // Check if clicking on rotation handle of an already selected region
         if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
           // Don't deselect if clicking on rotation handle - let it handle rotation
@@ -1727,7 +1728,6 @@ export const SimpleTabletop = () => {
         }
         
         // Region selection logic
-        console.log('Selecting region:', clickedRegion.id);
         clearSelection();
         selectRegion(clickedRegion.id);
         setSelectedRegionId(clickedRegion.id);
@@ -2081,10 +2081,17 @@ export const SimpleTabletop = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    // Handle freehand drawing
+    // Handle freehand drawing with throttling to reduce points
     if (isFreehandDrawing && pathDrawingMode === 'drawing' && pathDrawingType === 'freehand') {
       const worldPos = screenToWorld(mouseX, mouseY);
-      setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+      
+      // Only add point if it's far enough from the last point (throttling)
+      const minDistance = 5; // Minimum distance between points in world coordinates
+      if (!lastFreehandPoint || 
+          Math.sqrt((worldPos.x - lastFreehandPoint.x) ** 2 + (worldPos.y - lastFreehandPoint.y) ** 2) >= minDistance) {
+        setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+        setLastFreehandPoint(worldPos);
+      }
       return;
     }
     
