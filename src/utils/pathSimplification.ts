@@ -101,3 +101,64 @@ export function smoothPath(points: Point[], windowSize: number = 3): Point[] {
   
   return smoothed;
 }
+
+/**
+ * Convert a path to smooth curves using Catmull-Rom spline interpolation
+ * @param points - Array of points to convert to curves
+ * @param tension - Curve tension (0 = tight, 0.5 = normal, 1 = loose)
+ * @param segmentsPerCurve - Number of interpolated points per curve segment
+ * @returns Array of interpolated curve points
+ */
+export function pathToCurve(points: Point[], tension: number = 0.5, segmentsPerCurve: number = 10): Point[] {
+  if (points.length < 3) return points;
+  
+  const curvePoints: Point[] = [];
+  
+  // Add first point
+  curvePoints.push(points[0]);
+  
+  // For each segment between control points
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = i > 0 ? points[i - 1] : points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1];
+    
+    // Generate interpolated points for this curve segment
+    for (let t = 0; t < segmentsPerCurve; t++) {
+      const tNorm = t / segmentsPerCurve;
+      const point = catmullRomPoint(p0, p1, p2, p3, tNorm, tension);
+      curvePoints.push(point);
+    }
+  }
+  
+  // Add last point
+  curvePoints.push(points[points.length - 1]);
+  
+  return curvePoints;
+}
+
+/**
+ * Calculate a point on a Catmull-Rom spline curve
+ */
+function catmullRomPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number, tension: number): Point {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  
+  // Catmull-Rom basis functions
+  const v0 = (2 * p1.x);
+  const v1 = (-p0.x + p2.x) * tension;
+  const v2 = (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * tension;
+  const v3 = (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * tension;
+  
+  const x = 0.5 * (v0 + v1 * t + v2 * t2 + v3 * t3);
+  
+  const w0 = (2 * p1.y);
+  const w1 = (-p0.y + p2.y) * tension;
+  const w2 = (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * tension;
+  const w3 = (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * tension;
+  
+  const y = 0.5 * (w0 + w1 * t + w2 * t2 + w3 * t3);
+  
+  return { x, y };
+}

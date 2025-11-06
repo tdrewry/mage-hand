@@ -30,7 +30,7 @@ import {
   hexCorners 
 } from '../lib/hexCoordinates';
 import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from '../utils/pathUtils';
-import { simplifyPath, smoothPath } from '../utils/pathSimplification';
+import { simplifyPath, smoothPath, pathToCurve } from '../utils/pathSimplification';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
@@ -1475,10 +1475,12 @@ export const SimpleTabletop = () => {
     // Simplify and smooth the path if it's freehand
     let finalPath = currentPath;
     if (pathDrawingType === 'freehand') {
-      // First smooth the path slightly
-      finalPath = smoothPath(currentPath, 5);
-      // Then aggressively simplify to reduce point count (higher epsilon = fewer points)
-      finalPath = simplifyPath(finalPath, 8.0);
+      // First aggressively simplify to reduce point count (higher epsilon = fewer points)
+      finalPath = simplifyPath(currentPath, 10.0);
+      // Then convert to smooth curves using Catmull-Rom splines
+      finalPath = pathToCurve(finalPath, 0.5, 8);
+      // Final simplification to remove redundant curve points
+      finalPath = simplifyPath(finalPath, 3.0);
     }
 
     const bounds = getPolygonBounds(finalPath);
