@@ -2314,10 +2314,29 @@ export const SimpleTabletop = () => {
             y: point.y + deltaY
           }));
           
-          const newBounds = getPolygonBounds(newPathPoints);
+          // Also update bezier control points if they exist
+          let newBezierControls = draggedRegion.bezierControlPoints;
+          if (draggedRegion.bezierControlPoints) {
+            newBezierControls = draggedRegion.bezierControlPoints.map(control => ({
+              cp1: {
+                x: control.cp1.x + deltaX,
+                y: control.cp1.y + deltaY
+              },
+              cp2: {
+                x: control.cp2.x + deltaX,
+                y: control.cp2.y + deltaY
+              }
+            }));
+          }
+          
+          const newBounds = newBezierControls ? 
+            getBezierBounds(newPathPoints, newBezierControls) : 
+            getPolygonBounds(newPathPoints);
+          
           setDragPreview({
             regionId: draggedRegionId,
             pathPoints: newPathPoints,
+            bezierControlPoints: newBezierControls,
             x: newBounds.x,
             y: newBounds.y,
             width: newBounds.width,
@@ -2361,7 +2380,8 @@ export const SimpleTabletop = () => {
           y: draggedRegion.y,
           width: draggedRegion.width,
           height: draggedRegion.height,
-          pathPoints: draggedRegion.pathPoints
+          pathPoints: draggedRegion.pathPoints,
+          bezierControlPoints: draggedRegion.bezierControlPoints
         });
         
         // Rotate all grouped tokens around region center
