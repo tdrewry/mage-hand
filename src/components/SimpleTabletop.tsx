@@ -1689,6 +1689,7 @@ export const SimpleTabletop = () => {
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    console.log('handleCanvasClick', { pathDrawingMode, isDraggingToken, isPanning });
     if (e.button === 0 && !isPanning && !isDraggingToken) { // Left click and not panning/dragging
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -1718,6 +1719,7 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedRegion) {
+        console.log('Clicked region:', clickedRegion.id, 'isSelected:', clickedRegion.selected);
         // Check if clicking on rotation handle of an already selected region
         if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
           // Don't deselect if clicking on rotation handle - let it handle rotation
@@ -1725,6 +1727,7 @@ export const SimpleTabletop = () => {
         }
         
         // Region selection logic
+        console.log('Selecting region:', clickedRegion.id);
         clearSelection();
         selectRegion(clickedRegion.id);
         setSelectedRegionId(clickedRegion.id);
