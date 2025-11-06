@@ -1597,8 +1597,22 @@ export const SimpleTabletop = () => {
     // Simplify the path if it's freehand
     let finalPath = currentPath;
     if (pathDrawingType === 'freehand') {
-      // Aggressively simplify to get key anchor points
-      finalPath = simplifyPath(currentPath, 15.0);
+      // Aggressively simplify to get key anchor points (increased from 15.0 to 25.0)
+      finalPath = simplifyPath(currentPath, 25.0);
+      
+      // Enforce maximum point limit to prevent storage overflow
+      const MAX_POINTS = 100;
+      if (finalPath.length > MAX_POINTS) {
+        // Apply even more aggressive simplification
+        const targetEpsilon = 25.0 * (finalPath.length / MAX_POINTS);
+        finalPath = simplifyPath(currentPath, targetEpsilon);
+      }
+    }
+    
+    // Limit polygon paths too
+    const MAX_POLYGON_POINTS = 200;
+    if (finalPath.length > MAX_POLYGON_POINTS) {
+      finalPath = simplifyPath(finalPath, 10.0);
     }
     
     // Generate Bezier control points for smooth curves
@@ -2242,7 +2256,17 @@ export const SimpleTabletop = () => {
       const minDistance = 5; // Minimum distance between points in world coordinates
       if (!lastFreehandPoint || 
           Math.sqrt((worldPos.x - lastFreehandPoint.x) ** 2 + (worldPos.y - lastFreehandPoint.y) ** 2) >= minDistance) {
-        setCurrentPath(prev => [...prev, { x: worldPos.x, y: worldPos.y }]);
+        
+        // Limit max points during drawing to prevent memory issues
+        setCurrentPath(prev => {
+          const MAX_DRAWING_POINTS = 500;
+          if (prev.length >= MAX_DRAWING_POINTS) {
+            // Apply live simplification when hitting limit
+            const simplified = simplifyPath(prev, 10.0);
+            return [...simplified, { x: worldPos.x, y: worldPos.y }];
+          }
+          return [...prev, { x: worldPos.x, y: worldPos.y }];
+        });
         setLastFreehandPoint(worldPos);
       }
       return;
