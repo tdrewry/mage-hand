@@ -11,8 +11,10 @@ import {
   X, 
   Settings, 
   Trash2,
-  Edit3
+  Edit3,
+  Waves
 } from 'lucide-react';
+import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { CanvasRegion } from '../stores/regionStore';
 
@@ -178,6 +180,25 @@ export const RegionControlPanel: React.FC<RegionControlPanelProps> = ({
               )}
             </div>
           </div>
+
+          {/* Path Smoothing (only for path regions with bezier curves) */}
+          {region.regionType === 'path' && region.bezierControlPoints && (
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Path Settings</Label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Waves className="w-3 h-3" />
+                  <span className="text-xs">Smoothing</span>
+                </div>
+                <Switch
+                  checked={region.smoothing !== false}
+                  onCheckedChange={(checked) => 
+                    onUpdateRegion(region.id, { smoothing: checked })
+                  }
+                />
+              </div>
+            </div>
+          )}
 
           {/* Region Info */}
           <div className="space-y-2">
