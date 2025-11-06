@@ -888,8 +888,8 @@ export const SimpleTabletop = () => {
     if (region.pathPoints && region.pathPoints.length > 0) {
       ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
       
-      // Draw Bezier curves if control points exist and smoothing is enabled
-      if (region.bezierControlPoints && region.bezierControlPoints.length > 0 && region.smoothing !== false) {
+      // Draw Bezier curves if control points exist
+      if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
         for (let i = 0; i < region.pathPoints.length - 1; i++) {
           const p1 = region.pathPoints[i];
           const p2 = region.pathPoints[i + 1];
@@ -925,8 +925,8 @@ export const SimpleTabletop = () => {
       if (region.pathPoints && region.pathPoints.length > 0) {
         ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
         
-        // Draw Bezier curves if control points exist and smoothing is enabled
-        if (region.bezierControlPoints && region.bezierControlPoints.length > 0 && region.smoothing !== false) {
+        // Draw Bezier curves if control points exist
+        if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
           for (let i = 0; i < region.pathPoints.length - 1; i++) {
             const p1 = region.pathPoints[i];
             const p2 = region.pathPoints[i + 1];
@@ -1212,8 +1212,8 @@ export const SimpleTabletop = () => {
       ctx.beginPath();
       ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
       
-      // Use Bezier curves if control points exist and smoothing is enabled
-      if (region.bezierControlPoints && region.bezierControlPoints.length > 0 && region.smoothing !== false) {
+      // Use Bezier curves if control points exist
+      if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
         for (let i = 0; i < region.pathPoints.length - 1; i++) {
           const p1 = region.pathPoints[i];
           const p2 = region.pathPoints[i + 1];
@@ -1485,8 +1485,8 @@ export const SimpleTabletop = () => {
     
     const handleSize = 12 / transform.zoom;
     
-    // Draw Bezier control handles if they exist and smoothing is enabled
-    if (region.bezierControlPoints && region.bezierControlPoints.length > 0 && region.smoothing !== false) {
+    // Draw Bezier control handles if they exist
+    if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
       ctx.strokeStyle = '#666666';
       ctx.lineWidth = 1 / transform.zoom;
       ctx.setLineDash([3 / transform.zoom, 3 / transform.zoom]);
