@@ -548,39 +548,52 @@ export const SimpleTabletop = () => {
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.zoom, transform.zoom);
     
-    // Draw dark background
+    // Calculate viewport
     const viewWidth = canvas.width / transform.zoom;
     const viewHeight = canvas.height / transform.zoom;
     const viewX = -transform.x / transform.zoom;
     const viewY = -transform.y / transform.zoom;
     
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
+    // Determine rendering mode
+    const isDungeonMapMode = renderingMode === 'dungeon-map';
     
-    // Draw grid
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1 / transform.zoom; // Keep line width consistent
-    
-    const gridSize = 40;
-    const startX = Math.floor((viewX - 1000) / gridSize) * gridSize;
-    const endX = Math.ceil((viewX + viewWidth + 1000) / gridSize) * gridSize;
-    const startY = Math.floor((viewY - 1000) / gridSize) * gridSize;
-    const endY = Math.ceil((viewY + viewHeight + 1000) / gridSize) * gridSize;
-    
-    // Vertical lines
-    for (let x = startX; x <= endX; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-      ctx.stroke();
+    // Draw background (different for each mode)
+    if (isDungeonMapMode) {
+      // Dungeon map background
+      ctx.fillStyle = watabouStyle.colorBg;
+      ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
+    } else {
+      // VTT dark background
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
     }
     
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-      ctx.stroke();
+    // Draw grid (VTT mode only)
+    if (!isDungeonMapMode) {
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1 / transform.zoom;
+      
+      const gridSize = 40;
+      const startX = Math.floor((viewX - 1000) / gridSize) * gridSize;
+      const endX = Math.ceil((viewX + viewWidth + 1000) / gridSize) * gridSize;
+      const startY = Math.floor((viewY - 1000) / gridSize) * gridSize;
+      const endY = Math.ceil((viewY + viewHeight + 1000) / gridSize) * gridSize;
+      
+      // Vertical lines
+      for (let x = startX; x <= endX; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
+      }
+      
+      // Horizontal lines
+      for (let y = startY; y <= endY; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+      }
     }
     
     // Draw tokens that are in viewport
@@ -609,9 +622,6 @@ export const SimpleTabletop = () => {
         offScreenTokens.push(checkToken);
       }
     });
-    
-    // Draw dungeon features in correct z-order
-    const isDungeonMapMode = renderingMode === 'dungeon-map';
     
     // 1. First render terrain features (water, debris, etc.) - BELOW walls
     renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode, watabouStyle, regions);

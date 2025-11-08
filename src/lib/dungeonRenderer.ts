@@ -3,54 +3,84 @@ import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
- * Check if two wall segments overlap or are very close (within tolerance)
+ * Check if two wall segments are exactly coincident (same position and orientation)
+ */
+function segmentsCoincident(
+  seg1: { x1: number; y1: number; x2: number; y2: number },
+  seg2: { x1: number; y1: number; x2: number; y2: number },
+  tolerance: number = 1
+): boolean {
+  // Check if segments match in either direction
+  const match1 = Math.abs(seg1.x1 - seg2.x1) < tolerance &&
+                 Math.abs(seg1.y1 - seg2.y1) < tolerance &&
+                 Math.abs(seg1.x2 - seg2.x2) < tolerance &&
+                 Math.abs(seg1.y2 - seg2.y2) < tolerance;
+  
+  const match2 = Math.abs(seg1.x1 - seg2.x2) < tolerance &&
+                 Math.abs(seg1.y1 - seg2.y2) < tolerance &&
+                 Math.abs(seg1.x2 - seg2.x1) < tolerance &&
+                 Math.abs(seg1.y2 - seg2.y1) < tolerance;
+  
+  return match1 || match2;
+}
+
+/**
+ * Check if two segments share a significant portion of the same line
  */
 function segmentsOverlap(
   seg1: { x1: number; y1: number; x2: number; y2: number },
-  seg2: { x1: number; y1: number; x2: number; y2: number },
-  tolerance: number = 2
+  seg2: { x1: number; y1: number; x2: number; y2: number }
 ): boolean {
-  // Check if segments are parallel and overlapping
+  const tolerance = 0.5;
+  
+  // Calculate segment vectors
   const dx1 = seg1.x2 - seg1.x1;
   const dy1 = seg1.y2 - seg1.y1;
   const dx2 = seg2.x2 - seg2.x1;
   const dy2 = seg2.y2 - seg2.y1;
   
-  // Normalize segments so p1 is always "before" p2
-  const normSeg1 = {
-    x1: Math.min(seg1.x1, seg1.x2),
-    y1: Math.min(seg1.y1, seg1.y2),
-    x2: Math.max(seg1.x1, seg1.x2),
-    y2: Math.max(seg1.y1, seg1.y2)
-  };
-  const normSeg2 = {
-    x1: Math.min(seg2.x1, seg2.x2),
-    y1: Math.min(seg2.y1, seg2.y2),
-    x2: Math.max(seg2.x1, seg2.x2),
-    y2: Math.max(seg2.y1, seg2.y2)
-  };
+  const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+  const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
   
-  // Check if both are vertical (dx ≈ 0)
-  if (Math.abs(dx1) < 0.1 && Math.abs(dx2) < 0.1) {
-    // Check if x positions are close
-    if (Math.abs(normSeg1.x1 - normSeg2.x1) > tolerance) return false;
-    
-    // Check if y ranges overlap
-    const overlap = Math.min(normSeg1.y2, normSeg2.y2) - Math.max(normSeg1.y1, normSeg2.y1);
-    return overlap > -tolerance;
-  }
+  if (len1 < 0.1 || len2 < 0.1) return false;
   
-  // Check if both are horizontal (dy ≈ 0)
-  if (Math.abs(dy1) < 0.1 && Math.abs(dy2) < 0.1) {
-    // Check if y positions are close
-    if (Math.abs(normSeg1.y1 - normSeg2.y1) > tolerance) return false;
-    
-    // Check if x ranges overlap
-    const overlap = Math.min(normSeg1.x2, normSeg2.x2) - Math.max(normSeg1.x1, normSeg2.x1);
-    return overlap > -tolerance;
-  }
+  // Normalize direction vectors
+  const ndx1 = dx1 / len1;
+  const ndy1 = dy1 / len1;
+  const ndx2 = dx2 / len2;
+  const ndy2 = dy2 / len2;
   
-  return false;
+  // Check if parallel (dot product of normalized vectors ≈ ±1)
+  const dotProduct = Math.abs(ndx1 * ndx2 + ndy1 * ndy2);
+  if (dotProduct < 0.98) return false; // Not parallel
+  
+  // Check if segments are on the same line
+  // Project seg2's start point onto seg1's line
+  const dx = seg2.x1 - seg1.x1;
+  const dy = seg2.y1 - seg1.y1;
+  const perpDist = Math.abs(dx * ndy1 - dy * ndx1);
+  
+  if (perpDist > tolerance) return false; // Not on same line
+  
+  // Check if segments overlap along the line
+  // Project all points onto the line direction
+  const t1_start = 0;
+  const t1_end = len1;
+  const t2_start = (seg2.x1 - seg1.x1) * ndx1 + (seg2.y1 - seg1.y1) * ndy1;
+  const t2_end = (seg2.x2 - seg1.x1) * ndx1 + (seg2.y2 - seg1.y1) * ndy1;
+  
+  const t2_min = Math.min(t2_start, t2_end);
+  const t2_max = Math.max(t2_start, t2_end);
+  
+  // Check for overlap with a minimum overlap threshold
+  const overlapStart = Math.max(t1_start, t2_min);
+  const overlapEnd = Math.min(t1_end, t2_max);
+  const overlapLength = overlapEnd - overlapStart;
+  
+  // Require at least 50% of the shorter segment to overlap
+  const minOverlap = Math.min(len1, len2) * 0.5;
+  
+  return overlapLength >= minOverlap;
 }
 
 /**
@@ -83,10 +113,20 @@ function calculateWallSegments(regions: CanvasRegion[]): { x1: number; y1: numbe
   const sharedSegmentIndices = new Set<number>();
   
   for (let i = 0; i < allSegments.length; i++) {
+    if (sharedSegmentIndices.has(i)) continue;
+    
     for (let j = i + 1; j < allSegments.length; j++) {
+      if (sharedSegmentIndices.has(j)) continue;
+      
       // Only check segments from different regions
       if (allSegments[i].regionId !== allSegments[j].regionId) {
-        if (segmentsOverlap(allSegments[i], allSegments[j], 3)) {
+        // Use stricter coincident check first
+        if (segmentsCoincident(allSegments[i], allSegments[j], 1)) {
+          sharedSegmentIndices.add(i);
+          sharedSegmentIndices.add(j);
+        }
+        // Then check for significant overlap
+        else if (segmentsOverlap(allSegments[i], allSegments[j])) {
           sharedSegmentIndices.add(i);
           sharedSegmentIndices.add(j);
         }
@@ -198,11 +238,7 @@ export function renderDungeonMapRegions(
   
   ctx.save();
   
-  // Draw background
-  ctx.fillStyle = style.colorBg;
-  ctx.fillRect(-10000, -10000, 20000, 20000);
-  
-  // Fill all regions with paper color first
+  // Fill all regions with paper color (don't draw background here - it should be drawn earlier)
   regions.forEach((region) => {
     ctx.fillStyle = style.colorPaper;
     
