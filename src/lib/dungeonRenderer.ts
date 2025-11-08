@@ -4,6 +4,100 @@ import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 import { generateWallGeometry, applyWallHatching } from './wallGeometry';
 
 /**
+ * Helper: Blend two hex colors
+ */
+function blendColors(color1: string, color2: string, ratio: number): string {
+  const hex = (c: string) => {
+    const h = c.replace('#', '');
+    return {
+      r: parseInt(h.substring(0, 2), 16),
+      g: parseInt(h.substring(2, 4), 16),
+      b: parseInt(h.substring(4, 6), 16)
+    };
+  };
+  
+  const c1 = hex(color1);
+  const c2 = hex(color2);
+  
+  const r = Math.round(c1.r * (1 - ratio) + c2.r * ratio);
+  const g = Math.round(c1.g * (1 - ratio) + c2.g * ratio);
+  const b = Math.round(c1.b * (1 - ratio) + c2.b * ratio);
+  
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Helper: Get bounding box for any region type
+ */
+function getRegionBounds(region: CanvasRegion): { x: number; y: number; width: number; height: number } {
+  if (region.regionType === 'rectangle') {
+    return { x: region.x, y: region.y, width: region.width, height: region.height };
+  } else if (region.regionType === 'path' && region.pathPoints) {
+    const xs = region.pathPoints.map(p => p.x);
+    const ys = region.pathPoints.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+  return { x: region.x, y: region.y, width: region.width || 0, height: region.height || 0 };
+}
+
+/**
+ * Render subtle floor texture pattern
+ */
+function renderFloorPattern(
+  ctx: CanvasRenderingContext2D,
+  region: CanvasRegion,
+  style: WatabouStyle,
+  zoom: number
+) {
+  ctx.save();
+  
+  // Create clipping path for region
+  ctx.beginPath();
+  if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+    ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+    for (let i = 1; i < region.pathPoints.length; i++) {
+      ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+    }
+    ctx.closePath();
+  } else if (region.regionType === 'rectangle') {
+    if (region.rotation) {
+      const cx = region.x + region.width / 2;
+      const cy = region.y + region.height / 2;
+      ctx.translate(cx, cy);
+      ctx.rotate((region.rotation * Math.PI) / 180);
+      ctx.rect(-region.width / 2, -region.height / 2, region.width, region.height);
+    } else {
+      ctx.rect(region.x, region.y, region.width, region.height);
+    }
+  }
+  ctx.clip();
+  
+  // Draw dotted grid pattern
+  const dotSpacing = 10 / zoom;
+  const dotSize = (style.strokeThin * 0.8) / zoom;
+  
+  ctx.fillStyle = style.colorInk;
+  ctx.globalAlpha = 0.12;
+  
+  const bounds = getRegionBounds(region);
+  const padding = 20 / zoom;
+  
+  for (let x = bounds.x - padding; x < bounds.x + bounds.width + padding; x += dotSpacing) {
+    for (let y = bounds.y - padding; y < bounds.y + bounds.height + padding; y += dotSpacing) {
+      ctx.beginPath();
+      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  
+  ctx.restore();
+}
+
+/**
  * Render regions in dungeon map style with thick hatched walls using negative space
  */
 export function renderDungeonMapRegions(
@@ -18,9 +112,18 @@ export function renderDungeonMapRegions(
   
   ctx.save();
   
-  // 1. Fill all regions with paper color (floor)
+  // 1. Fill all regions with floor color and texture
   regions.forEach((region) => {
-    ctx.fillStyle = style.colorPaper;
+    // Determine room shade based on region color (special rooms are darker)
+    const isSpecialRoom = region.color?.includes('0, 70%') || region.color?.toLowerCase().includes('red');
+    
+    let fillColor = style.colorPaper;
+    if (isSpecialRoom) {
+      // Darker shade for special rooms (blend with brown)
+      fillColor = blendColors(style.colorPaper, '#8B4513', 0.15);
+    }
+    
+    ctx.fillStyle = fillColor;
     
     if (region.regionType === 'rectangle') {
       if (region.rotation) {
@@ -44,6 +147,9 @@ export function renderDungeonMapRegions(
       ctx.closePath();
       ctx.fill();
     }
+    
+    // Add floor texture pattern
+    renderFloorPattern(ctx, region, style, zoom);
   });
   
   // 2. Generate wall geometry (negative space)
