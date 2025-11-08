@@ -716,10 +716,6 @@ export const SimpleTabletop = () => {
         const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
         const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
         
-        // Configure soft shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = shadowDistance * 0.5;
-        
         // Draw shadow along each edge
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
@@ -736,16 +732,18 @@ export const SimpleTabletop = () => {
             // Check if this edge faces away from light (should cast shadow)
             const dotProduct = normalX * Math.cos(lightAngleRad) + normalY * Math.sin(lightAngleRad);
             
-            // Only draw shadow on edges that face away from light
-            if (dotProduct < -0.1) {
+            // Draw shadow on edges that face away from light (more lenient threshold)
+            if (dotProduct < 0.2) {
               // Create gradient for smooth fade
               const gradient = ctx.createLinearGradient(
                 point.x, point.y,
                 point.x + shadowDx, point.y + shadowDy
               );
               
-              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-              gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.1)');
+              // Vary intensity based on how directly the edge faces away from light
+              const intensity = Math.max(0.3, Math.min(0.6, -dotProduct));
+              gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
+              gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.3})`);
               gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
               
               ctx.fillStyle = gradient;
@@ -759,10 +757,6 @@ export const SimpleTabletop = () => {
             }
           }
         });
-        
-        // Reset shadow
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
         
         // Apply point light sources if any exist
         if (lightSources.length > 0) {
