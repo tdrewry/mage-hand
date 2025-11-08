@@ -179,6 +179,27 @@ export const RegionControlPanel: React.FC<RegionControlPanelProps> = ({
                 </Button>
               )}
             </div>
+            
+            {region.gridType !== 'free' && (
+              <div className="space-y-1">
+                <Label htmlFor="gridSize" className="text-xs">Grid Size (px)</Label>
+                <Input
+                  id="gridSize"
+                  type="number"
+                  min="10"
+                  max="500"
+                  step="5"
+                  value={region.gridSize}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value > 0) {
+                      onUpdateRegion(region.id, { gridSize: value });
+                    }
+                  }}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
           </div>
 
           {/* Path Smoothing (only for path regions with bezier curves) */}
