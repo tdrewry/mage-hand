@@ -16,6 +16,7 @@ export interface WatabouStyle {
   hatchingStrokes: number;
   hatchingSize: number;
   hatchingDistance: number;
+  wallMargin?: number; // Optional margin around regions for wall rendering
 }
 
 // Built-in style presets

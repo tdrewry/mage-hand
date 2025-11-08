@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DoorConnection, Annotation, TerrainFeature } from '@/lib/dungeonTypes';
 import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
+import { WallGeometry } from '@/lib/wallGeometry';
 
 interface DungeonStore {
   doors: DoorConnection[];
@@ -9,6 +10,11 @@ interface DungeonStore {
   terrainFeatures: TerrainFeature[];
   renderingMode: 'vtt' | 'dungeon-map';
   watabouStyle: WatabouStyle;
+  
+  // Wall geometry caching
+  cachedWallGeometry: WallGeometry | null;
+  wallGeometryCacheKey: string | null;
+  setCachedWallGeometry: (geometry: WallGeometry | null, cacheKey: string | null) => void;
   
   // Rendering mode
   setRenderingMode: (mode: 'vtt' | 'dungeon-map') => void;
@@ -47,9 +53,15 @@ export const useDungeonStore = create<DungeonStore>()(
     terrainFeatures: [],
     renderingMode: 'vtt',
     watabouStyle: DEFAULT_STYLE,
+    cachedWallGeometry: null,
+    wallGeometryCacheKey: null,
       
       setRenderingMode: (mode) => set({ renderingMode: mode }),
       setWatabouStyle: (style) => set({ watabouStyle: style }),
+      setCachedWallGeometry: (geometry, cacheKey) => set({ 
+        cachedWallGeometry: geometry, 
+        wallGeometryCacheKey: cacheKey 
+      }),
       
       // Door operations
       addDoor: (doorData) => {

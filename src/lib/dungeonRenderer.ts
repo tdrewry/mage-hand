@@ -1,232 +1,10 @@
 import { DoorConnection, Annotation, TerrainFeature, DOOR_TYPE_LABELS } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
+import { generateWallGeometry, applyWallHatching } from './wallGeometry';
 
 /**
- * Check if two wall segments are exactly coincident (same position and orientation)
- */
-function segmentsCoincident(
-  seg1: { x1: number; y1: number; x2: number; y2: number },
-  seg2: { x1: number; y1: number; x2: number; y2: number },
-  tolerance: number = 1
-): boolean {
-  // Check if segments match in either direction
-  const match1 = Math.abs(seg1.x1 - seg2.x1) < tolerance &&
-                 Math.abs(seg1.y1 - seg2.y1) < tolerance &&
-                 Math.abs(seg1.x2 - seg2.x2) < tolerance &&
-                 Math.abs(seg1.y2 - seg2.y2) < tolerance;
-  
-  const match2 = Math.abs(seg1.x1 - seg2.x2) < tolerance &&
-                 Math.abs(seg1.y1 - seg2.y2) < tolerance &&
-                 Math.abs(seg1.x2 - seg2.x1) < tolerance &&
-                 Math.abs(seg1.y2 - seg2.y1) < tolerance;
-  
-  return match1 || match2;
-}
-
-/**
- * Check if two segments share a significant portion of the same line
- */
-function segmentsOverlap(
-  seg1: { x1: number; y1: number; x2: number; y2: number },
-  seg2: { x1: number; y1: number; x2: number; y2: number }
-): boolean {
-  const tolerance = 0.5;
-  
-  // Calculate segment vectors
-  const dx1 = seg1.x2 - seg1.x1;
-  const dy1 = seg1.y2 - seg1.y1;
-  const dx2 = seg2.x2 - seg2.x1;
-  const dy2 = seg2.y2 - seg2.y1;
-  
-  const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-  const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-  
-  if (len1 < 0.1 || len2 < 0.1) return false;
-  
-  // Normalize direction vectors
-  const ndx1 = dx1 / len1;
-  const ndy1 = dy1 / len1;
-  const ndx2 = dx2 / len2;
-  const ndy2 = dy2 / len2;
-  
-  // Check if parallel (dot product of normalized vectors ≈ ±1)
-  const dotProduct = Math.abs(ndx1 * ndx2 + ndy1 * ndy2);
-  if (dotProduct < 0.98) return false; // Not parallel
-  
-  // Check if segments are on the same line
-  // Project seg2's start point onto seg1's line
-  const dx = seg2.x1 - seg1.x1;
-  const dy = seg2.y1 - seg1.y1;
-  const perpDist = Math.abs(dx * ndy1 - dy * ndx1);
-  
-  if (perpDist > tolerance) return false; // Not on same line
-  
-  // Check if segments overlap along the line
-  // Project all points onto the line direction
-  const t1_start = 0;
-  const t1_end = len1;
-  const t2_start = (seg2.x1 - seg1.x1) * ndx1 + (seg2.y1 - seg1.y1) * ndy1;
-  const t2_end = (seg2.x2 - seg1.x1) * ndx1 + (seg2.y2 - seg1.y1) * ndy1;
-  
-  const t2_min = Math.min(t2_start, t2_end);
-  const t2_max = Math.max(t2_start, t2_end);
-  
-  // Check for overlap with a minimum overlap threshold
-  const overlapStart = Math.max(t1_start, t2_min);
-  const overlapEnd = Math.min(t1_end, t2_max);
-  const overlapLength = overlapEnd - overlapStart;
-  
-  // Require at least 50% of the shorter segment to overlap
-  const minOverlap = Math.min(len1, len2) * 0.5;
-  
-  return overlapLength >= minOverlap;
-}
-
-/**
- * Calculate wall segments from regions, removing shared walls between adjacent regions
- */
-function calculateWallSegments(regions: CanvasRegion[]): { x1: number; y1: number; x2: number; y2: number }[] {
-  const allSegments: { x1: number; y1: number; x2: number; y2: number; regionId: string }[] = [];
-  
-  // Collect all wall segments with their region IDs
-  regions.forEach((region) => {
-    if (region.regionType === 'rectangle') {
-      // Add four walls for rectangle
-      allSegments.push(
-        { x1: region.x, y1: region.y, x2: region.x + region.width, y2: region.y, regionId: region.id },
-        { x1: region.x + region.width, y1: region.y, x2: region.x + region.width, y2: region.y + region.height, regionId: region.id },
-        { x1: region.x + region.width, y1: region.y + region.height, x2: region.x, y2: region.y + region.height, regionId: region.id },
-        { x1: region.x, y1: region.y + region.height, x2: region.x, y2: region.y, regionId: region.id }
-      );
-    } else if (region.regionType === 'path' && region.pathPoints) {
-      // Add segments for each path edge
-      for (let i = 0; i < region.pathPoints.length; i++) {
-        const p1 = region.pathPoints[i];
-        const p2 = region.pathPoints[(i + 1) % region.pathPoints.length];
-        allSegments.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, regionId: region.id });
-      }
-    }
-  });
-  
-  // Find and remove shared walls (walls that overlap between different regions)
-  const sharedSegmentIndices = new Set<number>();
-  
-  for (let i = 0; i < allSegments.length; i++) {
-    if (sharedSegmentIndices.has(i)) continue;
-    
-    for (let j = i + 1; j < allSegments.length; j++) {
-      if (sharedSegmentIndices.has(j)) continue;
-      
-      // Only check segments from different regions
-      if (allSegments[i].regionId !== allSegments[j].regionId) {
-        // Use stricter coincident check first
-        if (segmentsCoincident(allSegments[i], allSegments[j], 1)) {
-          sharedSegmentIndices.add(i);
-          sharedSegmentIndices.add(j);
-        }
-        // Then check for significant overlap
-        else if (segmentsOverlap(allSegments[i], allSegments[j])) {
-          sharedSegmentIndices.add(i);
-          sharedSegmentIndices.add(j);
-        }
-      }
-    }
-  }
-  
-  // Return only non-shared segments
-  return allSegments
-    .filter((_, index) => !sharedSegmentIndices.has(index))
-    .map(({ x1, y1, x2, y2 }) => ({ x1, y1, x2, y2 }));
-}
-
-/**
- * Draw hatching pattern for walls
- */
-function drawWallHatching(
-  ctx: CanvasRenderingContext2D,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  zoom: number,
-  wallThickness: number,
-  style: WatabouStyle
-) {
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  const perpAngle = angle + Math.PI / 2;
-  
-  const dx = Math.cos(perpAngle) * wallThickness / 2;
-  const dy = Math.sin(perpAngle) * wallThickness / 2;
-  
-  const hatchSpacing = (style.hatchingDistance * 20) / zoom;
-  const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-  const numHatches = Math.floor(length / hatchSpacing);
-  
-  ctx.strokeStyle = style.colorInk;
-  ctx.lineWidth = style.strokeHatching / zoom;
-  
-  if (style.hatchingStyle === 'Stonework') {
-    // Stonework pattern - irregular blocks
-    for (let i = 0; i <= numHatches; i++) {
-      const t = i / numHatches;
-      const mx = x1 + (x2 - x1) * t;
-      const my = y1 + (y2 - y1) * t;
-      
-      // Draw short perpendicular lines with slight randomness
-      const offset = (Math.random() - 0.5) * 0.2;
-      ctx.beginPath();
-      ctx.moveTo(mx + dx * (0.2 + offset), my + dy * (0.2 + offset));
-      ctx.lineTo(mx + dx * (0.8 + offset), my + dy * (0.8 + offset));
-      ctx.stroke();
-      
-      // Occasional horizontal breaks
-      if (Math.random() > 0.7) {
-        const breakLen = hatchSpacing * 0.3;
-        ctx.beginPath();
-        ctx.moveTo(mx - Math.cos(angle) * breakLen, my - Math.sin(angle) * breakLen);
-        ctx.lineTo(mx + Math.cos(angle) * breakLen, my + Math.sin(angle) * breakLen);
-        ctx.stroke();
-      }
-    }
-  } else if (style.hatchingStyle === 'Bricks') {
-    // Brick pattern
-    const brickHeight = hatchSpacing * 2;
-    const numRows = Math.floor(wallThickness / brickHeight);
-    
-    for (let row = 0; row < numRows; row++) {
-      const rowOffset = (row % 2) * hatchSpacing / 2;
-      for (let i = 0; i <= numHatches; i++) {
-        const t = (i * hatchSpacing + rowOffset) / length;
-        if (t > 1) break;
-        
-        const mx = x1 + (x2 - x1) * t;
-        const my = y1 + (y2 - y1) * t;
-        const rowT = row / numRows - 0.5;
-        
-        ctx.beginPath();
-        ctx.moveTo(mx + dx * rowT * 2, my + dy * rowT * 2);
-        ctx.lineTo(mx + dx * rowT * 2, my + dy * rowT * 2 + dy * 0.3);
-        ctx.stroke();
-      }
-    }
-  } else {
-    // Default hatching
-    for (let i = 0; i <= numHatches; i++) {
-      const t = i / numHatches;
-      const mx = x1 + (x2 - x1) * t;
-      const my = y1 + (y2 - y1) * t;
-      
-      ctx.beginPath();
-      ctx.moveTo(mx + dx * 0.2, my + dy * 0.2);
-      ctx.lineTo(mx + dx * 0.8, my + dy * 0.8);
-      ctx.stroke();
-    }
-  }
-}
-
-/**
- * Render regions in dungeon map style with thick hatched walls
+ * Render regions in dungeon map style with thick hatched walls using negative space
  */
 export function renderDungeonMapRegions(
   ctx: CanvasRenderingContext2D,
@@ -234,16 +12,29 @@ export function renderDungeonMapRegions(
   zoom: number,
   style: WatabouStyle = DEFAULT_STYLE
 ) {
+  if (regions.length === 0) return;
+  
   const wallThickness = (style.strokeThick * 2) / zoom;
   
   ctx.save();
   
-  // Fill all regions with paper color (don't draw background here - it should be drawn earlier)
+  // 1. Fill all regions with paper color (floor)
   regions.forEach((region) => {
     ctx.fillStyle = style.colorPaper;
     
     if (region.regionType === 'rectangle') {
-      ctx.fillRect(region.x, region.y, region.width, region.height);
+      if (region.rotation) {
+        // Handle rotated rectangles
+        const cx = region.x + region.width / 2;
+        const cy = region.y + region.height / 2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate((region.rotation * Math.PI) / 180);
+        ctx.fillRect(-region.width / 2, -region.height / 2, region.width, region.height);
+        ctx.restore();
+      } else {
+        ctx.fillRect(region.x, region.y, region.width, region.height);
+      }
     } else if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
       ctx.beginPath();
       ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
@@ -255,49 +46,30 @@ export function renderDungeonMapRegions(
     }
   });
   
-  // Draw walls with shadows and hatching
-  const segments = calculateWallSegments(regions);
+  // 2. Generate wall geometry (negative space)
+  const wallGeometry = generateWallGeometry(regions, wallThickness, style.wallMargin);
   
-  segments.forEach((seg) => {
-    const angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1);
-    const perpAngle = angle + Math.PI / 2;
-    
-    const dx = Math.cos(perpAngle) * wallThickness / 2;
-    const dy = Math.sin(perpAngle) * wallThickness / 2;
-    
-    // Draw shadow first
-    if (style.shadowDist > 0) {
-      const shadowOffset = (style.shadowDist * 10) / zoom;
-      ctx.fillStyle = style.shadowColor;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.moveTo(seg.x1 - dx + shadowOffset, seg.y1 - dy + shadowOffset);
-      ctx.lineTo(seg.x2 - dx + shadowOffset, seg.y2 - dy + shadowOffset);
-      ctx.lineTo(seg.x2 + dx + shadowOffset, seg.y2 + dy + shadowOffset);
-      ctx.lineTo(seg.x1 + dx + shadowOffset, seg.y1 + dy + shadowOffset);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1.0;
-    }
-    
-    // Draw thick wall base
-    ctx.fillStyle = style.colorShading;
-    ctx.beginPath();
-    ctx.moveTo(seg.x1 - dx, seg.y1 - dy);
-    ctx.lineTo(seg.x2 - dx, seg.y2 - dy);
-    ctx.lineTo(seg.x2 + dx, seg.y2 + dy);
-    ctx.lineTo(seg.x1 + dx, seg.y1 + dy);
-    ctx.closePath();
-    ctx.fill();
-    
-    // Draw wall outline
-    ctx.strokeStyle = style.colorInk;
-    ctx.lineWidth = style.strokeNormal / zoom;
-    ctx.stroke();
-    
-    // Add hatching
-    drawWallHatching(ctx, seg.x1, seg.y1, seg.x2, seg.y2, zoom, wallThickness, style);
-  });
+  // 3. Draw shadow layer (optional, under walls)
+  if (style.shadowDist > 0) {
+    ctx.save();
+    ctx.fillStyle = style.shadowColor;
+    ctx.globalAlpha = 0.3;
+    ctx.translate((style.shadowDist * 10) / zoom, (style.shadowDist * 10) / zoom);
+    ctx.fill(wallGeometry.wallPath, 'evenodd');
+    ctx.restore();
+  }
+  
+  // 4. Fill wall base (main wall color)
+  ctx.fillStyle = style.colorShading;
+  ctx.fill(wallGeometry.wallPath, 'evenodd');
+  
+  // 5. Stroke wall outline
+  ctx.strokeStyle = style.colorInk;
+  ctx.lineWidth = style.strokeNormal / zoom;
+  ctx.stroke(wallGeometry.wallPath);
+  
+  // 6. Apply hatching to walls
+  applyWallHatching(ctx, wallGeometry, style, zoom);
   
   ctx.restore();
 }
