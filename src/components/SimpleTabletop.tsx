@@ -96,6 +96,14 @@ export const SimpleTabletop = () => {
   const [transformHandle, setTransformHandle] = useState<string | null>(null);
   const [rotationCenter, setRotationCenter] = useState<{ x: number; y: number } | null>(null);
   
+  // Wall decoration cache to avoid regenerating on every pan/zoom
+  const wallDecorationCacheRef = useRef<{
+    cacheKey: string;
+    canvas: HTMLCanvasElement;
+    wallGeometry: any;
+    bounds: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+  
   // Grid highlighting state for token movement (supports both hex and square grids)
   const [highlightedGrids, setHighlightedGrids] = useState<{
     regionId: string, 
@@ -658,12 +666,77 @@ export const SimpleTabletop = () => {
         drawRegion(ctx, region, true); // skipStroke = true in edit mode
       });
       
-      // Draw negative space region in edit mode
+      // Draw negative space region in edit mode with caching
       const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
       const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
-      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
-      if (negativeSpace) {
-        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
+      
+      // Generate cache key
+      const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale);
+      
+      // Check if we can use cached decorations
+      let wallGeometry: any;
+      let cachedCanvas: HTMLCanvasElement | null = null;
+      
+      if (wallDecorationCacheRef.current && wallDecorationCacheRef.current.cacheKey === cacheKey) {
+        // Use cached data
+        wallGeometry = wallDecorationCacheRef.current.wallGeometry;
+        cachedCanvas = wallDecorationCacheRef.current.canvas;
+      } else {
+        // Generate new decorations and cache them
+        const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
+        if (negativeSpace) {
+          wallGeometry = negativeSpace.wallGeometry;
+          
+          // Create offscreen canvas for decorations
+          const offscreenCanvas = document.createElement('canvas');
+          const bounds = wallGeometry.bounds;
+          const padding = 50; // Extra padding for thick walls
+          offscreenCanvas.width = Math.ceil(bounds.width + padding * 2);
+          offscreenCanvas.height = Math.ceil(bounds.height + padding * 2);
+          
+          const offscreenCtx = offscreenCanvas.getContext('2d');
+          if (offscreenCtx) {
+            // Translate to account for bounds offset and padding
+            offscreenCtx.translate(-bounds.x + padding, -bounds.y + padding);
+            
+            // Draw decorative edges to offscreen canvas
+            offscreenCtx.save();
+            offscreenCtx.clip(wallGeometry.wallPath, 'evenodd');
+            drawDecorativeEdgesToContext(offscreenCtx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
+            offscreenCtx.restore();
+            
+            // Cache the result
+            wallDecorationCacheRef.current = {
+              cacheKey,
+              canvas: offscreenCanvas,
+              wallGeometry,
+              bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas.width, height: offscreenCanvas.height }
+            };
+            
+            cachedCanvas = offscreenCanvas;
+          }
+        }
+      }
+      
+      // Draw the base wall fill and outline
+      if (wallGeometry) {
+        ctx.save();
+        ctx.fillStyle = '#333333';
+        ctx.globalAlpha = 0.25;
+        ctx.fill(wallGeometry.wallPath, 'evenodd');
+        
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2 / transform.zoom;
+        const bounds = wallGeometry.bounds;
+        ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        ctx.restore();
+        
+        // Draw cached decorations
+        if (cachedCanvas && wallDecorationCacheRef.current) {
+          const cacheBounds = wallDecorationCacheRef.current.bounds;
+          ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
+        }
       }
     }
     
@@ -926,11 +999,11 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw decorative edges on negative space inner boundaries
-  const drawDecorativeInnerEdges = (
-    ctx: CanvasRenderingContext2D, 
+  // Helper to draw decorative edges to any context (for caching)
+  const drawDecorativeEdgesToContext = (
+    ctx: CanvasRenderingContext2D,
     wallGeometry: any,
-    regions: CanvasRegion[], 
+    regions: CanvasRegion[],
     style: WallEdgeStyle,
     wallThickness: number,
     textureScale: number
@@ -938,9 +1011,6 @@ export const SimpleTabletop = () => {
     const config = EDGE_STYLES[style];
     
     ctx.save();
-    
-    // Clip to negative space only - decorations should only appear on walls
-    ctx.clip(wallGeometry.wallPath, 'evenodd');
     
     // Only decorate the inner boundaries (region edges), not the outer bounding box
     regions.forEach(region => {
@@ -1078,34 +1148,20 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw negative space region (walls visualization in edit mode)
-  const drawNegativeSpaceRegion = (
-    ctx: CanvasRenderingContext2D, 
-    wallGeometry: any, 
+  // Generate cache key for wall decorations
+  const generateWallDecorationCacheKey = (
     regions: CanvasRegion[],
     wallEdgeStyle: WallEdgeStyle,
     wallThickness: number,
     textureScale: number
-  ) => {
-    ctx.save();
-    
-    // Draw the base wall path first (dark fill with red outline)
-    ctx.fillStyle = '#333333'; // Dark fill
-    ctx.globalAlpha = 0.25;
-    ctx.fill(wallGeometry.wallPath, 'evenodd');
-    
-    // Draw outer boundary stroke (but not inner edges - those will be decorated)
-    ctx.globalAlpha = 0.2;
-    ctx.strokeStyle = '#ff6b6b'; // Red outline
-    ctx.lineWidth = 2 / transform.zoom;
-    // Only stroke the outer boundary by drawing the bounding box
-    const bounds = wallGeometry.bounds;
-    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-    
-    ctx.restore();
-    
-    // Draw decorative inner edges with selected style (on top of everything)
-    drawDecorativeInnerEdges(ctx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
+  ): string => {
+    const regionData = regions.map(r => {
+      if (r.regionType === 'path' && r.pathPoints) {
+        return `${r.id}-${r.pathPoints.map(p => `${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(';')}`;
+      }
+      return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
+    }).join('|');
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}`;
   };
   
   // Function to draw regions
