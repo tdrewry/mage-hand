@@ -733,7 +733,7 @@ export const SimpleTabletop = () => {
             const dotProduct = normalX * Math.cos(lightAngleRad) + normalY * Math.sin(lightAngleRad);
             
             // Draw shadow on edges that face away from light (more lenient threshold)
-            if (dotProduct < 0.2) {
+            if (dotProduct < 0.3) {  // Even more lenient to catch more edges
               // Create gradient for smooth fade
               const gradient = ctx.createLinearGradient(
                 point.x, point.y,
@@ -741,9 +741,10 @@ export const SimpleTabletop = () => {
               );
               
               // Vary intensity based on how directly the edge faces away from light
-              const intensity = Math.max(0.3, Math.min(0.6, -dotProduct));
+              const intensity = Math.max(0.4, Math.min(0.7, Math.abs(dotProduct) + 0.2));
               gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
-              gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.3})`);
+              gradient.addColorStop(0.4, `rgba(0, 0, 0, ${intensity * 0.5})`);
+              gradient.addColorStop(0.8, `rgba(0, 0, 0, ${intensity * 0.2})`);
               gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
               
               ctx.fillStyle = gradient;
@@ -829,18 +830,11 @@ export const SimpleTabletop = () => {
           // Translate to account for bounds offset and padding
           offscreenCtx.translate(-bounds.x + padding, -bounds.y + padding);
           
-          // Draw wall fill with texture in play mode
+          // Draw wall fill with texture in play mode - REMOVED
+          // We only want edge decoration, not a full texture fill
           offscreenCtx.save();
-          if (isPlayMode) {
-            const pattern = createWallTexturePattern(offscreenCtx, wallEdgeStyle, bounds.width, bounds.height);
-            if (pattern) {
-              offscreenCtx.fillStyle = pattern;
-            } else {
-              offscreenCtx.fillStyle = '#333333';
-            }
-            offscreenCtx.globalAlpha = 1.0;
-            offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
-          } else {
+          if (!isPlayMode) {
+            // Edit mode: show subtle dark fill
             offscreenCtx.fillStyle = '#333333';
             offscreenCtx.globalAlpha = 0.25;
             offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
@@ -1736,8 +1730,8 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
-    // Draw region-specific grid (only if visible)
-    if (region.gridType !== 'free' && region.gridVisible) {
+    // Draw region-specific grid (only if visible and in edit mode)
+    if (region.gridType !== 'free' && region.gridVisible && renderingMode === 'edit') {
       drawRegionGrid(ctx, region);
     }
     
@@ -1812,8 +1806,8 @@ export const SimpleTabletop = () => {
       ctx.translate(-centerX, -centerY);
     }
     
-    // Draw region-specific grid (only if visible)
-    if (region.gridType !== 'free' && region.gridVisible) {
+    // Draw region-specific grid (only if visible and in edit mode)
+    if (region.gridType !== 'free' && region.gridVisible && renderingMode === 'edit') {
       drawRegionGrid(ctx, region);
     }
     
