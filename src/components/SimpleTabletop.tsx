@@ -669,117 +669,7 @@ export const SimpleTabletop = () => {
       drawRegion(ctx, region, true); // skipStroke = true for both modes
     });
     
-    // 3. Apply wall shadows and lighting to floor regions in play mode
-    if (isPlayMode && shadowDistance > 0) {
-      // Draw soft blur shadows on regions from wall edges
-      regions.forEach(region => {
-        ctx.save();
-        
-        // Clip to region bounds
-        if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-          ctx.beginPath();
-          if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
-            const points = region.pathPoints;
-            const controls = region.bezierControlPoints;
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 0; i < points.length - 1; i++) {
-              ctx.bezierCurveTo(
-                controls[i].cp2.x, controls[i].cp2.y,
-                controls[i + 1].cp1.x, controls[i + 1].cp1.y,
-                points[i + 1].x, points[i + 1].y
-              );
-            }
-            ctx.bezierCurveTo(
-              controls[points.length - 1].cp2.x, controls[points.length - 1].cp2.y,
-              controls[0].cp1.x, controls[0].cp1.y,
-              points[0].x, points[0].y
-            );
-            ctx.closePath();
-          } else {
-            ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-            for (let i = 1; i < region.pathPoints.length; i++) {
-              ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
-            }
-            ctx.closePath();
-          }
-        } else {
-          ctx.beginPath();
-          ctx.rect(region.x, region.y, region.width, region.height);
-        }
-        ctx.clip();
-        
-        // Draw directional wall shadows
-        const edgePoints = getRegionEdgePoints(region);
-        const lightAngleRad = (lightDirection * Math.PI) / 180;
-        
-        // Calculate shadow direction
-        const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
-        const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
-        
-        // Light source direction vector
-        const lightDx = Math.cos(lightAngleRad);
-        const lightDy = Math.sin(lightAngleRad);
-        
-        // Draw shadows on all edges (directional filtering temporarily disabled for visibility)
-        edgePoints.forEach((point, i) => {
-          const nextPoint = edgePoints[(i + 1) % edgePoints.length];
-          
-          // Create gradient for smooth fade
-          const gradient = ctx.createLinearGradient(
-            point.x, point.y,
-            point.x + shadowDx, point.y + shadowDy
-          );
-          
-          gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
-          gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
-          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(nextPoint.x, nextPoint.y);
-          ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-          ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-          ctx.closePath();
-          ctx.fill();
-        });
-        
-        // Apply point light sources if any exist
-        if (lightSources.length > 0) {
-          ctx.globalCompositeOperation = 'lighter';
-          
-          for (const light of lightSources) {
-            const lightRadius = light.radius;
-            
-            // Create radial gradient for each light
-            const gradient = ctx.createRadialGradient(
-              light.position.x, light.position.y, 0,
-              light.position.x, light.position.y, lightRadius
-            );
-            
-            // Parse color and apply intensity
-            const color = light.color;
-            gradient.addColorStop(0, `${color}${Math.round(light.intensity * 255).toString(16).padStart(2, '0')}`);
-            gradient.addColorStop(0.3, `${color}${Math.round(light.intensity * 180).toString(16).padStart(2, '0')}`);
-            gradient.addColorStop(0.6, `${color}${Math.round(light.intensity * 60).toString(16).padStart(2, '0')}`);
-            gradient.addColorStop(1, `${color}00`);
-            
-            ctx.fillStyle = gradient;
-            if (region.regionType === 'path') {
-              ctx.fill();
-            } else {
-              ctx.fillRect(region.x, region.y, region.width, region.height);
-            }
-          }
-          
-          ctx.globalCompositeOperation = 'source-over';
-        }
-        
-        ctx.restore();
-      });
-    }
-    
-    // 4. Then render walls (negative space) on top - ABOVE regions
+    // 3. Then render walls (negative space) on top - ABOVE regions
     // This ensures walls cover/overlap floor regions properly
     const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
@@ -877,6 +767,98 @@ export const SimpleTabletop = () => {
     if (cachedCanvas && wallDecorationCacheRef.current) {
       const cacheBounds = wallDecorationCacheRef.current.bounds;
       ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
+    }
+    
+    // Apply wall shadows to floor regions AFTER wallGeometry is available
+    if (isPlayMode && shadowDistance > 0 && wallGeometry) {
+      regions.forEach(region => {
+        ctx.save();
+        
+        // Clip to region bounds
+        if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+          ctx.beginPath();
+          if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
+            const points = region.pathPoints;
+            const controls = region.bezierControlPoints;
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 0; i < points.length - 1; i++) {
+              ctx.bezierCurveTo(
+                controls[i].cp2.x, controls[i].cp2.y,
+                controls[i + 1].cp1.x, controls[i + 1].cp1.y,
+                points[i + 1].x, points[i + 1].y
+              );
+            }
+            ctx.bezierCurveTo(
+              controls[points.length - 1].cp2.x, controls[points.length - 1].cp2.y,
+              controls[0].cp1.x, controls[0].cp1.y,
+              points[0].x, points[0].y
+            );
+            ctx.closePath();
+          } else {
+            ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+            for (let i = 1; i < region.pathPoints.length; i++) {
+              ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+            }
+            ctx.closePath();
+          }
+        } else {
+          ctx.beginPath();
+          ctx.rect(region.x, region.y, region.width, region.height);
+        }
+        ctx.clip();
+        
+        // Draw shadows only on edges that border negative space
+        const edgePoints = getRegionEdgePoints(region);
+        const lightAngleRad = (lightDirection * Math.PI) / 180;
+        const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
+        const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
+        
+        edgePoints.forEach((point, i) => {
+          const nextPoint = edgePoints[(i + 1) % edgePoints.length];
+          
+          // Check if edge borders negative space
+          const midX = (point.x + nextPoint.x) / 2;
+          const midY = (point.y + nextPoint.y) / 2;
+          
+          const edgeDx = nextPoint.x - point.x;
+          const edgeDy = nextPoint.y - point.y;
+          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+          
+          if (edgeLen > 0) {
+            const normalX = -edgeDy / edgeLen;
+            const normalY = edgeDx / edgeLen;
+            
+            // Test point outside the edge
+            const testX = midX + normalX * 2;
+            const testY = midY + normalY * 2;
+            
+            // Check if in wall
+            const isInWall = ctx.isPointInPath(wallGeometry.wallPath, testX, testY, 'evenodd');
+            
+            if (isInWall) {
+              const gradient = ctx.createLinearGradient(
+                point.x, point.y,
+                point.x + shadowDx, point.y + shadowDy
+              );
+              
+              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+              gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+              
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.moveTo(point.x, point.y);
+              ctx.lineTo(nextPoint.x, nextPoint.y);
+              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        });
+        
+        ctx.restore();
+      });
     }
     
     // 4. Then render doors - ABOVE walls (only in edit mode for now)
