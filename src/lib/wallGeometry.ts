@@ -9,6 +9,11 @@ export interface WallGeometry {
   margin: number;
 }
 
+export interface FloorGeometry {
+  floorPath: Path2D;
+  bounds: { x: number; y: number; width: number; height: number };
+}
+
 /**
  * Generate wall geometry as negative space (bounding box minus all regions)
  */
@@ -142,6 +147,33 @@ export function generateWallGeometry(
     bounds,
     wallThickness,
     margin: effectiveMargin,
+  };
+}
+
+/**
+ * Generate floor geometry as the inverse of wall geometry
+ * This creates a unified navigable space by cutting walls from the bounding box
+ */
+export function generateFloorGeometry(
+  wallGeometry: WallGeometry
+): FloorGeometry {
+  // Create compound path: outer rectangle minus wall geometry
+  const floorPath = new Path2D();
+  
+  // Add outer bounding box (clockwise winding)
+  floorPath.rect(
+    wallGeometry.bounds.x,
+    wallGeometry.bounds.y,
+    wallGeometry.bounds.width,
+    wallGeometry.bounds.height
+  );
+  
+  // Add wall geometry as a hole (it's already a compound path with proper winding)
+  floorPath.addPath(wallGeometry.wallPath);
+  
+  return {
+    floorPath,
+    bounds: wallGeometry.bounds,
   };
 }
 

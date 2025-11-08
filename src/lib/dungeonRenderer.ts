@@ -1,7 +1,7 @@
 import { DoorConnection, Annotation, TerrainFeature, DOOR_TYPE_LABELS } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
-import { generateWallGeometry, applyWallHatching } from './wallGeometry';
+import { generateWallGeometry, applyWallHatching, generateFloorGeometry, FloorGeometry } from './wallGeometry';
 
 /**
  * Helper: Blend two hex colors
@@ -45,45 +45,27 @@ function getRegionBounds(region: CanvasRegion): { x: number; y: number; width: n
 }
 
 /**
- * Render subtle floor texture pattern
+ * Render subtle floor texture pattern on unified floor geometry
  */
-function renderFloorPattern(
+function renderFloorPatternToPath(
   ctx: CanvasRenderingContext2D,
-  region: CanvasRegion,
+  floorGeometry: FloorGeometry,
   style: WatabouStyle,
   zoom: number
 ) {
   ctx.save();
   
-  // Create clipping path for region
-  ctx.beginPath();
-  if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-    ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-    for (let i = 1; i < region.pathPoints.length; i++) {
-      ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
-    }
-    ctx.closePath();
-  } else if (region.regionType === 'rectangle') {
-    if (region.rotation) {
-      const cx = region.x + region.width / 2;
-      const cy = region.y + region.height / 2;
-      ctx.translate(cx, cy);
-      ctx.rotate((region.rotation * Math.PI) / 180);
-      ctx.rect(-region.width / 2, -region.height / 2, region.width, region.height);
-    } else {
-      ctx.rect(region.x, region.y, region.width, region.height);
-    }
-  }
-  ctx.clip();
+  // Clip to the unified floor path
+  ctx.clip(floorGeometry.floorPath, 'evenodd');
   
-  // Draw dotted grid pattern
+  // Draw dotted grid pattern across entire bounds
   const dotSpacing = 15; // Fixed spacing in world coordinates
   const dotSize = 0.8; // Fixed dot size in world coordinates
   
   ctx.fillStyle = style.colorInk;
   ctx.globalAlpha = 0.2; // More visible opacity
   
-  const bounds = getRegionBounds(region);
+  const bounds = floorGeometry.bounds;
   const padding = 20;
   
   for (let x = bounds.x - padding; x < bounds.x + bounds.width + padding; x += dotSpacing) {
@@ -112,50 +94,20 @@ export function renderDungeonMapRegions(
   
   ctx.save();
   
-  // 1. Fill all regions with floor color and texture
-  regions.forEach((region) => {
-    // Determine room shade based on region color (special rooms are darker)
-    const isSpecialRoom = region.color?.includes('0, 70%') || region.color?.toLowerCase().includes('red');
-    
-    let fillColor = style.colorPaper;
-    if (isSpecialRoom) {
-      // Darker shade for special rooms (blend with brown)
-      fillColor = blendColors(style.colorPaper, '#8B4513', 0.15);
-    }
-    
-    ctx.fillStyle = fillColor;
-    
-    if (region.regionType === 'rectangle') {
-      if (region.rotation) {
-        // Handle rotated rectangles
-        const cx = region.x + region.width / 2;
-        const cy = region.y + region.height / 2;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate((region.rotation * Math.PI) / 180);
-        ctx.fillRect(-region.width / 2, -region.height / 2, region.width, region.height);
-        ctx.restore();
-      } else {
-        ctx.fillRect(region.x, region.y, region.width, region.height);
-      }
-    } else if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-      ctx.beginPath();
-      ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-      for (let i = 1; i < region.pathPoints.length; i++) {
-        ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-    
-    // Add floor texture pattern
-    renderFloorPattern(ctx, region, style, zoom);
-  });
-  
-  // 2. Generate wall geometry (negative space)
+  // 1. Generate wall geometry (negative space)
   const wallGeometry = generateWallGeometry(regions, wallThickness, style.wallMargin);
   
-  // 3. Draw shadow layer (optional, under walls)
+  // 2. Generate unified floor geometry (inverse of walls)
+  const floorGeometry = generateFloorGeometry(wallGeometry);
+  
+  // 3. Fill floor as single unified shape
+  ctx.fillStyle = style.colorPaper;
+  ctx.fill(floorGeometry.floorPath, 'evenodd');
+  
+  // 4. Apply floor texture to unified floor
+  renderFloorPatternToPath(ctx, floorGeometry, style, zoom);
+  
+  // 5. Draw shadow layer (optional, under walls)
   if (style.shadowDist > 0) {
     ctx.save();
     ctx.fillStyle = style.shadowColor;
@@ -165,16 +117,16 @@ export function renderDungeonMapRegions(
     ctx.restore();
   }
   
-  // 4. Fill wall base (main wall color)
+  // 6. Fill wall base (main wall color)
   ctx.fillStyle = style.colorShading;
   ctx.fill(wallGeometry.wallPath, 'evenodd');
   
-  // 5. Stroke wall outline
+  // 7. Stroke wall outline
   ctx.strokeStyle = style.colorInk;
   ctx.lineWidth = style.strokeNormal / zoom;
   ctx.stroke(wallGeometry.wallPath);
   
-  // 6. Apply hatching to walls
+  // 8. Apply hatching to walls
   applyWallHatching(ctx, wallGeometry, style, zoom);
   
   ctx.restore();
