@@ -796,7 +796,7 @@ export const SimpleTabletop = () => {
     
     // NEW: Render shadows using visibility polygon system
     if (isPlayMode && lights.length > 0 && wallGeometry) {
-      const illumination = computeIllumination(lights, regions);
+      const illumination = computeIllumination(lights, regions, wallGeometry);
       renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
     
@@ -898,11 +898,12 @@ export const SimpleTabletop = () => {
     }
     
     // Render fog of war (in world coordinate space, before restore)
-    if (isPlayMode && fogEnabled && !fogRevealAll) {
-      // Compute visibility from all tokens (in world coordinates)
+    if (isPlayMode && fogEnabled && !fogRevealAll && wallGeometry) {
+      // Compute visibility from tokens using wall geometry to filter and regions as obstacles
       const tokenVisibility = computeTokenVisibility(
-        tokens, // Use all tokens
-        regions,
+        tokens,
+        wallGeometry, // Used to filter out tokens in walls
+        regions, // Used as obstacles for visibility calculation
         fogVisionRange
       );
       

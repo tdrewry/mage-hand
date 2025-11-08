@@ -16,17 +16,34 @@ export interface IlluminationMap {
 
 /**
  * Compute illumination map from active light sources
+ * Uses regions as obstacles (they define the wall boundaries)
  */
 export function computeIllumination(
   lights: LightSource[],
-  obstacles: CanvasRegion[]
+  regions: CanvasRegion[],
+  wallGeometry?: any
 ): IlluminationMap {
-  const activeLights = lights.filter(light => light.enabled);
+  // Filter out lights that are inside walls (shouldn't cast light)
+  let activeLights = lights.filter(light => light.enabled);
+  
+  if (wallGeometry && activeLights.length > 0) {
+    // Create a temporary canvas context to test if lights are in walls
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    if (tempCtx) {
+      activeLights = activeLights.filter(light => {
+        // Check if light center is inside wall geometry (negative space)
+        const isInWall = tempCtx.isPointInPath(wallGeometry.wallPath, light.position.x, light.position.y, 'evenodd');
+        return !isInWall; // Only include lights NOT in walls
+      });
+    }
+  }
+  
   const litAreas: Path2D[] = [];
   
-  // Compute visibility polygon for each light
+  // Compute visibility polygon for each light using regions as obstacles
   for (const light of activeLights) {
-    const visibility = computeVisibility(light.position, obstacles, light.radius);
+    const visibility = computeVisibility(light.position, regions, light.radius);
     const path = visibilityPolygonToPath2D(visibility.polygon);
     litAreas.push(path);
   }
@@ -36,7 +53,7 @@ export function computeIllumination(
   if (activeLights.length > 0) {
     const positions = activeLights.map(light => light.position);
     const maxRadius = Math.max(...activeLights.map(light => light.radius));
-    const combined = computeMultiSourceVisibility(positions, obstacles, maxRadius);
+    const combined = computeMultiSourceVisibility(positions, regions, maxRadius);
     combinedLitArea = visibilityPolygonToPath2D(combined.polygon);
   }
   

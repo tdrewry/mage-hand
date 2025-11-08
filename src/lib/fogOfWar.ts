@@ -22,24 +22,46 @@ export interface Token {
 
 /**
  * Compute current visibility from token positions
+ * Uses wall geometry (negative space) to filter out tokens in walls,
+ * then uses regions as obstacles for visibility calculation
  */
 export function computeTokenVisibility(
   tokens: Token[],
-  obstacles: CanvasRegion[],
+  wallGeometry: any | null, // Wall geometry from negative space
+  regions: CanvasRegion[],
   visionRange: number = 300
 ): Path2D {
   if (tokens.length === 0) {
     return new Path2D();
   }
 
-  // Get positions of all tokens
-  const positions: Point[] = tokens.map(token => ({
+  // Filter out tokens that are inside walls (shouldn't cast light)
+  let validTokens = tokens;
+  if (wallGeometry) {
+    // Create a temporary canvas context to test if tokens are in walls
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    if (tempCtx) {
+      validTokens = tokens.filter(token => {
+        // Check if token center is inside wall geometry (negative space)
+        const isInWall = tempCtx.isPointInPath(wallGeometry.wallPath, token.x, token.y, 'evenodd');
+        return !isInWall; // Only include tokens NOT in walls
+      });
+    }
+  }
+
+  if (validTokens.length === 0) {
+    return new Path2D();
+  }
+
+  // Get positions of valid tokens
+  const positions: Point[] = validTokens.map(token => ({
     x: token.x,
     y: token.y
   }));
 
-  // Compute multi-source visibility
-  const visibility = computeMultiSourceVisibility(positions, obstacles, visionRange);
+  // Use regions as obstacles (they define the wall boundaries)
+  const visibility = computeMultiSourceVisibility(positions, regions, visionRange);
   
   return visibilityPolygonToPath2D(visibility.polygon);
 }
