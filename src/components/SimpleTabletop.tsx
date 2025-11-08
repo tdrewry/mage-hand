@@ -826,8 +826,8 @@ export const SimpleTabletop = () => {
             const normalY = edgeDx / edgeLen;
             
             // Test multiple points along the edge perpendicular to it
-            // Use larger threshold (15 pixels in world space) and test in untransformed space
-            const testDistance = 15;
+            // Use larger threshold (10 pixels in world space)
+            const testDistance = 10;
             let bordersWall = false;
             
             // Test at start, middle, and end of edge for robustness
@@ -839,11 +839,8 @@ export const SimpleTabletop = () => {
               const testX = testBaseX + normalX * testDistance;
               const testY = testBaseY + normalY * testDistance;
               
-              // Save transform, test in world space
-              ctx.save();
-              ctx.setTransform(1, 0, 0, 1, 0, 0);
+              // Test in current coordinate space (wall geometry is in world space)
               const isInWall = ctx.isPointInPath(wallGeometry.wallPath, testX, testY, 'evenodd');
-              ctx.restore();
               
               if (isInWall) {
                 bordersWall = true;
