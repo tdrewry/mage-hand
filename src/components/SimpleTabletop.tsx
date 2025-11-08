@@ -716,7 +716,7 @@ export const SimpleTabletop = () => {
         const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
         const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
         
-        // Draw shadow along each edge
+        // Draw shadow along each edge - ALL edges get shadows regardless of direction
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
@@ -725,37 +725,25 @@ export const SimpleTabletop = () => {
           const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
           
           if (edgeLen > 0) {
-            // Edge normal (perpendicular) pointing inward
-            const normalX = -edgeDy / edgeLen;
-            const normalY = edgeDx / edgeLen;
+            // Create gradient for smooth fade extending INTO the region
+            const gradient = ctx.createLinearGradient(
+              point.x, point.y,
+              point.x + shadowDx, point.y + shadowDy
+            );
             
-            // Check if this edge faces away from light (should cast shadow)
-            const dotProduct = normalX * Math.cos(lightAngleRad) + normalY * Math.sin(lightAngleRad);
+            // Strong visible shadow
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+            gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
             
-            // Draw shadow on edges that face away from light (more lenient threshold)
-            if (dotProduct < 0.3) {  // Even more lenient to catch more edges
-              // Create gradient for smooth fade
-              const gradient = ctx.createLinearGradient(
-                point.x, point.y,
-                point.x + shadowDx, point.y + shadowDy
-              );
-              
-              // Vary intensity based on how directly the edge faces away from light
-              const intensity = Math.max(0.4, Math.min(0.7, Math.abs(dotProduct) + 0.2));
-              gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
-              gradient.addColorStop(0.4, `rgba(0, 0, 0, ${intensity * 0.5})`);
-              gradient.addColorStop(0.8, `rgba(0, 0, 0, ${intensity * 0.2})`);
-              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-              
-              ctx.fillStyle = gradient;
-              ctx.beginPath();
-              ctx.moveTo(point.x, point.y);
-              ctx.lineTo(nextPoint.x, nextPoint.y);
-              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-              ctx.closePath();
-              ctx.fill();
-            }
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+            ctx.lineTo(nextPoint.x, nextPoint.y);
+            ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+            ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+            ctx.closePath();
+            ctx.fill();
           }
         });
         
@@ -850,51 +838,11 @@ export const SimpleTabletop = () => {
           cachedCanvas = offscreenCanvas;
         }
         
-        // Create shadow canvas (only for play mode)
+        // Create shadow canvas (only for play mode) - DISABLED
+        // The old shadow system was drawing shadows in the wrong place (on walls not regions)
+        // New shadow system draws shadows directly on regions in the main render loop
         let shadowCanvas: HTMLCanvasElement | null = null;
-        if (isPlayMode) {
-          shadowCanvas = document.createElement('canvas');
-          const shadowPadding = 30;
-          shadowCanvas.width = Math.ceil(bounds.width + shadowPadding * 2);
-          shadowCanvas.height = Math.ceil(bounds.height + shadowPadding * 2);
-          
-          const shadowCtx = shadowCanvas.getContext('2d');
-          if (shadowCtx) {
-            shadowCtx.translate(-bounds.x + shadowPadding, -bounds.y + shadowPadding);
-            
-            // Only draw shadows within the negative space (walls)
-            shadowCtx.save();
-            shadowCtx.clip(wallGeometry.wallPath, 'evenodd');
-            
-            // Draw inner shadow (walls cast shadow inward onto themselves)
-            const shadowOffset = 8;
-            const shadowBlur = 12;
-            
-            // Draw shadow by stroking the inner edges of regions
-            regions.forEach(region => {
-              const points = getRegionEdgePoints(region);
-              
-              shadowCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-              shadowCtx.lineWidth = shadowBlur * 2;
-              shadowCtx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-              shadowCtx.shadowBlur = shadowBlur;
-              shadowCtx.shadowOffsetX = shadowOffset * 0.5;
-              shadowCtx.shadowOffsetY = shadowOffset;
-              
-              shadowCtx.beginPath();
-              shadowCtx.moveTo(points[0].x, points[0].y);
-              for (let i = 1; i < points.length; i++) {
-                shadowCtx.lineTo(points[i].x, points[i].y);
-              }
-              shadowCtx.closePath();
-              shadowCtx.stroke();
-            });
-            
-            shadowCtx.restore();
-          }
-          
-          cachedShadowCanvas = shadowCanvas;
-        }
+        cachedShadowCanvas = null;
         
         // Cache the result
         wallDecorationCacheRef.current = {
@@ -908,13 +856,14 @@ export const SimpleTabletop = () => {
       }
     }
     
-    // Draw shadows first (under walls)
-    if (isPlayMode && cachedShadowCanvas && wallDecorationCacheRef.current) {
-      const shadowBounds = wallDecorationCacheRef.current.shadowBounds;
-      ctx.globalAlpha = 0.6;
-      ctx.drawImage(cachedShadowCanvas, shadowBounds.x, shadowBounds.y);
-      ctx.globalAlpha = 1.0;
-    }
+    // Old shadow system disabled - shadows now drawn directly on regions
+    // Draw shadows first (under walls) - DISABLED
+    // if (isPlayMode && cachedShadowCanvas && wallDecorationCacheRef.current) {
+    //   const shadowBounds = wallDecorationCacheRef.current.shadowBounds;
+    //   ctx.globalAlpha = 0.6;
+    //   ctx.drawImage(cachedShadowCanvas, shadowBounds.x, shadowBounds.y);
+    //   ctx.globalAlpha = 1.0;
+    // }
     
     // Draw the base wall with red outline in edit mode only
     if (wallGeometry && !isPlayMode) {
@@ -933,10 +882,8 @@ export const SimpleTabletop = () => {
       ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
     }
     
-    // 4. Then render doors - ABOVE walls
-    if (isPlayMode) {
-      renderDoors(ctx, doors, transform.zoom);
-    } else {
+    // 4. Then render doors - ABOVE walls (only in edit mode for now)
+    if (renderingMode === 'edit') {
       renderDoors(ctx, doors, transform.zoom);
     }
     
@@ -1730,8 +1677,8 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
-    // Draw region-specific grid (only if visible and in edit mode)
-    if (region.gridType !== 'free' && region.gridVisible && renderingMode === 'edit') {
+    // Draw region-specific grid (only if visible)
+    if (region.gridType !== 'free' && region.gridVisible) {
       drawRegionGrid(ctx, region);
     }
     
@@ -1806,8 +1753,8 @@ export const SimpleTabletop = () => {
       ctx.translate(-centerX, -centerY);
     }
     
-    // Draw region-specific grid (only if visible and in edit mode)
-    if (region.gridType !== 'free' && region.gridVisible && renderingMode === 'edit') {
+    // Draw region-specific grid (only if visible)
+    if (region.gridType !== 'free' && region.gridVisible) {
       drawRegionGrid(ctx, region);
     }
     
