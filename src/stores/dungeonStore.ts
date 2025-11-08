@@ -60,7 +60,7 @@ export const useDungeonStore = create<DungeonStore>()(
     renderingMode: 'edit',
     watabouStyle: DEFAULT_STYLE,
     wallEdgeStyle: 'stone',
-    wallThickness: 3,
+    wallThickness: 1,
     textureScale: 1,
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
@@ -185,7 +185,7 @@ export const useDungeonStore = create<DungeonStore>()(
     }),
     {
       name: 'dungeon-store',
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
         if (version === 1) {
           // Migrate from old mode names to new mode names
@@ -193,6 +193,12 @@ export const useDungeonStore = create<DungeonStore>()(
             persistedState.renderingMode = 'edit';
           } else if (persistedState.renderingMode === 'dungeon-map') {
             persistedState.renderingMode = 'play';
+          }
+        }
+        if (version < 3) {
+          // Migrate wall thickness from screen space (1-10) to world space (0.5-3)
+          if (persistedState.wallThickness && persistedState.wallThickness > 3) {
+            persistedState.wallThickness = 1; // Reset to default
           }
         }
         return persistedState;

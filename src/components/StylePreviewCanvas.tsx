@@ -63,7 +63,7 @@ export const StylePreviewCanvas: React.FC<StylePreviewCanvasProps> = ({ style, i
     ctx.moveTo(points[0].x, points[0].y);
     
     for (let i = 1; i < points.length; i++) {
-      ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, zoom);
+      ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength);
       ctx.lineTo(points[i].x, points[i].y);
       const dx = points[i].x - points[i - 1].x;
       const dy = points[i].y - points[i - 1].y;
@@ -73,7 +73,7 @@ export const StylePreviewCanvas: React.FC<StylePreviewCanvasProps> = ({ style, i
 
     // Draw shadow layer
     ctx.strokeStyle = config.shadowColor;
-    ctx.lineWidth = (config.shadowWidth * wallThickness) / zoom;
+    ctx.lineWidth = config.shadowWidth * wallThickness;
     ctx.globalAlpha = 0.5;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -85,13 +85,13 @@ export const StylePreviewCanvas: React.FC<StylePreviewCanvasProps> = ({ style, i
     // Apply texture patterns
     if (config.textureEnabled) {
       if (style === 'stone') {
-        applyHatchingPattern(ctx, points, zoom, style, textureScale);
-        applyStipplingPattern(ctx, points, zoom, style, textureScale);
+        applyHatchingPattern(ctx, points, style, textureScale);
+        applyStipplingPattern(ctx, points, style, textureScale);
       } else if (style === 'wood') {
-        applyWoodGrainPattern(ctx, points, zoom, textureScale);
-        applyStipplingPattern(ctx, points, zoom, style, textureScale);
+        applyWoodGrainPattern(ctx, points, textureScale);
+        applyStipplingPattern(ctx, points, style, textureScale);
       } else if (style === 'metal') {
-        applyHatchingPattern(ctx, points, zoom, style, textureScale);
+        applyHatchingPattern(ctx, points, style, textureScale);
       }
     }
   }, [style, isSelected]);

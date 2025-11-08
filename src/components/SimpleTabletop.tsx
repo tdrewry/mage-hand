@@ -978,7 +978,7 @@ export const SimpleTabletop = () => {
             const segmentDy = region.pathPoints[i + 1].y - region.pathPoints[i].y;
             const segmentLength = Math.sqrt(segmentDx * segmentDx + segmentDy * segmentDy);
             
-            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength);
             currentPos += segmentLength;
             
             const cp = region.bezierControlPoints[i];
@@ -1005,7 +1005,7 @@ export const SimpleTabletop = () => {
           }
         } else {
           for (let i = 1; i < region.pathPoints.length; i++) {
-            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength);
             ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
             const dx = region.pathPoints[i].x - region.pathPoints[i - 1].x;
             const dy = region.pathPoints[i].y - region.pathPoints[i - 1].y;
@@ -1018,7 +1018,7 @@ export const SimpleTabletop = () => {
         
         // Draw shadow layer
         ctx.strokeStyle = config.shadowColor;
-        ctx.lineWidth = (config.shadowWidth * wallThickness) / transform.zoom;
+        ctx.lineWidth = config.shadowWidth * wallThickness;
         ctx.globalAlpha = 0.5;
         ctx.stroke();
         
@@ -1035,7 +1035,7 @@ export const SimpleTabletop = () => {
         segments.forEach(seg => {
           ctx.beginPath();
           ctx.moveTo(seg.x1, seg.y1);
-          ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
+          ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength);
           ctx.lineTo(seg.x2, seg.y2);
           ctx.stroke();
           
@@ -1046,7 +1046,7 @@ export const SimpleTabletop = () => {
         
         // Draw shadow layer
         ctx.strokeStyle = config.shadowColor;
-        ctx.lineWidth = (config.shadowWidth * wallThickness) / transform.zoom;
+        ctx.lineWidth = config.shadowWidth * wallThickness;
         ctx.globalAlpha = 0.5;
         ctx.strokeRect(region.x, region.y, region.width, region.height);
       }
@@ -1054,13 +1054,13 @@ export const SimpleTabletop = () => {
       // Apply texture patterns
       if (config.textureEnabled) {
         if (style === 'stone') {
-          applyHatchingPattern(ctx, points, transform.zoom, style, textureScale);
-          applyStipplingPattern(ctx, points, transform.zoom, style, textureScale);
+          applyHatchingPattern(ctx, points, style, textureScale);
+          applyStipplingPattern(ctx, points, style, textureScale);
         } else if (style === 'wood') {
-          applyWoodGrainPattern(ctx, points, transform.zoom, textureScale);
-          applyStipplingPattern(ctx, points, transform.zoom, style, textureScale);
+          applyWoodGrainPattern(ctx, points, textureScale);
+          applyStipplingPattern(ctx, points, style, textureScale);
         } else if (style === 'metal') {
-          applyHatchingPattern(ctx, points, transform.zoom, style, textureScale);
+          applyHatchingPattern(ctx, points, style, textureScale);
         }
       }
       

@@ -68,14 +68,14 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
       <div className="space-y-2 mb-4">
         <div className="flex items-center justify-between">
           <Label>Wall Thickness</Label>
-          <span className="text-sm text-muted-foreground">{wallThickness.toFixed(1)}px</span>
+          <span className="text-sm text-muted-foreground">{wallThickness.toFixed(1)}x</span>
         </div>
         <Slider
           value={[wallThickness]}
           onValueChange={([value]) => setWallThickness(value)}
-          min={1}
-          max={10}
-          step={0.5}
+          min={0.5}
+          max={3}
+          step={0.1}
           className="w-full"
         />
       </div>
@@ -98,9 +98,9 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
 
       {/* Info */}
       <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
-        <p>• Adjust wall thickness to change edge width</p>
+        <p>• Wall thickness in world space units</p>
         <p>• Texture scale affects pattern density</p>
-        <p>• Different styles have unique textures</p>
+        <p>• Walls maintain size when zooming</p>
       </div>
     </Card>
   );

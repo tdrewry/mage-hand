@@ -52,7 +52,6 @@ export const EDGE_STYLES: Record<WallEdgeStyle, EdgeStyleConfig> = {
 export function applyHatchingPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
-  zoom: number,
   style: WallEdgeStyle,
   scale: number = 1
 ): void {
@@ -60,11 +59,11 @@ export function applyHatchingPattern(
   
   ctx.save();
   ctx.strokeStyle = EDGE_STYLES[style].shadowColor;
-  ctx.lineWidth = 0.5 / zoom;
+  ctx.lineWidth = 0.5;
   ctx.globalAlpha = 0.4;
   
-  const hatchSpacing = (8 / zoom) / scale;
-  const hatchLength = (6 / zoom) / scale;
+  const hatchSpacing = 8 / scale;
+  const hatchLength = 6 / scale;
   
   // Draw hatching perpendicular to edges
   for (let i = 0; i < points.length - 1; i++) {
@@ -83,7 +82,7 @@ export function applyHatchingPattern(
       const y = p1.y + t * dy;
       
       // Add randomness for hand-drawn look
-      const offset = (Math.random() - 0.5) * 2 / zoom;
+      const offset = (Math.random() - 0.5) * 2;
       const variance = 0.7 + Math.random() * 0.6;
       
       ctx.beginPath();
@@ -105,7 +104,6 @@ export function applyHatchingPattern(
 export function applyStipplingPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
-  zoom: number,
   style: WallEdgeStyle,
   scale: number = 1
 ): void {
@@ -115,8 +113,8 @@ export function applyStipplingPattern(
   ctx.fillStyle = EDGE_STYLES[style].shadowColor;
   ctx.globalAlpha = 0.3;
   
-  const dotSpacing = (4 / zoom) / scale;
-  const dotSize = (0.8 / zoom) / scale;
+  const dotSpacing = 4 / scale;
+  const dotSize = 0.8 / scale;
   const density = (style === 'stone' ? 1.2 : style === 'wood' ? 0.8 : 1.0) * scale;
   
   // Draw stippling dots along the edge
@@ -136,7 +134,7 @@ export function applyStipplingPattern(
       const y = p1.y + t * dy;
       
       // Offset slightly into the wall
-      const offsetDist = (Math.random() * 3 + 1) / zoom;
+      const offsetDist = Math.random() * 3 + 1;
       const xOffset = nx * offsetDist;
       const yOffset = ny * offsetDist;
       
@@ -155,15 +153,14 @@ export function applyStipplingPattern(
 export function applyWoodGrainPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
-  zoom: number,
   scale: number = 1
 ): void {
   ctx.save();
   ctx.strokeStyle = '#4a3820';
-  ctx.lineWidth = 0.6 / zoom;
+  ctx.lineWidth = 0.6;
   ctx.globalAlpha = 0.3;
   
-  const grainSpacing = (12 / zoom) / scale;
+  const grainSpacing = 12 / scale;
   
   // Draw wavy lines parallel to edges
   for (let i = 0; i < points.length - 1; i++) {
@@ -186,7 +183,7 @@ export function applyWoodGrainPattern(
       const segments = 5;
       for (let k = 1; k <= segments; k++) {
         const st = k / segments;
-        const waveOffset = Math.sin(st * Math.PI * 2) * 2 / zoom;
+        const waveOffset = Math.sin(st * Math.PI * 2) * 2;
         ctx.lineTo(
           x + st * (dx / numGrains) + waveOffset,
           y + st * (dy / numGrains)
@@ -205,15 +202,14 @@ export function applyWoodGrainPattern(
 export function getVariedLineWidth(
   baseWidth: number,
   position: number,
-  totalLength: number,
-  zoom: number
+  totalLength: number
 ): number {
   // Use sine wave with noise for organic variation
   const wave = Math.sin(position / totalLength * Math.PI * 4);
   const noise = (Math.random() - 0.5) * 0.3;
   const variation = 0.7 + (wave * 0.15) + noise;
   
-  return (baseWidth * variation) / zoom;
+  return baseWidth * variation;
 }
 
 /**
