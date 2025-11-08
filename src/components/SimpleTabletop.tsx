@@ -668,7 +668,118 @@ export const SimpleTabletop = () => {
       drawRegion(ctx, region, true); // skipStroke = true for both modes
     });
     
-    // 3. Then render walls (negative space) on top - ABOVE regions
+    // 3. Apply lighting effects to floor regions in play mode
+    if (isPlayMode) {
+      regions.forEach(region => {
+        ctx.save();
+        
+        // Clip to region bounds
+        if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+          ctx.beginPath();
+          if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
+            const points = region.pathPoints;
+            const controls = region.bezierControlPoints;
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 0; i < points.length - 1; i++) {
+              ctx.bezierCurveTo(
+                controls[i].cp2.x, controls[i].cp2.y,
+                controls[i + 1].cp1.x, controls[i + 1].cp1.y,
+                points[i + 1].x, points[i + 1].y
+              );
+            }
+            ctx.bezierCurveTo(
+              controls[points.length - 1].cp2.x, controls[points.length - 1].cp2.y,
+              controls[0].cp1.x, controls[0].cp1.y,
+              points[0].x, points[0].y
+            );
+            ctx.closePath();
+          } else {
+            ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+            for (let i = 1; i < region.pathPoints.length; i++) {
+              ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+            }
+            ctx.closePath();
+          }
+        } else {
+          ctx.beginPath();
+          ctx.rect(region.x, region.y, region.width, region.height);
+        }
+        ctx.clip();
+        
+        // Get region bounds for gradient
+        let boundsMinX: number, boundsMinY: number, boundsMaxX: number, boundsMaxY: number;
+        
+        if (region.regionType === 'path' && region.pathPoints) {
+          const pathBounds = getPolygonBounds(region.pathPoints);
+          boundsMinX = pathBounds.x;
+          boundsMinY = pathBounds.y;
+          boundsMaxX = pathBounds.x + pathBounds.width;
+          boundsMaxY = pathBounds.y + pathBounds.height;
+        } else {
+          boundsMinX = region.x;
+          boundsMinY = region.y;
+          boundsMaxX = region.x + region.width;
+          boundsMaxY = region.y + region.height;
+        }
+        
+        const regionWidth = boundsMaxX - boundsMinX;
+        const regionHeight = boundsMaxY - boundsMinY;
+        
+        // Add directional lighting gradient overlay
+        const lightAngle = (lightDirection * Math.PI) / 180;
+        const lightGradient = ctx.createLinearGradient(
+          boundsMinX,
+          boundsMinY,
+          boundsMinX + Math.cos(lightAngle) * regionWidth * 0.5,
+          boundsMinY + Math.sin(lightAngle) * regionHeight * 0.5
+        );
+        lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)'); // Highlight
+        lightGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0)'); // Neutral
+        lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Shadow
+        
+        ctx.fillStyle = lightGradient;
+        if (region.regionType === 'path') {
+          ctx.fill();
+        } else {
+          ctx.fillRect(boundsMinX, boundsMinY, regionWidth, regionHeight);
+        }
+        
+        // Apply point light sources if any exist
+        if (lightSources.length > 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          
+          for (const light of lightSources) {
+            const lightRadius = light.radius;
+            
+            // Create radial gradient for each light
+            const gradient = ctx.createRadialGradient(
+              light.position.x, light.position.y, 0,
+              light.position.x, light.position.y, lightRadius
+            );
+            
+            // Parse color and apply intensity
+            const color = light.color;
+            gradient.addColorStop(0, `${color}${Math.round(light.intensity * 255).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(0.3, `${color}${Math.round(light.intensity * 180).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(0.6, `${color}${Math.round(light.intensity * 60).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(1, `${color}00`);
+            
+            ctx.fillStyle = gradient;
+            if (region.regionType === 'path') {
+              ctx.fill();
+            } else {
+              ctx.fillRect(boundsMinX, boundsMinY, regionWidth, regionHeight);
+            }
+          }
+          
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        
+        ctx.restore();
+      });
+    }
+    
+    // 4. Then render walls (negative space) on top - ABOVE regions
     // This ensures walls cover/overlap floor regions properly
     const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
@@ -715,51 +826,6 @@ export const SimpleTabletop = () => {
             }
             offscreenCtx.globalAlpha = 1.0;
             offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
-            
-            // Add directional lighting gradient overlay (using lightDirection from store)
-            const lightAngle = (lightDirection * Math.PI) / 180;
-            const lightGradient = offscreenCtx.createLinearGradient(
-              bounds.x,
-              bounds.y,
-              bounds.x + Math.cos(lightAngle) * bounds.width * 0.5,
-              bounds.y + Math.sin(lightAngle) * bounds.height * 0.5
-            );
-            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)'); // Highlight
-            lightGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0)'); // Neutral
-            lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Shadow
-            
-            offscreenCtx.fillStyle = lightGradient;
-            offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
-            
-            // Add ambient occlusion at corners
-            drawAmbientOcclusion(offscreenCtx, regions, wallGeometry);
-            
-            // Apply point light sources if any exist
-            if (lightSources.length > 0) {
-              offscreenCtx.globalCompositeOperation = 'lighter';
-              
-              for (const light of lightSources) {
-                const lightRadius = light.radius * minGridSize;
-                
-                // Create radial gradient for each light
-                const gradient = offscreenCtx.createRadialGradient(
-                  light.position.x, light.position.y, 0,
-                  light.position.x, light.position.y, lightRadius
-                );
-                
-                // Parse color and apply intensity
-                const color = light.color;
-                gradient.addColorStop(0, `${color}${Math.round(light.intensity * 255).toString(16).padStart(2, '0')}`);
-                gradient.addColorStop(0.3, `${color}${Math.round(light.intensity * 180).toString(16).padStart(2, '0')}`);
-                gradient.addColorStop(0.6, `${color}${Math.round(light.intensity * 60).toString(16).padStart(2, '0')}`);
-                gradient.addColorStop(1, `${color}00`);
-                
-                offscreenCtx.fillStyle = gradient;
-                offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
-              }
-              
-              offscreenCtx.globalCompositeOperation = 'source-over';
-            }
           } else {
             offscreenCtx.fillStyle = '#333333';
             offscreenCtx.globalAlpha = 0.25;

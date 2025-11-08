@@ -46,6 +46,10 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
     const style = WATABOU_STYLES[styleName];
     if (style) {
       setWatabouStyle(style);
+      // Also update all region backgrounds to match the style's paper color
+      regions.forEach(region => {
+        updateRegion(region.id, { backgroundColor: style.colorPaper });
+      });
       toast.success(`Applied "${styleName}" style`);
     }
   };
