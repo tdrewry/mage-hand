@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2, Layers } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Layers, FileDown } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
 import { LayerStackModal } from './LayerStackModal';
+import { WatabouImportModal } from './modals/WatabouImportModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 
@@ -19,6 +20,7 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
   const { tokens, clearAllTokens } = useSessionStore();
   const { regions, clearRegions } = useRegionStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
+  const [watabouImportOpen, setWatabouImportOpen] = useState(false);
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
@@ -130,6 +132,17 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           <Button 
             variant="outline" 
             size="sm"
+            onClick={() => setWatabouImportOpen(true)}
+            className="text-foreground border-border hover:bg-secondary"
+            title="Import Watabou dungeon"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Import Dungeon
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
             onClick={() => setLayerModalOpen(true)}
             className="text-foreground border-border hover:bg-secondary"
             title="Manage layers"
@@ -161,6 +174,11 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
         open={layerModalOpen}
         onOpenChange={setLayerModalOpen}
         fabricCanvas={fabricCanvas}
+      />
+      
+      <WatabouImportModal 
+        open={watabouImportOpen}
+        onOpenChange={setWatabouImportOpen}
       />
     </div>
   );

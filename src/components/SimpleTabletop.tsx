@@ -18,6 +18,8 @@ import { TokenContextManager } from './TokenContextManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
+import { useDungeonStore } from '../stores/dungeonStore';
+import { renderDoors, renderAnnotations, renderTerrainFeatures } from '../lib/dungeonRenderer';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { 
   HexCoordinate, 
@@ -102,6 +104,14 @@ export const SimpleTabletop = () => {
     clearSelection,
     getSelectedRegions
   } = useRegionStore();
+  
+  // Dungeon features store
+  const { 
+    doors,
+    annotations,
+    terrainFeatures
+  } = useDungeonStore();
+  
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
@@ -603,6 +613,10 @@ export const SimpleTabletop = () => {
       drawRegion(ctx, region);
     });
     
+    // Draw dungeon features (terrain, doors, annotations)
+    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom);
+    renderDoors(ctx, doors, transform.zoom);
+    
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
     
@@ -613,6 +627,9 @@ export const SimpleTabletop = () => {
       const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
       drawToken(ctx, renderToken);
     });
+    
+    // Draw annotations on top of tokens
+    renderAnnotations(ctx, annotations, transform.zoom);
     
     // Draw current path being drawn
     if (pathDrawingMode === 'drawing' && currentPath.length > 0) {
