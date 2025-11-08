@@ -653,14 +653,14 @@ export const SimpleTabletop = () => {
     // 1. First render terrain features (water, debris, etc.) - BELOW walls
     renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isPlayMode, watabouStyle, regions);
     
-    // 2. Then render regions/walls - ABOVE terrain features
-    // Both play and edit modes now show walls with decorations
+    // 2. First render floor regions - ABOVE terrain features
     // Skip region strokes since decorative walls will handle the edges
     regions.forEach(region => {
       drawRegion(ctx, region, true); // skipStroke = true for both modes
     });
     
-    // Draw negative space region with caching (both play and edit modes)
+    // 3. Then render walls (negative space) on top - ABOVE regions
+    // This ensures walls cover/overlap floor regions properly
     const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
     
@@ -716,14 +716,18 @@ export const SimpleTabletop = () => {
     if (wallGeometry) {
       ctx.save();
       ctx.fillStyle = '#333333';
-      ctx.globalAlpha = 0.25;
+      // Play mode: solid fill, Edit mode: semi-transparent
+      ctx.globalAlpha = isPlayMode ? 1.0 : 0.25;
       ctx.fill(wallGeometry.wallPath, 'evenodd');
       
-      ctx.globalAlpha = 0.2;
-      ctx.strokeStyle = '#ff6b6b';
-      ctx.lineWidth = 2 / transform.zoom;
-      const bounds = wallGeometry.bounds;
-      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+      // Only show red bounding box in edit mode
+      if (!isPlayMode) {
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2 / transform.zoom;
+        const bounds = wallGeometry.bounds;
+        ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+      }
       ctx.restore();
       
       // Draw cached decorations
@@ -733,7 +737,7 @@ export const SimpleTabletop = () => {
       }
     }
     
-    // 3. Then render doors - ABOVE walls
+    // 4. Then render doors - ABOVE walls
     if (isPlayMode) {
       renderDoors(ctx, doors, transform.zoom);
     } else {
