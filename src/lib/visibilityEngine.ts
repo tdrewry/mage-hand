@@ -118,20 +118,17 @@ function generateCacheKey(position: Point, segments: LineSegment[], maxDistance?
 }
 
 /**
- * Compute visibility polygon from a point source
+ * Compute visibility polygon from line segments directly
  * @param position - The observer position (light source, token, etc.)
- * @param obstacles - Regions that block visibility (walls, etc.)
+ * @param segments - Line segments that block visibility
  * @param maxDistance - Optional maximum visibility distance
  * @returns Visibility polygon and metadata
  */
-export function computeVisibility(
+export function computeVisibilityFromSegments(
   position: Point,
-  obstacles: CanvasRegion[],
+  segments: LineSegment[],
   maxDistance?: number
 ): VisibilityResult {
-  // Convert regions to line segments
-  const segments = regionsToSegments(obstacles);
-
   // Check cache
   const cacheKey = generateCacheKey(position, segments, maxDistance);
   const cached = visibilityCache.get(cacheKey);
@@ -190,6 +187,23 @@ export function computeVisibility(
   visibilityCache.set(cacheKey, { result, timestamp: now });
 
   return result;
+}
+
+/**
+ * Compute visibility polygon from a point source (using regions)
+ * @param position - The observer position (light source, token, etc.)
+ * @param obstacles - Regions that block visibility (walls, etc.)
+ * @param maxDistance - Optional maximum visibility distance
+ * @returns Visibility polygon and metadata
+ */
+export function computeVisibility(
+  position: Point,
+  obstacles: CanvasRegion[],
+  maxDistance?: number
+): VisibilityResult {
+  // Convert regions to line segments
+  const segments = regionsToSegments(obstacles);
+  return computeVisibilityFromSegments(position, segments, maxDistance);
 }
 
 /**

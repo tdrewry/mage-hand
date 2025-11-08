@@ -2,8 +2,14 @@
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle } from './watabouStyles';
 
+export interface LineSegment {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
 export interface WallGeometry {
   wallPath: Path2D;
+  wallSegments: LineSegment[]; // NEW: Line segments that represent the actual wall boundaries
   bounds: { x: number; y: number; width: number; height: number };
   wallThickness: number;
   margin: number;
@@ -27,6 +33,7 @@ export function generateWallGeometry(
   if (regions.length === 0) {
     return {
       wallPath: new Path2D(),
+      wallSegments: [],
       bounds: { x: 0, y: 0, width: 0, height: 0 },
       wallThickness,
       margin: effectiveMargin,
@@ -88,11 +95,22 @@ export function generateWallGeometry(
     height: maxY - minY + 2 * effectiveMargin,
   };
   
+  // Track wall segments for light blocking
+  const wallSegments: LineSegment[] = [];
+  
   // Create compound path: outer rectangle minus all regions
   const wallPath = new Path2D();
   
   // Add outer bounding box (clockwise winding)
   wallPath.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+  
+  // Add outer bounding box segments
+  wallSegments.push(
+    { start: { x: bounds.x, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y } },
+    { start: { x: bounds.x + bounds.width, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height } },
+    { start: { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, end: { x: bounds.x, y: bounds.y + bounds.height } },
+    { start: { x: bounds.x, y: bounds.y + bounds.height }, end: { x: bounds.x, y: bounds.y } }
+  );
   
   // Subtract each region as a hole (counter-clockwise winding)
   regions.forEach((region) => {
@@ -144,6 +162,7 @@ export function generateWallGeometry(
   
   return {
     wallPath,
+    wallSegments,
     bounds,
     wallThickness,
     margin: effectiveMargin,

@@ -75,6 +75,7 @@ export const SimpleTabletop = () => {
   const [isFogControlModalOpen, setIsFogControlModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
+  const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   
   // Pan and zoom state
   const [transform, setTransform] = useState({
@@ -690,9 +691,11 @@ export const SimpleTabletop = () => {
     
     // 2. First render floor regions - ABOVE terrain features
     // Skip region strokes since decorative walls will handle the edges
-    regions.forEach(region => {
-      drawRegion(ctx, region, true); // skipStroke = true for both modes
-    });
+    if (showRegions) {
+      regions.forEach(region => {
+        drawRegion(ctx, region, true); // skipStroke = true for both modes
+      });
+    }
     
     // 3. Then render walls (negative space) on top - ABOVE regions
     // This ensures walls cover/overlap floor regions properly
@@ -796,7 +799,7 @@ export const SimpleTabletop = () => {
     
     // NEW: Render shadows using visibility polygon system
     if (isPlayMode && lights.length > 0 && wallGeometry) {
-      const illumination = computeIllumination(lights, regions, wallGeometry);
+      const illumination = computeIllumination(lights, wallGeometry.wallSegments, wallGeometry);
       renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
     
@@ -899,11 +902,11 @@ export const SimpleTabletop = () => {
     
     // Render fog of war (in world coordinate space, before restore)
     if (isPlayMode && fogEnabled && !fogRevealAll && wallGeometry) {
-      // Compute visibility from tokens using wall geometry to filter and regions as obstacles
+      // Compute visibility from tokens using wall segments as obstacles
       const tokenVisibility = computeTokenVisibility(
         tokens,
+        wallGeometry.wallSegments, // Wall segments define light-blocking edges
         wallGeometry, // Used to filter out tokens in walls
-        regions, // Used as obstacles for visibility calculation
         fogVisionRange
       );
       
@@ -3804,21 +3807,33 @@ export const SimpleTabletop = () => {
             </Button>
           )}
           {regions.length > 0 && (
-            <Button
-              variant={showNegativeSpacePanel ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setShowNegativeSpacePanel(!showNegativeSpacePanel);
-                // Close region panel when opening wall settings
-                if (!showNegativeSpacePanel) {
-                  setSelectedRegionId(null);
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <Settings2 className="w-4 h-4" />
-              {renderingMode === 'play' ? 'Styles' : 'Wall Settings'}
-            </Button>
+            <>
+              <Button
+                variant={showNegativeSpacePanel ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setShowNegativeSpacePanel(!showNegativeSpacePanel);
+                  // Close region panel when opening wall settings
+                  if (!showNegativeSpacePanel) {
+                    setSelectedRegionId(null);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <Settings2 className="w-4 h-4" />
+                {renderingMode === 'play' ? 'Styles' : 'Wall Settings'}
+              </Button>
+              <Button
+                variant={showRegions ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowRegions(!showRegions)}
+                className="flex items-center gap-2"
+                title="Toggle region visibility (for testing light blocking)"
+              >
+                <Eye className="w-4 h-4" />
+                Regions {showRegions ? 'On' : 'Off'}
+              </Button>
+            </>
           )}
         </div>
       </div>

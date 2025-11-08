@@ -4,8 +4,8 @@
 
 import type { LightSource } from '@/stores/lightStore';
 import type { CanvasRegion } from '@/stores/regionStore';
-import { computeVisibility, computeMultiSourceVisibility, visibilityPolygonToPath2D, clearVisibilityCache } from './visibilityEngine';
-import type { Point, VisibilityResult } from './visibilityEngine';
+import { computeVisibilityFromSegments, visibilityPolygonToPath2D, clearVisibilityCache } from './visibilityEngine';
+import type { Point, VisibilityResult, LineSegment } from './visibilityEngine';
 
 export interface IlluminationMap {
   litAreas: Path2D[]; // Areas lit by each light source
@@ -16,11 +16,11 @@ export interface IlluminationMap {
 
 /**
  * Compute illumination map from active light sources
- * Uses regions as obstacles (they define the wall boundaries)
+ * Uses wall geometry segments as obstacles
  */
 export function computeIllumination(
   lights: LightSource[],
-  regions: CanvasRegion[],
+  wallSegments: LineSegment[],
   wallGeometry?: any
 ): IlluminationMap {
   // Filter out lights that are inside walls (shouldn't cast light)
@@ -41,20 +41,20 @@ export function computeIllumination(
   
   const litAreas: Path2D[] = [];
   
-  // Compute visibility polygon for each light using regions as obstacles
+  // Compute visibility polygon for each light using wall segments as obstacles
   for (const light of activeLights) {
-    const visibility = computeVisibility(light.position, regions, light.radius);
+    const visibility = computeVisibilityFromSegments(light.position, wallSegments, light.radius);
     const path = visibilityPolygonToPath2D(visibility.polygon);
     litAreas.push(path);
   }
   
-  // For combined lit area, we compute multi-source visibility
+  // For combined lit area, compute visibility for all lights
   let combinedLitArea = new Path2D();
   if (activeLights.length > 0) {
-    const positions = activeLights.map(light => light.position);
-    const maxRadius = Math.max(...activeLights.map(light => light.radius));
-    const combined = computeMultiSourceVisibility(positions, regions, maxRadius);
-    combinedLitArea = visibilityPolygonToPath2D(combined.polygon);
+    // Merge all lit areas into one
+    for (const area of litAreas) {
+      combinedLitArea.addPath(area);
+    }
   }
   
   // Shadow areas are computed as needed (inverse of lit areas)

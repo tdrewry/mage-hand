@@ -3,7 +3,7 @@
  */
 
 import type { CanvasRegion } from '@/stores/regionStore';
-import { computeVisibility, computeMultiSourceVisibility, visibilityPolygonToPath2D, type Point } from './visibilityEngine';
+import { computeVisibilityFromSegments, visibilityPolygonToPath2D, type Point, type LineSegment } from './visibilityEngine';
 
 export interface FogOfWarState {
   exploredAreas: string; // Serialized Path2D data
@@ -23,12 +23,12 @@ export interface Token {
 /**
  * Compute current visibility from token positions
  * Uses wall geometry (negative space) to filter out tokens in walls,
- * then uses regions as obstacles for visibility calculation
+ * and uses wall segments as obstacles for visibility calculation
  */
 export function computeTokenVisibility(
   tokens: Token[],
-  wallGeometry: any | null, // Wall geometry from negative space
-  regions: CanvasRegion[],
+  wallSegments: LineSegment[],
+  wallGeometry: any | null,
   visionRange: number = 300
 ): Path2D {
   if (tokens.length === 0) {
@@ -54,16 +54,21 @@ export function computeTokenVisibility(
     return new Path2D();
   }
 
-  // Get positions of valid tokens
-  const positions: Point[] = validTokens.map(token => ({
-    x: token.x,
-    y: token.y
-  }));
-
-  // Use regions as obstacles (they define the wall boundaries)
-  const visibility = computeMultiSourceVisibility(positions, regions, visionRange);
+  // Compute visibility for each token using wall segments as obstacles
+  const visibleArea = new Path2D();
   
-  return visibilityPolygonToPath2D(visibility.polygon);
+  for (const token of validTokens) {
+    const visibility = computeVisibilityFromSegments(
+      { x: token.x, y: token.y },
+      wallSegments,
+      visionRange
+    );
+    
+    const path = visibilityPolygonToPath2D(visibility.polygon);
+    visibleArea.addPath(path);
+  }
+  
+  return visibleArea;
 }
 
 /**
