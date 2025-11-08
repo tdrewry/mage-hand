@@ -146,8 +146,11 @@ export function addVisibleToExplored(
   // Perform union operation
   const union = explored.unite(visible, { insert: false });
   
-  // Simplify to reduce polygon complexity
-  union.simplify(1.5); // Tolerance in pixels
+  // Flatten to reduce complexity WITHOUT smoothing curves
+  // This keeps sharp edges unlike simplify()
+  if (union.flatten) {
+    union.flatten(2); // Maximum error tolerance in pixels
+  }
   
   // Ensure result is a compound path
   if (union instanceof scope.CompoundPath) {

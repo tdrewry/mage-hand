@@ -295,6 +295,7 @@ export const SimpleTabletop = () => {
   }, [fogEnabled, setSerializedExploredAreas]);
   
   // Compute fog of war masks when tokens move or fog settings change
+  // Debounced to avoid excessive computation during panning
   useEffect(() => {
     if (!fogEnabled || fogRevealAll || !wallGeometryRef.current || !fogScopeRef.current) {
       fogMasksRef.current = null;
@@ -303,62 +304,67 @@ export const SimpleTabletop = () => {
     
     const wallGeometry = wallGeometryRef.current;
     
-    // Compute visibility asynchronously
-    const computeFog = async () => {
-      try {
-        const tokenVisibilityPaper = await computeTokenVisibilityPaper(
-          tokens,
-          wallGeometry.wallSegments,
-          wallGeometry,
-          fogVisionRange
-        );
-        
-        if (!tokenVisibilityPaper || !fogScopeRef.current) return;
-        
-        // Merge into explored areas
-        fogScopeRef.current.activate();
-        exploredAreaRef.current = addVisibleToExplored(
-          exploredAreaRef.current,
-          tokenVisibilityPaper
-        );
-        
-        // Serialize for persistence (debounced in practice, but simple for now)
-        const serialized = serializeFogGeometry(exploredAreaRef.current);
-        if (serialized) {
-          setSerializedExploredAreas(serialized);
+    // Debounce fog computation to avoid stuttering during pan/zoom
+    const timeoutId = setTimeout(() => {
+      // Compute visibility asynchronously
+      const computeFog = async () => {
+        try {
+          const tokenVisibilityPaper = await computeTokenVisibilityPaper(
+            tokens,
+            wallGeometry.wallSegments,
+            wallGeometry,
+            fogVisionRange
+          );
+          
+          if (!tokenVisibilityPaper || !fogScopeRef.current) return;
+          
+          // Merge into explored areas
+          fogScopeRef.current.activate();
+          exploredAreaRef.current = addVisibleToExplored(
+            exploredAreaRef.current,
+            tokenVisibilityPaper
+          );
+          
+          // Serialize for persistence (debounced in practice, but simple for now)
+          const serialized = serializeFogGeometry(exploredAreaRef.current);
+          if (serialized) {
+            setSerializedExploredAreas(serialized);
+          }
+          
+          // Compute masks
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          
+          const worldBounds = {
+            x: -transform.x / transform.zoom - 5000,
+            y: -transform.y / transform.zoom - 5000,
+            width: canvas.width / transform.zoom + 10000,
+            height: canvas.height / transform.zoom + 10000
+          };
+          
+          const masks = computeFogMasks(
+            exploredAreaRef.current,
+            tokenVisibilityPaper,
+            worldBounds
+          );
+          
+          // Store masks for rendering
+          fogMasksRef.current = masks;
+          
+          // Trigger redraw only once
+          requestAnimationFrame(() => {
+            redrawCanvas();
+          });
+        } catch (error) {
+          console.error('Fog computation error:', error);
         }
-        
-        // Compute masks
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const worldBounds = {
-          x: -transform.x / transform.zoom - 5000,
-          y: -transform.y / transform.zoom - 5000,
-          width: canvas.width / transform.zoom + 10000,
-          height: canvas.height / transform.zoom + 10000
-        };
-        
-        const masks = computeFogMasks(
-          exploredAreaRef.current,
-          tokenVisibilityPaper,
-          worldBounds
-        );
-        
-        // Store masks for rendering
-        fogMasksRef.current = masks;
-        
-        // Trigger redraw only once
-        requestAnimationFrame(() => {
-          redrawCanvas();
-        });
-      } catch (error) {
-        console.error('Fog computation error:', error);
-      }
-    };
+      };
+      
+      computeFog();
+    }, 100); // 100ms debounce
     
-    computeFog();
-  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, transform, setSerializedExploredAreas]);
+    return () => clearTimeout(timeoutId);
+  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, setSerializedExploredAreas]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
