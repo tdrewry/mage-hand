@@ -62,9 +62,9 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
   };
 
   return (
-    <Card className="absolute top-4 left-4 z-10 p-4 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <Card className="fixed bottom-4 left-4 z-50 p-4 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">{isPlayMode ? 'Play Mode Styles' : 'Negative Space Controls'}</h3>
+        <h3 className="text-lg font-semibold">{isPlayMode ? 'Play Mode Styles' : 'Wall & Light Settings'}</h3>
         <Button
           variant="ghost"
           size="sm"

@@ -3909,15 +3909,21 @@ export const SimpleTabletop = () => {
             <Grid3X3 className="w-4 h-4" />
             World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
           </Button>
-          {renderingMode === 'edit' && regions.length > 0 && (
+          {regions.length > 0 && (
             <Button
               variant={showNegativeSpacePanel ? "default" : "outline"}
               size="sm"
-              onClick={() => setShowNegativeSpacePanel(!showNegativeSpacePanel)}
+              onClick={() => {
+                setShowNegativeSpacePanel(!showNegativeSpacePanel);
+                // Close region panel when opening wall settings
+                if (!showNegativeSpacePanel) {
+                  setSelectedRegionId(null);
+                }
+              }}
               className="flex items-center gap-2"
             >
               <Settings2 className="w-4 h-4" />
-              Wall Settings
+              {renderingMode === 'play' ? 'Styles' : 'Wall Settings'}
             </Button>
           )}
         </div>
@@ -3925,15 +3931,15 @@ export const SimpleTabletop = () => {
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
-      {/* Negative Space Control Panel - only show in edit mode when toggled */}
-      {renderingMode === 'edit' && showNegativeSpacePanel && (
+      {/* Wall Settings Control Panel - available in both edit and play mode */}
+      {showNegativeSpacePanel && (
         <NegativeSpaceControlPanel
           onClose={() => setShowNegativeSpacePanel(false)}
         />
       )}
       
-      {/* Region Control Panel - only show in edit mode */}
-      {renderingMode === 'edit' && selectedRegionId && (() => {
+      {/* Region Control Panel - only show in edit mode when wall settings is closed */}
+      {renderingMode === 'edit' && selectedRegionId && !showNegativeSpacePanel && (() => {
         const selectedRegion = regions.find(r => r.id === selectedRegionId);
         if (!selectedRegion) return null;
         
