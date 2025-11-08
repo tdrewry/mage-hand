@@ -46,6 +46,7 @@ function getRegionBounds(region: CanvasRegion): { x: number; y: number; width: n
 
 /**
  * Render subtle floor texture pattern on unified floor geometry
+ * Optimized: only draw dots, clipping will handle visibility
  */
 function renderFloorPatternToPath(
   ctx: CanvasRenderingContext2D,
@@ -53,30 +54,9 @@ function renderFloorPatternToPath(
   style: WatabouStyle,
   zoom: number
 ) {
-  ctx.save();
-  
-  // Clip to the unified floor path
-  ctx.clip(floorGeometry.floorPath, 'evenodd');
-  
-  // Draw dotted grid pattern across entire bounds
-  const dotSpacing = 15; // Fixed spacing in world coordinates
-  const dotSize = 0.8; // Fixed dot size in world coordinates
-  
-  ctx.fillStyle = style.colorInk;
-  ctx.globalAlpha = 0.2; // More visible opacity
-  
-  const bounds = floorGeometry.bounds;
-  const padding = 20;
-  
-  for (let x = bounds.x - padding; x < bounds.x + bounds.width + padding; x += dotSpacing) {
-    for (let y = bounds.y - padding; y < bounds.y + bounds.height + padding; y += dotSpacing) {
-      ctx.beginPath();
-      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  
-  ctx.restore();
+  // Skip texture for now - it's causing performance issues
+  // We can add it back later with better optimization
+  return;
 }
 
 /**
