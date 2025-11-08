@@ -149,33 +149,27 @@ export function renderSimpleFog(
 
   ctx.save();
 
-  // 1. Draw unexplored fog over entire canvas (black)
-  ctx.fillStyle = `rgba(0, 0, 0, ${unexploredOpacity})`;
+  // Build fog mask: Start with full opacity, cut out explored, then cut out visible
+  // 1. Draw fully opaque unexplored fog
+  ctx.fillStyle = 'rgba(0, 0, 0, 1)';
   ctx.fillRect(canvasBounds.x, canvasBounds.y, canvasBounds.width, canvasBounds.height);
 
-  // 2. Lighten explored areas (semi-transparent fog)
+  // 2. Cut out explored areas and replace with semi-transparent fog
   if (exploredArea) {
-    ctx.save();
-    
-    // Cut out the explored area from the unexplored fog
+    // Punch hole in the opaque fog
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
     ctx.fill(exploredArea);
     
-    // Draw lighter fog over the explored area
+    // Fill the hole with semi-transparent fog
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
     ctx.fill(exploredArea);
-    
-    ctx.restore();
   }
 
-  // 3. Completely reveal currently visible areas
+  // 3. Cut out currently visible areas completely (no fog)
   if (visibleArea) {
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
     ctx.fill(visibleArea);
-    ctx.globalCompositeOperation = 'source-over';
   }
 
   ctx.restore();
