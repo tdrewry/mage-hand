@@ -121,6 +121,9 @@ export const SimpleTabletop = () => {
     shadowBounds: { x: number; y: number; width: number; height: number };
   } | null>(null);
   
+  // Store wall geometry separately for fog computation
+  const wallGeometryRef = useRef<any>(null);
+  
   // Grid highlighting state for token movement (supports both hex and square grids)
   const [highlightedGrids, setHighlightedGrids] = useState<{
     regionId: string, 
@@ -183,6 +186,16 @@ export const SimpleTabletop = () => {
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
+  
+  // Pre-computed fog masks (updated outside render loop)
+  const fogMasksRef = useRef<{
+    unexploredMask: Path2D;
+    exploredOnlyMask: Path2D;
+    visibleMask: Path2D;
+  } | null>(null);
+  
+  // Track if fog needs recomputation
+  const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -276,9 +289,76 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     if (!fogEnabled) {
       exploredAreaRef.current = null;
+      fogMasksRef.current = null;
       setSerializedExploredAreas('');
     }
   }, [fogEnabled, setSerializedExploredAreas]);
+  
+  // Compute fog of war masks when tokens move or fog settings change
+  useEffect(() => {
+    if (!fogEnabled || fogRevealAll || !wallGeometryRef.current || !fogScopeRef.current) {
+      fogMasksRef.current = null;
+      return;
+    }
+    
+    const wallGeometry = wallGeometryRef.current;
+    
+    // Compute visibility asynchronously
+    const computeFog = async () => {
+      try {
+        const tokenVisibilityPaper = await computeTokenVisibilityPaper(
+          tokens,
+          wallGeometry.wallSegments,
+          wallGeometry,
+          fogVisionRange
+        );
+        
+        if (!tokenVisibilityPaper || !fogScopeRef.current) return;
+        
+        // Merge into explored areas
+        fogScopeRef.current.activate();
+        exploredAreaRef.current = addVisibleToExplored(
+          exploredAreaRef.current,
+          tokenVisibilityPaper
+        );
+        
+        // Serialize for persistence (debounced in practice, but simple for now)
+        const serialized = serializeFogGeometry(exploredAreaRef.current);
+        if (serialized) {
+          setSerializedExploredAreas(serialized);
+        }
+        
+        // Compute masks
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const worldBounds = {
+          x: -transform.x / transform.zoom - 5000,
+          y: -transform.y / transform.zoom - 5000,
+          width: canvas.width / transform.zoom + 10000,
+          height: canvas.height / transform.zoom + 10000
+        };
+        
+        const masks = computeFogMasks(
+          exploredAreaRef.current,
+          tokenVisibilityPaper,
+          worldBounds
+        );
+        
+        // Store masks for rendering
+        fogMasksRef.current = masks;
+        
+        // Trigger redraw only once
+        requestAnimationFrame(() => {
+          redrawCanvas();
+        });
+      } catch (error) {
+        console.error('Fog computation error:', error);
+      }
+    };
+    
+    computeFog();
+  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, transform, setSerializedExploredAreas]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -761,6 +841,7 @@ export const SimpleTabletop = () => {
     if (wallDecorationCacheRef.current && wallDecorationCacheRef.current.cacheKey === cacheKey) {
       // Use cached data
       wallGeometry = wallDecorationCacheRef.current.wallGeometry;
+      wallGeometryRef.current = wallGeometry; // Update ref for fog computation
       cachedCanvas = wallDecorationCacheRef.current.canvas;
       cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
     } else {
@@ -816,6 +897,9 @@ export const SimpleTabletop = () => {
           bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas!.width, height: offscreenCanvas!.height },
           shadowBounds: cachedShadowCanvas ? { x: bounds.x - 30, y: bounds.y - 30, width: cachedShadowCanvas.width, height: cachedShadowCanvas.height } : { x: 0, y: 0, width: 0, height: 0 }
         };
+        
+        // Store in separate ref for fog computation
+        wallGeometryRef.current = wallGeometry;
       }
     }
     
@@ -949,59 +1033,16 @@ export const SimpleTabletop = () => {
     }
     
     // Render fog of war (in world coordinate space, before restore)
-    if (isPlayMode && fogEnabled && !fogRevealAll && wallGeometry) {
-      // Compute visibility from tokens using wall segments as obstacles (async)
-      computeTokenVisibilityPaper(
-        tokens,
-        wallGeometry.wallSegments, // Wall segments define light-blocking edges
-        wallGeometry, // Used to filter out tokens in walls
-        fogVisionRange
-      ).then(tokenVisibilityPaper => {
-        if (!tokenVisibilityPaper) return;
-        
-        // Merge current visibility into explored areas using paper.js union
-        if (fogScopeRef.current) {
-          fogScopeRef.current.activate();
-          exploredAreaRef.current = addVisibleToExplored(
-            exploredAreaRef.current,
-            tokenVisibilityPaper
-          );
-          
-          // Periodically save explored areas (debounced in practice)
-          // For now, save on every update - could add debouncing later
-          const serialized = serializeFogGeometry(exploredAreaRef.current);
-          if (serialized) {
-            setSerializedExploredAreas(serialized);
-          }
-        }
-        
-        // Compute fog masks using boolean operations
-        const worldBounds = {
-          x: -transform.x / transform.zoom - 5000,
-          y: -transform.y / transform.zoom - 5000,
-          width: (canvas?.width || 0) / transform.zoom + 10000,
-          height: (canvas?.height || 0) / transform.zoom + 10000
-        };
-        
-        const masks = computeFogMasks(
-          exploredAreaRef.current,
-          tokenVisibilityPaper,
-          worldBounds
-        );
-        
-        // Render the three fog layers
-        renderFogLayers(
-          ctx,
-          masks.unexploredMask,
-          masks.exploredOnlyMask,
-          masks.visibleMask,
-          fogOpacity,
-          exploredOpacity
-        );
-        
-        // Force redraw to show updated fog
-        redrawCanvas();
-      });
+    // Use pre-computed masks from useEffect
+    if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
+      renderFogLayers(
+        ctx,
+        fogMasksRef.current.unexploredMask,
+        fogMasksRef.current.exploredOnlyMask,
+        fogMasksRef.current.visibleMask,
+        fogOpacity,
+        exploredOpacity
+      );
     }
     
     // Restore context after all world-space rendering
