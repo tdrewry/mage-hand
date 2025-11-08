@@ -648,7 +648,7 @@ export const SimpleTabletop = () => {
       const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
       if (negativeSpace) {
-        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry);
+        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry, regions);
       }
     }
     
@@ -911,8 +911,89 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
+  // Function to draw decorative edges along region boundaries
+  const drawDecorativeInnerEdges = (ctx: CanvasRenderingContext2D, regions: CanvasRegion[]) => {
+    ctx.save();
+    
+    regions.forEach(region => {
+      ctx.strokeStyle = '#8b7355'; // Stone-like brown color
+      ctx.lineWidth = 3 / transform.zoom;
+      ctx.globalAlpha = 0.8;
+      
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
+        // Draw decorative edge for path regions
+        ctx.beginPath();
+        ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+        
+        if (region.bezierControlPoints && region.smoothing !== false) {
+          // Draw bezier curves
+          for (let i = 0; i < region.pathPoints.length - 1; i++) {
+            const cp = region.bezierControlPoints[i];
+            if (cp) {
+              ctx.bezierCurveTo(
+                cp.cp1.x, cp.cp1.y,
+                cp.cp2.x, cp.cp2.y,
+                region.pathPoints[i + 1].x, region.pathPoints[i + 1].y
+              );
+            } else {
+              ctx.lineTo(region.pathPoints[i + 1].x, region.pathPoints[i + 1].y);
+            }
+          }
+          // Close with final bezier or line
+          const lastCp = region.bezierControlPoints[region.pathPoints.length - 1];
+          if (lastCp) {
+            ctx.bezierCurveTo(
+              lastCp.cp1.x, lastCp.cp1.y,
+              lastCp.cp2.x, lastCp.cp2.y,
+              region.pathPoints[0].x, region.pathPoints[0].y
+            );
+          } else {
+            ctx.closePath();
+          }
+        } else {
+          // Draw straight lines
+          for (let i = 1; i < region.pathPoints.length; i++) {
+            ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+          }
+          ctx.closePath();
+        }
+        
+        ctx.stroke();
+        
+        // Add inner shadow effect
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        
+      } else {
+        // Draw decorative edge for rectangle regions
+        const effectiveRotation = region.rotation || 0;
+        
+        if (effectiveRotation !== 0) {
+          const centerX = region.x + region.width / 2;
+          const centerY = region.y + region.height / 2;
+          const angle = (effectiveRotation * Math.PI) / 180;
+          ctx.translate(centerX, centerY);
+          ctx.rotate(angle);
+          ctx.translate(-centerX, -centerY);
+        }
+        
+        ctx.strokeRect(region.x, region.y, region.width, region.height);
+        
+        // Add inner shadow effect
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.globalAlpha = 0.5;
+        ctx.strokeRect(region.x, region.y, region.width, region.height);
+      }
+    });
+    
+    ctx.restore();
+  };
+
   // Function to draw negative space region (walls visualization in edit mode)
-  const drawNegativeSpaceRegion = (ctx: CanvasRenderingContext2D, wallGeometry: any) => {
+  const drawNegativeSpaceRegion = (ctx: CanvasRenderingContext2D, wallGeometry: any, regions: CanvasRegion[]) => {
     ctx.save();
     
     // Draw with distinct visual style so users know it's the negative space
@@ -926,6 +1007,9 @@ export const SimpleTabletop = () => {
     ctx.stroke(wallGeometry.wallPath);
     
     ctx.restore();
+    
+    // Draw decorative inner edges
+    drawDecorativeInnerEdges(ctx, regions);
   };
   
   // Function to draw regions
