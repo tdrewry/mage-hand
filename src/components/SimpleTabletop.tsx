@@ -21,6 +21,15 @@ import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
 import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
 import { generateNegativeSpaceRegion } from '../lib/wallGeometry';
+import { 
+  applyHatchingPattern, 
+  applyStipplingPattern, 
+  applyWoodGrainPattern, 
+  getVariedLineWidth,
+  getRegionEdgePoints,
+  EDGE_STYLES,
+  type WallEdgeStyle 
+} from '../lib/wallTexturePatterns';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { 
   HexCoordinate, 
@@ -112,7 +121,8 @@ export const SimpleTabletop = () => {
     annotations,
     terrainFeatures,
     renderingMode,
-    watabouStyle
+    watabouStyle,
+    wallEdgeStyle
   } = useDungeonStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -912,22 +922,55 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw decorative edges along region boundaries
-  const drawDecorativeInnerEdges = (ctx: CanvasRenderingContext2D, regions: CanvasRegion[]) => {
+  const drawDecorativeInnerEdges = (ctx: CanvasRenderingContext2D, regions: CanvasRegion[], style: WallEdgeStyle) => {
+    const config = EDGE_STYLES[style];
+    
     ctx.save();
     
     regions.forEach(region => {
-      ctx.strokeStyle = '#8b7355'; // Stone-like brown color
-      ctx.lineWidth = 3 / transform.zoom;
-      ctx.globalAlpha = 0.8;
+      const points = getRegionEdgePoints(region);
+      
+      // Calculate total path length for variation
+      let totalLength = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const dx = points[i + 1].x - points[i].x;
+        const dy = points[i + 1].y - points[i].y;
+        totalLength += Math.sqrt(dx * dx + dy * dy);
+      }
+      
+      // Apply rotation for rectangle regions
+      const needsRotation = region.regionType !== 'path' && region.rotation;
+      if (needsRotation) {
+        const centerX = region.x + region.width / 2;
+        const centerY = region.y + region.height / 2;
+        const angle = (region.rotation! * Math.PI) / 180;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(angle);
+        ctx.translate(-centerX, -centerY);
+      }
+      
+      // Draw base edge with varied thickness
+      ctx.strokeStyle = config.baseColor;
+      ctx.globalAlpha = config.alpha;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-        // Draw decorative edge for path regions
+        // Draw path regions with bezier curves
+        let currentPos = 0;
+        
         ctx.beginPath();
         ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
         
         if (region.bezierControlPoints && region.smoothing !== false) {
-          // Draw bezier curves
           for (let i = 0; i < region.pathPoints.length - 1; i++) {
+            const segmentDx = region.pathPoints[i + 1].x - region.pathPoints[i].x;
+            const segmentDy = region.pathPoints[i + 1].y - region.pathPoints[i].y;
+            const segmentLength = Math.sqrt(segmentDx * segmentDx + segmentDy * segmentDy);
+            
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
+            currentPos += segmentLength;
+            
             const cp = region.bezierControlPoints[i];
             if (cp) {
               ctx.bezierCurveTo(
@@ -939,7 +982,7 @@ export const SimpleTabletop = () => {
               ctx.lineTo(region.pathPoints[i + 1].x, region.pathPoints[i + 1].y);
             }
           }
-          // Close with final bezier or line
+          
           const lastCp = region.bezierControlPoints[region.pathPoints.length - 1];
           if (lastCp) {
             ctx.bezierCurveTo(
@@ -951,41 +994,68 @@ export const SimpleTabletop = () => {
             ctx.closePath();
           }
         } else {
-          // Draw straight lines
           for (let i = 1; i < region.pathPoints.length; i++) {
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
             ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+            const dx = region.pathPoints[i].x - region.pathPoints[i - 1].x;
+            const dy = region.pathPoints[i].y - region.pathPoints[i - 1].y;
+            currentPos += Math.sqrt(dx * dx + dy * dy);
           }
           ctx.closePath();
         }
         
         ctx.stroke();
         
-        // Add inner shadow effect
-        ctx.strokeStyle = '#5a4a3a';
-        ctx.lineWidth = 1.5 / transform.zoom;
+        // Draw shadow layer
+        ctx.strokeStyle = config.shadowColor;
+        ctx.lineWidth = config.shadowWidth / transform.zoom;
         ctx.globalAlpha = 0.5;
         ctx.stroke();
         
       } else {
-        // Draw decorative edge for rectangle regions
-        const effectiveRotation = region.rotation || 0;
+        // Draw rectangle with varied thickness
+        const segments = [
+          { x1: region.x, y1: region.y, x2: region.x + region.width, y2: region.y },
+          { x1: region.x + region.width, y1: region.y, x2: region.x + region.width, y2: region.y + region.height },
+          { x1: region.x + region.width, y1: region.y + region.height, x2: region.x, y2: region.y + region.height },
+          { x1: region.x, y1: region.y + region.height, x2: region.x, y2: region.y },
+        ];
         
-        if (effectiveRotation !== 0) {
-          const centerX = region.x + region.width / 2;
-          const centerY = region.y + region.height / 2;
-          const angle = (effectiveRotation * Math.PI) / 180;
-          ctx.translate(centerX, centerY);
-          ctx.rotate(angle);
-          ctx.translate(-centerX, -centerY);
-        }
+        let currentPos = 0;
+        segments.forEach(seg => {
+          ctx.beginPath();
+          ctx.moveTo(seg.x1, seg.y1);
+          ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
+          ctx.lineTo(seg.x2, seg.y2);
+          ctx.stroke();
+          
+          const dx = seg.x2 - seg.x1;
+          const dy = seg.y2 - seg.y1;
+          currentPos += Math.sqrt(dx * dx + dy * dy);
+        });
         
-        ctx.strokeRect(region.x, region.y, region.width, region.height);
-        
-        // Add inner shadow effect
-        ctx.strokeStyle = '#5a4a3a';
-        ctx.lineWidth = 1.5 / transform.zoom;
+        // Draw shadow layer
+        ctx.strokeStyle = config.shadowColor;
+        ctx.lineWidth = config.shadowWidth / transform.zoom;
         ctx.globalAlpha = 0.5;
         ctx.strokeRect(region.x, region.y, region.width, region.height);
+      }
+      
+      // Apply texture patterns
+      if (config.textureEnabled) {
+        if (style === 'stone') {
+          applyHatchingPattern(ctx, points, transform.zoom, style);
+          applyStipplingPattern(ctx, points, transform.zoom, style);
+        } else if (style === 'wood') {
+          applyWoodGrainPattern(ctx, points, transform.zoom);
+          applyStipplingPattern(ctx, points, transform.zoom, style);
+        } else if (style === 'metal') {
+          applyHatchingPattern(ctx, points, transform.zoom, style);
+        }
+      }
+      
+      if (needsRotation) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
     });
     
@@ -1008,8 +1078,8 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
-    // Draw decorative inner edges
-    drawDecorativeInnerEdges(ctx, regions);
+    // Draw decorative inner edges with selected style
+    drawDecorativeInnerEdges(ctx, regions, wallEdgeStyle);
   };
   
   // Function to draw regions
