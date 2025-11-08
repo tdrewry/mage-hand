@@ -653,8 +653,9 @@ export const SimpleTabletop = () => {
       });
     } else {
       // Edit mode: Render regions + negative space visualization
+      // Skip region strokes since decorative walls will handle the edges
       regions.forEach(region => {
-        drawRegion(ctx, region);
+        drawRegion(ctx, region, true); // skipStroke = true in edit mode
       });
       
       // Draw negative space region in edit mode
@@ -1103,7 +1104,7 @@ export const SimpleTabletop = () => {
   };
   
   // Function to draw regions
-  const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+  const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, skipStroke: boolean = false) => {
     const isSelected = region.selected;
     
     // Check if this region has a drag preview
@@ -1122,10 +1123,10 @@ export const SimpleTabletop = () => {
     
     if (effectiveRegion.regionType === 'path' && effectiveRegion.pathPoints && effectiveRegion.pathPoints.length > 2) {
       // Handle path region rendering
-      drawPathRegion(ctx, effectiveRegion, isSelected);
+      drawPathRegion(ctx, effectiveRegion, isSelected, skipStroke);
     } else {
       // Handle rectangle region rendering
-      drawRectangleRegion(ctx, effectiveRegion, isSelected);
+      drawRectangleRegion(ctx, effectiveRegion, isSelected, skipStroke);
     }
     
     // Only show handles and selection in edit mode
@@ -1139,7 +1140,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw path regions
-  const drawPathRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean) => {
+  const drawPathRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean, skipStroke: boolean = false) => {
     ctx.save();
     
     // Create path for clipping and filling
@@ -1215,10 +1216,12 @@ export const SimpleTabletop = () => {
       ctx.fill();
     }
     
-    // Draw path outline
-    ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
-    ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
-    ctx.stroke();
+    // Draw path outline (skip in edit mode when negative space handles it)
+    if (!skipStroke) {
+      ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
+      ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
+      ctx.stroke();
+    }
     
     ctx.restore();
     
@@ -1252,7 +1255,7 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw rectangle regions
-  const drawRectangleRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean) => {
+  const drawRectangleRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion, isSelected: boolean, skipStroke: boolean = false) => {
     ctx.save();
     
     // Apply rotation if present
@@ -1303,10 +1306,12 @@ export const SimpleTabletop = () => {
       drawRegionGrid(ctx, region);
     }
     
-    // Draw region border
-    ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
-    ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
-    ctx.strokeRect(region.x, region.y, region.width, region.height);
+    // Draw region border (skip in edit mode when negative space handles it)
+    if (!skipStroke) {
+      ctx.strokeStyle = isSelected ? '#ffffff' : '#666666';
+      ctx.lineWidth = (isSelected ? 2 : 1) / transform.zoom;
+      ctx.strokeRect(region.x, region.y, region.width, region.height);
+    }
     
     // Draw grid type label
     if (region.gridType !== 'free') {
