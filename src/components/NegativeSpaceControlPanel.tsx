@@ -5,7 +5,10 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { X, Sun, MoveDown, MoveRight, MoveLeft } from 'lucide-react';
 import { useDungeonStore } from '@/stores/dungeonStore';
+import { useRegionStore } from '@/stores/regionStore';
 import { StylePreviewCanvas } from './StylePreviewCanvas';
+import { WATABOU_STYLES } from '@/lib/watabouStyles';
+import { toast } from 'sonner';
 
 interface NegativeSpaceControlPanelProps {
   onClose: () => void;
@@ -19,11 +22,16 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
     wallThickness, 
     textureScale,
     lightDirection,
+    renderingMode,
+    watabouStyle,
     setWallEdgeStyle, 
     setWallThickness,
     setTextureScale,
-    setLightDirection
+    setLightDirection,
+    setWatabouStyle
   } = useDungeonStore();
+  
+  const { regions, updateRegion } = useRegionStore();
 
   const edgeStyleLabels: Record<typeof wallEdgeStyle, string> = {
     stone: 'Stone',
@@ -31,11 +39,28 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
     metal: 'Metal',
     simple: 'Simple',
   };
+  
+  const isPlayMode = renderingMode === 'play';
+  
+  const quickSetStyle = (styleName: string) => {
+    const style = WATABOU_STYLES[styleName];
+    if (style) {
+      setWatabouStyle(style);
+      toast.success(`Applied "${styleName}" style`);
+    }
+  };
+  
+  const quickSetRegionBackground = (color: string) => {
+    regions.forEach(region => {
+      updateRegion(region.id, { backgroundColor: color });
+    });
+    toast.success('Updated all region backgrounds');
+  };
 
   return (
     <Card className="absolute top-4 left-4 z-10 p-4 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Negative Space Controls</h3>
+        <h3 className="text-lg font-semibold">{isPlayMode ? 'Play Mode Styles' : 'Negative Space Controls'}</h3>
         <Button
           variant="ghost"
           size="sm"
@@ -45,6 +70,62 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
           <X className="h-4 w-4" />
         </Button>
       </div>
+      
+      {/* Quick style presets for play mode */}
+      {isPlayMode && (
+        <div className="space-y-3 mb-4 pb-4 border-b">
+          <Label>Map Style Presets</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.keys(WATABOU_STYLES).map((styleName) => (
+              <Button
+                key={styleName}
+                variant={watabouStyle === WATABOU_STYLES[styleName] ? "default" : "outline"}
+                size="sm"
+                onClick={() => quickSetStyle(styleName)}
+                className="w-full"
+              >
+                {styleName}
+              </Button>
+            ))}
+          </div>
+          
+          <Label className="mt-4">Region Floor Color</Label>
+          <div className="grid grid-cols-4 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => quickSetRegionBackground('#EDE0CE')}
+              className="h-10 w-full"
+              style={{ backgroundColor: '#EDE0CE' }}
+              title="Parchment"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => quickSetRegionBackground('#E5E2CF')}
+              className="h-10 w-full"
+              style={{ backgroundColor: '#E5E2CF' }}
+              title="Stone"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => quickSetRegionBackground('#899199')}
+              className="h-10 w-full"
+              style={{ backgroundColor: '#899199' }}
+              title="Slate"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => quickSetRegionBackground('#F7EEDE')}
+              className="h-10 w-full"
+              style={{ backgroundColor: '#F7EEDE' }}
+              title="Antique"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Wall Edge Style */}
       <div className="space-y-3 mb-4">

@@ -46,7 +46,7 @@ import { simplifyPath } from '../utils/pathSimplification';
 import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUtils';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3, Eye, Pen, Square, Settings2 } from 'lucide-react';
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
@@ -95,6 +95,9 @@ export const SimpleTabletop = () => {
   const [isTransforming, setIsTransforming] = useState(false);
   const [transformHandle, setTransformHandle] = useState<string | null>(null);
   const [rotationCenter, setRotationCenter] = useState<{ x: number; y: number } | null>(null);
+  
+  // Selected annotation for flavor text display
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   
   // Wall decoration cache to avoid regenerating on every pan/zoom
   const wallDecorationCacheRef = useRef<{
@@ -903,8 +906,43 @@ export const SimpleTabletop = () => {
       });
     }
     
-    // Draw annotations on top of tokens
-    renderAnnotations(ctx, annotations, transform.zoom);
+    // Draw annotations on top of tokens with selection highlight
+    annotations.forEach((annotation) => {
+      ctx.save();
+      const { x, y } = annotation.position;
+      const radius = 12 / transform.zoom;
+      const fontSize = 10 / transform.zoom;
+      const isSelected = selectedAnnotationId === annotation.id;
+      
+      // Draw selection ring if selected
+      if (isSelected) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3 / transform.zoom;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 4 / transform.zoom, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+      
+      // Draw circle background
+      ctx.fillStyle = '#3b82f6';
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Draw white border
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.stroke();
+      
+      // Draw reference number
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(annotation.reference, x, y);
+      
+      ctx.restore();
+    });
     
     // Draw current path being drawn
     if (pathDrawingMode === 'drawing' && currentPath.length > 0) {
@@ -1632,8 +1670,8 @@ export const SimpleTabletop = () => {
       }
     }
     
-    // Draw grid type label
-    if (region.gridType !== 'free' && region.pathPoints && region.pathPoints.length > 0) {
+    // Draw grid type label (only in edit mode)
+    if (renderingMode === 'edit' && region.gridType !== 'free' && region.pathPoints && region.pathPoints.length > 0) {
       ctx.fillStyle = '#ffffff';
       ctx.font = `${10 / transform.zoom}px Arial`;
       ctx.textAlign = 'left';
@@ -1705,8 +1743,8 @@ export const SimpleTabletop = () => {
       ctx.strokeRect(region.x, region.y, region.width, region.height);
     }
     
-    // Draw grid type label
-    if (region.gridType !== 'free') {
+    // Draw grid type label (only in edit mode)
+    if (renderingMode === 'edit' && region.gridType !== 'free') {
       ctx.fillStyle = '#ffffff';
       ctx.font = `${10 / transform.zoom}px Arial`;
       ctx.textAlign = 'left';
@@ -2787,7 +2825,22 @@ export const SimpleTabletop = () => {
         }
       }
       
-      // PRIORITY 1: Check for ANY handle on selected region first
+      // PRIORITY 1: Check for annotation clicks (markers)
+      const clickedAnnotation = annotations.find(ann => {
+        const dx = worldPos.x - ann.position.x;
+        const dy = worldPos.y - ann.position.y;
+        const radius = 12;
+        return Math.sqrt(dx * dx + dy * dy) <= radius;
+      });
+      
+      if (clickedAnnotation) {
+        setSelectedAnnotationId(selectedAnnotationId === clickedAnnotation.id ? null : clickedAnnotation.id);
+        setSelectedTokenIds([]);
+        setSelectedRegionId(null);
+        return;
+      }
+      
+      // PRIORITY 2: Check for ANY handle on selected region first
       // This prevents deselection when clicking handles outside the shape boundary
       // But only in edit mode - no region manipulation in play mode
       if (selectedRegionId && renderingMode === 'edit') {
@@ -3741,40 +3794,42 @@ export const SimpleTabletop = () => {
         </Button>
       </div>
 
-      {/* Add Region Button */}
-      <div className="absolute top-32 right-4 z-10">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addNewRegion}
-            className="flex items-center gap-2"
-          >
-            <Square className="w-4 h-4" />
-            Add Region
-          </Button>
-          <Button
-            variant={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? "default" : "outline"}
-            size="sm"
-            onClick={() => pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? finishPathDrawing() : startPathDrawing('polygon')}
-            className="flex items-center gap-2"
-            disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
-          >
-            <Pen className="w-4 h-4" />
-            {pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? 'Finish Polygon' : 'Draw Polygon'}
-          </Button>
-          <Button
-            variant={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand' ? "default" : "outline"}
-            size="sm"
-            onClick={() => startPathDrawing('freehand')}
-            className="flex items-center gap-2"
-            disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
-          >
-            <Pen className="w-4 h-4" />
-            Draw Freehand
-          </Button>
+      {/* Add Region Button - Only in Edit Mode */}
+      {renderingMode === 'edit' && (
+        <div className="absolute top-32 right-4 z-10">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addNewRegion}
+              className="flex items-center gap-2"
+            >
+              <Square className="w-4 h-4" />
+              Add Region
+            </Button>
+            <Button
+              variant={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? "default" : "outline"}
+              size="sm"
+              onClick={() => pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? finishPathDrawing() : startPathDrawing('polygon')}
+              className="flex items-center gap-2"
+              disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
+            >
+              <Pen className="w-4 h-4" />
+              {pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? 'Finish Polygon' : 'Draw Polygon'}
+            </Button>
+            <Button
+              variant={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand' ? "default" : "outline"}
+              size="sm"
+              onClick={() => startPathDrawing('freehand')}
+              className="flex items-center gap-2"
+              disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+            >
+              <Pen className="w-4 h-4" />
+              Draw Freehand
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Grid Snapping Toggle */}
       <div className="absolute top-44 right-4 z-10">
@@ -3866,6 +3921,43 @@ export const SimpleTabletop = () => {
         onColorChange={handleTokenColorChange}
         onUpdateCanvas={handleCanvasUpdate}
       />
+      
+      {/* Selected Annotation Tooltip */}
+      {selectedAnnotationId && (() => {
+        const annotation = annotations.find(a => a.id === selectedAnnotationId);
+        if (!annotation || !annotation.text) return null;
+        
+        const screenX = annotation.position.x * transform.zoom + transform.x;
+        const screenY = annotation.position.y * transform.zoom + transform.y;
+        
+        return (
+          <div 
+            className="absolute z-50 bg-card/95 backdrop-blur border border-border rounded-lg p-3 shadow-lg max-w-xs"
+            style={{
+              left: `${screenX + 20}px`,
+              top: `${screenY - 10}px`,
+            }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                  {annotation.reference}
+                </div>
+                <span className="text-sm font-semibold">Marker {annotation.reference}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={() => setSelectedAnnotationId(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{annotation.text}</p>
+          </div>
+        );
+      })()}
 
       {/* Map Manager Modal */}
       {showMapManager && (
