@@ -47,10 +47,13 @@ import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUti
 import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged } from '../lib/lightSystem';
 import { useLightStore } from '../stores/lightStore';
 import { clearVisibilityCache } from '../lib/visibilityEngine';
+import { computeTokenVisibility, renderSimpleFog } from '../lib/fogOfWar';
+import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb } from 'lucide-react';
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import { FogControlModal } from './modals/FogControlModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
 import { 
@@ -69,6 +72,7 @@ export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
+  const [isFogControlModalOpen, setIsFogControlModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
   
@@ -157,6 +161,16 @@ export const SimpleTabletop = () => {
   
   // Light placement mode
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
+  
+  // Fog of war store
+  const {
+    enabled: fogEnabled,
+    revealAll: fogRevealAll,
+    visionRange: fogVisionRange,
+    fogOpacity,
+    setEnabled: setFogEnabled,
+    setRevealAll: setFogRevealAll,
+  } = useFogStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -890,6 +904,37 @@ export const SimpleTabletop = () => {
     offScreenTokens.forEach(token => {
       drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
     });
+    
+    // Render fog of war (after all game elements, before UI overlays)
+    if (isPlayMode && fogEnabled) {
+      const visibleTokens = tokens.filter(token => 
+        token.x >= viewX && token.x <= viewX + viewWidth &&
+        token.y >= viewY && token.y <= viewY + viewHeight
+      );
+      
+      const tokenVisibility = computeTokenVisibility(
+        visibleTokens,
+        regions,
+        fogVisionRange
+      );
+      
+      // Render fog with cutouts for visible areas
+      const canvasBounds = {
+        x: viewX,
+        y: viewY,
+        width: viewWidth,
+        height: viewHeight
+      };
+      
+      renderSimpleFog(
+        ctx,
+        tokenVisibility,
+        canvasBounds,
+        fogEnabled,
+        fogRevealAll,
+        fogOpacity
+      );
+    }
   };
 
   // Function to draw drag ghost and path
@@ -3748,6 +3793,17 @@ export const SimpleTabletop = () => {
             <Grid3X3 className="w-4 h-4" />
             World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
           </Button>
+          {renderingMode === 'play' && (
+            <Button
+              variant={fogEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsFogControlModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <CloudFog className="w-4 h-4" />
+              Fog {fogEnabled ? 'On' : 'Off'}
+            </Button>
+          )}
           {regions.length > 0 && (
             <Button
               variant={showNegativeSpacePanel ? "default" : "outline"}
@@ -3881,6 +3937,12 @@ export const SimpleTabletop = () => {
         onOpenChange={setIsRegionBackgroundModalOpen}
         region={selectedRegionForEdit}
         onUpdateRegion={updateRegion}
+      />
+      
+      {/* Fog Control Modal */}
+      <FogControlModal
+        open={isFogControlModalOpen}
+        onOpenChange={setIsFogControlModalOpen}
       />
     </div>
   );

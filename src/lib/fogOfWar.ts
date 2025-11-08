@@ -1,0 +1,190 @@
+/**
+ * Fog of War System - Tracks explored and visible areas
+ */
+
+import type { CanvasRegion } from '@/stores/regionStore';
+import { computeVisibility, computeMultiSourceVisibility, visibilityPolygonToPath2D, type Point } from './visibilityEngine';
+
+export interface FogOfWarState {
+  exploredAreas: string; // Serialized Path2D data
+  enabled: boolean;
+  revealAll: boolean; // DM mode - reveal entire map
+}
+
+export interface Token {
+  id: string;
+  x: number;
+  y: number;
+  gridWidth: number;
+  gridHeight: number;
+  ownerId?: string;
+}
+
+/**
+ * Compute current visibility from token positions
+ */
+export function computeTokenVisibility(
+  tokens: Token[],
+  obstacles: CanvasRegion[],
+  visionRange: number = 300
+): Path2D {
+  if (tokens.length === 0) {
+    return new Path2D();
+  }
+
+  // Get positions of all tokens
+  const positions: Point[] = tokens.map(token => ({
+    x: token.x,
+    y: token.y
+  }));
+
+  // Compute multi-source visibility
+  const visibility = computeMultiSourceVisibility(positions, obstacles, visionRange);
+  
+  return visibilityPolygonToPath2D(visibility.polygon);
+}
+
+/**
+ * Merge current visibility into explored areas
+ */
+export function mergeExploredAreas(
+  currentVisibility: Path2D,
+  previousExplored: Path2D
+): Path2D {
+  // In a full implementation, this would perform a union operation on the paths
+  // For now, we'll return the current visibility since Path2D doesn't support union directly
+  // A proper implementation would use a library like paper.js or perform polygon union
+  
+  // Simple approach: render both to an offscreen canvas and extract the combined path
+  // For now, just return current (will be improved in future iterations)
+  return currentVisibility;
+}
+
+/**
+ * Render fog of war overlay
+ */
+export function renderFogOfWar(
+  ctx: CanvasRenderingContext2D,
+  visibleArea: Path2D,
+  exploredArea: Path2D,
+  canvasBounds: { x: number; y: number; width: number; height: number },
+  fogEnabled: boolean,
+  revealAll: boolean
+) {
+  if (!fogEnabled || revealAll) return;
+
+  ctx.save();
+
+  // Create full canvas path
+  const fullCanvas = new Path2D();
+  fullCanvas.rect(canvasBounds.x, canvasBounds.y, canvasBounds.width, canvasBounds.height);
+
+  // 1. Draw unexplored areas (full black)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+  ctx.fill(fullCanvas, 'evenodd');
+
+  // 2. Draw explored but not visible areas (dimmed)
+  if (exploredArea) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Semi-transparent to create dimmed effect
+    ctx.fill(exploredArea);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 3. Reveal currently visible areas (fully clear)
+  if (visibleArea) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)'; // Full opacity to fully reveal
+    ctx.fill(visibleArea);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Create a simple fog overlay (before complex path merging is implemented)
+ */
+export function renderSimpleFog(
+  ctx: CanvasRenderingContext2D,
+  visibleArea: Path2D,
+  canvasBounds: { x: number; y: number; width: number; height: number },
+  fogEnabled: boolean,
+  revealAll: boolean,
+  fogOpacity: number = 0.9
+) {
+  if (!fogEnabled || revealAll) return;
+
+  ctx.save();
+
+  // Draw fog over entire canvas
+  ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+  ctx.fillRect(canvasBounds.x, canvasBounds.y, canvasBounds.width, canvasBounds.height);
+
+  // Cut out visible areas
+  if (visibleArea) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fill(visibleArea);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Serialize Path2D to string (for storage)
+ * Note: Path2D doesn't have native serialization, so we'd need to track points separately
+ */
+export function serializePath2D(path: Path2D): string {
+  // Placeholder - would need to track polygon points separately for real serialization
+  return '';
+}
+
+/**
+ * Deserialize Path2D from string
+ */
+export function deserializePath2D(data: string): Path2D {
+  // Placeholder - would reconstruct from stored polygon points
+  return new Path2D();
+}
+
+/**
+ * Calculate vision range based on token properties
+ */
+export function getTokenVisionRange(token: Token, defaultRange: number = 300): number {
+  // Could be extended to read from token properties (darkvision, etc.)
+  return defaultRange;
+}
+
+/**
+ * Check if a point is in fog (not visible and not explored)
+ */
+export function isPointInFog(
+  point: Point,
+  visibleArea: Path2D,
+  exploredArea: Path2D,
+  ctx: CanvasRenderingContext2D
+): boolean {
+  const isVisible = ctx.isPointInPath(visibleArea, point.x, point.y);
+  const isExplored = ctx.isPointInPath(exploredArea, point.x, point.y);
+  
+  return !isVisible && !isExplored;
+}
+
+/**
+ * Render fog edge softening (optional visual enhancement)
+ */
+export function renderFogEdges(
+  ctx: CanvasRenderingContext2D,
+  visibleArea: Path2D,
+  edgeWidth: number = 20
+) {
+  ctx.save();
+  
+  // Create gradient edge effect
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.lineWidth = edgeWidth;
+  ctx.stroke(visibleArea);
+  
+  ctx.restore();
+}
