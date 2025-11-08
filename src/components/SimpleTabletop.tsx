@@ -654,89 +654,82 @@ export const SimpleTabletop = () => {
     renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isPlayMode, watabouStyle, regions);
     
     // 2. Then render regions/walls - ABOVE terrain features
-    if (isPlayMode) {
-      // Play mode: Same rendering as edit for now
-      regions.forEach(region => {
-        drawRegion(ctx, region);
-      });
+    // Both play and edit modes now show walls with decorations
+    // Skip region strokes since decorative walls will handle the edges
+    regions.forEach(region => {
+      drawRegion(ctx, region, true); // skipStroke = true for both modes
+    });
+    
+    // Draw negative space region with caching (both play and edit modes)
+    const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
+    const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
+    
+    // Generate cache key
+    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale);
+    
+    // Check if we can use cached decorations
+    let wallGeometry: any;
+    let cachedCanvas: HTMLCanvasElement | null = null;
+    
+    if (wallDecorationCacheRef.current && wallDecorationCacheRef.current.cacheKey === cacheKey) {
+      // Use cached data
+      wallGeometry = wallDecorationCacheRef.current.wallGeometry;
+      cachedCanvas = wallDecorationCacheRef.current.canvas;
     } else {
-      // Edit mode: Render regions + negative space visualization
-      // Skip region strokes since decorative walls will handle the edges
-      regions.forEach(region => {
-        drawRegion(ctx, region, true); // skipStroke = true in edit mode
-      });
-      
-      // Draw negative space region in edit mode with caching
-      const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
-      const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
-      
-      // Generate cache key
-      const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale);
-      
-      // Check if we can use cached decorations
-      let wallGeometry: any;
-      let cachedCanvas: HTMLCanvasElement | null = null;
-      
-      if (wallDecorationCacheRef.current && wallDecorationCacheRef.current.cacheKey === cacheKey) {
-        // Use cached data
-        wallGeometry = wallDecorationCacheRef.current.wallGeometry;
-        cachedCanvas = wallDecorationCacheRef.current.canvas;
-      } else {
-        // Generate new decorations and cache them
-        const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
-        if (negativeSpace) {
-          wallGeometry = negativeSpace.wallGeometry;
+      // Generate new decorations and cache them
+      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
+      if (negativeSpace) {
+        wallGeometry = negativeSpace.wallGeometry;
+        
+        // Create offscreen canvas for decorations
+        const offscreenCanvas = document.createElement('canvas');
+        const bounds = wallGeometry.bounds;
+        const padding = 50; // Extra padding for thick walls
+        offscreenCanvas.width = Math.ceil(bounds.width + padding * 2);
+        offscreenCanvas.height = Math.ceil(bounds.height + padding * 2);
+        
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        if (offscreenCtx) {
+          // Translate to account for bounds offset and padding
+          offscreenCtx.translate(-bounds.x + padding, -bounds.y + padding);
           
-          // Create offscreen canvas for decorations
-          const offscreenCanvas = document.createElement('canvas');
-          const bounds = wallGeometry.bounds;
-          const padding = 50; // Extra padding for thick walls
-          offscreenCanvas.width = Math.ceil(bounds.width + padding * 2);
-          offscreenCanvas.height = Math.ceil(bounds.height + padding * 2);
+          // Draw decorative edges to offscreen canvas
+          offscreenCtx.save();
+          offscreenCtx.clip(wallGeometry.wallPath, 'evenodd');
+          drawDecorativeEdgesToContext(offscreenCtx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
+          offscreenCtx.restore();
           
-          const offscreenCtx = offscreenCanvas.getContext('2d');
-          if (offscreenCtx) {
-            // Translate to account for bounds offset and padding
-            offscreenCtx.translate(-bounds.x + padding, -bounds.y + padding);
-            
-            // Draw decorative edges to offscreen canvas
-            offscreenCtx.save();
-            offscreenCtx.clip(wallGeometry.wallPath, 'evenodd');
-            drawDecorativeEdgesToContext(offscreenCtx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
-            offscreenCtx.restore();
-            
-            // Cache the result
-            wallDecorationCacheRef.current = {
-              cacheKey,
-              canvas: offscreenCanvas,
-              wallGeometry,
-              bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas.width, height: offscreenCanvas.height }
-            };
-            
-            cachedCanvas = offscreenCanvas;
-          }
+          // Cache the result
+          wallDecorationCacheRef.current = {
+            cacheKey,
+            canvas: offscreenCanvas,
+            wallGeometry,
+            bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas.width, height: offscreenCanvas.height }
+          };
+          
+          cachedCanvas = offscreenCanvas;
         }
       }
+    }
+    
+    // Draw the base wall fill and outline
+    if (wallGeometry) {
+      ctx.save();
+      ctx.fillStyle = '#333333';
+      ctx.globalAlpha = 0.25;
+      ctx.fill(wallGeometry.wallPath, 'evenodd');
       
-      // Draw the base wall fill and outline
-      if (wallGeometry) {
-        ctx.save();
-        ctx.fillStyle = '#333333';
-        ctx.globalAlpha = 0.25;
-        ctx.fill(wallGeometry.wallPath, 'evenodd');
-        
-        ctx.globalAlpha = 0.2;
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 2 / transform.zoom;
-        const bounds = wallGeometry.bounds;
-        ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        ctx.restore();
-        
-        // Draw cached decorations
-        if (cachedCanvas && wallDecorationCacheRef.current) {
-          const cacheBounds = wallDecorationCacheRef.current.bounds;
-          ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
-        }
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2 / transform.zoom;
+      const bounds = wallGeometry.bounds;
+      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+      ctx.restore();
+      
+      // Draw cached decorations
+      if (cachedCanvas && wallDecorationCacheRef.current) {
+        const cacheBounds = wallDecorationCacheRef.current.bounds;
+        ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
       }
     }
     
