@@ -573,8 +573,8 @@ export const SimpleTabletop = () => {
       ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
     }
     
-    // Draw grid (both modes for now)
-    if (true) {
+    // Draw world grid (only in edit mode)
+    if (renderingMode === 'edit') {
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1 / transform.zoom;
       
