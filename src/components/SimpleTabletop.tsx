@@ -671,8 +671,6 @@ export const SimpleTabletop = () => {
     
     // 3. Apply wall shadows and lighting to floor regions in play mode
     if (isPlayMode && shadowDistance > 0) {
-      console.log('Drawing shadows - shadowDistance:', shadowDistance, 'lightDirection:', lightDirection);
-      
       // Draw soft blur shadows on regions from wall edges
       regions.forEach(region => {
         ctx.save();
@@ -710,7 +708,7 @@ export const SimpleTabletop = () => {
         }
         ctx.clip();
         
-        // Draw wall shadows - SIMPLIFIED for debugging
+        // Draw directional wall shadows
         const edgePoints = getRegionEdgePoints(region);
         const lightAngleRad = (lightDirection * Math.PI) / 180;
         
@@ -718,36 +716,53 @@ export const SimpleTabletop = () => {
         const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
         const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
         
-        console.log('Region edges:', edgePoints.length, 'shadowDx:', shadowDx, 'shadowDy:', shadowDy);
+        // Light source direction vector
+        const lightDx = Math.cos(lightAngleRad);
+        const lightDy = Math.sin(lightAngleRad);
         
-        let shadowsDrawn = 0;
-        
-        // Draw shadow on ALL edges for now (debugging)
+        // Draw shadow along edges where walls face away from light
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
-          // Create gradient for smooth fade
-          const gradient = ctx.createLinearGradient(
-            point.x, point.y,
-            point.x + shadowDx, point.y + shadowDy
-          );
+          const edgeDx = nextPoint.x - point.x;
+          const edgeDy = nextPoint.y - point.y;
+          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
           
-          gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
-          gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
-          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(nextPoint.x, nextPoint.y);
-          ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-          ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-          ctx.closePath();
-          ctx.fill();
-          shadowsDrawn++;
+          if (edgeLen > 0) {
+            // Calculate outward normal (perpendicular to edge, pointing OUT of region)
+            const normalX = -edgeDy / edgeLen;
+            const normalY = edgeDx / edgeLen;
+            
+            // Check if wall faces away from light
+            // Negative dot product = wall on shadow side
+            const dotProduct = normalX * lightDx + normalY * lightDy;
+            
+            // Cast shadow from walls on the shadow side
+            if (dotProduct < -0.05) {
+              // Shadow strength based on angle
+              const intensity = Math.min(0.7, Math.abs(dotProduct) * 0.8);
+              
+              // Create gradient extending INTO the region
+              const gradient = ctx.createLinearGradient(
+                point.x, point.y,
+                point.x + shadowDx, point.y + shadowDy
+              );
+              
+              gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
+              gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.4})`);
+              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+              
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.moveTo(point.x, point.y);
+              ctx.lineTo(nextPoint.x, nextPoint.y);
+              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
         });
-        
-        console.log('Shadows drawn:', shadowsDrawn);
         
         // Apply point light sources if any exist
         if (lightSources.length > 0) {
