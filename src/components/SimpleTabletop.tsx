@@ -712,11 +712,15 @@ export const SimpleTabletop = () => {
         const edgePoints = getRegionEdgePoints(region);
         const lightAngleRad = (lightDirection * Math.PI) / 180;
         
-        // Calculate shadow direction (opposite of light source)
+        // Calculate shadow direction (same as light direction)
         const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
         const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
         
-        // Draw shadow along each edge that faces away from light
+        // Light source direction vector
+        const lightDx = Math.cos(lightAngleRad);
+        const lightDy = Math.sin(lightAngleRad);
+        
+        // Draw shadow along each edge where wall faces the light
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
@@ -725,24 +729,20 @@ export const SimpleTabletop = () => {
           const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
           
           if (edgeLen > 0) {
-            // Calculate edge normal (perpendicular vector pointing INTO the region)
-            // For a clockwise polygon, rotate edge vector 90° clockwise
-            const normalX = edgeDy / edgeLen;
-            const normalY = -edgeDx / edgeLen;
+            // Calculate outward normal (perpendicular to edge, pointing OUT of region)
+            // Rotate edge vector 90° counter-clockwise for outward normal
+            const normalX = -edgeDy / edgeLen;
+            const normalY = edgeDx / edgeLen;
             
-            // Check if wall (outside the region) faces the light
-            // If wall faces light, it casts shadow into the region
-            const lightDx = Math.cos(lightAngleRad);
-            const lightDy = Math.sin(lightAngleRad);
-            
-            // Dot product: positive means edge normal points away from light
-            // (meaning the wall on this edge faces the light and should cast shadow)
+            // Check if this wall surface faces toward the light
+            // Negative dot product means wall faces away from light (toward shadow direction)
             const dotProduct = normalX * lightDx + normalY * lightDy;
             
-            // Only cast shadow if the wall faces toward the light source
-            if (dotProduct > 0.1) {
-              // Shadow strength based on how directly the wall faces the light
-              const intensity = Math.min(0.8, dotProduct * 0.7);
+            // Cast shadow from walls that face away from the light
+            // (these walls are on the shadow side)
+            if (dotProduct < -0.1) {
+              // Shadow strength based on angle
+              const intensity = Math.min(0.7, Math.abs(dotProduct) * 0.8);
               
               // Create gradient extending INTO the region
               const gradient = ctx.createLinearGradient(
