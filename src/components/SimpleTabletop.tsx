@@ -644,7 +644,9 @@ export const SimpleTabletop = () => {
       });
       
       // Draw negative space region in edit mode
-      const negativeSpace = generateNegativeSpaceRegion(regions);
+      const minGridSize = regions.reduce((min, r) => Math.min(min, r.gridSize), Infinity);
+      const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
+      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
       if (negativeSpace) {
         drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry);
       }
