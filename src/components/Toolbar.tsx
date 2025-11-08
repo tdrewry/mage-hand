@@ -2,10 +2,17 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle, Palette } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
+import { WATABOU_STYLES } from '../lib/watabouStyles';
 import { LayerStackModal } from './LayerStackModal';
 import { WatabouImportModal } from './modals/WatabouImportModal';
 import { Canvas as FabricCanvas } from 'fabric';
@@ -20,7 +27,7 @@ interface ToolbarProps {
 export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
   const { tokens, clearAllTokens } = useSessionStore();
   const { regions, clearRegions } = useRegionStore();
-  const { renderingMode, setRenderingMode } = useDungeonStore();
+  const { renderingMode, setRenderingMode, watabouStyle, setWatabouStyle } = useDungeonStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
   
@@ -28,6 +35,14 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
     const newMode = renderingMode === 'vtt' ? 'dungeon-map' : 'vtt';
     setRenderingMode(newMode);
     toast.success(`Switched to ${newMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT'} rendering mode`);
+  };
+  
+  const selectStyle = (styleName: string) => {
+    const style = WATABOU_STYLES[styleName];
+    if (style) {
+      setWatabouStyle(style);
+      toast.success(`Applied "${styleName}" style`);
+    }
   };
   
   const shareSession = () => {
@@ -158,6 +173,29 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
             <Castle className="h-4 w-4 mr-2" />
             {renderingMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT Mode'}
           </Button>
+          
+          {renderingMode === 'dungeon-map' && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-foreground border-border hover:bg-secondary"
+                  title="Select map style"
+                >
+                  <Palette className="h-4 w-4 mr-2" />
+                  Style
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {Object.keys(WATABOU_STYLES).map((styleName) => (
+                  <DropdownMenuItem key={styleName} onClick={() => selectStyle(styleName)}>
+                    {styleName}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           
           <Button 
             variant="outline" 

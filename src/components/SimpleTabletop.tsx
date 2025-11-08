@@ -110,7 +110,8 @@ export const SimpleTabletop = () => {
     doors,
     annotations,
     terrainFeatures,
-    renderingMode
+    renderingMode,
+    watabouStyle
   } = useDungeonStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -611,7 +612,7 @@ export const SimpleTabletop = () => {
     
     // Draw regions (different rendering based on mode)
     if (renderingMode === 'dungeon-map') {
-      renderDungeonMapRegions(ctx, regions, transform.zoom);
+      renderDungeonMapRegions(ctx, regions, transform.zoom, watabouStyle);
     } else {
       regions.forEach(region => {
         drawRegion(ctx, region);
@@ -620,10 +621,10 @@ export const SimpleTabletop = () => {
     
     // Draw dungeon features (terrain, doors, annotations)
     const isDungeonMapMode = renderingMode === 'dungeon-map';
-    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode);
+    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode, watabouStyle);
     
     if (isDungeonMapMode) {
-      renderDungeonMapDoors(ctx, doors, transform.zoom);
+      renderDungeonMapDoors(ctx, doors, transform.zoom, watabouStyle);
     } else {
       renderDoors(ctx, doors, transform.zoom);
     }

@@ -1,5 +1,6 @@
 import { DoorConnection, Annotation, TerrainFeature, DOOR_TYPE_LABELS } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
+import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
  * Calculate wall segments from regions for dungeon map rendering
@@ -32,14 +33,15 @@ function calculateWallSegments(regions: CanvasRegion[]): { x1: number; y1: numbe
 /**
  * Draw hatching pattern for walls
  */
-function drawHatching(
+function drawWallHatching(
   ctx: CanvasRenderingContext2D,
   x1: number,
   y1: number,
   x2: number,
   y2: number,
   zoom: number,
-  wallThickness: number
+  wallThickness: number,
+  style: WatabouStyle
 ) {
   const angle = Math.atan2(y2 - y1, x2 - x1);
   const perpAngle = angle + Math.PI / 2;
@@ -47,23 +49,69 @@ function drawHatching(
   const dx = Math.cos(perpAngle) * wallThickness / 2;
   const dy = Math.sin(perpAngle) * wallThickness / 2;
   
-  // Draw hatching lines
-  const hatchSpacing = 8 / zoom;
+  const hatchSpacing = (style.hatchingDistance * 20) / zoom;
   const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
   const numHatches = Math.floor(length / hatchSpacing);
   
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 0.5 / zoom;
+  ctx.strokeStyle = style.colorInk;
+  ctx.lineWidth = style.strokeHatching / zoom;
   
-  for (let i = 0; i <= numHatches; i++) {
-    const t = i / numHatches;
-    const mx = x1 + (x2 - x1) * t;
-    const my = y1 + (y2 - y1) * t;
+  if (style.hatchingStyle === 'Stonework') {
+    // Stonework pattern - irregular blocks
+    for (let i = 0; i <= numHatches; i++) {
+      const t = i / numHatches;
+      const mx = x1 + (x2 - x1) * t;
+      const my = y1 + (y2 - y1) * t;
+      
+      // Draw short perpendicular lines with slight randomness
+      const offset = (Math.random() - 0.5) * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(mx + dx * (0.2 + offset), my + dy * (0.2 + offset));
+      ctx.lineTo(mx + dx * (0.8 + offset), my + dy * (0.8 + offset));
+      ctx.stroke();
+      
+      // Occasional horizontal breaks
+      if (Math.random() > 0.7) {
+        const breakLen = hatchSpacing * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(mx - Math.cos(angle) * breakLen, my - Math.sin(angle) * breakLen);
+        ctx.lineTo(mx + Math.cos(angle) * breakLen, my + Math.sin(angle) * breakLen);
+        ctx.stroke();
+      }
+    }
+  } else if (style.hatchingStyle === 'Bricks') {
+    // Brick pattern
+    const brickHeight = hatchSpacing * 2;
+    const numRows = Math.floor(wallThickness / brickHeight);
     
-    ctx.beginPath();
-    ctx.moveTo(mx + dx * 0.3, my + dy * 0.3);
-    ctx.lineTo(mx + dx * 0.9, my + dy * 0.9);
-    ctx.stroke();
+    for (let row = 0; row < numRows; row++) {
+      const rowOffset = (row % 2) * hatchSpacing / 2;
+      for (let i = 0; i <= numHatches; i++) {
+        const t = (i * hatchSpacing + rowOffset) / length;
+        if (t > 1) break;
+        
+        const mx = x1 + (x2 - x1) * t;
+        const my = y1 + (y2 - y1) * t;
+        const rowT = row / numRows - 0.5;
+        
+        ctx.beginPath();
+        ctx.moveTo(mx + dx * rowT * 2, my + dy * rowT * 2);
+        ctx.lineTo(mx + dx * rowT * 2, my + dy * rowT * 2 + dy * 0.3);
+        ctx.stroke();
+      }
+    }
+  } else {
+    // Default hatching
+    for (let i = 0; i <= numHatches; i++) {
+      const t = i / numHatches;
+      const mx = x1 + (x2 - x1) * t;
+      const my = y1 + (y2 - y1) * t;
+      
+      ctx.beginPath();
+      ctx.moveTo(mx + dx * 0.2, my + dy * 0.2);
+      ctx.lineTo(mx + dx * 0.8, my + dy * 0.8);
+      ctx.stroke();
+    }
   }
 }
 
@@ -73,15 +121,20 @@ function drawHatching(
 export function renderDungeonMapRegions(
   ctx: CanvasRenderingContext2D,
   regions: CanvasRegion[],
-  zoom: number
+  zoom: number,
+  style: WatabouStyle = DEFAULT_STYLE
 ) {
-  const wallThickness = 6 / zoom;
+  const wallThickness = (style.strokeThick * 2) / zoom;
   
   ctx.save();
   
-  // Fill all regions with white first
+  // Draw background
+  ctx.fillStyle = style.colorBg;
+  ctx.fillRect(-10000, -10000, 20000, 20000);
+  
+  // Fill all regions with paper color first
   regions.forEach((region) => {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = style.colorPaper;
     
     if (region.regionType === 'rectangle') {
       ctx.fillRect(region.x, region.y, region.width, region.height);
@@ -96,7 +149,7 @@ export function renderDungeonMapRegions(
     }
   });
   
-  // Draw thick black walls
+  // Draw walls with shadows and hatching
   const segments = calculateWallSegments(regions);
   
   segments.forEach((seg) => {
@@ -106,8 +159,23 @@ export function renderDungeonMapRegions(
     const dx = Math.cos(perpAngle) * wallThickness / 2;
     const dy = Math.sin(perpAngle) * wallThickness / 2;
     
-    // Draw thick wall
-    ctx.fillStyle = '#000000';
+    // Draw shadow first
+    if (style.shadowDist > 0) {
+      const shadowOffset = (style.shadowDist * 10) / zoom;
+      ctx.fillStyle = style.shadowColor;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.moveTo(seg.x1 - dx + shadowOffset, seg.y1 - dy + shadowOffset);
+      ctx.lineTo(seg.x2 - dx + shadowOffset, seg.y2 - dy + shadowOffset);
+      ctx.lineTo(seg.x2 + dx + shadowOffset, seg.y2 + dy + shadowOffset);
+      ctx.lineTo(seg.x1 + dx + shadowOffset, seg.y1 + dy + shadowOffset);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    }
+    
+    // Draw thick wall base
+    ctx.fillStyle = style.colorShading;
     ctx.beginPath();
     ctx.moveTo(seg.x1 - dx, seg.y1 - dy);
     ctx.lineTo(seg.x2 - dx, seg.y2 - dy);
@@ -116,8 +184,13 @@ export function renderDungeonMapRegions(
     ctx.closePath();
     ctx.fill();
     
+    // Draw wall outline
+    ctx.strokeStyle = style.colorInk;
+    ctx.lineWidth = style.strokeNormal / zoom;
+    ctx.stroke();
+    
     // Add hatching
-    drawHatching(ctx, seg.x1, seg.y1, seg.x2, seg.y2, zoom, wallThickness);
+    drawWallHatching(ctx, seg.x1, seg.y1, seg.x2, seg.y2, zoom, wallThickness, style);
   });
   
   ctx.restore();
@@ -216,17 +289,18 @@ export function renderDoors(
 export function renderDungeonMapDoors(
   ctx: CanvasRenderingContext2D,
   doors: DoorConnection[],
-  zoom: number
+  zoom: number,
+  style: WatabouStyle = DEFAULT_STYLE
 ) {
   doors.forEach((door) => {
     ctx.save();
     
     const size = 16 / zoom;
-    const lineWidth = 2 / zoom;
+    const lineWidth = style.strokeNormal / zoom;
     
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = style.colorInk;
     ctx.lineWidth = lineWidth;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = style.colorPaper;
     
     const { x, y } = door.position;
     const { x: dx, y: dy } = door.direction;
@@ -265,7 +339,7 @@ export function renderDungeonMapDoors(
         break;
         
       case 2: // Secret door - dashed line
-        ctx.setLineDash([3 / zoom, 3 / zoom]);
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
         if (isHorizontal) {
           ctx.beginPath();
           ctx.moveTo(x, y - size / 2);
@@ -408,20 +482,21 @@ export function renderTerrainFeatures(
   ctx: CanvasRenderingContext2D,
   features: TerrainFeature[],
   zoom: number,
-  dungeonMapMode: boolean = false
+  dungeonMapMode: boolean = false,
+  style: WatabouStyle = DEFAULT_STYLE
 ) {
   features.forEach((feature) => {
     ctx.save();
     
     switch (feature.type) {
       case 'water':
-        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode);
+        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style);
         break;
       case 'column':
         renderColumnTiles(ctx, feature.tiles, zoom);
         break;
       case 'debris':
-        renderDebrisTiles(ctx, feature.tiles, zoom, dungeonMapMode);
+        renderDebrisTiles(ctx, feature.tiles, zoom, dungeonMapMode, style);
         break;
       case 'trap':
         renderTrapTiles(ctx, feature.tiles, zoom);
@@ -436,19 +511,28 @@ function renderWaterTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
   zoom: number,
-  dungeonMapMode: boolean = false
+  dungeonMapMode: boolean = false,
+  style: WatabouStyle = DEFAULT_STYLE
 ) {
   tiles.forEach((tile) => {
     if (dungeonMapMode) {
-      // Dungeon map style - diagonal hatching
-      ctx.strokeStyle = '#666666';
-      ctx.lineWidth = 1 / zoom;
+      // Fill with water color
+      ctx.fillStyle = style.colorWater;
+      ctx.fillRect(tile.x, tile.y, 50, 50);
       
-      const spacing = 6 / zoom;
-      for (let offset = -50; offset < 100; offset += spacing) {
+      // Wavy line pattern
+      ctx.strokeStyle = style.colorInk;
+      ctx.lineWidth = style.strokeThin / zoom;
+      
+      const numWaves = 3;
+      for (let i = 0; i < numWaves; i++) {
         ctx.beginPath();
-        ctx.moveTo(tile.x + offset, tile.y);
-        ctx.lineTo(tile.x + offset + 50, tile.y + 50);
+        const y = tile.y + (i + 1) * (50 / (numWaves + 1));
+        ctx.moveTo(tile.x, y);
+        for (let x = 0; x <= 50; x += 8) {
+          const wave = Math.sin((x / 50) * Math.PI * 4) * 2;
+          ctx.lineTo(tile.x + x, y + wave);
+        }
         ctx.stroke();
       }
     } else {
@@ -515,17 +599,21 @@ function renderDebrisTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
   zoom: number,
-  dungeonMapMode: boolean = false
+  dungeonMapMode: boolean = false,
+  style: WatabouStyle = DEFAULT_STYLE
 ) {
   tiles.forEach((tile) => {
     if (dungeonMapMode) {
-      // Dungeon map style - stippled pattern
-      ctx.fillStyle = '#333333';
-      for (let i = 0; i < 20; i++) {
+      // Dungeon map style - dense stippled pattern
+      ctx.fillStyle = style.colorInk;
+      ctx.globalAlpha = 0.15;
+      for (let i = 0; i < 40; i++) {
         const x = tile.x + Math.random() * 50;
         const y = tile.y + Math.random() * 50;
-        ctx.fillRect(x, y, 1 / zoom, 1 / zoom);
+        const size = 0.5 + Math.random() * 1.5;
+        ctx.fillRect(x, y, size / zoom, size / zoom);
       }
+      ctx.globalAlpha = 1.0;
     } else {
       // VTT style - gray shapes
       ctx.fillStyle = 'rgba(120, 113, 108, 0.5)';

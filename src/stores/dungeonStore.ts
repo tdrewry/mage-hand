@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DoorConnection, Annotation, TerrainFeature } from '@/lib/dungeonTypes';
+import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
 
 interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
   terrainFeatures: TerrainFeature[];
   renderingMode: 'vtt' | 'dungeon-map';
+  watabouStyle: WatabouStyle;
   
   // Rendering mode
   setRenderingMode: (mode: 'vtt' | 'dungeon-map') => void;
+  setWatabouStyle: (style: WatabouStyle) => void;
   
   // Door operations
   addDoor: (door: Omit<DoorConnection, 'id'>) => void;
@@ -39,12 +42,14 @@ interface DungeonStore {
 export const useDungeonStore = create<DungeonStore>()(
   persist(
     (set) => ({
-      doors: [],
-      annotations: [],
-      terrainFeatures: [],
-      renderingMode: 'vtt',
+    doors: [],
+    annotations: [],
+    terrainFeatures: [],
+    renderingMode: 'vtt',
+    watabouStyle: DEFAULT_STYLE,
       
       setRenderingMode: (mode) => set({ renderingMode: mode }),
+      setWatabouStyle: (style) => set({ watabouStyle: style }),
       
       // Door operations
       addDoor: (doorData) => {
