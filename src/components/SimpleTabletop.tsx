@@ -708,15 +708,15 @@ export const SimpleTabletop = () => {
         }
         ctx.clip();
         
-        // Draw wall shadows - soft blur extending from edges
+        // Draw wall shadows - cast from walls onto regions based on light direction
         const edgePoints = getRegionEdgePoints(region);
         const lightAngleRad = (lightDirection * Math.PI) / 180;
         
-        // Calculate shadow direction (opposite of light)
+        // Calculate shadow direction (opposite of light source)
         const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
         const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
         
-        // Draw shadow along each edge - ALL edges get shadows regardless of direction
+        // Draw shadow along each edge that faces away from light
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
@@ -725,25 +725,44 @@ export const SimpleTabletop = () => {
           const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
           
           if (edgeLen > 0) {
-            // Create gradient for smooth fade extending INTO the region
-            const gradient = ctx.createLinearGradient(
-              point.x, point.y,
-              point.x + shadowDx, point.y + shadowDy
-            );
+            // Calculate edge normal (perpendicular vector pointing INTO the region)
+            // For a clockwise polygon, rotate edge vector 90° clockwise
+            const normalX = edgeDy / edgeLen;
+            const normalY = -edgeDx / edgeLen;
             
-            // Strong visible shadow
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
-            gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            // Check if wall (outside the region) faces the light
+            // If wall faces light, it casts shadow into the region
+            const lightDx = Math.cos(lightAngleRad);
+            const lightDy = Math.sin(lightAngleRad);
             
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.moveTo(point.x, point.y);
-            ctx.lineTo(nextPoint.x, nextPoint.y);
-            ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-            ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-            ctx.closePath();
-            ctx.fill();
+            // Dot product: positive means edge normal points away from light
+            // (meaning the wall on this edge faces the light and should cast shadow)
+            const dotProduct = normalX * lightDx + normalY * lightDy;
+            
+            // Only cast shadow if the wall faces toward the light source
+            if (dotProduct > 0.1) {
+              // Shadow strength based on how directly the wall faces the light
+              const intensity = Math.min(0.8, dotProduct * 0.7);
+              
+              // Create gradient extending INTO the region
+              const gradient = ctx.createLinearGradient(
+                point.x, point.y,
+                point.x + shadowDx, point.y + shadowDy
+              );
+              
+              gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
+              gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.4})`);
+              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+              
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.moveTo(point.x, point.y);
+              ctx.lineTo(nextPoint.x, nextPoint.y);
+              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
         });
         
