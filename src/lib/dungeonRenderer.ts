@@ -77,14 +77,14 @@ function renderFloorPattern(
   ctx.clip();
   
   // Draw dotted grid pattern
-  const dotSpacing = 10 / zoom;
-  const dotSize = (style.strokeThin * 0.8) / zoom;
+  const dotSpacing = 15; // Fixed spacing in world coordinates
+  const dotSize = 0.8; // Fixed dot size in world coordinates
   
   ctx.fillStyle = style.colorInk;
-  ctx.globalAlpha = 0.12;
+  ctx.globalAlpha = 0.2; // More visible opacity
   
   const bounds = getRegionBounds(region);
-  const padding = 20 / zoom;
+  const padding = 20;
   
   for (let x = bounds.x - padding; x < bounds.x + bounds.width + padding; x += dotSpacing) {
     for (let y = bounds.y - padding; y < bounds.y + bounds.height + padding; y += dotSpacing) {
