@@ -1083,19 +1083,22 @@ export const SimpleTabletop = () => {
   ) => {
     ctx.save();
     
-    // Draw with distinct visual style so users know it's the negative space
+    // Draw the base wall path first (dark fill with red outline)
+    ctx.fillStyle = '#333333'; // Dark fill
+    ctx.globalAlpha = 0.25;
+    ctx.fill(wallGeometry.wallPath, 'evenodd');
+    
+    // Draw outer boundary stroke (but not inner edges - those will be decorated)
+    ctx.globalAlpha = 0.2;
     ctx.strokeStyle = '#ff6b6b'; // Red outline
     ctx.lineWidth = 2 / transform.zoom;
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = '#333333'; // Dark fill
-    
-    // Draw the wall path
-    ctx.fill(wallGeometry.wallPath, 'evenodd');
-    ctx.stroke(wallGeometry.wallPath);
+    // Only stroke the outer boundary by drawing the bounding box
+    const bounds = wallGeometry.bounds;
+    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
     
     ctx.restore();
     
-    // Draw decorative inner edges with selected style
+    // Draw decorative inner edges with selected style (on top of everything)
     drawDecorativeInnerEdges(ctx, regions, wallEdgeStyle, wallThickness, textureScale);
   };
   

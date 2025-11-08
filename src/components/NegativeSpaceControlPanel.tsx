@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { X } from 'lucide-react';
 import { useDungeonStore } from '@/stores/dungeonStore';
+import { StylePreviewCanvas } from './StylePreviewCanvas';
 
 interface NegativeSpaceControlPanelProps {
   onClose: () => void;
@@ -44,19 +45,21 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
       </div>
 
       {/* Wall Edge Style */}
-      <div className="space-y-2 mb-4">
+      <div className="space-y-3 mb-4">
         <Label>Wall Edge Style</Label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {(Object.keys(edgeStyleLabels) as Array<typeof wallEdgeStyle>).map((style) => (
-            <Button
-              key={style}
-              variant={wallEdgeStyle === style ? "default" : "outline"}
-              size="sm"
-              onClick={() => setWallEdgeStyle(style)}
-              className="w-full"
-            >
-              {edgeStyleLabels[style]}
-            </Button>
+            <div key={style} className="space-y-2">
+              <StylePreviewCanvas style={style} isSelected={wallEdgeStyle === style} />
+              <Button
+                variant={wallEdgeStyle === style ? "default" : "outline"}
+                size="sm"
+                onClick={() => setWallEdgeStyle(style)}
+                className="w-full"
+              >
+                {edgeStyleLabels[style]}
+              </Button>
+            </div>
           ))}
         </div>
       </div>
