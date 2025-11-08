@@ -53,7 +53,8 @@ export function applyHatchingPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
   zoom: number,
-  style: WallEdgeStyle
+  style: WallEdgeStyle,
+  scale: number = 1
 ): void {
   if (!EDGE_STYLES[style].textureEnabled) return;
   
@@ -62,8 +63,8 @@ export function applyHatchingPattern(
   ctx.lineWidth = 0.5 / zoom;
   ctx.globalAlpha = 0.4;
   
-  const hatchSpacing = 8 / zoom;
-  const hatchLength = 6 / zoom;
+  const hatchSpacing = (8 / zoom) / scale;
+  const hatchLength = (6 / zoom) / scale;
   
   // Draw hatching perpendicular to edges
   for (let i = 0; i < points.length - 1; i++) {
@@ -105,7 +106,8 @@ export function applyStipplingPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
   zoom: number,
-  style: WallEdgeStyle
+  style: WallEdgeStyle,
+  scale: number = 1
 ): void {
   if (!EDGE_STYLES[style].textureEnabled) return;
   
@@ -113,9 +115,9 @@ export function applyStipplingPattern(
   ctx.fillStyle = EDGE_STYLES[style].shadowColor;
   ctx.globalAlpha = 0.3;
   
-  const dotSpacing = 4 / zoom;
-  const dotSize = 0.8 / zoom;
-  const density = style === 'stone' ? 1.2 : style === 'wood' ? 0.8 : 1.0;
+  const dotSpacing = (4 / zoom) / scale;
+  const dotSize = (0.8 / zoom) / scale;
+  const density = (style === 'stone' ? 1.2 : style === 'wood' ? 0.8 : 1.0) * scale;
   
   // Draw stippling dots along the edge
   for (let i = 0; i < points.length - 1; i++) {
@@ -153,14 +155,15 @@ export function applyStipplingPattern(
 export function applyWoodGrainPattern(
   ctx: CanvasRenderingContext2D,
   points: Array<{ x: number; y: number }>,
-  zoom: number
+  zoom: number,
+  scale: number = 1
 ): void {
   ctx.save();
   ctx.strokeStyle = '#4a3820';
   ctx.lineWidth = 0.6 / zoom;
   ctx.globalAlpha = 0.3;
   
-  const grainSpacing = 12 / zoom;
+  const grainSpacing = (12 / zoom) / scale;
   
   // Draw wavy lines parallel to edges
   for (let i = 0; i < points.length - 1; i++) {

@@ -46,9 +46,10 @@ import { simplifyPath } from '../utils/pathSimplification';
 import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUtils';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3, Eye, Pen, Square } from 'lucide-react';
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2 } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
+import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
 import { 
   generateTransformHandles, 
   getRotationCenterHandle, 
@@ -66,6 +67,7 @@ export const SimpleTabletop = () => {
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
+  const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
   
   // Pan and zoom state
   const [transform, setTransform] = useState({
@@ -122,7 +124,9 @@ export const SimpleTabletop = () => {
     terrainFeatures,
     renderingMode,
     watabouStyle,
-    wallEdgeStyle
+    wallEdgeStyle,
+    wallThickness,
+    textureScale
   } = useDungeonStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -658,7 +662,7 @@ export const SimpleTabletop = () => {
       const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
       if (negativeSpace) {
-        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry, regions);
+        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
       }
     }
     
@@ -922,7 +926,13 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw decorative edges along region boundaries
-  const drawDecorativeInnerEdges = (ctx: CanvasRenderingContext2D, regions: CanvasRegion[], style: WallEdgeStyle) => {
+  const drawDecorativeInnerEdges = (
+    ctx: CanvasRenderingContext2D, 
+    regions: CanvasRegion[], 
+    style: WallEdgeStyle,
+    wallThickness: number,
+    textureScale: number
+  ) => {
     const config = EDGE_STYLES[style];
     
     ctx.save();
@@ -968,7 +978,7 @@ export const SimpleTabletop = () => {
             const segmentDy = region.pathPoints[i + 1].y - region.pathPoints[i].y;
             const segmentLength = Math.sqrt(segmentDx * segmentDx + segmentDy * segmentDy);
             
-            ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
             currentPos += segmentLength;
             
             const cp = region.bezierControlPoints[i];
@@ -995,7 +1005,7 @@ export const SimpleTabletop = () => {
           }
         } else {
           for (let i = 1; i < region.pathPoints.length; i++) {
-            ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
+            ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
             ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
             const dx = region.pathPoints[i].x - region.pathPoints[i - 1].x;
             const dy = region.pathPoints[i].y - region.pathPoints[i - 1].y;
@@ -1008,7 +1018,7 @@ export const SimpleTabletop = () => {
         
         // Draw shadow layer
         ctx.strokeStyle = config.shadowColor;
-        ctx.lineWidth = config.shadowWidth / transform.zoom;
+        ctx.lineWidth = (config.shadowWidth * wallThickness) / transform.zoom;
         ctx.globalAlpha = 0.5;
         ctx.stroke();
         
@@ -1025,7 +1035,7 @@ export const SimpleTabletop = () => {
         segments.forEach(seg => {
           ctx.beginPath();
           ctx.moveTo(seg.x1, seg.y1);
-          ctx.lineWidth = getVariedLineWidth(config.baseWidth, currentPos, totalLength, transform.zoom);
+          ctx.lineWidth = getVariedLineWidth(config.baseWidth * wallThickness, currentPos, totalLength, transform.zoom);
           ctx.lineTo(seg.x2, seg.y2);
           ctx.stroke();
           
@@ -1036,7 +1046,7 @@ export const SimpleTabletop = () => {
         
         // Draw shadow layer
         ctx.strokeStyle = config.shadowColor;
-        ctx.lineWidth = config.shadowWidth / transform.zoom;
+        ctx.lineWidth = (config.shadowWidth * wallThickness) / transform.zoom;
         ctx.globalAlpha = 0.5;
         ctx.strokeRect(region.x, region.y, region.width, region.height);
       }
@@ -1044,13 +1054,13 @@ export const SimpleTabletop = () => {
       // Apply texture patterns
       if (config.textureEnabled) {
         if (style === 'stone') {
-          applyHatchingPattern(ctx, points, transform.zoom, style);
-          applyStipplingPattern(ctx, points, transform.zoom, style);
+          applyHatchingPattern(ctx, points, transform.zoom, style, textureScale);
+          applyStipplingPattern(ctx, points, transform.zoom, style, textureScale);
         } else if (style === 'wood') {
-          applyWoodGrainPattern(ctx, points, transform.zoom);
-          applyStipplingPattern(ctx, points, transform.zoom, style);
+          applyWoodGrainPattern(ctx, points, transform.zoom, textureScale);
+          applyStipplingPattern(ctx, points, transform.zoom, style, textureScale);
         } else if (style === 'metal') {
-          applyHatchingPattern(ctx, points, transform.zoom, style);
+          applyHatchingPattern(ctx, points, transform.zoom, style, textureScale);
         }
       }
       
@@ -1063,7 +1073,14 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw negative space region (walls visualization in edit mode)
-  const drawNegativeSpaceRegion = (ctx: CanvasRenderingContext2D, wallGeometry: any, regions: CanvasRegion[]) => {
+  const drawNegativeSpaceRegion = (
+    ctx: CanvasRenderingContext2D, 
+    wallGeometry: any, 
+    regions: CanvasRegion[],
+    wallEdgeStyle: WallEdgeStyle,
+    wallThickness: number,
+    textureScale: number
+  ) => {
     ctx.save();
     
     // Draw with distinct visual style so users know it's the negative space
@@ -1079,7 +1096,7 @@ export const SimpleTabletop = () => {
     ctx.restore();
     
     // Draw decorative inner edges with selected style
-    drawDecorativeInnerEdges(ctx, regions, wallEdgeStyle);
+    drawDecorativeInnerEdges(ctx, regions, wallEdgeStyle, wallThickness, textureScale);
   };
   
   // Function to draw regions
@@ -3337,18 +3354,38 @@ export const SimpleTabletop = () => {
 
       {/* Grid Snapping Toggle */}
       <div className="absolute top-44 right-4 z-10">
-        <Button
-          variant={isGridSnappingEnabled ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-          className="flex items-center gap-2"
-        >
-          <Grid3X3 className="w-4 h-4" />
-          World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={isGridSnappingEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+            className="flex items-center gap-2"
+          >
+            <Grid3X3 className="w-4 h-4" />
+            World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
+          </Button>
+          {renderingMode === 'edit' && regions.length > 0 && (
+            <Button
+              variant={showNegativeSpacePanel ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowNegativeSpacePanel(!showNegativeSpacePanel)}
+              className="flex items-center gap-2"
+            >
+              <Settings2 className="w-4 h-4" />
+              Wall Settings
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
+      
+      {/* Negative Space Control Panel - only show in edit mode when toggled */}
+      {renderingMode === 'edit' && showNegativeSpacePanel && (
+        <NegativeSpaceControlPanel
+          onClose={() => setShowNegativeSpacePanel(false)}
+        />
+      )}
       
       {/* Region Control Panel - only show in edit mode */}
       {renderingMode === 'edit' && selectedRegionId && (() => {

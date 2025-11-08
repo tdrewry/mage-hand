@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle, Palette, PenTool } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle, Palette } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,16 +27,9 @@ interface ToolbarProps {
 export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
   const { tokens, clearAllTokens } = useSessionStore();
   const { regions, clearRegions } = useRegionStore();
-  const { renderingMode, setRenderingMode, watabouStyle, setWatabouStyle, wallEdgeStyle, setWallEdgeStyle } = useDungeonStore();
+  const { renderingMode, setRenderingMode, watabouStyle, setWatabouStyle } = useDungeonStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
-  
-  const edgeStyleLabels: Record<string, string> = {
-    stone: 'Stone',
-    wood: 'Wood',
-    metal: 'Metal',
-    simple: 'Simple'
-  };
   
   const toggleRenderingMode = () => {
     const newMode = renderingMode === 'edit' ? 'play' : 'edit';
@@ -50,11 +43,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
       setWatabouStyle(style);
       toast.success(`Applied "${styleName}" style`);
     }
-  };
-  
-  const selectEdgeStyle = (style: 'stone' | 'wood' | 'metal' | 'simple') => {
-    setWallEdgeStyle(style);
-    toast.success(`Applied "${edgeStyleLabels[style]}" edge style`);
   };
   
   const shareSession = () => {
@@ -185,36 +173,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
             <Castle className="h-4 w-4 mr-2" />
             {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
           </Button>
-          
-          {renderingMode === 'edit' && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="text-foreground border-border hover:bg-secondary"
-                  title="Select wall edge style"
-                >
-                  <PenTool className="h-4 w-4 mr-2" />
-                  {edgeStyleLabels[wallEdgeStyle]}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover">
-                <DropdownMenuItem onClick={() => selectEdgeStyle('stone')}>
-                  Stone (Default)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => selectEdgeStyle('wood')}>
-                  Wood
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => selectEdgeStyle('metal')}>
-                  Metal
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => selectEdgeStyle('simple')}>
-                  Simple
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
           
           {renderingMode === 'play' && (
             <DropdownMenu>

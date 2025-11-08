@@ -11,6 +11,8 @@ interface DungeonStore {
   renderingMode: 'edit' | 'play';
   watabouStyle: WatabouStyle;
   wallEdgeStyle: 'stone' | 'wood' | 'metal' | 'simple';
+  wallThickness: number;
+  textureScale: number;
   
   // Wall geometry caching
   cachedWallGeometry: WallGeometry | null;
@@ -21,6 +23,8 @@ interface DungeonStore {
   setRenderingMode: (mode: 'edit' | 'play') => void;
   setWatabouStyle: (style: WatabouStyle) => void;
   setWallEdgeStyle: (style: 'stone' | 'wood' | 'metal' | 'simple') => void;
+  setWallThickness: (thickness: number) => void;
+  setTextureScale: (scale: number) => void;
   
   // Door operations
   addDoor: (door: Omit<DoorConnection, 'id'>) => void;
@@ -56,12 +60,16 @@ export const useDungeonStore = create<DungeonStore>()(
     renderingMode: 'edit',
     watabouStyle: DEFAULT_STYLE,
     wallEdgeStyle: 'stone',
+    wallThickness: 3,
+    textureScale: 1,
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
       
       setRenderingMode: (mode) => set({ renderingMode: mode }),
       setWatabouStyle: (style) => set({ watabouStyle: style }),
       setWallEdgeStyle: (style) => set({ wallEdgeStyle: style }),
+      setWallThickness: (thickness) => set({ wallThickness: thickness }),
+      setTextureScale: (scale) => set({ textureScale: scale }),
       setCachedWallGeometry: (geometry, cacheKey) => set({ 
         cachedWallGeometry: geometry, 
         wallGeometryCacheKey: cacheKey 
