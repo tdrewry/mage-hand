@@ -43,6 +43,7 @@ export const RegionControlPanel: React.FC<RegionControlPanelProps> = ({
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(region.id);
+  const [gridSizeInput, setGridSizeInput] = useState(region.gridSize.toString());
 
   const handleNameSave = () => {
     onUpdateRegion(region.id, { id: tempName }); // Note: this might need a different approach for renaming
@@ -189,17 +190,48 @@ export const RegionControlPanel: React.FC<RegionControlPanelProps> = ({
                   min="10"
                   max="500"
                   step="5"
-                  value={region.gridSize}
+                  value={gridSizeInput}
                   onChange={(e) => {
+                    setGridSizeInput(e.target.value);
                     const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value > 0) {
+                    if (!isNaN(value) && value >= 10) {
                       onUpdateRegion(region.id, { gridSize: value });
+                    }
+                  }}
+                  onBlur={() => {
+                    // Restore valid value if input is empty or invalid
+                    if (!gridSizeInput || parseInt(gridSizeInput) < 10) {
+                      setGridSizeInput(region.gridSize.toString());
                     }
                   }}
                   className="h-8 text-xs"
                 />
               </div>
             )}
+          </div>
+
+          {/* Background Color */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Appearance</Label>
+            <div className="space-y-1">
+              <Label htmlFor="backgroundColor" className="text-xs">Background Color</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="backgroundColor"
+                  type="color"
+                  value={region.backgroundColor || '#000000'}
+                  onChange={(e) => onUpdateRegion(region.id, { backgroundColor: e.target.value })}
+                  className="h-8 w-16 p-1"
+                />
+                <Input
+                  type="text"
+                  value={region.backgroundColor || 'transparent'}
+                  onChange={(e) => onUpdateRegion(region.id, { backgroundColor: e.target.value })}
+                  placeholder="transparent"
+                  className="h-8 text-xs flex-1"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Path Smoothing (only for path regions with bezier curves) */}

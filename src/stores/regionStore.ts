@@ -18,6 +18,7 @@ export interface CanvasRegion {
   backgroundRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
   backgroundOffsetX?: number; // Offset for background alignment
   backgroundOffsetY?: number; // Offset for background alignment
+  backgroundColor?: string; // Background color for region
   
   // Path-based region support
   regionType?: 'rectangle' | 'path'; // Type of region

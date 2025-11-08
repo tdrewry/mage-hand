@@ -1035,7 +1035,7 @@ export const SimpleTabletop = () => {
       }
     } else {
       // Draw solid color background
-      ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
+      ctx.fillStyle = region.backgroundColor || region.color || 'rgba(100, 100, 100, 0.3)';
       ctx.fill();
     }
     
@@ -1101,7 +1101,7 @@ export const SimpleTabletop = () => {
       drawRegionBackground(ctx, region);
     } else {
       // Draw solid color background
-      ctx.fillStyle = region.color || 'rgba(100, 100, 100, 0.3)';
+      ctx.fillStyle = region.backgroundColor || region.color || 'rgba(100, 100, 100, 0.3)';
       ctx.fillRect(region.x, region.y, region.width, region.height);
     }
     
