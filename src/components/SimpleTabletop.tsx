@@ -44,9 +44,12 @@ import {
 import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from '../utils/pathUtils';
 import { simplifyPath } from '../utils/pathSimplification';
 import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUtils';
+import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged } from '../lib/lightSystem';
+import { useLightStore } from '../stores/lightStore';
+import { clearVisibilityCache } from '../lib/visibilityEngine';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
-import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X } from 'lucide-react';
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
@@ -140,12 +143,20 @@ export const SimpleTabletop = () => {
     wallEdgeStyle,
     wallThickness,
     textureScale,
-    lightDirection,
-    shadowDistance,
-    lightSources,
-    addLightSource,
-    removeLightSource
   } = useDungeonStore();
+  
+  // Light system store
+  const { 
+    lights, 
+    addLight, 
+    updateLight, 
+    removeLight,
+    globalAmbientLight,
+    shadowIntensity
+  } = useLightStore();
+  
+  // Light placement mode
+  const [lightPlacementMode, setLightPlacementMode] = useState(false);
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -675,7 +686,7 @@ export const SimpleTabletop = () => {
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
     
     // Generate cache key
-    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode, lightDirection, shadowDistance, lightSources.length);
+    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode, lights.length);
     
     // Check if we can use cached decorations
     let wallGeometry: any;
@@ -769,109 +780,10 @@ export const SimpleTabletop = () => {
       ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
     }
     
-    // Apply wall shadows to floor regions AFTER wallGeometry is available
-    if (isPlayMode && shadowDistance > 0 && wallGeometry) {
-      regions.forEach(region => {
-        ctx.save();
-        
-        // Clip to region bounds
-        if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
-          ctx.beginPath();
-          if (region.bezierControlPoints && region.bezierControlPoints.length > 0) {
-            const points = region.pathPoints;
-            const controls = region.bezierControlPoints;
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 0; i < points.length - 1; i++) {
-              ctx.bezierCurveTo(
-                controls[i].cp2.x, controls[i].cp2.y,
-                controls[i + 1].cp1.x, controls[i + 1].cp1.y,
-                points[i + 1].x, points[i + 1].y
-              );
-            }
-            ctx.bezierCurveTo(
-              controls[points.length - 1].cp2.x, controls[points.length - 1].cp2.y,
-              controls[0].cp1.x, controls[0].cp1.y,
-              points[0].x, points[0].y
-            );
-            ctx.closePath();
-          } else {
-            ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-            for (let i = 1; i < region.pathPoints.length; i++) {
-              ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
-            }
-            ctx.closePath();
-          }
-        } else {
-          ctx.beginPath();
-          ctx.rect(region.x, region.y, region.width, region.height);
-        }
-        ctx.clip();
-        
-        // Draw shadows only on edges that border negative space
-        const edgePoints = getRegionEdgePoints(region);
-        const lightAngleRad = (lightDirection * Math.PI) / 180;
-        const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
-        const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
-        
-        edgePoints.forEach((point, i) => {
-          const nextPoint = edgePoints[(i + 1) % edgePoints.length];
-          
-          // Calculate edge normal (perpendicular to edge)
-          const edgeDx = nextPoint.x - point.x;
-          const edgeDy = nextPoint.y - point.y;
-          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
-          
-          if (edgeLen > 0) {
-            const normalX = -edgeDy / edgeLen;
-            const normalY = edgeDx / edgeLen;
-            
-            // Test multiple points along the edge perpendicular to it
-            // Use larger threshold (10 pixels in world space)
-            const testDistance = 10;
-            let bordersWall = false;
-            
-            // Test at start, middle, and end of edge for robustness
-            const testPositions = [0.25, 0.5, 0.75];
-            
-            for (const t of testPositions) {
-              const testBaseX = point.x + (nextPoint.x - point.x) * t;
-              const testBaseY = point.y + (nextPoint.y - point.y) * t;
-              const testX = testBaseX + normalX * testDistance;
-              const testY = testBaseY + normalY * testDistance;
-              
-              // Test in current coordinate space (wall geometry is in world space)
-              const isInWall = ctx.isPointInPath(wallGeometry.wallPath, testX, testY, 'evenodd');
-              
-              if (isInWall) {
-                bordersWall = true;
-                break;
-              }
-            }
-            
-            if (bordersWall) {
-              const gradient = ctx.createLinearGradient(
-                point.x, point.y,
-                point.x + shadowDx, point.y + shadowDy
-              );
-              
-              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
-              gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
-              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-              
-              ctx.fillStyle = gradient;
-              ctx.beginPath();
-              ctx.moveTo(point.x, point.y);
-              ctx.lineTo(nextPoint.x, nextPoint.y);
-              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-        });
-        
-        ctx.restore();
-      });
+    // NEW: Render shadows using visibility polygon system
+    if (isPlayMode && lights.length > 0 && wallGeometry) {
+      const illumination = computeIllumination(lights, regions);
+      renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
     
     // 4. Then render doors - ABOVE walls (only in edit mode for now)
@@ -890,33 +802,9 @@ export const SimpleTabletop = () => {
       drawToken(ctx, renderToken);
     });
     
-    // Draw light sources in edit mode
-    if (renderingMode === 'edit' && lightSources.length > 0) {
-      lightSources.forEach(light => {
-        const screenX = light.position.x * transform.zoom + transform.x;
-        const screenY = light.position.y * transform.zoom + transform.y;
-        const screenRadius = light.radius * transform.zoom;
-        
-        // Draw light radius circle
-        ctx.save();
-        ctx.strokeStyle = light.color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Draw light bulb icon
-        ctx.fillStyle = light.color;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.restore();
-      });
+    // Draw light sources in edit mode using new system
+    if (renderingMode === 'edit' && lights.length > 0) {
+      renderLightSources(ctx, lights, transform);
     }
     
     // Draw annotations on top of tokens with selection highlight
@@ -1534,8 +1422,6 @@ export const SimpleTabletop = () => {
     wallThickness: number, 
     textureScale: number, 
     isPlayMode: boolean,
-    lightDir: number,
-    shadowDist: number,
     numLights: number
   ): string => {
     const regionData = regions.map(r => {
@@ -1544,7 +1430,7 @@ export const SimpleTabletop = () => {
       }
       return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
     }).join('|');
-    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}-${lightDir}-${shadowDist}-${numLights}`;
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}-${numLights}`;
   };
   
   // Function to draw regions
@@ -3023,29 +2909,34 @@ export const SimpleTabletop = () => {
           setTokensMovedByRegion(tokensInRegion.map(t => t.tokenId));
         }
         }
+      } else if (lightPlacementMode && renderingMode === 'edit') {
+        // Light placement mode - add light source at click location
+        const colors = ['#ffaa00', '#00ff88', '#0088ff', '#ff00ff', '#ffff00', '#ff0066'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        addLight({
+          position: { x: worldPos.x, y: worldPos.y },
+          color: randomColor,
+          intensity: 0.8,
+          radius: 200, // World space units
+          enabled: true,
+          label: `Light ${lights.length + 1}`
+        });
+        
+        toast.success('Light source placed');
+        setLightPlacementMode(false);
       } else if (e.shiftKey && renderingMode === 'edit') {
-        // Shift+click to add/remove light sources in edit mode
-        const clickedLight = lightSources.find(light => {
+        // Shift+click to remove light sources in edit mode
+        const clickedLight = lights.find(light => {
+          if (!light.enabled) return false;
           const dx = light.position.x - worldPos.x;
           const dy = light.position.y - worldPos.y;
-          return Math.sqrt(dx * dx + dy * dy) < light.radius;
+          return Math.sqrt(dx * dx + dy * dy) < 20 / transform.zoom; // Click tolerance
         });
         
         if (clickedLight) {
-          removeLightSource(clickedLight.id);
+          removeLight(clickedLight.id);
           toast.success('Light source removed');
-        } else {
-          // Add new light source
-          const colors = ['#ff6b00', '#00ff88', '#0088ff', '#ff00ff', '#ffff00', '#ff0066'];
-          const randomColor = colors[Math.floor(Math.random() * colors.length)];
-          
-          addLightSource({
-            position: { x: worldPos.x, y: worldPos.y },
-            color: randomColor,
-            intensity: 0.8,
-            radius: 150 // World space units
-          });
-          toast.success('Light source added (Shift+click to remove)');
         }
       } else {
         handleCanvasClick(e);
