@@ -926,9 +926,10 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw decorative edges along region boundaries
+  // Function to draw decorative edges on negative space inner boundaries
   const drawDecorativeInnerEdges = (
     ctx: CanvasRenderingContext2D, 
+    wallGeometry: any,
     regions: CanvasRegion[], 
     style: WallEdgeStyle,
     wallThickness: number,
@@ -938,6 +939,10 @@ export const SimpleTabletop = () => {
     
     ctx.save();
     
+    // Clip to negative space only - decorations should only appear on walls
+    ctx.clip(wallGeometry.wallPath, 'evenodd');
+    
+    // Only decorate the inner boundaries (region edges), not the outer bounding box
     regions.forEach(region => {
       const points = getRegionEdgePoints(region);
       
@@ -1100,7 +1105,7 @@ export const SimpleTabletop = () => {
     ctx.restore();
     
     // Draw decorative inner edges with selected style (on top of everything)
-    drawDecorativeInnerEdges(ctx, regions, wallEdgeStyle, wallThickness, textureScale);
+    drawDecorativeInnerEdges(ctx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
   };
   
   // Function to draw regions
