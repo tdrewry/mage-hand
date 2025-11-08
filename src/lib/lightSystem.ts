@@ -23,6 +23,12 @@ export function computeIllumination(
   wallSegments: LineSegment[],
   wallGeometry?: any
 ): IlluminationMap {
+  console.log('computeIllumination called with:', {
+    lightCount: lights.length,
+    segmentCount: wallSegments.length,
+    hasWallGeometry: !!wallGeometry
+  });
+
   // Filter out lights that are inside walls (shouldn't cast light)
   let activeLights = lights.filter(light => light.enabled);
   

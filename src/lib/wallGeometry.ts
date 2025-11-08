@@ -96,6 +96,7 @@ export function generateWallGeometry(
   };
   
   // Track wall segments for light blocking
+  // Add outer bounding box AND region edges that border walls (negative space)
   const wallSegments: LineSegment[] = [];
   
   // Create compound path: outer rectangle minus all regions
@@ -104,7 +105,7 @@ export function generateWallGeometry(
   // Add outer bounding box (clockwise winding)
   wallPath.rect(bounds.x, bounds.y, bounds.width, bounds.height);
   
-  // Add outer bounding box segments
+  // Add outer bounding box segments - these always block light
   wallSegments.push(
     { start: { x: bounds.x, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y } },
     { start: { x: bounds.x + bounds.width, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height } },
@@ -112,8 +113,15 @@ export function generateWallGeometry(
     { start: { x: bounds.x, y: bounds.y + bounds.height }, end: { x: bounds.x, y: bounds.y } }
   );
   
+  // Helper to check if an edge borders a wall (negative space)
+  // We'll use this AFTER the wallPath is complete
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  
+  const edgeSegmentCandidates: LineSegment[] = [];
+  
   // Subtract each region as a hole (counter-clockwise winding)
-  // AND add region boundaries as wall segments for light blocking
+  // AND collect edge candidates for wall boundary detection
   regions.forEach((region) => {
     if (region.regionType === 'rectangle') {
       if (region.rotation) {
@@ -144,9 +152,9 @@ export function generateWallGeometry(
         }
         wallPath.closePath();
         
-        // Add as wall segments (clockwise for light blocking)
+        // Collect edge candidates (clockwise)
         for (let i = 0; i < rotatedCorners.length; i++) {
-          wallSegments.push({
+          edgeSegmentCandidates.push({
             start: rotatedCorners[i],
             end: rotatedCorners[(i + 1) % rotatedCorners.length]
           });
@@ -159,7 +167,7 @@ export function generateWallGeometry(
         wallPath.lineTo(region.x + region.width, region.y);
         wallPath.closePath();
         
-        // Add as wall segments (clockwise for light blocking)
+        // Collect edge candidates (clockwise)
         const rectCorners = [
           { x: region.x, y: region.y },
           { x: region.x + region.width, y: region.y },
@@ -167,7 +175,7 @@ export function generateWallGeometry(
           { x: region.x, y: region.y + region.height },
         ];
         for (let i = 0; i < rectCorners.length; i++) {
-          wallSegments.push({
+          edgeSegmentCandidates.push({
             start: rectCorners[i],
             end: rectCorners[(i + 1) % rectCorners.length]
           });
@@ -181,9 +189,9 @@ export function generateWallGeometry(
       }
       wallPath.closePath();
       
-      // Add as wall segments (clockwise for light blocking)
+      // Collect edge candidates (clockwise)
       for (let i = 0; i < region.pathPoints.length; i++) {
-        wallSegments.push({
+        edgeSegmentCandidates.push({
           start: region.pathPoints[i],
           end: region.pathPoints[(i + 1) % region.pathPoints.length]
         });
@@ -191,6 +199,45 @@ export function generateWallGeometry(
     }
   });
   
+  // Now filter edge candidates: only add segments that border walls (negative space)
+  if (tempCtx) {
+    for (const segment of edgeSegmentCandidates) {
+      // Calculate edge midpoint and perpendicular outward direction
+      const midX = (segment.start.x + segment.end.x) / 2;
+      const midY = (segment.start.y + segment.end.y) / 2;
+      
+      const dx = segment.end.x - segment.start.x;
+      const dy = segment.end.y - segment.start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      
+      if (len === 0) continue;
+      
+      // Perpendicular outward normal (rotate 90 degrees clockwise for outward-facing)
+      const normalX = dy / len;
+      const normalY = -dx / len;
+      
+      // Test point just outside the edge
+      const testDistance = 5; // Small distance
+      const testX = midX + normalX * testDistance;
+      const testY = midY + normalY * testDistance;
+      
+      // Check if test point is inside wall geometry (negative space)
+      const isInWall = tempCtx.isPointInPath(wallPath, testX, testY, 'evenodd');
+      
+      // If the outward side is a wall, this edge is a wall boundary
+      if (isInWall) {
+        wallSegments.push(segment);
+      }
+    }
+  }
+  
+  console.log('Generated wall geometry:', {
+    totalSegments: wallSegments.length,
+    outerBoxSegments: 4,
+    regionSegments: wallSegments.length - 4,
+    sampleSegment: wallSegments[0]
+  });
+
   return {
     wallPath,
     wallSegments,
