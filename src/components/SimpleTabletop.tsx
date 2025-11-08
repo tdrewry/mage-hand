@@ -897,44 +897,42 @@ export const SimpleTabletop = () => {
       drawDragGhostAndPath(ctx);
     }
     
-    // Restore context before drawing off-screen indicators
-    ctx.restore();
-    
-    // Draw off-screen token indicators
-    offScreenTokens.forEach(token => {
-      drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
-    });
-    
-    // Render fog of war (after all game elements, before UI overlays)
-    if (isPlayMode && fogEnabled) {
-      const visibleTokens = tokens.filter(token => 
-        token.x >= viewX && token.x <= viewX + viewWidth &&
-        token.y >= viewY && token.y <= viewY + viewHeight
-      );
-      
+    // Render fog of war (in world coordinate space, before restore)
+    if (isPlayMode && fogEnabled && !fogRevealAll) {
+      // Compute visibility from all tokens (in world coordinates)
       const tokenVisibility = computeTokenVisibility(
-        visibleTokens,
+        tokens, // Use all tokens
         regions,
         fogVisionRange
       );
       
-      // Render fog with cutouts for visible areas
-      const canvasBounds = {
-        x: viewX,
-        y: viewY,
-        width: viewWidth,
-        height: viewHeight
+      // Canvas bounds in world coordinates - expand significantly beyond viewport
+      // to prevent seeing fog edges when panning
+      const padding = 5000; // Large padding to cover any reasonable pan distance
+      const worldBounds = {
+        x: -transform.x / transform.zoom - padding,
+        y: -transform.y / transform.zoom - padding,
+        width: (canvas?.width || 0) / transform.zoom + padding * 2,
+        height: (canvas?.height || 0) / transform.zoom + padding * 2
       };
       
       renderSimpleFog(
         ctx,
         tokenVisibility,
-        canvasBounds,
-        fogEnabled,
-        fogRevealAll,
+        worldBounds,
+        true, // fogEnabled
+        false, // fogRevealAll
         fogOpacity
       );
     }
+    
+    // Restore context after all world-space rendering
+    ctx.restore();
+    
+    // Draw off-screen token indicators (in screen space, after restore)
+    offScreenTokens.forEach(token => {
+      drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
+    });
   };
 
   // Function to draw drag ghost and path
