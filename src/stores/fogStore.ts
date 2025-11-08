@@ -8,7 +8,8 @@ export interface FogSettings {
   fogOpacity: number; // 0-1, how dark the fog is for unexplored areas
   exploredOpacity: number; // 0-1, how dark explored but not visible areas are
   showExploredAreas: boolean; // Whether to show previously explored areas as dimmed
-  exploredAreas: Array<{ x: number; y: number }>; // Serialized explored area polygon
+  serializedExploredAreas: string; // Paper.js JSON serialized explored geometry
+  fogVersion: number; // Schema version for migration
 }
 
 interface FogState extends FogSettings {
@@ -19,7 +20,7 @@ interface FogState extends FogSettings {
   setFogOpacity: (opacity: number) => void;
   setExploredOpacity: (opacity: number) => void;
   setShowExploredAreas: (show: boolean) => void;
-  addExploredArea: (points: Array<{ x: number; y: number }>) => void;
+  setSerializedExploredAreas: (data: string) => void;
   clearExploredAreas: () => void;
   resetFog: () => void;
 }
@@ -34,7 +35,8 @@ export const useFogStore = create<FogState>()(
       fogOpacity: 0.95,
       exploredOpacity: 0.4,
       showExploredAreas: true,
-      exploredAreas: [],
+      serializedExploredAreas: '',
+      fogVersion: 1,
       
       // Actions
       setEnabled: (enabled) => set({ enabled }),
@@ -49,14 +51,9 @@ export const useFogStore = create<FogState>()(
       
       setShowExploredAreas: (show) => set({ showExploredAreas: show }),
       
-      addExploredArea: (points) => set((state) => {
-        // Merge new points with existing explored areas
-        // For now, just concatenate - proper union would be done with paper.js
-        const merged = [...state.exploredAreas, ...points];
-        return { exploredAreas: merged };
-      }),
+      setSerializedExploredAreas: (data) => set({ serializedExploredAreas: data }),
       
-      clearExploredAreas: () => set({ exploredAreas: [] }),
+      clearExploredAreas: () => set({ serializedExploredAreas: '' }),
       
       resetFog: () => {
         set({
@@ -66,7 +63,8 @@ export const useFogStore = create<FogState>()(
           fogOpacity: 0.95,
           exploredOpacity: 0.4,
           showExploredAreas: true,
-          exploredAreas: [],
+          serializedExploredAreas: '',
+          fogVersion: 1,
         });
       },
     }),
@@ -79,7 +77,8 @@ export const useFogStore = create<FogState>()(
         fogOpacity: state.fogOpacity,
         exploredOpacity: state.exploredOpacity,
         showExploredAreas: state.showExploredAreas,
-        exploredAreas: state.exploredAreas,
+        serializedExploredAreas: state.serializedExploredAreas,
+        fogVersion: state.fogVersion,
       }),
     }
   )

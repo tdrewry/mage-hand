@@ -47,7 +47,11 @@ import { generateBezierControlPoints, getBezierBounds } from '../utils/bezierUti
 import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged } from '../lib/lightSystem';
 import { useLightStore } from '../stores/lightStore';
 import { clearVisibilityCache } from '../lib/visibilityEngine';
-import { computeTokenVisibility, renderSimpleFog } from '../lib/fogOfWar';
+import { computeTokenVisibilityPaper } from '../lib/fogOfWar';
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry } from '../lib/fogGeometry';
+import { serializeFogGeometry, deserializeFogGeometry } from '../lib/fogSerializer';
+import { renderFogLayers } from '../lib/fogRenderer';
+import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -170,13 +174,15 @@ export const SimpleTabletop = () => {
     visionRange: fogVisionRange,
     fogOpacity,
     exploredOpacity,
-    exploredAreas,
+    serializedExploredAreas,
+    setSerializedExploredAreas,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
   } = useFogStore();
   
-  // Track explored areas (accumulated visibility)
-  const exploredAreaRef = useRef<Path2D | null>(null);
+  // Track explored areas (accumulated visibility) using paper.js
+  const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
+  const fogScopeRef = useRef<paper.PaperScope | null>(null);
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -237,19 +243,42 @@ export const SimpleTabletop = () => {
     updateAllTokenHighlights();
   }, [tokens, regions]); // Re-run when tokens positions change or regions change
 
+  // Initialize paper.js scope and load explored areas
+  useEffect(() => {
+    // Initialize paper.js scope
+    if (!fogScopeRef.current) {
+      fogScopeRef.current = new paper.PaperScope();
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      fogScopeRef.current.setup(canvas);
+    }
+    
+    // Load serialized explored areas
+    if (fogEnabled && serializedExploredAreas) {
+      const scope = fogScopeRef.current;
+      if (scope) {
+        const deserialized = deserializeFogGeometry(serializedExploredAreas, scope);
+        if (deserialized) {
+          exploredAreaRef.current = deserialized;
+        }
+      }
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      cleanupFogGeometry();
+      fogScopeRef.current = null;
+    };
+  }, []);
+
   // Clear explored areas when fog is disabled
   useEffect(() => {
     if (!fogEnabled) {
       exploredAreaRef.current = null;
+      setSerializedExploredAreas('');
     }
-  }, [fogEnabled]);
-
-  // Clear explored area ref when store is cleared
-  useEffect(() => {
-    if (exploredAreas.length === 0) {
-      exploredAreaRef.current = null;
-    }
-  }, [exploredAreas.length]);
+  }, [fogEnabled, setSerializedExploredAreas]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -921,42 +950,58 @@ export const SimpleTabletop = () => {
     
     // Render fog of war (in world coordinate space, before restore)
     if (isPlayMode && fogEnabled && !fogRevealAll && wallGeometry) {
-      // Compute visibility from tokens using wall segments as obstacles
-      const tokenVisibility = computeTokenVisibility(
+      // Compute visibility from tokens using wall segments as obstacles (async)
+      computeTokenVisibilityPaper(
         tokens,
         wallGeometry.wallSegments, // Wall segments define light-blocking edges
         wallGeometry, // Used to filter out tokens in walls
         fogVisionRange
-      );
-      
-      // Merge current visibility into explored areas
-      if (tokenVisibility) {
-        if (!exploredAreaRef.current) {
-          exploredAreaRef.current = new Path2D();
+      ).then(tokenVisibilityPaper => {
+        if (!tokenVisibilityPaper) return;
+        
+        // Merge current visibility into explored areas using paper.js union
+        if (fogScopeRef.current) {
+          fogScopeRef.current.activate();
+          exploredAreaRef.current = addVisibleToExplored(
+            exploredAreaRef.current,
+            tokenVisibilityPaper
+          );
+          
+          // Periodically save explored areas (debounced in practice)
+          // For now, save on every update - could add debouncing later
+          const serialized = serializeFogGeometry(exploredAreaRef.current);
+          if (serialized) {
+            setSerializedExploredAreas(serialized);
+          }
         }
-        exploredAreaRef.current.addPath(tokenVisibility);
-      }
-      
-      // Canvas bounds in world coordinates - expand significantly beyond viewport
-      // to prevent seeing fog edges when panning
-      const padding = 5000; // Large padding to cover any reasonable pan distance
-      const worldBounds = {
-        x: -transform.x / transform.zoom - padding,
-        y: -transform.y / transform.zoom - padding,
-        width: (canvas?.width || 0) / transform.zoom + padding * 2,
-        height: (canvas?.height || 0) / transform.zoom + padding * 2
-      };
-      
-      renderSimpleFog(
-        ctx,
-        tokenVisibility,
-        exploredAreaRef.current,
-        worldBounds,
-        true, // fogEnabled
-        false, // fogRevealAll
-        fogOpacity,
-        exploredOpacity
-      );
+        
+        // Compute fog masks using boolean operations
+        const worldBounds = {
+          x: -transform.x / transform.zoom - 5000,
+          y: -transform.y / transform.zoom - 5000,
+          width: (canvas?.width || 0) / transform.zoom + 10000,
+          height: (canvas?.height || 0) / transform.zoom + 10000
+        };
+        
+        const masks = computeFogMasks(
+          exploredAreaRef.current,
+          tokenVisibilityPaper,
+          worldBounds
+        );
+        
+        // Render the three fog layers
+        renderFogLayers(
+          ctx,
+          masks.unexploredMask,
+          masks.exploredOnlyMask,
+          masks.visibleMask,
+          fogOpacity,
+          exploredOpacity
+        );
+        
+        // Force redraw to show updated fog
+        redrawCanvas();
+      });
     }
     
     // Restore context after all world-space rendering

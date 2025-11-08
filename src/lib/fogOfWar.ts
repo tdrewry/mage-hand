@@ -1,9 +1,11 @@
 /**
- * Fog of War System - Tracks explored and visible areas
+ * Fog of War System - Coordinator for fog geometry and rendering
+ * Uses paper.js for boolean operations via fogGeometry module
  */
 
 import type { CanvasRegion } from '@/stores/regionStore';
-import { computeVisibilityFromSegments, visibilityPolygonToPath2D, type Point, type LineSegment } from './visibilityEngine';
+import { computeVisibilityFromSegments, type Point, type LineSegment } from './visibilityEngine';
+import { visibilityPolygonToPaperPath } from './fogGeometry';
 
 export interface FogOfWarState {
   exploredAreas: string; // Serialized Path2D data
@@ -24,15 +26,18 @@ export interface Token {
  * Compute current visibility from token positions
  * Uses wall geometry (negative space) to filter out tokens in walls,
  * and uses wall segments as obstacles for visibility calculation
+ * @returns paper.js Path (not Path2D) for boolean operations
  */
-export function computeTokenVisibility(
+export async function computeTokenVisibilityPaper(
   tokens: Token[],
   wallSegments: LineSegment[],
   wallGeometry: any | null,
   visionRange: number = 300
-): Path2D {
+): Promise<any> {
+  const paper = await import('paper');
+  
   if (tokens.length === 0) {
-    return new Path2D();
+    return new paper.Path() as any;
   }
 
   // Filter out tokens that are inside walls (shouldn't cast light)
@@ -51,11 +56,11 @@ export function computeTokenVisibility(
   }
 
   if (validTokens.length === 0) {
-    return new Path2D();
+    return new paper.Path() as any;
   }
 
-  // Compute visibility for each token using wall segments as obstacles
-  const visibleArea = new Path2D();
+  // Compute visibility for each token and merge using paper.js union
+  let combinedVisibility: any = null;
   
   for (const token of validTokens) {
     const visibility = computeVisibilityFromSegments(
@@ -64,11 +69,21 @@ export function computeTokenVisibility(
       visionRange
     );
     
-    const path = visibilityPolygonToPath2D(visibility.polygon);
-    visibleArea.addPath(path);
+    // Convert visibility polygon to paper.js path
+    const paperPath = visibilityPolygonToPaperPath(visibility.polygon);
+    
+    if (!combinedVisibility) {
+      combinedVisibility = paperPath;
+    } else {
+      // Union with previous visibility
+      const united = combinedVisibility.unite(paperPath, { insert: false });
+      if (combinedVisibility.remove) combinedVisibility.remove();
+      if (paperPath.remove) paperPath.remove();
+      combinedVisibility = united;
+    }
   }
   
-  return visibleArea;
+  return combinedVisibility || new paper.Path();
 }
 
 /**
