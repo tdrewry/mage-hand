@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DoorConnection, Annotation, TerrainFeature } from '@/lib/dungeonTypes';
+import { DoorConnection, Annotation, TerrainFeature, LightSource } from '@/lib/dungeonTypes';
 import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
 import { WallGeometry } from '@/lib/wallGeometry';
 
@@ -8,11 +8,13 @@ interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
   terrainFeatures: TerrainFeature[];
+  lightSources: LightSource[];
   renderingMode: 'edit' | 'play';
   watabouStyle: WatabouStyle;
   wallEdgeStyle: 'stone' | 'wood' | 'metal' | 'simple';
   wallThickness: number;
   textureScale: number;
+  lightDirection: number; // Angle in degrees (0 = top, 90 = right, 180 = bottom, 270 = left)
   
   // Wall geometry caching
   cachedWallGeometry: WallGeometry | null;
@@ -25,6 +27,14 @@ interface DungeonStore {
   setWallEdgeStyle: (style: 'stone' | 'wood' | 'metal' | 'simple') => void;
   setWallThickness: (thickness: number) => void;
   setTextureScale: (scale: number) => void;
+  setLightDirection: (angle: number) => void;
+  
+  // Light source operations
+  addLightSource: (source: Omit<LightSource, 'id'>) => void;
+  updateLightSource: (id: string, updates: Partial<LightSource>) => void;
+  removeLightSource: (id: string) => void;
+  clearLightSources: () => void;
+  setLightSources: (sources: LightSource[]) => void;
   
   // Door operations
   addDoor: (door: Omit<DoorConnection, 'id'>) => void;
@@ -57,11 +67,13 @@ export const useDungeonStore = create<DungeonStore>()(
     doors: [],
     annotations: [],
     terrainFeatures: [],
+    lightSources: [],
     renderingMode: 'edit',
     watabouStyle: DEFAULT_STYLE,
     wallEdgeStyle: 'stone',
     wallThickness: 1,
     textureScale: 1,
+    lightDirection: 315, // Default: top-left (45 degrees from top)
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
       
@@ -70,6 +82,7 @@ export const useDungeonStore = create<DungeonStore>()(
       setWallEdgeStyle: (style) => set({ wallEdgeStyle: style }),
       setWallThickness: (thickness) => set({ wallThickness: thickness }),
       setTextureScale: (scale) => set({ textureScale: scale }),
+      setLightDirection: (angle) => set({ lightDirection: angle }),
       setCachedWallGeometry: (geometry, cacheKey) => set({ 
         cachedWallGeometry: geometry, 
         wallGeometryCacheKey: cacheKey 
@@ -174,12 +187,46 @@ export const useDungeonStore = create<DungeonStore>()(
         set({ terrainFeatures: features });
       },
       
+      // Light source operations
+      addLightSource: (sourceData) => {
+        const newSource: LightSource = {
+          ...sourceData,
+          id: `light-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        set((state) => ({
+          lightSources: [...state.lightSources, newSource],
+        }));
+      },
+      
+      updateLightSource: (id, updates) => {
+        set((state) => ({
+          lightSources: state.lightSources.map((source) =>
+            source.id === id ? { ...source, ...updates } : source
+          ),
+        }));
+      },
+      
+      removeLightSource: (id) => {
+        set((state) => ({
+          lightSources: state.lightSources.filter((source) => source.id !== id),
+        }));
+      },
+      
+      clearLightSources: () => {
+        set({ lightSources: [] });
+      },
+      
+      setLightSources: (sources) => {
+        set({ lightSources: sources });
+      },
+      
       // Clear all
       clearAll: () => {
         set({
           doors: [],
           annotations: [],
           terrainFeatures: [],
+          lightSources: [],
         });
       },
     }),

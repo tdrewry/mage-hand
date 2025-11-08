@@ -136,7 +136,11 @@ export const SimpleTabletop = () => {
     watabouStyle,
     wallEdgeStyle,
     wallThickness,
-    textureScale
+    textureScale,
+    lightDirection,
+    lightSources,
+    addLightSource,
+    removeLightSource
   } = useDungeonStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -667,7 +671,7 @@ export const SimpleTabletop = () => {
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
     
     // Generate cache key
-    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode);
+    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode, lightDirection, lightSources.length);
     
     // Check if we can use cached decorations
     let wallGeometry: any;
@@ -709,8 +713,8 @@ export const SimpleTabletop = () => {
             offscreenCtx.globalAlpha = 1.0;
             offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
             
-            // Add directional lighting gradient overlay
-            const lightAngle = Math.PI / 4; // 45 degrees (top-left light source)
+            // Add directional lighting gradient overlay (using lightDirection from store)
+            const lightAngle = (lightDirection * Math.PI) / 180;
             const lightGradient = offscreenCtx.createLinearGradient(
               bounds.x,
               bounds.y,
@@ -726,6 +730,33 @@ export const SimpleTabletop = () => {
             
             // Add ambient occlusion at corners
             drawAmbientOcclusion(offscreenCtx, regions, wallGeometry);
+            
+            // Apply point light sources if any exist
+            if (lightSources.length > 0) {
+              offscreenCtx.globalCompositeOperation = 'lighter';
+              
+              for (const light of lightSources) {
+                const lightRadius = light.radius * minGridSize;
+                
+                // Create radial gradient for each light
+                const gradient = offscreenCtx.createRadialGradient(
+                  light.position.x, light.position.y, 0,
+                  light.position.x, light.position.y, lightRadius
+                );
+                
+                // Parse color and apply intensity
+                const color = light.color;
+                gradient.addColorStop(0, `${color}${Math.round(light.intensity * 255).toString(16).padStart(2, '0')}`);
+                gradient.addColorStop(0.3, `${color}${Math.round(light.intensity * 180).toString(16).padStart(2, '0')}`);
+                gradient.addColorStop(0.6, `${color}${Math.round(light.intensity * 60).toString(16).padStart(2, '0')}`);
+                gradient.addColorStop(1, `${color}00`);
+                
+                offscreenCtx.fillStyle = gradient;
+                offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
+              }
+              
+              offscreenCtx.globalCompositeOperation = 'source-over';
+            }
           } else {
             offscreenCtx.fillStyle = '#333333';
             offscreenCtx.globalAlpha = 0.25;
@@ -842,6 +873,35 @@ export const SimpleTabletop = () => {
       const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
       drawToken(ctx, renderToken);
     });
+    
+    // Draw light sources in edit mode
+    if (renderingMode === 'edit' && lightSources.length > 0) {
+      lightSources.forEach(light => {
+        const screenX = light.position.x * transform.zoom + transform.x;
+        const screenY = light.position.y * transform.zoom + transform.y;
+        const screenRadius = light.radius * transform.zoom;
+        
+        // Draw light radius circle
+        ctx.save();
+        ctx.strokeStyle = light.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw light bulb icon
+        ctx.fillStyle = light.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
     
     // Draw annotations on top of tokens
     renderAnnotations(ctx, annotations, transform.zoom);
@@ -1422,7 +1482,9 @@ export const SimpleTabletop = () => {
     wallEdgeStyle: WallEdgeStyle,
     wallThickness: number,
     textureScale: number,
-    isPlayMode: boolean
+    isPlayMode: boolean,
+    lightDir: number,
+    numLights: number
   ): string => {
     const regionData = regions.map(r => {
       if (r.regionType === 'path' && r.pathPoints) {
@@ -1430,7 +1492,7 @@ export const SimpleTabletop = () => {
       }
       return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
     }).join('|');
-    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}`;
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}-${lightDir}-${numLights}`;
   };
   
   // Function to draw regions
@@ -2893,6 +2955,30 @@ export const SimpleTabletop = () => {
           setGroupedTokens(tokensInRegion);
           setTokensMovedByRegion(tokensInRegion.map(t => t.tokenId));
         }
+        }
+      } else if (e.shiftKey && renderingMode === 'edit') {
+        // Shift+click to add/remove light sources in edit mode
+        const clickedLight = lightSources.find(light => {
+          const dx = light.position.x - worldPos.x;
+          const dy = light.position.y - worldPos.y;
+          return Math.sqrt(dx * dx + dy * dy) < light.radius;
+        });
+        
+        if (clickedLight) {
+          removeLightSource(clickedLight.id);
+          toast.success('Light source removed');
+        } else {
+          // Add new light source
+          const colors = ['#ff6b00', '#00ff88', '#0088ff', '#ff00ff', '#ffff00', '#ff0066'];
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          
+          addLightSource({
+            position: { x: worldPos.x, y: worldPos.y },
+            color: randomColor,
+            intensity: 0.8,
+            radius: 150 // World space units
+          });
+          toast.success('Light source added (Shift+click to remove)');
         }
       } else {
         handleCanvasClick(e);

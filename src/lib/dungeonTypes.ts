@@ -22,6 +22,14 @@ export interface TerrainFeature {
   tiles: { x: number; y: number }[];
 }
 
+export interface LightSource {
+  id: string;
+  position: { x: number; y: number };
+  color: string;
+  intensity: number; // 0-1
+  radius: number; // in grid units
+}
+
 // Watabou JSON format types
 export interface WatabouRect {
   x: number;
