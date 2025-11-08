@@ -3,31 +3,101 @@ import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
- * Calculate wall segments from regions for dungeon map rendering
+ * Check if two wall segments overlap or are very close (within tolerance)
+ */
+function segmentsOverlap(
+  seg1: { x1: number; y1: number; x2: number; y2: number },
+  seg2: { x1: number; y1: number; x2: number; y2: number },
+  tolerance: number = 2
+): boolean {
+  // Check if segments are parallel and overlapping
+  const dx1 = seg1.x2 - seg1.x1;
+  const dy1 = seg1.y2 - seg1.y1;
+  const dx2 = seg2.x2 - seg2.x1;
+  const dy2 = seg2.y2 - seg2.y1;
+  
+  // Normalize segments so p1 is always "before" p2
+  const normSeg1 = {
+    x1: Math.min(seg1.x1, seg1.x2),
+    y1: Math.min(seg1.y1, seg1.y2),
+    x2: Math.max(seg1.x1, seg1.x2),
+    y2: Math.max(seg1.y1, seg1.y2)
+  };
+  const normSeg2 = {
+    x1: Math.min(seg2.x1, seg2.x2),
+    y1: Math.min(seg2.y1, seg2.y2),
+    x2: Math.max(seg2.x1, seg2.x2),
+    y2: Math.max(seg2.y1, seg2.y2)
+  };
+  
+  // Check if both are vertical (dx ≈ 0)
+  if (Math.abs(dx1) < 0.1 && Math.abs(dx2) < 0.1) {
+    // Check if x positions are close
+    if (Math.abs(normSeg1.x1 - normSeg2.x1) > tolerance) return false;
+    
+    // Check if y ranges overlap
+    const overlap = Math.min(normSeg1.y2, normSeg2.y2) - Math.max(normSeg1.y1, normSeg2.y1);
+    return overlap > -tolerance;
+  }
+  
+  // Check if both are horizontal (dy ≈ 0)
+  if (Math.abs(dy1) < 0.1 && Math.abs(dy2) < 0.1) {
+    // Check if y positions are close
+    if (Math.abs(normSeg1.y1 - normSeg2.y1) > tolerance) return false;
+    
+    // Check if x ranges overlap
+    const overlap = Math.min(normSeg1.x2, normSeg2.x2) - Math.max(normSeg1.x1, normSeg2.x1);
+    return overlap > -tolerance;
+  }
+  
+  return false;
+}
+
+/**
+ * Calculate wall segments from regions, removing shared walls between adjacent regions
  */
 function calculateWallSegments(regions: CanvasRegion[]): { x1: number; y1: number; x2: number; y2: number }[] {
-  const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const allSegments: { x1: number; y1: number; x2: number; y2: number; regionId: string }[] = [];
   
+  // Collect all wall segments with their region IDs
   regions.forEach((region) => {
     if (region.regionType === 'rectangle') {
       // Add four walls for rectangle
-      segments.push(
-        { x1: region.x, y1: region.y, x2: region.x + region.width, y2: region.y },
-        { x1: region.x + region.width, y1: region.y, x2: region.x + region.width, y2: region.y + region.height },
-        { x1: region.x + region.width, y1: region.y + region.height, x2: region.x, y2: region.y + region.height },
-        { x1: region.x, y1: region.y + region.height, x2: region.x, y2: region.y }
+      allSegments.push(
+        { x1: region.x, y1: region.y, x2: region.x + region.width, y2: region.y, regionId: region.id },
+        { x1: region.x + region.width, y1: region.y, x2: region.x + region.width, y2: region.y + region.height, regionId: region.id },
+        { x1: region.x + region.width, y1: region.y + region.height, x2: region.x, y2: region.y + region.height, regionId: region.id },
+        { x1: region.x, y1: region.y + region.height, x2: region.x, y2: region.y, regionId: region.id }
       );
     } else if (region.regionType === 'path' && region.pathPoints) {
       // Add segments for each path edge
       for (let i = 0; i < region.pathPoints.length; i++) {
         const p1 = region.pathPoints[i];
         const p2 = region.pathPoints[(i + 1) % region.pathPoints.length];
-        segments.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
+        allSegments.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, regionId: region.id });
       }
     }
   });
   
-  return segments;
+  // Find and remove shared walls (walls that overlap between different regions)
+  const sharedSegmentIndices = new Set<number>();
+  
+  for (let i = 0; i < allSegments.length; i++) {
+    for (let j = i + 1; j < allSegments.length; j++) {
+      // Only check segments from different regions
+      if (allSegments[i].regionId !== allSegments[j].regionId) {
+        if (segmentsOverlap(allSegments[i], allSegments[j], 3)) {
+          sharedSegmentIndices.add(i);
+          sharedSegmentIndices.add(j);
+        }
+      }
+    }
+  }
+  
+  // Return only non-shared segments
+  return allSegments
+    .filter((_, index) => !sharedSegmentIndices.has(index))
+    .map(({ x1, y1, x2, y2 }) => ({ x1, y1, x2, y2 }));
 }
 
 /**
@@ -483,23 +553,24 @@ export function renderTerrainFeatures(
   features: TerrainFeature[],
   zoom: number,
   dungeonMapMode: boolean = false,
-  style: WatabouStyle = DEFAULT_STYLE
+  style: WatabouStyle = DEFAULT_STYLE,
+  regions: CanvasRegion[] = []
 ) {
   features.forEach((feature) => {
     ctx.save();
     
     switch (feature.type) {
       case 'water':
-        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style);
+        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions);
         break;
       case 'column':
-        renderColumnTiles(ctx, feature.tiles, zoom);
+        renderColumnTiles(ctx, feature.tiles, zoom, regions);
         break;
       case 'debris':
-        renderDebrisTiles(ctx, feature.tiles, zoom, dungeonMapMode, style);
+        renderDebrisTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions);
         break;
       case 'trap':
-        renderTrapTiles(ctx, feature.tiles, zoom);
+        renderTrapTiles(ctx, feature.tiles, zoom, regions);
         break;
     }
     
@@ -512,10 +583,24 @@ function renderWaterTiles(
   tiles: { x: number; y: number }[],
   zoom: number,
   dungeonMapMode: boolean = false,
-  style: WatabouStyle = DEFAULT_STYLE
+  style: WatabouStyle = DEFAULT_STYLE,
+  regions: CanvasRegion[] = []
 ) {
   tiles.forEach((tile) => {
     if (dungeonMapMode) {
+      // Find region containing this tile for clipping
+      const containingRegion = regions.find(region => {
+        const tileCenterX = tile.x + 25;
+        const tileCenterY = tile.y + 25;
+        return isPointInRegion(tileCenterX, tileCenterY, region);
+      });
+      
+      if (containingRegion) {
+        ctx.save();
+        // Clip to region bounds
+        clipToRegion(ctx, containingRegion);
+      }
+      
       // Fill with water color
       ctx.fillStyle = style.colorWater;
       ctx.fillRect(tile.x, tile.y, 50, 50);
@@ -534,6 +619,10 @@ function renderWaterTiles(
           ctx.lineTo(tile.x + x, y + wave);
         }
         ctx.stroke();
+      }
+      
+      if (containingRegion) {
+        ctx.restore();
       }
     } else {
       // VTT style - blue with waves
@@ -576,12 +665,23 @@ function renderWaterTiles(
 function renderColumnTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
-  zoom: number
+  zoom: number,
+  regions: CanvasRegion[] = []
 ) {
   tiles.forEach((tile) => {
     const centerX = tile.x + 25;
     const centerY = tile.y + 25;
     const radius = 8;
+    
+    // Find region containing this tile for clipping
+    const containingRegion = regions.find(region => 
+      isPointInRegion(centerX, centerY, region)
+    );
+    
+    if (containingRegion) {
+      ctx.save();
+      clipToRegion(ctx, containingRegion);
+    }
     
     // Draw column as circle
     ctx.fillStyle = '#71717a'; // Gray
@@ -592,6 +692,10 @@ function renderColumnTiles(
     ctx.strokeStyle = '#52525b';
     ctx.lineWidth = 2 / zoom;
     ctx.stroke();
+    
+    if (containingRegion) {
+      ctx.restore();
+    }
   });
 }
 
@@ -600,10 +704,23 @@ function renderDebrisTiles(
   tiles: { x: number; y: number }[],
   zoom: number,
   dungeonMapMode: boolean = false,
-  style: WatabouStyle = DEFAULT_STYLE
+  style: WatabouStyle = DEFAULT_STYLE,
+  regions: CanvasRegion[] = []
 ) {
   tiles.forEach((tile) => {
     if (dungeonMapMode) {
+      // Find region containing this tile for clipping
+      const containingRegion = regions.find(region => {
+        const tileCenterX = tile.x + 25;
+        const tileCenterY = tile.y + 25;
+        return isPointInRegion(tileCenterX, tileCenterY, region);
+      });
+      
+      if (containingRegion) {
+        ctx.save();
+        clipToRegion(ctx, containingRegion);
+      }
+      
       // Dungeon map style - dense stippled pattern
       ctx.fillStyle = style.colorInk;
       ctx.globalAlpha = 0.15;
@@ -614,6 +731,10 @@ function renderDebrisTiles(
         ctx.fillRect(x, y, size / zoom, size / zoom);
       }
       ctx.globalAlpha = 1.0;
+      
+      if (containingRegion) {
+        ctx.restore();
+      }
     } else {
       // VTT style - gray shapes
       ctx.fillStyle = 'rgba(120, 113, 108, 0.5)';
@@ -630,11 +751,22 @@ function renderDebrisTiles(
 function renderTrapTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
-  zoom: number
+  zoom: number,
+  regions: CanvasRegion[] = []
 ) {
   tiles.forEach((tile) => {
     const centerX = tile.x + 25;
     const centerY = tile.y + 25;
+    
+    // Find region containing this tile for clipping
+    const containingRegion = regions.find(region => 
+      isPointInRegion(centerX, centerY, region)
+    );
+    
+    if (containingRegion) {
+      ctx.save();
+      clipToRegion(ctx, containingRegion);
+    }
     
     // Draw trap as warning symbol
     ctx.strokeStyle = '#dc2626'; // Red
@@ -647,5 +779,49 @@ function renderTrapTiles(
     ctx.moveTo(centerX + 10, centerY - 10);
     ctx.lineTo(centerX - 10, centerY + 10);
     ctx.stroke();
+    
+    if (containingRegion) {
+      ctx.restore();
+    }
   });
+}
+
+/**
+ * Helper to check if a point is inside a region
+ */
+function isPointInRegion(x: number, y: number, region: CanvasRegion): boolean {
+  if (region.regionType === 'rectangle') {
+    return x >= region.x && x <= region.x + region.width &&
+           y >= region.y && y <= region.y + region.height;
+  } else if (region.regionType === 'path' && region.pathPoints) {
+    // Point-in-polygon test
+    let inside = false;
+    const points = region.pathPoints;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i].x, yi = points[i].y;
+      const xj = points[j].x, yj = points[j].y;
+      const intersect = ((yi > y) !== (yj > y)) && 
+                       (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+  return false;
+}
+
+/**
+ * Helper to create a clipping path for a region
+ */
+function clipToRegion(ctx: CanvasRenderingContext2D, region: CanvasRegion): void {
+  ctx.beginPath();
+  if (region.regionType === 'rectangle') {
+    ctx.rect(region.x, region.y, region.width, region.height);
+  } else if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+    ctx.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
+    for (let i = 1; i < region.pathPoints.length; i++) {
+      ctx.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
+    }
+    ctx.closePath();
+  }
+  ctx.clip();
 }

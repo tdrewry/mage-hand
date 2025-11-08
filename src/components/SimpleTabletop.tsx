@@ -610,8 +610,14 @@ export const SimpleTabletop = () => {
       }
     });
     
-    // Draw regions (different rendering based on mode)
-    if (renderingMode === 'dungeon-map') {
+    // Draw dungeon features in correct z-order
+    const isDungeonMapMode = renderingMode === 'dungeon-map';
+    
+    // 1. First render terrain features (water, debris, etc.) - BELOW walls
+    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode, watabouStyle, regions);
+    
+    // 2. Then render regions/walls - ABOVE terrain features
+    if (isDungeonMapMode) {
       renderDungeonMapRegions(ctx, regions, transform.zoom, watabouStyle);
     } else {
       regions.forEach(region => {
@@ -619,10 +625,7 @@ export const SimpleTabletop = () => {
       });
     }
     
-    // Draw dungeon features (terrain, doors, annotations)
-    const isDungeonMapMode = renderingMode === 'dungeon-map';
-    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode, watabouStyle);
-    
+    // 3. Then render doors - ABOVE walls
     if (isDungeonMapMode) {
       renderDungeonMapDoors(ctx, doors, transform.zoom, watabouStyle);
     } else {
