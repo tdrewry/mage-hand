@@ -100,8 +100,10 @@ export const SimpleTabletop = () => {
   const wallDecorationCacheRef = useRef<{
     cacheKey: string;
     canvas: HTMLCanvasElement;
+    shadowCanvas: HTMLCanvasElement; // Separate canvas for shadows
     wallGeometry: any;
     bounds: { x: number; y: number; width: number; height: number };
+    shadowBounds: { x: number; y: number; width: number; height: number };
   } | null>(null);
   
   // Grid highlighting state for token movement (supports both hex and square grids)
@@ -665,16 +667,18 @@ export const SimpleTabletop = () => {
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
     
     // Generate cache key
-    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale);
+    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode);
     
     // Check if we can use cached decorations
     let wallGeometry: any;
     let cachedCanvas: HTMLCanvasElement | null = null;
+    let cachedShadowCanvas: HTMLCanvasElement | null = null;
     
     if (wallDecorationCacheRef.current && wallDecorationCacheRef.current.cacheKey === cacheKey) {
       // Use cached data
       wallGeometry = wallDecorationCacheRef.current.wallGeometry;
       cachedCanvas = wallDecorationCacheRef.current.canvas;
+      cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
     } else {
       // Generate new decorations and cache them
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
@@ -693,48 +697,112 @@ export const SimpleTabletop = () => {
           // Translate to account for bounds offset and padding
           offscreenCtx.translate(-bounds.x + padding, -bounds.y + padding);
           
+          // Draw wall fill with texture in play mode
+          offscreenCtx.save();
+          if (isPlayMode) {
+            const pattern = createWallTexturePattern(offscreenCtx, wallEdgeStyle, bounds.width, bounds.height);
+            if (pattern) {
+              offscreenCtx.fillStyle = pattern;
+            } else {
+              offscreenCtx.fillStyle = '#333333';
+            }
+            offscreenCtx.globalAlpha = 1.0;
+          } else {
+            offscreenCtx.fillStyle = '#333333';
+            offscreenCtx.globalAlpha = 0.25;
+          }
+          offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
+          offscreenCtx.restore();
+          
           // Draw decorative edges to offscreen canvas
           offscreenCtx.save();
           offscreenCtx.clip(wallGeometry.wallPath, 'evenodd');
           drawDecorativeEdgesToContext(offscreenCtx, wallGeometry, regions, wallEdgeStyle, wallThickness, textureScale);
           offscreenCtx.restore();
           
-          // Cache the result
-          wallDecorationCacheRef.current = {
-            cacheKey,
-            canvas: offscreenCanvas,
-            wallGeometry,
-            bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas.width, height: offscreenCanvas.height }
-          };
-          
           cachedCanvas = offscreenCanvas;
         }
+        
+        // Create shadow canvas (only for play mode)
+        let shadowCanvas: HTMLCanvasElement | null = null;
+        if (isPlayMode) {
+          shadowCanvas = document.createElement('canvas');
+          const shadowPadding = 30;
+          shadowCanvas.width = Math.ceil(bounds.width + shadowPadding * 2);
+          shadowCanvas.height = Math.ceil(bounds.height + shadowPadding * 2);
+          
+          const shadowCtx = shadowCanvas.getContext('2d');
+          if (shadowCtx) {
+            shadowCtx.translate(-bounds.x + shadowPadding, -bounds.y + shadowPadding);
+            
+            // Draw inner shadow (walls cast shadow onto floor)
+            shadowCtx.save();
+            
+            // Create gradient for shadow effect
+            const shadowOffset = 10;
+            const shadowBlur = 15;
+            
+            // Draw shadow by stroking the inner edges
+            regions.forEach(region => {
+              const points = getRegionEdgePoints(region);
+              
+              shadowCtx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+              shadowCtx.lineWidth = shadowBlur;
+              shadowCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+              shadowCtx.shadowBlur = shadowBlur;
+              shadowCtx.shadowOffsetX = shadowOffset / 2;
+              shadowCtx.shadowOffsetY = shadowOffset;
+              
+              shadowCtx.beginPath();
+              shadowCtx.moveTo(points[0].x, points[0].y);
+              for (let i = 1; i < points.length; i++) {
+                shadowCtx.lineTo(points[i].x, points[i].y);
+              }
+              shadowCtx.closePath();
+              shadowCtx.stroke();
+            });
+            
+            shadowCtx.restore();
+          }
+          
+          cachedShadowCanvas = shadowCanvas;
+        }
+        
+        // Cache the result
+        wallDecorationCacheRef.current = {
+          cacheKey,
+          canvas: cachedCanvas!,
+          shadowCanvas: cachedShadowCanvas!,
+          wallGeometry,
+          bounds: { x: bounds.x - padding, y: bounds.y - padding, width: offscreenCanvas!.width, height: offscreenCanvas!.height },
+          shadowBounds: cachedShadowCanvas ? { x: bounds.x - 30, y: bounds.y - 30, width: cachedShadowCanvas.width, height: cachedShadowCanvas.height } : { x: 0, y: 0, width: 0, height: 0 }
+        };
       }
     }
     
-    // Draw the base wall fill and outline
-    if (wallGeometry) {
+    // Draw shadows first (under walls)
+    if (isPlayMode && cachedShadowCanvas && wallDecorationCacheRef.current) {
+      const shadowBounds = wallDecorationCacheRef.current.shadowBounds;
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(cachedShadowCanvas, shadowBounds.x, shadowBounds.y);
+      ctx.globalAlpha = 1.0;
+    }
+    
+    // Draw the base wall with red outline in edit mode only
+    if (wallGeometry && !isPlayMode) {
       ctx.save();
-      ctx.fillStyle = '#333333';
-      // Play mode: solid fill, Edit mode: semi-transparent
-      ctx.globalAlpha = isPlayMode ? 1.0 : 0.25;
-      ctx.fill(wallGeometry.wallPath, 'evenodd');
-      
-      // Only show red bounding box in edit mode
-      if (!isPlayMode) {
-        ctx.globalAlpha = 0.2;
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 2 / transform.zoom;
-        const bounds = wallGeometry.bounds;
-        ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-      }
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2 / transform.zoom;
+      const bounds = wallGeometry.bounds;
+      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
       ctx.restore();
-      
-      // Draw cached decorations
-      if (cachedCanvas && wallDecorationCacheRef.current) {
-        const cacheBounds = wallDecorationCacheRef.current.bounds;
-        ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
-      }
+    }
+    
+    // Draw cached wall with texture and decorations
+    if (cachedCanvas && wallDecorationCacheRef.current) {
+      const cacheBounds = wallDecorationCacheRef.current.bounds;
+      ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
     }
     
     // 4. Then render doors - ABOVE walls
@@ -1145,12 +1213,137 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
+  // Helper to create wall texture pattern
+  const createWallTexturePattern = (
+    ctx: CanvasRenderingContext2D,
+    style: WallEdgeStyle,
+    width: number,
+    height: number
+  ): CanvasPattern | null => {
+    const patternCanvas = document.createElement('canvas');
+    const patternSize = 64;
+    patternCanvas.width = patternSize;
+    patternCanvas.height = patternSize;
+    const patternCtx = patternCanvas.getContext('2d');
+    if (!patternCtx) return null;
+
+    // Base color
+    patternCtx.fillStyle = '#2a2a2a';
+    patternCtx.fillRect(0, 0, patternSize, patternSize);
+
+    if (style === 'stone') {
+      // Stone texture - irregular blocks
+      patternCtx.strokeStyle = '#1a1a1a';
+      patternCtx.lineWidth = 1;
+      
+      // Draw irregular stone pattern
+      const stones = [
+        [0, 0, 32, 20], [32, 0, 32, 24],
+        [0, 20, 24, 22], [24, 20, 40, 22],
+        [0, 42, 28, 22], [28, 42, 36, 22]
+      ];
+      
+      stones.forEach(([x, y, w, h]) => {
+        patternCtx.strokeRect(x, y, w, h);
+        // Add some variation
+        patternCtx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.2})`;
+        patternCtx.fillRect(x, y, w, h);
+      });
+      
+      // Add some dots for texture
+      for (let i = 0; i < 15; i++) {
+        patternCtx.fillStyle = `rgba(${50 + Math.random() * 30}, ${50 + Math.random() * 30}, ${50 + Math.random() * 30}, 0.3)`;
+        patternCtx.fillRect(Math.random() * patternSize, Math.random() * patternSize, 2, 2);
+      }
+    } else if (style === 'metal') {
+      // Metal texture - riveted panels
+      patternCtx.strokeStyle = '#3a3a3a';
+      patternCtx.lineWidth = 2;
+      
+      // Panel lines
+      patternCtx.beginPath();
+      patternCtx.moveTo(0, patternSize / 2);
+      patternCtx.lineTo(patternSize, patternSize / 2);
+      patternCtx.moveTo(patternSize / 2, 0);
+      patternCtx.lineTo(patternSize / 2, patternSize);
+      patternCtx.stroke();
+      
+      // Rivets
+      const rivetPositions = [[8, 8], [56, 8], [8, 56], [56, 56], [32, 32]];
+      rivetPositions.forEach(([x, y]) => {
+        patternCtx.fillStyle = '#444';
+        patternCtx.beginPath();
+        patternCtx.arc(x, y, 3, 0, Math.PI * 2);
+        patternCtx.fill();
+        patternCtx.strokeStyle = '#1a1a1a';
+        patternCtx.lineWidth = 1;
+        patternCtx.stroke();
+      });
+      
+      // Scratches
+      patternCtx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
+      patternCtx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const y = Math.random() * patternSize;
+        patternCtx.beginPath();
+        patternCtx.moveTo(0, y);
+        patternCtx.lineTo(patternSize, y + (Math.random() - 0.5) * 10);
+        patternCtx.stroke();
+      }
+    } else if (style === 'wood') {
+      // Wood grain texture
+      patternCtx.fillStyle = '#3d2f1f';
+      patternCtx.fillRect(0, 0, patternSize, patternSize);
+      
+      // Wood planks
+      const plankHeight = patternSize / 3;
+      for (let i = 0; i < 3; i++) {
+        const y = i * plankHeight;
+        patternCtx.strokeStyle = '#2a1f10';
+        patternCtx.lineWidth = 2;
+        patternCtx.strokeRect(0, y, patternSize, plankHeight);
+        
+        // Grain lines
+        patternCtx.strokeStyle = 'rgba(42, 31, 16, 0.5)';
+        patternCtx.lineWidth = 1;
+        for (let j = 0; j < 3; j++) {
+          const grainY = y + 5 + j * (plankHeight / 4);
+          patternCtx.beginPath();
+          patternCtx.moveTo(0, grainY);
+          patternCtx.bezierCurveTo(
+            patternSize / 4, grainY + (Math.random() - 0.5) * 3,
+            patternSize * 3 / 4, grainY + (Math.random() - 0.5) * 3,
+            patternSize, grainY
+          );
+          patternCtx.stroke();
+        }
+        
+        // Knots
+        if (Math.random() > 0.5) {
+          const knotX = patternSize * 0.3 + Math.random() * patternSize * 0.4;
+          const knotY = y + plankHeight / 2;
+          patternCtx.fillStyle = 'rgba(20, 10, 5, 0.4)';
+          patternCtx.beginPath();
+          patternCtx.ellipse(knotX, knotY, 4, 3, Math.random() * Math.PI, 0, Math.PI * 2);
+          patternCtx.fill();
+        }
+      }
+    } else {
+      // Simple texture for 'simple' style
+      patternCtx.fillStyle = '#333';
+      patternCtx.fillRect(0, 0, patternSize, patternSize);
+    }
+
+    return ctx.createPattern(patternCanvas, 'repeat');
+  };
+
   // Generate cache key for wall decorations
   const generateWallDecorationCacheKey = (
     regions: CanvasRegion[],
     wallEdgeStyle: WallEdgeStyle,
     wallThickness: number,
-    textureScale: number
+    textureScale: number,
+    isPlayMode: boolean
   ): string => {
     const regionData = regions.map(r => {
       if (r.regionType === 'path' && r.pathPoints) {
@@ -1158,7 +1351,7 @@ export const SimpleTabletop = () => {
       }
       return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
     }).join('|');
-    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}`;
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}`;
   };
   
   // Function to draw regions
