@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useFogStore } from '@/stores/fogStore';
 import { Eye, EyeOff, Circle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 
 interface FogControlModalProps {
   open: boolean;
@@ -25,10 +26,13 @@ export const FogControlModal = ({ open, onOpenChange }: FogControlModalProps) =>
     revealAll,
     visionRange,
     fogOpacity,
+    exploredOpacity,
     setEnabled,
     setRevealAll,
     setVisionRange,
     setFogOpacity,
+    setExploredOpacity,
+    clearExploredAreas,
     resetFog,
   } = useFogStore();
 
@@ -116,7 +120,7 @@ export const FogControlModal = ({ open, onOpenChange }: FogControlModalProps) =>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label htmlFor="fog-opacity" className="text-base">
-                Fog Darkness
+                Unexplored Darkness
               </Label>
               <span className="text-sm font-medium">{Math.round(fogOpacity * 100)}%</span>
             </div>
@@ -137,8 +141,43 @@ export const FogControlModal = ({ open, onOpenChange }: FogControlModalProps) =>
 
           <Separator />
 
+          {/* Explored Opacity */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="explored-opacity" className="text-base">
+                Explored Darkness
+              </Label>
+              <span className="text-sm font-medium">{Math.round(exploredOpacity * 100)}%</span>
+            </div>
+            <Slider
+              id="explored-opacity"
+              min={0}
+              max={100}
+              step={5}
+              value={[exploredOpacity * 100]}
+              onValueChange={([value]) => setExploredOpacity(value / 100)}
+              disabled={!enabled}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              How dark explored but not visible areas appear
+            </p>
+          </div>
+
+          <Separator />
+
           {/* Reset Button */}
-          <div className="flex justify-end">
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                clearExploredAreas();
+                toast('Explored areas cleared');
+              }}
+              disabled={!enabled}
+            >
+              Clear Explored
+            </Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -146,15 +185,16 @@ export const FogControlModal = ({ open, onOpenChange }: FogControlModalProps) =>
                 onOpenChange(false);
               }}
             >
-              Reset to Defaults
+              Reset All
             </Button>
           </div>
         </div>
 
         <div className="bg-muted/50 rounded-lg p-4 mt-2">
           <p className="text-sm text-muted-foreground">
-            <strong>Tip:</strong> Place tokens on the map to reveal fog around them. 
-            In Play mode, only areas within token vision ranges will be visible.
+            <strong>Tip:</strong> Fog has three states: <strong>unexplored</strong> (black), 
+            <strong>explored</strong> (dimmed), and <strong>visible</strong> (clear). 
+            Tokens reveal fog as they move around the map.
           </p>
         </div>
       </DialogContent>

@@ -130,27 +130,50 @@ export function renderFogOfWar(
 }
 
 /**
- * Create a simple fog overlay (before complex path merging is implemented)
+ * Create a fog overlay with three visibility states:
+ * 1. Unexplored (completely black)
+ * 2. Explored but not visible (semi-transparent)
+ * 3. Currently visible (no fog)
  */
 export function renderSimpleFog(
   ctx: CanvasRenderingContext2D,
   visibleArea: Path2D,
+  exploredArea: Path2D | null,
   canvasBounds: { x: number; y: number; width: number; height: number },
   fogEnabled: boolean,
   revealAll: boolean,
-  fogOpacity: number = 0.9
+  unexploredOpacity: number = 0.95,
+  exploredOpacity: number = 0.4
 ) {
   if (!fogEnabled || revealAll) return;
 
   ctx.save();
 
-  // Draw fog over entire canvas
-  ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+  // 1. Draw unexplored fog over entire canvas (black)
+  ctx.fillStyle = `rgba(0, 0, 0, ${unexploredOpacity})`;
   ctx.fillRect(canvasBounds.x, canvasBounds.y, canvasBounds.width, canvasBounds.height);
 
-  // Cut out visible areas
+  // 2. Lighten explored areas (semi-transparent fog)
+  if (exploredArea) {
+    ctx.save();
+    
+    // Cut out the explored area from the unexplored fog
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+    ctx.fill(exploredArea);
+    
+    // Draw lighter fog over the explored area
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+    ctx.fill(exploredArea);
+    
+    ctx.restore();
+  }
+
+  // 3. Completely reveal currently visible areas
   if (visibleArea) {
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
     ctx.fill(visibleArea);
     ctx.globalCompositeOperation = 'source-over';
   }

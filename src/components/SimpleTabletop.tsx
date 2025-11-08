@@ -169,9 +169,14 @@ export const SimpleTabletop = () => {
     revealAll: fogRevealAll,
     visionRange: fogVisionRange,
     fogOpacity,
+    exploredOpacity,
+    exploredAreas,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
   } = useFogStore();
+  
+  // Track explored areas (accumulated visibility)
+  const exploredAreaRef = useRef<Path2D | null>(null);
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -231,6 +236,20 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     updateAllTokenHighlights();
   }, [tokens, regions]); // Re-run when tokens positions change or regions change
+
+  // Clear explored areas when fog is disabled
+  useEffect(() => {
+    if (!fogEnabled) {
+      exploredAreaRef.current = null;
+    }
+  }, [fogEnabled]);
+
+  // Clear explored area ref when store is cleared
+  useEffect(() => {
+    if (exploredAreas.length === 0) {
+      exploredAreaRef.current = null;
+    }
+  }, [exploredAreas.length]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -910,6 +929,14 @@ export const SimpleTabletop = () => {
         fogVisionRange
       );
       
+      // Merge current visibility into explored areas
+      if (tokenVisibility) {
+        if (!exploredAreaRef.current) {
+          exploredAreaRef.current = new Path2D();
+        }
+        exploredAreaRef.current.addPath(tokenVisibility);
+      }
+      
       // Canvas bounds in world coordinates - expand significantly beyond viewport
       // to prevent seeing fog edges when panning
       const padding = 5000; // Large padding to cover any reasonable pan distance
@@ -923,10 +950,12 @@ export const SimpleTabletop = () => {
       renderSimpleFog(
         ctx,
         tokenVisibility,
+        exploredAreaRef.current,
         worldBounds,
         true, // fogEnabled
         false, // fogRevealAll
-        fogOpacity
+        fogOpacity,
+        exploredOpacity
       );
     }
     
