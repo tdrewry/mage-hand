@@ -45,21 +45,6 @@ function getRegionBounds(region: CanvasRegion): { x: number; y: number; width: n
 }
 
 /**
- * Render subtle floor texture pattern on unified floor geometry
- * Optimized: only draw dots, clipping will handle visibility
- */
-function renderFloorPatternToPath(
-  ctx: CanvasRenderingContext2D,
-  floorGeometry: FloorGeometry,
-  style: WatabouStyle,
-  zoom: number
-) {
-  // Skip texture for now - it's causing performance issues
-  // We can add it back later with better optimization
-  return;
-}
-
-/**
  * Render regions in dungeon map style with thick hatched walls using negative space
  */
 export function renderDungeonMapRegions(
@@ -84,10 +69,7 @@ export function renderDungeonMapRegions(
   ctx.fillStyle = style.colorPaper;
   ctx.fill(floorGeometry.floorPath, 'evenodd');
   
-  // 4. Apply floor texture to unified floor
-  renderFloorPatternToPath(ctx, floorGeometry, style, zoom);
-  
-  // 5. Draw shadow layer (optional, under walls)
+  // 4. Draw shadow layer (optional, under walls)
   if (style.shadowDist > 0) {
     ctx.save();
     ctx.fillStyle = style.shadowColor;
@@ -97,16 +79,16 @@ export function renderDungeonMapRegions(
     ctx.restore();
   }
   
-  // 6. Fill wall base (main wall color)
+  // 5. Fill wall base (main wall color)
   ctx.fillStyle = style.colorShading;
   ctx.fill(wallGeometry.wallPath, 'evenodd');
   
-  // 7. Stroke wall outline
+  // 6. Stroke wall outline
   ctx.strokeStyle = style.colorInk;
   ctx.lineWidth = style.strokeNormal / zoom;
   ctx.stroke(wallGeometry.wallPath);
   
-  // 8. Apply hatching to walls
+  // 7. Apply hatching to walls
   applyWallHatching(ctx, wallGeometry, style, zoom);
   
   ctx.restore();
