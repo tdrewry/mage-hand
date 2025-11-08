@@ -707,11 +707,30 @@ export const SimpleTabletop = () => {
               offscreenCtx.fillStyle = '#333333';
             }
             offscreenCtx.globalAlpha = 1.0;
+            offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
+            
+            // Add directional lighting gradient overlay
+            const lightAngle = Math.PI / 4; // 45 degrees (top-left light source)
+            const lightGradient = offscreenCtx.createLinearGradient(
+              bounds.x,
+              bounds.y,
+              bounds.x + Math.cos(lightAngle) * bounds.width * 0.5,
+              bounds.y + Math.sin(lightAngle) * bounds.height * 0.5
+            );
+            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)'); // Highlight
+            lightGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0)'); // Neutral
+            lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Shadow
+            
+            offscreenCtx.fillStyle = lightGradient;
+            offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
+            
+            // Add ambient occlusion at corners
+            drawAmbientOcclusion(offscreenCtx, regions, wallGeometry);
           } else {
             offscreenCtx.fillStyle = '#333333';
             offscreenCtx.globalAlpha = 0.25;
+            offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
           }
-          offscreenCtx.fill(wallGeometry.wallPath, 'evenodd');
           offscreenCtx.restore();
           
           // Draw decorative edges to offscreen canvas
@@ -735,22 +754,23 @@ export const SimpleTabletop = () => {
           if (shadowCtx) {
             shadowCtx.translate(-bounds.x + shadowPadding, -bounds.y + shadowPadding);
             
-            // Draw inner shadow (walls cast shadow onto floor)
+            // Only draw shadows within the negative space (walls)
             shadowCtx.save();
+            shadowCtx.clip(wallGeometry.wallPath, 'evenodd');
             
-            // Create gradient for shadow effect
-            const shadowOffset = 10;
-            const shadowBlur = 15;
+            // Draw inner shadow (walls cast shadow inward onto themselves)
+            const shadowOffset = 8;
+            const shadowBlur = 12;
             
-            // Draw shadow by stroking the inner edges
+            // Draw shadow by stroking the inner edges of regions
             regions.forEach(region => {
               const points = getRegionEdgePoints(region);
               
-              shadowCtx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-              shadowCtx.lineWidth = shadowBlur;
-              shadowCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+              shadowCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+              shadowCtx.lineWidth = shadowBlur * 2;
+              shadowCtx.shadowColor = 'rgba(0, 0, 0, 0.7)';
               shadowCtx.shadowBlur = shadowBlur;
-              shadowCtx.shadowOffsetX = shadowOffset / 2;
+              shadowCtx.shadowOffsetX = shadowOffset * 0.5;
               shadowCtx.shadowOffsetY = shadowOffset;
               
               shadowCtx.beginPath();
@@ -1208,6 +1228,65 @@ export const SimpleTabletop = () => {
       if (needsRotation) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
+    });
+    
+    ctx.restore();
+  };
+
+  // Helper to draw ambient occlusion at wall corners
+  const drawAmbientOcclusion = (
+    ctx: CanvasRenderingContext2D,
+    regions: CanvasRegion[],
+    wallGeometry: any
+  ) => {
+    ctx.save();
+    ctx.clip(wallGeometry.wallPath, 'evenodd');
+    
+    // Find corners where walls meet
+    regions.forEach(region => {
+      const points = getRegionEdgePoints(region);
+      
+      // Draw darkening at each corner
+      points.forEach((point, i) => {
+        const prevPoint = points[i === 0 ? points.length - 1 : i - 1];
+        const nextPoint = points[(i + 1) % points.length];
+        
+        // Calculate angle between edges
+        const v1 = { x: prevPoint.x - point.x, y: prevPoint.y - point.y };
+        const v2 = { x: nextPoint.x - point.x, y: nextPoint.y - point.y };
+        const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+        const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+        
+        if (len1 > 0 && len2 > 0) {
+          v1.x /= len1;
+          v1.y /= len1;
+          v2.x /= len2;
+          v2.y /= len2;
+          
+          const dot = v1.x * v2.x + v1.y * v2.y;
+          const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+          
+          // Stronger darkening for sharper corners
+          if (angle > Math.PI / 6) { // More than 30 degrees
+            const occlusionRadius = 15;
+            const gradient = ctx.createRadialGradient(
+              point.x, point.y, 0,
+              point.x, point.y, occlusionRadius
+            );
+            
+            // Intensity based on corner sharpness
+            const intensity = Math.min(0.6, angle / Math.PI * 0.8);
+            gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
+            gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.4})`);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, occlusionRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      });
     });
     
     ctx.restore();
