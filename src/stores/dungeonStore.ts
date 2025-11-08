@@ -8,7 +8,7 @@ interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
   terrainFeatures: TerrainFeature[];
-  renderingMode: 'vtt' | 'dungeon-map';
+  renderingMode: 'edit' | 'play';
   watabouStyle: WatabouStyle;
   
   // Wall geometry caching
@@ -17,7 +17,7 @@ interface DungeonStore {
   setCachedWallGeometry: (geometry: WallGeometry | null, cacheKey: string | null) => void;
   
   // Rendering mode
-  setRenderingMode: (mode: 'vtt' | 'dungeon-map') => void;
+  setRenderingMode: (mode: 'edit' | 'play') => void;
   setWatabouStyle: (style: WatabouStyle) => void;
   
   // Door operations
@@ -51,7 +51,7 @@ export const useDungeonStore = create<DungeonStore>()(
     doors: [],
     annotations: [],
     terrainFeatures: [],
-    renderingMode: 'vtt',
+    renderingMode: 'edit',
     watabouStyle: DEFAULT_STYLE,
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
@@ -173,7 +173,18 @@ export const useDungeonStore = create<DungeonStore>()(
     }),
     {
       name: 'dungeon-store',
-      version: 1,
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version === 1) {
+          // Migrate from old mode names to new mode names
+          if (persistedState.renderingMode === 'vtt') {
+            persistedState.renderingMode = 'edit';
+          } else if (persistedState.renderingMode === 'dungeon-map') {
+            persistedState.renderingMode = 'play';
+          }
+        }
+        return persistedState;
+      },
     }
   )
 );

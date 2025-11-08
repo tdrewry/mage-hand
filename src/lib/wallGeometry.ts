@@ -266,3 +266,53 @@ export function generateWallGeometryCacheKey(regions: CanvasRegion[]): string {
     }))
   );
 }
+
+/**
+ * Generate negative space region data for visualization
+ * This creates a special visual representation of walls/negative space
+ */
+export interface NegativeSpaceRegion {
+  id: 'negative-space';
+  pathPoints: Array<{ x: number; y: number }>;
+  bounds: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Convert Path2D to path points for rendering
+ * Note: This is a simplified approach that extracts the bounding rectangle
+ */
+function extractPathPointsFromWallGeometry(wallGeometry: WallGeometry): Array<{ x: number; y: number }> {
+  const { bounds } = wallGeometry;
+  
+  // Return the outer bounding box as a path
+  // The actual negative space rendering will use the wallPath directly
+  return [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    { x: bounds.x, y: bounds.y + bounds.height },
+  ];
+}
+
+/**
+ * Generate negative space region from existing regions
+ * Returns null if no regions exist
+ */
+export function generateNegativeSpaceRegion(
+  regions: CanvasRegion[],
+  wallThickness: number = 15,
+  margin: number = 5
+): { wallGeometry: WallGeometry; visualRegion: NegativeSpaceRegion } | null {
+  if (regions.length === 0) return null;
+  
+  const wallGeometry = generateWallGeometry(regions, wallThickness, margin);
+  
+  // Create a visual representation
+  const visualRegion: NegativeSpaceRegion = {
+    id: 'negative-space',
+    pathPoints: extractPathPointsFromWallGeometry(wallGeometry),
+    bounds: wallGeometry.bounds,
+  };
+  
+  return { wallGeometry, visualRegion };
+}

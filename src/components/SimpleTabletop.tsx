@@ -20,6 +20,7 @@ import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
 import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
+import { generateNegativeSpaceRegion } from '../lib/wallGeometry';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { 
   HexCoordinate, 
@@ -555,21 +556,25 @@ export const SimpleTabletop = () => {
     const viewY = -transform.y / transform.zoom;
     
     // Determine rendering mode
-    const isDungeonMapMode = renderingMode === 'dungeon-map';
+    const isPlayMode = renderingMode === 'play';
+    const isEditMode = renderingMode === 'edit';
     
-    // Draw background (different for each mode)
-    if (isDungeonMapMode) {
-      // Dungeon map background
-      ctx.fillStyle = watabouStyle.colorBg;
+    // TODO: Future enhancement - apply Watabou styling in Play Mode
+    // For now, both modes use the same VTT rendering style
+    
+    // Draw background
+    if (isPlayMode) {
+      // Play mode: Eventually will use Watabou styling, for now same as edit
+      ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
     } else {
-      // VTT dark background
+      // Edit mode: VTT dark background
       ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(viewX - 1000, viewY - 1000, viewWidth + 2000, viewHeight + 2000);
     }
     
-    // Draw grid (VTT mode only)
-    if (!isDungeonMapMode) {
+    // Draw grid (both modes for now)
+    if (true) {
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1 / transform.zoom;
       
@@ -624,20 +629,30 @@ export const SimpleTabletop = () => {
     });
     
     // 1. First render terrain features (water, debris, etc.) - BELOW walls
-    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode, watabouStyle, regions);
+    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isPlayMode, watabouStyle, regions);
     
     // 2. Then render regions/walls - ABOVE terrain features
-    if (isDungeonMapMode) {
-      renderDungeonMapRegions(ctx, regions, transform.zoom, watabouStyle);
-    } else {
+    if (isPlayMode) {
+      // Play mode: Same rendering as edit for now
       regions.forEach(region => {
         drawRegion(ctx, region);
       });
+    } else {
+      // Edit mode: Render regions + negative space visualization
+      regions.forEach(region => {
+        drawRegion(ctx, region);
+      });
+      
+      // Draw negative space region in edit mode
+      const negativeSpace = generateNegativeSpaceRegion(regions);
+      if (negativeSpace) {
+        drawNegativeSpaceRegion(ctx, negativeSpace.wallGeometry);
+      }
     }
     
     // 3. Then render doors - ABOVE walls
-    if (isDungeonMapMode) {
-      renderDungeonMapDoors(ctx, doors, transform.zoom, watabouStyle);
+    if (isPlayMode) {
+      renderDoors(ctx, doors, transform.zoom);
     } else {
       renderDoors(ctx, doors, transform.zoom);
     }
@@ -894,6 +909,23 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
+  // Function to draw negative space region (walls visualization in edit mode)
+  const drawNegativeSpaceRegion = (ctx: CanvasRenderingContext2D, wallGeometry: any) => {
+    ctx.save();
+    
+    // Draw with distinct visual style so users know it's the negative space
+    ctx.strokeStyle = '#ff6b6b'; // Red outline
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#333333'; // Dark fill
+    
+    // Draw the wall path
+    ctx.fill(wallGeometry.wallPath, 'evenodd');
+    ctx.stroke(wallGeometry.wallPath);
+    
+    ctx.restore();
+  };
+  
   // Function to draw regions
   const drawRegion = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const isSelected = region.selected;
@@ -918,6 +950,15 @@ export const SimpleTabletop = () => {
     } else {
       // Handle rectangle region rendering
       drawRectangleRegion(ctx, effectiveRegion, isSelected);
+    }
+    
+    // Only show handles and selection in edit mode
+    if (isSelected && renderingMode === 'edit') {
+      if (region.regionType === 'path') {
+        drawPathHandles(ctx, region);
+      } else {
+        drawRegionHandles(ctx, region);
+      }
     }
   };
 
@@ -1010,10 +1051,8 @@ export const SimpleTabletop = () => {
       drawRegionGrid(ctx, region);
     }
     
-    // Draw selection handles if selected (control nodes for paths)
+    // Draw transformation handles based on mode (handles themselves drawn in parent)
     if (isSelected) {
-      drawPathHandles(ctx, region);
-      
       // Draw transformation handles based on mode
       if (transformMode === 'scale') {
         drawScaleHandles(ctx, region);
@@ -1108,10 +1147,8 @@ export const SimpleTabletop = () => {
     
     ctx.restore();
     
-    // Draw selection handles if selected (without rotation)
+    // Draw transformation handles based on mode (handles themselves drawn in parent)
     if (isSelected) {
-      drawRegionHandles(ctx, region);
-      
       // Draw transformation handles based on mode
       if (transformMode === 'scale') {
         drawScaleHandles(ctx, region);
@@ -1923,17 +1960,21 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedRegion) {
-        // Check if clicking on rotation handle of an already selected region
-        if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
-          // Don't deselect if clicking on rotation handle - let it handle rotation
-          return;
+        // Only allow region selection in edit mode
+        if (renderingMode === 'edit') {
+          // Check if clicking on rotation handle of an already selected region
+          if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
+            // Don't deselect if clicking on rotation handle - let it handle rotation
+            return;
+          }
+          
+          // Region selection logic
+          clearSelection();
+          selectRegion(clickedRegion.id);
+          setSelectedRegionId(clickedRegion.id);
+          setSelectedTokenIds([]); // Deselect tokens when selecting region
         }
-        
-        // Region selection logic
-        clearSelection();
-        selectRegion(clickedRegion.id);
-        setSelectedRegionId(clickedRegion.id);
-        setSelectedTokenIds([]); // Deselect tokens when selecting region
+        // In play mode, clicking regions does nothing
       } else {
         // Clicked on empty space: deselect all or add token
         if (e.shiftKey) {
@@ -2109,6 +2150,15 @@ export const SimpleTabletop = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
+    
+    // Early exit if in play mode and clicking on a region
+    if (renderingMode === 'play') {
+      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+      if (clickedRegion) {
+        // Don't allow region interaction in play mode
+        return;
+      }
+    }
     
     if (e.button === 2) { // Right click
       e.preventDefault();
@@ -3150,8 +3200,8 @@ export const SimpleTabletop = () => {
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
-      {/* Region Control Panel */}
-      {selectedRegionId && (() => {
+      {/* Region Control Panel - only show in edit mode */}
+      {renderingMode === 'edit' && selectedRegionId && (() => {
         const selectedRegion = regions.find(r => r.id === selectedRegionId);
         if (!selectedRegion) return null;
         

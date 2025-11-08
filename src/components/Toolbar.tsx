@@ -32,9 +32,9 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
   
   const toggleRenderingMode = () => {
-    const newMode = renderingMode === 'vtt' ? 'dungeon-map' : 'vtt';
+    const newMode = renderingMode === 'edit' ? 'play' : 'edit';
     setRenderingMode(newMode);
-    toast.success(`Switched to ${newMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT'} rendering mode`);
+    toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'Edit'} mode`);
   };
   
   const selectStyle = (styleName: string) => {
@@ -164,17 +164,17 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           </Button>
           
           <Button 
-            variant={renderingMode === 'dungeon-map' ? 'default' : 'outline'}
+            variant={renderingMode === 'play' ? 'default' : 'outline'}
             size="sm"
             onClick={toggleRenderingMode}
-            className={renderingMode === 'dungeon-map' ? '' : 'text-foreground border-border hover:bg-secondary'}
-            title="Toggle between VTT and Dungeon Map rendering"
+            className={renderingMode === 'play' ? '' : 'text-foreground border-border hover:bg-secondary'}
+            title="Toggle between Edit and Play mode"
           >
             <Castle className="h-4 w-4 mr-2" />
-            {renderingMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT Mode'}
+            {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
           </Button>
           
-          {renderingMode === 'dungeon-map' && (
+          {renderingMode === 'play' && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
