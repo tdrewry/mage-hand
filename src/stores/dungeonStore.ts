@@ -15,6 +15,7 @@ interface DungeonStore {
   wallThickness: number;
   textureScale: number;
   lightDirection: number; // Angle in degrees (0 = top, 90 = right, 180 = bottom, 270 = left)
+  shadowDistance: number; // Distance shadows extend from walls in pixels
   
   // Wall geometry caching
   cachedWallGeometry: WallGeometry | null;
@@ -28,6 +29,7 @@ interface DungeonStore {
   setWallThickness: (thickness: number) => void;
   setTextureScale: (scale: number) => void;
   setLightDirection: (angle: number) => void;
+  setShadowDistance: (distance: number) => void;
   
   // Light source operations
   addLightSource: (source: Omit<LightSource, 'id'>) => void;
@@ -74,6 +76,7 @@ export const useDungeonStore = create<DungeonStore>()(
     wallThickness: 1,
     textureScale: 1,
     lightDirection: 315, // Default: top-left (45 degrees from top)
+    shadowDistance: 30, // Default: 30px shadow distance
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
       
@@ -83,7 +86,8 @@ export const useDungeonStore = create<DungeonStore>()(
       setWallThickness: (thickness) => set({ wallThickness: thickness }),
       setTextureScale: (scale) => set({ textureScale: scale }),
       setLightDirection: (angle) => set({ lightDirection: angle }),
-      setCachedWallGeometry: (geometry, cacheKey) => set({ 
+      setShadowDistance: (distance) => set({ shadowDistance: distance }),
+      setCachedWallGeometry: (geometry, cacheKey) => set({
         cachedWallGeometry: geometry, 
         wallGeometryCacheKey: cacheKey 
       }),

@@ -22,12 +22,14 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
     wallThickness, 
     textureScale,
     lightDirection,
+    shadowDistance,
     renderingMode,
     watabouStyle,
     setWallEdgeStyle, 
     setWallThickness,
     setTextureScale,
     setLightDirection,
+    setShadowDistance,
     setWatabouStyle
   } = useDungeonStore();
   
@@ -179,6 +181,22 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
           min={0.5}
           max={3}
           step={0.1}
+          className="w-full"
+        />
+      </div>
+
+      {/* Shadow Distance */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center justify-between">
+          <Label>Shadow Distance</Label>
+          <span className="text-sm text-muted-foreground">{shadowDistance.toFixed(0)}px</span>
+        </div>
+        <Slider
+          value={[shadowDistance]}
+          onValueChange={([value]) => setShadowDistance(value)}
+          min={0}
+          max={100}
+          step={5}
           className="w-full"
         />
       </div>

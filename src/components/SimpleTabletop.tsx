@@ -141,6 +141,7 @@ export const SimpleTabletop = () => {
     wallThickness,
     textureScale,
     lightDirection,
+    shadowDistance,
     lightSources,
     addLightSource,
     removeLightSource
@@ -669,8 +670,8 @@ export const SimpleTabletop = () => {
     });
     
     // 3. Apply wall shadows and lighting to floor regions in play mode
-    if (isPlayMode) {
-      // Draw wall shadows on regions based on directional light
+    if (isPlayMode && shadowDistance > 0) {
+      // Draw soft blur shadows on regions from wall edges
       regions.forEach(region => {
         ctx.save();
         
@@ -707,20 +708,22 @@ export const SimpleTabletop = () => {
         }
         ctx.clip();
         
-        // Draw wall shadows - shadow extends from edges into the region
+        // Draw wall shadows - soft blur extending from edges
         const edgePoints = getRegionEdgePoints(region);
-        const shadowLength = 20; // Shadow extends this far into the region
         const lightAngleRad = (lightDirection * Math.PI) / 180;
         
         // Calculate shadow direction (opposite of light)
-        const shadowDx = Math.cos(lightAngleRad) * shadowLength;
-        const shadowDy = Math.sin(lightAngleRad) * shadowLength;
+        const shadowDx = Math.cos(lightAngleRad) * shadowDistance;
+        const shadowDy = Math.sin(lightAngleRad) * shadowDistance;
+        
+        // Configure soft shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = shadowDistance * 0.5;
         
         // Draw shadow along each edge
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
-          // Create gradient perpendicular to edge, extending into region
           const edgeDx = nextPoint.x - point.x;
           const edgeDy = nextPoint.y - point.y;
           const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
@@ -730,17 +733,19 @@ export const SimpleTabletop = () => {
             const normalX = -edgeDy / edgeLen;
             const normalY = edgeDx / edgeLen;
             
-            // Check if this edge faces the light (should cast shadow)
+            // Check if this edge faces away from light (should cast shadow)
             const dotProduct = normalX * Math.cos(lightAngleRad) + normalY * Math.sin(lightAngleRad);
             
             // Only draw shadow on edges that face away from light
-            if (dotProduct < 0) {
+            if (dotProduct < -0.1) {
+              // Create gradient for smooth fade
               const gradient = ctx.createLinearGradient(
                 point.x, point.y,
                 point.x + shadowDx, point.y + shadowDy
               );
               
-              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+              gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.1)');
               gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
               
               ctx.fillStyle = gradient;
@@ -754,6 +759,10 @@ export const SimpleTabletop = () => {
             }
           }
         });
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
         
         // Apply point light sources if any exist
         if (lightSources.length > 0) {
@@ -796,7 +805,7 @@ export const SimpleTabletop = () => {
     const margin = minGridSize !== Infinity ? minGridSize * 2 : 80; // Default to 80 if no regions
     
     // Generate cache key
-    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode, lightDirection, lightSources.length);
+    const cacheKey = generateWallDecorationCacheKey(regions, wallEdgeStyle, wallThickness, textureScale, isPlayMode, lightDirection, shadowDistance, lightSources.length);
     
     // Check if we can use cached decorations
     let wallGeometry: any;
@@ -1593,12 +1602,13 @@ export const SimpleTabletop = () => {
 
   // Generate cache key for wall decorations
   const generateWallDecorationCacheKey = (
-    regions: CanvasRegion[],
-    wallEdgeStyle: WallEdgeStyle,
-    wallThickness: number,
-    textureScale: number,
+    regions: CanvasRegion[], 
+    wallEdgeStyle: WallEdgeStyle, 
+    wallThickness: number, 
+    textureScale: number, 
     isPlayMode: boolean,
     lightDir: number,
+    shadowDist: number,
     numLights: number
   ): string => {
     const regionData = regions.map(r => {
@@ -1607,7 +1617,7 @@ export const SimpleTabletop = () => {
       }
       return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
     }).join('|');
-    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}-${lightDir}-${numLights}`;
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? 'play' : 'edit'}-${lightDir}-${shadowDist}-${numLights}`;
   };
   
   // Function to draw regions
