@@ -6,6 +6,10 @@ interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
   terrainFeatures: TerrainFeature[];
+  renderingMode: 'vtt' | 'dungeon-map';
+  
+  // Rendering mode
+  setRenderingMode: (mode: 'vtt' | 'dungeon-map') => void;
   
   // Door operations
   addDoor: (door: Omit<DoorConnection, 'id'>) => void;
@@ -38,6 +42,9 @@ export const useDungeonStore = create<DungeonStore>()(
       doors: [],
       annotations: [],
       terrainFeatures: [],
+      renderingMode: 'vtt',
+      
+      setRenderingMode: (mode) => set({ renderingMode: mode }),
       
       // Door operations
       addDoor: (doorData) => {

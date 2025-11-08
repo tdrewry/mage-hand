@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2, Layers, FileDown } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
+import { useDungeonStore } from '../stores/dungeonStore';
 import { LayerStackModal } from './LayerStackModal';
 import { WatabouImportModal } from './modals/WatabouImportModal';
 import { Canvas as FabricCanvas } from 'fabric';
@@ -19,8 +20,15 @@ interface ToolbarProps {
 export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
   const { tokens, clearAllTokens } = useSessionStore();
   const { regions, clearRegions } = useRegionStore();
+  const { renderingMode, setRenderingMode } = useDungeonStore();
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
+  
+  const toggleRenderingMode = () => {
+    const newMode = renderingMode === 'vtt' ? 'dungeon-map' : 'vtt';
+    setRenderingMode(newMode);
+    toast.success(`Switched to ${newMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT'} rendering mode`);
+  };
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
@@ -138,6 +146,17 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           >
             <FileDown className="h-4 w-4 mr-2" />
             Import Dungeon
+          </Button>
+          
+          <Button 
+            variant={renderingMode === 'dungeon-map' ? 'default' : 'outline'}
+            size="sm"
+            onClick={toggleRenderingMode}
+            className={renderingMode === 'dungeon-map' ? '' : 'text-foreground border-border hover:bg-secondary'}
+            title="Toggle between VTT and Dungeon Map rendering"
+          >
+            <Castle className="h-4 w-4 mr-2" />
+            {renderingMode === 'dungeon-map' ? 'Dungeon Map' : 'VTT Mode'}
           </Button>
           
           <Button 

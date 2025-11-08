@@ -19,7 +19,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
-import { renderDoors, renderAnnotations, renderTerrainFeatures } from '../lib/dungeonRenderer';
+import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
 import { snapToMapGrid } from '../lib/mapGridSystem';
 import { 
   HexCoordinate, 
@@ -109,7 +109,8 @@ export const SimpleTabletop = () => {
   const { 
     doors,
     annotations,
-    terrainFeatures
+    terrainFeatures,
+    renderingMode
   } = useDungeonStore();
   
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -608,14 +609,24 @@ export const SimpleTabletop = () => {
       }
     });
     
-    // Draw regions
-    regions.forEach(region => {
-      drawRegion(ctx, region);
-    });
+    // Draw regions (different rendering based on mode)
+    if (renderingMode === 'dungeon-map') {
+      renderDungeonMapRegions(ctx, regions, transform.zoom);
+    } else {
+      regions.forEach(region => {
+        drawRegion(ctx, region);
+      });
+    }
     
     // Draw dungeon features (terrain, doors, annotations)
-    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom);
-    renderDoors(ctx, doors, transform.zoom);
+    const isDungeonMapMode = renderingMode === 'dungeon-map';
+    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isDungeonMapMode);
+    
+    if (isDungeonMapMode) {
+      renderDungeonMapDoors(ctx, doors, transform.zoom);
+    } else {
+      renderDoors(ctx, doors, transform.zoom);
+    }
     
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
