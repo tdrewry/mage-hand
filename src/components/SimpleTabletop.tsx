@@ -2151,15 +2151,6 @@ export const SimpleTabletop = () => {
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
     
-    // Early exit if in play mode and clicking on a region
-    if (renderingMode === 'play') {
-      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-      if (clickedRegion) {
-        // Don't allow region interaction in play mode
-        return;
-      }
-    }
-    
     if (e.button === 2) { // Right click
       e.preventDefault();
       setIsPanning(true);
@@ -2225,7 +2216,8 @@ export const SimpleTabletop = () => {
       
       // PRIORITY 1: Check for ANY handle on selected region first
       // This prevents deselection when clicking handles outside the shape boundary
-      if (selectedRegionId) {
+      // But only in edit mode - no region manipulation in play mode
+      if (selectedRegionId && renderingMode === 'edit') {
         const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
         if (selectedRegion) {
           // Check for resize/anchor/bezier handles
@@ -2264,7 +2256,8 @@ export const SimpleTabletop = () => {
       }
       
       // PRIORITY 2: Check for transformation handles on selected regions
-      if (selectedRegionId && transformMode !== 'move') {
+      // Only in edit mode
+      if (selectedRegionId && transformMode !== 'move' && renderingMode === 'edit') {
         const selectedRegion = regions.find(r => r.id === selectedRegionId && r.selected);
         if (selectedRegion) {
           if (transformMode === 'scale') {
@@ -2321,7 +2314,8 @@ export const SimpleTabletop = () => {
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
         }
-      } else if (clickedRegion && clickedRegion.selected) {
+      } else if (clickedRegion && clickedRegion.selected && renderingMode === 'edit') {
+        // Only allow region manipulation in edit mode
         // Check if we're clicking on a rotation handle first
         if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
           setIsRotatingRegion(true);
