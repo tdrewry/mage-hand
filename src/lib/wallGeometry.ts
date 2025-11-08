@@ -1,6 +1,7 @@
 // Wall geometry generation using negative space approach
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle } from './watabouStyles';
+import paper from 'paper';
 
 export interface LineSegment {
   start: { x: number; y: number };
@@ -22,6 +23,7 @@ export interface FloorGeometry {
 
 /**
  * Generate wall geometry as negative space (bounding box minus all regions)
+ * Uses paper.js for proper boolean operations and segment extraction
  */
 export function generateWallGeometry(
   regions: CanvasRegion[],
@@ -40,6 +42,9 @@ export function generateWallGeometry(
     };
   }
   
+  // Setup paper.js scope in memory (no canvas required)
+  paper.setup(new paper.Size(1, 1));
+  
   // Calculate bounding box for all regions
   let minX = Infinity;
   let minY = Infinity;
@@ -48,7 +53,6 @@ export function generateWallGeometry(
   
   regions.forEach((region) => {
     if (region.regionType === 'rectangle') {
-      // Handle rotation if present
       if (region.rotation) {
         const cx = region.x + region.width / 2;
         const cy = region.y + region.height / 2;
@@ -95,130 +99,105 @@ export function generateWallGeometry(
     height: maxY - minY + 2 * effectiveMargin,
   };
   
-  // Track wall segments for light blocking
-  // In negative space model: outer box + ALL region boundaries = walls
-  const wallSegments: LineSegment[] = [];
+  // Create outer bounding rectangle using paper.js
+  const outerRect = new paper.Path.Rectangle({
+    point: [bounds.x, bounds.y],
+    size: [bounds.width, bounds.height]
+  });
   
-  // Create compound path: outer rectangle minus all regions
-  const wallPath = new Path2D();
+  // Start with the outer rectangle as our wall geometry
+  let wallCompoundPath: paper.PathItem = outerRect;
   
-  // Add outer bounding box (clockwise winding)
-  wallPath.rect(bounds.x, bounds.y, bounds.width, bounds.height);
-  
-  // Add outer bounding box segments - outer walls
-  wallSegments.push(
-    { start: { x: bounds.x, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y } },
-    { start: { x: bounds.x + bounds.width, y: bounds.y }, end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height } },
-    { start: { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, end: { x: bounds.x, y: bounds.y + bounds.height } },
-    { start: { x: bounds.x, y: bounds.y + bounds.height }, end: { x: bounds.x, y: bounds.y } }
-  );
-  
-  // Subtract each region as a hole AND add its boundaries as wall segments
-  // Regions are holes in the wall - their edges ARE walls
+  // Subtract each region from the wall geometry
   regions.forEach((region) => {
+    let regionPath: paper.Path | null = null;
+    
     if (region.regionType === 'rectangle') {
       if (region.rotation) {
-        // For rotated rectangles
+        // Create rotated rectangle
         const cx = region.x + region.width / 2;
         const cy = region.y + region.height / 2;
-        const angle = (region.rotation * Math.PI) / 180;
-        const corners = [
-          { x: region.x, y: region.y },
-          { x: region.x + region.width, y: region.y },
-          { x: region.x + region.width, y: region.y + region.height },
-          { x: region.x, y: region.y + region.height },
-        ];
-        
-        const rotatedCorners = corners.map((corner) => {
-          const dx = corner.x - cx;
-          const dy = corner.y - cy;
-          return {
-            x: cx + dx * Math.cos(angle) - dy * Math.sin(angle),
-            y: cy + dx * Math.sin(angle) + dy * Math.cos(angle),
-          };
+        const rect = new paper.Path.Rectangle({
+          point: [region.x, region.y],
+          size: [region.width, region.height]
         });
-        
-        // Add to path (counter-clockwise for hole)
-        wallPath.moveTo(rotatedCorners[0].x, rotatedCorners[0].y);
-        for (let i = rotatedCorners.length - 1; i >= 0; i--) {
-          wallPath.lineTo(rotatedCorners[i].x, rotatedCorners[i].y);
-        }
-        wallPath.closePath();
-        
-        // Add edge segments for light blocking
-        for (let i = 0; i < rotatedCorners.length; i++) {
-          wallSegments.push({
-            start: rotatedCorners[i],
-            end: rotatedCorners[(i + 1) % rotatedCorners.length]
-          });
-        }
+        rect.rotate(region.rotation, new paper.Point(cx, cy));
+        regionPath = rect;
       } else {
         // Non-rotated rectangle
-        wallPath.moveTo(region.x, region.y);
-        wallPath.lineTo(region.x, region.y + region.height);
-        wallPath.lineTo(region.x + region.width, region.y + region.height);
-        wallPath.lineTo(region.x + region.width, region.y);
-        wallPath.closePath();
-        
-        // Add edge segments for light blocking
-        wallSegments.push(
-          { start: { x: region.x, y: region.y }, end: { x: region.x + region.width, y: region.y } },
-          { start: { x: region.x + region.width, y: region.y }, end: { x: region.x + region.width, y: region.y + region.height } },
-          { start: { x: region.x + region.width, y: region.y + region.height }, end: { x: region.x, y: region.y + region.height } },
-          { start: { x: region.x, y: region.y + region.height }, end: { x: region.x, y: region.y } }
-        );
+        regionPath = new paper.Path.Rectangle({
+          point: [region.x, region.y],
+          size: [region.width, region.height]
+        });
       }
     } else if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
       // Path-based region
-      wallPath.moveTo(region.pathPoints[0].x, region.pathPoints[0].y);
-      for (let i = region.pathPoints.length - 1; i >= 0; i--) {
-        wallPath.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
-      }
-      wallPath.closePath();
-      
-      // Add edge segments for light blocking
-      for (let i = 0; i < region.pathPoints.length; i++) {
+      regionPath = new paper.Path();
+      region.pathPoints.forEach((point) => {
+        regionPath!.add(new paper.Point(point.x, point.y));
+      });
+      regionPath.closePath();
+    }
+    
+    // Subtract this region from the wall geometry
+    if (regionPath) {
+      const newPath = wallCompoundPath.subtract(regionPath);
+      wallCompoundPath.remove(); // Clean up old path
+      regionPath.remove(); // Clean up region path
+      wallCompoundPath = newPath;
+    }
+  });
+  
+  // Extract wall segments from the resolved boolean geometry
+  const wallSegments: LineSegment[] = [];
+  
+  // The result can be a CompoundPath (multiple children) or a single Path
+  const paths = wallCompoundPath.className === 'CompoundPath' 
+    ? (wallCompoundPath as paper.CompoundPath).children 
+    : [wallCompoundPath as paper.Path];
+  
+  paths.forEach((path) => {
+    if (path.className === 'Path') {
+      const segments = (path as paper.Path).segments;
+      segments.forEach((segment, index) => {
+        const nextSegment = segments[(index + 1) % segments.length];
         wallSegments.push({
-          start: region.pathPoints[i],
-          end: region.pathPoints[(i + 1) % region.pathPoints.length]
+          start: { x: segment.point.x, y: segment.point.y },
+          end: { x: nextSegment.point.x, y: nextSegment.point.y }
         });
+      });
+    }
+  });
+  
+  // Convert paper.js path to Path2D for canvas rendering
+  const wallPath = new Path2D();
+  paths.forEach((path, pathIndex) => {
+    if (path.className === 'Path') {
+      const segments = (path as paper.Path).segments;
+      if (segments.length > 0) {
+        const firstPoint = segments[0].point;
+        wallPath.moveTo(firstPoint.x, firstPoint.y);
+        
+        segments.forEach((segment) => {
+          wallPath.lineTo(segment.point.x, segment.point.y);
+        });
+        wallPath.closePath();
       }
     }
   });
   
-  // Remove duplicate segments (shared edges between adjacent regions)
-  // If a segment appears in both directions, it's an interior edge that shouldn't block light
-  const deduplicatedSegments: LineSegment[] = [];
-  const segmentMap = new Map<string, { segment: LineSegment; reversed: boolean }>();
+  // Clean up paper.js
+  wallCompoundPath.remove();
   
-  for (const segment of wallSegments) {
-    // Create keys for both directions
-    const forwardKey = `${segment.start.x},${segment.start.y}-${segment.end.x},${segment.end.y}`;
-    const reverseKey = `${segment.end.x},${segment.end.y}-${segment.start.x},${segment.start.y}`;
-    
-    // Check if the reverse segment already exists
-    if (segmentMap.has(reverseKey)) {
-      // This is a shared interior edge - remove both directions
-      segmentMap.delete(reverseKey);
-    } else {
-      // New segment - add it
-      segmentMap.set(forwardKey, { segment, reversed: false });
-    }
-  }
-  
-  // Convert map back to array
-  const finalWallSegments = Array.from(segmentMap.values()).map(item => item.segment);
-  
-  console.log('Generated wall geometry:', {
-    totalSegments: wallSegments.length,
-    afterDeduplication: finalWallSegments.length,
-    removedInteriorEdges: wallSegments.length - finalWallSegments.length,
+  console.log('Generated wall geometry using paper.js:', {
+    wallSegments: wallSegments.length,
+    paths: paths.length,
     regions: regions.length
   });
 
   return {
     wallPath,
-    wallSegments: finalWallSegments,
+    wallSegments,
     bounds,
     wallThickness,
     margin: effectiveMargin,
