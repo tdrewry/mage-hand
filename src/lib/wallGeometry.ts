@@ -113,6 +113,7 @@ export function generateWallGeometry(
   );
   
   // Subtract each region as a hole (counter-clockwise winding)
+  // AND add region boundaries as wall segments for light blocking
   regions.forEach((region) => {
     if (region.regionType === 'rectangle') {
       if (region.rotation) {
@@ -136,12 +137,20 @@ export function generateWallGeometry(
           };
         });
         
-        // Add counter-clockwise (reversed order)
+        // Add counter-clockwise (reversed order) to path
         wallPath.moveTo(rotatedCorners[0].x, rotatedCorners[0].y);
         for (let i = rotatedCorners.length - 1; i >= 0; i--) {
           wallPath.lineTo(rotatedCorners[i].x, rotatedCorners[i].y);
         }
         wallPath.closePath();
+        
+        // Add as wall segments (clockwise for light blocking)
+        for (let i = 0; i < rotatedCorners.length; i++) {
+          wallSegments.push({
+            start: rotatedCorners[i],
+            end: rotatedCorners[(i + 1) % rotatedCorners.length]
+          });
+        }
       } else {
         // Add non-rotated rectangle as counter-clockwise hole
         wallPath.moveTo(region.x, region.y);
@@ -149,6 +158,20 @@ export function generateWallGeometry(
         wallPath.lineTo(region.x + region.width, region.y + region.height);
         wallPath.lineTo(region.x + region.width, region.y);
         wallPath.closePath();
+        
+        // Add as wall segments (clockwise for light blocking)
+        const rectCorners = [
+          { x: region.x, y: region.y },
+          { x: region.x + region.width, y: region.y },
+          { x: region.x + region.width, y: region.y + region.height },
+          { x: region.x, y: region.y + region.height },
+        ];
+        for (let i = 0; i < rectCorners.length; i++) {
+          wallSegments.push({
+            start: rectCorners[i],
+            end: rectCorners[(i + 1) % rectCorners.length]
+          });
+        }
       }
     } else if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 2) {
       // Add path-based region as counter-clockwise hole
@@ -157,6 +180,14 @@ export function generateWallGeometry(
         wallPath.lineTo(region.pathPoints[i].x, region.pathPoints[i].y);
       }
       wallPath.closePath();
+      
+      // Add as wall segments (clockwise for light blocking)
+      for (let i = 0; i < region.pathPoints.length; i++) {
+        wallSegments.push({
+          start: region.pathPoints[i],
+          end: region.pathPoints[(i + 1) % region.pathPoints.length]
+        });
+      }
     }
   });
   
