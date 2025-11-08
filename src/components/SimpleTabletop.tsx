@@ -816,10 +816,7 @@ export const SimpleTabletop = () => {
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
-          // Check if edge borders negative space
-          const midX = (point.x + nextPoint.x) / 2;
-          const midY = (point.y + nextPoint.y) / 2;
-          
+          // Calculate edge normal (perpendicular to edge)
           const edgeDx = nextPoint.x - point.x;
           const edgeDy = nextPoint.y - point.y;
           const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
@@ -828,14 +825,33 @@ export const SimpleTabletop = () => {
             const normalX = -edgeDy / edgeLen;
             const normalY = edgeDx / edgeLen;
             
-            // Test point outside the edge
-            const testX = midX + normalX * 2;
-            const testY = midY + normalY * 2;
+            // Test multiple points along the edge perpendicular to it
+            // Use larger threshold (15 pixels in world space) and test in untransformed space
+            const testDistance = 15;
+            let bordersWall = false;
             
-            // Check if in wall
-            const isInWall = ctx.isPointInPath(wallGeometry.wallPath, testX, testY, 'evenodd');
+            // Test at start, middle, and end of edge for robustness
+            const testPositions = [0.25, 0.5, 0.75];
             
-            if (isInWall) {
+            for (const t of testPositions) {
+              const testBaseX = point.x + (nextPoint.x - point.x) * t;
+              const testBaseY = point.y + (nextPoint.y - point.y) * t;
+              const testX = testBaseX + normalX * testDistance;
+              const testY = testBaseY + normalY * testDistance;
+              
+              // Save transform, test in world space
+              ctx.save();
+              ctx.setTransform(1, 0, 0, 1, 0, 0);
+              const isInWall = ctx.isPointInPath(wallGeometry.wallPath, testX, testY, 'evenodd');
+              ctx.restore();
+              
+              if (isInWall) {
+                bordersWall = true;
+                break;
+              }
+            }
+            
+            if (bordersWall) {
               const gradient = ctx.createLinearGradient(
                 point.x, point.y,
                 point.x + shadowDx, point.y + shadowDy
