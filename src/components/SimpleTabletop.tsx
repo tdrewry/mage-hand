@@ -720,48 +720,28 @@ export const SimpleTabletop = () => {
         const lightDx = Math.cos(lightAngleRad);
         const lightDy = Math.sin(lightAngleRad);
         
-        // Draw shadow along edges where walls face away from light
+        // Draw shadows on all edges (directional filtering temporarily disabled for visibility)
         edgePoints.forEach((point, i) => {
           const nextPoint = edgePoints[(i + 1) % edgePoints.length];
           
-          const edgeDx = nextPoint.x - point.x;
-          const edgeDy = nextPoint.y - point.y;
-          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+          // Create gradient for smooth fade
+          const gradient = ctx.createLinearGradient(
+            point.x, point.y,
+            point.x + shadowDx, point.y + shadowDy
+          );
           
-          if (edgeLen > 0) {
-            // Calculate outward normal (perpendicular to edge, pointing OUT of region)
-            const normalX = -edgeDy / edgeLen;
-            const normalY = edgeDx / edgeLen;
-            
-            // Check if wall faces away from light
-            // Negative dot product = wall on shadow side
-            const dotProduct = normalX * lightDx + normalY * lightDy;
-            
-            // Cast shadow from walls on the shadow side
-            if (dotProduct < -0.05) {
-              // Shadow strength based on angle
-              const intensity = Math.min(0.7, Math.abs(dotProduct) * 0.8);
-              
-              // Create gradient extending INTO the region
-              const gradient = ctx.createLinearGradient(
-                point.x, point.y,
-                point.x + shadowDx, point.y + shadowDy
-              );
-              
-              gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
-              gradient.addColorStop(0.5, `rgba(0, 0, 0, ${intensity * 0.4})`);
-              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-              
-              ctx.fillStyle = gradient;
-              ctx.beginPath();
-              ctx.moveTo(point.x, point.y);
-              ctx.lineTo(nextPoint.x, nextPoint.y);
-              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
-              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
+          gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+          gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(nextPoint.x, nextPoint.y);
+          ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+          ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+          ctx.closePath();
+          ctx.fill();
         });
         
         // Apply point light sources if any exist
