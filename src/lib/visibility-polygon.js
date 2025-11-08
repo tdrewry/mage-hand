@@ -27,3 +27,5 @@ VisibilityPolygon.angle=function(d,c){return 180*Math.atan2(c[1]-d[1],c[0]-d[0])
 VisibilityPolygon.computeDirection=function(d,c,e,g,f,k){a=(f-d)*(g-c);b=(e-d)*(k-c);return a<b?-1:a>b?1:0};
 VisibilityPolygon.doLineSegmentsIntersect=function(d,c,e,g,f,k,h,l){d1=VisibilityPolygon.computeDirection(f,k,h,l,d,c);d2=VisibilityPolygon.computeDirection(f,k,h,l,e,g);d3=VisibilityPolygon.computeDirection(d,c,e,g,f,k);d4=VisibilityPolygon.computeDirection(d,c,e,g,h,l);return(0<d1&&0>d2||0>d1&&0<d2)&&(0<d3&&0>d4||0>d3&&0<d4)||0==d1&&VisibilityPolygon.isOnSegment(f,k,h,l,d,c)||0==d2&&VisibilityPolygon.isOnSegment(f,k,h,l,e,g)||0==d3&&VisibilityPolygon.isOnSegment(d,c,e,g,f,k)||0==d4&&VisibilityPolygon.isOnSegment(d,
 c,e,g,h,l)};
+
+export default VisibilityPolygon;
