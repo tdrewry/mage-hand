@@ -668,8 +668,9 @@ export const SimpleTabletop = () => {
       drawRegion(ctx, region, true); // skipStroke = true for both modes
     });
     
-    // 3. Apply lighting effects to floor regions in play mode
+    // 3. Apply wall shadows and lighting to floor regions in play mode
     if (isPlayMode) {
+      // Draw wall shadows on regions based on directional light
       regions.forEach(region => {
         ctx.save();
         
@@ -706,43 +707,53 @@ export const SimpleTabletop = () => {
         }
         ctx.clip();
         
-        // Get region bounds for gradient
-        let boundsMinX: number, boundsMinY: number, boundsMaxX: number, boundsMaxY: number;
+        // Draw wall shadows - shadow extends from edges into the region
+        const edgePoints = getRegionEdgePoints(region);
+        const shadowLength = 20; // Shadow extends this far into the region
+        const lightAngleRad = (lightDirection * Math.PI) / 180;
         
-        if (region.regionType === 'path' && region.pathPoints) {
-          const pathBounds = getPolygonBounds(region.pathPoints);
-          boundsMinX = pathBounds.x;
-          boundsMinY = pathBounds.y;
-          boundsMaxX = pathBounds.x + pathBounds.width;
-          boundsMaxY = pathBounds.y + pathBounds.height;
-        } else {
-          boundsMinX = region.x;
-          boundsMinY = region.y;
-          boundsMaxX = region.x + region.width;
-          boundsMaxY = region.y + region.height;
-        }
+        // Calculate shadow direction (opposite of light)
+        const shadowDx = Math.cos(lightAngleRad) * shadowLength;
+        const shadowDy = Math.sin(lightAngleRad) * shadowLength;
         
-        const regionWidth = boundsMaxX - boundsMinX;
-        const regionHeight = boundsMaxY - boundsMinY;
-        
-        // Add directional lighting gradient overlay
-        const lightAngle = (lightDirection * Math.PI) / 180;
-        const lightGradient = ctx.createLinearGradient(
-          boundsMinX,
-          boundsMinY,
-          boundsMinX + Math.cos(lightAngle) * regionWidth * 0.5,
-          boundsMinY + Math.sin(lightAngle) * regionHeight * 0.5
-        );
-        lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)'); // Highlight
-        lightGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0)'); // Neutral
-        lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Shadow
-        
-        ctx.fillStyle = lightGradient;
-        if (region.regionType === 'path') {
-          ctx.fill();
-        } else {
-          ctx.fillRect(boundsMinX, boundsMinY, regionWidth, regionHeight);
-        }
+        // Draw shadow along each edge
+        edgePoints.forEach((point, i) => {
+          const nextPoint = edgePoints[(i + 1) % edgePoints.length];
+          
+          // Create gradient perpendicular to edge, extending into region
+          const edgeDx = nextPoint.x - point.x;
+          const edgeDy = nextPoint.y - point.y;
+          const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+          
+          if (edgeLen > 0) {
+            // Edge normal (perpendicular) pointing inward
+            const normalX = -edgeDy / edgeLen;
+            const normalY = edgeDx / edgeLen;
+            
+            // Check if this edge faces the light (should cast shadow)
+            const dotProduct = normalX * Math.cos(lightAngleRad) + normalY * Math.sin(lightAngleRad);
+            
+            // Only draw shadow on edges that face away from light
+            if (dotProduct < 0) {
+              const gradient = ctx.createLinearGradient(
+                point.x, point.y,
+                point.x + shadowDx, point.y + shadowDy
+              );
+              
+              gradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+              gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+              
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.moveTo(point.x, point.y);
+              ctx.lineTo(nextPoint.x, nextPoint.y);
+              ctx.lineTo(nextPoint.x + shadowDx, nextPoint.y + shadowDy);
+              ctx.lineTo(point.x + shadowDx, point.y + shadowDy);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        });
         
         // Apply point light sources if any exist
         if (lightSources.length > 0) {
@@ -768,7 +779,7 @@ export const SimpleTabletop = () => {
             if (region.regionType === 'path') {
               ctx.fill();
             } else {
-              ctx.fillRect(boundsMinX, boundsMinY, regionWidth, regionHeight);
+              ctx.fillRect(region.x, region.y, region.width, region.height);
             }
           }
           
