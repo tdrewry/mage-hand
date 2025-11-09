@@ -29,17 +29,21 @@ export function CardManager({ children }: CardManagerProps) {
       {children}
       
       {/* Render all registered cards */}
-      {cards.map((card) => (
-        <BaseCard
-          key={card.id}
-          id={card.id}
-          title={getCardTitle(card.type)}
-          isResizable={true}
-          isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
-        >
-          {renderCardContent(card.id, card.type)}
-        </BaseCard>
-      ))}
+      {cards.map((card) => {
+        const { content, minimizedContent } = renderCardContent(card.id, card.type);
+        return (
+          <BaseCard
+            key={card.id}
+            id={card.id}
+            title={getCardTitle(card.type)}
+            isResizable={true}
+            isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
+            minimizedContent={minimizedContent}
+          >
+            {content}
+          </BaseCard>
+        );
+      })}
     </>
   );
 }
@@ -66,46 +70,52 @@ function getCardTitle(type: CardType): string {
 }
 
 // Helper function to render card-specific content
-function renderCardContent(cardId: string, type: CardType): React.ReactNode {
+function renderCardContent(cardId: string, type: CardType): { content: React.ReactNode; minimizedContent?: React.ReactNode } {
   switch (type) {
-    case CardType.ROSTER:
-      return <RosterCardContent cardId={cardId} />;
+    case CardType.ROSTER: {
+      const roster = RosterCardContent({ cardId });
+      return { content: roster.fullContent, minimizedContent: roster.minimizedContent };
+    }
     case CardType.FOG:
-      return <FogControlCardContent />;
+      return { content: <FogControlCardContent /> };
     case CardType.LAYERS:
-      return <LayerStackCardContent />;
+      return { content: <LayerStackCardContent /> };
     case CardType.TOKENS:
-      return <TokenPanelCardContent onAddToken={(imageUrl, x, y, gridWidth, gridHeight, color) => {
+      return { content: <TokenPanelCardContent onAddToken={(imageUrl, x, y, gridWidth, gridHeight, color) => {
         // TODO: Wire up to actual token adding function from SimpleTabletop
         console.log('Add token:', { imageUrl, x, y, gridWidth, gridHeight, color });
-      }} />;
+      }} /> };
     case CardType.MAP_CONTROLS:
-      return <MapControlsCardContent fabricCanvas={null} />; // TODO: Pass actual fabricCanvas
+      return { content: <MapControlsCardContent fabricCanvas={null} /> }; // TODO: Pass actual fabricCanvas
     case CardType.WATABOU_IMPORT:
-      return <WatabouImportCardContent />;
+      return { content: <WatabouImportCardContent /> };
     case CardType.BACKGROUND_GRID:
-      return (
-        <BackgroundGridCardContent
-          fabricCanvas={null}
-          gridColor="#000000"
-          gridOpacity={50}
-          onGridColorChange={() => {}}
-          onGridOpacityChange={() => {}}
-        />
-      );
+      return {
+        content: (
+          <BackgroundGridCardContent
+            fabricCanvas={null}
+            gridColor="#000000"
+            gridOpacity={50}
+            onGridColorChange={() => {}}
+            onGridOpacityChange={() => {}}
+          />
+        )
+      };
     case CardType.PROJECT_MANAGER:
-      return (
-        <ProjectManagerCardContent
-          viewport={{ x: 0, y: 0, zoom: 1 }}
-        />
-      );
+      return {
+        content: (
+          <ProjectManagerCardContent
+            viewport={{ x: 0, y: 0, zoom: 1 }}
+          />
+        )
+      };
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:
     case CardType.GROUP_MANAGER:
     case CardType.REGION_CONTROL:
-      return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
+      return { content: <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div> };
     default:
-      return <div className="text-muted-foreground text-sm">Unknown card type</div>;
+      return { content: <div className="text-muted-foreground text-sm">Unknown card type</div> };
   }
 }

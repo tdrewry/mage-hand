@@ -10,6 +10,7 @@ interface BaseCardProps {
   id: string;
   title: string;
   children: React.ReactNode;
+  minimizedContent?: React.ReactNode;
   isResizable?: boolean;
   isClosable?: boolean;
   minSize?: CardSize;
@@ -21,6 +22,7 @@ export function BaseCard({
   id,
   title,
   children,
+  minimizedContent,
   isResizable = true,
   isClosable = true,
   minSize = { width: 200, height: 200 },
@@ -185,7 +187,11 @@ export function BaseCard({
           </div>
         </CardHeader>
 
-        {!isMinimized && (
+        {isMinimized && minimizedContent ? (
+          <CardContent className="p-0 overflow-visible">
+            {minimizedContent}
+          </CardContent>
+        ) : !isMinimized ? (
           <>
             <CardContent className="flex-1 overflow-auto p-4">
               {children}
@@ -200,7 +206,7 @@ export function BaseCard({
               </div>
             )}
           </>
-        )}
+        ) : null}
       </Card>
     </div>
   );
