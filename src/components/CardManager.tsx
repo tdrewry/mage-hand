@@ -8,6 +8,7 @@ import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
+import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { CardType } from '@/types/cardTypes';
@@ -89,6 +90,7 @@ function getCardTitle(type: CardType): string {
     [CardType.REGION_CONTROL]: 'Region Control',
     [CardType.WATABOU_IMPORT]: 'Watabou Import',
     [CardType.BACKGROUND_GRID]: 'Background & Grid',
+    [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
   };
   
   return titles[type] || type;
@@ -129,6 +131,8 @@ function renderCardContent(
           viewport={{ x: 0, y: 0, zoom: 1 }}
         />
       );
+    case CardType.INITIATIVE_TRACKER:
+      return <InitiativeTrackerCardContent />;
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:

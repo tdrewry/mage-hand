@@ -1,0 +1,141 @@
+import { useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { InitiativeCard } from '@/components/InitiativeCard';
+import { TurnCard } from '@/components/TurnCard';
+import { useInitiativeStore } from '@/stores/initiativeStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
+
+export function InitiativeTrackerCardContent() {
+  const {
+    currentTurnIndex,
+    roundNumber,
+    initiativeOrder,
+    nextTurn,
+    previousTurn,
+    removeFromInitiative,
+    reorderInitiative,
+    updateInitiative,
+    resetRound
+  } = useInitiativeStore();
+
+  const { tokens } = useSessionStore();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleNextTurn = () => {
+    nextTurn();
+    setTimeout(() => {
+      const activeCard = scrollContainerRef.current?.querySelector('[data-active="true"]');
+      activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 100);
+  };
+
+  const handleCardClick = (tokenId: string) => {
+    const event = new CustomEvent('centerOnToken', {
+      detail: { tokenId }
+    });
+    window.dispatchEvent(event);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const draggedIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    if (!isNaN(draggedIndex) && draggedIndex !== dropIndex) {
+      reorderInitiative(draggedIndex, dropIndex);
+      toast.success('Initiative order updated');
+    }
+  };
+
+  const totalCards = initiativeOrder.length + 1;
+  const baseSize = 80;
+  const maxSize = 100;
+  const minSize = 60;
+  
+  let cardSize = baseSize;
+  if (totalCards > 8) {
+    cardSize = Math.max(minSize, baseSize * (8 / totalCards));
+  } else if (totalCards < 5) {
+    cardSize = Math.min(maxSize, baseSize * 1.1);
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 p-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={previousTurn}
+        disabled={currentTurnIndex === 0 && roundNumber === 1}
+        className="shrink-0 h-8 w-8"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      <div 
+        ref={scrollContainerRef}
+        className="flex gap-1.5 overflow-x-auto flex-1"
+      >
+        <TurnCard
+          turnNumber={currentTurnIndex + 1}
+          roundNumber={roundNumber}
+          totalTokens={initiativeOrder.length}
+          isCompact={true}
+          size={cardSize}
+          onResetRound={resetRound}
+        />
+
+        {initiativeOrder.map((entry, index) => {
+          const token = tokens.find(t => t.id === entry.tokenId);
+          if (!token) return null;
+
+          return (
+            <div
+              key={entry.tokenId}
+              data-active={index === currentTurnIndex}
+            >
+              <InitiativeCard
+                token={token}
+                initiative={entry.initiative}
+                isActive={index === currentTurnIndex}
+                hasGone={entry.hasGone}
+                onClick={() => handleCardClick(entry.tokenId)}
+                onRemove={() => {
+                  removeFromInitiative(entry.tokenId);
+                  toast.success('Removed from initiative');
+                }}
+                onInitiativeChange={(newInit) => {
+                  updateInitiative(entry.tokenId, newInit);
+                  toast.success('Initiative updated');
+                }}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                isCompact={true}
+                size={cardSize}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <Button
+        variant="default"
+        size="icon"
+        onClick={handleNextTurn}
+        className="shrink-0 h-8 w-8"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}

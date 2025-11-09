@@ -141,6 +141,14 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
   },
+  [CardType.INITIATIVE_TRACKER]: {
+    title: 'Initiative Tracker',
+    defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+    defaultSize: { width: 800, height: 140 },
+    minSize: { width: 400, height: 120 },
+    isResizable: true,
+    isClosable: true,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

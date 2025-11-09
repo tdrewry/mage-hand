@@ -12,6 +12,7 @@ export enum CardType {
   REGION_CONTROL = 'region_control',
   WATABOU_IMPORT = 'watabou_import',
   BACKGROUND_GRID = 'background_grid',
+  INITIATIVE_TRACKER = 'initiative_tracker',
 }
 
 export interface CardPosition {
