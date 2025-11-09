@@ -196,6 +196,9 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
   const handleCombatToggle = () => {
     if (isInCombat) {
       endCombat();
+      if (initiativeCard) {
+        setVisibility(initiativeCard.id, false);
+      }
       toast.success('Combat ended');
     } else {
       const { initiativeOrder } = useInitiativeStore.getState();
@@ -218,10 +221,15 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
           minSize: { width: 400, height: 120 },
           isResizable: true,
           isClosable: true,
-          defaultVisible: true,
+          defaultVisible: false, // Don't auto-show on register
           hideHeader: true,
           fullCardDraggable: true,
         });
+        // Immediately set it visible after registration
+        setTimeout(() => {
+          const card = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
+          if (card) setVisibility(card.id, true);
+        }, 0);
       }
       toast.success('Combat started!');
     }

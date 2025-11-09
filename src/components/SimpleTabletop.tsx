@@ -270,13 +270,12 @@ export const SimpleTabletop = () => {
   } = useInitiativeStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
-  const cards = useCardStore((state) => state.cards);
+  const getCardByType = useCardStore((state) => state.getCardByType);
   
-  // Register MENU, TOOLS, and MAP cards on mount
+  // Register MENU, TOOLS, and MAP cards on mount (only once)
   useEffect(() => {
     // Register MENU card if it doesn't exist
-    const menuCard = cards.find(c => c.type === CardType.MENU);
-    if (!menuCard) {
+    if (!getCardByType(CardType.MENU)) {
       registerCard({
         type: CardType.MENU,
         title: 'Menu',
@@ -290,8 +289,7 @@ export const SimpleTabletop = () => {
     }
     
     // Register TOOLS card if it doesn't exist
-    const toolsCard = cards.find(c => c.type === CardType.TOOLS);
-    if (!toolsCard) {
+    if (!getCardByType(CardType.TOOLS)) {
       registerCard({
         type: CardType.TOOLS,
         title: 'Tools',
@@ -305,8 +303,7 @@ export const SimpleTabletop = () => {
     }
     
     // Register MAP card if it doesn't exist
-    const mapCard = cards.find(c => c.type === CardType.MAP);
-    if (!mapCard) {
+    if (!getCardByType(CardType.MAP)) {
       registerCard({
         type: CardType.MAP,
         title: 'Map View',
@@ -318,7 +315,8 @@ export const SimpleTabletop = () => {
         defaultVisible: true,
       });
     }
-  }, [registerCard, cards]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {

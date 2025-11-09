@@ -151,6 +151,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 400, height: 120 },
     isResizable: true,
     isClosable: true,
+    defaultVisible: false, // Only show when combat starts
     hideHeader: true,
     fullCardDraggable: true,
   },
