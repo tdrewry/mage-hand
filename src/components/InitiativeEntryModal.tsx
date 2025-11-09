@@ -3,7 +3,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -11,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Token } from '@/stores/sessionStore';
-import { Dices } from 'lucide-react';
+import { Dices, Check, X } from 'lucide-react';
 
 interface InitiativeEntryModalProps {
   open: boolean;
@@ -76,10 +75,35 @@ export const InitiativeEntryModal: React.FC<InitiativeEntryModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Tokens to Initiative</DialogTitle>
-          <DialogDescription>
-            Select tokens and set their initiative values
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Add Tokens to Initiative</DialogTitle>
+              <DialogDescription>
+                Select tokens and set their initiative values
+              </DialogDescription>
+            </div>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleAddSelected}
+                disabled={selectedTokenIds.length === 0}
+                className="h-8 w-8 hover:bg-green-500/20 text-green-600 hover:text-green-600"
+                title="Add to Initiative"
+              >
+                <Check className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onOpenChange(false)}
+                className="h-8 w-8 hover:bg-red-500/20 text-red-600 hover:text-red-600"
+                title="Cancel"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -169,18 +193,6 @@ export const InitiativeEntryModal: React.FC<InitiativeEntryModalProps> = ({
             ))}
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleAddSelected}
-            disabled={selectedTokenIds.length === 0}
-          >
-            Add {selectedTokenIds.length > 0 && `(${selectedTokenIds.length})`} to Initiative
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
