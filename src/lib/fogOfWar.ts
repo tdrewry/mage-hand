@@ -6,6 +6,7 @@
 import type { CanvasRegion } from '@/stores/regionStore';
 import { computeVisibilityFromSegments, type Point, type LineSegment } from './visibilityEngine';
 import { visibilityPolygonToPaperPath } from './fogGeometry';
+import paper from 'paper';
 
 export interface FogOfWarState {
   exploredAreas: string; // Serialized Path2D data
@@ -35,8 +36,6 @@ export async function computeTokenVisibilityPaper(
   wallGeometry: any | null,
   visionRangePixels: number = 300
 ): Promise<any> {
-  const paper = await import('paper');
-  
   if (tokens.length === 0) {
     return new paper.Path() as any;
   }
@@ -75,7 +74,7 @@ export async function computeTokenVisibilityPaper(
     
     // Create circular clipping mask for this token
     const circle = new paper.Path.Circle({
-      center: new paper.Point(token.x, token.y),
+      center: [token.x, token.y],
       radius: visionRangePixels,
     });
     
