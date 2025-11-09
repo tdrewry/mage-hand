@@ -16,8 +16,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Edit3, Palette, Trash2 } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useInitiativeStore } from '../stores/initiativeStore';
 import { toast } from 'sonner';
 
 interface TokenContextMenuProps {
@@ -41,11 +42,15 @@ export const TokenContextMenu = ({
     setTokenOwner 
   } = useSessionStore();
   
+  const { addToInitiative } = useInitiativeStore();
+  
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [labelValue, setLabelValue] = useState('');
   const [colorValue, setColorValue] = useState('#FF6B6B');
+  const [initiativeValue, setInitiativeValue] = useState('');
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -111,6 +116,33 @@ export const TokenContextMenu = ({
     toast.success(`Deleted ${targetTokens.length} token(s)`);
   };
 
+  const handleInitiativeClick = () => {
+    setInitiativeValue('');
+    setShowInitiativeModal(true);
+  };
+
+  const handleRollInitiative = () => {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    setInitiativeValue(roll.toString());
+  };
+
+  const applyInitiative = () => {
+    const targetTokens = getTargetTokens();
+    const initiative = parseInt(initiativeValue);
+    
+    if (isNaN(initiative)) {
+      toast.error('Please enter a valid initiative value');
+      return;
+    }
+    
+    targetTokens.forEach(token => {
+      addToInitiative(token.id, initiative);
+    });
+    
+    setShowInitiativeModal(false);
+    toast.success(`Added ${targetTokens.length} token(s) to initiative`);
+  };
+
   const targetTokens = getTargetTokens();
   const isMultiSelection = targetTokens.length > 1;
 
@@ -128,6 +160,10 @@ export const TokenContextMenu = ({
           <ContextMenuItem onClick={handleColorClick}>
             <Palette className="mr-2 h-4 w-4" />
             <span>Change Color{isMultiSelection ? 's' : ''}</span>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleInitiativeClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            <span>Add to Initiative</span>
           </ContextMenuItem>
           <ContextMenuItem onClick={handleDeleteClick} className="text-destructive">
             <Trash2 className="mr-2 h-4 w-4" />
@@ -233,6 +269,51 @@ export const TokenContextMenu = ({
             </Button>
             <Button onClick={applyColor}>
               Apply Color{isMultiSelection ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Initiative Modal */}
+      <Dialog open={showInitiativeModal} onOpenChange={setShowInitiativeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Initiative</DialogTitle>
+            <DialogDescription>
+              {isMultiSelection 
+                ? `Set initiative for ${targetTokens.length} tokens`
+                : 'Enter initiative value for this token'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="initiative-value">Initiative Value</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="initiative-value"
+                  type="number"
+                  value={initiativeValue}
+                  onChange={(e) => setInitiativeValue(e.target.value)}
+                  placeholder="Enter value"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleRollInitiative}
+                >
+                  <Dices className="mr-2 h-4 w-4" />
+                  Roll d20
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInitiativeModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={applyInitiative}>
+              Add to Initiative
             </Button>
           </DialogFooter>
         </DialogContent>

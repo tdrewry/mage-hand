@@ -16,6 +16,7 @@ import { MapManager } from './MapManager';
 import { TokenContextManager } from './TokenContextManager';
 import { EditModeToolbar } from './EditModeToolbar';
 import { PlayModeToolbar } from './PlayModeToolbar';
+import { InitiativeTracker } from './InitiativeTracker';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -4062,6 +4063,9 @@ export const SimpleTabletop = () => {
         onColorChange={handleTokenColorChange}
         onUpdateCanvas={handleCanvasUpdate}
       />
+      
+      {/* Initiative Tracker */}
+      <InitiativeTracker />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {

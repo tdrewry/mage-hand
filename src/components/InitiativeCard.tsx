@@ -1,0 +1,117 @@
+import React, { useState } from 'react';
+import { Token } from '@/stores/sessionStore';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface InitiativeCardProps {
+  token: Token;
+  initiative: number;
+  isActive: boolean;
+  hasGone?: boolean;
+  onRemove: () => void;
+  onInitiativeChange: (newInitiative: number) => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+}
+
+export const InitiativeCard: React.FC<InitiativeCardProps> = ({
+  token,
+  initiative,
+  isActive,
+  hasGone,
+  onRemove,
+  onInitiativeChange,
+  onDragStart,
+  onDragOver,
+  onDrop
+}) => {
+  const [isEditingInitiative, setIsEditingInitiative] = useState(false);
+  const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
+
+  const handleInitiativeSubmit = () => {
+    const value = parseInt(initiativeValue);
+    if (!isNaN(value)) {
+      onInitiativeChange(value);
+    }
+    setIsEditingInitiative(false);
+  };
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={cn(
+        "relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing min-w-[120px]",
+        isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
+        !isActive && hasGone && "opacity-60 border-border bg-muted/50",
+        !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
+      )}
+    >
+      {/* Remove Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+        onClick={onRemove}
+      >
+        <X className="h-3 w-3" />
+      </Button>
+
+      {/* Initiative Number */}
+      <div className="flex items-center justify-center w-full">
+        {isEditingInitiative ? (
+          <Input
+            type="number"
+            value={initiativeValue}
+            onChange={(e) => setInitiativeValue(e.target.value)}
+            onBlur={handleInitiativeSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleInitiativeSubmit();
+              if (e.key === 'Escape') setIsEditingInitiative(false);
+            }}
+            className="w-16 h-8 text-center text-xl font-bold"
+            autoFocus
+          />
+        ) : (
+          <div
+            onClick={() => setIsEditingInitiative(true)}
+            className="text-2xl font-bold text-primary cursor-pointer hover:text-primary/80"
+          >
+            {initiative}
+          </div>
+        )}
+      </div>
+
+      {/* Token Image or Color */}
+      <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-border">
+        {token.imageUrl ? (
+          <img
+            src={token.imageUrl}
+            alt={token.label || token.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className="w-full h-full"
+            style={{ backgroundColor: token.color || '#888' }}
+          />
+        )}
+      </div>
+
+      {/* Token Label */}
+      <div className="text-sm font-medium text-center text-foreground truncate max-w-full px-1">
+        {token.label || token.name}
+      </div>
+
+      {/* Active Indicator */}
+      {isActive && (
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full animate-pulse" />
+      )}
+    </div>
+  );
+};

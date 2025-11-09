@@ -14,6 +14,7 @@ import {
   Eye,
   Layers,
   Grid3X3,
+  Swords,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LayerStackModal } from './LayerStackModal';
@@ -21,6 +22,7 @@ import { FogControlModal } from './modals/FogControlModal';
 import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useFogStore } from '@/stores/fogStore';
+import { useInitiativeStore } from '@/stores/initiativeStore';
 
 interface PlayModeToolbarProps {
   showNegativeSpacePanel: boolean;
@@ -50,6 +52,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
   
   const { enabled: fogEnabled } = useFogStore();
+  const { isInCombat, isTrackerVisible, setTrackerVisible } = useInitiativeStore();
 
   return (
     <TooltipProvider>
@@ -107,6 +110,23 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
           </Tooltip>
 
           <div className="h-px bg-border" />
+
+          {/* Initiative / Combat */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isInCombat ? "default" : "ghost"}
+                size="icon"
+                onClick={() => setTrackerVisible(!isTrackerVisible)}
+                className="w-10 h-10"
+              >
+                <Swords className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Initiative {isInCombat ? '(Active)' : ''}</p>
+            </TooltipContent>
+          </Tooltip>
 
           {/* Background & Grid */}
           <Tooltip>

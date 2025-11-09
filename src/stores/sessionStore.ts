@@ -18,6 +18,8 @@ export interface Token {
   label: string;      // Editable label/name
   ownerId?: string;   // Player who owns this token
   color?: string;     // Token color (for default tokens)
+  initiative?: number; // Initiative value
+  inCombat?: boolean;  // Whether token is in combat
 }
 
 export interface Player {
