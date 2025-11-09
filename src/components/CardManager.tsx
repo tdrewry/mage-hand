@@ -9,18 +9,24 @@ import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
+import { MenuCardContent } from '@/components/cards/MenuCard';
+import { ToolsCardContent } from '@/components/cards/ToolsCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import { CardType } from '@/types/cardTypes';
+import { useDungeonStore } from '@/stores/dungeonStore';
+import { CardType, ToolsCardProps } from '@/types/cardTypes';
 
 interface CardManagerProps {
   children?: React.ReactNode;
+  sessionId?: string;
+  toolsCardProps?: Omit<ToolsCardProps, 'mode'>;
 }
 
-export function CardManager({ children }: CardManagerProps) {
+export function CardManager({ children, sessionId, toolsCardProps }: CardManagerProps) {
   const cards = useCardStore((state) => state.cards);
   const loadLayout = useCardStore((state) => state.loadLayout);
   const { addToken } = useSessionStore();
+  const { renderingMode } = useDungeonStore();
 
   // Load saved layout on mount
   useEffect(() => {
@@ -57,7 +63,7 @@ export function CardManager({ children }: CardManagerProps) {
       
       {/* Render all registered cards */}
       {cards.map((card) => {
-        const content = renderCardContent(card.id, card.type, handleAddToken);
+        const content = renderCardContent(card.id, card.type, handleAddToken, sessionId, renderingMode, toolsCardProps);
         return (
           <BaseCard
             key={card.id}
@@ -102,9 +108,16 @@ function getCardTitle(type: CardType): string {
 function renderCardContent(
   cardId: string, 
   type: CardType, 
-  addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void
+  addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
+  sessionId?: string,
+  mode?: 'edit' | 'play',
+  toolsCardProps?: Omit<ToolsCardProps, 'mode'>
 ): React.ReactNode {
   switch (type) {
+    case CardType.MENU:
+      return <MenuCardContent sessionId={sessionId} />;
+    case CardType.TOOLS:
+      return toolsCardProps && mode ? <ToolsCardContent mode={mode} {...toolsCardProps} /> : null;
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
@@ -136,8 +149,6 @@ function renderCardContent(
     case CardType.INITIATIVE_TRACKER:
       return <InitiativeTrackerCardContent />;
     case CardType.MAP:
-    case CardType.MENU:
-    case CardType.TOOLS:
     case CardType.GROUP_MANAGER:
     case CardType.REGION_CONTROL:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;

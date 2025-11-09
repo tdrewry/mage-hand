@@ -63,10 +63,10 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.TOOLS]: {
     title: 'Tools',
-    defaultPosition: { x: 20, y: 100 },
-    defaultSize: { width: 280, height: 500 },
-    minSize: { width: 200, height: 300 },
-    isResizable: true,
+    defaultPosition: { x: window.innerWidth - 70, y: 80 },
+    defaultSize: { width: 54, height: 600 },
+    minSize: { width: 54, height: 400 },
+    isResizable: false,
     isClosable: false,
   },
   [CardType.FOG]: {

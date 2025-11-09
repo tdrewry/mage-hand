@@ -11,17 +11,16 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';
 import { TokenContextManager } from './TokenContextManager';
-import { EditModeToolbar } from './EditModeToolbar';
-import { PlayModeToolbar } from './PlayModeToolbar';
 import { CardManager } from './CardManager';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
+import { useCardStore } from '../stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
 import { generateNegativeSpaceRegion } from '../lib/wallGeometry';
 import { 
@@ -269,6 +268,42 @@ export const SimpleTabletop = () => {
     initiativeOrder,
     restrictMovement 
   } = useInitiativeStore();
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  
+  // Register MENU and TOOLS cards on mount
+  useEffect(() => {
+    // Register MENU card if it doesn't exist
+    const menuCard = cards.find(c => c.type === CardType.MENU);
+    if (!menuCard) {
+      registerCard({
+        type: CardType.MENU,
+        title: 'Menu',
+        defaultPosition: { x: 20, y: 20 },
+        defaultSize: { width: 280, height: 500 },
+        minSize: { width: 250, height: 400 },
+        isResizable: true,
+        isClosable: false,
+        defaultVisible: true,
+      });
+    }
+    
+    // Register TOOLS card if it doesn't exist
+    const toolsCard = cards.find(c => c.type === CardType.TOOLS);
+    if (!toolsCard) {
+      registerCard({
+        type: CardType.TOOLS,
+        title: 'Tools',
+        defaultPosition: { x: window.innerWidth - 70, y: 80 },
+        defaultSize: { width: 54, height: 600 },
+        minSize: { width: 54, height: 400 },
+        isResizable: false,
+        isClosable: false,
+        defaultVisible: true,
+      });
+    }
+  }, [registerCard, cards]);
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {
@@ -4024,62 +4059,6 @@ export const SimpleTabletop = () => {
 
   return (
     <div className="w-full h-screen bg-surface flex flex-col relative">
-      {/* Toolbar */}
-      <Toolbar 
-        sessionId={sessionId}
-        fabricCanvas={null}
-      />
-      
-      {/* Edit Mode Toolbar - Only in Edit Mode */}
-      {renderingMode === 'edit' && (
-        <EditModeToolbar
-          onOpenMapManager={() => setShowMapManager(true)}
-          onAddRegion={addNewRegion}
-          onStartPolygonDraw={() => startPathDrawing('polygon')}
-          onStartFreehandDraw={() => startPathDrawing('freehand')}
-          onFinishPolygonDraw={finishPathDrawing}
-          isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
-          isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
-          isGridSnappingEnabled={isGridSnappingEnabled}
-          onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-          showNegativeSpacePanel={showNegativeSpacePanel}
-          onToggleNegativeSpacePanel={() => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          }}
-          showRegions={showRegions}
-          onToggleRegions={() => setShowRegions(!showRegions)}
-          fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
-          gridColor={gridColor}
-          gridOpacity={gridOpacity}
-          onGridColorChange={setGridColor}
-          onGridOpacityChange={setGridOpacity}
-        />
-      )}
-
-      {/* Play Mode Toolbar */}
-      {renderingMode === 'play' && (
-        <PlayModeToolbar
-          showNegativeSpacePanel={showNegativeSpacePanel}
-          onToggleNegativeSpacePanel={() => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          }}
-          showRegions={showRegions}
-          onToggleRegions={() => setShowRegions(!showRegions)}
-          fabricCanvas={null}
-          gridColor={gridColor}
-          gridOpacity={gridOpacity}
-          onGridColorChange={setGridColor}
-          onGridOpacityChange={setGridOpacity}
-        />
-      )}
-
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
       {/* Wall Settings Control Panel - available in both edit and play mode */}
@@ -4134,7 +4113,30 @@ export const SimpleTabletop = () => {
       />
       
       {/* Card-Based UI System */}
-      <CardManager />
+      <CardManager 
+        sessionId={sessionId}
+        toolsCardProps={{
+          fabricCanvas: null,
+          onOpenMapManager: () => setShowMapManager(true),
+          onAddRegion: addNewRegion,
+          onStartPolygonDraw: () => startPathDrawing('polygon'),
+          onStartFreehandDraw: () => startPathDrawing('freehand'),
+          onFinishPolygonDraw: finishPathDrawing,
+          isDrawingPolygon: pathDrawingMode === 'drawing' && pathDrawingType === 'polygon',
+          isDrawingFreehand: pathDrawingMode === 'drawing' && pathDrawingType === 'freehand',
+          isGridSnappingEnabled,
+          onToggleGridSnapping: () => setIsGridSnappingEnabled(!isGridSnappingEnabled),
+          showNegativeSpacePanel,
+          onToggleNegativeSpacePanel: () => {
+            setShowNegativeSpacePanel(!showNegativeSpacePanel);
+            if (!showNegativeSpacePanel) {
+              setSelectedRegionId(null);
+            }
+          },
+          showRegions,
+          onToggleRegions: () => setShowRegions(!showRegions),
+        }}
+      />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {

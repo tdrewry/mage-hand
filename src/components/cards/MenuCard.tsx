@@ -3,9 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen } from 'lucide-react';
-import { Canvas as FabricCanvas } from 'fabric';
-import { useCardStore } from '@/stores/cardStore';
-import { CardType } from '@/types/cardTypes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,17 +13,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useSessionStore } from '../stores/sessionStore';
-import { useRegionStore } from '../stores/regionStore';
-import { useDungeonStore } from '../stores/dungeonStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useRegionStore } from '@/stores/regionStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { toast } from 'sonner';
 
-interface ToolbarProps {
+interface MenuCardContentProps {
   sessionId?: string;
-  fabricCanvas?: FabricCanvas | null;
 }
 
-export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
+export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) => {
   const { tokens } = useSessionStore();
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode } = useDungeonStore();
@@ -69,136 +67,127 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
   const clearStorage = () => {
     setDeleteDialogOpen(false);
     localStorage.clear();
-    // Also clear the Zustand store
     const { getState } = useSessionStore;
     const state = getState();
-    state.tokens.length = 0; // Clear tokens array
+    state.tokens.length = 0;
     toast.success('Storage and tokens cleared! Reload page to start fresh.');
     setTimeout(() => window.location.reload(), 1000);
   };
 
   const handleSave = () => {
-    // TODO: Implement save functionality
     toast.info('Save functionality coming soon');
   };
 
   const handleLoad = () => {
-    // TODO: Implement load functionality
     toast.info('Load functionality coming soon');
   };
 
   return (
-    <div className="bg-card/95 backdrop-blur-sm border-b border-border p-3 relative z-50">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Map className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground">D20PRO Virtual Tabletop</h1>
-          </div>
-          
-          <Separator orientation="vertical" className="h-6" />
-          
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              Session: {sessionId?.slice(0, 8) || 'paper-demo'}
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              Tokens: {tokens.length}
-              {tokens.length > 0 && (
-                <span className="ml-1 text-xs text-muted-foreground">
-                  (actual count)
-                </span>
-              )}
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              Regions: {regions.length}
-            </Badge>
-          </div>
-        </div>
+    <div className="p-3 space-y-3">
+      {/* Session Info */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant="outline" className="text-xs">
+          Session: {sessionId?.slice(0, 8) || 'paper-demo'}
+        </Badge>
+        <Badge variant="secondary" className="text-xs">
+          Tokens: {tokens.length}
+        </Badge>
+        <Badge variant="secondary" className="text-xs">
+          Regions: {regions.length}
+        </Badge>
+      </div>
 
-        <div className="flex items-center gap-2">
+      <Separator />
+
+      {/* Mode Toggle */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Mode</p>
+        <Button 
+          variant={renderingMode === 'play' ? 'default' : 'outline'}
+          size="sm"
+          onClick={toggleRenderingMode}
+          className="w-full"
+        >
+          <Castle className="h-4 w-4 mr-2" />
+          {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Session Controls */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Session</p>
+        <div className="grid grid-cols-2 gap-2">
           <Button 
             variant="outline" 
             size="sm" 
             onClick={shareSession}
-            className="text-foreground border-border hover:bg-secondary"
           >
             <Share2 className="h-4 w-4 mr-2" />
-            Share Session
+            Share
           </Button>
           
           <Button 
             variant="outline" 
             size="sm"
-            className="text-foreground border-border hover:bg-secondary"
           >
             <Users className="h-4 w-4 mr-2" />
             Players (1)
           </Button>
-          
-          <Button 
-            variant={renderingMode === 'play' ? 'default' : 'outline'}
-            size="sm"
-            onClick={toggleRenderingMode}
-            className={renderingMode === 'play' ? '' : 'text-foreground border-border hover:bg-secondary'}
-            title="Toggle between Edit and Play mode"
-          >
-            <Castle className="h-4 w-4 mr-2" />
-            {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
-          </Button>
+        </div>
+      </div>
 
-          <Separator orientation="vertical" className="h-6" />
+      <Separator />
 
-          {/* Save Button */}
+      {/* Project Controls */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Project</p>
+        <div className="grid grid-cols-2 gap-2">
           <Button 
             variant="outline" 
             size="sm"
             onClick={handleSave}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Save project"
           >
             <Save className="h-4 w-4 mr-2" />
             Save
           </Button>
 
-          {/* Load Button */}
           <Button 
             variant="outline" 
             size="sm"
             onClick={handleLoad}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Load project"
           >
             <FolderOpen className="h-4 w-4 mr-2" />
             Load
           </Button>
-
-          <Separator orientation="vertical" className="h-6" />
-          
-          {/* Delete Button with confirmation */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-            title="Clear all data"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-          
-          <Separator orientation="vertical" className="h-6" />
-          
-          <Button 
-            variant={mapControlsCard?.isVisible ? "default" : "outline"}
-            size="sm"
-            onClick={handleToggleMapControlsCard}
-            className={mapControlsCard?.isVisible ? '' : 'text-foreground border-border hover:bg-secondary'}
-          >
-            <Map className="h-4 w-4 mr-2" />
-            Map Controls
-          </Button>
         </div>
+        
+        <Button 
+          variant={mapControlsCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleMapControlsCard}
+          className="w-full"
+        >
+          <Map className="h-4 w-4 mr-2" />
+          Map Controls
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Danger Zone */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Danger Zone</p>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setDeleteDialogOpen(true)}
+          className="w-full text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete All Data
+        </Button>
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -222,7 +211,6 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 };
