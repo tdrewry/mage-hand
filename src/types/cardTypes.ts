@@ -36,6 +36,8 @@ export interface CardConfig {
   isClosable?: boolean;
   defaultMinimized?: boolean;
   defaultVisible?: boolean;
+  hideHeader?: boolean;
+  fullCardDraggable?: boolean;
 }
 
 export interface CardState {

@@ -15,6 +15,8 @@ interface BaseCardProps {
   minSize?: CardSize;
   maxSize?: CardSize;
   className?: string;
+  hideHeader?: boolean;
+  fullCardDraggable?: boolean;
 }
 
 export function BaseCard({
@@ -26,6 +28,8 @@ export function BaseCard({
   minSize = { width: 200, height: 200 },
   maxSize,
   className,
+  hideHeader = false,
+  fullCardDraggable = false,
 }: BaseCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -93,7 +97,10 @@ export function BaseCard({
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
-    if ((e.target as HTMLElement).closest('button')) return; // Don't drag when clicking buttons
+    
+    // Don't drag when clicking interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, select, [draggable="true"]')) return;
     
     bringToFront(id);
     setIsDragging(true);
@@ -151,38 +158,43 @@ export function BaseCard({
       }}
       onClick={handleCardClick}
     >
-      <Card className="h-full flex flex-col shadow-lg border-border">
-        <CardHeader
-          ref={headerRef}
-          className="flex flex-row items-center justify-between space-y-0 p-3 cursor-move border-b border-border bg-card"
-          onMouseDown={handleMouseDown}
-        >
-          <h3 className="text-sm font-semibold text-card-foreground">{title}</h3>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={handleMinimize}
-            >
-              {isMinimized ? (
-                <Maximize2 className="h-3 w-3" />
-              ) : (
-                <Minus className="h-3 w-3" />
-              )}
-            </Button>
-            {isClosable && (
+      <Card 
+        className="h-full flex flex-col shadow-lg border-border"
+        onMouseDown={fullCardDraggable ? handleMouseDown : undefined}
+      >
+        {!hideHeader && (
+          <CardHeader
+            ref={headerRef}
+            className="flex flex-row items-center justify-between space-y-0 p-3 cursor-move border-b border-border bg-card"
+            onMouseDown={!fullCardDraggable ? handleMouseDown : undefined}
+          >
+            <h3 className="text-sm font-semibold text-card-foreground">{title}</h3>
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={handleClose}
+                onClick={handleMinimize}
               >
-                <X className="h-3 w-3" />
+                {isMinimized ? (
+                  <Maximize2 className="h-3 w-3" />
+                ) : (
+                  <Minus className="h-3 w-3" />
+                )}
               </Button>
-            )}
-          </div>
-        </CardHeader>
+              {isClosable && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={handleClose}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+        )}
 
         {!isMinimized && (
           <>

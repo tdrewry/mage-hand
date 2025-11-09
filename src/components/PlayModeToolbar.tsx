@@ -228,6 +228,8 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
                         isResizable: true,
                         isClosable: true,
                         defaultVisible: true,
+                        hideHeader: true,
+                        fullCardDraggable: true,
                       });
                     }
                     toast.success('Combat started!');
