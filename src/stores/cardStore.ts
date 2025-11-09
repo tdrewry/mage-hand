@@ -160,7 +160,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
           position: config.defaultPosition || defaultConfig.defaultPosition,
           size: config.defaultSize || defaultConfig.defaultSize,
           isMinimized: config.defaultMinimized || false,
-          isVisible: true,
+          isVisible: config.defaultVisible ?? false,
           zIndex: state.nextZIndex,
         },
       ],

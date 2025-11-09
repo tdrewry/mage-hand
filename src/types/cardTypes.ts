@@ -34,6 +34,7 @@ export interface CardConfig {
   isResizable?: boolean;
   isClosable?: boolean;
   defaultMinimized?: boolean;
+  defaultVisible?: boolean;
 }
 
 export interface CardState {
