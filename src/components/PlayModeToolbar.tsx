@@ -21,11 +21,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LayerStackModal } from './LayerStackModal';
-import { FogControlModal } from './modals/FogControlModal';
 import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 
 interface PlayModeToolbarProps {
   showNegativeSpacePanel: boolean;
@@ -51,11 +52,32 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   onGridOpacityChange,
 }) => {
   const [layerModalOpen, setLayerModalOpen] = useState(false);
-  const [fogModalOpen, setFogModalOpen] = useState(false);
   const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
   
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, isTrackerVisible, restrictMovement, setTrackerVisible, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+  
+  const fogCard = cards.find((c) => c.type === CardType.FOG);
+
+  const handleToggleFogCard = () => {
+    if (fogCard) {
+      setVisibility(fogCard.id, !fogCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.FOG,
+        title: 'Fog Control',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 350, height: 520 },
+        minSize: { width: 300, height: 450 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -82,9 +104,9 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={fogEnabled ? "default" : "ghost"}
+                variant={fogCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setFogModalOpen(true)}
+                onClick={handleToggleFogCard}
                 className="w-10 h-10"
               >
                 <CloudFog className="w-5 h-5" />
@@ -215,11 +237,6 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
       </div>
 
       {/* Modals */}
-      <FogControlModal
-        open={fogModalOpen}
-        onOpenChange={setFogModalOpen}
-      />
-
       <BackgroundGridModal
         open={backgroundGridModalOpen}
         onOpenChange={setBackgroundGridModalOpen}

@@ -81,13 +81,13 @@ This document outlines the complete refactoring plan to transform the current VT
   - [x] Test in both combat and non-combat modes
 
 #### 2.2 Convert Fog Control Modal to Card
-- [ ] Create `src/components/cards/FogControlCard.tsx`
-  - [ ] Extract content from `FogControlModal.tsx`
-  - [ ] Wrap in `BaseCard`
-  - [ ] Register card with type `FOG`
-  - [ ] Set default position and size
-  - [ ] Update trigger button to toggle card visibility
-  - [ ] Remove modal dialog wrapper
+- [x] Create `src/components/cards/FogControlCard.tsx`
+  - [x] Extract content from `FogControlModal.tsx`
+  - [x] Wrap in `BaseCard`
+  - [x] Register card with type `FOG`
+  - [x] Set default position and size
+  - [x] Update trigger button to toggle card visibility
+  - [x] Remove modal dialog wrapper
 
 #### 2.3 Convert Layer Stack Modal to Card
 - [ ] Create `src/components/cards/LayerStackCard.tsx`
@@ -410,10 +410,10 @@ This document outlines the complete refactoring plan to transform the current VT
 
 ### Phase 2: Convert Floating Elements
 **Status**: 🚧 In Progress  
-**Progress**: 1/7 sections complete
+**Progress**: 2/7 sections complete
 
 - ✅ Converted InitiativeTracker to RosterCard
-- ⏳ Convert Fog Control Modal to Card
+- ✅ Converted FogControlModal to FogControlCard
 - ⏳ Convert Layer Stack Modal to Card
 - ⏳ Convert Token Panel Modal to Card
 - ⏳ Convert Map Controls Modal to Card
