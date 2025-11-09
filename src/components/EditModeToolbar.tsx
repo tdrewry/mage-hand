@@ -24,9 +24,6 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { toast } from 'sonner';
-import { WatabouImportModal } from './modals/WatabouImportModal';
-import { TokenPanelModal } from './modals/TokenPanelModal';
-import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
@@ -74,9 +71,6 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
   onGridColorChange,
   onGridOpacityChange,
 }) => {
-  const [watabouImportOpen, setWatabouImportOpen] = useState(false);
-  const [tokensModalOpen, setTokensModalOpen] = useState(false);
-  const [backgroundModalOpen, setBackgroundModalOpen] = useState(false);
   
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
@@ -86,6 +80,8 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
   const setVisibility = useCardStore((state) => state.setVisibility);
   
   const layerCard = cards.find((c) => c.type === CardType.LAYERS);
+  const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
+  const watabouCard = cards.find((c) => c.type === CardType.WATABOU_IMPORT);
 
   const handleToggleLayerCard = () => {
     if (layerCard) {
@@ -97,6 +93,38 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
         defaultPosition: { x: 20, y: 80 },
         defaultSize: { width: 280, height: 450 },
         minSize: { width: 250, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleToggleTokenCard = () => {
+    if (tokenCard) {
+      setVisibility(tokenCard.id, !tokenCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.TOKENS,
+        title: 'Token Panel',
+        defaultPosition: { x: window.innerWidth - 420, y: 80 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 300, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleToggleWatabouCard = () => {
+    if (watabouCard) {
+      setVisibility(watabouCard.id, !watabouCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.WATABOU_IMPORT,
+        title: 'Import Dungeon',
+        defaultPosition: { x: window.innerWidth / 2 - 250, y: 100 },
+        defaultSize: { width: 500, height: 550 },
+        minSize: { width: 400, height: 500 },
         isResizable: true,
         isClosable: true,
       });
@@ -150,9 +178,9 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant={tokenCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setTokensModalOpen(true)}
+                onClick={handleToggleTokenCard}
                 className="w-10 h-10"
               >
                 <Plus className="w-5 h-5" />
@@ -160,23 +188,6 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Tokens</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Background & Grid */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setBackgroundModalOpen(true)}
-                className="w-10 h-10"
-              >
-                <Palette className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>Background & Grid</p>
             </TooltipContent>
           </Tooltip>
 
@@ -328,9 +339,9 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant={watabouCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setWatabouImportOpen(true)}
+                onClick={handleToggleWatabouCard}
                 className="w-10 h-10"
               >
                 <FileDown className="w-5 h-5" />
@@ -360,27 +371,6 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
         </div>
       </div>
 
-      {/* Modals */}
-      <TokenPanelModal
-        open={tokensModalOpen}
-        onOpenChange={setTokensModalOpen}
-        onAddToken={onAddToken}
-      />
-
-      <BackgroundGridModal
-        open={backgroundModalOpen}
-        onOpenChange={setBackgroundModalOpen}
-        fabricCanvas={fabricCanvas}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={onGridColorChange}
-        onGridOpacityChange={onGridOpacityChange}
-      />
-      
-      <WatabouImportModal 
-        open={watabouImportOpen}
-        onOpenChange={setWatabouImportOpen}
-      />
     </TooltipProvider>
   );
 };

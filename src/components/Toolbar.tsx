@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen } from 'lucide-react';
-import { MapControlsModal } from './modals/MapControlsModal';
 import { Canvas as FabricCanvas } from 'fabric';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +31,28 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode } = useDungeonStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [mapControlsOpen, setMapControlsOpen] = useState(false);
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+  
+  const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
+
+  const handleToggleMapControlsCard = () => {
+    if (mapControlsCard) {
+      setVisibility(mapControlsCard.id, !mapControlsCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.MAP_CONTROLS,
+        title: 'Map Controls',
+        defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+        defaultSize: { width: 400, height: 450 },
+        minSize: { width: 350, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
   
   const toggleRenderingMode = () => {
     const newMode = renderingMode === 'edit' ? 'play' : 'edit';
@@ -168,10 +190,10 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
           <Separator orientation="vertical" className="h-6" />
           
           <Button 
-            variant="outline" 
+            variant={mapControlsCard?.isVisible ? "default" : "outline"}
             size="sm"
-            onClick={() => setMapControlsOpen(true)}
-            className="text-foreground border-border hover:bg-secondary"
+            onClick={handleToggleMapControlsCard}
+            className={mapControlsCard?.isVisible ? '' : 'text-foreground border-border hover:bg-secondary'}
           >
             <Map className="h-4 w-4 mr-2" />
             Map Controls
@@ -201,12 +223,6 @@ export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Map Controls Modal */}
-      <MapControlsModal
-        open={mapControlsOpen}
-        onOpenChange={setMapControlsOpen}
-        fabricCanvas={fabricCanvas || null}
-      />
     </div>
   );
 };

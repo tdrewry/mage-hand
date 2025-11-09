@@ -3,6 +3,9 @@ import { BaseCard } from '@/components/cards/BaseCard';
 import { RosterCardContent } from '@/components/cards/RosterCard';
 import { FogControlCardContent } from '@/components/cards/FogControlCard';
 import { LayerStackCardContent } from '@/components/cards/LayerStackCard';
+import { TokenPanelCardContent } from '@/components/cards/TokenPanelCard';
+import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
+import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -69,15 +72,21 @@ function renderCardContent(cardId: string, type: CardType): React.ReactNode {
       return <FogControlCardContent />;
     case CardType.LAYERS:
       return <LayerStackCardContent />;
+    case CardType.TOKENS:
+      return <TokenPanelCardContent onAddToken={(imageUrl, x, y, gridWidth, gridHeight, color) => {
+        // TODO: Wire up to actual token adding function from SimpleTabletop
+        console.log('Add token:', { imageUrl, x, y, gridWidth, gridHeight, color });
+      }} />;
+    case CardType.MAP_CONTROLS:
+      return <MapControlsCardContent fabricCanvas={null} />; // TODO: Pass actual fabricCanvas
+    case CardType.WATABOU_IMPORT:
+      return <WatabouImportCardContent />;
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:
-    case CardType.TOKENS:
-    case CardType.MAP_CONTROLS:
     case CardType.GROUP_MANAGER:
     case CardType.PROJECT_MANAGER:
     case CardType.REGION_CONTROL:
-    case CardType.WATABOU_IMPORT:
     case CardType.BACKGROUND_GRID:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
