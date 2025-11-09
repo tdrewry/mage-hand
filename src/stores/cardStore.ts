@@ -266,7 +266,15 @@ export const useCardStore = create<CardStore>((set, get) => ({
     if (stored) {
       try {
         const cards = JSON.parse(stored);
-        set({ cards });
+        // Filter out any duplicate cards by type (keep only the first of each type)
+        const uniqueCards = cards.reduce((acc: CardState[], card: CardState) => {
+          const exists = acc.some(c => c.type === card.type);
+          if (!exists) {
+            acc.push(card);
+          }
+          return acc;
+        }, []);
+        set({ cards: uniqueCards });
       } catch (e) {
         console.error('Failed to load card layout:', e);
       }

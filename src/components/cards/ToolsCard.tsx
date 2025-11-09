@@ -196,8 +196,10 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
   const handleCombatToggle = () => {
     if (isInCombat) {
       endCombat();
-      if (initiativeCard) {
-        setVisibility(initiativeCard.id, false);
+      // Hide initiative tracker when combat ends
+      const tracker = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
+      if (tracker) {
+        setVisibility(tracker.id, false);
       }
       toast.success('Combat ended');
     } else {

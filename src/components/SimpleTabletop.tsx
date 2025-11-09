@@ -271,52 +271,66 @@ export const SimpleTabletop = () => {
   
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);
+  const setVisibility = useCardStore((state) => state.setVisibility);
   
   // Register MENU, TOOLS, and MAP cards on mount (only once)
   useEffect(() => {
-    // Register MENU card if it doesn't exist
-    if (!getCardByType(CardType.MENU)) {
-      registerCard({
-        type: CardType.MENU,
-        title: 'Menu',
-        defaultPosition: { x: 20, y: 20 },
-        defaultSize: { width: 280, height: 500 },
-        minSize: { width: 250, height: 400 },
-        isResizable: true,
-        isClosable: false,
-        defaultVisible: true,
-      });
-    }
+    // Small delay to ensure layout is loaded first
+    const timer = setTimeout(() => {
+      // Register MENU card if it doesn't exist
+      if (!getCardByType(CardType.MENU)) {
+        registerCard({
+          type: CardType.MENU,
+          title: 'Menu',
+          defaultPosition: { x: 20, y: 20 },
+          defaultSize: { width: 280, height: 500 },
+          minSize: { width: 250, height: 400 },
+          isResizable: true,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
+      
+      // Register TOOLS card if it doesn't exist
+      if (!getCardByType(CardType.TOOLS)) {
+        registerCard({
+          type: CardType.TOOLS,
+          title: 'Tools',
+          defaultPosition: { x: window.innerWidth - 70, y: 80 },
+          defaultSize: { width: 54, height: 600 },
+          minSize: { width: 54, height: 400 },
+          isResizable: false,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
+      
+      // Register MAP card if it doesn't exist
+      if (!getCardByType(CardType.MAP)) {
+        registerCard({
+          type: CardType.MAP,
+          title: 'Map View',
+          defaultPosition: { x: 320, y: 20 },
+          defaultSize: { width: 800, height: 600 },
+          minSize: { width: 400, height: 300 },
+          isResizable: true,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
+    }, 100);
     
-    // Register TOOLS card if it doesn't exist
-    if (!getCardByType(CardType.TOOLS)) {
-      registerCard({
-        type: CardType.TOOLS,
-        title: 'Tools',
-        defaultPosition: { x: window.innerWidth - 70, y: 80 },
-        defaultSize: { width: 54, height: 600 },
-        minSize: { width: 54, height: 400 },
-        isResizable: false,
-        isClosable: false,
-        defaultVisible: true,
-      });
-    }
-    
-    // Register MAP card if it doesn't exist
-    if (!getCardByType(CardType.MAP)) {
-      registerCard({
-        type: CardType.MAP,
-        title: 'Map View',
-        defaultPosition: { x: 320, y: 20 },
-        defaultSize: { width: 800, height: 600 },
-        minSize: { width: 400, height: 300 },
-        isResizable: true,
-        isClosable: false,
-        defaultVisible: true,
-      });
-    }
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
+  
+  // Hide initiative tracker if combat is not active
+  useEffect(() => {
+    const initiativeCard = getCardByType(CardType.INITIATIVE_TRACKER);
+    if (initiativeCard && !isInCombat && initiativeCard.isVisible) {
+      setVisibility(initiativeCard.id, false);
+    }
+  }, [isInCombat, getCardByType, setVisibility]);
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {

@@ -141,9 +141,43 @@ export const MapCardContent = () => {
 
     // Draw regions
     regions.forEach(region => {
+      // Fill region background
+      if (region.backgroundColor) {
+        ctx.fillStyle = region.backgroundColor;
+        ctx.fillRect(region.x, region.y, region.width, region.height);
+      }
+      
+      // Draw region outline
       ctx.strokeStyle = region.color || '#ffffff';
       ctx.lineWidth = 2 / transform.zoom;
       ctx.strokeRect(region.x, region.y, region.width, region.height);
+      
+      // Draw grid if enabled and visible
+      if (region.gridVisible && region.gridSize && region.gridSize > 0) {
+        ctx.strokeStyle = region.color || '#ffffff';
+        ctx.globalAlpha = 0.3; // Default grid opacity
+        ctx.lineWidth = 1 / transform.zoom;
+        
+        if (region.gridType === 'square') {
+          // Draw vertical lines
+          for (let x = region.x; x <= region.x + region.width; x += region.gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, region.y);
+            ctx.lineTo(x, region.y + region.height);
+            ctx.stroke();
+          }
+          
+          // Draw horizontal lines
+          for (let y = region.y; y <= region.y + region.height; y += region.gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(region.x, y);
+            ctx.lineTo(region.x + region.width, y);
+            ctx.stroke();
+          }
+        }
+        
+        ctx.globalAlpha = 1.0;
+      }
     });
 
     // Draw tokens
