@@ -272,7 +272,7 @@ export const SimpleTabletop = () => {
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
   
-  // Register MENU and TOOLS cards on mount
+  // Register MENU, TOOLS, and MAP cards on mount
   useEffect(() => {
     // Register MENU card if it doesn't exist
     const menuCard = cards.find(c => c.type === CardType.MENU);
@@ -299,6 +299,21 @@ export const SimpleTabletop = () => {
         defaultSize: { width: 54, height: 600 },
         minSize: { width: 54, height: 400 },
         isResizable: false,
+        isClosable: false,
+        defaultVisible: true,
+      });
+    }
+    
+    // Register MAP card if it doesn't exist
+    const mapCard = cards.find(c => c.type === CardType.MAP);
+    if (!mapCard) {
+      registerCard({
+        type: CardType.MAP,
+        title: 'Map View',
+        defaultPosition: { x: 320, y: 20 },
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 400, height: 300 },
+        isResizable: true,
         isClosable: false,
         defaultVisible: true,
       });

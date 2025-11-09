@@ -39,11 +39,12 @@ const STORAGE_KEY = 'vtt-card-layout';
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   [CardType.MAP]: {
     title: 'Map View',
-    defaultPosition: { x: 100, y: 100 },
+    defaultPosition: { x: 320, y: 20 },
     defaultSize: { width: 800, height: 600 },
     minSize: { width: 400, height: 300 },
     isResizable: true,
     isClosable: false,
+    defaultVisible: true,
   },
   [CardType.MENU]: {
     title: 'Menu',
@@ -52,6 +53,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 200, height: 300 },
     isResizable: true,
     isClosable: false,
+    defaultVisible: true,
   },
   [CardType.ROSTER]: {
     title: 'Roster',
@@ -68,6 +70,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 54, height: 400 },
     isResizable: false,
     isClosable: false,
+    defaultVisible: true,
   },
   [CardType.FOG]: {
     title: 'Fog Control',

@@ -11,6 +11,7 @@ import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { MenuCardContent } from '@/components/cards/MenuCard';
 import { ToolsCardContent } from '@/components/cards/ToolsCard';
+import { MapCardContent } from '@/components/cards/MapCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -149,6 +150,7 @@ function renderCardContent(
     case CardType.INITIATIVE_TRACKER:
       return <InitiativeTrackerCardContent />;
     case CardType.MAP:
+      return <MapCardContent />;
     case CardType.GROUP_MANAGER:
     case CardType.REGION_CONTROL:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
