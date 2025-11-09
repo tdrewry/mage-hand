@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BaseCard } from '@/components/cards/BaseCard';
+import { RosterCardContent } from '@/components/cards/RosterCard';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -29,8 +30,7 @@ export function CardManager({ children }: CardManagerProps) {
           isResizable={true}
           isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
         >
-          {/* Card content will be provided by specific card components */}
-          <div>Card content for {card.type}</div>
+          {renderCardContent(card.id, card.type)}
         </BaseCard>
       ))}
     </>
@@ -56,4 +56,27 @@ function getCardTitle(type: CardType): string {
   };
   
   return titles[type] || type;
+}
+
+// Helper function to render card-specific content
+function renderCardContent(cardId: string, type: CardType): React.ReactNode {
+  switch (type) {
+    case CardType.ROSTER:
+      return <RosterCardContent cardId={cardId} />;
+    case CardType.MAP:
+    case CardType.MENU:
+    case CardType.TOOLS:
+    case CardType.FOG:
+    case CardType.LAYERS:
+    case CardType.TOKENS:
+    case CardType.MAP_CONTROLS:
+    case CardType.GROUP_MANAGER:
+    case CardType.PROJECT_MANAGER:
+    case CardType.REGION_CONTROL:
+    case CardType.WATABOU_IMPORT:
+    case CardType.BACKGROUND_GRID:
+      return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
+    default:
+      return <div className="text-muted-foreground text-sm">Unknown card type</div>;
+  }
 }

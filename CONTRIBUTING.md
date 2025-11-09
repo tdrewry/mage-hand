@@ -399,12 +399,26 @@ This document outlines the complete refactoring plan to transform the current VT
 ## Progress Tracking
 
 ### Phase 1: Card Infrastructure
-**Status**: Not Started  
-**Progress**: 0/5 sections complete
+**Status**: ✅ Complete  
+**Progress**: 5/5 sections complete
+
+- ✅ Created BaseCard component with drag, resize, minimize functionality
+- ✅ Created cardStore with Zustand for state management and localStorage persistence
+- ✅ Created CardManager component to render all registered cards
+- ✅ Defined CardType enum and interfaces in cardTypes.ts
+- ✅ Successfully tested with RosterCard proof-of-concept
 
 ### Phase 2: Convert Floating Elements
-**Status**: Not Started  
-**Progress**: 0/7 sections complete
+**Status**: 🚧 In Progress  
+**Progress**: 1/7 sections complete
+
+- ✅ Converted InitiativeTracker to RosterCard
+- ⏳ Convert Fog Control Modal to Card
+- ⏳ Convert Layer Stack Modal to Card
+- ⏳ Convert Token Panel Modal to Card
+- ⏳ Convert Map Controls Modal to Card
+- ⏳ Convert other modals
+- ⏳ Update all references and test
 
 ### Phase 3: Toolbar Consolidation
 **Status**: Not Started  

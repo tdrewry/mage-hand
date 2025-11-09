@@ -16,7 +16,8 @@ import { MapManager } from './MapManager';
 import { TokenContextManager } from './TokenContextManager';
 import { EditModeToolbar } from './EditModeToolbar';
 import { PlayModeToolbar } from './PlayModeToolbar';
-import { InitiativeTracker } from './InitiativeTracker';
+import { CardManager } from './CardManager';
+import { RosterCardDemo } from './RosterCardDemo';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -4133,8 +4134,9 @@ export const SimpleTabletop = () => {
         onUpdateCanvas={handleCanvasUpdate}
       />
       
-      {/* Initiative Tracker */}
-      <InitiativeTracker />
+      {/* Card-Based UI System */}
+      <CardManager />
+      <RosterCardDemo />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
