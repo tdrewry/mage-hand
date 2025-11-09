@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Palette, Eye, Map, Settings } from 'lucide-react';
-import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { VisibilityModal } from './modals/VisibilityModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useCardStore } from '@/stores/cardStore';
@@ -33,9 +32,25 @@ export const FloatingMenu = ({
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
+
+  useEffect(() => {
+    const card = cards.find(c => c.type === CardType.BACKGROUND_GRID);
+    if (!card) {
+      registerCard({
+        type: CardType.BACKGROUND_GRID,
+        title: 'Background & Grid',
+        defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 350, height: 450 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  }, [registerCard, cards]);
   
   const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
+  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
 
   const handleToggleTokenCard = () => {
     if (tokenCard) {
@@ -104,7 +119,8 @@ export const FloatingMenu = ({
           const IconComponent = item.icon;
           const isActive = 
             (item.id === 'tokens' && tokenCard?.isVisible) ||
-            (item.id === 'maps' && mapControlsCard?.isVisible);
+            (item.id === 'maps' && mapControlsCard?.isVisible) ||
+            (item.id === 'background' && backgroundGridCard?.isVisible);
           
           return (
             <Button
@@ -114,6 +130,10 @@ export const FloatingMenu = ({
                   handleToggleTokenCard();
                 } else if (item.id === 'maps') {
                   handleToggleMapControlsCard();
+                } else if (item.id === 'background') {
+                  if (backgroundGridCard) {
+                    setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
+                  }
                 } else {
                   setActiveModal(item.id);
                 }
@@ -128,16 +148,6 @@ export const FloatingMenu = ({
       </div>
 
       {/* Modals */}
-      <BackgroundGridModal
-        open={activeModal === 'background'}
-        onOpenChange={(open) => setActiveModal(open ? 'background' : null)}
-        fabricCanvas={fabricCanvas}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={onGridColorChange}
-        onGridOpacityChange={onGridOpacityChange}
-      />
-
       <VisibilityModal
         open={activeModal === 'visibility'}
         onOpenChange={(open) => setActiveModal(open ? 'visibility' : null)}

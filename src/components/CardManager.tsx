@@ -6,6 +6,7 @@ import { LayerStackCardContent } from '@/components/cards/LayerStackCard';
 import { TokenPanelCardContent } from '@/components/cards/TokenPanelCard';
 import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
+import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -57,7 +58,7 @@ function getCardTitle(type: CardType): string {
     [CardType.PROJECT_MANAGER]: 'Project Manager',
     [CardType.REGION_CONTROL]: 'Region Control',
     [CardType.WATABOU_IMPORT]: 'Watabou Import',
-    [CardType.BACKGROUND_GRID]: 'Background Grid',
+    [CardType.BACKGROUND_GRID]: 'Background & Grid',
   };
   
   return titles[type] || type;
@@ -81,13 +82,22 @@ function renderCardContent(cardId: string, type: CardType): React.ReactNode {
       return <MapControlsCardContent fabricCanvas={null} />; // TODO: Pass actual fabricCanvas
     case CardType.WATABOU_IMPORT:
       return <WatabouImportCardContent />;
+    case CardType.BACKGROUND_GRID:
+      return (
+        <BackgroundGridCardContent
+          fabricCanvas={null}
+          gridColor="#000000"
+          gridOpacity={50}
+          onGridColorChange={() => {}}
+          onGridOpacityChange={() => {}}
+        />
+      );
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:
     case CardType.GROUP_MANAGER:
     case CardType.PROJECT_MANAGER:
     case CardType.REGION_CONTROL:
-    case CardType.BACKGROUND_GRID:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;

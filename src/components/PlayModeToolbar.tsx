@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import {
   Tooltip,
@@ -20,7 +20,6 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -50,14 +49,27 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   onGridColorChange,
   onGridOpacityChange,
 }) => {
-  const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
-  
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, isTrackerVisible, restrictMovement, setTrackerVisible, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
+
+  useEffect(() => {
+    const card = cards.find(c => c.type === CardType.BACKGROUND_GRID);
+    if (!card) {
+      registerCard({
+        type: CardType.BACKGROUND_GRID,
+        title: 'Background & Grid',
+        defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 350, height: 450 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  }, [registerCard, cards]);
   
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const layerCard = cards.find((c) => c.type === CardType.LAYERS);
@@ -221,7 +233,12 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setBackgroundGridModalOpen(true)}
+                onClick={() => {
+                  const card = cards.find(c => c.type === CardType.BACKGROUND_GRID);
+                  if (card) {
+                    setVisibility(card.id, true);
+                  }
+                }}
                 className="w-10 h-10"
               >
                 <Grid3X3 className="w-5 h-5" />
@@ -251,16 +268,6 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
         </div>
       </div>
 
-      {/* Modals */}
-      <BackgroundGridModal
-        open={backgroundGridModalOpen}
-        onOpenChange={setBackgroundGridModalOpen}
-        fabricCanvas={fabricCanvas}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={onGridColorChange}
-        onGridOpacityChange={onGridOpacityChange}
-      />
     </TooltipProvider>
   );
 };
