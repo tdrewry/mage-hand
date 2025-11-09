@@ -125,7 +125,17 @@ export const InitiativeTracker: React.FC = () => {
     return (
       <>
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
-          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl relative">
+            {/* Minimize/Maximize Button - Upper right corner */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-card border border-border hover:bg-accent z-10"
+            >
+              {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+            </Button>
+
             <div className="flex items-center gap-2 p-2">
               {/* Previous Turn Button */}
               <Button
@@ -150,6 +160,7 @@ export const InitiativeTracker: React.FC = () => {
                   totalTokens={initiativeOrder.length}
                   isCompact={isMinimized}
                   size={cardSize}
+                  onResetRound={resetRound}
                 />
 
                 {/* Token Cards */}
@@ -196,39 +207,6 @@ export const InitiativeTracker: React.FC = () => {
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
-
-              {/* Controls - only show when expanded */}
-              {!isMinimized && (
-                <>
-                  <div className="h-8 w-px bg-border mx-1" />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetRound}
-                    className="shrink-0"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleEndCombat}
-                    className="shrink-0"
-                  >
-                    End
-                  </Button>
-                </>
-              )}
-
-              {/* Minimize/Maximize Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="shrink-0"
-              >
-                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-              </Button>
             </div>
           </div>
         </div>
@@ -247,7 +225,17 @@ export const InitiativeTracker: React.FC = () => {
   return (
     <>
       <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
-        <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl">
+        <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl relative">
+          {/* Minimize/Maximize Button - Upper right corner */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-card border border-border hover:bg-accent z-10"
+          >
+            {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+          </Button>
+
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
             <div className="flex items-center gap-3">
@@ -264,23 +252,6 @@ export const InitiativeTracker: React.FC = () => {
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Tokens
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleStartCombat}
-                disabled={initiativeOrder.length === 0}
-              >
-                <Swords className="h-4 w-4 mr-2" />
-                Start Combat
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMinimized(!isMinimized)}
-              >
-                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
               </Button>
             </div>
           </div>

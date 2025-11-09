@@ -17,6 +17,7 @@ import {
   Swords,
   Lock,
   LockOpen,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LayerStackModal } from './LayerStackModal';
@@ -54,7 +55,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
   
   const { enabled: fogEnabled } = useFogStore();
-  const { isInCombat, isTrackerVisible, restrictMovement, setTrackerVisible, setRestrictMovement } = useInitiativeStore();
+  const { isInCombat, isTrackerVisible, restrictMovement, setTrackerVisible, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
 
   return (
     <TooltipProvider>
@@ -113,20 +114,45 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
 
           <div className="h-px bg-border" />
 
-          {/* Initiative / Combat */}
+          {/* Show/Hide Roster */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isTrackerVisible ? "default" : "ghost"}
+                size="icon"
+                onClick={() => setTrackerVisible(!isTrackerVisible)}
+                className="w-10 h-10"
+              >
+                <Users className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>{isTrackerVisible ? 'Hide' : 'Show'} Initiative Roster</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Start/Stop Combat */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant={isInCombat ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setTrackerVisible(!isTrackerVisible)}
+                onClick={() => {
+                  if (isInCombat) {
+                    endCombat();
+                    toast.success('Combat ended');
+                  } else {
+                    startCombat();
+                    toast.success('Combat started!');
+                  }
+                }}
                 className="w-10 h-10"
               >
                 <Swords className="w-5 h-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Initiative {isInCombat ? '(Active)' : ''}</p>
+              <p>{isInCombat ? 'End' : 'Start'} Combat</p>
             </TooltipContent>
           </Tooltip>
 
