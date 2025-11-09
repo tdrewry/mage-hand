@@ -16,6 +16,7 @@ interface InitiativeCardProps {
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
+  isCompact?: boolean;
 }
 
 export const InitiativeCard: React.FC<InitiativeCardProps> = ({
@@ -28,7 +29,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   onInitiativeChange,
   onDragStart,
   onDragOver,
-  onDrop
+  onDrop,
+  isCompact = false
 }) => {
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
   const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
@@ -49,25 +51,31 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing min-w-[120px]",
+        "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing min-w-[120px]",
+        isCompact ? "gap-1 p-2" : "gap-2 p-3",
         isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
         !isActive && hasGone && "opacity-60 border-border bg-muted/50",
         !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
       )}
     >
       {/* Remove Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
-        onClick={onRemove}
-      >
-        <X className="h-3 w-3" />
-      </Button>
+      {!isCompact && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      )}
 
       {/* Initiative Number */}
       <div className="flex items-center justify-center w-full">
-        {isEditingInitiative ? (
+        {isEditingInitiative && !isCompact ? (
           <Input
             type="number"
             value={initiativeValue}
@@ -79,11 +87,18 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
             }}
             className="w-16 h-8 text-center text-xl font-bold"
             autoFocus
+            onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <div
-            onClick={() => setIsEditingInitiative(true)}
-            className="text-2xl font-bold text-primary cursor-pointer hover:text-primary/80"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isCompact) setIsEditingInitiative(true);
+            }}
+            className={cn(
+              "font-bold text-primary",
+              isCompact ? "text-lg" : "text-2xl cursor-pointer hover:text-primary/80"
+            )}
           >
             {initiative}
           </div>
@@ -91,7 +106,10 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       </div>
 
       {/* Token Image or Color */}
-      <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-border">
+      <div className={cn(
+        "rounded-lg overflow-hidden border-2 border-border",
+        isCompact ? "w-12 h-12" : "w-16 h-16"
+      )}>
         {token.imageUrl ? (
           <img
             src={token.imageUrl}
@@ -107,9 +125,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       </div>
 
       {/* Token Label */}
-      <div className="text-sm font-medium text-center text-foreground truncate max-w-full px-1">
-        {token.label || token.name}
-      </div>
+      {!isCompact && (
+        <div className="text-sm font-medium text-center text-foreground truncate max-w-full px-1">
+          {token.label || token.name}
+        </div>
+      )}
 
       {/* Active Indicator */}
       {isActive && (

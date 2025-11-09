@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Button } from './ui/button';
 import { InitiativeCard } from './InitiativeCard';
+import { TurnCard } from './TurnCard';
 import { InitiativeEntryModal } from './InitiativeEntryModal';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -10,7 +11,6 @@ import {
   ChevronRight, 
   Plus, 
   RotateCcw,
-  Trash2,
   Minimize2,
   Maximize2,
   Lock,
@@ -110,6 +110,143 @@ export const InitiativeTracker: React.FC = () => {
     return null;
   }
 
+  // Combat mode: streamlined horizontal layout
+  if (isInCombat) {
+    return (
+      <>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl">
+            <div className="flex items-center gap-2 p-2">
+              {/* Previous Turn Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={previousTurn}
+                disabled={currentTurnIndex === 0 && roundNumber === 1}
+                className="shrink-0"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+
+              {/* Scrollable Token/Turn Cards */}
+              <div 
+                ref={scrollContainerRef}
+                className="flex gap-2 overflow-x-auto flex-1"
+                style={{ scrollbarWidth: 'thin' }}
+              >
+                {/* Turn Card */}
+                <TurnCard
+                  turnNumber={currentTurnIndex + 1}
+                  roundNumber={roundNumber}
+                  totalTokens={initiativeOrder.length}
+                  isCompact={isMinimized}
+                />
+
+                {/* Token Cards */}
+                {initiativeOrder.map((entry, index) => {
+                  const token = tokens.find(t => t.id === entry.tokenId);
+                  if (!token) return null;
+
+                  return (
+                    <div
+                      key={entry.tokenId}
+                      data-active={index === currentTurnIndex}
+                    >
+                      <InitiativeCard
+                        token={token}
+                        initiative={entry.initiative}
+                        isActive={index === currentTurnIndex}
+                        hasGone={entry.hasGone}
+                        onClick={() => handleCardClick(entry.tokenId)}
+                        onRemove={() => {
+                          removeFromInitiative(entry.tokenId);
+                          toast.success('Removed from initiative');
+                        }}
+                        onInitiativeChange={(newInit) => {
+                          updateInitiative(entry.tokenId, newInit);
+                          toast.success('Initiative updated');
+                        }}
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, index)}
+                        isCompact={isMinimized}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Next Turn Button */}
+              <Button
+                variant="default"
+                size="icon"
+                onClick={handleNextTurn}
+                className="shrink-0"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+
+              {/* Controls - only show when expanded */}
+              {!isMinimized && (
+                <>
+                  <div className="h-8 w-px bg-border mx-1" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRestrictMovement(!restrictMovement)}
+                    title={restrictMovement ? "Only active token can move" : "All tokens can move"}
+                    className="shrink-0"
+                  >
+                    {restrictMovement ? (
+                      <Lock className="h-4 w-4 mr-2" />
+                    ) : (
+                      <LockOpen className="h-4 w-4 mr-2" />
+                    )}
+                    {restrictMovement ? 'Locked' : 'Free'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetRound}
+                    className="shrink-0"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleEndCombat}
+                    className="shrink-0"
+                  >
+                    End
+                  </Button>
+                </>
+              )}
+
+              {/* Minimize/Maximize Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="shrink-0"
+              >
+                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <InitiativeEntryModal
+          open={showAddModal}
+          onOpenChange={setShowAddModal}
+          tokens={availableTokens}
+          onAddToInitiative={handleAddToInitiative}
+        />
+      </>
+    );
+  }
+
+  // Setup mode: traditional layout with header and controls
   return (
     <>
       <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
@@ -118,70 +255,28 @@ export const InitiativeTracker: React.FC = () => {
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
             <div className="flex items-center gap-3">
               <Swords className="h-5 w-5 text-primary" />
-              <div>
-                <h3 className="font-bold text-foreground">Initiative Tracker</h3>
-                {isInCombat && (
-                  <p className="text-xs text-muted-foreground">
-                    Round {roundNumber} • {currentToken?.label || currentToken?.name || 'No active token'}'s turn
-                  </p>
-                )}
-              </div>
+              <h3 className="font-bold text-foreground">Initiative Tracker</h3>
             </div>
 
             <div className="flex items-center gap-2">
-              {!isInCombat ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddModal(true)}
-                    disabled={availableTokens.length === 0}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Tokens
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleStartCombat}
-                    disabled={initiativeOrder.length === 0}
-                  >
-                    <Swords className="h-4 w-4 mr-2" />
-                    Start Combat
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRestrictMovement(!restrictMovement)}
-                    title={restrictMovement ? "Only active token can move" : "All tokens can move"}
-                  >
-                    {restrictMovement ? (
-                      <Lock className="h-4 w-4 mr-2" />
-                    ) : (
-                      <LockOpen className="h-4 w-4 mr-2" />
-                    )}
-                    {restrictMovement ? 'Active Only' : 'All Tokens'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetRound}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reset Round
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleEndCombat}
-                  >
-                    End Combat
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddModal(true)}
+                disabled={availableTokens.length === 0}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tokens
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleStartCombat}
+                disabled={initiativeOrder.length === 0}
+              >
+                <Swords className="h-4 w-4 mr-2" />
+                Start Combat
+              </Button>
               
               <Button
                 variant="ghost"
@@ -210,13 +305,12 @@ export const InitiativeTracker: React.FC = () => {
                     return (
                       <div
                         key={entry.tokenId}
-                        data-active={isInCombat && index === currentTurnIndex}
                       >
                         <InitiativeCard
                           token={token}
                           initiative={entry.initiative}
-                          isActive={isInCombat && index === currentTurnIndex}
-                          hasGone={entry.hasGone}
+                          isActive={false}
+                          hasGone={false}
                           onClick={() => handleCardClick(entry.tokenId)}
                           onRemove={() => {
                             removeFromInitiative(entry.tokenId);
@@ -245,34 +339,6 @@ export const InitiativeTracker: React.FC = () => {
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Tokens
-                  </Button>
-                </div>
-              )}
-
-              {/* Turn Controls */}
-              {isInCombat && initiativeOrder.length > 0 && (
-                <div className="flex items-center justify-center gap-4 px-4 pb-4">
-                  <Button
-                    variant="outline"
-                    onClick={previousTurn}
-                    disabled={currentTurnIndex === 0 && roundNumber === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Previous
-                  </Button>
-                  
-                  <div className="px-6 py-2 bg-primary/10 border border-primary rounded-lg">
-                    <span className="text-sm font-medium text-primary">
-                      Turn {currentTurnIndex + 1} of {initiativeOrder.length}
-                    </span>
-                  </div>
-
-                  <Button
-                    variant="default"
-                    onClick={handleNextTurn}
-                  >
-                    End Turn
-                    <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
               )}
