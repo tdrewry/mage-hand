@@ -73,6 +73,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const layerCard = cards.find((c) => c.type === CardType.LAYERS);
+  const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
 
   const handleToggleFogCard = () => {
     if (fogCard) {
@@ -102,6 +103,23 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
         minSize: { width: 250, height: 400 },
         isResizable: true,
         isClosable: true,
+      });
+    }
+  };
+
+  const handleToggleRosterCard = () => {
+    if (rosterCard) {
+      setVisibility(rosterCard.id, !rosterCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.ROSTER,
+        title: 'Roster',
+        defaultPosition: { x: window.innerWidth - 320, y: 80 },
+        defaultSize: { width: 300, height: 500 },
+        minSize: { width: 250, height: 300 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -167,16 +185,16 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={isTrackerVisible ? "default" : "ghost"}
+                variant={rosterCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setTrackerVisible(!isTrackerVisible)}
+                onClick={handleToggleRosterCard}
                 className="w-10 h-10"
               >
                 <Users className="w-5 h-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>{isTrackerVisible ? 'Hide' : 'Show'} Initiative Roster</p>
+              <p>{rosterCard?.isVisible ? 'Hide' : 'Show'} Roster</p>
             </TooltipContent>
           </Tooltip>
 
