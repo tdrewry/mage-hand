@@ -74,6 +74,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const layerCard = cards.find((c) => c.type === CardType.LAYERS);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
+  const initiativeCard = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
 
   const handleToggleFogCard = () => {
     if (fogCard) {
@@ -207,9 +208,28 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
                 onClick={() => {
                   if (isInCombat) {
                     endCombat();
+                    // Hide initiative tracker
+                    if (initiativeCard) {
+                      setVisibility(initiativeCard.id, false);
+                    }
                     toast.success('Combat ended');
                   } else {
                     startCombat();
+                    // Show/register initiative tracker
+                    if (initiativeCard) {
+                      setVisibility(initiativeCard.id, true);
+                    } else {
+                      registerCard({
+                        type: CardType.INITIATIVE_TRACKER,
+                        title: 'Initiative Tracker',
+                        defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+                        defaultSize: { width: 800, height: 140 },
+                        minSize: { width: 400, height: 120 },
+                        isResizable: true,
+                        isClosable: true,
+                        defaultVisible: true,
+                      });
+                    }
                     toast.success('Combat started!');
                   }
                 }}
