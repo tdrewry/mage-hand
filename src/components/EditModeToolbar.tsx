@@ -17,6 +17,8 @@ import {
   Trash2,
   FileDown,
   Layers,
+  Plus,
+  Palette,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -24,6 +26,8 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { toast } from 'sonner';
 import { LayerStackModal } from './LayerStackModal';
 import { WatabouImportModal } from './modals/WatabouImportModal';
+import { TokenPanelModal } from './modals/TokenPanelModal';
+import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 
 interface EditModeToolbarProps {
@@ -41,6 +45,11 @@ interface EditModeToolbarProps {
   showRegions: boolean;
   onToggleRegions: () => void;
   fabricCanvas?: FabricCanvas | null;
+  onAddToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void;
+  gridColor: string;
+  gridOpacity: number;
+  onGridColorChange: (color: string) => void;
+  onGridOpacityChange: (opacity: number) => void;
 }
 
 export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
@@ -58,9 +67,16 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
   showRegions,
   onToggleRegions,
   fabricCanvas,
+  onAddToken,
+  gridColor,
+  gridOpacity,
+  onGridColorChange,
+  onGridOpacityChange,
 }) => {
   const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
+  const [tokensModalOpen, setTokensModalOpen] = useState(false);
+  const [backgroundModalOpen, setBackgroundModalOpen] = useState(false);
   
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
@@ -105,6 +121,40 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Map Manager</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Tokens */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTokensModalOpen(true)}
+                className="w-10 h-10"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Tokens</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Background & Grid */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setBackgroundModalOpen(true)}
+                className="w-10 h-10"
+              >
+                <Palette className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Background & Grid</p>
             </TooltipContent>
           </Tooltip>
 
@@ -289,6 +339,22 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
       </div>
 
       {/* Modals */}
+      <TokenPanelModal
+        open={tokensModalOpen}
+        onOpenChange={setTokensModalOpen}
+        onAddToken={onAddToken}
+      />
+
+      <BackgroundGridModal
+        open={backgroundModalOpen}
+        onOpenChange={setBackgroundModalOpen}
+        fabricCanvas={fabricCanvas}
+        gridColor={gridColor}
+        gridOpacity={gridOpacity}
+        onGridColorChange={onGridColorChange}
+        onGridOpacityChange={onGridOpacityChange}
+      />
+
       <LayerStackModal 
         open={layerModalOpen}
         onOpenChange={setLayerModalOpen}
