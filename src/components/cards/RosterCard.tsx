@@ -8,11 +8,9 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { 
-  Swords, 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
-  RotateCcw
+  Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,8 +24,6 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
     currentTurnIndex,
     roundNumber,
     initiativeOrder,
-    startCombat,
-    endCombat,
     nextTurn,
     previousTurn,
     removeFromInitiative,
@@ -48,20 +44,6 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
   const handleAddToInitiative = (tokenId: string, initiative: number) => {
     useInitiativeStore.getState().addToInitiative(tokenId, initiative);
     toast.success('Added to initiative');
-  };
-
-  const handleStartCombat = () => {
-    if (initiativeOrder.length === 0) {
-      toast.error('Add tokens to initiative first');
-      return;
-    }
-    startCombat();
-    toast.success('Combat started!');
-  };
-
-  const handleEndCombat = () => {
-    endCombat();
-    toast.success('Combat ended');
   };
 
   const handleNextTurn = () => {
@@ -182,15 +164,6 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
           </Button>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleEndCombat}
-          className="w-full"
-        >
-          End Combat
-        </Button>
-
         <InitiativeEntryModal
           open={showAddModal}
           onOpenChange={setShowAddModal}
@@ -206,7 +179,6 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Swords className="h-4 w-4 text-primary" />
           <span className="font-semibold text-sm">Initiative</span>
         </div>
         <Button
@@ -255,14 +227,6 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
               );
             })}
           </div>
-
-          <Button
-            variant="default"
-            onClick={handleStartCombat}
-            className="w-full"
-          >
-            Start Combat
-          </Button>
         </>
       ) : (
         <div className="py-8 text-center text-muted-foreground">

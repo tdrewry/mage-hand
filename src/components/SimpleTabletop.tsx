@@ -17,6 +17,7 @@ import { TokenContextManager } from './TokenContextManager';
 import { EditModeToolbar } from './EditModeToolbar';
 import { PlayModeToolbar } from './PlayModeToolbar';
 import { CardManager } from './CardManager';
+import { InitiativeTracker } from './InitiativeTracker';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -4135,6 +4136,9 @@ export const SimpleTabletop = () => {
       
       {/* Card-Based UI System */}
       <CardManager />
+      
+      {/* Initiative Tracker - Docked at top middle */}
+      <InitiativeTracker />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {

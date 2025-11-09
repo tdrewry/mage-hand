@@ -6,11 +6,9 @@ import { InitiativeEntryModal } from './InitiativeEntryModal';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { 
-  Swords, 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
-  RotateCcw,
+  Plus,
   Minimize2,
   Maximize2
 } from 'lucide-react';
@@ -24,8 +22,6 @@ export const InitiativeTracker: React.FC = () => {
     roundNumber,
     initiativeOrder,
     isTrackerVisible,
-    startCombat,
-    endCombat,
     nextTurn,
     previousTurn,
     removeFromInitiative,
@@ -47,20 +43,6 @@ export const InitiativeTracker: React.FC = () => {
   const handleAddToInitiative = (tokenId: string, initiative: number) => {
     useInitiativeStore.getState().addToInitiative(tokenId, initiative);
     toast.success('Added to initiative');
-  };
-
-  const handleStartCombat = () => {
-    if (initiativeOrder.length === 0) {
-      toast.error('Add tokens to initiative first');
-      return;
-    }
-    startCombat();
-    toast.success('Combat started!');
-  };
-
-  const handleEndCombat = () => {
-    endCombat();
-    toast.success('Combat ended');
   };
 
   const handleNextTurn = () => {
@@ -239,7 +221,6 @@ export const InitiativeTracker: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
             <div className="flex items-center gap-3">
-              <Swords className="h-5 w-5 text-primary" />
               <h3 className="font-bold text-foreground">Initiative Tracker</h3>
             </div>
 
