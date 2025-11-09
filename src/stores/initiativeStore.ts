@@ -65,7 +65,8 @@ export const useInitiativeStore = create<InitiativeState>()(
           isInCombat: false,
           currentTurnIndex: 0,
           roundNumber: 1,
-          initiativeOrder: []
+          initiativeOrder: [],
+          restrictMovement: false
         });
       },
       
