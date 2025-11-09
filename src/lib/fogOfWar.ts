@@ -23,16 +23,17 @@ export interface Token {
 }
 
 /**
- * Compute current visibility from token positions
+ * Compute current visibility from token positions with circular vision
  * Uses wall geometry (negative space) to filter out tokens in walls,
  * and uses wall segments as obstacles for visibility calculation
+ * @param visionRangePixels Vision range in pixels (already converted from grid units)
  * @returns paper.js Path (not Path2D) for boolean operations
  */
 export async function computeTokenVisibilityPaper(
   tokens: Token[],
   wallSegments: LineSegment[],
   wallGeometry: any | null,
-  visionRange: number = 300
+  visionRangePixels: number = 300
 ): Promise<any> {
   const paper = await import('paper');
   
@@ -66,19 +67,32 @@ export async function computeTokenVisibilityPaper(
     const visibility = computeVisibilityFromSegments(
       { x: token.x, y: token.y },
       wallSegments,
-      visionRange
+      visionRangePixels
     );
     
     // Convert visibility polygon to paper.js path
     const paperPath = visibilityPolygonToPaperPath(visibility.polygon);
     
+    // Create circular clipping mask for this token
+    const circle = new paper.Path.Circle({
+      center: new paper.Point(token.x, token.y),
+      radius: visionRangePixels,
+    });
+    
+    // Intersect visibility polygon with circle to create circular vision
+    const circularVision = paperPath.intersect(circle, { insert: false });
+    
+    // Clean up temporary paths
+    if (paperPath.remove) paperPath.remove();
+    if (circle.remove) circle.remove();
+    
     if (!combinedVisibility) {
-      combinedVisibility = paperPath;
+      combinedVisibility = circularVision;
     } else {
       // Union with previous visibility
-      const united = combinedVisibility.unite(paperPath, { insert: false });
+      const united = combinedVisibility.unite(circularVision, { insert: false });
       if (combinedVisibility.remove) combinedVisibility.remove();
-      if (paperPath.remove) paperPath.remove();
+      if (circularVision.remove) circularVision.remove();
       combinedVisibility = united;
     }
   }

@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 export interface FogSettings {
   enabled: boolean;
   revealAll: boolean; // DM mode - show entire map
-  visionRange: number; // Default token vision range in pixels
+  visionRange: number; // Default token vision range in grid units
   fogOpacity: number; // 0-1, how dark the fog is for unexplored areas
   exploredOpacity: number; // 0-1, how dark explored but not visible areas are
   showExploredAreas: boolean; // Whether to show previously explored areas as dimmed
@@ -31,7 +31,7 @@ export const useFogStore = create<FogState>()(
       // Initial state
       enabled: false,
       revealAll: false,
-      visionRange: 300,
+      visionRange: 6, // 6 grid units default
       fogOpacity: 0.95,
       exploredOpacity: 0.4,
       showExploredAreas: true,
@@ -43,7 +43,7 @@ export const useFogStore = create<FogState>()(
       
       setRevealAll: (revealAll) => set({ revealAll }),
       
-      setVisionRange: (range) => set({ visionRange: Math.max(50, Math.min(1000, range)) }),
+      setVisionRange: (range) => set({ visionRange: Math.max(1, Math.min(50, range)) }),
       
       setFogOpacity: (opacity) => set({ fogOpacity: Math.max(0, Math.min(1, opacity)) }),
       
@@ -59,7 +59,7 @@ export const useFogStore = create<FogState>()(
         set({
           enabled: false,
           revealAll: false,
-          visionRange: 300,
+          visionRange: 6, // 6 grid units default
           fogOpacity: 0.95,
           exploredOpacity: 0.4,
           showExploredAreas: true,

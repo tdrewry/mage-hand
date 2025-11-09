@@ -314,11 +314,30 @@ export const SimpleTabletop = () => {
       // Compute visibility asynchronously
       const computeFog = async () => {
         try {
+          // Convert vision range from grid units to pixels
+          // Use average grid size from tokens' regions or default to 40
+          let totalGridSize = 0;
+          let regionsFound = 0;
+          
+          tokens.forEach(token => {
+            const tokenRegion = regions.find(r => 
+              token.x >= r.x && token.x <= r.x + r.width &&
+              token.y >= r.y && token.y <= r.y + r.height
+            );
+            if (tokenRegion) {
+              totalGridSize += tokenRegion.gridSize;
+              regionsFound++;
+            }
+          });
+          
+          const avgGridSize = regionsFound > 0 ? totalGridSize / regionsFound : 40;
+          const visionRangePixels = fogVisionRange * avgGridSize;
+          
           const tokenVisibilityPaper = await computeTokenVisibilityPaper(
             tokens,
             wallGeometry.wallSegments,
             wallGeometry,
-            fogVisionRange
+            visionRangePixels
           );
           
           if (!tokenVisibilityPaper || !fogScopeRef.current) return;

@@ -97,20 +97,20 @@ export const FogControlModal = ({ open, onOpenChange }: FogControlModalProps) =>
                 <Circle className="h-4 w-4" />
                 Token Vision Range
               </Label>
-              <span className="text-sm font-medium">{visionRange}px</span>
+              <span className="text-sm font-medium">{visionRange} grid units</span>
             </div>
             <Slider
               id="vision-range"
-              min={50}
-              max={1000}
-              step={50}
+              min={1}
+              max={20}
+              step={1}
               value={[visionRange]}
               onValueChange={([value]) => setVisionRange(value)}
               disabled={!enabled}
               className="w-full"
             />
             <p className="text-xs text-muted-foreground">
-              How far tokens can see through fog
+              How far tokens can see through fog (in grid squares)
             </p>
           </div>
 
