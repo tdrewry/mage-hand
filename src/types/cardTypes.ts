@@ -48,4 +48,6 @@ export interface CardState {
   isMinimized: boolean;
   isVisible: boolean;
   zIndex: number;
+  hideHeader?: boolean;
+  fullCardDraggable?: boolean;
 }

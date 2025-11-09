@@ -172,6 +172,8 @@ export const useCardStore = create<CardStore>((set, get) => ({
           isMinimized: config.defaultMinimized || false,
           isVisible: config.defaultVisible ?? false,
           zIndex: state.nextZIndex,
+          hideHeader: config.hideHeader ?? defaultConfig.hideHeader,
+          fullCardDraggable: config.fullCardDraggable ?? defaultConfig.fullCardDraggable,
         },
       ],
       nextZIndex: state.nextZIndex + 1,

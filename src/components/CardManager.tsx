@@ -65,6 +65,8 @@ export function CardManager({ children }: CardManagerProps) {
             title={getCardTitle(card.type)}
             isResizable={true}
             isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
+            hideHeader={card.hideHeader}
+            fullCardDraggable={card.fullCardDraggable}
           >
             {content}
           </BaseCard>
