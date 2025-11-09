@@ -12,9 +12,7 @@ import {
   Plus, 
   RotateCcw,
   Minimize2,
-  Maximize2,
-  Lock,
-  LockOpen
+  Maximize2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -26,7 +24,6 @@ export const InitiativeTracker: React.FC = () => {
     roundNumber,
     initiativeOrder,
     isTrackerVisible,
-    restrictMovement,
     startCombat,
     endCombat,
     nextTurn,
@@ -35,7 +32,6 @@ export const InitiativeTracker: React.FC = () => {
     reorderInitiative,
     updateInitiative,
     setTrackerVisible,
-    setRestrictMovement,
     resetRound
   } = useInitiativeStore();
 
@@ -205,20 +201,6 @@ export const InitiativeTracker: React.FC = () => {
               {!isMinimized && (
                 <>
                   <div className="h-8 w-px bg-border mx-1" />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRestrictMovement(!restrictMovement)}
-                    title={restrictMovement ? "Only active token can move" : "All tokens can move"}
-                    className="shrink-0"
-                  >
-                    {restrictMovement ? (
-                      <Lock className="h-4 w-4 mr-2" />
-                    ) : (
-                      <LockOpen className="h-4 w-4 mr-2" />
-                    )}
-                    {restrictMovement ? 'Locked' : 'Free'}
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

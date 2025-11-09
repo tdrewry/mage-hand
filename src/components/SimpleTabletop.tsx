@@ -3153,11 +3153,18 @@ export const SimpleTabletop = () => {
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
-        // Check if movement is restricted during combat
-        if (isInCombat && restrictMovement) {
-          const currentEntry = initiativeOrder[currentTurnIndex];
-          if (currentEntry?.tokenId !== clickedToken.id) {
-            toast.error('Can only move the active token during their turn');
+        // Check if movement is restricted
+        if (restrictMovement) {
+          if (isInCombat) {
+            // In combat: only active token can move
+            const currentEntry = initiativeOrder[currentTurnIndex];
+            if (currentEntry?.tokenId !== clickedToken.id) {
+              toast.error('Can only move the active token during their turn');
+              return;
+            }
+          } else {
+            // Out of combat: no token movement allowed (GM only mode)
+            toast.error('Token movement is locked. Unlock to move tokens.');
             return;
           }
         }

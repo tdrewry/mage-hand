@@ -15,6 +15,8 @@ import {
   Layers,
   Grid3X3,
   Swords,
+  Lock,
+  LockOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LayerStackModal } from './LayerStackModal';
@@ -52,7 +54,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
   
   const { enabled: fogEnabled } = useFogStore();
-  const { isInCombat, isTrackerVisible, setTrackerVisible } = useInitiativeStore();
+  const { isInCombat, isTrackerVisible, restrictMovement, setTrackerVisible, setRestrictMovement } = useInitiativeStore();
 
   return (
     <TooltipProvider>
@@ -125,6 +127,28 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Initiative {isInCombat ? '(Active)' : ''}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Movement Lock */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={restrictMovement ? "default" : "ghost"}
+                size="icon"
+                onClick={() => setRestrictMovement(!restrictMovement)}
+                className="w-10 h-10"
+              >
+                {restrictMovement ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>
+                {isInCombat 
+                  ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 
+                  : (restrictMovement ? 'GM Only' : 'Free Movement')
+                }
+              </p>
             </TooltipContent>
           </Tooltip>
 
