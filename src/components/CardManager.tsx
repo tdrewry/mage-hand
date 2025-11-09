@@ -9,6 +9,7 @@ import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { useCardStore } from '@/stores/cardStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { CardType } from '@/types/cardTypes';
 
 interface CardManagerProps {
@@ -18,11 +19,36 @@ interface CardManagerProps {
 export function CardManager({ children }: CardManagerProps) {
   const cards = useCardStore((state) => state.cards);
   const loadLayout = useCardStore((state) => state.loadLayout);
+  const { addToken } = useSessionStore();
 
   // Load saved layout on mount
   useEffect(() => {
     loadLayout();
   }, [loadLayout]);
+
+  // Wrapper function to convert token panel params to Token object
+  const handleAddToken = (
+    imageUrl: string, 
+    x: number = 100, 
+    y: number = 100, 
+    gridWidth: number = 1, 
+    gridHeight: number = 1, 
+    color?: string
+  ) => {
+    const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newToken = {
+      id: tokenId,
+      name: `Token ${tokenId.slice(-4)}`,
+      imageUrl,
+      x,
+      y,
+      gridWidth,
+      gridHeight,
+      label: `Token ${tokenId.slice(-4)}`,
+      color,
+    };
+    addToken(newToken);
+  };
 
   return (
     <>
@@ -30,7 +56,7 @@ export function CardManager({ children }: CardManagerProps) {
       
       {/* Render all registered cards */}
       {cards.map((card) => {
-        const content = renderCardContent(card.id, card.type);
+        const content = renderCardContent(card.id, card.type, handleAddToken);
         return (
           <BaseCard
             key={card.id}
@@ -69,7 +95,11 @@ function getCardTitle(type: CardType): string {
 }
 
 // Helper function to render card-specific content
-function renderCardContent(cardId: string, type: CardType): React.ReactNode {
+function renderCardContent(
+  cardId: string, 
+  type: CardType, 
+  addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void
+): React.ReactNode {
   switch (type) {
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
@@ -78,10 +108,7 @@ function renderCardContent(cardId: string, type: CardType): React.ReactNode {
     case CardType.LAYERS:
       return <LayerStackCardContent />;
     case CardType.TOKENS:
-      return <TokenPanelCardContent onAddToken={(imageUrl, x, y, gridWidth, gridHeight, color) => {
-        // TODO: Wire up to actual token adding function from SimpleTabletop
-        console.log('Add token:', { imageUrl, x, y, gridWidth, gridHeight, color });
-      }} />;
+      return <TokenPanelCardContent onAddToken={addToken} />;
     case CardType.MAP_CONTROLS:
       return <MapControlsCardContent fabricCanvas={null} />; // TODO: Pass actual fabricCanvas
     case CardType.WATABOU_IMPORT:
