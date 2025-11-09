@@ -1054,20 +1054,7 @@ export const SimpleTabletop = () => {
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
     
-    // Draw visible tokens
-    visibleTokens.forEach(token => {
-      // Use temporary position if available (during region drag)
-      const tempPos = tempTokenPositions?.[token.id];
-      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-      drawToken(ctx, renderToken);
-    });
-    
-    // Draw light sources in edit mode using new system
-    if (renderingMode === 'edit' && lights.length > 0) {
-      renderLightSources(ctx, lights, transform);
-    }
-    
-    // Draw annotations on top of tokens with selection highlight
+    // Draw annotations (markers) below tokens so tokens are visible
     annotations.forEach((annotation) => {
       ctx.save();
       const { x, y } = annotation.position;
@@ -1104,6 +1091,19 @@ export const SimpleTabletop = () => {
       
       ctx.restore();
     });
+    
+    // Draw visible tokens (on top of markers)
+    visibleTokens.forEach(token => {
+      // Use temporary position if available (during region drag)
+      const tempPos = tempTokenPositions?.[token.id];
+      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+      drawToken(ctx, renderToken);
+    });
+    
+    // Draw light sources in edit mode using new system
+    if (renderingMode === 'edit' && lights.length > 0) {
+      renderLightSources(ctx, lights, transform);
+    }
     
     // Draw current path being drawn
     if (pathDrawingMode === 'drawing' && currentPath.length > 0) {
