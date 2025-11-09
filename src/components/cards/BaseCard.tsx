@@ -42,42 +42,11 @@ export function BaseCard({
   const bringToFront = useCardStore((state) => state.bringToFront);
   const saveLayout = useCardStore((state) => state.saveLayout);
 
-  if (!card || !card.isVisible) return null;
-
-  const { position, size, isMinimized, zIndex } = card;
-
-  // Handle drag start
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
-    if ((e.target as HTMLElement).closest('button')) return; // Don't drag when clicking buttons
-    
-    bringToFront(id);
-    setIsDragging(true);
-    setDragOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-  };
-
-  // Handle resize start
-  const handleResizeMouseDown = (e: React.MouseEvent) => {
-    if (!isResizable) return;
-    e.stopPropagation();
-    
-    bringToFront(id);
-    setIsResizing(true);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: size.width,
-      height: size.height,
-    });
-  };
-
   // Handle mouse move for dragging and resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
+      if (isDragging && card) {
+        const { position, size } = card;
         const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, window.innerWidth - size.width));
         const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, window.innerHeight - 40));
         
@@ -115,7 +84,39 @@ export function BaseCard({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, isResizing, dragOffset, resizeStart, id, size, minSize, maxSize, updateCardPosition, updateCardSize, saveLayout]);
+  }, [isDragging, isResizing, dragOffset, resizeStart, id, card, minSize, maxSize, updateCardPosition, updateCardSize, saveLayout]);
+
+  if (!card || !card.isVisible) return null;
+
+  const { position, size, isMinimized, zIndex } = card;
+
+  // Handle drag start
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    if ((e.target as HTMLElement).closest('button')) return; // Don't drag when clicking buttons
+    
+    bringToFront(id);
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
+
+  // Handle resize start
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    if (!isResizable || !card) return;
+    e.stopPropagation();
+    
+    bringToFront(id);
+    setIsResizing(true);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      width: card.size.width,
+      height: card.size.height,
+    });
+  };
 
   const handleMinimize = () => {
     toggleMinimize(id);
