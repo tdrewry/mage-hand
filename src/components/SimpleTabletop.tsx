@@ -13,7 +13,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';
-import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
 import { EditModeToolbar } from './EditModeToolbar';
 import { PlayModeToolbar } from './PlayModeToolbar';
@@ -3958,6 +3957,7 @@ export const SimpleTabletop = () => {
       {/* Toolbar */}
       <Toolbar 
         sessionId={sessionId}
+        fabricCanvas={null}
       />
       
       {/* Edit Mode Toolbar - Only in Edit Mode */}
@@ -4003,7 +4003,10 @@ export const SimpleTabletop = () => {
           showRegions={showRegions}
           onToggleRegions={() => setShowRegions(!showRegions)}
           fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
+          gridColor={gridColor}
+          gridOpacity={gridOpacity}
+          onGridColorChange={setGridColor}
+          onGridOpacityChange={setGridOpacity}
         />
       )}
 
@@ -4052,18 +4055,6 @@ export const SimpleTabletop = () => {
           onContextMenu={handleContextMenu}
         />
       </div>
-
-      {/* Floating Menu */}
-      <FloatingMenu
-        fabricCanvas={null}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={setGridColor}
-        onGridOpacityChange={setGridOpacity}
-        onAddToken={addTokenToCanvas}
-        onColorChange={handleTokenColorChange}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
 
       {/* Token Context Manager */}
       <TokenContextManager

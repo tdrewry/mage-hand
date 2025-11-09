@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Palette, Save, FolderOpen } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen } from 'lucide-react';
+import { MapControlsModal } from './modals/MapControlsModal';
+import { Canvas as FabricCanvas } from 'fabric';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,40 +15,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
-import { WATABOU_STYLES } from '../lib/watabouStyles';
 import { toast } from 'sonner';
 
 interface ToolbarProps {
   sessionId?: string;
+  fabricCanvas?: FabricCanvas | null;
 }
 
-export const Toolbar = ({ sessionId }: ToolbarProps) => {
+export const Toolbar = ({ sessionId, fabricCanvas }: ToolbarProps) => {
   const { tokens } = useSessionStore();
   const { regions } = useRegionStore();
-  const { renderingMode, setRenderingMode, setWatabouStyle } = useDungeonStore();
+  const { renderingMode, setRenderingMode } = useDungeonStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [mapControlsOpen, setMapControlsOpen] = useState(false);
   
   const toggleRenderingMode = () => {
     const newMode = renderingMode === 'edit' ? 'play' : 'edit';
     setRenderingMode(newMode);
     toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'Edit'} mode`);
-  };
-  
-  const selectStyle = (styleName: string) => {
-    const style = WATABOU_STYLES[styleName];
-    if (style) {
-      setWatabouStyle(style);
-      toast.success(`Applied "${styleName}" style`);
-    }
   };
   
   const shareSession = () => {
@@ -176,32 +165,12 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
             Delete
           </Button>
           
-          {renderingMode === 'play' && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="text-foreground border-border hover:bg-secondary"
-                  title="Select map style"
-                >
-                  <Palette className="h-4 w-4 mr-2" />
-                  Style
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover">
-                {Object.keys(WATABOU_STYLES).map((styleName) => (
-                  <DropdownMenuItem key={styleName} onClick={() => selectStyle(styleName)}>
-                    {styleName}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <Separator orientation="vertical" className="h-6" />
           
           <Button 
             variant="outline" 
             size="sm"
+            onClick={() => setMapControlsOpen(true)}
             className="text-foreground border-border hover:bg-secondary"
           >
             <Map className="h-4 w-4 mr-2" />
@@ -231,6 +200,13 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Map Controls Modal */}
+      <MapControlsModal
+        open={mapControlsOpen}
+        onOpenChange={setMapControlsOpen}
+        fabricCanvas={fabricCanvas || null}
+      />
     </div>
   );
 };
