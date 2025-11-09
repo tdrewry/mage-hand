@@ -21,6 +21,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
+import { useInitiativeStore } from '../stores/initiativeStore';
 import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
 import { generateNegativeSpaceRegion } from '../lib/wallGeometry';
 import { 
@@ -261,11 +262,40 @@ export const SimpleTabletop = () => {
   } = useSessionStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+  
+  const { 
+    isInCombat, 
+    currentTurnIndex, 
+    initiativeOrder,
+    restrictMovement 
+  } = useInitiativeStore();
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {
     updateAllTokenHighlights();
   }, [tokens, regions]); // Re-run when tokens positions change or regions change
+  
+  // Listen for center on token events
+  useEffect(() => {
+    const handleCenterOnToken = (e: CustomEvent) => {
+      const { tokenId } = e.detail;
+      const token = tokens.find(t => t.id === tokenId);
+      if (token && canvasRef.current) {
+        const canvas = canvasRef.current;
+        // Center the viewport on the token
+        setTransform({
+          x: canvas.width / 2 - token.x * transform.zoom,
+          y: canvas.height / 2 - token.y * transform.zoom,
+          zoom: transform.zoom
+        });
+      }
+    };
+    
+    window.addEventListener('centerOnToken', handleCenterOnToken as EventListener);
+    return () => {
+      window.removeEventListener('centerOnToken', handleCenterOnToken as EventListener);
+    };
+  }, [tokens, transform.zoom]);
 
   // Initialize paper.js scope and load explored areas
   useEffect(() => {
@@ -2572,6 +2602,29 @@ export const SimpleTabletop = () => {
     const radius = tokenSize / 2;
     const isSelected = selectedTokenIds.includes(token.id);
     
+    // Check if this is the active token in combat
+    const currentEntry = initiativeOrder[currentTurnIndex];
+    const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
+    
+    // Draw active combat highlight (pulsing glow)
+    if (isActiveInCombat) {
+      ctx.save();
+      // Outer glow
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)'; // Gold
+      ctx.lineWidth = 6 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 6, 0, 2 * Math.PI);
+      ctx.stroke();
+      
+      // Inner glow
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+      ctx.lineWidth = 3 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 3, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+    
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -2710,10 +2763,10 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
-  // Redraw when transform, tokens, regions, or path changes
+  // Redraw when transform, tokens, regions, path, or combat state changes
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens, regions, currentPath]);
+  }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -3100,6 +3153,15 @@ export const SimpleTabletop = () => {
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
+        // Check if movement is restricted during combat
+        if (isInCombat && restrictMovement) {
+          const currentEntry = initiativeOrder[currentTurnIndex];
+          if (currentEntry?.tokenId !== clickedToken.id) {
+            toast.error('Can only move the active token during their turn');
+            return;
+          }
+        }
+        
         setIsDraggingToken(true);
         setDraggedTokenId(clickedToken.id);
         setDragOffset({

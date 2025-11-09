@@ -14,6 +14,7 @@ interface InitiativeState {
   roundNumber: number;
   initiativeOrder: InitiativeEntry[];
   isTrackerVisible: boolean;
+  restrictMovement: boolean;
   
   // Actions
   startCombat: () => void;
@@ -27,6 +28,7 @@ interface InitiativeState {
   setCurrentTurn: (index: number) => void;
   updateInitiative: (tokenId: string, newInitiative: number) => void;
   setTrackerVisible: (visible: boolean) => void;
+  setRestrictMovement: (restrict: boolean) => void;
   resetRound: () => void;
 }
 
@@ -38,6 +40,7 @@ export const useInitiativeStore = create<InitiativeState>()(
       roundNumber: 1,
       initiativeOrder: [],
       isTrackerVisible: true,
+      restrictMovement: true,
       
       startCombat: () => {
         const order = get().initiativeOrder;
@@ -169,6 +172,10 @@ export const useInitiativeStore = create<InitiativeState>()(
         set({ isTrackerVisible: visible });
       },
       
+      setRestrictMovement: (restrict) => {
+        set({ restrictMovement: restrict });
+      },
+      
       resetRound: () => {
         set((state) => ({
           currentTurnIndex: 0,
@@ -183,7 +190,8 @@ export const useInitiativeStore = create<InitiativeState>()(
         currentTurnIndex: state.currentTurnIndex,
         roundNumber: state.roundNumber,
         initiativeOrder: state.initiativeOrder,
-        isTrackerVisible: state.isTrackerVisible
+        isTrackerVisible: state.isTrackerVisible,
+        restrictMovement: state.restrictMovement
       })
     }
   )

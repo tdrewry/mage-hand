@@ -12,7 +12,9 @@ import {
   RotateCcw,
   Trash2,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Lock,
+  LockOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -24,6 +26,7 @@ export const InitiativeTracker: React.FC = () => {
     roundNumber,
     initiativeOrder,
     isTrackerVisible,
+    restrictMovement,
     startCombat,
     endCombat,
     nextTurn,
@@ -32,6 +35,7 @@ export const InitiativeTracker: React.FC = () => {
     reorderInitiative,
     updateInitiative,
     setTrackerVisible,
+    setRestrictMovement,
     resetRound
   } = useInitiativeStore();
 
@@ -70,6 +74,14 @@ export const InitiativeTracker: React.FC = () => {
       const activeCard = scrollContainerRef.current?.querySelector('[data-active="true"]');
       activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }, 100);
+  };
+
+  const handleCardClick = (tokenId: string) => {
+    // Dispatch event to center map on token
+    const event = new CustomEvent('centerOnToken', {
+      detail: { tokenId }
+    });
+    window.dispatchEvent(event);
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -143,6 +155,19 @@ export const InitiativeTracker: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setRestrictMovement(!restrictMovement)}
+                    title={restrictMovement ? "Only active token can move" : "All tokens can move"}
+                  >
+                    {restrictMovement ? (
+                      <Lock className="h-4 w-4 mr-2" />
+                    ) : (
+                      <LockOpen className="h-4 w-4 mr-2" />
+                    )}
+                    {restrictMovement ? 'Active Only' : 'All Tokens'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={resetRound}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
@@ -192,6 +217,7 @@ export const InitiativeTracker: React.FC = () => {
                           initiative={entry.initiative}
                           isActive={isInCombat && index === currentTurnIndex}
                           hasGone={entry.hasGone}
+                          onClick={() => handleCardClick(entry.tokenId)}
                           onRemove={() => {
                             removeFromInitiative(entry.tokenId);
                             toast.success('Removed from initiative');

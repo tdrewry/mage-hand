@@ -10,6 +10,7 @@ interface InitiativeCardProps {
   initiative: number;
   isActive: boolean;
   hasGone?: boolean;
+  onClick?: () => void;
   onRemove: () => void;
   onInitiativeChange: (newInitiative: number) => void;
   onDragStart: (e: React.DragEvent) => void;
@@ -22,6 +23,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   initiative,
   isActive,
   hasGone,
+  onClick,
   onRemove,
   onInitiativeChange,
   onDragStart,
@@ -42,11 +44,12 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   return (
     <div
       draggable
+      onClick={onClick}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing min-w-[120px]",
+        "relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing min-w-[120px]",
         isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
         !isActive && hasGone && "opacity-60 border-border bg-muted/50",
         !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
