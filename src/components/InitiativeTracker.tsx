@@ -100,7 +100,7 @@ export const InitiativeTracker: React.FC = () => {
 
   return (
     <>
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[90vw]">
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
         <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-lg shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
