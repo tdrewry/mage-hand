@@ -24,11 +24,12 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { toast } from 'sonner';
-import { LayerStackModal } from './LayerStackModal';
 import { WatabouImportModal } from './modals/WatabouImportModal';
 import { TokenPanelModal } from './modals/TokenPanelModal';
 import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 
 interface EditModeToolbarProps {
   onOpenMapManager: () => void;
@@ -73,13 +74,34 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
   onGridColorChange,
   onGridOpacityChange,
 }) => {
-  const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [watabouImportOpen, setWatabouImportOpen] = useState(false);
   const [tokensModalOpen, setTokensModalOpen] = useState(false);
   const [backgroundModalOpen, setBackgroundModalOpen] = useState(false);
   
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
+
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+  
+  const layerCard = cards.find((c) => c.type === CardType.LAYERS);
+
+  const handleToggleLayerCard = () => {
+    if (layerCard) {
+      setVisibility(layerCard.id, !layerCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.LAYERS,
+        title: 'Layer Stack',
+        defaultPosition: { x: 20, y: 80 },
+        defaultSize: { width: 280, height: 450 },
+        minSize: { width: 250, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
 
   const handleClearTokens = () => {
     // Clear tokens from canvas
@@ -323,9 +345,9 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant={layerCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setLayerModalOpen(true)}
+                onClick={handleToggleLayerCard}
                 className="w-10 h-10"
               >
                 <Layers className="w-5 h-5" />
@@ -353,12 +375,6 @@ export const EditModeToolbar: React.FC<EditModeToolbarProps> = ({
         gridOpacity={gridOpacity}
         onGridColorChange={onGridColorChange}
         onGridOpacityChange={onGridOpacityChange}
-      />
-
-      <LayerStackModal 
-        open={layerModalOpen}
-        onOpenChange={setLayerModalOpen}
-        fabricCanvas={fabricCanvas}
       />
       
       <WatabouImportModal 

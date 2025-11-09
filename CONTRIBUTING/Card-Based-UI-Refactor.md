@@ -90,13 +90,13 @@ This document outlines the complete refactoring plan to transform the current VT
   - [x] Remove modal dialog wrapper
 
 #### 2.3 Convert Layer Stack Modal to Card
-- [ ] Create `src/components/cards/LayerStackCard.tsx`
-  - [ ] Extract content from `LayerStackModal.tsx`
-  - [ ] Wrap in `BaseCard`
-  - [ ] Register card with type `LAYERS`
-  - [ ] Set default position (left side) and size
-  - [ ] Update trigger to toggle card visibility
-  - [ ] Remove modal dialog wrapper
+- [x] Create `src/components/cards/LayerStackCard.tsx`
+  - [x] Extract content from `LayerStackModal.tsx`
+  - [x] Wrap in `BaseCard`
+  - [x] Register card with type `LAYERS`
+  - [x] Set default position (left side) and size
+  - [x] Update trigger to toggle card visibility
+  - [x] Remove modal dialog wrapper
 
 #### 2.4 Convert Token Panel Modal to Card
 - [ ] Create `src/components/cards/TokenPanelCard.tsx`
@@ -410,11 +410,11 @@ This document outlines the complete refactoring plan to transform the current VT
 
 ### Phase 2: Convert Floating Elements
 **Status**: 🚧 In Progress  
-**Progress**: 2/7 sections complete
+**Progress**: 3/7 sections complete
 
 - ✅ Converted InitiativeTracker to RosterCard
 - ✅ Converted FogControlModal to FogControlCard
-- ⏳ Convert Layer Stack Modal to Card
+- ✅ Converted LayerStackModal to LayerStackCard
 - ⏳ Convert Token Panel Modal to Card
 - ⏳ Convert Map Controls Modal to Card
 - ⏳ Convert other modals

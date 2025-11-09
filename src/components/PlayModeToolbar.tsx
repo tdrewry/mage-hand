@@ -20,7 +20,6 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { LayerStackModal } from './LayerStackModal';
 import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useFogStore } from '@/stores/fogStore';
@@ -51,7 +50,6 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   onGridColorChange,
   onGridOpacityChange,
 }) => {
-  const [layerModalOpen, setLayerModalOpen] = useState(false);
   const [backgroundGridModalOpen, setBackgroundGridModalOpen] = useState(false);
   
   const { enabled: fogEnabled } = useFogStore();
@@ -62,6 +60,7 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const setVisibility = useCardStore((state) => state.setVisibility);
   
   const fogCard = cards.find((c) => c.type === CardType.FOG);
+  const layerCard = cards.find((c) => c.type === CardType.LAYERS);
 
   const handleToggleFogCard = () => {
     if (fogCard) {
@@ -73,6 +72,22 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 350, height: 520 },
         minSize: { width: 300, height: 450 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleToggleLayerCard = () => {
+    if (layerCard) {
+      setVisibility(layerCard.id, !layerCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.LAYERS,
+        title: 'Layer Stack',
+        defaultPosition: { x: 20, y: 80 },
+        defaultSize: { width: 280, height: 450 },
+        minSize: { width: 250, height: 400 },
         isResizable: true,
         isClosable: true,
       });
@@ -221,9 +236,9 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant={layerCard?.isVisible ? "default" : "ghost"}
                 size="icon"
-                onClick={() => setLayerModalOpen(true)}
+                onClick={handleToggleLayerCard}
                 className="w-10 h-10"
               >
                 <Layers className="w-5 h-5" />
@@ -245,12 +260,6 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
         gridOpacity={gridOpacity}
         onGridColorChange={onGridColorChange}
         onGridOpacityChange={onGridOpacityChange}
-      />
-
-      <LayerStackModal 
-        open={layerModalOpen}
-        onOpenChange={setLayerModalOpen}
-        fabricCanvas={fabricCanvas}
       />
     </TooltipProvider>
   );

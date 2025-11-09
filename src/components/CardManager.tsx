@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BaseCard } from '@/components/cards/BaseCard';
 import { RosterCardContent } from '@/components/cards/RosterCard';
 import { FogControlCardContent } from '@/components/cards/FogControlCard';
+import { LayerStackCardContent } from '@/components/cards/LayerStackCard';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -66,10 +67,11 @@ function renderCardContent(cardId: string, type: CardType): React.ReactNode {
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
       return <FogControlCardContent />;
+    case CardType.LAYERS:
+      return <LayerStackCardContent />;
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:
-    case CardType.LAYERS:
     case CardType.TOKENS:
     case CardType.MAP_CONTROLS:
     case CardType.GROUP_MANAGER:
