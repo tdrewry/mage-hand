@@ -1,18 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Palette, Save, FolderOpen } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Share2, Settings, Users, Map, Trash2, Castle, Palette } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +23,6 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
   const { tokens } = useSessionStore();
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode, setWatabouStyle } = useDungeonStore();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   const toggleRenderingMode = () => {
     const newMode = renderingMode === 'edit' ? 'play' : 'edit';
@@ -56,7 +45,6 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
   };
 
   const clearStorage = () => {
-    setDeleteDialogOpen(false);
     localStorage.clear();
     // Also clear the Zustand store
     const { getState } = useSessionStore;
@@ -64,16 +52,6 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
     state.tokens.length = 0; // Clear tokens array
     toast.success('Storage and tokens cleared! Reload page to start fresh.');
     setTimeout(() => window.location.reload(), 1000);
-  };
-
-  const handleSave = () => {
-    // TODO: Implement save functionality
-    toast.info('Save functionality coming soon');
-  };
-
-  const handleLoad = () => {
-    // TODO: Implement load functionality
-    toast.info('Load functionality coming soon');
   };
 
   return (
@@ -135,46 +113,6 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
             <Castle className="h-4 w-4 mr-2" />
             {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
           </Button>
-
-          <Separator orientation="vertical" className="h-6" />
-
-          {/* Save Button */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleSave}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Save project"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-
-          {/* Load Button */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleLoad}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Load project"
-          >
-            <FolderOpen className="h-4 w-4 mr-2" />
-            Load
-          </Button>
-
-          <Separator orientation="vertical" className="h-6" />
-          
-          {/* Delete Button with confirmation */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-            title="Clear all data"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
           
           {renderingMode === 'play' && (
             <DropdownMenu>
@@ -204,33 +142,20 @@ export const Toolbar = ({ sessionId }: ToolbarProps) => {
             size="sm"
             className="text-foreground border-border hover:bg-secondary"
           >
-            <Map className="h-4 w-4 mr-2" />
-            Map Controls
+            <Settings className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={clearStorage}
+            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+            title="Clear storage if experiencing issues"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all tokens, 
-              regions, maps, and settings from your local storage.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={clearStorage}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete Everything
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

@@ -16,7 +16,6 @@ import { MapManager } from './MapManager';
 import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
 import { EditModeToolbar } from './EditModeToolbar';
-import { PlayModeToolbar } from './PlayModeToolbar';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -59,6 +58,7 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import { FogControlModal } from './modals/FogControlModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
 import { 
@@ -77,11 +77,10 @@ export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
+  const [isFogControlModalOpen, setIsFogControlModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
-  const [gridColor, setGridColor] = useState('#333');
-  const [gridOpacity, setGridOpacity] = useState(80);
   
   // Pan and zoom state
   const [transform, setTransform] = useState({
@@ -3982,29 +3981,40 @@ export const SimpleTabletop = () => {
           showRegions={showRegions}
           onToggleRegions={() => setShowRegions(!showRegions)}
           fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
-          gridColor={gridColor}
-          gridOpacity={gridOpacity}
-          onGridColorChange={setGridColor}
-          onGridOpacityChange={setGridOpacity}
         />
       )}
 
-      {/* Play Mode Toolbar */}
+      {/* Play Mode Controls */}
       {renderingMode === 'play' && (
-        <PlayModeToolbar
-          showNegativeSpacePanel={showNegativeSpacePanel}
-          onToggleNegativeSpacePanel={() => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          }}
-          showRegions={showRegions}
-          onToggleRegions={() => setShowRegions(!showRegions)}
-          fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
-        />
+        <div className="absolute top-20 right-4 z-10">
+          <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-2 flex flex-col gap-2">
+            <Button
+              variant={fogEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsFogControlModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <CloudFog className="w-4 h-4" />
+              Fog {fogEnabled ? 'On' : 'Off'}
+            </Button>
+            {regions.length > 0 && (
+              <Button
+                variant={showNegativeSpacePanel ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setShowNegativeSpacePanel(!showNegativeSpacePanel);
+                  if (!showNegativeSpacePanel) {
+                    setSelectedRegionId(null);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <Settings2 className="w-4 h-4" />
+                Styles
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
@@ -4056,10 +4066,10 @@ export const SimpleTabletop = () => {
       {/* Floating Menu */}
       <FloatingMenu
         fabricCanvas={null}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={setGridColor}
-        onGridOpacityChange={setGridOpacity}
+        gridColor="#333"
+        gridOpacity={80}
+        onGridColorChange={() => {}}
+        onGridOpacityChange={() => {}}
         onAddToken={addTokenToCanvas}
         onColorChange={handleTokenColorChange}
         onUpdateCanvas={handleCanvasUpdate}
@@ -4120,6 +4130,12 @@ export const SimpleTabletop = () => {
         onOpenChange={setIsRegionBackgroundModalOpen}
         region={selectedRegionForEdit}
         onUpdateRegion={updateRegion}
+      />
+      
+      {/* Fog Control Modal */}
+      <FogControlModal
+        open={isFogControlModalOpen}
+        onOpenChange={setIsFogControlModalOpen}
       />
     </div>
   );
