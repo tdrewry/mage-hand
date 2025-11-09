@@ -58,20 +58,20 @@ export function InitiativeTracker() {
   };
 
   const totalCards = initiativeOrder.length + 1;
-  const baseSize = 100;
-  const maxSize = 120;
-  const minSize = 80;
+  const baseSize = 80;
+  const maxSize = 100;
+  const minSize = 60;
   
   let cardSize = baseSize;
   if (totalCards > 8) {
     cardSize = Math.max(minSize, baseSize * (8 / totalCards));
   } else if (totalCards < 5) {
-    cardSize = Math.min(maxSize, baseSize * 1.2);
+    cardSize = Math.min(maxSize, baseSize * 1.1);
   }
 
   return (
     <div 
-      className="fixed bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-2 flex items-center gap-2"
+      className="fixed bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-1.5 flex items-center gap-1.5"
       style={{ 
         top: '80px',
         left: '50%',
@@ -84,20 +84,20 @@ export function InitiativeTracker() {
         size="icon"
         onClick={previousTurn}
         disabled={currentTurnIndex === 0 && roundNumber === 1}
-        className="shrink-0"
+        className="shrink-0 h-8 w-8"
       >
-        <ChevronLeft className="h-5 w-5" />
+        <ChevronLeft className="h-4 w-4" />
       </Button>
 
       <div 
         ref={scrollContainerRef}
-        className="flex gap-2 overflow-x-auto max-w-[800px]"
+        className="flex gap-1.5 overflow-x-auto max-w-[800px]"
       >
         <TurnCard
           turnNumber={currentTurnIndex + 1}
           roundNumber={roundNumber}
           totalTokens={initiativeOrder.length}
-          isCompact={false}
+          isCompact={true}
           size={cardSize}
           onResetRound={resetRound}
         />
@@ -128,7 +128,7 @@ export function InitiativeTracker() {
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, index)}
-                isCompact={false}
+                isCompact={true}
                 size={cardSize}
               />
             </div>
@@ -140,9 +140,9 @@ export function InitiativeTracker() {
         variant="default"
         size="icon"
         onClick={handleNextTurn}
-        className="shrink-0"
+        className="shrink-0 h-8 w-8"
       >
-        <ChevronRight className="h-5 w-5" />
+        <ChevronRight className="h-4 w-4" />
       </Button>
     </div>
   );
