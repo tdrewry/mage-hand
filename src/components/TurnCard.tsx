@@ -33,15 +33,15 @@ export const TurnCard: React.FC<TurnCardProps> = ({
         width: `${size}px`
       } : { minWidth: '120px' }}
     >
-      {onResetRound && !isCompact && (
+      {onResetRound && (
         <Button
           variant="ghost"
           size="icon"
           onClick={onResetRound}
-          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-card border border-border hover:bg-accent"
+          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-card border border-border hover:bg-accent"
           title="Reset Round"
         >
-          <RotateCcw className="h-3 w-3" />
+          <RotateCcw className="h-2.5 w-2.5" />
         </Button>
       )}
       <Swords 
