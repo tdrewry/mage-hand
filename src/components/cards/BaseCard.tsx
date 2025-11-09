@@ -94,12 +94,13 @@ export function BaseCard({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
     if ((e.target as HTMLElement).closest('button')) return; // Don't drag when clicking buttons
+    if (!card || card.isMinimized) return; // Don't drag when minimized
     
     bringToFront(id);
     setIsDragging(true);
     setDragOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+      x: e.clientX - card.position.x,
+      y: e.clientY - card.position.y,
     });
   };
 

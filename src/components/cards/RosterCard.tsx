@@ -34,12 +34,32 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
 
   const { tokens } = useSessionStore();
   const card = useCardStore((state) => state.getCard(cardId));
+  const updateCardPosition = useCardStore((state) => state.updateCardPosition);
+  const updateCardSize = useCardStore((state) => state.updateCardSize);
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const isMinimized = card?.isMinimized || false;
   const availableTokens = tokens;
+
+  // Auto-dock to top-middle when minimized
+  useEffect(() => {
+    if (card && isMinimized) {
+      const dockedPosition = {
+        x: window.innerWidth / 2 - 400, // Center horizontally (assuming 800px width)
+        y: 80 // Below main menu
+      };
+      const dockedSize = {
+        width: 800,
+        height: 120
+      };
+      
+      updateCardPosition(cardId, dockedPosition);
+      updateCardSize(cardId, dockedSize);
+    }
+  }, [isMinimized, cardId, card, updateCardPosition, updateCardSize]);
 
   const handleAddToInitiative = (tokenId: string, initiative: number) => {
     useInitiativeStore.getState().addToInitiative(tokenId, initiative);
@@ -80,8 +100,8 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
     setDraggedIndex(null);
   };
 
-  // Combat mode: horizontal layout
-  if (isInCombat) {
+  // Combat mode: horizontal layout (shown when minimized in combat)
+  if (isInCombat && isMinimized) {
     const totalCards = initiativeOrder.length + 1;
     const baseSize = 100;
     const maxSize = 120;
@@ -95,73 +115,142 @@ export function RosterCardContent({ cardId }: RosterCardContentProps) {
     }
 
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={previousTurn}
-            disabled={currentTurnIndex === 0 && roundNumber === 1}
-            className="shrink-0"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+      <div className="flex items-center gap-2 p-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={previousTurn}
+          disabled={currentTurnIndex === 0 && roundNumber === 1}
+          className="shrink-0"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
 
-          <div 
-            ref={scrollContainerRef}
-            className="flex gap-2 flex-1 overflow-x-auto"
-          >
-            <TurnCard
-              turnNumber={currentTurnIndex + 1}
-              roundNumber={roundNumber}
-              totalTokens={initiativeOrder.length}
-              isCompact={false}
-              size={cardSize}
-              onResetRound={resetRound}
-            />
+        <div 
+          ref={scrollContainerRef}
+          className="flex gap-2 flex-1 overflow-x-auto"
+        >
+          <TurnCard
+            turnNumber={currentTurnIndex + 1}
+            roundNumber={roundNumber}
+            totalTokens={initiativeOrder.length}
+            isCompact={false}
+            size={cardSize}
+            onResetRound={resetRound}
+          />
 
-            {initiativeOrder.map((entry, index) => {
-              const token = tokens.find(t => t.id === entry.tokenId);
-              if (!token) return null;
+          {initiativeOrder.map((entry, index) => {
+            const token = tokens.find(t => t.id === entry.tokenId);
+            if (!token) return null;
 
-              return (
-                <div
-                  key={entry.tokenId}
-                  data-active={index === currentTurnIndex}
-                >
-                  <InitiativeCard
-                    token={token}
-                    initiative={entry.initiative}
-                    isActive={index === currentTurnIndex}
-                    hasGone={entry.hasGone}
-                    onClick={() => handleCardClick(entry.tokenId)}
-                    onRemove={() => {
-                      removeFromInitiative(entry.tokenId);
-                      toast.success('Removed from initiative');
-                    }}
-                    onInitiativeChange={(newInit) => {
-                      updateInitiative(entry.tokenId, newInit);
-                      toast.success('Initiative updated');
-                    }}
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, index)}
-                    isCompact={false}
-                    size={cardSize}
-                  />
-                </div>
-              );
-            })}
+            return (
+              <div
+                key={entry.tokenId}
+                data-active={index === currentTurnIndex}
+              >
+                <InitiativeCard
+                  token={token}
+                  initiative={entry.initiative}
+                  isActive={index === currentTurnIndex}
+                  hasGone={entry.hasGone}
+                  onClick={() => handleCardClick(entry.tokenId)}
+                  onRemove={() => {
+                    removeFromInitiative(entry.tokenId);
+                    toast.success('Removed from initiative');
+                  }}
+                  onInitiativeChange={(newInit) => {
+                    updateInitiative(entry.tokenId, newInit);
+                    toast.success('Initiative updated');
+                  }}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                  isCompact={false}
+                  size={cardSize}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <Button
+          variant="default"
+          size="icon"
+          onClick={handleNextTurn}
+          className="shrink-0"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+
+        <InitiativeEntryModal
+          open={showAddModal}
+          onOpenChange={setShowAddModal}
+          tokens={availableTokens}
+          onAddToInitiative={handleAddToInitiative}
+        />
+      </div>
+    );
+  }
+
+  // Combat mode: vertical layout when not minimized (traditional card view)
+  if (isInCombat) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">Turn {currentTurnIndex + 1} - Round {roundNumber}</span>
           </div>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={previousTurn}
+              disabled={currentTurnIndex === 0 && roundNumber === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleNextTurn}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-          <Button
-            variant="default"
-            size="icon"
-            onClick={handleNextTurn}
-            className="shrink-0"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
+        <div 
+          ref={scrollContainerRef}
+          className="flex flex-wrap gap-2 max-h-[500px] overflow-y-auto"
+        >
+          {initiativeOrder.map((entry, index) => {
+            const token = tokens.find(t => t.id === entry.tokenId);
+            if (!token) return null;
+
+            return (
+              <div key={entry.tokenId}>
+                <InitiativeCard
+                  token={token}
+                  initiative={entry.initiative}
+                  isActive={index === currentTurnIndex}
+                  hasGone={entry.hasGone}
+                  onClick={() => handleCardClick(entry.tokenId)}
+                  onRemove={() => {
+                    removeFromInitiative(entry.tokenId);
+                    toast.success('Removed from initiative');
+                  }}
+                  onInitiativeChange={(newInit) => {
+                    updateInitiative(entry.tokenId, newInit);
+                    toast.success('Initiative updated');
+                  }}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                  size={100}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <InitiativeEntryModal
