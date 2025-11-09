@@ -78,11 +78,11 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
 
   // Sync initiative tracker visibility with combat state
   useEffect(() => {
-    if (!isInCombat && initiativeCard) {
-      // Hide tracker when not in combat
+    if (!isInCombat && initiativeCard && initiativeCard.isVisible) {
+      // Only hide if currently visible to avoid infinite loop
       setVisibility(initiativeCard.id, false);
     }
-  }, [isInCombat, initiativeCard, setVisibility]);
+  }, [isInCombat, initiativeCard?.id, initiativeCard?.isVisible, setVisibility]);
 
   const handleToggleFogCard = () => {
     if (fogCard) {
