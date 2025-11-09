@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Settings, Users, Map, Trash2, Layers, FileDown, Castle, Palette } from 'lucide-react';
+import { Share2, Settings, Users, Map, Trash2, Castle, Palette } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,23 +13,16 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
 import { WATABOU_STYLES } from '../lib/watabouStyles';
-import { LayerStackModal } from './LayerStackModal';
-import { WatabouImportModal } from './modals/WatabouImportModal';
-import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 
 interface ToolbarProps {
   sessionId?: string;
-  fabricCanvas?: FabricCanvas | null;
-  addTokenToCanvas?: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void | Promise<void>;
 }
 
-export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarProps) => {
-  const { tokens, clearAllTokens } = useSessionStore();
-  const { regions, clearRegions } = useRegionStore();
-  const { renderingMode, setRenderingMode, watabouStyle, setWatabouStyle } = useDungeonStore();
-  const [layerModalOpen, setLayerModalOpen] = useState(false);
-  const [watabouImportOpen, setWatabouImportOpen] = useState(false);
+export const Toolbar = ({ sessionId }: ToolbarProps) => {
+  const { tokens } = useSessionStore();
+  const { regions } = useRegionStore();
+  const { renderingMode, setRenderingMode, setWatabouStyle } = useDungeonStore();
   
   const toggleRenderingMode = () => {
     const newMode = renderingMode === 'edit' ? 'play' : 'edit';
@@ -49,28 +42,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
     navigator.clipboard.writeText(url);
     toast.success('Session URL copied to clipboard!');
-  };
-
-  const clearTokens = () => {
-    // Clear tokens from canvas
-    if (fabricCanvas) {
-      const objects = fabricCanvas.getObjects();
-      objects.forEach((obj: any) => {
-        if (obj.tokenId || obj.isTokenLabel) {
-          fabricCanvas.remove(obj);
-        }
-      });
-      fabricCanvas.renderAll();
-    }
-    
-    // Clear from store
-    clearAllTokens();
-    toast.success('All tokens cleared!');
-  };
-
-  const clearAllRegions = () => {
-    clearRegions();
-    toast.success('All regions cleared!');
   };
 
   const clearStorage = () => {
@@ -133,37 +104,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           </Button>
           
           <Button 
-            variant="outline" 
-            size="sm"
-            onClick={clearTokens}
-            className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
-            title="Clear all tokens from map and storage"
-          >
-            Clear Tokens
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={clearAllRegions}
-            className="text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
-            title="Clear all regions from map and storage"
-          >
-            Clear Regions
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setWatabouImportOpen(true)}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Import Watabou dungeon"
-          >
-            <FileDown className="h-4 w-4 mr-2" />
-            Import Dungeon
-          </Button>
-          
-          <Button 
             variant={renderingMode === 'play' ? 'default' : 'outline'}
             size="sm"
             onClick={toggleRenderingMode}
@@ -200,16 +140,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setLayerModalOpen(true)}
-            className="text-foreground border-border hover:bg-secondary"
-            title="Manage layers"
-          >
-            <Layers className="h-4 w-4" />
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm"
             className="text-foreground border-border hover:bg-secondary"
           >
             <Settings className="h-4 w-4" />
@@ -226,17 +156,6 @@ export const Toolbar = ({ sessionId, fabricCanvas, addTokenToCanvas }: ToolbarPr
           </Button>
         </div>
       </div>
-      
-      <LayerStackModal 
-        open={layerModalOpen}
-        onOpenChange={setLayerModalOpen}
-        fabricCanvas={fabricCanvas}
-      />
-      
-      <WatabouImportModal 
-        open={watabouImportOpen}
-        onOpenChange={setWatabouImportOpen}
-      />
     </div>
   );
 };

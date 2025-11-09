@@ -15,6 +15,7 @@ import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';
 import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
+import { EditModeToolbar } from './EditModeToolbar';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -3955,73 +3956,38 @@ export const SimpleTabletop = () => {
     <div className="w-full h-screen bg-surface flex flex-col relative">
       {/* Toolbar */}
       <Toolbar 
-        sessionId={sessionId} 
-        addTokenToCanvas={addTokenToCanvas}
+        sessionId={sessionId}
       />
       
-      {/* Map Manager Button */}
-      <div className="absolute top-20 right-4 z-10">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setShowMapManager(true)}
-          className="flex items-center gap-2"
-        >
-          <Settings className="w-4 h-4" />
-          Maps
-        </Button>
-      </div>
-
-      {/* Add Region Button - Only in Edit Mode */}
+      {/* Edit Mode Toolbar - Only in Edit Mode */}
       {renderingMode === 'edit' && (
-        <div className="absolute top-32 right-4 z-10">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addNewRegion}
-              className="flex items-center gap-2"
-            >
-              <Square className="w-4 h-4" />
-              Add Region
-            </Button>
-            <Button
-              variant={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? "default" : "outline"}
-              size="sm"
-              onClick={() => pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? finishPathDrawing() : startPathDrawing('polygon')}
-              className="flex items-center gap-2"
-              disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
-            >
-              <Pen className="w-4 h-4" />
-              {pathDrawingMode === 'drawing' && pathDrawingType === 'polygon' ? 'Finish Polygon' : 'Draw Polygon'}
-            </Button>
-            <Button
-              variant={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand' ? "default" : "outline"}
-              size="sm"
-              onClick={() => startPathDrawing('freehand')}
-              className="flex items-center gap-2"
-              disabled={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
-            >
-              <Pen className="w-4 h-4" />
-              Draw Freehand
-            </Button>
-          </div>
-        </div>
+        <EditModeToolbar
+          onOpenMapManager={() => setShowMapManager(true)}
+          onAddRegion={addNewRegion}
+          onStartPolygonDraw={() => startPathDrawing('polygon')}
+          onStartFreehandDraw={() => startPathDrawing('freehand')}
+          onFinishPolygonDraw={finishPathDrawing}
+          isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+          isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
+          isGridSnappingEnabled={isGridSnappingEnabled}
+          onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+          showNegativeSpacePanel={showNegativeSpacePanel}
+          onToggleNegativeSpacePanel={() => {
+            setShowNegativeSpacePanel(!showNegativeSpacePanel);
+            if (!showNegativeSpacePanel) {
+              setSelectedRegionId(null);
+            }
+          }}
+          showRegions={showRegions}
+          onToggleRegions={() => setShowRegions(!showRegions)}
+          fabricCanvas={null}
+        />
       )}
 
-      {/* Grid Snapping Toggle */}
-      <div className="absolute top-44 right-4 z-10">
-        <div className="flex gap-2">
-          <Button
-            variant={isGridSnappingEnabled ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-            className="flex items-center gap-2"
-          >
-            <Grid3X3 className="w-4 h-4" />
-            World Snap {isGridSnappingEnabled ? 'On' : 'Off'}
-          </Button>
-          {renderingMode === 'play' && (
+      {/* Play Mode Controls */}
+      {renderingMode === 'play' && (
+        <div className="absolute top-20 right-4 z-10">
+          <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-2 flex flex-col gap-2">
             <Button
               variant={fogEnabled ? "default" : "outline"}
               size="sm"
@@ -4031,15 +3997,12 @@ export const SimpleTabletop = () => {
               <CloudFog className="w-4 h-4" />
               Fog {fogEnabled ? 'On' : 'Off'}
             </Button>
-          )}
-          {regions.length > 0 && (
-            <>
+            {regions.length > 0 && (
               <Button
                 variant={showNegativeSpacePanel ? "default" : "outline"}
                 size="sm"
                 onClick={() => {
                   setShowNegativeSpacePanel(!showNegativeSpacePanel);
-                  // Close region panel when opening wall settings
                   if (!showNegativeSpacePanel) {
                     setSelectedRegionId(null);
                   }
@@ -4047,22 +4010,12 @@ export const SimpleTabletop = () => {
                 className="flex items-center gap-2"
               >
                 <Settings2 className="w-4 h-4" />
-                {renderingMode === 'play' ? 'Styles' : 'Wall Settings'}
+                Styles
               </Button>
-              <Button
-                variant={showRegions ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowRegions(!showRegions)}
-                className="flex items-center gap-2"
-                title="Toggle region visibility (for testing light blocking)"
-              >
-                <Eye className="w-4 h-4" />
-                Regions {showRegions ? 'On' : 'Off'}
-              </Button>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
