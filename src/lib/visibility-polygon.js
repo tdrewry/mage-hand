@@ -28,4 +28,4 @@ VisibilityPolygon.computeDirection=function(d,c,e,g,f,k){var a=(f-d)*(g-c);var b
 VisibilityPolygon.doLineSegmentsIntersect=function(d,c,e,g,f,k,h,l){var d1=VisibilityPolygon.computeDirection(f,k,h,l,d,c);var d2=VisibilityPolygon.computeDirection(f,k,h,l,e,g);var d3=VisibilityPolygon.computeDirection(d,c,e,g,f,k);var d4=VisibilityPolygon.computeDirection(d,c,e,g,h,l);return(0<d1&&0>d2||0>d1&&0<d2)&&(0<d3&&0>d4||0>d3&&0<d4)||0==d1&&VisibilityPolygon.isOnSegment(f,k,h,l,d,c)||0==d2&&VisibilityPolygon.isOnSegment(f,k,h,l,e,g)||0==d3&&VisibilityPolygon.isOnSegment(d,c,e,g,f,k)||0==d4&&VisibilityPolygon.isOnSegment(d,
 c,e,g,h,l)};
 
-export default VisibilityPolygon;
+export { VisibilityPolygon as default };
