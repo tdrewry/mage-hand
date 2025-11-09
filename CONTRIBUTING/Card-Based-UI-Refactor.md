@@ -21,46 +21,46 @@ This document outlines the complete refactoring plan to transform the current VT
 ### Tasks
 
 #### 1.1 Create Base Card Component
-- [ ] Create `src/components/cards/BaseCard.tsx`
-  - [ ] Implement draggable functionality using native drag API or library
-  - [ ] Add resize handles using `react-resizable-panels` or custom implementation
-  - [ ] Add minimize/maximize toggle
-  - [ ] Add close button (optional per card)
-  - [ ] Implement card header with title and controls
-  - [ ] Add z-index management for focused cards
-  - [ ] Style with semantic tokens from design system
+- [x] Create `src/components/cards/BaseCard.tsx`
+  - [x] Implement draggable functionality using native drag API or library
+  - [x] Add resize handles using `react-resizable-panels` or custom implementation
+  - [x] Add minimize/maximize toggle
+  - [x] Add close button (optional per card)
+  - [x] Implement card header with title and controls
+  - [x] Add z-index management for focused cards
+  - [x] Style with semantic tokens from design system
 
 #### 1.2 Create Card State Management
-- [ ] Create `src/stores/cardStore.ts`
-  - [ ] Define `CardState` interface (id, position, size, isMinimized, isVisible, zIndex)
-  - [ ] Implement `cards` array to track all card instances
-  - [ ] Add actions: `registerCard`, `unregisterCard`, `updateCardPosition`, `updateCardSize`
-  - [ ] Add actions: `toggleMinimize`, `toggleVisibility`, `bringToFront`
-  - [ ] Add actions: `saveLayout`, `loadLayout`, `resetLayout`
-  - [ ] Implement persistence with localStorage
-  - [ ] Add default positions and sizes for each card type
+- [x] Create `src/stores/cardStore.ts`
+  - [x] Define `CardState` interface (id, position, size, isMinimized, isVisible, zIndex)
+  - [x] Implement `cards` array to track all card instances
+  - [x] Add actions: `registerCard`, `unregisterCard`, `updateCardPosition`, `updateCardSize`
+  - [x] Add actions: `toggleMinimize`, `toggleVisibility`, `bringToFront`
+  - [x] Add actions: `saveLayout`, `loadLayout`, `resetLayout`
+  - [x] Implement persistence with localStorage
+  - [x] Add default positions and sizes for each card type
 
 #### 1.3 Create Card Manager Component
-- [ ] Create `src/components/CardManager.tsx`
-  - [ ] Render all registered cards
-  - [ ] Handle card focus/blur events
-  - [ ] Manage card z-index stacking
-  - [ ] Provide context for card interactions
-  - [ ] Handle card collision detection (optional)
+- [x] Create `src/components/CardManager.tsx`
+  - [x] Render all registered cards
+  - [x] Handle card focus/blur events
+  - [x] Manage card z-index stacking
+  - [x] Provide context for card interactions
+  - [x] Handle card collision detection (optional)
 
 #### 1.4 Card Types Definition
-- [ ] Create `src/types/cardTypes.ts`
-  - [ ] Define `CardType` enum (MAP, MENU, ROSTER, TOOLS, FOG, LAYERS, TOKENS, etc.)
-  - [ ] Define `CardConfig` interface for default settings
-  - [ ] Define `CardPosition` and `CardSize` types
+- [x] Create `src/types/cardTypes.ts`
+  - [x] Define `CardType` enum (MAP, MENU, ROSTER, TOOLS, FOG, LAYERS, TOKENS, etc.)
+  - [x] Define `CardConfig` interface for default settings
+  - [x] Define `CardPosition` and `CardSize` types
 
 #### 1.5 Testing & Polish
-- [ ] Test drag functionality across different screen sizes
-- [ ] Test resize behavior and constraints
-- [ ] Ensure cards stay within viewport bounds
-- [ ] Test minimize/maximize animations
-- [ ] Verify z-index behavior when clicking cards
-- [ ] Test persistence (save/load layout)
+- [x] Test drag functionality across different screen sizes
+- [x] Test resize behavior and constraints
+- [x] Ensure cards stay within viewport bounds
+- [x] Test minimize/maximize animations
+- [x] Verify z-index behavior when clicking cards
+- [x] Test persistence (save/load layout)
 
 ---
 
@@ -71,14 +71,14 @@ This document outlines the complete refactoring plan to transform the current VT
 ### Tasks
 
 #### 2.1 Convert Initiative Tracker to Roster Card
-- [ ] Create `src/components/cards/RosterCard.tsx`
-  - [ ] Wrap `InitiativeTracker` content in `BaseCard`
-  - [ ] Register card in `cardStore` with type `ROSTER`
-  - [ ] Set default position (right side) and size
-  - [ ] Update minimize behavior to use card system
-  - [ ] Remove old positioning logic from `InitiativeTracker.tsx`
-  - [ ] Update `PlayModeToolbar` to toggle roster card visibility
-  - [ ] Test in both combat and non-combat modes
+- [x] Create `src/components/cards/RosterCard.tsx`
+  - [x] Wrap `InitiativeTracker` content in `BaseCard`
+  - [x] Register card in `cardStore` with type `ROSTER`
+  - [x] Set default position (right side) and size
+  - [x] Update minimize behavior to use card system
+  - [x] Remove old positioning logic from `InitiativeTracker.tsx`
+  - [x] Update `PlayModeToolbar` to toggle roster card visibility
+  - [x] Test in both combat and non-combat modes
 
 #### 2.2 Convert Fog Control Modal to Card
 - [ ] Create `src/components/cards/FogControlCard.tsx`
@@ -431,4 +431,4 @@ This document outlines the complete refactoring plan to transform the current VT
 ---
 
 **Last Updated**: 2025-11-09  
-**Document Version**: 1.0
+**Document Version**: 1.1
