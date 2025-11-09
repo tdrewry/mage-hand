@@ -194,6 +194,15 @@ export const SimpleTabletop = () => {
     visibleMask: Path2D;
   } | null>(null);
   
+  // Cache individual token visibility shapes to avoid recomputing unchanged tokens
+  const tokenVisibilityCacheRef = useRef<Map<string, {
+    position: { x: number; y: number };
+    visionPath: any; // paper.js Path
+  }>>(new Map());
+  
+  // Track previous token positions to detect changes
+  const prevTokenPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
   // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
   
@@ -314,42 +323,95 @@ export const SimpleTabletop = () => {
       // Compute visibility asynchronously
       const computeFog = async () => {
         try {
-          // Convert vision range from grid units to pixels
-          // Use average grid size from tokens' regions or default to 40
-          let totalGridSize = 0;
-          let regionsFound = 0;
+          const paper = await import('paper');
+          if (!fogScopeRef.current) return;
+          fogScopeRef.current.activate();
+          
+          // Identify which tokens have moved
+          const movedTokens: typeof tokens = [];
+          const currentTokenIds = new Set(tokens.map(t => t.id));
           
           tokens.forEach(token => {
+            const prevPos = prevTokenPositionsRef.current.get(token.id);
+            if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
+              movedTokens.push(token);
+            }
+          });
+          
+          // Remove cached visibility for tokens that no longer exist
+          const cachedIds = Array.from(tokenVisibilityCacheRef.current.keys());
+          cachedIds.forEach(id => {
+            if (!currentTokenIds.has(id)) {
+              const cached = tokenVisibilityCacheRef.current.get(id);
+              if (cached?.visionPath?.remove) cached.visionPath.remove();
+              tokenVisibilityCacheRef.current.delete(id);
+              prevTokenPositionsRef.current.delete(id);
+            }
+          });
+          
+          // If no tokens moved, skip computation
+          if (movedTokens.length === 0 && tokenVisibilityCacheRef.current.size === tokens.length) {
+            return;
+          }
+          
+          // Compute visibility only for moved tokens
+          for (const token of movedTokens) {
+            // Find token's region to get grid size
             const tokenRegion = regions.find(r => 
               token.x >= r.x && token.x <= r.x + r.width &&
               token.y >= r.y && token.y <= r.y + r.height
             );
-            if (tokenRegion) {
-              totalGridSize += tokenRegion.gridSize;
-              regionsFound++;
+            const gridSize = tokenRegion?.gridSize || 40;
+            const visionRangePixels = fogVisionRange * gridSize;
+            
+            // Remove old cached vision for this token
+            const oldCached = tokenVisibilityCacheRef.current.get(token.id);
+            if (oldCached?.visionPath?.remove) oldCached.visionPath.remove();
+            
+            // Compute new visibility for this token
+            const tokenVision = await computeTokenVisibilityPaper(
+              [token],
+              wallGeometry.wallSegments,
+              wallGeometry,
+              visionRangePixels
+            );
+            
+            // Cache the new vision path
+            tokenVisibilityCacheRef.current.set(token.id, {
+              position: { x: token.x, y: token.y },
+              visionPath: tokenVision
+            });
+            
+            // Update previous position
+            prevTokenPositionsRef.current.set(token.id, { x: token.x, y: token.y });
+          }
+          
+          // Merge all cached token visions
+          let combinedVisibility: any = null;
+          tokenVisibilityCacheRef.current.forEach((cached) => {
+            if (!cached.visionPath) return;
+            
+            if (!combinedVisibility) {
+              combinedVisibility = cached.visionPath.clone({ insert: false });
+            } else {
+              const united = combinedVisibility.unite(cached.visionPath, { insert: false });
+              if (combinedVisibility.remove) combinedVisibility.remove();
+              combinedVisibility = united;
             }
           });
           
-          const avgGridSize = regionsFound > 0 ? totalGridSize / regionsFound : 40;
-          const visionRangePixels = fogVisionRange * avgGridSize;
-          
-          const tokenVisibilityPaper = await computeTokenVisibilityPaper(
-            tokens,
-            wallGeometry.wallSegments,
-            wallGeometry,
-            visionRangePixels
-          );
-          
-          if (!tokenVisibilityPaper || !fogScopeRef.current) return;
+          if (!combinedVisibility) return;
           
           // Merge into explored areas
-          fogScopeRef.current.activate();
           exploredAreaRef.current = addVisibleToExplored(
             exploredAreaRef.current,
-            tokenVisibilityPaper
+            combinedVisibility
           );
           
-          // Serialize for persistence (debounced in practice, but simple for now)
+          // Clean up combined visibility
+          if (combinedVisibility.remove) combinedVisibility.remove();
+          
+          // Serialize for persistence
           const serialized = serializeFogGeometry(exploredAreaRef.current);
           if (serialized) {
             setSerializedExploredAreas(serialized);
@@ -366,11 +428,30 @@ export const SimpleTabletop = () => {
             height: canvas.height / transform.zoom + 10000
           };
           
+          // Recompute combined visibility for mask generation
+          let visibilityForMask: any = null;
+          tokenVisibilityCacheRef.current.forEach((cached) => {
+            if (!cached.visionPath) return;
+            
+            if (!visibilityForMask) {
+              visibilityForMask = cached.visionPath.clone({ insert: false });
+            } else {
+              const united = visibilityForMask.unite(cached.visionPath, { insert: false });
+              if (visibilityForMask.remove) visibilityForMask.remove();
+              visibilityForMask = united;
+            }
+          });
+          
+          if (!visibilityForMask) return;
+          
           const masks = computeFogMasks(
             exploredAreaRef.current,
-            tokenVisibilityPaper,
+            visibilityForMask,
             worldBounds
           );
+          
+          // Clean up
+          if (visibilityForMask.remove) visibilityForMask.remove();
           
           // Store masks for rendering
           fogMasksRef.current = masks;
