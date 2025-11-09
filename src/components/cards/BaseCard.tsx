@@ -198,7 +198,10 @@ export function BaseCard({
 
         {!isMinimized && (
           <>
-            <CardContent className="flex-1 overflow-auto p-4">
+            <CardContent className={cn(
+              "flex-1 overflow-auto p-4",
+              hideHeader && "scrollbar-hide"
+            )}>
               {children}
             </CardContent>
 
