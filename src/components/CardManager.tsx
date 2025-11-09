@@ -7,6 +7,7 @@ import { TokenPanelCardContent } from '@/components/cards/TokenPanelCard';
 import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
+import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -92,11 +93,16 @@ function renderCardContent(cardId: string, type: CardType): React.ReactNode {
           onGridOpacityChange={() => {}}
         />
       );
+    case CardType.PROJECT_MANAGER:
+      return (
+        <ProjectManagerCardContent
+          viewport={{ x: 0, y: 0, zoom: 1 }}
+        />
+      );
     case CardType.MAP:
     case CardType.MENU:
     case CardType.TOOLS:
     case CardType.GROUP_MANAGER:
-    case CardType.PROJECT_MANAGER:
     case CardType.REGION_CONTROL:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
