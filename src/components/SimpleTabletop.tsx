@@ -295,16 +295,21 @@ export const SimpleTabletop = () => {
   }, [fogEnabled, setSerializedExploredAreas]);
   
   // Compute fog of war masks when tokens move or fog settings change
-  // Debounced to avoid excessive computation during panning
+  // Skip during dragging to prevent stuttering
   useEffect(() => {
     if (!fogEnabled || fogRevealAll || !wallGeometryRef.current || !fogScopeRef.current) {
       fogMasksRef.current = null;
       return;
     }
     
+    // Skip fog computation while dragging tokens to prevent stuttering
+    if (isDraggingToken) {
+      return;
+    }
+    
     const wallGeometry = wallGeometryRef.current;
     
-    // Debounce fog computation to avoid stuttering during pan/zoom
+    // Debounce fog computation to avoid excessive updates
     const timeoutId = setTimeout(() => {
       // Compute visibility asynchronously
       const computeFog = async () => {
@@ -364,7 +369,7 @@ export const SimpleTabletop = () => {
     }, 100); // 100ms debounce
     
     return () => clearTimeout(timeoutId);
-  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, setSerializedExploredAreas]);
+  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, isDraggingToken, setSerializedExploredAreas]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
