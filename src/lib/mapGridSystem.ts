@@ -10,6 +10,18 @@ import {
   POINTY_TOP 
 } from './hexCoordinates';
 
+// Utility functions for polygon operations
+function isPointInPolygon(x: number, y: number, points: Array<{ x: number; y: number }>): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    if (((points[i].y > y) !== (points[j].y > y)) &&
+        (x < (points[j].x - points[i].x) * (y - points[i].y) / (points[j].y - points[i].y) + points[i].x)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 // Map-based grid rendering system
 export function renderMapGrids(
   renderer: GridRenderer,
@@ -110,6 +122,12 @@ function renderGridRegion(
 ): void {
   if (region.gridType === 'none') return;
   
+  const { ctx } = renderer;
+  
+  // First render the filled polygon region
+  renderRegionBackground(renderer, region, viewport);
+  
+  // Then render the grid overlay
   const gridColor = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${region.gridOpacity / 100})`;
   
   switch (region.gridType) {
@@ -122,6 +140,41 @@ function renderGridRegion(
   }
 }
 
+function renderRegionBackground(
+  renderer: GridRenderer,
+  region: GridRegion,
+  viewport: Viewport
+): void {
+  const { ctx } = renderer;
+  
+  if (region.points.length < 3) return; // Need at least 3 points for a polygon
+  
+  // Convert region color to rgba with opacity
+  const fillColor = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${Math.min(region.gridOpacity / 100 * 0.3, 0.3)})`;
+  
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = `rgba(${parseInt(region.gridColor.slice(1, 3), 16)}, ${parseInt(region.gridColor.slice(3, 5), 16)}, ${parseInt(region.gridColor.slice(5, 7), 16)}, ${Math.min(region.gridOpacity / 100 * 0.8, 0.8)})`;
+  ctx.lineWidth = Math.max(1, 2 / viewport.zoom);
+  
+  // Draw the filled polygon
+  ctx.beginPath();
+  const firstPoint = region.points[0];
+  const screenX1 = (firstPoint.x - viewport.x) * viewport.zoom;
+  const screenY1 = (firstPoint.y - viewport.y) * viewport.zoom;
+  ctx.moveTo(screenX1, screenY1);
+  
+  for (let i = 1; i < region.points.length; i++) {
+    const point = region.points[i];
+    const screenX = (point.x - viewport.x) * viewport.zoom;
+    const screenY = (point.y - viewport.y) * viewport.zoom;
+    ctx.lineTo(screenX, screenY);
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
 function renderSquareGridRegion(
   renderer: GridRenderer,
   region: GridRegion,
@@ -129,67 +182,65 @@ function renderSquareGridRegion(
   color: string
 ): void {
   const { ctx } = renderer;
-  const { bounds, gridSize } = region;
+  const { gridSize } = region;
   
-  // Calculate visible grid area within region bounds
-  const regionLeft = bounds.x;
-  const regionRight = bounds.x + bounds.width;
-  const regionTop = bounds.y;
-  const regionBottom = bounds.y + bounds.height;
+  // Calculate bounding box of the polygon
+  const minX = Math.min(...region.points.map(p => p.x));
+  const maxX = Math.max(...region.points.map(p => p.x));
+  const minY = Math.min(...region.points.map(p => p.y));
+  const maxY = Math.max(...region.points.map(p => p.y));
   
-  const viewLeft = viewport.x;
-  const viewRight = viewport.x + (viewport.width / viewport.zoom);
-  const viewTop = viewport.y;
-  const viewBottom = viewport.y + (viewport.height / viewport.zoom);
+  // Calculate grid bounds in local coordinates (relative to minX, minY)
+  const localWidth = maxX - minX;
+  const localHeight = maxY - minY;
   
-  // Find intersection of region and viewport
-  const left = Math.max(regionLeft, viewLeft);
-  const right = Math.min(regionRight, viewRight);
-  const top = Math.max(regionTop, viewTop);
-  const bottom = Math.min(regionBottom, viewBottom);
+  // Calculate how many grid cells fit in each dimension
+  const cellsX = Math.floor(localWidth / gridSize);
+  const cellsY = Math.floor(localHeight / gridSize);
   
-  if (left >= right || top >= bottom) return; // No intersection
-  
-  // Calculate grid lines within the region
-  const startX = Math.floor(regionLeft / gridSize) * gridSize;
-  const endX = Math.ceil(regionRight / gridSize) * gridSize;
-  const startY = Math.floor(regionTop / gridSize) * gridSize;
-  const endY = Math.ceil(regionBottom / gridSize) * gridSize;
+  if (cellsX <= 0 || cellsY <= 0) return; // No complete cells
   
   // Set up drawing
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(0.5, 1 / viewport.zoom);
-  ctx.beginPath();
   
-  // Vertical lines
-  for (let x = startX; x <= endX; x += gridSize) {
-    if (x >= regionLeft && x <= regionRight) {
-      const screenX = (x - viewport.x) * viewport.zoom;
-      const screenTop = (Math.max(regionTop, viewTop) - viewport.y) * viewport.zoom;
-      const screenBottom = (Math.min(regionBottom, viewBottom) - viewport.y) * viewport.zoom;
+  // Draw each individual square cell that falls within the region polygon
+  for (let row = 0; row < cellsY; row++) {
+    for (let col = 0; col < cellsX; col++) {
+      // Calculate cell center position (where tokens snap to)
+      const centerX = minX + (col + 0.5) * gridSize;
+      const centerY = minY + (row + 0.5) * gridSize;
       
-      if (screenX >= 0 && screenX <= renderer.canvas.width) {
-        ctx.moveTo(screenX, screenTop);
-        ctx.lineTo(screenX, screenBottom);
+      // Check if cell center is within the polygon region
+      if (!isPointInPolygon(centerX, centerY, region.points)) {
+        continue;
+      }
+      
+      // Calculate cell boundaries
+      const cellLeft = minX + (col * gridSize);
+      const cellTop = minY + (row * gridSize);
+      const cellRight = cellLeft + gridSize;
+      const cellBottom = cellTop + gridSize;
+      
+      // Convert to screen coordinates
+      const screenLeft = (cellLeft - viewport.x) * viewport.zoom;
+      const screenTop = (cellTop - viewport.y) * viewport.zoom;
+      const screenWidth = gridSize * viewport.zoom;
+      const screenHeight = gridSize * viewport.zoom;
+      
+      // Only draw if cell is visible on screen
+      if (screenLeft < renderer.canvas.width && 
+          screenLeft + screenWidth > 0 && 
+          screenTop < renderer.canvas.height && 
+          screenTop + screenHeight > 0) {
+        
+        // Draw the square cell
+        ctx.beginPath();
+        ctx.rect(screenLeft, screenTop, screenWidth, screenHeight);
+        ctx.stroke();
       }
     }
   }
-  
-  // Horizontal lines
-  for (let y = startY; y <= endY; y += gridSize) {
-    if (y >= regionTop && y <= regionBottom) {
-      const screenY = (y - viewport.y) * viewport.zoom;
-      const screenLeft = (Math.max(regionLeft, viewLeft) - viewport.x) * viewport.zoom;
-      const screenRight = (Math.min(regionRight, viewRight) - viewport.x) * viewport.zoom;
-      
-      if (screenY >= 0 && screenY <= renderer.canvas.height) {
-        ctx.moveTo(screenLeft, screenY);
-        ctx.lineTo(screenRight, screenY);
-      }
-    }
-  }
-  
-  ctx.stroke();
 }
 
 function renderHexGridRegion(
@@ -199,13 +250,19 @@ function renderHexGridRegion(
   color: string
 ): void {
   const { ctx } = renderer;
-  const { bounds, gridSize } = region;
+  const { gridSize } = region;
+  
+  // Calculate bounding box of the polygon
+  const minX = Math.min(...region.points.map(p => p.x));
+  const maxX = Math.max(...region.points.map(p => p.x));
+  const minY = Math.min(...region.points.map(p => p.y));
+  const maxY = Math.max(...region.points.map(p => p.y));
   
   // Create hex layout for this region
   const layout = createHexLayout(gridSize, POINTY_TOP);
   
-  // Get hexes within region bounds
-  const hexes = hexesInRectangle(layout, bounds.x, bounds.y, bounds.width, bounds.height);
+  // Get hexes within polygon bounds
+  const hexes = hexesInRectangle(layout, minX, minY, maxX - minX, maxY - minY);
   
   // Set up drawing
   ctx.strokeStyle = color;
@@ -216,7 +273,7 @@ function renderHexGridRegion(
     const corners = hexCorners(layout, hex);
     if (corners.length === 0) return;
     
-    // Check if hex center is within region bounds
+    // Check if hex center is within polygon
     const center = corners.reduce(
       (acc, corner) => ({ x: acc.x + corner.x, y: acc.y + corner.y }),
       { x: 0, y: 0 }
@@ -224,12 +281,8 @@ function renderHexGridRegion(
     center.x /= corners.length;
     center.y /= corners.length;
     
-    if (
-      center.x < bounds.x ||
-      center.x > bounds.x + bounds.width ||
-      center.y < bounds.y ||
-      center.y > bounds.y + bounds.height
-    ) {
+    // Check if hex center is within polygon
+    if (!isPointInPolygon(center.x, center.y, region.points)) {
       return;
     }
     
@@ -260,18 +313,56 @@ export function snapToMapGrid(x: number, y: number, regions: { map: GameMap; reg
   
   const { region } = regions;
   
+  // Check if the point is within the polygon
+  if (!isPointInPolygon(x, y, region.points)) {
+    return { x, y }; // Don't snap if outside the region
+  }
+  
   switch (region.gridType) {
     case 'square':
-      return {
-        x: Math.round(x / region.gridSize) * region.gridSize,
-        y: Math.round(y / region.gridSize) * region.gridSize,
-      };
+      // Calculate bounding box for local coordinates
+      const minX = Math.min(...region.points.map(p => p.x));
+      const minY = Math.min(...region.points.map(p => p.y));
+      
+      // Convert to region-local coordinates
+      const localX = x - minX;
+      const localY = y - minY;
+      
+      // Snap to center of grid cells
+      const gridCellX = Math.floor(localX / region.gridSize);
+      const gridCellY = Math.floor(localY / region.gridSize);
+      
+      // Calculate center of the grid cell
+      const centerX = (gridCellX + 0.5) * region.gridSize;
+      const centerY = (gridCellY + 0.5) * region.gridSize;
+      
+      // Convert back to world coordinates
+      const snappedX = centerX + minX;
+      const snappedY = centerY + minY;
+      
+      // Verify the snapped point is still within the polygon
+      if (isPointInPolygon(snappedX, snappedY, region.points)) {
+        return { x: snappedX, y: snappedY };
+      }
+      return { x, y };
       
     case 'hex':
+      // Create hex layout using same coordinate system as rendering
       const layout = createHexLayout(region.gridSize, POINTY_TOP);
+      
+      // Convert to hex coordinates and round to nearest hex center
       const hex = pixelToHex(layout, { x, y });
       const roundedHex = hexRound(hex);
-      return hexToPixel(layout, roundedHex);
+      
+      // Convert back to pixel coordinates (will be at hex center)
+      const snappedPoint = hexToPixel(layout, roundedHex);
+      
+      // Ensure the snapped point is within the polygon
+      if (isPointInPolygon(snappedPoint.x, snappedPoint.y, region.points)) {
+        return snappedPoint;
+      }
+      
+      return { x, y }; // Don't snap if result would be outside region
       
     default:
       return { x, y };

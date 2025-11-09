@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Force rebuild - clear Vite cache
   // Set dark mode by default for gaming
   React.useEffect(() => {
     document.documentElement.classList.add('dark');
