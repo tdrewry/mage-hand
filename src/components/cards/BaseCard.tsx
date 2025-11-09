@@ -10,7 +10,6 @@ interface BaseCardProps {
   id: string;
   title: string;
   children: React.ReactNode;
-  minimizedContent?: React.ReactNode;
   isResizable?: boolean;
   isClosable?: boolean;
   minSize?: CardSize;
@@ -22,7 +21,6 @@ export function BaseCard({
   id,
   title,
   children,
-  minimizedContent,
   isResizable = true,
   isClosable = true,
   minSize = { width: 200, height: 200 },
@@ -96,7 +94,6 @@ export function BaseCard({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
     if ((e.target as HTMLElement).closest('button')) return; // Don't drag when clicking buttons
-    if (!card || card.isMinimized) return; // Don't drag when minimized
     
     bringToFront(id);
     setIsDragging(true);
@@ -187,11 +184,7 @@ export function BaseCard({
           </div>
         </CardHeader>
 
-        {isMinimized && minimizedContent ? (
-          <CardContent className="p-0 overflow-visible">
-            {minimizedContent}
-          </CardContent>
-        ) : !isMinimized ? (
+        {!isMinimized && (
           <>
             <CardContent className="flex-1 overflow-auto p-4">
               {children}
@@ -206,7 +199,7 @@ export function BaseCard({
               </div>
             )}
           </>
-        ) : null}
+        )}
       </Card>
     </div>
   );
