@@ -112,6 +112,20 @@ export const InitiativeTracker: React.FC = () => {
 
   // Combat mode: streamlined horizontal layout
   if (isInCombat) {
+    // Calculate card size based on number of tokens
+    const totalCards = initiativeOrder.length + 1; // +1 for turn card
+    const baseSize = isMinimized ? 80 : 120;
+    const maxSize = isMinimized ? 100 : 140;
+    const minSize = isMinimized ? 60 : 80;
+    
+    // Scale cards to fit available space
+    let cardSize = baseSize;
+    if (totalCards > 8) {
+      cardSize = Math.max(minSize, baseSize * (8 / totalCards));
+    } else if (totalCards < 5) {
+      cardSize = Math.min(maxSize, baseSize * 1.2);
+    }
+
     return (
       <>
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-[90vw]">
@@ -128,11 +142,10 @@ export const InitiativeTracker: React.FC = () => {
                 <ChevronLeft className="h-5 w-5" />
               </Button>
 
-              {/* Scrollable Token/Turn Cards */}
+              {/* Scaled Token/Turn Cards */}
               <div 
                 ref={scrollContainerRef}
-                className="flex gap-2 overflow-x-auto flex-1"
-                style={{ scrollbarWidth: 'thin' }}
+                className="flex gap-2 flex-1 justify-center"
               >
                 {/* Turn Card */}
                 <TurnCard
@@ -140,6 +153,7 @@ export const InitiativeTracker: React.FC = () => {
                   roundNumber={roundNumber}
                   totalTokens={initiativeOrder.length}
                   isCompact={isMinimized}
+                  size={cardSize}
                 />
 
                 {/* Token Cards */}
@@ -170,6 +184,7 @@ export const InitiativeTracker: React.FC = () => {
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, index)}
                         isCompact={isMinimized}
+                        size={cardSize}
                       />
                     </div>
                   );
@@ -295,8 +310,7 @@ export const InitiativeTracker: React.FC = () => {
               {initiativeOrder.length > 0 ? (
                 <div 
                   ref={scrollContainerRef}
-                  className="flex gap-3 p-4 overflow-x-auto"
-                  style={{ scrollbarWidth: 'thin' }}
+                  className="flex gap-3 p-4 flex-wrap justify-center"
                 >
                   {initiativeOrder.map((entry, index) => {
                     const token = tokens.find(t => t.id === entry.tokenId);

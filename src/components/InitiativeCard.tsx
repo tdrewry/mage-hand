@@ -17,6 +17,7 @@ interface InitiativeCardProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   isCompact?: boolean;
+  size?: number;
 }
 
 export const InitiativeCard: React.FC<InitiativeCardProps> = ({
@@ -30,11 +31,14 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   onDragStart,
   onDragOver,
   onDrop,
-  isCompact = false
+  isCompact = false,
+  size
 }) => {
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
   const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
 
+  const imageSize = size ? size * 0.5 : (isCompact ? 48 : 64);
+  const fontSize = size ? Math.max(12, size * 0.15) : (isCompact ? 18 : 24);
   const handleInitiativeSubmit = () => {
     const value = parseInt(initiativeValue);
     if (!isNaN(value)) {
@@ -51,12 +55,16 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={cn(
-        "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing min-w-[120px]",
+        "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
         isCompact ? "gap-1 p-2" : "gap-2 p-3",
         isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
         !isActive && hasGone && "opacity-60 border-border bg-muted/50",
         !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
       )}
+      style={size ? { 
+        minWidth: `${size}px`,
+        width: `${size}px`
+      } : { minWidth: '120px' }}
     >
       {/* Remove Button */}
       {!isCompact && (
@@ -95,10 +103,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
               e.stopPropagation();
               if (!isCompact) setIsEditingInitiative(true);
             }}
-            className={cn(
-              "font-bold text-primary",
-              isCompact ? "text-lg" : "text-2xl cursor-pointer hover:text-primary/80"
-            )}
+            className="font-bold text-primary cursor-pointer hover:text-primary/80"
+            style={{ fontSize: `${fontSize}px` }}
           >
             {initiative}
           </div>
@@ -106,10 +112,13 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       </div>
 
       {/* Token Image or Color */}
-      <div className={cn(
-        "rounded-lg overflow-hidden border-2 border-border",
-        isCompact ? "w-12 h-12" : "w-16 h-16"
-      )}>
+      <div 
+        className="rounded-lg overflow-hidden border-2 border-border"
+        style={{ 
+          width: `${imageSize}px`, 
+          height: `${imageSize}px` 
+        }}
+      >
         {token.imageUrl ? (
           <img
             src={token.imageUrl}
@@ -126,7 +135,10 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
       {/* Token Label */}
       {!isCompact && (
-        <div className="text-sm font-medium text-center text-foreground truncate max-w-full px-1">
+        <div 
+          className="font-medium text-center text-foreground truncate max-w-full px-1"
+          style={{ fontSize: `${Math.max(10, fontSize * 0.6)}px` }}
+        >
           {token.label || token.name}
         </div>
       )}
