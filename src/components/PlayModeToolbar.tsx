@@ -76,6 +76,14 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
   const initiativeCard = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
 
+  // Sync initiative tracker visibility with combat state
+  useEffect(() => {
+    if (!isInCombat && initiativeCard) {
+      // Hide tracker when not in combat
+      setVisibility(initiativeCard.id, false);
+    }
+  }, [isInCombat, initiativeCard, setVisibility]);
+
   const handleToggleFogCard = () => {
     if (fogCard) {
       setVisibility(fogCard.id, !fogCard.isVisible);
@@ -208,13 +216,17 @@ export const PlayModeToolbar: React.FC<PlayModeToolbarProps> = ({
                 onClick={() => {
                   if (isInCombat) {
                     endCombat();
-                    // Hide initiative tracker
-                    if (initiativeCard) {
-                      setVisibility(initiativeCard.id, false);
-                    }
                     toast.success('Combat ended');
                   } else {
+                    const { initiativeOrder } = useInitiativeStore.getState();
+                    
+                    if (initiativeOrder.length === 0) {
+                      toast.error('Add characters to initiative first');
+                      return;
+                    }
+                    
                     startCombat();
+                    
                     // Show/register initiative tracker
                     if (initiativeCard) {
                       setVisibility(initiativeCard.id, true);
