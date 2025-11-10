@@ -334,6 +334,45 @@ export const SimpleTabletop = () => {
     }
   }, [isInCombat, getCardByType, setVisibility]);
 
+  // Global mouseup listener to ensure drag states are always reset
+  useEffect(() => {
+    if (isDraggingToken || isDraggingRegion || isTransforming || isPanning) {
+      const handleGlobalMouseUp = () => {
+        // Reset all drag states
+        if (isDraggingToken) {
+          setIsDraggingToken(false);
+          setDraggedTokenId(null);
+          setDragOffset({ x: 0, y: 0 });
+          setDragStartPos({ x: 0, y: 0 });
+          setDragPath([]);
+          setGroupedTokens([]);
+          setTempTokenPositions(undefined);
+        }
+        if (isDraggingRegion) {
+          setIsDraggingRegion(false);
+          setDraggedRegionId(null);
+          setDragPreview(null);
+        }
+        if (isTransforming) {
+          setIsTransforming(false);
+          setTransformHandle(null);
+        }
+        if (isPanning) {
+          setIsPanning(false);
+        }
+        if (isRotatingRegion) {
+          setIsRotatingRegion(false);
+          setTempRegionRotation({});
+        }
+      };
+
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [isDraggingToken, isDraggingRegion, isTransforming, isPanning, isRotatingRegion]);
+
   // Update highlights whenever tokens or regions change
   useEffect(() => {
     updateAllTokenHighlights();
