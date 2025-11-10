@@ -15,6 +15,7 @@ export enum CardType {
   BACKGROUND_GRID = 'background_grid',
   INITIATIVE_TRACKER = 'initiative_tracker',
   STYLES = 'styles',
+  VISION_PROFILE_MANAGER = 'vision_profile_manager',
 }
 
 export interface ToolsCardProps {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3 } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +38,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const playerViewCard = cards.find((c) => c.type === CardType.MAP);
+  const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -99,6 +100,23 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 400, height: 450 },
         minSize: { width: 350, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleVisionProfiles = () => {
+    if (visionProfileCard) {
+      setVisibility(visionProfileCard.id, !visionProfileCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.VISION_PROFILE_MANAGER,
+        title: 'Vision Profile Manager',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 450, height: 650 },
+        minSize: { width: 400, height: 550 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -255,6 +273,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Grid3x3 className="h-4 w-4 mr-2" />
           Background & Grid
+        </Button>
+
+        <Button 
+          variant={visionProfileCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleVisionProfiles}
+          className="w-full"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Vision Profiles
         </Button>
       </div>
 

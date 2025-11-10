@@ -176,6 +176,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.VISION_PROFILE_MANAGER]: {
+    title: 'Vision Profile Manager',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 450, height: 650 },
+    minSize: { width: 400, height: 550 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

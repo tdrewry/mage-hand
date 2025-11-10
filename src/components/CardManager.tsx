@@ -14,6 +14,7 @@ import { MenuCardContent } from '@/components/cards/MenuCard';
 import { MapCardContent } from '@/components/cards/MapCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
+import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -129,6 +130,7 @@ function getCardTitle(type: CardType): string {
     [CardType.BACKGROUND_GRID]: 'Background & Grid',
     [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
     [CardType.STYLES]: 'Styles',
+    [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
   };
   
   return titles[type] || type;
@@ -197,6 +199,8 @@ function renderCardContent(
           onToggleGridVisibility={onToggleGridVisibility || (() => {})}
         />
       );
+    case CardType.VISION_PROFILE_MANAGER:
+      return <VisionProfileManagerCardContent />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
