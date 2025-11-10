@@ -62,6 +62,13 @@ export const TokenContextMenu = ({
   const [visionRangeValue, setVisionRangeValue] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [useGradientsValue, setUseGradientsValue] = useState(true);
+  
+  // Debug: Log profiles when modal opens
+  React.useEffect(() => {
+    if (showVisionRangeModal) {
+      console.log('Vision profiles loaded:', profiles.length, profiles);
+    }
+  }, [showVisionRangeModal, profiles]);
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -471,24 +478,30 @@ export const TokenContextMenu = ({
             <div>
               <Label className="text-sm font-medium">Vision Profiles</Label>
               <div className="grid grid-cols-1 gap-2 mt-2">
-                {profiles.map((profile) => (
-                  <Button
-                    key={profile.id}
-                    variant={selectedProfileId === profile.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => selectProfile(profile.id)}
-                    className="justify-start gap-2"
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: profile.color }}
-                    />
-                    <span className="flex-1 text-left">{profile.name}</span>
-                    {profile.useGradients && (
-                      <span className="text-xs text-muted-foreground">Soft</span>
-                    )}
-                  </Button>
-                ))}
+                {profiles.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">
+                    No vision profiles available. Create profiles in the Vision Profile Manager.
+                  </div>
+                ) : (
+                  profiles.map((profile) => (
+                    <Button
+                      key={profile.id}
+                      variant={selectedProfileId === profile.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => selectProfile(profile.id)}
+                      className="justify-start gap-2"
+                    >
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: profile.color }}
+                      />
+                      <span className="flex-1 text-left">{profile.name}</span>
+                      {profile.useGradients && (
+                        <span className="text-xs text-muted-foreground">Soft</span>
+                      )}
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
             
