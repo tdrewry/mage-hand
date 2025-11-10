@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Label } from '../ui/label';
 import { Slider } from '../ui/slider';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -36,16 +36,9 @@ export const StylesCardContent: React.FC = () => {
     const style = WATABOU_STYLES[styleName];
     if (style) {
       setWatabouStyle(style);
-      // Force a redraw by dispatching a custom event
-      window.dispatchEvent(new CustomEvent('styleChanged'));
       toast.success(`Applied ${styleName} style`);
     }
   };
-  
-  // Force redraw when manual controls change
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('styleChanged'));
-  }, [wallEdgeStyle, wallThickness, textureScale]);
 
   return (
     <div className="p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">

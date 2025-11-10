@@ -53,7 +53,14 @@ export const MapCardContent = () => {
   const { regions } = useRegionStore();
   const fogSettings = useFogStore();
   const { lights, globalAmbientLight, shadowIntensity } = useLightStore();
-  const { renderingMode, doors } = useDungeonStore();
+  const { 
+    renderingMode, 
+    doors, 
+    wallEdgeStyle, 
+    wallThickness, 
+    textureScale, 
+    watabouStyle 
+  } = useDungeonStore();
 
   // Fog of war state
   const [exploredArea, setExploredArea] = useState<paper.CompoundPath | null>(null);
@@ -388,7 +395,11 @@ export const MapCardContent = () => {
     tokenVisibility,
     labelVisibility,
     currentPlayerId,
-    doors
+    doors,
+    wallEdgeStyle,
+    wallThickness,
+    textureScale,
+    watabouStyle
   ]);
 
   return (

@@ -383,18 +383,7 @@ export const SimpleTabletop = () => {
     };
   }, [tokens, transform.zoom]);
 
-  // Listen for style change events from Styles card
-  useEffect(() => {
-    const handleStyleChanged = () => {
-      // Force a complete redraw when styles change
-      requestAnimationFrame(() => redrawCanvas());
-    };
-    
-    window.addEventListener('styleChanged', handleStyleChanged);
-    return () => {
-      window.removeEventListener('styleChanged', handleStyleChanged);
-    };
-  }, []);
+  // Canvas rendering now auto-updates via dependencies - no manual event listening needed
 
   // Initialize paper.js scope and load explored areas
   useEffect(() => {
