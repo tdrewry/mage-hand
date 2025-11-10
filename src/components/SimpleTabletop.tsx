@@ -58,6 +58,7 @@ import { serializeFogGeometry, deserializeFogGeometry } from '../lib/fogSerializ
 import { renderFogLayers } from '../lib/fogRenderer';
 import { renderFogWithGradients, renderFogWithHardEdges } from '../lib/fogGradientRenderer';
 import { getDefaultGradientSettings } from '../lib/fogGradientHelper';
+import { useVisionProfileStore } from '../stores/visionProfileStore';
 import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
@@ -197,6 +198,9 @@ export const SimpleTabletop = () => {
     outerFadeStart,
   } = useFogStore();
   
+  // Vision profiles store
+  const { getProfile } = useVisionProfileStore();
+  
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
@@ -214,6 +218,12 @@ export const SimpleTabletop = () => {
     visionRange: number;
     visibilityPath: Path2D;
     useGradients: boolean;
+    gradientSettings?: {
+      innerFadeStart: number;
+      midpointPosition: number;
+      midpointOpacity: number;
+      outerFadeStart: number;
+    };
   }>>([]);
   
   // Cache individual token visibility shapes to avoid recomputing unchanged tokens
@@ -609,6 +619,12 @@ export const SimpleTabletop = () => {
             visionRange: number;
             visibilityPath: Path2D;
             useGradients: boolean;
+            gradientSettings?: {
+              innerFadeStart: number;
+              midpointPosition: number;
+              midpointOpacity: number;
+              outerFadeStart: number;
+            };
           }> = [];
           
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
@@ -629,6 +645,39 @@ export const SimpleTabletop = () => {
             // Check if token uses gradients (default to true if not specified)
             const tokenUseGradients = token.useGradients !== false;
             
+            // Get token's gradient settings from profile or use defaults
+            let tokenGradientSettings: {
+              innerFadeStart: number;
+              midpointPosition: number;
+              midpointOpacity: number;
+              outerFadeStart: number;
+            } | undefined;
+            
+            if (tokenUseGradients) {
+              if (token.visionProfileId) {
+                // Use profile's gradient settings
+                const profile = getProfile(token.visionProfileId);
+                if (profile) {
+                  tokenGradientSettings = {
+                    innerFadeStart: profile.innerFadeStart,
+                    midpointPosition: profile.midpointPosition,
+                    midpointOpacity: profile.midpointOpacity,
+                    outerFadeStart: profile.outerFadeStart,
+                  };
+                }
+              }
+              
+              // Fall back to global gradient settings if no profile or profile not found
+              if (!tokenGradientSettings) {
+                tokenGradientSettings = {
+                  innerFadeStart,
+                  midpointPosition,
+                  midpointOpacity,
+                  outerFadeStart,
+                };
+              }
+            }
+            
             // Convert paper.js path to Path2D using the existing helper
             const path2D = paperPathToPath2D(cached.visionPath);
             
@@ -637,6 +686,7 @@ export const SimpleTabletop = () => {
               visionRange: visionRangePixels,
               visibilityPath: path2D,
               useGradients: tokenUseGradients,
+              gradientSettings: tokenGradientSettings,
             });
           });
           
@@ -1351,33 +1401,31 @@ export const SimpleTabletop = () => {
       ctx.fill(fogMasksRef.current.exploredOnlyMask);
       
       // Render tokens with gradients if any
-      if (useGradients && tokensWithGradients.length > 0) {
-        const gradientSettings = {
-          innerFadeStart,
-          midpointPosition,
-          midpointOpacity,
-          outerFadeStart,
-          fogOpacity,
-          exploredOpacity
-        };
-        
-        // Use destination-out to punch gradient holes
+      if (tokensWithGradients.length > 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
         
-        tokensWithGradients.forEach(({ position, visionRange, visibilityPath }) => {
+        tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
+          // Use token-specific gradient settings or fall back to global
+          const settings = gradientSettings || {
+            innerFadeStart,
+            midpointPosition,
+            midpointOpacity,
+            outerFadeStart,
+          };
+          
           const canvasGradient = ctx.createRadialGradient(
             position.x, position.y, 0,
             position.x, position.y, visionRange
           );
           
-          const midpointRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.midpointOpacity / gradientSettings.fogOpacity)));
-          const outerRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.exploredOpacity / gradientSettings.fogOpacity)));
+          const midpointRemoval = Math.max(0, Math.min(1, 1 - (settings.midpointOpacity / fogOpacity)));
+          const outerRemoval = Math.max(0, Math.min(1, 1 - (exploredOpacity / fogOpacity)));
           
           canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);
-          canvasGradient.addColorStop(gradientSettings.innerFadeStart, `rgba(255, 255, 255, 1)`);
-          canvasGradient.addColorStop(gradientSettings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);
-          canvasGradient.addColorStop(gradientSettings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);
+          canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 1)`);
+          canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);
+          canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);
           canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
           
           ctx.save();
