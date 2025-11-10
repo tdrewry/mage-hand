@@ -626,36 +626,28 @@ export const SimpleTabletop = () => {
   const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
     const baseTokenSize = 40; // Base size for 1x1 token
     
-    console.log('🔍 getTokenAtPosition called with world coords:', { worldX, worldY });
-    console.log('📍 Available tokens:', tokens.map(t => ({ 
-      id: t.id.slice(-8), 
-      x: t.x, 
-      y: t.y, 
-      gridW: t.gridWidth || 1, 
-      gridH: t.gridHeight || 1 
-    })));
-    
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i];
       // Calculate actual token size based on grid dimensions
       const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
       const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
-      const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      const baseRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      
+      // Add extra tolerance for borders, selection highlights, and visual size
+      // Tokens have 2-3px borders + 4px selection highlight
+      const borderTolerance = 8; // Extra pixels to account for visual size
+      const maxRadius = baseRadius + borderTolerance;
       
       const distance = Math.sqrt(
         Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
       );
       
-      console.log(`  Token ${token.id.slice(-8)}: pos(${token.x}, ${token.y}), distance=${distance.toFixed(1)}, maxRadius=${maxRadius}`);
-      
       if (distance <= maxRadius) {
-        console.log(`  ✓ HIT! Token ${token.id.slice(-8)}`);
         return token;
       }
     }
     
-    console.log('  ✗ No token hit');
     return null;
   };
 
@@ -3104,19 +3096,7 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    console.log('🖱️ MouseDown:', {
-      clientX: e.clientX,
-      clientY: e.clientY,
-      'rect.left': rect.left,
-      'rect.top': rect.top,
-      'rect.width': rect.width,
-      'rect.height': rect.height,
-      mouseX,
-      mouseY,
-      transform
-    });
     const worldPos = screenToWorld(mouseX, mouseY);
-    console.log('🌍 World position:', worldPos);
     
     if (e.button === 2) { // Right click
       e.preventDefault();
@@ -3279,8 +3259,6 @@ export const SimpleTabletop = () => {
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-      
-      console.log('🎯 Hit test results:', { clickedToken: clickedToken?.id, clickedRegion: clickedRegion?.id });
       
       if (clickedToken) {
         // Check if movement is restricted
