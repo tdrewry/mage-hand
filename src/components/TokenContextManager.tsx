@@ -101,7 +101,15 @@ export const TokenContextManager = ({
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     
-    const targetTokens = getTargetTokens(tokenId);
+    // Get fresh token data from store (not from closure)
+    const freshTokens = useSessionStore.getState().tokens;
+    const freshSelectedTokenIds = useSessionStore.getState().selectedTokenIds;
+    
+    // Get target tokens with fresh data
+    const targetTokens = freshSelectedTokenIds.includes(tokenId)
+      ? freshTokens.filter(t => freshSelectedTokenIds.includes(t.id))
+      : freshTokens.filter(t => t.id === tokenId);
+    
     const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
     
     // Debug logging
@@ -190,7 +198,14 @@ export const TokenContextManager = ({
   };
 
   const handleToggleVision = (tokenId: string) => {
-    const targetTokens = getTargetTokens(tokenId);
+    // Get fresh token data from store
+    const freshTokens = useSessionStore.getState().tokens;
+    const freshSelectedTokenIds = useSessionStore.getState().selectedTokenIds;
+    
+    const targetTokens = freshSelectedTokenIds.includes(tokenId)
+      ? freshTokens.filter(t => freshSelectedTokenIds.includes(t.id))
+      : freshTokens.filter(t => t.id === tokenId);
+    
     const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
     const newVisionState = !hasVisionEnabled;
     
