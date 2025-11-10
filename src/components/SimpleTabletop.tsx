@@ -16,6 +16,7 @@ import { TokenContextManager } from './TokenContextManager';
 import { CardManager } from './CardManager';
 import { CircularButtonBar } from './CircularButtonBar';
 import { VerticalToolbar } from './VerticalToolbar';
+import { InitiativePanel } from './InitiativePanel';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -4211,6 +4212,9 @@ export const SimpleTabletop = () => {
       
       {/* Card-Based UI System */}
       <CardManager sessionId={sessionId} />
+      
+      {/* Initiative Tracker Panel - Bottom middle */}
+      <InitiativePanel />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
