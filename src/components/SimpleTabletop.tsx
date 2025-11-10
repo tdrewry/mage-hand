@@ -454,11 +454,12 @@ export const SimpleTabletop = () => {
           if (!fogScopeRef.current) return;
           fogScopeRef.current.activate();
           
-          // Identify which tokens have moved
+          // Identify which tokens have moved (only consider tokens with vision)
+          const tokensWithVision = tokens.filter(t => t.hasVision !== false);
           const movedTokens: typeof tokens = [];
-          const currentTokenIds = new Set(tokens.map(t => t.id));
+          const currentTokenIds = new Set(tokensWithVision.map(t => t.id));
           
-          tokens.forEach(token => {
+          tokensWithVision.forEach(token => {
             const prevPos = prevTokenPositionsRef.current.get(token.id);
             if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
               movedTokens.push(token);
@@ -479,7 +480,7 @@ export const SimpleTabletop = () => {
           // If no tokens moved and we have cached data, skip computation
           // Unless we're in play mode and don't have fog masks yet (initial render)
           if (movedTokens.length === 0 && 
-              tokenVisibilityCacheRef.current.size === tokens.length && 
+              tokenVisibilityCacheRef.current.size === tokensWithVision.length && 
               fogMasksRef.current !== null) {
             return;
           }

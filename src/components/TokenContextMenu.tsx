@@ -4,6 +4,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  ContextMenuCheckboxItem,
 } from '@/components/ui/context-menu';
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { toast } from 'sonner';
@@ -38,6 +39,7 @@ export const TokenContextMenu = ({
     tokens, 
     selectedTokenIds, 
     updateTokenLabel, 
+    updateTokenVision,
     removeToken,
     setTokenOwner 
   } = useSessionStore();
@@ -145,6 +147,16 @@ export const TokenContextMenu = ({
 
   const targetTokens = getTargetTokens();
   const isMultiSelection = targetTokens.length > 1;
+  const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
+
+  const handleToggleVision = () => {
+    const newVisionState = !hasVisionEnabled;
+    targetTokens.forEach(token => {
+      updateTokenVision(token.id, newVisionState);
+    });
+    onUpdateCanvas?.();
+    toast.success(`Vision ${newVisionState ? 'enabled' : 'disabled'} for ${targetTokens.length} token(s)`);
+  };
 
   return (
     <>
@@ -161,6 +173,13 @@ export const TokenContextMenu = ({
             <Palette className="mr-2 h-4 w-4" />
             <span>Change Color{isMultiSelection ? 's' : ''}</span>
           </ContextMenuItem>
+          <ContextMenuCheckboxItem
+            checked={hasVisionEnabled}
+            onCheckedChange={handleToggleVision}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            <span>Has Vision</span>
+          </ContextMenuCheckboxItem>
           <ContextMenuItem onClick={handleInitiativeClick}>
             <Plus className="mr-2 h-4 w-4" />
             <span>Add to Initiative</span>

@@ -20,6 +20,7 @@ export interface Token {
   color?: string;     // Token color (for default tokens)
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
+  hasVision?: boolean; // Whether token can see through fog of war (default: true)
 }
 
 export interface Player {
@@ -44,6 +45,7 @@ export interface SessionState {
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
+  updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   clearAllTokens: () => void;
@@ -116,6 +118,13 @@ export const useSessionStore = create<SessionState>()(
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, color } : token
+          ),
+        })),
+
+      updateTokenVision: (tokenId, hasVision) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, hasVision } : token
           ),
         })),
 
