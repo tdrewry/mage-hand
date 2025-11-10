@@ -5,6 +5,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
   ContextMenuCheckboxItem,
+  ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import {
   Dialog,
@@ -173,6 +174,7 @@ export const TokenContextMenu = ({
             <Palette className="mr-2 h-4 w-4" />
             <span>Change Color{isMultiSelection ? 's' : ''}</span>
           </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuCheckboxItem
             checked={hasVisionEnabled}
             onCheckedChange={handleToggleVision}
@@ -180,6 +182,7 @@ export const TokenContextMenu = ({
             <Eye className="mr-2 h-4 w-4" />
             <span>Has Vision</span>
           </ContextMenuCheckboxItem>
+          <ContextMenuSeparator />
           <ContextMenuItem onClick={handleInitiativeClick}>
             <Plus className="mr-2 h-4 w-4" />
             <span>Add to Initiative</span>

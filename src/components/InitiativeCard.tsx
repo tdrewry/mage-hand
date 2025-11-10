@@ -4,6 +4,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TokenContextMenu } from './TokenContextMenu';
 
 interface InitiativeCardProps {
   token: Token;
@@ -48,24 +49,25 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   };
 
   return (
-    <div
-      draggable
-      onClick={onClick}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className={cn(
-        "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
-        isCompact ? "gap-1 p-2" : "gap-2 p-3",
-        isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
-        !isActive && hasGone && "opacity-60 border-border bg-muted/50",
-        !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
-      )}
-      style={size ? { 
-        minWidth: `${size}px`,
-        width: `${size}px`
-      } : { minWidth: '120px' }}
-    >
+    <TokenContextMenu tokenId={token.id}>
+      <div
+        draggable
+        onClick={onClick}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        className={cn(
+          "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
+          isCompact ? "gap-1 p-2" : "gap-2 p-3",
+          isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
+          !isActive && hasGone && "opacity-60 border-border bg-muted/50",
+          !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
+        )}
+        style={size ? { 
+          minWidth: `${size}px`,
+          width: `${size}px`
+        } : { minWidth: '120px' }}
+      >
       {/* Remove Button */}
       {!isCompact && (
         <Button
@@ -147,6 +149,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       {isActive && (
         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full animate-pulse" />
       )}
-    </div>
+      </div>
+    </TokenContextMenu>
   );
 };

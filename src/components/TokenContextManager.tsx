@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Edit3, Palette, Trash2 } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 import { Canvas as FabricCanvas } from 'fabric';
@@ -35,7 +35,8 @@ export const TokenContextManager = ({
   const { 
     tokens, 
     selectedTokenIds, 
-    updateTokenLabel, 
+    updateTokenLabel,
+    updateTokenVision,
     removeToken,
     setTokenOwner 
   } = useSessionStore();
@@ -100,9 +101,17 @@ export const TokenContextManager = ({
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     
+    const targetTokens = getTargetTokens(tokenId);
+    const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
+    
     const menuItems = [
       { label: 'Edit Label', icon: '✏️', action: () => handleLabelClick(tokenId) },
       { label: 'Change Color', icon: '🎨', action: () => handleColorClick(tokenId) },
+      { 
+        label: hasVisionEnabled ? 'Disable Vision' : 'Enable Vision', 
+        icon: hasVisionEnabled ? '👁️' : '🙈', 
+        action: () => handleToggleVision(tokenId)
+      },
       { label: 'Delete Token', icon: '🗑️', action: () => handleDeleteClick(tokenId), danger: true }
     ];
     
@@ -171,6 +180,19 @@ export const TokenContextManager = ({
   const handleDeleteClick = (tokenId: string) => {
     setContextTokenId(tokenId);
     setShowDeleteModal(true);
+  };
+
+  const handleToggleVision = (tokenId: string) => {
+    const targetTokens = getTargetTokens(tokenId);
+    const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
+    const newVisionState = !hasVisionEnabled;
+    
+    targetTokens.forEach(token => {
+      updateTokenVision(token.id, newVisionState);
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Vision ${newVisionState ? 'enabled' : 'disabled'} for ${targetTokens.length} token(s)`);
   };
 
   const applyLabel = () => {
