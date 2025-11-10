@@ -277,6 +277,11 @@ export const TokenContextMenu = ({
     toast.success(`Applied ${profile.name} to ${targetTokens.length} token(s)`);
   };
 
+  // Debug: Log profiles on render
+  React.useEffect(() => {
+    console.log('TokenContextMenu - Profiles loaded:', profiles.length, profiles);
+  }, [profiles]);
+
   return (
     <>
       <ContextMenu>
