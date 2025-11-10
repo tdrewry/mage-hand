@@ -58,6 +58,28 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   return (
     <TooltipProvider>
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg">
+        {/* Menu Toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleToggleMenu}
+              className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
+                menuCard?.isVisible
+                  ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
+                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
+              )}
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Menu</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="w-px h-8 bg-border" />
+
         {/* Mode Toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -98,26 +120,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         </Tooltip>
 
         <div className="w-px h-8 bg-border" />
-
-        {/* Menu Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleToggleMenu}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                menuCard?.isVisible
-                  ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              <MenuIcon className="w-6 h-6" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Menu</p>
-          </TooltipContent>
-        </Tooltip>
 
         {/* Roster Toggle */}
         <Tooltip>
