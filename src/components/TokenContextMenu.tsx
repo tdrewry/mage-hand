@@ -463,7 +463,7 @@ export const TokenContextMenu = ({
 
       {/* Vision Range Modal */}
       <Dialog open={showVisionRangeModal} onOpenChange={setShowVisionRangeModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Set Vision Profile</DialogTitle>
             <DialogDescription>
