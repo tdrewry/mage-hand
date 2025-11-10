@@ -14,12 +14,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useVisionProfileStore, type VisionProfile } from '@/stores/visionProfileStore';
-import { Plus, Edit, Trash2, Eye, Sparkles } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Sparkles, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export function VisionProfileManagerCardContent() {
-  const { profiles, addProfile, updateProfile, removeProfile } = useVisionProfileStore();
+  const { profiles, addProfile, updateProfile, removeProfile, resetToDefaults } = useVisionProfileStore();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -136,6 +136,13 @@ export function VisionProfileManagerCardContent() {
     if (confirm(`Are you sure you want to delete "${profile.name}"?`)) {
       removeProfile(profile.id);
       toast.success(`Deleted vision profile: ${profile.name}`);
+    }
+  };
+
+  const handleResetToDefaults = () => {
+    if (confirm('Reset all vision profiles to defaults? This will delete all custom profiles.')) {
+      resetToDefaults();
+      toast.success('Vision profiles reset to defaults');
     }
   };
 
@@ -351,10 +358,16 @@ export function VisionProfileManagerCardContent() {
         <p className="text-sm text-muted-foreground">
           Create and manage custom vision profiles for tokens
         </p>
-        <Button size="sm" onClick={openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Profile
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleResetToDefaults}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset
+          </Button>
+          <Button size="sm" onClick={openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Profile
+          </Button>
+        </div>
       </div>
 
       {/* Default Profiles */}

@@ -25,6 +25,7 @@ interface VisionProfileState {
   updateProfile: (id: string, updates: Partial<VisionProfile>) => void;
   removeProfile: (id: string) => void;
   getProfile: (id: string) => VisionProfile | undefined;
+  resetToDefaults: () => void;
 }
 
 // Default vision profiles
@@ -140,6 +141,11 @@ export const useVisionProfileStore = create<VisionProfileState>()(
       
       getProfile: (id) => {
         return get().profiles.find((p) => p.id === id);
+      },
+      
+      resetToDefaults: () => {
+        localStorage.removeItem('vision-profile-store');
+        set({ profiles: DEFAULT_PROFILES });
       },
     }),
     {
