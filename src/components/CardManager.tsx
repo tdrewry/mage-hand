@@ -5,6 +5,7 @@ import { FogControlCardContent } from '@/components/cards/FogControlCard';
 import { LayerStackCardContent } from '@/components/cards/LayerStackCard';
 import { TokenPanelCardContent } from '@/components/cards/TokenPanelCard';
 import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
+import { MapManagerCardContent } from '@/components/cards/MapManagerCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
@@ -120,6 +121,7 @@ function getCardTitle(type: CardType): string {
     [CardType.LAYERS]: 'Layer Stack',
     [CardType.TOKENS]: 'Token Panel',
     [CardType.MAP_CONTROLS]: 'Map Controls',
+    [CardType.MAP_MANAGER]: 'Map Manager',
     [CardType.GROUP_MANAGER]: 'Group Manager',
     [CardType.PROJECT_MANAGER]: 'Project Manager',
     [CardType.REGION_CONTROL]: 'Region Control',
@@ -159,6 +161,8 @@ function renderCardContent(
       return <TokenPanelCardContent onAddToken={addToken} />;
     case CardType.MAP_CONTROLS:
       return <MapControlsCardContent fabricCanvas={null} />; // TODO: Pass actual fabricCanvas
+    case CardType.MAP_MANAGER:
+      return <MapManagerCardContent />;
     case CardType.WATABOU_IMPORT:
       return <WatabouImportCardContent />;
     case CardType.BACKGROUND_GRID:

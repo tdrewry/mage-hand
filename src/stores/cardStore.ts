@@ -108,6 +108,14 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
   },
+  [CardType.MAP_MANAGER]: {
+    title: 'Map Manager',
+    defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+    defaultSize: { width: 600, height: 600 },
+    minSize: { width: 500, height: 500 },
+    isResizable: true,
+    isClosable: true,
+  },
   [CardType.GROUP_MANAGER]: {
     title: 'Group Manager',
     defaultPosition: { x: 320, y: 80 },

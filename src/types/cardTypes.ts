@@ -7,6 +7,7 @@ export enum CardType {
   LAYERS = 'layers',
   TOKENS = 'tokens',
   MAP_CONTROLS = 'map_controls',
+  MAP_MANAGER = 'map_manager',
   GROUP_MANAGER = 'group_manager',
   PROJECT_MANAGER = 'project_manager',
   REGION_CONTROL = 'region_control',

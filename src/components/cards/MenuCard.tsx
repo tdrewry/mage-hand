@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,8 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const setVisibility = useCardStore((state) => state.setVisibility);
   
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
+  const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
+  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const playerViewCard = cards.find((c) => c.type === CardType.MAP);
 
   const handleToggleMapControlsCard = () => {
@@ -63,6 +65,40 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         defaultPosition: { x: 320, y: 20 },
         defaultSize: { width: 800, height: 600 },
         minSize: { width: 400, height: 300 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleMapManager = () => {
+    if (mapManagerCard) {
+      setVisibility(mapManagerCard.id, !mapManagerCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.MAP_MANAGER,
+        title: 'Map Manager',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+        defaultSize: { width: 600, height: 600 },
+        minSize: { width: 500, height: 500 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleBackgroundGrid = () => {
+    if (backgroundGridCard) {
+      setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.BACKGROUND_GRID,
+        title: 'Background & Grid',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 400, height: 450 },
+        minSize: { width: 350, height: 400 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -199,6 +235,26 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Eye className="h-4 w-4 mr-2" />
           Player View
+        </Button>
+
+        <Button 
+          variant={mapManagerCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleMapManager}
+          className="w-full"
+        >
+          <Layers className="h-4 w-4 mr-2" />
+          Map Manager
+        </Button>
+
+        <Button 
+          variant={backgroundGridCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleBackgroundGrid}
+          className="w-full"
+        >
+          <Grid3x3 className="h-4 w-4 mr-2" />
+          Background & Grid
         </Button>
       </div>
 
