@@ -635,9 +635,13 @@ export const SimpleTabletop = () => {
       const baseRadius = Math.max(tokenWidth, tokenHeight) / 2;
       
       // Add extra tolerance for borders, selection highlights, and visual size
-      // Tokens have 2-3px borders + 4px selection highlight
-      const borderTolerance = 8; // Extra pixels to account for visual size
-      const maxRadius = baseRadius + borderTolerance;
+      // Scale tolerance inversely with zoom: more forgiving when zoomed out, tighter when zoomed in
+      // At zoom=1: tolerance = 8px
+      // At zoom=0.5 (zoomed out): tolerance = 16px (easier to click small tokens)
+      // At zoom=2 (zoomed in): tolerance = 4px (tighter precision for large tokens)
+      const baseBorderTolerance = 8;
+      const zoomAdjustedTolerance = baseBorderTolerance / transform.zoom;
+      const maxRadius = baseRadius + zoomAdjustedTolerance;
       
       const distance = Math.sqrt(
         Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
