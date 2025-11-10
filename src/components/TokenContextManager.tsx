@@ -112,13 +112,6 @@ export const TokenContextManager = ({
     
     const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
     
-    // Debug logging
-    console.log('Vision menu debug:', {
-      targetTokens: targetTokens.map(t => ({ id: t.id, hasVision: t.hasVision })),
-      hasVisionEnabled,
-      menuLabel: hasVisionEnabled ? 'Disable Vision' : 'Enable Vision'
-    });
-    
     const menuItems = [
       { label: 'Edit Label', icon: '✏️', action: () => handleLabelClick(tokenId) },
       { label: 'Change Color', icon: '🎨', action: () => handleColorClick(tokenId) },
@@ -208,12 +201,6 @@ export const TokenContextManager = ({
     
     const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
     const newVisionState = !hasVisionEnabled;
-    
-    console.log('Toggling vision:', {
-      targetTokens: targetTokens.map(t => ({ id: t.id, currentVision: t.hasVision })),
-      hasVisionEnabled,
-      newVisionState
-    });
     
     targetTokens.forEach(token => {
       updateTokenVision(token.id, newVisionState);

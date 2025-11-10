@@ -459,6 +459,9 @@ export const SimpleTabletop = () => {
           const movedTokens: typeof tokens = [];
           const currentTokenIds = new Set(tokensWithVision.map(t => t.id));
           
+          // Track tokens whose vision state changed
+          let visionStateChanged = false;
+          
           tokensWithVision.forEach(token => {
             const prevPos = prevTokenPositionsRef.current.get(token.id);
             if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
@@ -466,7 +469,7 @@ export const SimpleTabletop = () => {
             }
           });
           
-          // Remove cached visibility for tokens that no longer exist
+          // Remove cached visibility for tokens that no longer exist OR lost vision
           const cachedIds = Array.from(tokenVisibilityCacheRef.current.keys());
           cachedIds.forEach(id => {
             if (!currentTokenIds.has(id)) {
@@ -474,12 +477,14 @@ export const SimpleTabletop = () => {
               if (cached?.visionPath?.remove) cached.visionPath.remove();
               tokenVisibilityCacheRef.current.delete(id);
               prevTokenPositionsRef.current.delete(id);
+              visionStateChanged = true; // Vision was disabled for this token
             }
           });
           
-          // If no tokens moved and we have cached data, skip computation
+          // If no tokens moved and vision state didn't change, skip computation
           // Unless we're in play mode and don't have fog masks yet (initial render)
           if (movedTokens.length === 0 && 
+              !visionStateChanged &&
               tokenVisibilityCacheRef.current.size === tokensWithVision.length && 
               fogMasksRef.current !== null) {
             return;
