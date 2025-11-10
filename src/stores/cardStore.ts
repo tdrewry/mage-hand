@@ -28,6 +28,7 @@ interface CardStore {
   saveLayout: () => void;
   loadLayout: () => void;
   resetLayout: () => void;
+  removeCardsByType: (types: CardType[]) => void;
   
   // Utilities
   getCard: (id: string) => CardState | undefined;
@@ -269,10 +270,13 @@ export const useCardStore = create<CardStore>((set, get) => ({
     if (stored) {
       try {
         const cards = JSON.parse(stored);
+        // Filter out deprecated card types (TOOLS is replaced by VerticalToolbar)
+        const deprecatedTypes = [CardType.TOOLS];
         // Filter out any duplicate cards by type (keep only the first of each type)
         const uniqueCards = cards.reduce((acc: CardState[], card: CardState) => {
+          const isDeprecated = deprecatedTypes.includes(card.type);
           const exists = acc.some(c => c.type === card.type);
-          if (!exists) {
+          if (!isDeprecated && !exists) {
             acc.push(card);
           }
           return acc;
@@ -287,6 +291,26 @@ export const useCardStore = create<CardStore>((set, get) => ({
   resetLayout: () => {
     localStorage.removeItem(STORAGE_KEY);
     set({ cards: [], nextZIndex: 1000 });
+  },
+
+  removeCardsByType: (types: CardType[]) => {
+    set((state) => {
+      const filteredCards = state.cards.filter(card => !types.includes(card.type));
+      
+      // Also update localStorage
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const storedCards = JSON.parse(stored);
+          const cleanedCards = storedCards.filter((card: CardState) => !types.includes(card.type));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedCards));
+        } catch (e) {
+          console.error('Failed to clean card storage:', e);
+        }
+      }
+      
+      return { cards: filteredCards };
+    });
   },
 
   getCard: (id: string) => {
