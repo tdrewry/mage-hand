@@ -109,7 +109,7 @@ export const TokenContextManager = ({
       { label: 'Change Color', icon: '🎨', action: () => handleColorClick(tokenId) },
       { 
         label: hasVisionEnabled ? 'Disable Vision' : 'Enable Vision', 
-        icon: hasVisionEnabled ? '👁️' : '🙈', 
+        icon: hasVisionEnabled ? '🙈' : '👁️', 
         action: () => handleToggleVision(tokenId)
       },
       { label: 'Delete Token', icon: '🗑️', action: () => handleDeleteClick(tokenId), danger: true }

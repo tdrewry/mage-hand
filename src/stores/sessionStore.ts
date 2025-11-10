@@ -21,6 +21,7 @@ export interface Token {
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
   hasVision?: boolean; // Whether token can see through fog of war (default: true)
+  visionRange?: number; // Vision range in grid units (uses global default if not set)
 }
 
 export interface Player {

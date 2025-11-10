@@ -493,7 +493,9 @@ export const SimpleTabletop = () => {
               token.y >= r.y && token.y <= r.y + r.height
             );
             const gridSize = tokenRegion?.gridSize || 40;
-            const visionRangePixels = fogVisionRange * gridSize;
+            // Use token's individual vision range, or fall back to global default
+            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            const visionRangePixels = tokenVisionRange * gridSize;
             
             // Remove old cached vision for this token
             const oldCached = tokenVisibilityCacheRef.current.get(token.id);
