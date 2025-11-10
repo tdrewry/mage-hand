@@ -297,19 +297,18 @@ export const SimpleTabletop = () => {
       // TOOLS card removed - replaced by VerticalToolbar component
       
       // Register MAP card if it doesn't exist
-      // COMMENTED OUT FOR TESTING - checking if MAP card interferes with SimpleTabletop canvas clicks
-      // if (!getCardByType(CardType.MAP)) {
-      //   registerCard({
-      //     type: CardType.MAP,
-      //     title: 'Map View',
-      //     defaultPosition: { x: 320, y: 20 },
-      //     defaultSize: { width: 800, height: 600 },
-      //     minSize: { width: 400, height: 300 },
-      //     isResizable: true,
-      //     isClosable: false,
-      //     defaultVisible: true,
-      //   });
-      // }
+      if (!getCardByType(CardType.MAP)) {
+        registerCard({
+          type: CardType.MAP,
+          title: 'Map View',
+          defaultPosition: { x: 320, y: 20 },
+          defaultSize: { width: 800, height: 600 },
+          minSize: { width: 400, height: 300 },
+          isResizable: true,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
     }, 100);
     
     return () => clearTimeout(timer);
