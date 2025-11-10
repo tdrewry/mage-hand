@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapManager } from './MapManager';
 import { TokenContextManager } from './TokenContextManager';
 import { CardManager } from './CardManager';
+import { CircularButtonBar } from './CircularButtonBar';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -153,6 +154,7 @@ export const SimpleTabletop = () => {
     annotations,
     terrainFeatures,
     renderingMode,
+    setRenderingMode,
     watabouStyle,
     wallEdgeStyle,
     wallThickness,
@@ -4086,6 +4088,12 @@ export const SimpleTabletop = () => {
 
   return (
     <div className="w-full h-screen bg-surface flex flex-col relative">
+      {/* Circular Button Bar - Always visible at top */}
+      <CircularButtonBar 
+        mode={renderingMode} 
+        onToggleMode={() => setRenderingMode(renderingMode === 'edit' ? 'play' : 'edit')}
+      />
+      
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
       {/* Wall Settings Control Panel - available in both edit and play mode */}

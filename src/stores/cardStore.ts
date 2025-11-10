@@ -70,7 +70,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 54, height: 400 },
     maxSize: { width: 200, height: 800 },
     isResizable: true,
-    isClosable: false,
+    isClosable: true,
     defaultVisible: true,
     hideHeader: true,
     fullCardDraggable: true,
