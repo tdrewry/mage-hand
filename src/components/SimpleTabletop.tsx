@@ -1388,63 +1388,6 @@ export const SimpleTabletop = () => {
     
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
-    // Render colored vision indicators (before fog)
-    if (isPlayMode && fogEnabled && !fogRevealAll) {
-      tokenVisibilityDataRef.current.forEach(({ position, visionRange, visibilityPath, useGradients, gradientSettings }) => {
-        if (!useGradients) return;
-        
-        // Get token data to find profile color
-        const token = tokens.find(t => t.x === position.x && t.y === position.y);
-        if (!token || !token.visionProfileId) return;
-        
-        const profile = getProfile(token.visionProfileId);
-        if (!profile) return;
-        
-        // Parse profile color
-        const hexToRgb = (hex: string) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-          } : { r: 255, g: 255, b: 255 };
-        };
-        
-        const rgb = hexToRgb(profile.color);
-        const settings = gradientSettings || {
-          innerFadeStart,
-          midpointPosition,
-          midpointOpacity,
-          outerFadeStart,
-        };
-        
-        // Create colored radial gradient (transparent center to colored edges)
-        const coloredGradient = ctx.createRadialGradient(
-          position.x, position.y, 0,
-          position.x, position.y, visionRange
-        );
-        
-        // Gradient from transparent at center to darker color at edges
-        coloredGradient.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.centerOpacity ?? 0})`);
-        coloredGradient.addColorStop(settings.innerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.innerOpacity ?? 0})`);
-        coloredGradient.addColorStop(settings.midpointPosition, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.midpointColorOpacity ?? 0.1})`);
-        coloredGradient.addColorStop(settings.outerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.outerOpacity ?? 0.25})`);
-        coloredGradient.addColorStop(1.0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.edgeOpacity ?? 0.4})`);
-        
-        // Clip to visibility polygon and apply gradient
-        ctx.save();
-        ctx.clip(visibilityPath);
-        ctx.fillStyle = coloredGradient;
-        ctx.fillRect(
-          position.x - visionRange,
-          position.y - visionRange,
-          visionRange * 2,
-          visionRange * 2
-        );
-        ctx.restore();
-      });
-    }
-    
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
       // Separate tokens by gradient preference
       const tokensWithGradients = tokenVisibilityDataRef.current.filter(t => t.useGradients);
@@ -1514,6 +1457,59 @@ export const SimpleTabletop = () => {
         ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
       }
+      
+      // AFTER fog removal, render colored vision gradient overlays (only in visible areas)
+      tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
+        // Get token data to find profile color
+        const token = tokens.find(t => t.x === position.x && t.y === position.y);
+        if (!token || !token.visionProfileId) return;
+        
+        const profile = getProfile(token.visionProfileId);
+        if (!profile) return;
+        
+        // Parse profile color
+        const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          } : { r: 255, g: 255, b: 255 };
+        };
+        
+        const rgb = hexToRgb(profile.color);
+        const settings = gradientSettings || {
+          innerFadeStart,
+          midpointPosition,
+          midpointOpacity,
+          outerFadeStart,
+        };
+        
+        // Create colored radial gradient (transparent center to colored edges)
+        const coloredGradient = ctx.createRadialGradient(
+          position.x, position.y, 0,
+          position.x, position.y, visionRange
+        );
+        
+        // Gradient from transparent at center to darker color at edges
+        coloredGradient.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.centerOpacity ?? 0})`);
+        coloredGradient.addColorStop(settings.innerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.innerOpacity ?? 0})`);
+        coloredGradient.addColorStop(settings.midpointPosition, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.midpointColorOpacity ?? 0.1})`);
+        coloredGradient.addColorStop(settings.outerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.outerOpacity ?? 0.25})`);
+        coloredGradient.addColorStop(1.0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.edgeOpacity ?? 0.4})`);
+        
+        // Clip to visibility polygon and apply gradient
+        ctx.save();
+        ctx.clip(visibilityPath);
+        ctx.fillStyle = coloredGradient;
+        ctx.fillRect(
+          position.x - visionRange,
+          position.y - visionRange,
+          visionRange * 2,
+          visionRange * 2
+        );
+        ctx.restore();
+      });
     }
     
     // Draw visible tokens AFTER fog so they appear on top of darkness
