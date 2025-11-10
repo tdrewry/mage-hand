@@ -144,6 +144,29 @@ export const useVisionProfileStore = create<VisionProfileState>()(
     }),
     {
       name: 'vision-profile-store',
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        // Ensure default profiles are always present
+        if (version === 0 || !persistedState.profiles || persistedState.profiles.length === 0) {
+          return {
+            ...persistedState,
+            profiles: DEFAULT_PROFILES,
+          };
+        }
+        
+        // Merge any missing default profiles
+        const existingIds = new Set(persistedState.profiles.map((p: VisionProfile) => p.id));
+        const missingDefaults = DEFAULT_PROFILES.filter(dp => !existingIds.has(dp.id));
+        
+        if (missingDefaults.length > 0) {
+          return {
+            ...persistedState,
+            profiles: [...DEFAULT_PROFILES.filter(dp => existingIds.has(dp.id)), ...persistedState.profiles.filter((p: VisionProfile) => !DEFAULT_PROFILES.find(dp => dp.id === p.id)), ...missingDefaults],
+          };
+        }
+        
+        return persistedState;
+      },
     }
   )
 );
