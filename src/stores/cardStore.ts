@@ -38,12 +38,12 @@ const STORAGE_KEY = 'vtt-card-layout';
 
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   [CardType.MAP]: {
-    title: 'Map View',
+    title: 'Player View',
     defaultPosition: { x: 320, y: 20 },
     defaultSize: { width: 800, height: 600 },
     minSize: { width: 400, height: 300 },
     isResizable: true,
-    isClosable: false,
+    isClosable: true,
     defaultVisible: true,
   },
   [CardType.MENU]: {

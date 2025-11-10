@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const setVisibility = useCardStore((state) => state.setVisibility);
   
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
+  const playerViewCard = cards.find((c) => c.type === CardType.MAP);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -48,6 +49,23 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         minSize: { width: 350, height: 400 },
         isResizable: true,
         isClosable: true,
+      });
+    }
+  };
+
+  const handleTogglePlayerView = () => {
+    if (playerViewCard) {
+      setVisibility(playerViewCard.id, !playerViewCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.MAP,
+        title: 'Player View',
+        defaultPosition: { x: 320, y: 20 },
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 400, height: 300 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -171,6 +189,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Map className="h-4 w-4 mr-2" />
           Map Controls
+        </Button>
+
+        <Button 
+          variant={playerViewCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleTogglePlayerView}
+          className="w-full"
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Player View
         </Button>
       </div>
 
