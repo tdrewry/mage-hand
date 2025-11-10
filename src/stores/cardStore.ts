@@ -159,6 +159,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     hideHeader: true,
     fullCardDraggable: true,
   },
+  [CardType.STYLES]: {
+    title: 'Styles',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 400, height: 600 },
+    minSize: { width: 350, height: 500 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

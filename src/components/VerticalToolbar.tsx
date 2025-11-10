@@ -52,8 +52,6 @@ interface VerticalToolbarProps {
   onToggleGridSnapping?: () => void;
   
   // Shared props
-  showNegativeSpacePanel: boolean;
-  onToggleNegativeSpacePanel: () => void;
   showRegions: boolean;
   onToggleRegions: () => void;
 }
@@ -70,8 +68,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   isDrawingFreehand = false,
   isGridSnappingEnabled = false,
   onToggleGridSnapping,
-  showNegativeSpacePanel,
-  onToggleNegativeSpacePanel,
   showRegions,
   onToggleRegions,
 }) => {
@@ -90,6 +86,23 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
+  const stylesCard = cards.find((c) => c.type === CardType.STYLES);
+
+  const handleToggleStylesCard = () => {
+    if (stylesCard) {
+      setVisibility(stylesCard.id, !stylesCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.STYLES,
+        title: 'Styles',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 400, height: 600 },
+        minSize: { width: 350, height: 500 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
 
   const handleToggleLayerCard = () => {
     if (layerCard) {
@@ -319,16 +332,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={showNegativeSpacePanel ? "default" : "ghost"}
+                  variant={stylesCard?.isVisible ? "default" : "ghost"}
                   size="icon"
-                  onClick={onToggleNegativeSpacePanel}
+                  onClick={handleToggleStylesCard}
                   className="w-10 h-10 rounded-full"
                 >
                   <Settings2 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p>Wall Settings</p>
+                <p>Styles</p>
               </TooltipContent>
             </Tooltip>
 
@@ -420,9 +433,9 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={showNegativeSpacePanel ? "default" : "ghost"}
+                  variant={stylesCard?.isVisible ? "default" : "ghost"}
                   size="icon"
-                  onClick={onToggleNegativeSpacePanel}
+                  onClick={handleToggleStylesCard}
                   className="w-10 h-10 rounded-full"
                 >
                   <Palette className="w-5 h-5" />

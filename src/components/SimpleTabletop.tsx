@@ -63,7 +63,6 @@ import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
-import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
 import { 
   generateTransformHandles, 
   getRotationCenterHandle, 
@@ -81,7 +80,6 @@ export const SimpleTabletop = () => {
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
-  const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState('#333');
   const [gridOpacity, setGridOpacity] = useState(80);
@@ -4140,28 +4138,14 @@ export const SimpleTabletop = () => {
         isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
         isGridSnappingEnabled={isGridSnappingEnabled}
         onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-        showNegativeSpacePanel={showNegativeSpacePanel}
-        onToggleNegativeSpacePanel={() => {
-          setShowNegativeSpacePanel(!showNegativeSpacePanel);
-          if (!showNegativeSpacePanel) {
-            setSelectedRegionId(null);
-          }
-        }}
         showRegions={showRegions}
         onToggleRegions={() => setShowRegions(!showRegions)}
       />
       
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
-      {/* Wall Settings Control Panel - available in both edit and play mode */}
-      {showNegativeSpacePanel && (
-        <NegativeSpaceControlPanel
-          onClose={() => setShowNegativeSpacePanel(false)}
-        />
-      )}
-      
-      {/* Region Control Panel - only show in edit mode when wall settings is closed */}
-      {renderingMode === 'edit' && selectedRegionId && !showNegativeSpacePanel && (() => {
+      {/* Region Control Panel - only show in edit mode */}
+      {renderingMode === 'edit' && selectedRegionId && (() => {
         const selectedRegion = regions.find(r => r.id === selectedRegionId);
         if (!selectedRegion) return null;
         

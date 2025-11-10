@@ -13,6 +13,7 @@ export enum CardType {
   WATABOU_IMPORT = 'watabou_import',
   BACKGROUND_GRID = 'background_grid',
   INITIATIVE_TRACKER = 'initiative_tracker',
+  STYLES = 'styles',
 }
 
 export interface ToolsCardProps {
