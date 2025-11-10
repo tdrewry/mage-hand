@@ -627,6 +627,13 @@ export const SimpleTabletop = () => {
     const baseTokenSize = 40; // Base size for 1x1 token
     
     console.log('🔍 getTokenAtPosition called with world coords:', { worldX, worldY });
+    console.log('📍 Available tokens:', tokens.map(t => ({ 
+      id: t.id.slice(-8), 
+      x: t.x, 
+      y: t.y, 
+      gridW: t.gridWidth || 1, 
+      gridH: t.gridHeight || 1 
+    })));
     
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -640,11 +647,15 @@ export const SimpleTabletop = () => {
         Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
       );
       
+      console.log(`  Token ${token.id.slice(-8)}: pos(${token.x}, ${token.y}), distance=${distance.toFixed(1)}, maxRadius=${maxRadius}`);
+      
       if (distance <= maxRadius) {
+        console.log(`  ✓ HIT! Token ${token.id.slice(-8)}`);
         return token;
       }
     }
     
+    console.log('  ✗ No token hit');
     return null;
   };
 
