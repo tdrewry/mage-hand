@@ -440,6 +440,9 @@ export const SimpleTabletop = () => {
       return;
     }
     
+    // Force fog computation when switching to play mode
+    const isPlayMode = renderingMode === 'play';
+    
     const wallGeometry = wallGeometryRef.current;
     
     // Debounce fog computation to avoid excessive updates
@@ -473,8 +476,11 @@ export const SimpleTabletop = () => {
             }
           });
           
-          // If no tokens moved, skip computation
-          if (movedTokens.length === 0 && tokenVisibilityCacheRef.current.size === tokens.length) {
+          // If no tokens moved and we have cached data, skip computation
+          // Unless we're in play mode and don't have fog masks yet (initial render)
+          if (movedTokens.length === 0 && 
+              tokenVisibilityCacheRef.current.size === tokens.length && 
+              fogMasksRef.current !== null) {
             return;
           }
           
@@ -593,7 +599,7 @@ export const SimpleTabletop = () => {
     }, 100); // 100ms debounce
     
     return () => clearTimeout(timeoutId);
-  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, isDraggingToken, setSerializedExploredAreas]);
+  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, isDraggingToken, setSerializedExploredAreas, renderingMode, regions, transform.x, transform.y, transform.zoom]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -1225,14 +1231,6 @@ export const SimpleTabletop = () => {
       ctx.restore();
     });
     
-    // Draw visible tokens (on top of markers)
-    visibleTokens.forEach(token => {
-      // Use temporary position if available (during region drag)
-      const tempPos = tempTokenPositions?.[token.id];
-      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-      drawToken(ctx, renderToken);
-    });
-    
     // Draw light sources in edit mode using new system
     if (renderingMode === 'edit' && lights.length > 0) {
       renderLightSources(ctx, lights, transform);
@@ -1276,7 +1274,7 @@ export const SimpleTabletop = () => {
       drawDragGhostAndPath(ctx);
     }
     
-    // Render fog of war (in world coordinate space, before restore)
+    // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
       renderFogLayers(
@@ -1288,6 +1286,14 @@ export const SimpleTabletop = () => {
         exploredOpacity
       );
     }
+    
+    // Draw visible tokens AFTER fog so they appear on top of darkness
+    visibleTokens.forEach(token => {
+      // Use temporary position if available (during region drag)
+      const tempPos = tempTokenPositions?.[token.id];
+      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+      drawToken(ctx, renderToken);
+    });
     
     // Restore context after all world-space rendering
     ctx.restore();
