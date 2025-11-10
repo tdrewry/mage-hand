@@ -34,7 +34,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const toolsCard = cards.find((c) => c.type === CardType.TOOLS);
   const initiativeCard = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
 
   const handleToggleMenu = () => {
@@ -60,11 +59,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
     }
   };
 
-  const handleToggleTools = () => {
-    if (toolsCard) {
-      setVisibility(toolsCard.id, !toolsCard.isVisible);
-    }
-  };
 
   const handleToggleInitiative = () => {
     if (initiativeCard) {
@@ -169,27 +163,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
           </TooltipContent>
         </Tooltip>
 
-        {/* Tools Toggle */}
-        {toolsCard && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={handleToggleTools}
-                className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                  toolsCard.isVisible
-                    ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
-                    : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-                )}
-              >
-                <Swords className="w-6 h-6" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Tools</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
 
         {/* Initiative Tracker Toggle - show when in combat or if card exists */}
         {(isInCombat || initiativeCard) && (

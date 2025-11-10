@@ -295,19 +295,7 @@ export const SimpleTabletop = () => {
         });
       }
       
-      // Register TOOLS card if it doesn't exist
-      if (!getCardByType(CardType.TOOLS)) {
-        registerCard({
-          type: CardType.TOOLS,
-          title: 'Tools',
-          defaultPosition: { x: window.innerWidth - 70, y: 80 },
-          defaultSize: { width: 54, height: 600 },
-          minSize: { width: 54, height: 400 },
-          isResizable: false,
-          isClosable: false,
-          defaultVisible: true,
-        });
-      }
+      // TOOLS card removed - replaced by VerticalToolbar component
       
       // Register MAP card if it doesn't exist
       if (!getCardByType(CardType.MAP)) {
@@ -4144,37 +4132,29 @@ export const SimpleTabletop = () => {
         onToggleMode={() => setRenderingMode(renderingMode === 'edit' ? 'play' : 'edit')}
       />
       
-      {/* Vertical Toolbar - Middle left of viewport (controlled by Tools card visibility) */}
-      {(() => {
-        const toolsCard = cards.find((c) => c.type === CardType.TOOLS);
-        if (toolsCard?.isVisible) {
-          return (
-            <VerticalToolbar 
-              mode={renderingMode}
-              fabricCanvas={null}
-              onOpenMapManager={() => setShowMapManager(true)}
-              onAddRegion={addNewRegion}
-              onStartPolygonDraw={() => startPathDrawing('polygon')}
-              onStartFreehandDraw={() => startPathDrawing('freehand')}
-              onFinishPolygonDraw={finishPathDrawing}
-              isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
-              isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
-              isGridSnappingEnabled={isGridSnappingEnabled}
-              onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-              showNegativeSpacePanel={showNegativeSpacePanel}
-              onToggleNegativeSpacePanel={() => {
-                setShowNegativeSpacePanel(!showNegativeSpacePanel);
-                if (!showNegativeSpacePanel) {
-                  setSelectedRegionId(null);
-                }
-              }}
-              showRegions={showRegions}
-              onToggleRegions={() => setShowRegions(!showRegions)}
-            />
-          );
-        }
-        return null;
-      })()}
+      {/* Vertical Toolbar - Middle left of viewport (controlled by CircularButtonBar) */}
+      <VerticalToolbar 
+        mode={renderingMode}
+        fabricCanvas={null}
+        onOpenMapManager={() => setShowMapManager(true)}
+        onAddRegion={addNewRegion}
+        onStartPolygonDraw={() => startPathDrawing('polygon')}
+        onStartFreehandDraw={() => startPathDrawing('freehand')}
+        onFinishPolygonDraw={finishPathDrawing}
+        isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+        isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
+        isGridSnappingEnabled={isGridSnappingEnabled}
+        onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+        showNegativeSpacePanel={showNegativeSpacePanel}
+        onToggleNegativeSpacePanel={() => {
+          setShowNegativeSpacePanel(!showNegativeSpacePanel);
+          if (!showNegativeSpacePanel) {
+            setSelectedRegionId(null);
+          }
+        }}
+        showRegions={showRegions}
+        onToggleRegions={() => setShowRegions(!showRegions)}
+      />
       
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
@@ -4230,30 +4210,7 @@ export const SimpleTabletop = () => {
       />
       
       {/* Card-Based UI System */}
-      <CardManager 
-        sessionId={sessionId}
-        toolsCardProps={{
-          fabricCanvas: null,
-          onOpenMapManager: () => setShowMapManager(true),
-          onAddRegion: addNewRegion,
-          onStartPolygonDraw: () => startPathDrawing('polygon'),
-          onStartFreehandDraw: () => startPathDrawing('freehand'),
-          onFinishPolygonDraw: finishPathDrawing,
-          isDrawingPolygon: pathDrawingMode === 'drawing' && pathDrawingType === 'polygon',
-          isDrawingFreehand: pathDrawingMode === 'drawing' && pathDrawingType === 'freehand',
-          isGridSnappingEnabled,
-          onToggleGridSnapping: () => setIsGridSnappingEnabled(!isGridSnappingEnabled),
-          showNegativeSpacePanel,
-          onToggleNegativeSpacePanel: () => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          },
-          showRegions,
-          onToggleRegions: () => setShowRegions(!showRegions),
-        }}
-      />
+      <CardManager sessionId={sessionId} />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {

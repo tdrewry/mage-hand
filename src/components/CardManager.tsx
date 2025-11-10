@@ -10,17 +10,16 @@ import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { MenuCardContent } from '@/components/cards/MenuCard';
-import { ToolsCardContent } from '@/components/cards/ToolsCard';
 import { MapCardContent } from '@/components/cards/MapCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
-import { CardType, ToolsCardProps } from '@/types/cardTypes';
+import { CardType } from '@/types/cardTypes';
 
 interface CardManagerProps {
   children?: React.ReactNode;
   sessionId?: string;
-  toolsCardProps?: Omit<ToolsCardProps, 'mode'>;
+  toolsCardProps?: any; // Keep for backward compatibility but not used
 }
 
 export function CardManager({ children, sessionId, toolsCardProps }: CardManagerProps) {
@@ -64,7 +63,7 @@ export function CardManager({ children, sessionId, toolsCardProps }: CardManager
       
       {/* Render all registered cards */}
       {cards.map((card) => {
-        const content = renderCardContent(card.id, card.type, handleAddToken, sessionId, renderingMode, toolsCardProps);
+        const content = renderCardContent(card.id, card.type, handleAddToken, sessionId);
         return (
           <BaseCard
             key={card.id}
@@ -110,15 +109,13 @@ function renderCardContent(
   cardId: string, 
   type: CardType, 
   addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
-  sessionId?: string,
-  mode?: 'edit' | 'play',
-  toolsCardProps?: Omit<ToolsCardProps, 'mode'>
+  sessionId?: string
 ): React.ReactNode {
   switch (type) {
     case CardType.MENU:
       return <MenuCardContent sessionId={sessionId} />;
     case CardType.TOOLS:
-      return toolsCardProps && mode ? <ToolsCardContent mode={mode} {...toolsCardProps} /> : null;
+      return null; // TOOLS card removed - replaced by VerticalToolbar
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
