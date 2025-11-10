@@ -6,6 +6,9 @@ import {
   ContextMenuTrigger,
   ContextMenuCheckboxItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
 } from '@/components/ui/context-menu';
 import {
   Dialog,
@@ -19,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { useVisionProfileStore } from '../stores/visionProfileStore';
@@ -249,6 +252,31 @@ export const TokenContextMenu = ({
     }
   };
 
+  const applyProfileQuick = (profileId: string) => {
+    const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
+
+    const targetTokens = getTargetTokens();
+    
+    targetTokens.forEach((token) => {
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map((t) =>
+          t.id === token.id
+            ? {
+                ...t,
+                visionProfileId: profile.id,
+                visionRange: profile.visionRange,
+                useGradients: profile.useGradients,
+              }
+            : t
+        ),
+      }));
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Applied ${profile.name} to ${targetTokens.length} token(s)`);
+  };
+
   return (
     <>
       <ContextMenu>
@@ -272,6 +300,32 @@ export const TokenContextMenu = ({
             <Eye className="mr-2 h-4 w-4" />
             <span>Has Vision</span>
           </ContextMenuCheckboxItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <User className="mr-2 h-4 w-4" />
+              <span>Use Profile</span>
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto">
+              {profiles.length === 0 ? (
+                <ContextMenuItem disabled>
+                  <span className="text-xs text-muted-foreground">No profiles available</span>
+                </ContextMenuItem>
+              ) : (
+                profiles.map((profile) => (
+                  <ContextMenuItem 
+                    key={profile.id}
+                    onClick={() => applyProfileQuick(profile.id)}
+                  >
+                    <div 
+                      className="mr-2 h-3 w-3 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: profile.color }}
+                    />
+                    <span className="flex-1">{profile.name}</span>
+                  </ContextMenuItem>
+                ))
+              )}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
           <ContextMenuItem onClick={handleVisionRangeClick}>
             <Scan className="mr-2 h-4 w-4" />
             <span>Set Vision Range</span>
