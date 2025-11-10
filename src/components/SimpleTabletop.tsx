@@ -15,6 +15,7 @@ import { MapManager } from './MapManager';
 import { TokenContextManager } from './TokenContextManager';
 import { CardManager } from './CardManager';
 import { CircularButtonBar } from './CircularButtonBar';
+import { VerticalToolbar } from './VerticalToolbar';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -274,6 +275,7 @@ export const SimpleTabletop = () => {
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);
   const setVisibility = useCardStore((state) => state.setVisibility);
+  const cards = useCardStore((state) => state.cards);
   
   // Register MENU, TOOLS, and MAP cards on mount (only once)
   useEffect(() => {
@@ -4141,6 +4143,38 @@ export const SimpleTabletop = () => {
         mode={renderingMode} 
         onToggleMode={() => setRenderingMode(renderingMode === 'edit' ? 'play' : 'edit')}
       />
+      
+      {/* Vertical Toolbar - Middle left of viewport (controlled by Tools card visibility) */}
+      {(() => {
+        const toolsCard = cards.find((c) => c.type === CardType.TOOLS);
+        if (toolsCard?.isVisible) {
+          return (
+            <VerticalToolbar 
+              mode={renderingMode}
+              fabricCanvas={null}
+              onOpenMapManager={() => setShowMapManager(true)}
+              onAddRegion={addNewRegion}
+              onStartPolygonDraw={() => startPathDrawing('polygon')}
+              onStartFreehandDraw={() => startPathDrawing('freehand')}
+              onFinishPolygonDraw={finishPathDrawing}
+              isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+              isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
+              isGridSnappingEnabled={isGridSnappingEnabled}
+              onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+              showNegativeSpacePanel={showNegativeSpacePanel}
+              onToggleNegativeSpacePanel={() => {
+                setShowNegativeSpacePanel(!showNegativeSpacePanel);
+                if (!showNegativeSpacePanel) {
+                  setSelectedRegionId(null);
+                }
+              }}
+              showRegions={showRegions}
+              onToggleRegions={() => setShowRegions(!showRegions)}
+            />
+          );
+        }
+        return null;
+      })()}
       
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
