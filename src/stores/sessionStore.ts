@@ -22,6 +22,8 @@ export interface Token {
   inCombat?: boolean;  // Whether token is in combat
   hasVision?: boolean; // Whether token can see through fog of war (default: true)
   visionRange?: number; // Vision range in grid units (uses global default if not set)
+  visionProfileId?: string; // Reference to a vision profile from visionProfileStore
+  useGradients?: boolean; // Whether to use gradient edges (can override profile setting)
 }
 
 export interface Player {

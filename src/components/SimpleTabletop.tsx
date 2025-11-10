@@ -213,6 +213,7 @@ export const SimpleTabletop = () => {
     position: { x: number; y: number };
     visionRange: number;
     visibilityPath: Path2D;
+    useGradients: boolean;
   }>>([]);
   
   // Cache individual token visibility shapes to avoid recomputing unchanged tokens
@@ -607,12 +608,13 @@ export const SimpleTabletop = () => {
             position: { x: number; y: number };
             visionRange: number;
             visibilityPath: Path2D;
+            useGradients: boolean;
           }> = [];
           
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
             if (!cached.visionPath) return;
             
-            // Find the token to get its vision range
+            // Find the token to get its vision range and gradient settings
             const token = tokens.find(t => t.id === tokenId);
             if (!token) return;
             
@@ -624,13 +626,17 @@ export const SimpleTabletop = () => {
             const tokenVisionRange = token.visionRange ?? fogVisionRange;
             const visionRangePixels = tokenVisionRange * gridSize;
             
+            // Check if token uses gradients (default to true if not specified)
+            const tokenUseGradients = token.useGradients !== false;
+            
             // Convert paper.js path to Path2D using the existing helper
             const path2D = paperPathToPath2D(cached.visionPath);
             
             tokenVisData.push({
               position: cached.position,
               visionRange: visionRangePixels,
-              visibilityPath: path2D
+              visibilityPath: path2D,
+              useGradients: tokenUseGradients,
             });
           });
           
@@ -1333,8 +1339,19 @@ export const SimpleTabletop = () => {
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
-      if (useGradients && tokenVisibilityDataRef.current.length > 0) {
-        // Render with soft gradient edges
+      // Separate tokens by gradient preference
+      const tokensWithGradients = tokenVisibilityDataRef.current.filter(t => t.useGradients);
+      const tokensWithoutGradients = tokenVisibilityDataRef.current.filter(t => !t.useGradients);
+      
+      // First render base fog layers
+      ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+      ctx.fill(fogMasksRef.current.unexploredMask);
+      
+      ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+      ctx.fill(fogMasksRef.current.exploredOnlyMask);
+      
+      // Render tokens with gradients if any
+      if (useGradients && tokensWithGradients.length > 0) {
         const gradientSettings = {
           innerFadeStart,
           midpointPosition,
@@ -1344,23 +1361,53 @@ export const SimpleTabletop = () => {
           exploredOpacity
         };
         
-        renderFogWithGradients(
-          ctx,
-          fogMasksRef.current.unexploredMask,
-          fogMasksRef.current.exploredOnlyMask,
-          tokenVisibilityDataRef.current,
-          gradientSettings
-        );
-      } else {
-        // Fallback to hard edges
-        renderFogWithHardEdges(
-          ctx,
-          fogMasksRef.current.unexploredMask,
-          fogMasksRef.current.exploredOnlyMask,
-          fogMasksRef.current.visibleMask,
-          fogOpacity,
-          exploredOpacity
-        );
+        // Use destination-out to punch gradient holes
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        
+        tokensWithGradients.forEach(({ position, visionRange, visibilityPath }) => {
+          const canvasGradient = ctx.createRadialGradient(
+            position.x, position.y, 0,
+            position.x, position.y, visionRange
+          );
+          
+          const midpointRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.midpointOpacity / gradientSettings.fogOpacity)));
+          const outerRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.exploredOpacity / gradientSettings.fogOpacity)));
+          
+          canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);
+          canvasGradient.addColorStop(gradientSettings.innerFadeStart, `rgba(255, 255, 255, 1)`);
+          canvasGradient.addColorStop(gradientSettings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);
+          canvasGradient.addColorStop(gradientSettings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);
+          canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
+          
+          ctx.save();
+          ctx.clip(visibilityPath);
+          ctx.fillStyle = canvasGradient;
+          ctx.fillRect(
+            position.x - visionRange,
+            position.y - visionRange,
+            visionRange * 2,
+            visionRange * 2
+          );
+          ctx.restore();
+        });
+        
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      }
+      
+      // Render tokens without gradients (hard edges)
+      if (tokensWithoutGradients.length > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        
+        tokensWithoutGradients.forEach(({ visibilityPath }) => {
+          ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+          ctx.fill(visibilityPath);
+        });
+        
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
       }
     }
     

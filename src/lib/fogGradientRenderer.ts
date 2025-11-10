@@ -37,13 +37,19 @@ export function renderFogWithGradients(
       position.x, position.y, visionRange
     );
     
-    // Add gradient stops for destination-out composite operation
-    // Alpha 1.0 = fully remove fog (clear vision), Alpha 0.0 = keep fog (darkness)
-    canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);  // Center: fully clear
+    // Calculate removal alphas for destination-out
+    // We start with fogOpacity darkness and want to reduce it to target opacities
+    // removal_alpha = (fogOpacity - target) / fogOpacity
+    const midpointRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.midpointOpacity / gradientSettings.fogOpacity)));
+    const outerRemoval = Math.max(0, Math.min(1, 1 - (gradientSettings.exploredOpacity / gradientSettings.fogOpacity)));
+    
+    // Add gradient stops for destination-out
+    // Alpha 1.0 = fully remove fog (clear), Alpha 0.0 = don't remove (keep darkness)
+    canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);  // Center: remove all fog
     canvasGradient.addColorStop(gradientSettings.innerFadeStart, `rgba(255, 255, 255, 1)`);  // Inner: still clear
-    canvasGradient.addColorStop(gradientSettings.midpointPosition, `rgba(255, 255, 255, ${gradientSettings.midpointOpacity})`);  // Midpoint: start dimming
-    canvasGradient.addColorStop(gradientSettings.outerFadeStart, `rgba(255, 255, 255, ${gradientSettings.exploredOpacity})`);  // Outer: more dimming
-    canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);  // Edge: full fog (no removal)
+    canvasGradient.addColorStop(gradientSettings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);  // Midpoint
+    canvasGradient.addColorStop(gradientSettings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);  // Outer fade
+    canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);  // Edge: keep all fog
     
     // Clip to visibility path and fill with gradient
     ctx.save();
