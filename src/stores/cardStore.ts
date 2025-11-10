@@ -72,6 +72,8 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: false,
     defaultVisible: true,
+    hideHeader: true,
+    fullCardDraggable: true,
   },
   [CardType.FOG]: {
     title: 'Fog Control',
