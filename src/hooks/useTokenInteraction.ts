@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { Token } from '@/stores/sessionStore';
 
@@ -102,6 +102,20 @@ export const useTokenInteraction = () => {
   const clearSelection = useCallback(() => {
     setSelectedTokenIds([]);
   }, []);
+
+  // Global mouseup listener to ensure drag state is always reset
+  useEffect(() => {
+    if (isDraggingToken) {
+      const handleGlobalMouseUp = () => {
+        endTokenDrag();
+      };
+
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [isDraggingToken, endTokenDrag]);
 
   return {
     selectedTokenIds,

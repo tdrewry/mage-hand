@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRegionStore, type CanvasRegion } from '@/stores/regionStore';
 import { isPointInPolygon, isPointNearPolygonEdge, findNearestVertex } from '@/utils/pathUtils';
 
@@ -121,6 +121,20 @@ export const useRegionInteraction = () => {
     setPathDrawingMode('none');
     setCurrentPath([]);
   }, []);
+
+  // Global mouseup listener to ensure drag state is always reset
+  useEffect(() => {
+    if (isDraggingRegion) {
+      const handleGlobalMouseUp = () => {
+        endRegionDrag();
+      };
+
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [isDraggingRegion, endRegionDrag]);
 
   return {
     selectedRegionId,
