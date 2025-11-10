@@ -103,7 +103,7 @@ let profileIdCounter = 1000;
 export const useVisionProfileStore = create<VisionProfileState>()(
   persist(
     (set, get) => ({
-      profiles: DEFAULT_PROFILES,
+      profiles: [],
       
       addProfile: (profileData) => {
         const id = `custom-${profileIdCounter++}`;
@@ -151,6 +151,12 @@ export const useVisionProfileStore = create<VisionProfileState>()(
     {
       name: 'vision-profile-store',
       version: 1,
+      onRehydrateStorage: () => (state) => {
+        // Ensure default profiles are always present after rehydration
+        if (!state || !state.profiles || state.profiles.length === 0) {
+          state && (state.profiles = DEFAULT_PROFILES);
+        }
+      },
       migrate: (persistedState: any, version: number) => {
         // Ensure default profiles are always present
         if (version === 0 || !persistedState.profiles || persistedState.profiles.length === 0) {
