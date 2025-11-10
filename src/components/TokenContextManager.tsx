@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Edit3, Palette, Trash2, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Eye, EyeOff, Scan } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { toast } from 'sonner';
 import { Canvas as FabricCanvas } from 'fabric';
@@ -37,6 +37,7 @@ export const TokenContextManager = ({
     selectedTokenIds, 
     updateTokenLabel,
     updateTokenVision,
+    updateTokenVisionRange,
     removeToken,
     setTokenOwner 
   } = useSessionStore();
@@ -44,8 +45,10 @@ export const TokenContextManager = ({
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showVisionRangeModal, setShowVisionRangeModal] = useState(false);
   const [labelValue, setLabelValue] = useState('');
   const [colorValue, setColorValue] = useState('#FF6B6B');
+  const [visionRangeValue, setVisionRangeValue] = useState('');
   const [contextTokenId, setContextTokenId] = useState<string>('');
 
   // Listen for custom event from PaperTabletop
@@ -120,6 +123,7 @@ export const TokenContextManager = ({
         icon: hasVisionEnabled ? '🙈' : '👁️', 
         action: () => handleToggleVision(tokenId)
       },
+      { label: 'Set Vision Range', icon: '🔍', action: () => handleVisionRangeClick(tokenId) },
       { label: 'Delete Token', icon: '🗑️', action: () => handleDeleteClick(tokenId), danger: true }
     ];
     
@@ -208,6 +212,43 @@ export const TokenContextManager = ({
     
     onUpdateCanvas?.();
     toast.success(`Vision ${newVisionState ? 'enabled' : 'disabled'} for ${targetTokens.length} token(s)`);
+  };
+
+  const handleVisionRangeClick = (tokenId: string) => {
+    const targetTokens = getTargetTokens(tokenId);
+    if (targetTokens.length === 1 && targetTokens[0].visionRange !== undefined) {
+      setVisionRangeValue(targetTokens[0].visionRange.toString());
+    } else {
+      setVisionRangeValue('');
+    }
+    setContextTokenId(tokenId);
+    setShowVisionRangeModal(true);
+  };
+
+  const applyVisionRange = () => {
+    const targetTokens = getTargetTokens(contextTokenId);
+    const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
+    
+    if (range !== undefined && (isNaN(range) || range < 0)) {
+      toast.error('Please enter a valid vision range');
+      return;
+    }
+    
+    targetTokens.forEach(token => {
+      updateTokenVisionRange(token.id, range);
+    });
+    
+    setShowVisionRangeModal(false);
+    onUpdateCanvas?.();
+    toast.success(`Vision range updated for ${targetTokens.length} token(s)`);
+  };
+
+  const setVisionPreset = (range: number | undefined) => {
+    if (range === undefined) {
+      setVisionRangeValue('');
+    } else {
+      setVisionRangeValue(range.toString());
+    }
   };
 
   const applyLabel = () => {
@@ -381,6 +422,96 @@ export const TokenContextManager = ({
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               Delete Token{isMultiSelection ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vision Range Modal */}
+      <Dialog open={showVisionRangeModal} onOpenChange={setShowVisionRangeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Vision Range</DialogTitle>
+            <DialogDescription>
+              {isMultiSelection 
+                ? `Set vision range for ${targetTokens.length} tokens (in grid units)`
+                : 'Set vision range for this token (in grid units)'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="vision-range">Vision Range (grid units)</Label>
+              <Input
+                id="vision-range"
+                type="number"
+                value={visionRangeValue}
+                onChange={(e) => setVisionRangeValue(e.target.value)}
+                placeholder="Use default"
+                min="0"
+                step="1"
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave empty to use the global default
+              </p>
+            </div>
+            
+            {/* Vision Presets */}
+            <div>
+              <Label className="text-sm text-muted-foreground">Quick Presets (5ft per grid)</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(undefined)}
+                >
+                  Use Default
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(6)}
+                >
+                  Normal (30ft)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(12)}
+                >
+                  Darkvision (60ft)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(24)}
+                >
+                  Superior (120ft)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(6)}
+                >
+                  Blindsight (30ft)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisionPreset(0)}
+                >
+                  Blind (0ft)
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVisionRangeModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={applyVisionRange}>
+              Apply Range
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -47,6 +47,7 @@ export interface SessionState {
   updateTokenLabel: (tokenId: string, label: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
+  updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   clearAllTokens: () => void;
@@ -126,6 +127,13 @@ export const useSessionStore = create<SessionState>()(
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, hasVision } : token
+          ),
+        })),
+
+      updateTokenVisionRange: (tokenId, visionRange) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, visionRange } : token
           ),
         })),
 
