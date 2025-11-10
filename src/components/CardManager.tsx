@@ -12,18 +12,34 @@ import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrack
 import { MenuCardContent } from '@/components/cards/MenuCard';
 import { MapCardContent } from '@/components/cards/MapCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
+import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { CardType } from '@/types/cardTypes';
+import { TransformMode } from '@/components/RegionControlPanel';
 
 interface CardManagerProps {
   children?: React.ReactNode;
   sessionId?: string;
   toolsCardProps?: any; // Keep for backward compatibility but not used
+  activeRegionId?: string | null;
+  transformMode?: TransformMode;
+  onTransformModeChange?: (mode: TransformMode) => void;
+  onToggleSnapping?: (id: string) => void;
+  onToggleGridVisibility?: (id: string) => void;
 }
 
-export function CardManager({ children, sessionId, toolsCardProps }: CardManagerProps) {
+export function CardManager({ 
+  children, 
+  sessionId, 
+  toolsCardProps,
+  activeRegionId,
+  transformMode = 'move',
+  onTransformModeChange = () => {},
+  onToggleSnapping = () => {},
+  onToggleGridVisibility = () => {}
+}: CardManagerProps) {
   const cards = useCardStore((state) => state.cards);
   const loadLayout = useCardStore((state) => state.loadLayout);
   const { addToken } = useSessionStore();
@@ -64,7 +80,17 @@ export function CardManager({ children, sessionId, toolsCardProps }: CardManager
       
       {/* Render all registered cards */}
       {cards.map((card) => {
-        const content = renderCardContent(card.id, card.type, handleAddToken, sessionId);
+        const content = renderCardContent(
+          card.id, 
+          card.type, 
+          handleAddToken, 
+          sessionId,
+          activeRegionId,
+          transformMode,
+          onTransformModeChange,
+          onToggleSnapping,
+          onToggleGridVisibility
+        );
         return (
           <BaseCard
             key={card.id}
@@ -111,7 +137,12 @@ function renderCardContent(
   cardId: string, 
   type: CardType, 
   addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
-  sessionId?: string
+  sessionId?: string,
+  activeRegionId?: string | null,
+  transformMode?: TransformMode,
+  onTransformModeChange?: (mode: TransformMode) => void,
+  onToggleSnapping?: (id: string) => void,
+  onToggleGridVisibility?: (id: string) => void
 ): React.ReactNode {
   switch (type) {
     case CardType.MENU:
@@ -152,8 +183,17 @@ function renderCardContent(
       return <MapCardContent />;
     case CardType.STYLES:
       return <StylesCardContent />;
-    case CardType.GROUP_MANAGER:
     case CardType.REGION_CONTROL:
+      return (
+        <RegionControlsCardContent 
+          regionId={activeRegionId || null}
+          transformMode={transformMode || 'move'}
+          onTransformModeChange={onTransformModeChange || (() => {})}
+          onToggleSnapping={onToggleSnapping || (() => {})}
+          onToggleGridVisibility={onToggleGridVisibility || (() => {})}
+        />
+      );
+    case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;

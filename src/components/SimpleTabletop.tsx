@@ -114,6 +114,9 @@ export const SimpleTabletop = () => {
   // Selected annotation for flavor text display
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   
+  // Active region for Region Controls card
+  const [activeRegionControlId, setActiveRegionControlId] = useState<string | null>(null);
+  
   // Wall decoration cache to avoid regenerating on every pan/zoom
   const wallDecorationCacheRef = useRef<{
     cacheKey: string;
@@ -274,6 +277,7 @@ export const SimpleTabletop = () => {
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);
   const setVisibility = useCardStore((state) => state.setVisibility);
+  const bringToFront = useCardStore((state) => state.bringToFront);
   const cards = useCardStore((state) => state.cards);
   
   // Register MENU, TOOLS, and MAP cards on mount (only once)
@@ -2962,6 +2966,33 @@ export const SimpleTabletop = () => {
     }
   };
 
+  // Function to open Region Controls card for a specific region
+  const openRegionControlsCard = (regionId: string) => {
+    // Set the active region ID for the card
+    setActiveRegionControlId(regionId);
+    
+    // Check if REGION_CONTROL card exists
+    const existingCard = getCardByType(CardType.REGION_CONTROL);
+    
+    if (existingCard) {
+      // If card exists, make it visible and bring to front
+      setVisibility(existingCard.id, true);
+      bringToFront(existingCard.id);
+    } else {
+      // Register a new REGION_CONTROL card
+      registerCard({
+        type: CardType.REGION_CONTROL,
+        title: 'Region Controls',
+        defaultPosition: { x: window.innerWidth - 380, y: 100 },
+        defaultSize: { width: 350, height: 600 },
+        minSize: { width: 300, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
   // Function to show region context menu
   const showRegionContextMenu = (x: number, y: number, region: CanvasRegion) => {
     // Remove any existing context menu safely
@@ -2985,6 +3016,12 @@ export const SimpleTabletop = () => {
         }
       },
       { 
+        label: 'Region Controls', 
+        icon: '⚙️', 
+        action: () => openRegionControlsCard(region.id)
+      },
+      { type: 'separator' },
+      { 
         label: 'Free Grid', 
         icon: '📐', 
         action: () => setRegionGridType(region.id, 'free'),
@@ -3002,22 +3039,30 @@ export const SimpleTabletop = () => {
         action: () => setRegionGridType(region.id, 'hex'),
         active: region.gridType === 'hex'
       },
+      { type: 'separator' },
       { 
         label: 'Delete Region', 
         icon: '🗑️', 
         action: () => deleteSelectedRegion(region.id), 
         danger: true 
       }
-    ];
+    ] as const;
     
     menuItems.forEach(item => {
+      if ('type' in item && item.type === 'separator') {
+        const separator = document.createElement('div');
+        separator.className = 'my-1 h-px bg-border';
+        menu.appendChild(separator);
+        return;
+      }
+      
       const menuItem = document.createElement('div');
       menuItem.className = `px-3 py-2 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${
-        item.danger ? 'text-destructive' : ''
-      } ${item.active ? 'bg-accent font-medium' : ''}`;
-      menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}${item.active ? ' ✓' : ''}`;
+        'danger' in item && item.danger ? 'text-destructive' : ''
+      } ${'active' in item && item.active ? 'bg-accent font-medium' : ''}`;
+      menuItem.innerHTML = `<span>${'icon' in item ? item.icon : ''}</span> ${'label' in item ? item.label : ''}${'active' in item && item.active ? ' ✓' : ''}`;
       menuItem.onclick = () => {
-        item.action();
+        if ('action' in item) item.action();
         // Safe menu removal
         if (document.body.contains(menu)) {
           document.body.removeChild(menu);
@@ -4148,24 +4193,7 @@ export const SimpleTabletop = () => {
       
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
-      {/* Region Control Panel - only show in edit mode */}
-      {renderingMode === 'edit' && selectedRegionId && (() => {
-        const selectedRegion = regions.find(r => r.id === selectedRegionId);
-        if (!selectedRegion) return null;
-        
-        return (
-          <RegionControlPanel
-            region={selectedRegion}
-            transformMode={transformMode}
-            onTransformModeChange={setTransformMode}
-            onUpdateRegion={updateRegion}
-            onDeleteRegion={deleteSelectedRegion}
-            onClose={() => setSelectedRegionId(null)}
-            onToggleSnapping={toggleRegionSnapping}
-            onToggleGridVisibility={toggleRegionGridVisibility}
-          />
-        );
-      })()}
+      {/* Region Control Panel - removed, now using Region Controls Card */}
 
       {/* Main Canvas Container */}
       <div className="flex-1 relative overflow-hidden">
@@ -4193,7 +4221,14 @@ export const SimpleTabletop = () => {
       />
       
       {/* Card-Based UI System */}
-      <CardManager sessionId={sessionId} />
+      <CardManager 
+        sessionId={sessionId}
+        activeRegionId={activeRegionControlId}
+        transformMode={transformMode}
+        onTransformModeChange={setTransformMode}
+        onToggleSnapping={toggleRegionSnapping}
+        onToggleGridVisibility={toggleRegionGridVisibility}
+      />
       
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel />
