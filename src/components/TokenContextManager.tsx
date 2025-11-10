@@ -16,8 +16,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Edit3, Palette, Trash2, Eye, EyeOff, Scan } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Eye, EyeOff, Scan, User } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useVisionProfileStore } from '../stores/visionProfileStore';
 import { toast } from 'sonner';
 import { Canvas as FabricCanvas } from 'fabric';
 
@@ -41,6 +42,8 @@ export const TokenContextManager = ({
     removeToken,
     setTokenOwner 
   } = useSessionStore();
+  
+  const { profiles } = useVisionProfileStore();
   
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
@@ -123,21 +126,80 @@ export const TokenContextManager = ({
         icon: hasVisionEnabled ? '🙈' : '👁️', 
         action: () => handleToggleVision(tokenId)
       },
+      { label: 'Use Profile', icon: '👤', hasSubmenu: true, submenuItems: profiles },
       { label: 'Set Vision Range', icon: '🔍', action: () => handleVisionRangeClick(tokenId) },
       { label: 'Delete Token', icon: '🗑️', action: () => handleDeleteClick(tokenId), danger: true }
     ];
     
     menuItems.forEach(item => {
       const menuItem = document.createElement('div');
-      menuItem.className = `px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${item.danger ? 'text-destructive' : ''}`;
-      menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}`;
-      menuItem.onclick = () => {
-        item.action();
-        // Safe menu removal
-        if (document.body.contains(menu)) {
-          document.body.removeChild(menu);
+      
+      if (item.hasSubmenu) {
+        // Create submenu container
+        menuItem.className = 'px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 justify-between relative';
+        menuItem.innerHTML = `<div class="flex items-center gap-2"><span>${item.icon}</span> ${item.label}</div><span>▶</span>`;
+        
+        // Create submenu
+        const submenu = document.createElement('div');
+        submenu.className = 'absolute left-full top-0 ml-1 bg-popover border border-border rounded-md shadow-lg p-1 min-w-[200px] hidden';
+        submenu.style.maxHeight = '400px';
+        submenu.style.overflowY = 'auto';
+        
+        if (item.submenuItems && item.submenuItems.length > 0) {
+          item.submenuItems.forEach((profile: any) => {
+            const submenuItem = document.createElement('div');
+            submenuItem.className = 'px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2';
+            submenuItem.innerHTML = `
+              <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${profile.color}"></div>
+              <span class="flex-1">${profile.name}</span>
+            `;
+            submenuItem.onclick = (e) => {
+              e.stopPropagation();
+              applyProfileQuick(tokenId, profile.id);
+              if (document.body.contains(menu)) {
+                document.body.removeChild(menu);
+              }
+            };
+            submenu.appendChild(submenuItem);
+          });
+        } else {
+          const emptyItem = document.createElement('div');
+          emptyItem.className = 'px-2 py-1 text-xs text-muted-foreground';
+          emptyItem.textContent = 'No profiles available';
+          submenu.appendChild(emptyItem);
         }
-      };
+        
+        menuItem.appendChild(submenu);
+        
+        // Show/hide submenu on hover
+        menuItem.onmouseenter = () => {
+          submenu.classList.remove('hidden');
+        };
+        menuItem.onmouseleave = (e) => {
+          // Only hide if not moving to submenu
+          const relatedTarget = e.relatedTarget as Node;
+          if (!submenu.contains(relatedTarget)) {
+            submenu.classList.add('hidden');
+          }
+        };
+        submenu.onmouseleave = (e) => {
+          const relatedTarget = e.relatedTarget as Node;
+          if (!menuItem.contains(relatedTarget)) {
+            submenu.classList.add('hidden');
+          }
+        };
+      } else {
+        menuItem.className = `px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${item.danger ? 'text-destructive' : ''}`;
+        menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}`;
+        menuItem.onclick = () => {
+          item.action();
+          // Safe menu removal
+          if (document.body.contains(menu)) {
+            document.body.removeChild(menu);
+          }
+        };
+      }
+      
       menu.appendChild(menuItem);
     });
     
@@ -223,6 +285,31 @@ export const TokenContextManager = ({
     }
     setContextTokenId(tokenId);
     setShowVisionRangeModal(true);
+  };
+
+  const applyProfileQuick = (tokenId: string, profileId: string) => {
+    const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
+
+    const targetTokens = getTargetTokens(tokenId);
+    
+    targetTokens.forEach((token) => {
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map((t) =>
+          t.id === token.id
+            ? {
+                ...t,
+                visionProfileId: profile.id,
+                visionRange: profile.visionRange,
+                useGradients: profile.useGradients,
+              }
+            : t
+        ),
+      }));
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Applied ${profile.name} to ${targetTokens.length} token(s)`);
   };
 
   const applyVisionRange = () => {
