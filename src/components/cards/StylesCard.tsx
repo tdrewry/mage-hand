@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Label } from '../ui/label';
 import { Slider } from '../ui/slider';
-import { Sun, MoveDown, MoveRight, MoveLeft } from 'lucide-react';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { WATABOU_STYLES } from '@/lib/watabouStyles';
@@ -14,19 +13,15 @@ export const StylesCardContent: React.FC = () => {
     wallEdgeStyle, 
     wallThickness, 
     textureScale,
-    lightDirection,
-    shadowDistance,
     renderingMode,
     watabouStyle,
     setWallEdgeStyle, 
     setWallThickness,
     setTextureScale,
-    setLightDirection,
-    setShadowDistance,
     setWatabouStyle
   } = useDungeonStore();
   
-  const { regions, updateRegion } = useRegionStore();
+  const { regions } = useRegionStore();
 
   const edgeStyleLabels: Record<WallEdgeStyle, string> = {
     stone: 'Stone',
@@ -41,25 +36,16 @@ export const StylesCardContent: React.FC = () => {
     const style = WATABOU_STYLES[styleName];
     if (style) {
       setWatabouStyle(style);
+      // Force a redraw by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('styleChanged'));
       toast.success(`Applied ${styleName} style`);
     }
   };
   
-  const getDirectionLabel = (angle: number): string => {
-    if (angle === 0) return 'Top';
-    if (angle === 90) return 'Right';
-    if (angle === 180) return 'Bottom';
-    if (angle === 270) return 'Left';
-    return `${angle}°`;
-  };
-  
-  const getDirectionIcon = (angle: number) => {
-    if (angle === 0) return <MoveDown className="w-4 h-4" />;
-    if (angle === 90) return <MoveLeft className="w-4 h-4" />;
-    if (angle === 180) return <MoveDown className="w-4 h-4 rotate-180" />;
-    if (angle === 270) return <MoveRight className="w-4 h-4" />;
-    return <Sun className="w-4 h-4" />;
-  };
+  // Force redraw when manual controls change
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('styleChanged'));
+  }, [wallEdgeStyle, wallThickness, textureScale]);
 
   return (
     <div className="p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
@@ -102,14 +88,6 @@ export const StylesCardContent: React.FC = () => {
               <span className="font-medium">{textureScale}%</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Preview - Simple placeholder since StylePreviewCanvas needs refactoring */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Preview</Label>
-        <div className="border rounded-md overflow-hidden bg-muted/10 h-24 flex items-center justify-center text-xs text-muted-foreground">
-          Preview: {edgeStyleLabels[wallEdgeStyle]}
         </div>
       </div>
 
@@ -166,37 +144,9 @@ export const StylesCardContent: React.FC = () => {
           />
         </div>
 
-        {/* Light Direction */}
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <Label className="text-xs">Light Direction</Label>
-            <span className="text-xs text-muted-foreground">{getDirectionLabel(lightDirection)}</span>
-          </div>
-          <Slider
-            value={[lightDirection]}
-            onValueChange={([value]) => setLightDirection(value)}
-            min={0}
-            max={359}
-            step={45}
-            className="w-full"
-          />
-        </div>
-
-        {/* Shadow Distance */}
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <Label className="text-xs">Shadow Distance</Label>
-            <span className="text-xs text-muted-foreground">{shadowDistance}px</span>
-          </div>
-          <Slider
-            value={[shadowDistance]}
-            onValueChange={([value]) => setShadowDistance(value)}
-            min={0}
-            max={10}
-            step={1}
-            className="w-full"
-          />
-        </div>
+        {/* TODO: Light Direction and Shadow Distance
+             These controls are hidden until rendering implementation is complete.
+             See CONTRIBUTING/Card-Based-UI-Refactor.md for details. */}
       </div>
     </div>
   );
