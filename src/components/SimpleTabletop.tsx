@@ -53,9 +53,11 @@ import { computeIllumination, renderShadows, renderLightSources, notifyObstacles
 import { useLightStore } from '../stores/lightStore';
 import { clearVisibilityCache } from '../lib/visibilityEngine';
 import { computeTokenVisibilityPaper } from '../lib/fogOfWar';
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry } from '../lib/fogGeometry';
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D } from '../lib/fogGeometry';
 import { serializeFogGeometry, deserializeFogGeometry } from '../lib/fogSerializer';
 import { renderFogLayers } from '../lib/fogRenderer';
+import { renderFogWithGradients, renderFogWithHardEdges } from '../lib/fogGradientRenderer';
+import { getDefaultGradientSettings } from '../lib/fogGradientHelper';
 import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
@@ -188,6 +190,11 @@ export const SimpleTabletop = () => {
     setSerializedExploredAreas,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
+    useGradients,
+    innerFadeStart,
+    midpointPosition,
+    midpointOpacity,
+    outerFadeStart,
   } = useFogStore();
   
   // Track explored areas (accumulated visibility) using paper.js
@@ -200,6 +207,13 @@ export const SimpleTabletop = () => {
     exploredOnlyMask: Path2D;
     visibleMask: Path2D;
   } | null>(null);
+  
+  // Store individual token visibility data for gradient rendering
+  const tokenVisibilityDataRef = useRef<Array<{
+    position: { x: number; y: number };
+    visionRange: number;
+    visibilityPath: Path2D;
+  }>>([]);
   
   // Cache individual token visibility shapes to avoid recomputing unchanged tokens
   const tokenVisibilityCacheRef = useRef<Map<string, {
@@ -587,6 +601,40 @@ export const SimpleTabletop = () => {
             visibilityForMask,
             worldBounds
           );
+          
+          // Store individual token visibility data for gradient rendering
+          const tokenVisData: Array<{
+            position: { x: number; y: number };
+            visionRange: number;
+            visibilityPath: Path2D;
+          }> = [];
+          
+          tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
+            if (!cached.visionPath) return;
+            
+            // Find the token to get its vision range
+            const token = tokens.find(t => t.id === tokenId);
+            if (!token) return;
+            
+            const tokenRegion = regions.find(r => 
+              token.x >= r.x && token.x <= r.x + r.width &&
+              token.y >= r.y && token.y <= r.y + r.height
+            );
+            const gridSize = tokenRegion?.gridSize || 40;
+            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            const visionRangePixels = tokenVisionRange * gridSize;
+            
+            // Convert paper.js path to Path2D using the existing helper
+            const path2D = paperPathToPath2D(cached.visionPath);
+            
+            tokenVisData.push({
+              position: cached.position,
+              visionRange: visionRangePixels,
+              visibilityPath: path2D
+            });
+          });
+          
+          tokenVisibilityDataRef.current = tokenVisData;
           
           // Clean up
           if (visibilityForMask.remove) visibilityForMask.remove();
@@ -1285,14 +1333,35 @@ export const SimpleTabletop = () => {
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
-      renderFogLayers(
-        ctx,
-        fogMasksRef.current.unexploredMask,
-        fogMasksRef.current.exploredOnlyMask,
-        fogMasksRef.current.visibleMask,
-        fogOpacity,
-        exploredOpacity
-      );
+      if (useGradients && tokenVisibilityDataRef.current.length > 0) {
+        // Render with soft gradient edges
+        const gradientSettings = {
+          innerFadeStart,
+          midpointPosition,
+          midpointOpacity,
+          outerFadeStart,
+          fogOpacity,
+          exploredOpacity
+        };
+        
+        renderFogWithGradients(
+          ctx,
+          fogMasksRef.current.unexploredMask,
+          fogMasksRef.current.exploredOnlyMask,
+          tokenVisibilityDataRef.current,
+          gradientSettings
+        );
+      } else {
+        // Fallback to hard edges
+        renderFogWithHardEdges(
+          ctx,
+          fogMasksRef.current.unexploredMask,
+          fogMasksRef.current.exploredOnlyMask,
+          fogMasksRef.current.visibleMask,
+          fogOpacity,
+          exploredOpacity
+        );
+      }
     }
     
     // Draw visible tokens AFTER fog so they appear on top of darkness

@@ -14,11 +14,21 @@ export function FogControlCardContent() {
     visionRange,
     fogOpacity,
     exploredOpacity,
+    useGradients,
+    innerFadeStart,
+    midpointPosition,
+    midpointOpacity,
+    outerFadeStart,
     setEnabled,
     setRevealAll,
     setVisionRange,
     setFogOpacity,
     setExploredOpacity,
+    setUseGradients,
+    setInnerFadeStart,
+    setMidpointPosition,
+    setMidpointOpacity,
+    setOuterFadeStart,
     clearExploredAreas,
     resetFog,
   } = useFogStore();
@@ -141,6 +151,124 @@ export function FogControlCardContent() {
         <p className="text-xs text-muted-foreground">
           How dark explored but not visible areas appear
         </p>
+      </div>
+
+      <Separator />
+
+      {/* Soft Edges - Gradient Settings */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="use-gradients" className="text-sm font-medium">
+              Soft Vision Edges
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Smooth gradient fade at vision boundaries
+            </p>
+          </div>
+          <Switch
+            id="use-gradients"
+            checked={useGradients}
+            onCheckedChange={setUseGradients}
+            disabled={!enabled}
+          />
+        </div>
+
+        {useGradients && (
+          <>
+            {/* Inner Fade Start */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="inner-fade" className="text-xs font-medium">
+                  Inner Clear Zone
+                </Label>
+                <span className="text-xs font-medium">{Math.round(innerFadeStart * 100)}%</span>
+              </div>
+              <Slider
+                id="inner-fade"
+                min={0}
+                max={100}
+                step={5}
+                value={[innerFadeStart * 100]}
+                onValueChange={([value]) => setInnerFadeStart(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Radius where vision is perfectly clear
+              </p>
+            </div>
+
+            {/* Midpoint Position */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="midpoint-pos" className="text-xs font-medium">
+                  Midpoint Distance
+                </Label>
+                <span className="text-xs font-medium">{Math.round(midpointPosition * 100)}%</span>
+              </div>
+              <Slider
+                id="midpoint-pos"
+                min={0}
+                max={100}
+                step={5}
+                value={[midpointPosition * 100]}
+                onValueChange={([value]) => setMidpointPosition(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Where the mid-fade transition occurs
+              </p>
+            </div>
+
+            {/* Midpoint Opacity */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="midpoint-opacity" className="text-xs font-medium">
+                  Midpoint Darkness
+                </Label>
+                <span className="text-xs font-medium">{Math.round(midpointOpacity * 100)}%</span>
+              </div>
+              <Slider
+                id="midpoint-opacity"
+                min={0}
+                max={100}
+                step={5}
+                value={[midpointOpacity * 100]}
+                onValueChange={([value]) => setMidpointOpacity(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Darkness level at midpoint
+              </p>
+            </div>
+
+            {/* Outer Fade Start */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="outer-fade" className="text-xs font-medium">
+                  Outer Fade Start
+                </Label>
+                <span className="text-xs font-medium">{Math.round(outerFadeStart * 100)}%</span>
+              </div>
+              <Slider
+                id="outer-fade"
+                min={0}
+                max={100}
+                step={5}
+                value={[outerFadeStart * 100]}
+                onValueChange={([value]) => setOuterFadeStart(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Where final fade to full darkness begins
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <Separator />
