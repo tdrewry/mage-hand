@@ -626,6 +626,8 @@ export const SimpleTabletop = () => {
   const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
     const baseTokenSize = 40; // Base size for 1x1 token
     
+    console.log('🔍 getTokenAtPosition called with world coords:', { worldX, worldY });
+    
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i];
@@ -3091,7 +3093,19 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+    console.log('🖱️ MouseDown:', {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      'rect.left': rect.left,
+      'rect.top': rect.top,
+      'rect.width': rect.width,
+      'rect.height': rect.height,
+      mouseX,
+      mouseY,
+      transform
+    });
     const worldPos = screenToWorld(mouseX, mouseY);
+    console.log('🌍 World position:', worldPos);
     
     if (e.button === 2) { // Right click
       e.preventDefault();
@@ -3254,6 +3268,8 @@ export const SimpleTabletop = () => {
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+      
+      console.log('🎯 Hit test results:', { clickedToken: clickedToken?.id, clickedRegion: clickedRegion?.id });
       
       if (clickedToken) {
         // Check if movement is restricted
