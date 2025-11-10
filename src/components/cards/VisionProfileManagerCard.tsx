@@ -34,6 +34,13 @@ export function VisionProfileManagerCardContent() {
   const [formMidpointOpacity, setFormMidpointOpacity] = useState(0.2);
   const [formOuterFadeStart, setFormOuterFadeStart] = useState(0.95);
   const [formColor, setFormColor] = useState('#FFD700');
+  
+  // Color gradient opacity controls
+  const [formCenterOpacity, setFormCenterOpacity] = useState(0);
+  const [formInnerOpacity, setFormInnerOpacity] = useState(0);
+  const [formMidpointColorOpacity, setFormMidpointColorOpacity] = useState(0.1);
+  const [formOuterOpacity, setFormOuterOpacity] = useState(0.25);
+  const [formEdgeOpacity, setFormEdgeOpacity] = useState(0.4);
 
   const defaultProfiles = profiles.filter(p => 
     ['normal', 'darkvision', 'superior', 'lowlight', 'blindsight', 'blind'].includes(p.id)
@@ -51,6 +58,11 @@ export function VisionProfileManagerCardContent() {
     setFormMidpointOpacity(0.2);
     setFormOuterFadeStart(0.95);
     setFormColor('#FFD700');
+    setFormCenterOpacity(0);
+    setFormInnerOpacity(0);
+    setFormMidpointColorOpacity(0.1);
+    setFormOuterOpacity(0.25);
+    setFormEdgeOpacity(0.4);
   };
 
   const openCreateModal = () => {
@@ -68,6 +80,11 @@ export function VisionProfileManagerCardContent() {
     setFormMidpointOpacity(profile.midpointOpacity);
     setFormOuterFadeStart(profile.outerFadeStart);
     setFormColor(profile.color);
+    setFormCenterOpacity(profile.centerOpacity ?? 0);
+    setFormInnerOpacity(profile.innerOpacity ?? 0);
+    setFormMidpointColorOpacity(profile.midpointColorOpacity ?? 0.1);
+    setFormOuterOpacity(profile.outerOpacity ?? 0.25);
+    setFormEdgeOpacity(profile.edgeOpacity ?? 0.4);
     setShowEditModal(true);
   };
 
@@ -99,6 +116,11 @@ export function VisionProfileManagerCardContent() {
       midpointOpacity: formMidpointOpacity,
       outerFadeStart: formOuterFadeStart,
       color: formColor,
+      centerOpacity: formCenterOpacity,
+      innerOpacity: formInnerOpacity,
+      midpointColorOpacity: formMidpointColorOpacity,
+      outerOpacity: formOuterOpacity,
+      edgeOpacity: formEdgeOpacity,
     });
 
     toast.success(`Created vision profile: ${formName}`);
@@ -119,6 +141,11 @@ export function VisionProfileManagerCardContent() {
       midpointOpacity: formMidpointOpacity,
       outerFadeStart: formOuterFadeStart,
       color: formColor,
+      centerOpacity: formCenterOpacity,
+      innerOpacity: formInnerOpacity,
+      midpointColorOpacity: formMidpointColorOpacity,
+      outerOpacity: formOuterOpacity,
+      edgeOpacity: formEdgeOpacity,
     });
 
     toast.success(`Updated vision profile: ${formName}`);
@@ -349,6 +376,80 @@ export function VisionProfileManagerCardContent() {
           </div>
         </div>
       )}
+      
+      <Separator />
+      
+      {/* Color Gradient Opacity Controls */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-sm font-semibold">Color Overlay Opacity</Label>
+          <p className="text-xs text-muted-foreground">
+            Controls colored vision gradient visibility (transparent center → opaque edges)
+          </p>
+        </div>
+        
+        <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+          <div className="space-y-2">
+            <Label htmlFor="center-opacity" className="text-xs">Center: {(formCenterOpacity * 100).toFixed(0)}%</Label>
+            <Slider
+              id="center-opacity"
+              value={[formCenterOpacity * 100]}
+              onValueChange={([value]) => setFormCenterOpacity(value / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="inner-opacity" className="text-xs">Inner: {(formInnerOpacity * 100).toFixed(0)}%</Label>
+            <Slider
+              id="inner-opacity"
+              value={[formInnerOpacity * 100]}
+              onValueChange={([value]) => setFormInnerOpacity(value / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="midpoint-color-opacity" className="text-xs">Midpoint: {(formMidpointColorOpacity * 100).toFixed(0)}%</Label>
+            <Slider
+              id="midpoint-color-opacity"
+              value={[formMidpointColorOpacity * 100]}
+              onValueChange={([value]) => setFormMidpointColorOpacity(value / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="outer-opacity" className="text-xs">Outer: {(formOuterOpacity * 100).toFixed(0)}%</Label>
+            <Slider
+              id="outer-opacity"
+              value={[formOuterOpacity * 100]}
+              onValueChange={([value]) => setFormOuterOpacity(value / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="edge-opacity" className="text-xs">Edge: {(formEdgeOpacity * 100).toFixed(0)}%</Label>
+            <Slider
+              id="edge-opacity"
+              value={[formEdgeOpacity * 100]}
+              onValueChange={([value]) => setFormEdgeOpacity(value / 100)}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 

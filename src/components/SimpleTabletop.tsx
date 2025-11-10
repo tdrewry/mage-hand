@@ -1425,11 +1425,11 @@ export const SimpleTabletop = () => {
         );
         
         // Gradient from transparent at center to darker color at edges
-        coloredGradient.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
-        coloredGradient.addColorStop(settings.innerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
-        coloredGradient.addColorStop(settings.midpointPosition, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`);
-        coloredGradient.addColorStop(settings.outerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`);
-        coloredGradient.addColorStop(1.0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`);
+        coloredGradient.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.centerOpacity ?? 0})`);
+        coloredGradient.addColorStop(settings.innerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.innerOpacity ?? 0})`);
+        coloredGradient.addColorStop(settings.midpointPosition, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.midpointColorOpacity ?? 0.1})`);
+        coloredGradient.addColorStop(settings.outerFadeStart, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.outerOpacity ?? 0.25})`);
+        coloredGradient.addColorStop(1.0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${profile.edgeOpacity ?? 0.4})`);
         
         // Clip to visibility polygon and apply gradient
         ctx.save();
