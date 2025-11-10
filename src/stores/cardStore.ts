@@ -270,8 +270,8 @@ export const useCardStore = create<CardStore>((set, get) => ({
     if (stored) {
       try {
         const cards = JSON.parse(stored);
-        // Filter out deprecated card types (TOOLS is replaced by VerticalToolbar)
-        const deprecatedTypes = [CardType.TOOLS];
+        // Filter out deprecated card types (replaced by new toolbar components)
+        const deprecatedTypes = [CardType.TOOLS, CardType.INITIATIVE_TRACKER];
         // Filter out any duplicate cards by type (keep only the first of each type)
         const uniqueCards = cards.reduce((acc: CardState[], card: CardState) => {
           const isDeprecated = deprecatedTypes.includes(card.type);

@@ -89,7 +89,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const watabouCard = cards.find((c) => c.type === CardType.WATABOU_IMPORT);
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const initiativeCard = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
 
   const handleToggleLayerCard = () => {
@@ -195,10 +194,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const handleCombatToggle = () => {
     if (isInCombat) {
       endCombat();
-      const tracker = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
-      if (tracker) {
-        setVisibility(tracker.id, false);
-      }
       toast.success('Combat ended');
     } else {
       const { initiativeOrder } = useInitiativeStore.getState();
@@ -209,27 +204,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
       }
       
       startCombat();
-      
-      if (initiativeCard) {
-        setVisibility(initiativeCard.id, true);
-      } else {
-        registerCard({
-          type: CardType.INITIATIVE_TRACKER,
-          title: 'Initiative Tracker',
-          defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
-          defaultSize: { width: 800, height: 140 },
-          minSize: { width: 400, height: 120 },
-          isResizable: true,
-          isClosable: true,
-          defaultVisible: false,
-          hideHeader: true,
-          fullCardDraggable: true,
-        });
-        setTimeout(() => {
-          const card = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
-          if (card) setVisibility(card.id, true);
-        }, 0);
-      }
       toast.success('Combat started!');
     }
   };

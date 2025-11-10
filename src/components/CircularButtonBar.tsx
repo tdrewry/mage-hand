@@ -4,8 +4,6 @@ import {
   Edit,
   Menu as MenuIcon,
   Users,
-  Swords,
-  ListOrdered,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -14,7 +12,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useCardStore } from '@/stores/cardStore';
-import { useInitiativeStore } from '@/stores/initiativeStore';
 import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
 
@@ -30,11 +27,9 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   const registerCard = useCardStore((state) => state.registerCard);
-  const { isInCombat } = useInitiativeStore();
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const initiativeCard = cards.find((c) => c.type === CardType.INITIATIVE_TRACKER);
 
   const handleToggleMenu = () => {
     if (menuCard) {
@@ -59,25 +54,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
     }
   };
 
-
-  const handleToggleInitiative = () => {
-    if (initiativeCard) {
-      setVisibility(initiativeCard.id, !initiativeCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.INITIATIVE_TRACKER,
-        title: 'Initiative Tracker',
-        defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
-        defaultSize: { width: 800, height: 140 },
-        minSize: { width: 400, height: 120 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-        hideHeader: true,
-        fullCardDraggable: true,
-      });
-    }
-  };
 
   return (
     <TooltipProvider>
@@ -163,31 +139,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
           </TooltipContent>
         </Tooltip>
 
-
-        {/* Initiative Tracker Toggle - show when in combat or if card exists */}
-        {(isInCombat || initiativeCard) && (
-          <>
-            <div className="w-px h-8 bg-border" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleToggleInitiative}
-                  className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                    initiativeCard?.isVisible
-                      ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
-                      : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-                  )}
-                >
-                  <ListOrdered className="w-6 h-6" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Initiative Tracker</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
       </div>
     </TooltipProvider>
   );

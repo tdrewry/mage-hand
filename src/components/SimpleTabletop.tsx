@@ -317,13 +317,7 @@ export const SimpleTabletop = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
   
-  // Hide initiative tracker if combat is not active
-  useEffect(() => {
-    const initiativeCard = getCardByType(CardType.INITIATIVE_TRACKER);
-    if (initiativeCard && !isInCombat && initiativeCard.isVisible) {
-      setVisibility(initiativeCard.id, false);
-    }
-  }, [isInCombat, getCardByType, setVisibility]);
+  // Cards now managed independently - no automatic visibility control needed
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
