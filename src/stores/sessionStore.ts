@@ -210,8 +210,7 @@ export const useSessionStore = create<SessionState>()(
           currentPlayerId,
         });
         
-        // Set default role as DM for now (can be changed later)
-        get().setCurrentPlayer(currentPlayerId, 'dm');
+        // Don't auto-assign role here - let RoleSelectionModal handle it
         
         // Update URL if needed
         if (!urlSessionId || urlSessionId !== finalSessionId) {

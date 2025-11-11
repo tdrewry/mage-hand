@@ -67,6 +67,7 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import { RoleSelectionModal } from './modals/RoleSelectionModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { 
   generateTransformHandles, 
@@ -4481,6 +4482,9 @@ export const SimpleTabletop = () => {
         region={selectedRegionForEdit}
         onUpdateRegion={updateRegion}
       />
+
+      {/* Role Selection Modal - Shows on session entry */}
+      <RoleSelectionModal open={true} />
     </div>
   );
 };
