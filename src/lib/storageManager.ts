@@ -111,19 +111,19 @@ export async function getStorageInfo(): Promise<StorageInfo> {
  * Categorize a storage key
  */
 function categorizeKey(key: string): string {
-  if (key.startsWith('project_') || key.startsWith('currentProject')) {
+  if (key.startsWith('d20pro-projects') || key === 'currentProject') {
     return 'projects';
   }
-  if (key.startsWith('autosave_')) {
+  if (key.startsWith('d20pro-autosave')) {
     return 'auto-saves';
   }
-  if (key.startsWith('history_')) {
+  if (key.startsWith('d20pro-history-')) {
     return 'history';
   }
-  if (key.startsWith('template_')) {
+  if (key === 'd20pro-templates') {
     return 'templates';
   }
-  if (key.includes('session') || key.includes('state')) {
+  if (key.includes('session') || key.includes('state') || key.includes('store')) {
     return 'session';
   }
   return 'other';
