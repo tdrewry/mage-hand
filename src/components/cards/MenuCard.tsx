@@ -40,6 +40,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const playerViewCard = cards.find((c) => c.type === CardType.MAP);
   const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
   const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
+  const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -165,11 +166,39 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   };
 
   const handleSave = () => {
-    toast.info('Save functionality coming soon');
+    if (projectManagerCard) {
+      setVisibility(projectManagerCard.id, true);
+    } else {
+      registerCard({
+        type: CardType.PROJECT_MANAGER,
+        title: 'Project Manager',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+        defaultSize: { width: 600, height: 700 },
+        minSize: { width: 500, height: 600 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+    toast.success('Opening Project Manager');
   };
 
   const handleLoad = () => {
-    toast.info('Load functionality coming soon');
+    if (projectManagerCard) {
+      setVisibility(projectManagerCard.id, true);
+    } else {
+      registerCard({
+        type: CardType.PROJECT_MANAGER,
+        title: 'Project Manager',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+        defaultSize: { width: 600, height: 700 },
+        minSize: { width: 500, height: 600 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+    toast.success('Opening Project Manager');
   };
 
   return (
