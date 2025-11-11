@@ -18,6 +18,7 @@ import { CircularButtonBar } from './CircularButtonBar';
 import { VerticalToolbar } from './VerticalToolbar';
 import { InitiativePanel } from './InitiativePanel';
 import { BulkOperationsToolbar } from './BulkOperationsToolbar';
+import { MovementLockIndicator } from './MovementLockIndicator';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -4589,6 +4590,9 @@ export const SimpleTabletop = () => {
         onClearSelection={() => setSelectedTokenIds([])}
         onUpdateCanvas={handleCanvasUpdate}
       />
+      
+      {/* Movement Lock Indicator - Shows when token movement is locked */}
+      <MovementLockIndicator />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
