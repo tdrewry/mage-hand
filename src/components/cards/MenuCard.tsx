@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield, Network } from 'lucide-react';
+import { SessionManager } from '@/components/SessionManager';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +30,9 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const { tokens } = useSessionStore();
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode } = useDungeonStore();
+  const { isConnected, currentSession, connectedUsers } = useMultiplayerStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -234,6 +238,29 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
 
       <Separator />
 
+      {/* Multiplayer Controls */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Multiplayer</p>
+        <Button 
+          variant={isConnected ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSessionManagerOpen(true)}
+          className="w-full"
+        >
+          <Network className="h-4 w-4 mr-2" />
+          {isConnected ? `Session: ${currentSession?.sessionCode}` : 'Connect to Session'}
+        </Button>
+        
+        {isConnected && (
+          <Badge variant="secondary" className="w-full justify-center text-xs">
+            <Users className="h-3 w-3 mr-1" />
+            {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
+          </Badge>
+        )}
+      </div>
+
+      <Separator />
+
       {/* Session Controls */}
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">Session</p>
@@ -380,6 +407,12 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Session Manager Modal */}
+      <SessionManager 
+        open={sessionManagerOpen} 
+        onOpenChange={setSessionManagerOpen} 
+      />
     </div>
   );
 };
