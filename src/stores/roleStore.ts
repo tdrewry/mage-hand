@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface Role {
   id: string;
@@ -121,17 +122,31 @@ export const useRoleStore = create<RoleState>()(
     (set, get) => ({
       roles: [],
       
-      addRole: (role) =>
+      addRole: (role) => {
         set((state) => ({
           roles: [...state.roles, role],
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          // TODO: Implement role sync
+          console.log('[Role] Role added, sync not yet implemented', role);
+        }
+      },
       
-      updateRole: (roleId, updates) =>
+      updateRole: (roleId, updates) => {
         set((state) => ({
           roles: state.roles.map((role) =>
             role.id === roleId ? { ...role, ...updates } : role
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          // TODO: Implement role sync
+          console.log('[Role] Role updated, sync not yet implemented', roleId, updates);
+        }
+      },
       
       removeRole: (roleId) => {
         const role = get().getRoleById(roleId);
@@ -172,6 +187,12 @@ export const useRoleStore = create<RoleState>()(
           
           return { roles: updatedRoles };
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          // TODO: Implement hostility sync
+          console.log('[Role] Hostility changed, sync not yet implemented', roleId, targetRoleId, isHostile);
+        }
       },
       
       areRolesHostile: (roleId1, roleId2) => {

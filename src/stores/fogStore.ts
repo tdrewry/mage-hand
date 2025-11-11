@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface FogSettings {
   enabled: boolean;
@@ -72,7 +73,16 @@ export const useFogStore = create<FogState>()(
       
       setShowExploredAreas: (show) => set({ showExploredAreas: show }),
       
-      setSerializedExploredAreas: (data) => set({ serializedExploredAreas: data }),
+      setSerializedExploredAreas: (data) => {
+        set({ serializedExploredAreas: data });
+        
+        // Sync to multiplayer (fog reveals)
+        if (syncManager.isConnected()) {
+          // TODO: Implement fog sync - this will be a large payload
+          // May need throttling or delta sync
+          console.log('[Fog] Fog data changed, sync not yet implemented');
+        }
+      },
       
       clearExploredAreas: () => set({ serializedExploredAreas: '' }),
       

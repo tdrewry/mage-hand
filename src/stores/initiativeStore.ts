@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface InitiativeEntry {
   tokenId: string;
@@ -58,6 +59,15 @@ export const useInitiativeStore = create<InitiativeState>()(
           roundNumber: 1,
           isTrackerVisible: true
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('start_combat', { 
+            initiativeOrder: sortedOrder,
+            currentTurnIndex: 0,
+            roundNumber: 1 
+          });
+        }
       },
       
       endCombat: () => {
@@ -68,10 +78,20 @@ export const useInitiativeStore = create<InitiativeState>()(
           initiativeOrder: [],
           restrictMovement: false
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('end_combat');
+        }
       },
       
       setInitiativeOrder: (order) => {
         set({ initiativeOrder: order });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('set_order', { initiativeOrder: order });
+        }
       },
       
       addToInitiative: (tokenId, initiative) => {
@@ -92,24 +112,41 @@ export const useInitiativeStore = create<InitiativeState>()(
             initiativeOrder: [...state.initiativeOrder, { tokenId, initiative, hasGone: false }]
           };
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('add_entry', { tokenId, initiative });
+        }
       },
       
       removeFromInitiative: (tokenId) => {
         set((state) => ({
           initiativeOrder: state.initiativeOrder.filter(e => e.tokenId !== tokenId)
         }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('remove_entry', { tokenId });
+        }
       },
       
       reorderInitiative: (fromIndex, toIndex) => {
+        let newOrder: InitiativeEntry[] = [];
         set((state) => {
-          const newOrder = [...state.initiativeOrder];
+          newOrder = [...state.initiativeOrder];
           const [removed] = newOrder.splice(fromIndex, 1);
           newOrder.splice(toIndex, 0, removed);
           return { initiativeOrder: newOrder };
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('reorder', { initiativeOrder: newOrder });
+        }
       },
       
       nextTurn: () => {
+        let syncData: any = {};
         set((state) => {
           const nextIndex = state.currentTurnIndex + 1;
           
@@ -121,21 +158,29 @@ export const useInitiativeStore = create<InitiativeState>()(
           // Check if we've completed a round
           if (nextIndex >= state.initiativeOrder.length) {
             // Start new round
-            return {
+            syncData = {
               currentTurnIndex: 0,
               roundNumber: state.roundNumber + 1,
               initiativeOrder: updatedOrder.map(e => ({ ...e, hasGone: false }))
             };
+            return syncData;
           }
           
-          return {
+          syncData = {
             currentTurnIndex: nextIndex,
             initiativeOrder: updatedOrder
           };
+          return syncData;
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('next_turn', syncData);
+        }
       },
       
       previousTurn: () => {
+        let syncData: any = {};
         set((state) => {
           const prevIndex = state.currentTurnIndex - 1;
           
@@ -143,22 +188,34 @@ export const useInitiativeStore = create<InitiativeState>()(
           if (prevIndex < 0) {
             // Go to previous round
             if (state.roundNumber > 1) {
-              return {
+              syncData = {
                 currentTurnIndex: state.initiativeOrder.length - 1,
                 roundNumber: state.roundNumber - 1
               };
+              return syncData;
             }
             return state; // Can't go before round 1
           }
           
-          return {
+          syncData = {
             currentTurnIndex: prevIndex
           };
+          return syncData;
         });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected() && Object.keys(syncData).length > 0) {
+          syncManager.syncInitiative('previous_turn', syncData);
+        }
       },
       
       setCurrentTurn: (index) => {
         set({ currentTurnIndex: index });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('set_turn', { currentTurnIndex: index });
+        }
       },
       
       updateInitiative: (tokenId, newInitiative) => {
@@ -167,6 +224,11 @@ export const useInitiativeStore = create<InitiativeState>()(
             e.tokenId === tokenId ? { ...e, initiative: newInitiative } : e
           )
         }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncInitiative('update_initiative', { tokenId, initiative: newInitiative });
+        }
       },
       
       setTrackerVisible: (visible) => {

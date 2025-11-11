@@ -6,6 +6,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface Token {
   id: string;
@@ -80,10 +81,16 @@ export const useSessionStore = create<SessionState>()(
       labelVisibility: 'show',
       movementLocked: false,
       
-      addToken: (token) =>
+      addToken: (token) => {
         set((state) => ({
           tokens: [...state.tokens, token],
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncTokenAdd(token);
+        }
+      },
       
       updateTokenPosition: (tokenId, x, y) => {
         // Check if movement is locked
@@ -106,6 +113,11 @@ export const useSessionStore = create<SessionState>()(
                 token.id === tokenId ? { ...token, x, y } : token
               ),
             }));
+            
+            // Sync to multiplayer (throttled)
+            if (syncManager.isConnected()) {
+              syncManager.syncTokenPositionThrottled(tokenId, x, y);
+            }
           } catch (error) {
             console.warn('Failed to update token position:', error);
             // Clear old data if storage is full
@@ -125,46 +137,97 @@ export const useSessionStore = create<SessionState>()(
         }
       },
 
-      updateTokenLabel: (tokenId, label) =>
+      updateTokenLabel: (tokenId, label) => {
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, label } : token
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          const token = get().tokens.find(t => t.id === tokenId);
+          if (token) {
+            syncManager.syncTokenAdd({ ...token, label });
+          }
+        }
+      },
 
-      updateTokenColor: (tokenId, color) =>
+      updateTokenColor: (tokenId, color) => {
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, color } : token
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          const token = get().tokens.find(t => t.id === tokenId);
+          if (token) {
+            syncManager.syncTokenAdd({ ...token, color });
+          }
+        }
+      },
 
-      updateTokenVision: (tokenId, hasVision) =>
+      updateTokenVision: (tokenId, hasVision) => {
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, hasVision } : token
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          const token = get().tokens.find(t => t.id === tokenId);
+          if (token) {
+            syncManager.syncTokenAdd({ ...token, hasVision });
+          }
+        }
+      },
 
-      updateTokenVisionRange: (tokenId, visionRange) =>
+      updateTokenVisionRange: (tokenId, visionRange) => {
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, visionRange } : token
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          const token = get().tokens.find(t => t.id === tokenId);
+          if (token) {
+            syncManager.syncTokenAdd({ ...token, visionRange });
+          }
+        }
+      },
 
-      setTokenOwner: (tokenId, ownerId) =>
+      setTokenOwner: (tokenId, ownerId) => {
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, ownerId } : token
           ),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          const token = get().tokens.find(t => t.id === tokenId);
+          if (token) {
+            syncManager.syncTokenAdd({ ...token, ownerId });
+          }
+        }
+      },
       
-      removeToken: (tokenId) =>
+      removeToken: (tokenId) => {
         set((state) => ({
           tokens: state.tokens.filter((token) => token.id !== tokenId),
           selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
-        })),
+        }));
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncTokenRemove(tokenId);
+        }
+      },
 
       clearAllTokens: () =>
         set({ 
