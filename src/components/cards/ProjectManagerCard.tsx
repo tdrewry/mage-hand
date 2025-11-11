@@ -81,6 +81,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [previousState, setPreviousState] = useState<ProjectData | null>(null);
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -385,7 +387,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     try {
       // Step 1: Clear and add tokens
       setLoadingProgress('Loading tokens...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       const existingTokens = [...sessionStore.tokens];
       existingTokens.forEach(token => sessionStore.removeToken(token.id));
@@ -400,7 +403,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 2: Clear and add maps
       setLoadingProgress('Loading maps...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       const existingMaps = [...mapStore.maps];
       existingMaps.forEach(map => mapStore.removeMap(map.id));
@@ -412,14 +416,16 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 3: Clear and add regions
       setLoadingProgress('Loading regions...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       regionStore.clearRegions();
       (projectData.regions || []).forEach(region => regionStore.addRegion(region));
     
       // Step 4: Clear and add groups
       setLoadingProgress('Loading groups...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       groupStore.clearAllGroups();
       (projectData.groups || []).forEach(group => {
@@ -438,7 +444,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 5: Apply initiative data
       setLoadingProgress('Loading initiative...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.initiative) {
         initiativeStore.endCombat(); // Clear first
@@ -457,7 +464,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 6: Apply roles
       setLoadingProgress('Loading roles...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.roles) {
         const existingRoles = [...roleStore.roles];
@@ -467,7 +475,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 7: Apply vision profiles
       setLoadingProgress('Loading vision profiles...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.visionProfiles) {
         const existingProfiles = [...visionProfileStore.profiles];
@@ -477,7 +486,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 8: Apply fog data
       setLoadingProgress('Loading fog of war...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.fogData) {
         fogStore.setEnabled(projectData.fogData.enabled);
@@ -498,7 +508,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 9: Apply lights
       setLoadingProgress('Loading lights...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.lights) {
         lightStore.clearAllLights();
@@ -507,7 +518,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 10: Apply card states
       setLoadingProgress('Loading UI layout...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.cardStates) {
         // Clear and re-register cards
@@ -530,7 +542,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       // Step 11: Apply dungeon data if present
       setLoadingProgress('Loading dungeon features...');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
       if (projectData.dungeonData) {
         dungeonStore.clearAll();
@@ -562,6 +575,19 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           dungeonStore.setShadowDistance(projectData.dungeonData.shadowDistance);
         }
       }
+    } catch (error) {
+      // If cancelled, restore previous state
+      if (cancelRequested && previousState) {
+        setLoadingProgress('Restoring previous state...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Restore the previous state
+        await applyProjectDataWithoutCancel(previousState);
+        
+        toast.info('Import cancelled - previous state restored');
+      } else {
+        throw error;
+      }
     } finally {
       // Unlock movement and re-enable auto-save if it was enabled before
       sessionStore.setMovementLocked(false);
@@ -572,6 +598,42 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }, 100);
       }
     }
+  };
+
+  // Helper to restore state without cancel checks
+  const applyProjectDataWithoutCancel = async (projectData: ProjectData) => {
+    // Simplified restore without cancel checks - just apply the data
+    const existingTokens = [...sessionStore.tokens];
+    existingTokens.forEach(token => sessionStore.removeToken(token.id));
+    (projectData.tokens || []).forEach(token => sessionStore.addToken(token));
+    
+    (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
+    sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
+    sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
+    
+    const existingMaps = [...mapStore.maps];
+    existingMaps.forEach(map => mapStore.removeMap(map.id));
+    (projectData.maps || []).forEach(map => {
+      const { regions, ...mapData } = map;
+      mapStore.addMap({ ...mapData, regions: [] });
+    });
+    
+    regionStore.clearRegions();
+    (projectData.regions || []).forEach(region => regionStore.addRegion(region));
+    
+    groupStore.clearAllGroups();
+    (projectData.groups || []).forEach(group => {
+      const { name, tokenIds } = group;
+      const newGroup = groupStore.addGroup(name, tokenIds);
+      groupStore.updateGroup(newGroup.id, {
+        id: group.id,
+        transform: group.transform,
+        pivot: group.pivot,
+        bounds: group.bounds,
+        locked: group.locked,
+        visible: group.visible,
+      });
+    });
   };
 
   const handleLoadFromStorage = async (projectId: string) => {
@@ -602,6 +664,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const confirmLoad = async () => {
     if (!pendingLoadData) return;
     
+    // Save current state for cancel/restore
+    const currentState = createCurrentProjectData();
+    setPreviousState(currentState);
+    setCancelRequested(false);
+    
     setLoading(true);
     setLoadingProgress('Preparing to load project...');
     
@@ -615,13 +682,24 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       setShowLoadConfirm(false);
       setLoading(false);
       setLoadingProgress('');
+      setPreviousState(null);
       
       toast.success('Project loaded successfully');
     } catch (error) {
       setLoading(false);
       setLoadingProgress('');
-      toast.error(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setPreviousState(null);
+      setCancelRequested(false);
+      
+      if (error instanceof Error && error.message !== 'Import cancelled by user') {
+        toast.error(`Failed to load project: ${error.message}`);
+      }
     }
+  };
+
+  const handleCancelImport = () => {
+    setCancelRequested(true);
+    setLoadingProgress('Cancelling import...');
   };
 
   const cancelLoad = () => {
@@ -691,13 +769,22 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-2 relative">
       {/* Loading Overlay */}
       {loading && (
-        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 rounded-lg">
-          <div className="flex flex-col items-center gap-3">
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-[100] flex flex-col items-center justify-center gap-4 rounded-lg">
+          <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
             <div className="text-center px-6">
               <p className="text-lg font-semibold text-foreground">{loadingProgress}</p>
               <p className="text-sm text-muted-foreground mt-1">Please wait, do not close this window</p>
             </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleCancelImport}
+              disabled={cancelRequested}
+              className="mt-2"
+            >
+              {cancelRequested ? 'Cancelling...' : 'Cancel Import'}
+            </Button>
           </div>
         </div>
       )}
