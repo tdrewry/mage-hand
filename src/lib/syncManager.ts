@@ -18,6 +18,7 @@ import type {
   SyncInitiativePayload,
   SyncMapPayload,
   SyncFogPayload,
+  SyncVisibilityPayload,
   TokenUpdatedPayload,
   SessionErrorPayload
 } from '@/types/multiplayerEvents';
@@ -152,6 +153,7 @@ class SyncManager {
     this.socketClient.on('combat_state_changed', this.handleCombatStateChanged.bind(this));
     this.socketClient.on('map_updated', this.handleMapUpdated.bind(this));
     this.socketClient.on('fog_updated', this.handleFogUpdated.bind(this));
+    this.socketClient.on('visibility_updated', this.handleVisibilityUpdated.bind(this));
 
     // User management
     this.socketClient.on('user_list_updated', this.handleUserListUpdated.bind(this));
@@ -253,6 +255,21 @@ class SyncManager {
       if (set) {
         set(data.fog);
       }
+    }
+
+    // Apply visibility
+    if (data.visibility) {
+      console.log('👁️ Applying visibility state from server');
+      // Add lastUpdated to each token visibility entry if not present
+      const tokensWithTimestamp = data.visibility.tokens.map(t => ({
+        ...t,
+        lastUpdated: (t as any).lastUpdated || data.visibility!.timestamp
+      }));
+      
+      useMultiplayerStore.getState().setVisibilitySnapshot({
+        tokens: tokensWithTimestamp,
+        timestamp: data.visibility.timestamp
+      });
     }
 
     // Apply connected users
@@ -451,6 +468,28 @@ class SyncManager {
         set({ serializedExploredAreas: '' });
         break;
     }
+  }
+
+  private handleVisibilityUpdated(data: SyncVisibilityPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+
+    // Ignore our own updates (already applied locally)
+    if (data.userId === currentUserId) {
+      return;
+    }
+
+    console.log('👁️ Visibility updated from remote');
+    
+    // Add lastUpdated to each token visibility entry
+    const tokensWithTimestamp = data.data.tokens.map(t => ({
+      ...t,
+      lastUpdated: data.timestamp
+    }));
+    
+    useMultiplayerStore.getState().setVisibilitySnapshot({
+      tokens: tokensWithTimestamp,
+      timestamp: data.timestamp
+    });
   }
 
   // ============= Sync Methods (Local → Server) =============
@@ -700,6 +739,28 @@ class SyncManager {
     };
 
     this.socketClient?.emit('sync_fog', payload);
+  }
+
+  // ============= Visibility Sync Methods =============
+
+  /**
+   * Sync token visibility
+   */
+  syncVisibility(visibilityData: Array<{
+    tokenId: string;
+    visibleToPlayers: string[];
+    hiddenFromPlayers: string[];
+  }>): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncVisibilityPayload = {
+      action: 'update',
+      data: { tokens: visibilityData },
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_visibility', payload);
   }
 }
 

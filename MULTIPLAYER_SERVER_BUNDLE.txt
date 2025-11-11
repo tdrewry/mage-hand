@@ -46,6 +46,7 @@ const {
   handleSyncFog,
   handleSyncRole,
   handleSyncMap,
+  handleSyncVisibility,
   handleRequestFullSync,
   handleKickUser
 } = require('./eventHandlers');
@@ -108,6 +109,10 @@ io.on('connection', (socket) => {
     handleSyncMap(socket, io, sessionManager, payload)
   );
 
+  socket.on('sync_visibility', (payload) => 
+    handleSyncVisibility(socket, io, sessionManager, payload)
+  );
+
   // Additional Events
   socket.on('request_full_sync', () => 
     handleRequestFullSync(socket, sessionManager)
@@ -166,7 +171,11 @@ class SessionManager {
         },
         maps: [],
         fog: null,
-        roles: []
+        roles: [],
+        visibility: {
+          tokens: [],
+          timestamp: Date.now()
+        }
       }
     };
 
@@ -780,6 +789,32 @@ function handleSyncMap(socket, io, sessionManager, payload) {
 }
 
 /**
+ * Handle visibility synchronization
+ */
+function handleSyncVisibility(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, data, timestamp, userId } = payload;
+
+  // Update session visibility state
+  const visibility = {
+    tokens: data.tokens,
+    timestamp
+  };
+  
+  sessionManager.updateState(session.sessionId, 'visibility', visibility);
+
+  // Broadcast to all clients
+  io.to(session.sessionId).emit('visibility_updated', {
+    action,
+    data,
+    timestamp,
+    userId
+  });
+}
+
+/**
  * Handle full state sync request
  */
 function handleRequestFullSync(socket, sessionManager) {
@@ -793,6 +828,7 @@ function handleRequestFullSync(socket, sessionManager) {
     initiative: session.state.initiative,
     maps: session.state.maps,
     fog: session.state.fog,
+    visibility: session.state.visibility,
     roles: session.state.roles,
     players: users,
     sessionMetadata: {
@@ -856,6 +892,7 @@ module.exports = {
   handleSyncFog,
   handleSyncRole,
   handleSyncMap,
+  handleSyncVisibility,
   handleRequestFullSync,
   handleKickUser
 };

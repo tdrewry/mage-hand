@@ -43,6 +43,19 @@ export interface SyncFogPayload {
   userId: string;
 }
 
+export interface SyncVisibilityPayload {
+  action: 'update';
+  data: {
+    tokens: Array<{
+      tokenId: string;
+      visibleToPlayers: string[];
+      hiddenFromPlayers: string[];
+    }>;
+  };
+  timestamp: number;
+  userId: string;
+}
+
 export interface SyncRolePayload {
   action: 'assign' | 'unassign';
   userId: string;
@@ -96,6 +109,14 @@ export interface FullStateSyncPayload {
   };
   maps?: any[]; // Map data
   fog?: any;
+  visibility?: {
+    tokens: Array<{
+      tokenId: string;
+      visibleToPlayers: string[];
+      hiddenFromPlayers: string[];
+    }>;
+    timestamp: number;
+  };
   roles?: any[];
   players: ConnectedUser[];
   sessionMetadata: {
@@ -157,6 +178,7 @@ export const ClientEvents = {
   SYNC_FOG: 'sync_fog',
   SYNC_ROLE: 'sync_role',
   SYNC_MAP: 'sync_map',
+  SYNC_VISIBILITY: 'sync_visibility',
   
   // Requests
   REQUEST_FULL_SYNC: 'request_full_sync',
@@ -183,6 +205,7 @@ export const ServerEvents = {
   FOG_UPDATED: 'fog_updated',
   ROLE_ASSIGNED: 'role_assigned',
   MAP_UPDATED: 'map_updated',
+  VISIBILITY_UPDATED: 'visibility_updated',
   
   // User management
   USER_LIST_UPDATED: 'user_list_updated',
