@@ -379,7 +379,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   };
 
   const applyProjectData = async (projectData: ProjectData) => {
-    console.log('💾 applyProjectData started');
     // Temporarily disable auto-save and lock movement during import to prevent cascade
     const wasAutoSaveEnabled = autoSave.settings.enabled;
     if (wasAutoSaveEnabled) {
@@ -730,24 +729,17 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   };
 
   const confirmLoad = async () => {
-    console.log('🔄 confirmLoad called, pendingLoadData:', !!pendingLoadData);
-    if (!pendingLoadData) {
-      console.error('🔄 No pending load data!');
-      return;
-    }
+    if (!pendingLoadData) return;
     
     try {
-      console.log('🔄 Closing confirmation dialog...');
       setShowLoadConfirm(false);
       
       // Save current state for cancel/restore
-      console.log('🔄 Saving current state...');
       const currentState = createCurrentProjectData();
       setPreviousState(currentState);
       setCancelRequested(false);
       
       // Set loading state FIRST
-      console.log('🔄 Setting loading state...');
       setLoading(true);
       setLoadingProgress('Preparing to load project...');
       
@@ -755,10 +747,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // NOW start the import process
-      console.log('🔄 Starting applyProjectData...');
       await applyProjectData(pendingLoadData);
       
-      console.log('🔄 Import complete!');
       toast.success('Project loaded successfully');
       
       // Refresh the saved projects list
@@ -798,27 +788,18 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('📁 File selected:', file.name);
     const loadingToast = toast.loading('Importing project file...');
 
     try {
-      console.log('📁 Reading project file...');
       const projectData = await importProjectFromFile(file);
-      console.log('📁 Project data loaded:', {
-        name: projectData.metadata.name,
-        tokens: projectData.tokens.length,
-        maps: projectData.maps.length
-      });
       
       toast.dismiss(loadingToast);
       
       // Show confirmation dialog before applying
       setPendingLoadData(projectData);
       setShowLoadConfirm(true);
-      console.log('📁 Showing confirmation dialog');
       
     } catch (error) {
-      console.error('📁 Import error:', error);
       toast.dismiss(loadingToast);
       toast.error(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -1390,11 +1371,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       </Tabs>
 
       {/* Load Confirmation Dialog */}
-      {(() => { console.log('🎭 Rendering AlertDialog, showLoadConfirm:', showLoadConfirm, 'pendingLoadData:', !!pendingLoadData); return null; })()}
-      <AlertDialog open={showLoadConfirm} onOpenChange={(open) => {
-        console.log('🎭 AlertDialog onOpenChange called:', open);
-        setShowLoadConfirm(open);
-      }}>
+      <AlertDialog open={showLoadConfirm} onOpenChange={setShowLoadConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
