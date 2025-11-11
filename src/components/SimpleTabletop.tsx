@@ -11,16 +11,19 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Toolbar } from './Toolbar';
 import { MapManager } from './MapManager';
-import { FloatingMenu } from './FloatingMenu';
 import { TokenContextManager } from './TokenContextManager';
-import { EditModeToolbar } from './EditModeToolbar';
-import { PlayModeToolbar } from './PlayModeToolbar';
+import { CardManager } from './CardManager';
+import { CircularButtonBar } from './CircularButtonBar';
+import { VerticalToolbar } from './VerticalToolbar';
+import { InitiativePanel } from './InitiativePanel';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
 import { useDungeonStore } from '../stores/dungeonStore';
+import { useInitiativeStore } from '../stores/initiativeStore';
+import { useCardStore } from '../stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { renderDoors, renderAnnotations, renderTerrainFeatures, renderDungeonMapRegions, renderDungeonMapDoors } from '../lib/dungeonRenderer';
 import { generateNegativeSpaceRegion } from '../lib/wallGeometry';
 import { 
@@ -50,9 +53,12 @@ import { computeIllumination, renderShadows, renderLightSources, notifyObstacles
 import { useLightStore } from '../stores/lightStore';
 import { clearVisibilityCache } from '../lib/visibilityEngine';
 import { computeTokenVisibilityPaper } from '../lib/fogOfWar';
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry } from '../lib/fogGeometry';
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D } from '../lib/fogGeometry';
 import { serializeFogGeometry, deserializeFogGeometry } from '../lib/fogSerializer';
 import { renderFogLayers } from '../lib/fogRenderer';
+import { renderFogWithGradients, renderFogWithHardEdges } from '../lib/fogGradientRenderer';
+import { getDefaultGradientSettings } from '../lib/fogGradientHelper';
+import { useVisionProfileStore } from '../stores/visionProfileStore';
 import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
@@ -60,7 +66,6 @@ import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
-import { NegativeSpaceControlPanel } from './NegativeSpaceControlPanel';
 import { 
   generateTransformHandles, 
   getRotationCenterHandle, 
@@ -78,7 +83,6 @@ export const SimpleTabletop = () => {
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
-  const [showNegativeSpacePanel, setShowNegativeSpacePanel] = useState(false);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState('#333');
   const [gridOpacity, setGridOpacity] = useState(80);
@@ -112,6 +116,9 @@ export const SimpleTabletop = () => {
   
   // Selected annotation for flavor text display
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  
+  // Active region for Region Controls card
+  const [activeRegionControlId, setActiveRegionControlId] = useState<string | null>(null);
   
   // Wall decoration cache to avoid regenerating on every pan/zoom
   const wallDecorationCacheRef = useRef<{
@@ -153,6 +160,7 @@ export const SimpleTabletop = () => {
     annotations,
     terrainFeatures,
     renderingMode,
+    setRenderingMode,
     watabouStyle,
     wallEdgeStyle,
     wallThickness,
@@ -183,7 +191,15 @@ export const SimpleTabletop = () => {
     setSerializedExploredAreas,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
+    useGradients,
+    innerFadeStart,
+    midpointPosition,
+    midpointOpacity,
+    outerFadeStart,
   } = useFogStore();
+  
+  // Vision profiles store
+  const { getProfile } = useVisionProfileStore();
   
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
@@ -195,6 +211,20 @@ export const SimpleTabletop = () => {
     exploredOnlyMask: Path2D;
     visibleMask: Path2D;
   } | null>(null);
+  
+  // Store individual token visibility data for gradient rendering
+  const tokenVisibilityDataRef = useRef<Array<{
+    position: { x: number; y: number };
+    visionRange: number;
+    visibilityPath: Path2D;
+    useGradients: boolean;
+    gradientSettings?: {
+      innerFadeStart: number;
+      midpointPosition: number;
+      midpointOpacity: number;
+      outerFadeStart: number;
+    };
+  }>>([]);
   
   // Cache individual token visibility shapes to avoid recomputing unchanged tokens
   const tokenVisibilityCacheRef = useRef<Map<string, {
@@ -261,11 +291,128 @@ export const SimpleTabletop = () => {
   } = useSessionStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+  
+  const { 
+    isInCombat, 
+    currentTurnIndex, 
+    initiativeOrder,
+    restrictMovement 
+  } = useInitiativeStore();
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const getCardByType = useCardStore((state) => state.getCardByType);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+  const bringToFront = useCardStore((state) => state.bringToFront);
+  const cards = useCardStore((state) => state.cards);
+  
+  // Register MENU, TOOLS, and MAP cards on mount (only once)
+  useEffect(() => {
+    // Small delay to ensure layout is loaded first
+    const timer = setTimeout(() => {
+      // Register MENU card if it doesn't exist
+      if (!getCardByType(CardType.MENU)) {
+        registerCard({
+          type: CardType.MENU,
+          title: 'Menu',
+          defaultPosition: { x: 20, y: 20 },
+          defaultSize: { width: 280, height: 500 },
+          minSize: { width: 250, height: 400 },
+          isResizable: true,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
+      
+      // TOOLS card removed - replaced by VerticalToolbar component
+      
+      // Register MAP card if it doesn't exist
+      if (!getCardByType(CardType.MAP)) {
+        registerCard({
+          type: CardType.MAP,
+          title: 'Map View',
+          defaultPosition: { x: 320, y: 20 },
+          defaultSize: { width: 800, height: 600 },
+          minSize: { width: 400, height: 300 },
+          isResizable: true,
+          isClosable: false,
+          defaultVisible: true,
+        });
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+  
+  // Cards now managed independently - no automatic visibility control needed
+
+  // Global mouseup listener to ensure drag states are always reset
+  useEffect(() => {
+    if (isDraggingToken || isDraggingRegion || isTransforming || isPanning) {
+      const handleGlobalMouseUp = () => {
+        // Reset all drag states
+        if (isDraggingToken) {
+          setIsDraggingToken(false);
+          setDraggedTokenId(null);
+          setDragOffset({ x: 0, y: 0 });
+          setDragStartPos({ x: 0, y: 0 });
+          setDragPath([]);
+          setGroupedTokens([]);
+          setTempTokenPositions(undefined);
+        }
+        if (isDraggingRegion) {
+          setIsDraggingRegion(false);
+          setDraggedRegionId(null);
+          setDragPreview(null);
+        }
+        if (isTransforming) {
+          setIsTransforming(false);
+          setTransformHandle(null);
+        }
+        if (isPanning) {
+          setIsPanning(false);
+        }
+        if (isRotatingRegion) {
+          setIsRotatingRegion(false);
+          setTempRegionRotation({});
+        }
+      };
+
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [isDraggingToken, isDraggingRegion, isTransforming, isPanning, isRotatingRegion]);
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {
     updateAllTokenHighlights();
   }, [tokens, regions]); // Re-run when tokens positions change or regions change
+  
+  // Listen for center on token events
+  useEffect(() => {
+    const handleCenterOnToken = (e: CustomEvent) => {
+      const { tokenId } = e.detail;
+      const token = tokens.find(t => t.id === tokenId);
+      if (token && canvasRef.current) {
+        const canvas = canvasRef.current;
+        // Center the viewport on the token
+        setTransform({
+          x: canvas.width / 2 - token.x * transform.zoom,
+          y: canvas.height / 2 - token.y * transform.zoom,
+          zoom: transform.zoom
+        });
+      }
+    };
+    
+    window.addEventListener('centerOnToken', handleCenterOnToken as EventListener);
+    return () => {
+      window.removeEventListener('centerOnToken', handleCenterOnToken as EventListener);
+    };
+  }, [tokens, transform.zoom]);
+
+  // Canvas rendering now auto-updates via dependencies - no manual event listening needed
 
   // Initialize paper.js scope and load explored areas
   useEffect(() => {
@@ -318,6 +465,9 @@ export const SimpleTabletop = () => {
       return;
     }
     
+    // Force fog computation when switching to play mode
+    const isPlayMode = renderingMode === 'play';
+    
     const wallGeometry = wallGeometryRef.current;
     
     // Debounce fog computation to avoid excessive updates
@@ -329,18 +479,22 @@ export const SimpleTabletop = () => {
           if (!fogScopeRef.current) return;
           fogScopeRef.current.activate();
           
-          // Identify which tokens have moved
+          // Identify which tokens have moved (only consider tokens with vision)
+          const tokensWithVision = tokens.filter(t => t.hasVision !== false);
           const movedTokens: typeof tokens = [];
-          const currentTokenIds = new Set(tokens.map(t => t.id));
+          const currentTokenIds = new Set(tokensWithVision.map(t => t.id));
           
-          tokens.forEach(token => {
+          // Track tokens whose vision state changed
+          let visionStateChanged = false;
+          
+          tokensWithVision.forEach(token => {
             const prevPos = prevTokenPositionsRef.current.get(token.id);
             if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
               movedTokens.push(token);
             }
           });
           
-          // Remove cached visibility for tokens that no longer exist
+          // Remove cached visibility for tokens that no longer exist OR lost vision
           const cachedIds = Array.from(tokenVisibilityCacheRef.current.keys());
           cachedIds.forEach(id => {
             if (!currentTokenIds.has(id)) {
@@ -348,11 +502,16 @@ export const SimpleTabletop = () => {
               if (cached?.visionPath?.remove) cached.visionPath.remove();
               tokenVisibilityCacheRef.current.delete(id);
               prevTokenPositionsRef.current.delete(id);
+              visionStateChanged = true; // Vision was disabled for this token
             }
           });
           
-          // If no tokens moved, skip computation
-          if (movedTokens.length === 0 && tokenVisibilityCacheRef.current.size === tokens.length) {
+          // If no tokens moved and vision state didn't change, skip computation
+          // Unless we're in play mode and don't have fog masks yet (initial render)
+          if (movedTokens.length === 0 && 
+              !visionStateChanged &&
+              tokenVisibilityCacheRef.current.size === tokensWithVision.length && 
+              fogMasksRef.current !== null) {
             return;
           }
           
@@ -364,7 +523,9 @@ export const SimpleTabletop = () => {
               token.y >= r.y && token.y <= r.y + r.height
             );
             const gridSize = tokenRegion?.gridSize || 40;
-            const visionRangePixels = fogVisionRange * gridSize;
+            // Use token's individual vision range, or fall back to global default
+            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            const visionRangePixels = tokenVisionRange * gridSize;
             
             // Remove old cached vision for this token
             const oldCached = tokenVisibilityCacheRef.current.get(token.id);
@@ -452,6 +613,85 @@ export const SimpleTabletop = () => {
             worldBounds
           );
           
+          // Store individual token visibility data for gradient rendering
+          const tokenVisData: Array<{
+            position: { x: number; y: number };
+            visionRange: number;
+            visibilityPath: Path2D;
+            useGradients: boolean;
+            gradientSettings?: {
+              innerFadeStart: number;
+              midpointPosition: number;
+              midpointOpacity: number;
+              outerFadeStart: number;
+            };
+          }> = [];
+          
+          tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
+            if (!cached.visionPath) return;
+            
+            // Find the token to get its vision range and gradient settings
+            const token = tokens.find(t => t.id === tokenId);
+            if (!token) return;
+            
+            const tokenRegion = regions.find(r => 
+              token.x >= r.x && token.x <= r.x + r.width &&
+              token.y >= r.y && token.y <= r.y + r.height
+            );
+            const gridSize = tokenRegion?.gridSize || 40;
+            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            const visionRangePixels = tokenVisionRange * gridSize;
+            
+            // Check if token uses gradients (default to true if not specified)
+            const tokenUseGradients = token.useGradients !== false;
+            
+            // Get token's gradient settings from profile or use defaults
+            let tokenGradientSettings: {
+              innerFadeStart: number;
+              midpointPosition: number;
+              midpointOpacity: number;
+              outerFadeStart: number;
+            } | undefined;
+            
+            if (tokenUseGradients) {
+              if (token.visionProfileId) {
+                // Use profile's gradient settings
+                const profile = getProfile(token.visionProfileId);
+                if (profile) {
+                  tokenGradientSettings = {
+                    innerFadeStart: profile.innerFadeStart,
+                    midpointPosition: profile.midpointPosition,
+                    midpointOpacity: profile.midpointOpacity,
+                    outerFadeStart: profile.outerFadeStart,
+                  };
+                }
+              }
+              
+              // Fall back to global gradient settings if no profile or profile not found
+              if (!tokenGradientSettings) {
+                tokenGradientSettings = {
+                  innerFadeStart,
+                  midpointPosition,
+                  midpointOpacity,
+                  outerFadeStart,
+                };
+              }
+            }
+            
+            // Convert paper.js path to Path2D using the existing helper
+            const path2D = paperPathToPath2D(cached.visionPath);
+            
+            tokenVisData.push({
+              position: cached.position,
+              visionRange: visionRangePixels,
+              visibilityPath: path2D,
+              useGradients: tokenUseGradients,
+              gradientSettings: tokenGradientSettings,
+            });
+          });
+          
+          tokenVisibilityDataRef.current = tokenVisData;
+          
           // Clean up
           if (visibilityForMask.remove) visibilityForMask.remove();
           
@@ -471,7 +711,7 @@ export const SimpleTabletop = () => {
     }, 100); // 100ms debounce
     
     return () => clearTimeout(timeoutId);
-  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, isDraggingToken, setSerializedExploredAreas]);
+  }, [tokens, fogEnabled, fogRevealAll, fogVisionRange, isDraggingToken, setSerializedExploredAreas, renderingMode, regions, transform.x, transform.y, transform.zoom]);
 
   // Helper function to convert screen coordinates to world coordinates
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -499,7 +739,16 @@ export const SimpleTabletop = () => {
       // Calculate actual token size based on grid dimensions
       const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
       const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
-      const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      const baseRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      
+      // Add extra tolerance for borders, selection highlights, and visual size
+      // Scale tolerance inversely with zoom: more forgiving when zoomed out, tighter when zoomed in
+      // At zoom=1: tolerance = 8px
+      // At zoom=0.5 (zoomed out): tolerance = 16px (easier to click small tokens)
+      // At zoom=2 (zoomed in): tolerance = 4px (tighter precision for large tokens)
+      const baseBorderTolerance = 8;
+      const zoomAdjustedTolerance = baseBorderTolerance / transform.zoom;
+      const maxRadius = baseRadius + zoomAdjustedTolerance;
       
       const distance = Math.sqrt(
         Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
@@ -1094,14 +1343,6 @@ export const SimpleTabletop = () => {
       ctx.restore();
     });
     
-    // Draw visible tokens (on top of markers)
-    visibleTokens.forEach(token => {
-      // Use temporary position if available (during region drag)
-      const tempPos = tempTokenPositions?.[token.id];
-      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-      drawToken(ctx, renderToken);
-    });
-    
     // Draw light sources in edit mode using new system
     if (renderingMode === 'edit' && lights.length > 0) {
       renderLightSources(ctx, lights, transform);
@@ -1145,18 +1386,86 @@ export const SimpleTabletop = () => {
       drawDragGhostAndPath(ctx);
     }
     
-    // Render fog of war (in world coordinate space, before restore)
+    // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
-      renderFogLayers(
-        ctx,
-        fogMasksRef.current.unexploredMask,
-        fogMasksRef.current.exploredOnlyMask,
-        fogMasksRef.current.visibleMask,
-        fogOpacity,
-        exploredOpacity
-      );
+      // Separate tokens by gradient preference
+      const tokensWithGradients = tokenVisibilityDataRef.current.filter(t => t.useGradients);
+      const tokensWithoutGradients = tokenVisibilityDataRef.current.filter(t => !t.useGradients);
+      
+      // First render base fog layers
+      ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+      ctx.fill(fogMasksRef.current.unexploredMask);
+      
+      ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+      ctx.fill(fogMasksRef.current.exploredOnlyMask);
+      
+      // Render tokens with gradients if any
+      if (tokensWithGradients.length > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        
+        tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
+          // Use token-specific gradient settings or fall back to global
+          const settings = gradientSettings || {
+            innerFadeStart,
+            midpointPosition,
+            midpointOpacity,
+            outerFadeStart,
+          };
+          
+          const canvasGradient = ctx.createRadialGradient(
+            position.x, position.y, 0,
+            position.x, position.y, visionRange
+          );
+          
+          const midpointRemoval = Math.max(0, Math.min(1, 1 - (settings.midpointOpacity / fogOpacity)));
+          const outerRemoval = Math.max(0, Math.min(1, 1 - (exploredOpacity / fogOpacity)));
+          
+          canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);
+          canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 1)`);
+          canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);
+          canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);
+          canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
+          
+          ctx.save();
+          ctx.clip(visibilityPath);
+          ctx.fillStyle = canvasGradient;
+          ctx.fillRect(
+            position.x - visionRange,
+            position.y - visionRange,
+            visionRange * 2,
+            visionRange * 2
+          );
+          ctx.restore();
+        });
+        
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      }
+      
+      // Render tokens without gradients (hard edges)
+      if (tokensWithoutGradients.length > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        
+        tokensWithoutGradients.forEach(({ visibilityPath }) => {
+          ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+          ctx.fill(visibilityPath);
+        });
+        
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      }
     }
+    
+    // Draw visible tokens AFTER fog so they appear on top of darkness
+    visibleTokens.forEach(token => {
+      // Use temporary position if available (during region drag)
+      const tempPos = tempTokenPositions?.[token.id];
+      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+      drawToken(ctx, renderToken);
+    });
     
     // Restore context after all world-space rendering
     ctx.restore();
@@ -2572,6 +2881,29 @@ export const SimpleTabletop = () => {
     const radius = tokenSize / 2;
     const isSelected = selectedTokenIds.includes(token.id);
     
+    // Check if this is the active token in combat
+    const currentEntry = initiativeOrder[currentTurnIndex];
+    const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
+    
+    // Draw active combat highlight (pulsing glow)
+    if (isActiveInCombat) {
+      ctx.save();
+      // Outer glow
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)'; // Gold
+      ctx.lineWidth = 6 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 6, 0, 2 * Math.PI);
+      ctx.stroke();
+      
+      // Inner glow
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+      ctx.lineWidth = 3 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 3, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+    
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -2689,8 +3021,9 @@ export const SimpleTabletop = () => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 80;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     // Initial draw
     redrawCanvas();
@@ -2698,8 +3031,9 @@ export const SimpleTabletop = () => {
     toast.success('Pan/Zoom Tabletop Ready! Controls: Left-click=select, Shift+click=add token, Right-click=pan, Scroll=zoom, Right-click token=menu');
 
     const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight - 80;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
       redrawCanvas();
     };
 
@@ -2710,10 +3044,10 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
-  // Redraw when transform, tokens, regions, or path changes
+  // Redraw when transform, tokens, regions, path, or combat state changes
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens, regions, currentPath]);
+  }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -2810,6 +3144,33 @@ export const SimpleTabletop = () => {
     }
   };
 
+  // Function to open Region Controls card for a specific region
+  const openRegionControlsCard = (regionId: string) => {
+    // Set the active region ID for the card
+    setActiveRegionControlId(regionId);
+    
+    // Check if REGION_CONTROL card exists
+    const existingCard = getCardByType(CardType.REGION_CONTROL);
+    
+    if (existingCard) {
+      // If card exists, make it visible and bring to front
+      setVisibility(existingCard.id, true);
+      bringToFront(existingCard.id);
+    } else {
+      // Register a new REGION_CONTROL card
+      registerCard({
+        type: CardType.REGION_CONTROL,
+        title: 'Region Controls',
+        defaultPosition: { x: window.innerWidth - 380, y: 100 },
+        defaultSize: { width: 350, height: 600 },
+        minSize: { width: 300, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
   // Function to show region context menu
   const showRegionContextMenu = (x: number, y: number, region: CanvasRegion) => {
     // Remove any existing context menu safely
@@ -2833,6 +3194,12 @@ export const SimpleTabletop = () => {
         }
       },
       { 
+        label: 'Region Controls', 
+        icon: '⚙️', 
+        action: () => openRegionControlsCard(region.id)
+      },
+      { type: 'separator' },
+      { 
         label: 'Free Grid', 
         icon: '📐', 
         action: () => setRegionGridType(region.id, 'free'),
@@ -2850,22 +3217,30 @@ export const SimpleTabletop = () => {
         action: () => setRegionGridType(region.id, 'hex'),
         active: region.gridType === 'hex'
       },
+      { type: 'separator' },
       { 
         label: 'Delete Region', 
         icon: '🗑️', 
         action: () => deleteSelectedRegion(region.id), 
         danger: true 
       }
-    ];
+    ] as const;
     
     menuItems.forEach(item => {
+      if ('type' in item && item.type === 'separator') {
+        const separator = document.createElement('div');
+        separator.className = 'my-1 h-px bg-border';
+        menu.appendChild(separator);
+        return;
+      }
+      
       const menuItem = document.createElement('div');
       menuItem.className = `px-3 py-2 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${
-        item.danger ? 'text-destructive' : ''
-      } ${item.active ? 'bg-accent font-medium' : ''}`;
-      menuItem.innerHTML = `<span>${item.icon}</span> ${item.label}${item.active ? ' ✓' : ''}`;
+        'danger' in item && item.danger ? 'text-destructive' : ''
+      } ${'active' in item && item.active ? 'bg-accent font-medium' : ''}`;
+      menuItem.innerHTML = `<span>${'icon' in item ? item.icon : ''}</span> ${'label' in item ? item.label : ''}${'active' in item && item.active ? ' ✓' : ''}`;
       menuItem.onclick = () => {
-        item.action();
+        if ('action' in item) item.action();
         // Safe menu removal
         if (document.body.contains(menu)) {
           document.body.removeChild(menu);
@@ -3100,6 +3475,22 @@ export const SimpleTabletop = () => {
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
       
       if (clickedToken) {
+        // Check if movement is restricted
+        if (restrictMovement) {
+          if (isInCombat) {
+            // In combat: only active token can move
+            const currentEntry = initiativeOrder[currentTurnIndex];
+            if (currentEntry?.tokenId !== clickedToken.id) {
+              toast.error('Can only move the active token during their turn');
+              return;
+            }
+          } else {
+            // Out of combat: no token movement allowed (GM only mode)
+            toast.error('Token movement is locked. Unlock to move tokens.');
+            return;
+          }
+        }
+        
         setIsDraggingToken(true);
         setDraggedTokenId(clickedToken.id);
         setDragOffset({
@@ -3955,85 +4346,32 @@ export const SimpleTabletop = () => {
 
   return (
     <div className="w-full h-screen bg-surface flex flex-col relative">
-      {/* Toolbar */}
-      <Toolbar 
-        sessionId={sessionId}
+      {/* Circular Button Bar - Always visible at top */}
+      <CircularButtonBar 
+        mode={renderingMode} 
+        onToggleMode={() => setRenderingMode(renderingMode === 'edit' ? 'play' : 'edit')}
       />
       
-      {/* Edit Mode Toolbar - Only in Edit Mode */}
-      {renderingMode === 'edit' && (
-        <EditModeToolbar
-          onOpenMapManager={() => setShowMapManager(true)}
-          onAddRegion={addNewRegion}
-          onStartPolygonDraw={() => startPathDrawing('polygon')}
-          onStartFreehandDraw={() => startPathDrawing('freehand')}
-          onFinishPolygonDraw={finishPathDrawing}
-          isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
-          isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
-          isGridSnappingEnabled={isGridSnappingEnabled}
-          onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-          showNegativeSpacePanel={showNegativeSpacePanel}
-          onToggleNegativeSpacePanel={() => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          }}
-          showRegions={showRegions}
-          onToggleRegions={() => setShowRegions(!showRegions)}
-          fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
-          gridColor={gridColor}
-          gridOpacity={gridOpacity}
-          onGridColorChange={setGridColor}
-          onGridOpacityChange={setGridOpacity}
-        />
-      )}
-
-      {/* Play Mode Toolbar */}
-      {renderingMode === 'play' && (
-        <PlayModeToolbar
-          showNegativeSpacePanel={showNegativeSpacePanel}
-          onToggleNegativeSpacePanel={() => {
-            setShowNegativeSpacePanel(!showNegativeSpacePanel);
-            if (!showNegativeSpacePanel) {
-              setSelectedRegionId(null);
-            }
-          }}
-          showRegions={showRegions}
-          onToggleRegions={() => setShowRegions(!showRegions)}
-          fabricCanvas={null}
-          onAddToken={addTokenToCanvas}
-        />
-      )}
-
+      {/* Vertical Toolbar - Middle left of viewport (controlled by CircularButtonBar) */}
+      <VerticalToolbar 
+        mode={renderingMode}
+        fabricCanvas={null}
+        onOpenMapManager={() => setShowMapManager(true)}
+        onAddRegion={addNewRegion}
+        onStartPolygonDraw={() => startPathDrawing('polygon')}
+        onStartFreehandDraw={() => startPathDrawing('freehand')}
+        onFinishPolygonDraw={finishPathDrawing}
+        isDrawingPolygon={pathDrawingMode === 'drawing' && pathDrawingType === 'polygon'}
+        isDrawingFreehand={pathDrawingMode === 'drawing' && pathDrawingType === 'freehand'}
+        isGridSnappingEnabled={isGridSnappingEnabled}
+        onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+        showRegions={showRegions}
+        onToggleRegions={() => setShowRegions(!showRegions)}
+      />
+      
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
       
-      {/* Wall Settings Control Panel - available in both edit and play mode */}
-      {showNegativeSpacePanel && (
-        <NegativeSpaceControlPanel
-          onClose={() => setShowNegativeSpacePanel(false)}
-        />
-      )}
-      
-      {/* Region Control Panel - only show in edit mode when wall settings is closed */}
-      {renderingMode === 'edit' && selectedRegionId && !showNegativeSpacePanel && (() => {
-        const selectedRegion = regions.find(r => r.id === selectedRegionId);
-        if (!selectedRegion) return null;
-        
-        return (
-          <RegionControlPanel
-            region={selectedRegion}
-            transformMode={transformMode}
-            onTransformModeChange={setTransformMode}
-            onUpdateRegion={updateRegion}
-            onDeleteRegion={deleteSelectedRegion}
-            onClose={() => setSelectedRegionId(null)}
-            onToggleSnapping={toggleRegionSnapping}
-            onToggleGridVisibility={toggleRegionGridVisibility}
-          />
-        );
-      })()}
+      {/* Region Control Panel - removed, now using Region Controls Card */}
 
       {/* Main Canvas Container */}
       <div className="flex-1 relative overflow-hidden">
@@ -4053,24 +4391,25 @@ export const SimpleTabletop = () => {
         />
       </div>
 
-      {/* Floating Menu */}
-      <FloatingMenu
-        fabricCanvas={null}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={setGridColor}
-        onGridOpacityChange={setGridOpacity}
-        onAddToken={addTokenToCanvas}
-        onColorChange={handleTokenColorChange}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
-
       {/* Token Context Manager */}
       <TokenContextManager
         fabricCanvas={null}
         onColorChange={handleTokenColorChange}
         onUpdateCanvas={handleCanvasUpdate}
       />
+      
+      {/* Card-Based UI System */}
+      <CardManager 
+        sessionId={sessionId}
+        activeRegionId={activeRegionControlId}
+        transformMode={transformMode}
+        onTransformModeChange={setTransformMode}
+        onToggleSnapping={toggleRegionSnapping}
+        onToggleGridVisibility={toggleRegionGridVisibility}
+      />
+      
+      {/* Initiative Tracker Panel - Bottom middle */}
+      <InitiativePanel />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
