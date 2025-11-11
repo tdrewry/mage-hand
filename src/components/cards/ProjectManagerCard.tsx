@@ -327,10 +327,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       const projectData = createCurrentProjectData();
       saveProjectToStorage(projectData);
       
-      // Save version to history
-      const sessionHistory = useSessionHistory(projectData.metadata.id);
-      sessionHistory.saveVersion(projectData, 'Manual save');
-      
       toast.success('Project saved successfully');
       
       // Refresh saved projects list
@@ -1109,21 +1105,23 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               <AlertTriangle className="h-5 w-5 text-warning" />
               Load Project?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Loading this project will replace your current session. This action cannot be undone.
-              {pendingLoadData && (
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <div className="font-medium text-foreground mb-2">
-                    {pendingLoadData.metadata.name}
+            <AlertDialogDescription asChild>
+              <div>
+                Loading this project will replace your current session. This action cannot be undone.
+                {pendingLoadData && (
+                  <div className="mt-4 p-3 bg-muted rounded-lg">
+                    <div className="font-medium text-foreground mb-2">
+                      {pendingLoadData.metadata.name}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>Tokens: {pendingLoadData.tokens.length}</div>
+                      <div>Maps: {pendingLoadData.maps.length}</div>
+                      <div>Regions: {pendingLoadData.regions.length}</div>
+                      <div>Groups: {pendingLoadData.groups.length}</div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>Tokens: {pendingLoadData.tokens.length}</div>
-                    <div>Maps: {pendingLoadData.maps.length}</div>
-                    <div>Regions: {pendingLoadData.regions.length}</div>
-                    <div>Groups: {pendingLoadData.groups.length}</div>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1143,24 +1141,26 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               <AlertTriangle className="h-5 w-5 text-warning" />
               Apply Template?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Applying this template will replace your current role and vision profile configurations. Maps, tokens, and regions will be preserved.
-              {pendingTemplate && (
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <div className="font-medium text-foreground mb-2">
-                    {pendingTemplate.name}
+            <AlertDialogDescription asChild>
+              <div>
+                Applying this template will replace your current role and vision profile configurations. Maps, tokens, and regions will be preserved.
+                {pendingTemplate && (
+                  <div className="mt-4 p-3 bg-muted rounded-lg">
+                    <div className="font-medium text-foreground mb-2">
+                      {pendingTemplate.name}
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {pendingTemplate.description}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>Roles: {pendingTemplate.roles.length}</div>
+                      <div>Vision Profiles: {pendingTemplate.visionProfiles.length}</div>
+                      <div>Maps: {pendingTemplate.maps.length}</div>
+                      <div>Regions: {pendingTemplate.regions.length}</div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {pendingTemplate.description}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>Roles: {pendingTemplate.roles.length}</div>
-                    <div>Vision Profiles: {pendingTemplate.visionProfiles.length}</div>
-                    <div>Maps: {pendingTemplate.maps.length}</div>
-                    <div>Regions: {pendingTemplate.regions.length}</div>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
