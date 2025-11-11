@@ -13,6 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { toast } from 'sonner';
 import { 
   Save, 
@@ -22,6 +32,7 @@ import {
   FileText, 
   Clock, 
   User,
+  AlertTriangle,
 } from 'lucide-react';
 
 import {
@@ -40,6 +51,13 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useMapStore } from '../../stores/mapStore';
 import { useRegionStore } from '../../stores/regionStore';
 import { useGroupStore } from '../../stores/groupStore';
+import { useInitiativeStore } from '../../stores/initiativeStore';
+import { useRoleStore } from '../../stores/roleStore';
+import { useVisionProfileStore } from '../../stores/visionProfileStore';
+import { useFogStore } from '../../stores/fogStore';
+import { useLightStore } from '../../stores/lightStore';
+import { useCardStore } from '../../stores/cardStore';
+import { useDungeonStore } from '../../stores/dungeonStore';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
@@ -54,13 +72,22 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [authorName, setAuthorName] = useState('');
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showLoadConfirm, setShowLoadConfirm] = useState(false);
+  const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Store hooks
-  const { tokens, tokenVisibility, labelVisibility } = useSessionStore();
-  const { maps } = useMapStore();
-  const { regions } = useRegionStore();
-  const { groups } = useGroupStore();
+  // Store hooks - for reading
+  const sessionStore = useSessionStore();
+  const mapStore = useMapStore();
+  const regionStore = useRegionStore();
+  const groupStore = useGroupStore();
+  const initiativeStore = useInitiativeStore();
+  const roleStore = useRoleStore();
+  const visionProfileStore = useVisionProfileStore();
+  const fogStore = useFogStore();
+  const lightStore = useLightStore();
+  const cardStore = useCardStore();
+  const dungeonStore = useDungeonStore();
 
   // Load saved projects when component mounts
   React.useEffect(() => {
@@ -74,19 +101,58 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       projectDescription,
       authorName
     ),
-    tokens,
-    maps,
-    regions,
-    groups,
+    tokens: sessionStore.tokens,
+    players: sessionStore.players,
+    maps: mapStore.maps,
+    regions: regionStore.regions,
+    groups: groupStore.groups,
     viewport,
     settings: {
       gridSnappingEnabled: false,
-      tokenVisibility,
-      labelVisibility,
+      tokenVisibility: sessionStore.tokenVisibility,
+      labelVisibility: sessionStore.labelVisibility,
       gridColor: '#333333',
       backgroundColor: '#1a1a1a',
       defaultGridSize: 50
-    }
+    },
+    // Capture all store states
+    initiative: {
+      isInCombat: initiativeStore.isInCombat,
+      currentTurnIndex: initiativeStore.currentTurnIndex,
+      roundNumber: initiativeStore.roundNumber,
+      initiativeOrder: initiativeStore.initiativeOrder,
+      restrictMovement: initiativeStore.restrictMovement,
+    },
+    roles: roleStore.roles,
+    visionProfiles: visionProfileStore.profiles,
+    fogData: {
+      enabled: fogStore.enabled,
+      revealAll: fogStore.revealAll,
+      visionRange: fogStore.visionRange,
+      fogOpacity: fogStore.fogOpacity,
+      exploredOpacity: fogStore.exploredOpacity,
+      showExploredAreas: fogStore.showExploredAreas,
+      serializedExploredAreas: fogStore.serializedExploredAreas,
+      fogVersion: fogStore.fogVersion,
+      useGradients: fogStore.useGradients,
+      innerFadeStart: fogStore.innerFadeStart,
+      midpointPosition: fogStore.midpointPosition,
+      midpointOpacity: fogStore.midpointOpacity,
+      outerFadeStart: fogStore.outerFadeStart,
+    },
+    lights: lightStore.lights,
+    cardStates: cardStore.cards,
+    dungeonData: {
+      doors: dungeonStore.doors,
+      annotations: dungeonStore.annotations,
+      terrainFeatures: dungeonStore.terrainFeatures,
+      watabouStyle: dungeonStore.watabouStyle,
+      wallEdgeStyle: dungeonStore.wallEdgeStyle,
+      wallThickness: dungeonStore.wallThickness,
+      textureScale: dungeonStore.textureScale,
+      lightDirection: dungeonStore.lightDirection,
+      shadowDistance: dungeonStore.shadowDistance,
+    },
   });
 
   const handleSaveToStorage = async () => {
@@ -131,6 +197,157 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
+  const applyProjectData = (projectData: ProjectData) => {
+    // Clear existing tokens and add new ones
+    const existingTokens = [...sessionStore.tokens];
+    existingTokens.forEach(token => sessionStore.removeToken(token.id));
+    (projectData.tokens || []).forEach(token => sessionStore.addToken(token));
+    
+    // Add/update players (addPlayer replaces if exists)
+    (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
+    
+    // Apply session settings
+    sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
+    sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
+    
+    // Clear and add maps
+    const existingMaps = [...mapStore.maps];
+    existingMaps.forEach(map => mapStore.removeMap(map.id));
+    (projectData.maps || []).forEach(map => {
+      // Add map without regions first, then add regions separately
+      const { regions, ...mapData } = map;
+      mapStore.addMap({ ...mapData, regions: [] });
+    });
+    
+    // Clear and add regions
+    regionStore.clearRegions();
+    (projectData.regions || []).forEach(region => regionStore.addRegion(region));
+    
+    // Clear and add groups
+    groupStore.clearAllGroups();
+    (projectData.groups || []).forEach(group => {
+      const { name, tokenIds } = group;
+      const newGroup = groupStore.addGroup(name, tokenIds);
+      // Update the group with the full saved data
+      groupStore.updateGroup(newGroup.id, {
+        id: group.id, // Restore original ID
+        transform: group.transform,
+        pivot: group.pivot,
+        bounds: group.bounds,
+        locked: group.locked,
+        visible: group.visible,
+      });
+    });
+    
+    // Apply initiative data
+    if (projectData.initiative) {
+      initiativeStore.endCombat(); // Clear first
+      if (projectData.initiative.isInCombat) {
+        projectData.initiative.initiativeOrder.forEach(entry => {
+          initiativeStore.addToInitiative(entry.tokenId, entry.initiative);
+        });
+        initiativeStore.startCombat();
+        // Set to correct turn
+        for (let i = 0; i < projectData.initiative.currentTurnIndex; i++) {
+          initiativeStore.nextTurn();
+        }
+      }
+      initiativeStore.setRestrictMovement(projectData.initiative.restrictMovement);
+    }
+    
+    // Apply roles
+    if (projectData.roles) {
+      const existingRoles = [...roleStore.roles];
+      existingRoles.forEach(role => roleStore.removeRole(role.id));
+      projectData.roles.forEach(role => roleStore.addRole(role));
+    }
+    
+    // Apply vision profiles
+    if (projectData.visionProfiles) {
+      const existingProfiles = [...visionProfileStore.profiles];
+      existingProfiles.forEach(profile => visionProfileStore.removeProfile(profile.id));
+      projectData.visionProfiles.forEach(profile => visionProfileStore.addProfile(profile));
+    }
+    
+    // Apply fog data
+    if (projectData.fogData) {
+      fogStore.setEnabled(projectData.fogData.enabled);
+      fogStore.setRevealAll(projectData.fogData.revealAll);
+      fogStore.setVisionRange(projectData.fogData.visionRange);
+      fogStore.setFogOpacity(projectData.fogData.fogOpacity);
+      fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
+      fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
+      fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
+      if (projectData.fogData.useGradients !== undefined) {
+        fogStore.setUseGradients(projectData.fogData.useGradients);
+        fogStore.setInnerFadeStart(projectData.fogData.innerFadeStart);
+        fogStore.setMidpointPosition(projectData.fogData.midpointPosition);
+        fogStore.setMidpointOpacity(projectData.fogData.midpointOpacity);
+        fogStore.setOuterFadeStart(projectData.fogData.outerFadeStart);
+      }
+    }
+    
+    // Apply lights
+    if (projectData.lights) {
+      lightStore.clearAllLights();
+      projectData.lights.forEach(light => lightStore.addLight(light));
+    }
+    
+    // Apply card states
+    if (projectData.cardStates) {
+      // Clear and re-register cards
+      const existingCards = [...cardStore.cards];
+      existingCards.forEach(card => cardStore.unregisterCard(card.id));
+      projectData.cardStates.forEach(card => {
+        const config = {
+          type: card.type,
+          title: '', // Will use default
+          defaultPosition: card.position,
+          defaultSize: card.size,
+          defaultMinimized: card.isMinimized,
+          defaultVisible: card.isVisible,
+          hideHeader: card.hideHeader,
+          fullCardDraggable: card.fullCardDraggable,
+        };
+        cardStore.registerCard(config);
+      });
+    }
+    
+    // Apply dungeon data if present
+    if (projectData.dungeonData) {
+      dungeonStore.clearAll();
+      if (projectData.dungeonData.doors) {
+        dungeonStore.setDoors(projectData.dungeonData.doors);
+      }
+      if (projectData.dungeonData.annotations) {
+        dungeonStore.setAnnotations(projectData.dungeonData.annotations);
+      }
+      if (projectData.dungeonData.terrainFeatures) {
+        dungeonStore.setTerrainFeatures(projectData.dungeonData.terrainFeatures);
+      }
+      if (projectData.dungeonData.watabouStyle) {
+        dungeonStore.setWatabouStyle(projectData.dungeonData.watabouStyle);
+      }
+      if (projectData.dungeonData.wallEdgeStyle) {
+        dungeonStore.setWallEdgeStyle(projectData.dungeonData.wallEdgeStyle);
+      }
+      if (projectData.dungeonData.wallThickness !== undefined) {
+        dungeonStore.setWallThickness(projectData.dungeonData.wallThickness);
+      }
+      if (projectData.dungeonData.textureScale !== undefined) {
+        dungeonStore.setTextureScale(projectData.dungeonData.textureScale);
+      }
+      if (projectData.dungeonData.lightDirection !== undefined) {
+        dungeonStore.setLightDirection(projectData.dungeonData.lightDirection);
+      }
+      if (projectData.dungeonData.shadowDistance !== undefined) {
+        dungeonStore.setShadowDistance(projectData.dungeonData.shadowDistance);
+      }
+    }
+    
+    toast.success(`Project "${projectData.metadata.name}" loaded successfully`);
+  };
+
   const handleLoadFromStorage = async (projectId: string) => {
     setLoading(true);
     try {
@@ -138,19 +355,32 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       
       if (!projectData) {
         toast.error('Project not found');
+        setLoading(false);
         return;
       }
 
-      // Load data into stores
-      toast.success(`Project "${projectData.metadata.name}" loaded successfully`);
-      
-      console.log('Loaded project data:', projectData);
+      // Show confirmation dialog
+      setPendingLoadData(projectData);
+      setShowLoadConfirm(true);
       
     } catch (error) {
       toast.error(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const confirmLoad = () => {
+    if (pendingLoadData) {
+      applyProjectData(pendingLoadData);
+      setPendingLoadData(null);
+    }
+    setShowLoadConfirm(false);
+  };
+
+  const cancelLoad = () => {
+    setPendingLoadData(null);
+    setShowLoadConfirm(false);
   };
 
   const handleImportFromFile = () => {
@@ -165,14 +395,14 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     try {
       const projectData = await importProjectFromFile(file);
       
-      toast.success(`Project "${projectData.metadata.name}" imported successfully`);
-      
-      console.log('Imported project data:', projectData);
+      // Show confirmation dialog before applying
+      setPendingLoadData(projectData);
+      setShowLoadConfirm(true);
       
     } catch (error) {
       toast.error(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
       setLoading(false);
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -270,10 +500,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               <div className="bg-muted p-3 rounded-lg">
                 <h4 className="font-medium mb-2 text-xs">Current Session:</h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>Tokens: {tokens.length}</div>
-                  <div>Maps: {maps.length}</div>
-                  <div>Regions: {regions.length}</div>
-                  <div>Groups: {groups.length}</div>
+                  <div>Tokens: {sessionStore.tokens.length}</div>
+                  <div>Maps: {mapStore.maps.length}</div>
+                  <div>Regions: {regionStore.regions.length}</div>
+                  <div>Groups: {groupStore.groups.length}</div>
                 </div>
               </div>
 
@@ -434,6 +664,40 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Load Confirmation Dialog */}
+      <AlertDialog open={showLoadConfirm} onOpenChange={setShowLoadConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Load Project?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Loading this project will replace your current session. This action cannot be undone.
+              {pendingLoadData && (
+                <div className="mt-4 p-3 bg-muted rounded-lg">
+                  <div className="font-medium text-foreground mb-2">
+                    {pendingLoadData.metadata.name}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Tokens: {pendingLoadData.tokens.length}</div>
+                    <div>Maps: {pendingLoadData.maps.length}</div>
+                    <div>Regions: {pendingLoadData.regions.length}</div>
+                    <div>Groups: {pendingLoadData.groups.length}</div>
+                  </div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelLoad}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLoad}>
+              Load Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
