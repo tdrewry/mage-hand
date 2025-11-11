@@ -645,12 +645,19 @@ const importSession = (file: File) => {
 ```typescript
 
 export type CardType = 
+
   | 'menu' 
+
   | 'tools' 
+
   | 'roster' 
+
   | 'map-manager'
+
   | 'initiative-tracker'  // Mark as synced
+
   | 'synced-custom';      // New category for future synced cards
+
 ```
 
 **Mark InitiativeTrackerCard** as requiring sync connection
@@ -968,21 +975,37 @@ LOG_LEVEL=info
 ```
 
 src/
+
 ├── lib/
+
 │   ├── syncManager.ts          # Core sync orchestration
+
 │   ├── socketClient.ts         # Socket.io client wrapper
+
 │   ├── syncMiddleware.ts       # Zustand sync middleware
+
 │   └── throttle.ts             # Throttle utility
+
 ├── stores/
+
 │   └── multiplayerStore.ts     # Multiplayer state
+
 ├── types/
+
 │   └── multiplayerEvents.ts    # Event type definitions
+
 ├── components/
+
 │   ├── SessionManager.tsx      # Session create/join UI
+
 │   ├── ConnectedUsersPanel.tsx # User list panel
+
 │   ├── ConnectionIndicator.tsx # Status indicator
+
 │   └── SessionSetupModal.tsx   # Initial setup modal
+
 └── hooks/
+
     └── useMultiplayer.ts       # Multiplayer hook
 
 ```
@@ -992,13 +1015,21 @@ src/
 ```
 
 src/
+
 ├── stores/
+
 │   ├── sessionStore.ts         # Add sync hooks
+
 │   └── initiativeStore.ts      # Add sync hooks
+
 ├── types/
+
 │   └── cardTypes.ts            # Add synced card type
+
 └── components/
+
     └── cards/
+
         └── InitiativeTrackerCard.tsx  # Add sync indicator
 
 ```
