@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { useStorageWarning } from "./hooks/useStorageWarning";
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,9 @@ const App = () => {
   React.useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
+
+  // Monitor storage usage and show warnings
+  useStorageWarning();
 
   return (
   <QueryClientProvider client={queryClient}>
