@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield, Network } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
+import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import {
   AlertDialog,
@@ -274,13 +275,18 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             Share
           </Button>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Players (1)
-          </Button>
+          <ConnectedUsersPanel
+            trigger={
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={!isConnected}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Players ({isConnected ? connectedUsers.length : 0})
+              </Button>
+            }
+          />
         </div>
       </div>
 
