@@ -5,6 +5,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useMapStore } from '@/stores/mapStore';
+import { useFogStore } from '@/stores/fogStore';
 import { hasPermission } from './rolePermissions';
 import type {
   JoinSessionPayload,
@@ -16,6 +17,7 @@ import type {
   SyncTokenPayload,
   SyncInitiativePayload,
   SyncMapPayload,
+  SyncFogPayload,
   TokenUpdatedPayload,
   SessionErrorPayload
 } from '@/types/multiplayerEvents';
@@ -149,6 +151,7 @@ class SyncManager {
     this.socketClient.on('initiative_updated', this.handleInitiativeUpdated.bind(this));
     this.socketClient.on('combat_state_changed', this.handleCombatStateChanged.bind(this));
     this.socketClient.on('map_updated', this.handleMapUpdated.bind(this));
+    this.socketClient.on('fog_updated', this.handleFogUpdated.bind(this));
 
     // User management
     this.socketClient.on('user_list_updated', this.handleUserListUpdated.bind(this));
@@ -239,6 +242,16 @@ class SyncManager {
           maps: data.maps,
           selectedMapId: data.maps[0]?.id || null 
         });
+      }
+    }
+
+    // Apply fog settings
+    if (data.fog) {
+      console.log('🌫️ Applying fog state from server');
+      const fogStore = useFogStore.getState();
+      const set = (fogStore as any)._set || ((fogStore as any).setState);
+      if (set) {
+        set(data.fog);
       }
     }
 
@@ -401,6 +414,41 @@ class SyncManager {
           
           set({ maps: newMaps });
         }
+        break;
+    }
+  }
+
+  private handleFogUpdated(data: SyncFogPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+
+    // Ignore our own updates (already applied locally)
+    if (data.userId === currentUserId) {
+      return;
+    }
+
+    console.log('🌫️ Fog updated from remote:', data.action);
+    const fogStore = useFogStore.getState();
+    const set = (fogStore as any)._set || ((fogStore as any).setState);
+
+    if (!set) {
+      console.error('Cannot update fog store - no setState method');
+      return;
+    }
+
+    switch (data.action) {
+      case 'reveal':
+        if (data.data?.serializedExploredAreas !== undefined) {
+          console.log('  👁️ Applying fog reveals from remote');
+          set({ serializedExploredAreas: data.data.serializedExploredAreas });
+        }
+        break;
+      case 'update':
+        console.log('  ⚙️ Applying fog settings from remote');
+        set(data.data);
+        break;
+      case 'clear':
+        console.log('  🧹 Clearing fog from remote');
+        set({ serializedExploredAreas: '' });
         break;
     }
   }
@@ -602,6 +650,56 @@ class SyncManager {
     };
 
     this.socketClient?.emit('sync_map', payload);
+  }
+
+  // ============= Fog Sync Methods =============
+
+  /**
+   * Sync fog reveals (explored areas)
+   */
+  syncFogReveal(serializedData: string): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncFogPayload = {
+      action: 'reveal',
+      data: { serializedExploredAreas: serializedData },
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_fog', payload);
+  }
+
+  /**
+   * Sync fog settings changes
+   */
+  syncFogSettings(settings: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncFogPayload = {
+      action: 'update',
+      data: settings,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_fog', payload);
+  }
+
+  /**
+   * Clear all fog
+   */
+  syncFogClear(): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncFogPayload = {
+      action: 'clear',
+      data: {},
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_fog', payload);
   }
 }
 

@@ -37,7 +37,7 @@ export interface SyncCombatPayload {
 }
 
 export interface SyncFogPayload {
-  action: 'reveal' | 'conceal' | 'clear';
+  action: 'reveal' | 'conceal' | 'clear' | 'update';
   data: any;
   timestamp: number;
   userId: string;

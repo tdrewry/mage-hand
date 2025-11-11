@@ -61,30 +61,80 @@ export const useFogStore = create<FogState>()(
       outerFadeStart: 0.9,
       
       // Actions
-      setEnabled: (enabled) => set({ enabled }),
+      setEnabled: (enabled) => {
+        set({ enabled });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ enabled });
+        }
+      },
       
-      setRevealAll: (revealAll) => set({ revealAll }),
+      setRevealAll: (revealAll) => {
+        set({ revealAll });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ revealAll });
+        }
+      },
       
-      setVisionRange: (range) => set({ visionRange: Math.max(1, Math.min(50, range)) }),
+      setVisionRange: (range) => {
+        const clampedRange = Math.max(1, Math.min(50, range));
+        set({ visionRange: clampedRange });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ visionRange: clampedRange });
+        }
+      },
       
-      setFogOpacity: (opacity) => set({ fogOpacity: Math.max(0, Math.min(1, opacity)) }),
+      setFogOpacity: (opacity) => {
+        const clampedOpacity = Math.max(0, Math.min(1, opacity));
+        set({ fogOpacity: clampedOpacity });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ fogOpacity: clampedOpacity });
+        }
+      },
       
-      setExploredOpacity: (opacity) => set({ exploredOpacity: Math.max(0, Math.min(1, opacity)) }),
+      setExploredOpacity: (opacity) => {
+        const clampedOpacity = Math.max(0, Math.min(1, opacity));
+        set({ exploredOpacity: clampedOpacity });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ exploredOpacity: clampedOpacity });
+        }
+      },
       
-      setShowExploredAreas: (show) => set({ showExploredAreas: show }),
+      setShowExploredAreas: (show) => {
+        set({ showExploredAreas: show });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ showExploredAreas: show });
+        }
+      },
       
       setSerializedExploredAreas: (data) => {
         set({ serializedExploredAreas: data });
         
         // Sync to multiplayer (fog reveals)
         if (syncManager.isConnected()) {
-          // TODO: Implement fog sync - this will be a large payload
-          // May need throttling or delta sync
-          console.log('[Fog] Fog data changed, sync not yet implemented');
+          syncManager.syncFogReveal(data);
         }
       },
       
-      clearExploredAreas: () => set({ serializedExploredAreas: '' }),
+      clearExploredAreas: () => {
+        set({ serializedExploredAreas: '' });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogClear();
+        }
+      },
       
       resetFog: () => {
         set({
@@ -105,11 +155,50 @@ export const useFogStore = create<FogState>()(
       },
       
       // Gradient actions
-      setUseGradients: (enabled) => set({ useGradients: enabled }),
-      setInnerFadeStart: (value) => set({ innerFadeStart: Math.max(0, Math.min(1, value)) }),
-      setMidpointPosition: (value) => set({ midpointPosition: Math.max(0, Math.min(1, value)) }),
-      setMidpointOpacity: (value) => set({ midpointOpacity: Math.max(0, Math.min(1, value)) }),
-      setOuterFadeStart: (value) => set({ outerFadeStart: Math.max(0, Math.min(1, value)) }),
+      setUseGradients: (enabled) => {
+        set({ useGradients: enabled });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ useGradients: enabled });
+        }
+      },
+      setInnerFadeStart: (value) => {
+        const clampedValue = Math.max(0, Math.min(1, value));
+        set({ innerFadeStart: clampedValue });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ innerFadeStart: clampedValue });
+        }
+      },
+      setMidpointPosition: (value) => {
+        const clampedValue = Math.max(0, Math.min(1, value));
+        set({ midpointPosition: clampedValue });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ midpointPosition: clampedValue });
+        }
+      },
+      setMidpointOpacity: (value) => {
+        const clampedValue = Math.max(0, Math.min(1, value));
+        set({ midpointOpacity: clampedValue });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ midpointOpacity: clampedValue });
+        }
+      },
+      setOuterFadeStart: (value) => {
+        const clampedValue = Math.max(0, Math.min(1, value));
+        set({ outerFadeStart: clampedValue });
+        
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncFogSettings({ outerFadeStart: clampedValue });
+        }
+      },
     }),
     {
       name: 'fog-of-war-store',

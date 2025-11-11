@@ -639,8 +639,31 @@ function handleSyncFog(socket, io, sessionManager, payload) {
 
   const { action, data, timestamp, userId } = payload;
 
+  // Get current fog state
+  let fogState = session.state.fog || {};
+
+  // Handle different actions
+  switch (action) {
+    case 'reveal':
+      // Update explored areas
+      fogState = { ...fogState, ...data };
+      break;
+    case 'update':
+      // Merge settings (partial update)
+      fogState = { ...fogState, ...data };
+      break;
+    case 'clear':
+      // Clear explored areas
+      fogState = { ...fogState, serializedExploredAreas: '' };
+      break;
+    case 'conceal':
+      // Optional: handle concealing specific areas (not currently used)
+      fogState = { ...fogState, ...data };
+      break;
+  }
+
   // Update session fog state
-  sessionManager.updateState(session.sessionId, 'fog', data);
+  sessionManager.updateState(session.sessionId, 'fog', fogState);
 
   // Broadcast to all clients
   io.to(session.sessionId).emit('fog_updated', {
