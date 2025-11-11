@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +39,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const playerViewCard = cards.find((c) => c.type === CardType.MAP);
   const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
+  const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -117,6 +118,23 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 450, height: 650 },
         minSize: { width: 400, height: 550 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleRoleManager = () => {
+    if (roleManagerCard) {
+      setVisibility(roleManagerCard.id, !roleManagerCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.ROLE_MANAGER,
+        title: 'Role Manager',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 600, height: 700 },
+        minSize: { width: 500, height: 600 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -283,6 +301,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Sparkles className="h-4 w-4 mr-2" />
           Vision Profiles
+        </Button>
+
+        <Button 
+          variant={roleManagerCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleRoleManager}
+          className="w-full"
+        >
+          <Shield className="h-4 w-4 mr-2" />
+          Role Manager
         </Button>
       </div>
 

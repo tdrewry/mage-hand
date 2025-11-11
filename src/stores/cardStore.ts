@@ -185,6 +185,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.ROLE_MANAGER]: {
+    title: 'Role Manager',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 600, height: 700 },
+    minSize: { width: 500, height: 600 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({
