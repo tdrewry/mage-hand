@@ -4334,7 +4334,9 @@ export const SimpleTabletop = () => {
         gridHeight: gridHeight,
         label: `T${tokenId.slice(-4)}`,
         ownerId: currentPlayerId,
-        color: tokenColor
+        color: tokenColor,
+        roleId: 'player', // Default to player role
+        isHidden: false
       });
 
       toast.success('Token added to map');

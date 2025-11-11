@@ -62,7 +62,9 @@ export const useGroupStore = create<GroupStore>()(
           gridWidth: 1,
           gridHeight: 1,
           label: 'Token',
-          color: '#ffffff'
+          color: '#ffffff',
+          roleId: 'player',
+          isHidden: false
         }));
 
         const newGroup = createTokenGroup(name, dummyTokens);

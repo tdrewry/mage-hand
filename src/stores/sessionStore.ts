@@ -16,7 +16,8 @@ export interface Token {
   gridWidth: number;  // Width in grid units
   gridHeight: number; // Height in grid units
   label: string;      // Editable label/name
-  ownerId?: string;   // Player who owns this token
+  roleId: string;     // Role this token belongs to
+  isHidden: boolean;  // Whether token is hidden (only visible to privileged roles)
   color?: string;     // Token color (for default tokens)
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
@@ -24,13 +25,17 @@ export interface Token {
   visionRange?: number; // Vision range in grid units (uses global default if not set)
   visionProfileId?: string; // Reference to a vision profile from visionProfileStore
   useGradients?: boolean; // Whether to use gradient edges (can override profile setting)
+  // @deprecated Use roleId instead
+  ownerId?: string;   // Player who owns this token (deprecated, for backward compatibility)
 }
 
 export interface Player {
   id: string;
   name: string;
-  role: 'dm' | 'player';
+  roleIds: string[]; // Array of role IDs this player is assigned to
   isConnected: boolean;
+  // @deprecated Use roleIds instead
+  role?: 'dm' | 'player'; // Deprecated, for backward compatibility
 }
 
 export type TokenVisibility = 'all' | 'owned' | 'dm-only';
@@ -175,9 +180,11 @@ export const useSessionStore = create<SessionState>()(
       setCurrentPlayer: (playerId, role) => {
         set((state) => {
           const existingPlayer = state.players.find(p => p.id === playerId);
+          // Convert old role to roleIds array
+          const roleIds = role === 'dm' ? ['dm'] : ['player'];
           const updatedPlayers = existingPlayer 
-            ? state.players.map(p => p.id === playerId ? { ...p, role, isConnected: true } : p)
-            : [...state.players, { id: playerId, name: `${role === 'dm' ? 'DM' : 'Player'} ${playerId.slice(-4)}`, role, isConnected: true }];
+            ? state.players.map(p => p.id === playerId ? { ...p, roleIds, role, isConnected: true } : p)
+            : [...state.players, { id: playerId, name: `${role === 'dm' ? 'DM' : 'Player'} ${playerId.slice(-4)}`, roleIds, role, isConnected: true }];
           
           return {
             currentPlayerId: playerId,

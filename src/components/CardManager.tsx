@@ -72,6 +72,8 @@ export function CardManager({
       gridHeight,
       label: `Token ${tokenId.slice(-4)}`,
       color,
+      roleId: 'player', // Default to player role
+      isHidden: false,
     };
     addToken(newToken);
   };
