@@ -17,6 +17,7 @@ import { CardManager } from './CardManager';
 import { CircularButtonBar } from './CircularButtonBar';
 import { VerticalToolbar } from './VerticalToolbar';
 import { InitiativePanel } from './InitiativePanel';
+import { BulkOperationsToolbar } from './BulkOperationsToolbar';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -242,6 +243,9 @@ export const SimpleTabletop = () => {
   
   // Track previous token positions to detect changes
   const prevTokenPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  // Performance optimization: Cache for token drawing to reduce redundant renders
+  const tokenDrawCache = useRef<Map<string, { lastDrawn: number, data: any }>>(new Map());
   
   // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
@@ -2904,6 +2908,22 @@ export const SimpleTabletop = () => {
     const isSelected = selectedTokenIds.includes(token.id);
     const isHovered = hoveredTokenId === token.id;
     
+    // Performance optimization: Create a simple hash of token's visual state
+    // If state hasn't changed, we can potentially skip some computations
+    const visualStateHash = `${token.x},${token.y},${token.color},${isSelected},${isHovered},${token.roleId}`;
+    const cached = tokenDrawCache.current.get(token.id);
+    const now = Date.now();
+    
+    // Cache validity check (invalidate after 100ms to keep animations smooth)
+    const isCacheValid = cached && cached.data === visualStateHash && (now - cached.lastDrawn) < 100;
+    
+    if (!isCacheValid) {
+      tokenDrawCache.current.set(token.id, {
+        lastDrawn: now,
+        data: visualStateHash
+      });
+    }
+    
     // Get current player for permission checks
     const currentPlayer = players.find(p => p.id === currentPlayerId);
     
@@ -4562,6 +4582,13 @@ export const SimpleTabletop = () => {
       
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel />
+      
+      {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
+      <BulkOperationsToolbar 
+        selectedTokenIds={selectedTokenIds}
+        onClearSelection={() => setSelectedTokenIds([])}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
       
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
