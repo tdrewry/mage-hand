@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useStorageWarning } from "./hooks/useStorageWarning";
+import { ConnectionIndicator } from "./components/ConnectionIndicator";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <ConnectionIndicator />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
