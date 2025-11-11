@@ -169,7 +169,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   
   return (
     <>
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[997] bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3">
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[999] bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground px-2">
             {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''} selected
