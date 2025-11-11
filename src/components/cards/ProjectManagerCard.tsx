@@ -63,7 +63,9 @@ import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useSessionTemplates } from '../../hooks/useSessionTemplates';
+import { useSessionHistory } from '../../hooks/useSessionHistory';
 import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
+import { SessionHistoryModal } from '../SessionHistoryModal';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
@@ -92,6 +94,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [templateDescription, setTemplateDescription] = useState('');
   const [showTemplateConfirm, setShowTemplateConfirm] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<SessionTemplate | null>(null);
+
+  // History
+  const [selectedProjectForHistory, setSelectedProjectForHistory] = useState<string | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const historyHook = useSessionHistory(selectedProjectForHistory || undefined);
 
   // Store hooks - for reading
   const sessionStore = useSessionStore();
@@ -222,6 +229,33 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
+  const handleShowHistory = (projectId: string) => {
+    setSelectedProjectForHistory(projectId);
+    setShowHistoryModal(true);
+  };
+
+  const handleRestoreVersion = (versionId: string) => {
+    const version = historyHook.getVersion(versionId);
+    if (!version) {
+      toast.error('Version not found');
+      return;
+    }
+
+    // Set pending load data and show confirmation
+    setPendingLoadData(version.projectData);
+    setShowLoadConfirm(true);
+    setShowHistoryModal(false);
+  };
+
+  const handleDeleteVersion = (versionId: string) => {
+    try {
+      historyHook.deleteVersion(versionId);
+      toast.success('Version deleted successfully');
+    } catch (error) {
+      toast.error(`Failed to delete version: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const createCurrentProjectData = (): ProjectData => ({
     metadata: createProjectMetadata(
       projectName || `Project ${Date.now()}`,
@@ -292,6 +326,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     try {
       const projectData = createCurrentProjectData();
       saveProjectToStorage(projectData);
+      
+      // Save version to history
+      const sessionHistory = useSessionHistory(projectData.metadata.id);
+      sessionHistory.saveVersion(projectData, 'Manual save');
       
       toast.success('Project saved successfully');
       
@@ -824,6 +862,15 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleShowHistory(project.id)}
+                              className="text-xs"
+                              title="View version history"
+                            >
+                              <Clock className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleLoadFromStorage(project.id)}
                               disabled={loading}
                               className="text-xs"
@@ -1124,6 +1171,16 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Session History Modal */}
+      <SessionHistoryModal
+        open={showHistoryModal}
+        onOpenChange={setShowHistoryModal}
+        versions={historyHook.history?.versions || []}
+        onRestore={handleRestoreVersion}
+        onDelete={handleDeleteVersion}
+        onCompare={historyHook.compare}
+      />
     </div>
   );
 };
