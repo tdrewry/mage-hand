@@ -1390,7 +1390,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       </Tabs>
 
       {/* Load Confirmation Dialog */}
-      <AlertDialog open={showLoadConfirm} onOpenChange={setShowLoadConfirm}>
+      {(() => { console.log('🎭 Rendering AlertDialog, showLoadConfirm:', showLoadConfirm, 'pendingLoadData:', !!pendingLoadData); return null; })()}
+      <AlertDialog open={showLoadConfirm} onOpenChange={(open) => {
+        console.log('🎭 AlertDialog onOpenChange called:', open);
+        setShowLoadConfirm(open);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
