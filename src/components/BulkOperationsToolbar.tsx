@@ -186,7 +186,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                   Assign Role
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-48">
+              <DropdownMenuContent className="w-48 z-[1100] bg-popover">
                 {roles.map((role) => (
                   <DropdownMenuItem 
                     key={role.id}
@@ -215,7 +215,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                   Visibility
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent className="z-[1100] bg-popover">
                 <DropdownMenuItem onClick={() => handleToggleHidden(true)}>
                   <EyeOff className="h-4 w-4 mr-2" />
                   Hide All
@@ -236,7 +236,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                 Vision
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56">
+            <DropdownMenuContent className="w-56 z-[1100] bg-popover">
               <DropdownMenuItem onClick={() => handleToggleVision(true)}>
                 Enable Vision
               </DropdownMenuItem>
