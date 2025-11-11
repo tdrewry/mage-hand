@@ -11,6 +11,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { getTokensForVisionCalculation } from '@/lib/visionPermissions';
+import { canSeeToken } from '@/lib/rolePermissions';
 import { getFogScope, computeFogMasks, visibilityPolygonToPaperPath, addVisibleToExplored, createEmptyExplored } from '@/lib/fogGeometry';
 import { computeTokenVisibilityPaper } from '@/lib/fogOfWar';
 import { regionsToSegments } from '@/lib/visibilityEngine';
@@ -56,10 +57,7 @@ export const MapCardContent = () => {
   const { regions } = useRegionStore();
   const fogSettings = useFogStore();
   const { roles } = useRoleStore();
-  const { visibilitySnapshot, isConnected } = useMultiplayerStore(state => ({
-    visibilitySnapshot: state.visibilitySnapshot,
-    isConnected: state.connectionStatus === 'connected'
-  }));
+  const isConnected = useMultiplayerStore(state => state.connectionStatus === 'connected');
   const { lights, globalAmbientLight, shadowIntensity } = useLightStore();
   const { 
     renderingMode, 
@@ -359,27 +357,13 @@ export const MapCardContent = () => {
       }
     }
 
-    // Filter and draw tokens based on visibility
+    // Filter and draw tokens based on role permissions
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
     const visibleTokens = tokens.filter(token => {
       // In play mode, apply visibility filtering
       if (renderingMode === 'play') {
-        // In multiplayer, use synced visibility data
-        if (isConnected && visibilitySnapshot) {
-          const tokenVisData = visibilitySnapshot.tokens.find(t => t.tokenId === token.id);
-          if (tokenVisData) {
-            // Check if current player can see this token
-            return tokenVisData.visibleToPlayers.includes(currentPlayerId || '');
-          }
-          // If no visibility data, assume visible (fallback)
-          return true;
-        }
-        
-        // Single player mode - use local visibility rules
-        // Check ownership
-        if (tokenVisibility === 'owned' && token.ownerId !== currentPlayerId) {
-          return false;
-        }
-        if (tokenVisibility === 'dm-only') {
+        // Use role-based permissions for all modes (single and multiplayer)
+        if (currentPlayer && !canSeeToken(token, currentPlayer, roles)) {
           return false;
         }
 

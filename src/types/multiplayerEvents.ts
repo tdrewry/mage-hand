@@ -43,15 +43,11 @@ export interface SyncFogPayload {
   userId: string;
 }
 
-export interface SyncVisibilityPayload {
-  action: 'update';
-  data: {
-    tokens: Array<{
-      tokenId: string;
-      visibleToPlayers: string[];
-      hiddenFromPlayers: string[];
-    }>;
-  };
+export interface SyncLightPayload {
+  action: 'add' | 'update' | 'remove' | 'toggle';
+  lightId?: string;
+  light?: any; // Full light for 'add'
+  data?: any; // Partial data for updates
   timestamp: number;
   userId: string;
 }
@@ -116,17 +112,10 @@ export interface FullStateSyncPayload {
     roundNumber: number;
     initiativeOrder: any[];
   };
-  maps?: any[]; // Map data
-  regions?: any[]; // Region data
+  maps?: any[];
+  regions?: any[];
   fog?: any;
-  visibility?: {
-    tokens: Array<{
-      tokenId: string;
-      visibleToPlayers: string[];
-      hiddenFromPlayers: string[];
-    }>;
-    timestamp: number;
-  };
+  lights?: any[];
   roles?: any[];
   players: ConnectedUser[];
   sessionMetadata: {
@@ -189,7 +178,7 @@ export const ClientEvents = {
   SYNC_ROLE: 'sync_role',
   SYNC_MAP: 'sync_map',
   SYNC_REGION: 'sync_region',
-  SYNC_VISIBILITY: 'sync_visibility',
+  SYNC_LIGHT: 'sync_light',
   
   // Requests
   REQUEST_FULL_SYNC: 'request_full_sync',
@@ -217,7 +206,8 @@ export const ServerEvents = {
   ROLE_ASSIGNED: 'role_assigned',
   MAP_UPDATED: 'map_updated',
   REGION_UPDATED: 'region_updated',
-  VISIBILITY_UPDATED: 'visibility_updated',
+  LIGHT_UPDATED: 'light_updated',
+  ROLE_UPDATED: 'role_updated',
   
   // User management
   USER_LIST_UPDATED: 'user_list_updated',

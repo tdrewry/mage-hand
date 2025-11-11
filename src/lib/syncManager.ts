@@ -6,6 +6,8 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useFogStore } from '@/stores/fogStore';
+import { useRegionStore } from '@/stores/regionStore';
+import { useLightStore } from '@/stores/lightStore';
 import { hasPermission } from './rolePermissions';
 import type {
   JoinSessionPayload,
@@ -18,7 +20,9 @@ import type {
   SyncInitiativePayload,
   SyncMapPayload,
   SyncFogPayload,
-  SyncVisibilityPayload,
+  SyncRegionPayload,
+  SyncLightPayload,
+  SyncRolePayload,
   TokenUpdatedPayload,
   SessionErrorPayload
 } from '@/types/multiplayerEvents';
@@ -153,7 +157,9 @@ class SyncManager {
     this.socketClient.on('combat_state_changed', this.handleCombatStateChanged.bind(this));
     this.socketClient.on('map_updated', this.handleMapUpdated.bind(this));
     this.socketClient.on('fog_updated', this.handleFogUpdated.bind(this));
-    this.socketClient.on('visibility_updated', this.handleVisibilityUpdated.bind(this));
+    this.socketClient.on('region_updated', this.handleRegionUpdated.bind(this));
+    this.socketClient.on('light_updated', this.handleLightUpdated.bind(this));
+    this.socketClient.on('role_updated', this.handleRoleUpdated.bind(this));
 
     // User management
     this.socketClient.on('user_list_updated', this.handleUserListUpdated.bind(this));
@@ -257,19 +263,31 @@ class SyncManager {
       }
     }
 
-    // Apply visibility
-    if (data.visibility) {
-      console.log('👁️ Applying visibility state from server');
-      // Add lastUpdated to each token visibility entry if not present
-      const tokensWithTimestamp = data.visibility.tokens.map(t => ({
-        ...t,
-        lastUpdated: (t as any).lastUpdated || data.visibility!.timestamp
-      }));
-      
-      useMultiplayerStore.getState().setVisibilitySnapshot({
-        tokens: tokensWithTimestamp,
-        timestamp: data.visibility.timestamp
-      });
+    // Apply regions
+    if (data.regions && data.regions.length > 0) {
+      console.log('🗺️ Applying regions from server');
+      const regionStore = useRegionStore.getState();
+      regionStore.setRegions(data.regions);
+    }
+
+    // Apply lights
+    if (data.lights) {
+      console.log('💡 Applying lights from server');
+      const lightStore = useLightStore.getState();
+      const set = (lightStore as any)._set || ((lightStore as any).setState);
+      if (set) {
+        set({ lights: data.lights });
+      }
+    }
+
+    // Apply roles
+    if (data.roles && data.roles.length > 0) {
+      console.log('🔐 Applying roles from server');
+      const roleStore = useRoleStore.getState();
+      const set = (roleStore as any)._set || ((roleStore as any).setState);
+      if (set) {
+        set({ roles: data.roles });
+      }
     }
 
     // Apply connected users
@@ -466,26 +484,60 @@ class SyncManager {
     }
   }
 
-  private handleVisibilityUpdated(data: SyncVisibilityPayload): void {
+  private handleRegionUpdated(data: SyncRegionPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
+    if (data.userId === currentUserId) return;
 
-    // Ignore our own updates (already applied locally)
-    if (data.userId === currentUserId) {
-      return;
+    console.log('🗺️ Region updated from remote:', data.action);
+    const regionStore = useRegionStore.getState();
+
+    switch (data.action) {
+      case 'add':
+        if (data.region) regionStore.addRegion(data.region);
+        break;
+      case 'update':
+        if (data.regionId && data.data) regionStore.updateRegion(data.regionId, data.data);
+        break;
+      case 'remove':
+        if (data.regionId) regionStore.removeRegion(data.regionId);
+        break;
+      case 'clear':
+        regionStore.clearRegions();
+        break;
     }
+  }
 
-    console.log('👁️ Visibility updated from remote');
+  private handleLightUpdated(data: SyncLightPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    if (data.userId === currentUserId) return;
+
+    console.log('💡 Light updated from remote:', data.action);
+    const lightStore = useLightStore.getState();
+
+    switch (data.action) {
+      case 'add':
+        if (data.light) lightStore.addLight(data.light);
+        break;
+      case 'update':
+        if (data.lightId && data.data) lightStore.updateLight(data.lightId, data.data);
+        break;
+      case 'remove':
+        if (data.lightId) lightStore.removeLight(data.lightId);
+        break;
+      case 'toggle':
+        if (data.lightId) lightStore.toggleLight(data.lightId);
+        break;
+    }
+  }
+
+  private handleRoleUpdated(data: SyncRolePayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    if (data.senderId === currentUserId) return;
+
+    console.log('🔐 Role updated from remote:', data.action);
     
-    // Add lastUpdated to each token visibility entry
-    const tokensWithTimestamp = data.data.tokens.map(t => ({
-      ...t,
-      lastUpdated: data.timestamp
-    }));
-    
-    useMultiplayerStore.getState().setVisibilitySnapshot({
-      tokens: tokensWithTimestamp,
-      timestamp: data.timestamp
-    });
+    // Update the user's roles in the multiplayer store
+    useMultiplayerStore.getState().updateUserRoles(data.userId, data.roleIds);
   }
 
   // ============= Sync Methods (Local → Server) =============
@@ -737,26 +789,117 @@ class SyncManager {
     this.socketClient?.emit('sync_fog', payload);
   }
 
-  // ============= Visibility Sync Methods =============
+  // ============= Region Sync Methods =============
 
-  /**
-   * Sync token visibility
-   */
-  syncVisibility(visibilityData: Array<{
-    tokenId: string;
-    visibleToPlayers: string[];
-    hiddenFromPlayers: string[];
-  }>): void {
+  syncRegionAdd(region: any): void {
     if (!this.canSync()) return;
 
-    const payload: SyncVisibilityPayload = {
-      action: 'update',
-      data: { tokens: visibilityData },
+    const payload: SyncRegionPayload = {
+      action: 'add',
+      region,
       timestamp: Date.now(),
       userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
-    this.socketClient?.emit('sync_visibility', payload);
+    this.socketClient?.emit('sync_region', payload);
+  }
+
+  syncRegionUpdate(regionId: string, data: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncRegionPayload = {
+      action: 'update',
+      regionId,
+      data,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_region', payload);
+  }
+
+  syncRegionRemove(regionId: string): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncRegionPayload = {
+      action: 'remove',
+      regionId,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_region', payload);
+  }
+
+  // ============= Light Sync Methods =============
+
+  syncLightAdd(light: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncLightPayload = {
+      action: 'add',
+      light,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_light', payload);
+  }
+
+  syncLightUpdate(lightId: string, data: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncLightPayload = {
+      action: 'update',
+      lightId,
+      data,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_light', payload);
+  }
+
+  syncLightRemove(lightId: string): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncLightPayload = {
+      action: 'remove',
+      lightId,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_light', payload);
+  }
+
+  syncLightToggle(lightId: string): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncLightPayload = {
+      action: 'toggle',
+      lightId,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_light', payload);
+  }
+
+  // ============= Role Sync Methods =============
+
+  syncRoleAssign(userId: string, roleIds: string[]): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncRolePayload = {
+      action: 'assign',
+      userId,
+      roleIds,
+      timestamp: Date.now(),
+      senderId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_role', payload);
   }
 }
 

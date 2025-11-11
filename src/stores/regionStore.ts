@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface CanvasRegion {
   id: string;
@@ -62,6 +63,9 @@ export const useRegionStore = create<RegionStore>()(
         set((state) => ({
           regions: [...state.regions, newRegion],
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncRegionAdd(newRegion);
       },
 
       updateRegion: (id, updates) => {
@@ -70,12 +74,18 @@ export const useRegionStore = create<RegionStore>()(
             region.id === id ? { ...region, ...updates } : region
           ),
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncRegionUpdate(id, updates);
       },
 
       removeRegion: (id) => {
         set((state) => ({
           regions: state.regions.filter((region) => region.id !== id),
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncRegionRemove(id);
       },
 
       clearRegions: () => {

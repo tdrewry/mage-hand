@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useStorageWarning } from "./hooks/useStorageWarning";
 import { useAutoReconnect } from "./hooks/useAutoReconnect";
-import { useVisibilitySync } from "./hooks/useVisibilitySync";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 
 const queryClient = new QueryClient();
@@ -24,9 +23,6 @@ const App = () => {
 
   // Auto-reconnect to multiplayer session on page load
   useAutoReconnect();
-
-  // Auto-sync token visibility in multiplayer sessions
-  useVisibilitySync();
 
   return (
   <QueryClientProvider client={queryClient}>

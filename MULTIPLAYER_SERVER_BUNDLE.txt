@@ -46,7 +46,8 @@ const {
   handleSyncFog,
   handleSyncRole,
   handleSyncMap,
-  handleSyncVisibility,
+  handleSyncRegion,
+  handleSyncLight,
   handleRequestFullSync,
   handleKickUser
 } = require('./eventHandlers');
@@ -109,8 +110,12 @@ io.on('connection', (socket) => {
     handleSyncMap(socket, io, sessionManager, payload)
   );
 
-  socket.on('sync_visibility', (payload) => 
-    handleSyncVisibility(socket, io, sessionManager, payload)
+  socket.on('sync_region', (payload) => 
+    handleSyncRegion(socket, io, sessionManager, payload)
+  );
+
+  socket.on('sync_light', (payload) => 
+    handleSyncLight(socket, io, sessionManager, payload)
   );
 
   // Additional Events
@@ -170,12 +175,10 @@ class SessionManager {
           initiativeOrder: []
         },
         maps: [],
+        regions: [],
+        lights: [],
         fog: null,
-        roles: [],
-        visibility: {
-          tokens: [],
-          timestamp: Date.now()
-        }
+        roles: []
       }
     };
 
@@ -304,6 +307,12 @@ class SessionManager {
         break;
       case 'maps':
         session.state.maps = data;
+        break;
+      case 'regions':
+        session.state.regions = data;
+        break;
+      case 'lights':
+        session.state.lights = data;
         break;
       case 'fog':
         session.state.fog = data;
@@ -447,6 +456,8 @@ function handleJoinSession(socket, io, sessionManager, payload) {
     tokens: session.state.tokens,
     initiative: session.state.initiative,
     maps: session.state.maps,
+    regions: session.state.regions,
+    lights: session.state.lights,
     fog: session.state.fog,
     roles: session.state.roles,
     players: users,
@@ -789,29 +800,136 @@ function handleSyncMap(socket, io, sessionManager, payload) {
 }
 
 /**
- * Handle visibility synchronization
+ * Handle region synchronization
  */
-function handleSyncVisibility(socket, io, sessionManager, payload) {
+function handleSyncRegion(socket, io, sessionManager, payload) {
   const session = sessionManager.getSessionBySocket(socket.id);
   if (!session) return;
 
-  const { action, data, timestamp, userId } = payload;
+  const { action, regionId, region, data, timestamp, userId } = payload;
 
-  // Update session visibility state
-  const visibility = {
-    tokens: data.tokens,
-    timestamp
-  };
+  let regions = [...session.state.regions];
   
-  sessionManager.updateState(session.sessionId, 'visibility', visibility);
+  switch (action) {
+    case 'add':
+      regions.push(region);
+      sessionManager.updateState(session.sessionId, 'regions', regions);
+      
+      io.to(session.sessionId).emit('region_updated', {
+        action,
+        region,
+        timestamp,
+        userId
+      });
+      break;
 
-  // Broadcast to all clients
-  io.to(session.sessionId).emit('visibility_updated', {
-    action,
-    data,
-    timestamp,
-    userId
-  });
+    case 'remove':
+      regions = regions.filter(r => r.id !== regionId);
+      sessionManager.updateState(session.sessionId, 'regions', regions);
+      
+      io.to(session.sessionId).emit('region_updated', {
+        action,
+        regionId,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'update':
+      const regionIndex = regions.findIndex(r => r.id === regionId);
+      if (regionIndex !== -1) {
+        regions[regionIndex] = { ...regions[regionIndex], ...data };
+        sessionManager.updateState(session.sessionId, 'regions', regions);
+      }
+      
+      io.to(session.sessionId).emit('region_updated', {
+        action,
+        regionId,
+        data,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'clear':
+      sessionManager.updateState(session.sessionId, 'regions', []);
+      
+      io.to(session.sessionId).emit('region_updated', {
+        action,
+        timestamp,
+        userId
+      });
+      break;
+  }
+}
+
+/**
+ * Handle light synchronization
+ */
+function handleSyncLight(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, lightId, light, data, timestamp, userId } = payload;
+
+  let lights = [...session.state.lights];
+  
+  switch (action) {
+    case 'add':
+      lights.push(light);
+      sessionManager.updateState(session.sessionId, 'lights', lights);
+      
+      io.to(session.sessionId).emit('light_updated', {
+        action,
+        light,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'remove':
+      lights = lights.filter(l => l.id !== lightId);
+      sessionManager.updateState(session.sessionId, 'lights', lights);
+      
+      io.to(session.sessionId).emit('light_updated', {
+        action,
+        lightId,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'update':
+      const lightIndex = lights.findIndex(l => l.id === lightId);
+      if (lightIndex !== -1) {
+        lights[lightIndex] = { ...lights[lightIndex], ...data };
+        sessionManager.updateState(session.sessionId, 'lights', lights);
+      }
+      
+      io.to(session.sessionId).emit('light_updated', {
+        action,
+        lightId,
+        data,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'toggle':
+      const toggleIndex = lights.findIndex(l => l.id === lightId);
+      if (toggleIndex !== -1) {
+        lights[toggleIndex].enabled = !lights[toggleIndex].enabled;
+        sessionManager.updateState(session.sessionId, 'lights', lights);
+      }
+      
+      io.to(session.sessionId).emit('light_updated', {
+        action,
+        lightId,
+        timestamp,
+        userId
+      });
+      break;
+  }
 }
 
 /**
@@ -827,8 +945,9 @@ function handleRequestFullSync(socket, sessionManager) {
     tokens: session.state.tokens,
     initiative: session.state.initiative,
     maps: session.state.maps,
+    regions: session.state.regions,
+    lights: session.state.lights,
     fog: session.state.fog,
-    visibility: session.state.visibility,
     roles: session.state.roles,
     players: users,
     sessionMetadata: {
@@ -892,7 +1011,8 @@ module.exports = {
   handleSyncFog,
   handleSyncRole,
   handleSyncMap,
-  handleSyncVisibility,
+  handleSyncRegion,
+  handleSyncLight,
   handleRequestFullSync,
   handleKickUser
 };

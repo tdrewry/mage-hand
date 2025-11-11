@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectionStatus } from '@/lib/socketClient';
 import type { ConnectedUser } from '@/types/multiplayerEvents';
-import type { VisibilitySnapshot } from '@/lib/visibilitySync';
 
 export interface SessionInfo {
   sessionCode: string;
@@ -28,9 +27,6 @@ export interface MultiplayerState {
   lastSyncTimestamp: number;
   syncErrors: string[];
   
-  // Visibility state
-  visibilitySnapshot: VisibilitySnapshot | null;
-  
   // Actions
   setServerUrl: (url: string) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -45,7 +41,6 @@ export interface MultiplayerState {
   updateLastSyncTimestamp: () => void;
   addSyncError: (error: string) => void;
   clearSyncErrors: () => void;
-  setVisibilitySnapshot: (snapshot: VisibilitySnapshot | null) => void;
   reset: () => void;
 }
 
@@ -65,7 +60,6 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
-      visibilitySnapshot: null,
       
       // Actions
       setServerUrl: (url) => {
@@ -139,10 +133,6 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         set({ syncErrors: [] });
       },
       
-      setVisibilitySnapshot: (snapshot) => {
-        set({ visibilitySnapshot: snapshot });
-      },
-      
       reset: () => {
         set({
           isConnected: false,
@@ -152,8 +142,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
           currentUserId: null,
           isSyncing: false,
           lastSyncTimestamp: 0,
-          syncErrors: [],
-          visibilitySnapshot: null
+          syncErrors: []
         });
       }
     }),

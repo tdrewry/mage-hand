@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface LightSource {
   id: string;
@@ -46,6 +47,9 @@ export const useLightStore = create<LightState>()(
           lights: [...state.lights, newLight],
         }));
         
+        // Sync to multiplayer
+        syncManager.syncLightAdd(newLight);
+        
         return id;
       },
       
@@ -55,12 +59,18 @@ export const useLightStore = create<LightState>()(
             light.id === id ? { ...light, ...updates } : light
           ),
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncLightUpdate(id, updates);
       },
       
       removeLight: (id) => {
         set((state) => ({
           lights: state.lights.filter((light) => light.id !== id),
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncLightRemove(id);
       },
       
       toggleLight: (id) => {
@@ -69,6 +79,9 @@ export const useLightStore = create<LightState>()(
             light.id === id ? { ...light, enabled: !light.enabled } : light
           ),
         }));
+        
+        // Sync to multiplayer
+        syncManager.syncLightToggle(id);
       },
       
       setGlobalAmbientLight: (level) => {
