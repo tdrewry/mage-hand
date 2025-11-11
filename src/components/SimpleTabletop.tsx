@@ -59,6 +59,8 @@ import { renderFogLayers } from '../lib/fogRenderer';
 import { renderFogWithGradients, renderFogWithHardEdges } from '../lib/fogGradientRenderer';
 import { getDefaultGradientSettings } from '../lib/fogGradientHelper';
 import { useVisionProfileStore } from '../stores/visionProfileStore';
+import { useRoleStore } from '../stores/roleStore';
+import { getTokensForVisionCalculation } from '../lib/visionPermissions';
 import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
@@ -201,6 +203,9 @@ export const SimpleTabletop = () => {
   // Vision profiles store
   const { getProfile } = useVisionProfileStore();
   
+  // Role store
+  const { roles } = useRoleStore();
+  
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
@@ -288,6 +293,7 @@ export const SimpleTabletop = () => {
     updateTokenColor,
     removeToken,
     currentPlayerId,
+    players,
   } = useSessionStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
@@ -479,8 +485,21 @@ export const SimpleTabletop = () => {
           if (!fogScopeRef.current) return;
           fogScopeRef.current.activate();
           
-          // Identify which tokens have moved (only consider tokens with vision)
-          const tokensWithVision = tokens.filter(t => t.hasVision !== false);
+          // Get current player to filter tokens by role permissions
+          const currentPlayer = players.find(p => p.id === currentPlayerId);
+          if (!currentPlayer || !wallGeometry) return;
+          
+          // Filter tokens based on role permissions and hostility
+          // This replaces simple ownership-based filtering with role-based logic
+          const tokensForVision = getTokensForVisionCalculation(
+            tokens,
+            currentPlayer,
+            roles,
+            wallGeometry.wallSegments
+          );
+          
+          // Only consider tokens with vision enabled
+          const tokensWithVision = tokensForVision.filter(t => t.hasVision !== false);
           const movedTokens: typeof tokens = [];
           const currentTokenIds = new Set(tokensWithVision.map(t => t.id));
           
