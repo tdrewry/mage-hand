@@ -518,6 +518,43 @@ export const deleteTemplate = (id: string): void => {
   }
 };
 
+// Get the size of a specific template
+export const getTemplateSize = (id: string): number => {
+  try {
+    const template = getTemplate(id);
+    if (!template) return 0;
+    return new Blob([JSON.stringify(template)]).size / 1024; // Return size in KB
+  } catch (error) {
+    console.error('Failed to get template size:', error);
+    return 0;
+  }
+};
+
+// Get total storage size of all custom templates
+export const getTotalTemplatesSize = (): number => {
+  try {
+    const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+    if (!stored) return 0;
+    return new Blob([stored]).size / 1024; // Return size in KB
+  } catch (error) {
+    console.error('Failed to get templates size:', error);
+    return 0;
+  }
+};
+
+// Clear all custom templates
+export const clearAllCustomTemplates = (): number => {
+  try {
+    const customTemplates = getCustomTemplates();
+    const count = customTemplates.length;
+    localStorage.removeItem(TEMPLATES_STORAGE_KEY);
+    return count;
+  } catch (error) {
+    console.error('Failed to clear custom templates:', error);
+    return 0;
+  }
+};
+
 // Create a template from current session data
 export const createTemplateFromSession = (
   name: string,

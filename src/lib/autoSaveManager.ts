@@ -286,6 +286,31 @@ export class AutoSaveManager {
     }
   }
 
+  getAutoSaveSize(): number {
+    try {
+      const data = localStorage.getItem(AUTO_SAVE_KEY);
+      if (!data) return 0;
+      return new Blob([data]).size / 1024; // Return size in KB
+    } catch (error) {
+      console.error('Failed to get auto-save size:', error);
+      return 0;
+    }
+  }
+
+  clearOldAutoSaves(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): void {
+    try {
+      const lastSave = this.getLastSaveTime();
+      const now = Date.now();
+      
+      if (lastSave > 0 && (now - lastSave) > maxAgeMs) {
+        this.clearAutoSave();
+        console.log('Cleared old auto-save data');
+      }
+    } catch (error) {
+      console.error('Failed to clear old auto-saves:', error);
+    }
+  }
+
   forceAutoSave(): void {
     this.hasChanges = true;
     this.performSave();

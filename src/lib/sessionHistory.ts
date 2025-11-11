@@ -301,3 +301,94 @@ export const getTotalHistoryStorageSize = (): number => {
   
   return totalSize;
 };
+
+// Get size of a specific version
+export const getVersionSize = (projectId: string, versionId: string): number => {
+  try {
+    const version = getProjectVersion(projectId, versionId);
+    if (!version) return 0;
+    return new Blob([JSON.stringify(version)]).size / 1024;
+  } catch (error) {
+    console.error('Failed to get version size:', error);
+    return 0;
+  }
+};
+
+// Remove old versions across all projects (keep only the N most recent per project)
+export const trimOldHistoryVersions = (maxVersionsPerProject: number = MAX_VERSIONS_PER_PROJECT): number => {
+  let removedCount = 0;
+  
+  try {
+    const histories = getAllProjectHistories();
+    
+    for (const history of histories) {
+      if (history.versions.length > maxVersionsPerProject) {
+        const versionsToKeep = history.versions.slice(0, maxVersionsPerProject);
+        const trimmedHistory: ProjectHistory = {
+          ...history,
+          versions: versionsToKeep,
+        };
+        
+        localStorage.setItem(getHistoryKey(history.projectId), JSON.stringify(trimmedHistory));
+        removedCount += history.versions.length - maxVersionsPerProject;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to trim old history versions:', error);
+  }
+  
+  return removedCount;
+};
+
+// Remove versions older than a specific date across all projects
+export const clearOldHistoryVersions = (maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): number => {
+  let removedCount = 0;
+  const cutoffDate = Date.now() - maxAgeMs;
+  
+  try {
+    const histories = getAllProjectHistories();
+    
+    for (const history of histories) {
+      const filteredVersions = history.versions.filter(version => {
+        const versionDate = new Date(version.timestamp).getTime();
+        return versionDate >= cutoffDate;
+      });
+      
+      if (filteredVersions.length !== history.versions.length) {
+        removedCount += history.versions.length - filteredVersions.length;
+        
+        if (filteredVersions.length === 0) {
+          localStorage.removeItem(getHistoryKey(history.projectId));
+        } else {
+          const updatedHistory: ProjectHistory = {
+            ...history,
+            versions: filteredVersions,
+          };
+          localStorage.setItem(getHistoryKey(history.projectId), JSON.stringify(updatedHistory));
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to clear old history versions:', error);
+  }
+  
+  return removedCount;
+};
+
+// Clear all history across all projects
+export const clearAllHistory = (): number => {
+  let removedCount = 0;
+  
+  try {
+    const histories = getAllProjectHistories();
+    
+    for (const history of histories) {
+      localStorage.removeItem(getHistoryKey(history.projectId));
+      removedCount += history.versions.length;
+    }
+  } catch (error) {
+    console.error('Failed to clear all history:', error);
+  }
+  
+  return removedCount;
+};
