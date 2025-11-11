@@ -172,6 +172,15 @@ class SyncManager {
     multiplayerStore.setCurrentUserId(data.yourUserId);
     multiplayerStore.setConnectedUsers(data.users);
 
+    // If this is the first user (session creator), sync local maps to server
+    if (data.users.length === 1) {
+      console.log('📤 Syncing initial map state to server');
+      const mapStore = useMapStore.getState();
+      mapStore.maps.forEach(map => {
+        this.syncMapAdd(map);
+      });
+    }
+
     // Request full state sync
     this.socketClient?.emit('request_full_sync');
   }
@@ -192,11 +201,16 @@ class SyncManager {
   }
 
   private handleFullStateSync(data: FullStateSyncPayload): void {
-    console.log('📦 Received full state sync');
+    console.log('📦 Received full state sync', {
+      tokensCount: data.tokens?.length || 0,
+      mapsCount: data.maps?.length || 0,
+      playersCount: data.players?.length || 0
+    });
 
     const sessionStore = useSessionStore.getState();
     const initiativeStore = useInitiativeStore.getState();
     const mapStore = useMapStore.getState();
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
 
     // Apply tokens
     if (data.tokens && data.tokens.length > 0) {
@@ -213,16 +227,19 @@ class SyncManager {
       }
     }
 
-    // Apply maps
+    // Apply maps (only if we received maps from server)
     if (data.maps && data.maps.length > 0) {
-      // Clear existing maps and replace with synced data
-      const currentMaps = mapStore.maps;
-      currentMaps.forEach(map => mapStore.removeMap(map.id));
+      console.log('🗺️ Replacing local maps with', data.maps.length, 'maps from server');
       
-      data.maps.forEach(map => {
-        // Add map directly to store (bypass sync to avoid loop)
-        mapStore.addMap(map);
-      });
+      // Directly set the maps state without triggering sync
+      // This is safe because we're receiving authoritative server state
+      const set = (mapStore as any)._set || ((mapStore as any).setState);
+      if (set) {
+        set({ 
+          maps: data.maps,
+          selectedMapId: data.maps[0]?.id || null 
+        });
+      }
     }
 
     // Apply connected users
@@ -341,26 +358,48 @@ class SyncManager {
 
     console.log('🗺️ Map updated from remote:', data.action);
     const mapStore = useMapStore.getState();
+    const set = (mapStore as any)._set || ((mapStore as any).setState);
 
     switch (data.action) {
       case 'add':
-        if (data.map) {
-          mapStore.addMap(data.map);
+        if (data.map && set) {
+          console.log('  ➕ Adding map:', data.map.name);
+          set({ maps: [...mapStore.maps, data.map] });
         }
         break;
       case 'update':
-        if (data.mapId && data.data) {
-          mapStore.updateMap(data.mapId, data.data);
+        if (data.mapId && data.data && set) {
+          console.log('  ✏️ Updating map:', data.mapId);
+          set({
+            maps: mapStore.maps.map((map) =>
+              map.id === data.mapId ? { ...map, ...data.data } : map
+            )
+          });
         }
         break;
       case 'remove':
-        if (data.mapId) {
-          mapStore.removeMap(data.mapId);
+        if (data.mapId && set) {
+          console.log('  ➖ Removing map:', data.mapId);
+          const newMaps = mapStore.maps.filter((map) => map.id !== data.mapId);
+          set({
+            maps: newMaps,
+            selectedMapId: mapStore.selectedMapId === data.mapId ? newMaps[0]?.id || null : mapStore.selectedMapId
+          });
         }
         break;
       case 'reorder':
-        if (data.data?.fromIndex !== undefined && data.data?.toIndex !== undefined) {
-          mapStore.reorderMaps(data.data.fromIndex, data.data.toIndex);
+        if (data.data?.fromIndex !== undefined && data.data?.toIndex !== undefined && set) {
+          console.log('  🔄 Reordering maps:', data.data.fromIndex, '->', data.data.toIndex);
+          const newMaps = [...mapStore.maps];
+          const [removed] = newMaps.splice(data.data.fromIndex, 1);
+          newMaps.splice(data.data.toIndex, 0, removed);
+          
+          // Update z-indices
+          newMaps.forEach((map, index) => {
+            map.zIndex = index;
+          });
+          
+          set({ maps: newMaps });
         }
         break;
     }
