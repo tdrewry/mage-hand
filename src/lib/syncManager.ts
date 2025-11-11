@@ -4,6 +4,7 @@ import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
+import { useMapStore } from '@/stores/mapStore';
 import { hasPermission } from './rolePermissions';
 import type {
   JoinSessionPayload,
@@ -14,6 +15,7 @@ import type {
   FullStateSyncPayload,
   SyncTokenPayload,
   SyncInitiativePayload,
+  SyncMapPayload,
   TokenUpdatedPayload,
   SessionErrorPayload
 } from '@/types/multiplayerEvents';
@@ -146,6 +148,7 @@ class SyncManager {
     this.socketClient.on('token_removed', this.handleTokenRemoved.bind(this));
     this.socketClient.on('initiative_updated', this.handleInitiativeUpdated.bind(this));
     this.socketClient.on('combat_state_changed', this.handleCombatStateChanged.bind(this));
+    this.socketClient.on('map_updated', this.handleMapUpdated.bind(this));
 
     // User management
     this.socketClient.on('user_list_updated', this.handleUserListUpdated.bind(this));
@@ -193,6 +196,7 @@ class SyncManager {
 
     const sessionStore = useSessionStore.getState();
     const initiativeStore = useInitiativeStore.getState();
+    const mapStore = useMapStore.getState();
 
     // Apply tokens
     if (data.tokens && data.tokens.length > 0) {
@@ -207,6 +211,18 @@ class SyncManager {
         initiativeStore.startCombat();
         initiativeStore.setCurrentTurn(data.initiative.currentTurnIndex);
       }
+    }
+
+    // Apply maps
+    if (data.maps && data.maps.length > 0) {
+      // Clear existing maps and replace with synced data
+      const currentMaps = mapStore.maps;
+      currentMaps.forEach(map => mapStore.removeMap(map.id));
+      
+      data.maps.forEach(map => {
+        // Add map directly to store (bypass sync to avoid loop)
+        mapStore.addMap(map);
+      });
     }
 
     // Apply connected users
@@ -317,6 +333,37 @@ class SyncManager {
   private handleUserRoleChanged(data: any): void {
     console.log('🎭 User role changed:', data.userId);
     useMultiplayerStore.getState().updateUserRoles(data.userId, data.roleIds);
+  }
+
+  private handleMapUpdated(data: SyncMapPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    if (data.userId === currentUserId) return;
+
+    console.log('🗺️ Map updated from remote:', data.action);
+    const mapStore = useMapStore.getState();
+
+    switch (data.action) {
+      case 'add':
+        if (data.map) {
+          mapStore.addMap(data.map);
+        }
+        break;
+      case 'update':
+        if (data.mapId && data.data) {
+          mapStore.updateMap(data.mapId, data.data);
+        }
+        break;
+      case 'remove':
+        if (data.mapId) {
+          mapStore.removeMap(data.mapId);
+        }
+        break;
+      case 'reorder':
+        if (data.data?.fromIndex !== undefined && data.data?.toIndex !== undefined) {
+          mapStore.reorderMaps(data.data.fromIndex, data.data.toIndex);
+        }
+        break;
+    }
   }
 
   // ============= Sync Methods (Local → Server) =============
@@ -449,6 +496,73 @@ class SyncManager {
    */
   isConnected(): boolean {
     return this.socketClient?.isConnected() || false;
+  }
+
+  // ============= Map Sync Methods =============
+
+  /**
+   * Sync map addition
+   */
+  syncMapAdd(map: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncMapPayload = {
+      action: 'add',
+      map,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_map', payload);
+  }
+
+  /**
+   * Sync map update
+   */
+  syncMapUpdate(mapId: string, data: any): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncMapPayload = {
+      action: 'update',
+      mapId,
+      data,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_map', payload);
+  }
+
+  /**
+   * Sync map removal
+   */
+  syncMapRemove(mapId: string): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncMapPayload = {
+      action: 'remove',
+      mapId,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_map', payload);
+  }
+
+  /**
+   * Sync map reorder
+   */
+  syncMapReorder(fromIndex: number, toIndex: number): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncMapPayload = {
+      action: 'reorder',
+      data: { fromIndex, toIndex },
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_map', payload);
   }
 }
 

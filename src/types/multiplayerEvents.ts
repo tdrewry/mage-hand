@@ -51,6 +51,15 @@ export interface SyncRolePayload {
   senderId: string;
 }
 
+export interface SyncMapPayload {
+  action: 'add' | 'update' | 'remove' | 'reorder';
+  mapId?: string;
+  map?: any; // Full map for 'add'
+  data?: any; // Partial data for updates
+  timestamp: number;
+  userId: string;
+}
+
 // ============= Server → Client Events =============
 
 export interface SessionJoinedPayload {
@@ -85,6 +94,7 @@ export interface FullStateSyncPayload {
     roundNumber: number;
     initiativeOrder: any[];
   };
+  maps?: any[]; // Map data
   fog?: any;
   roles?: any[];
   players: ConnectedUser[];
@@ -146,6 +156,7 @@ export const ClientEvents = {
   SYNC_COMBAT: 'sync_combat',
   SYNC_FOG: 'sync_fog',
   SYNC_ROLE: 'sync_role',
+  SYNC_MAP: 'sync_map',
   
   // Requests
   REQUEST_FULL_SYNC: 'request_full_sync',
@@ -171,6 +182,7 @@ export const ServerEvents = {
   TURN_CHANGED: 'turn_changed',
   FOG_UPDATED: 'fog_updated',
   ROLE_ASSIGNED: 'role_assigned',
+  MAP_UPDATED: 'map_updated',
   
   // User management
   USER_LIST_UPDATED: 'user_list_updated',

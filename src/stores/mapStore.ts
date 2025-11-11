@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncManager } from '@/lib/syncManager';
 
 export interface GridRegion {
   id: string;
@@ -99,6 +100,9 @@ export const useMapStore = create<MapStore>()(
         set((state) => ({
           maps: [...state.maps, newMap],
         }));
+
+        // Sync to multiplayer
+        syncManager.syncMapAdd(newMap);
       },
 
       updateMap: (id, updates) => {
@@ -107,6 +111,9 @@ export const useMapStore = create<MapStore>()(
             map.id === id ? { ...map, ...updates } : map
           ),
         }));
+
+        // Sync to multiplayer
+        syncManager.syncMapUpdate(id, updates);
       },
 
       removeMap: (id) => {
@@ -117,6 +124,9 @@ export const useMapStore = create<MapStore>()(
             selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
           };
         });
+
+        // Sync to multiplayer
+        syncManager.syncMapRemove(id);
       },
 
       setSelectedMap: (id) => {
@@ -136,6 +146,9 @@ export const useMapStore = create<MapStore>()(
           
           return { maps: newMaps };
         });
+
+        // Sync to multiplayer
+        syncManager.syncMapReorder(fromIndex, toIndex);
       },
 
       addRegion: (mapId, regionData) => {

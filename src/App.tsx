@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useStorageWarning } from "./hooks/useStorageWarning";
+import { useAutoReconnect } from "./hooks/useAutoReconnect";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 
 const queryClient = new QueryClient();
@@ -19,6 +20,9 @@ const App = () => {
 
   // Monitor storage usage and show warnings
   useStorageWarning();
+
+  // Auto-reconnect to multiplayer session on page load
+  useAutoReconnect();
 
   return (
   <QueryClientProvider client={queryClient}>

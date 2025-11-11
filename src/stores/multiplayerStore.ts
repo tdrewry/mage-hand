@@ -151,6 +151,8 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       partialize: (state) => ({
         serverUrl: state.serverUrl,
         currentUsername: state.currentUsername,
+        currentSession: state.currentSession,
+        currentUserId: state.currentUserId,
       })
     }
   )
