@@ -3122,7 +3122,7 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
 
-  // Animation loop for hostile tokens and hover effects
+  // Animation loop for hostile tokens and hover effects - optimized with throttling
   useEffect(() => {
     const currentPlayer = players.find(p => p.id === currentPlayerId);
     if (!currentPlayer) return;
@@ -3135,10 +3135,17 @@ export const SimpleTabletop = () => {
     
     if (!hasHostileTokens && !hoveredTokenId) return;
     
-    // Set up animation loop
+    // Set up throttled animation loop (limit to ~30 FPS for hostile glow)
     let animationId: number;
-    const animate = () => {
-      redrawCanvas();
+    let lastFrameTime = 0;
+    const frameDelay = 1000 / 30; // ~30 FPS
+    
+    const animate = (currentTime: number) => {
+      // Throttle to reduce CPU usage
+      if (currentTime - lastFrameTime >= frameDelay) {
+        redrawCanvas();
+        lastFrameTime = currentTime;
+      }
       animationId = requestAnimationFrame(animate);
     };
     
@@ -3705,6 +3712,9 @@ export const SimpleTabletop = () => {
         if (clickedLight) {
           removeLight(clickedLight.id);
           toast.success('Light source removed');
+        } else {
+          // No light clicked, handle as normal shift+click (token creation)
+          handleCanvasClick(e);
         }
       } else {
         handleCanvasClick(e);

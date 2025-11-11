@@ -369,7 +369,7 @@ export const TokenContextMenu = ({
         <ContextMenuTrigger asChild>
           {children}
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-56 bg-popover z-50">
+        <ContextMenuContent className="w-56 bg-popover z-[1000]">
           <ContextMenuItem onClick={handleLabelClick} disabled={!canControl}>
             <Edit3 className="mr-2 h-4 w-4" />
             <span>Edit Label{isMultiSelection ? 's' : ''}</span>
@@ -394,7 +394,7 @@ export const TokenContextMenu = ({
               <User className="mr-2 h-4 w-4" />
               <span>Use Profile</span>
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto bg-popover z-50">
+            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto bg-popover z-[1000]">
               {profiles.length === 0 ? (
                 <ContextMenuItem disabled>
                   <span className="text-xs text-muted-foreground">No profiles available</span>
@@ -427,7 +427,7 @@ export const TokenContextMenu = ({
                   <Shield className="mr-2 h-4 w-4" />
                   <span>Assign to Role</span>
                 </ContextMenuSubTrigger>
-                <ContextMenuSubContent className="w-48 bg-popover z-50">
+                <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
                   {roles.map((role) => {
                     const isCurrentRole = targetTokens.every(t => t.roleId === role.id);
                     return (
