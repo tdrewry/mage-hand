@@ -8,6 +8,8 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useFogStore } from '@/stores/fogStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { getTokensForVisionCalculation } from '@/lib/visionPermissions';
 import { getFogScope, computeFogMasks, visibilityPolygonToPaperPath, addVisibleToExplored, createEmptyExplored } from '@/lib/fogGeometry';
 import { computeTokenVisibilityPaper } from '@/lib/fogOfWar';
 import { regionsToSegments } from '@/lib/visibilityEngine';
@@ -48,10 +50,11 @@ export const MapCardContent = () => {
     endRegionDrag
   } = useRegionInteraction();
 
-  const { tokens, currentPlayerId, tokenVisibility, labelVisibility } = useSessionStore();
+  const { tokens, currentPlayerId, players, tokenVisibility, labelVisibility } = useSessionStore();
   const { maps } = useMapStore();
   const { regions } = useRegionStore();
   const fogSettings = useFogStore();
+  const { roles } = useRoleStore();
   const { lights, globalAmbientLight, shadowIntensity } = useLightStore();
   const { 
     renderingMode, 
@@ -89,12 +92,18 @@ export const MapCardContent = () => {
     // Get wall segments from regions
     const wallSegments = regionsToSegments(regions);
 
-    // Filter tokens based on ownership for player perspective
-    const playerTokens = tokens.filter(token => {
-      if (tokenVisibility === 'all') return true;
-      if (tokenVisibility === 'owned') return token.ownerId === currentPlayerId;
-      return false;
-    });
+    // Get current player for role-based filtering
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    if (!currentPlayer) return;
+
+    // Filter tokens based on role permissions and hostility
+    // This replaces simple ownership-based filtering with role-based logic
+    const playerTokens = getTokensForVisionCalculation(
+      tokens,
+      currentPlayer,
+      roles,
+      wallSegments
+    );
 
     // Compute visibility for player tokens
     computeTokenVisibilityPaper(
@@ -129,7 +138,7 @@ export const MapCardContent = () => {
         fogMasksRef.current = masks;
       }
     });
-  }, [tokens, regions, fogSettings, renderingMode, tokenVisibility, currentPlayerId]);
+  }, [tokens, regions, fogSettings, renderingMode, currentPlayerId, players, roles]);
 
   // Canvas mouse handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {

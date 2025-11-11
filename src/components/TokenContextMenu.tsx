@@ -22,10 +22,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { useVisionProfileStore } from '../stores/visionProfileStore';
+import { 
+  canControlToken, 
+  canDeleteToken, 
+  canAssignTokenRoles 
+} from '../lib/rolePermissions';
 import { toast } from 'sonner';
 
 interface TokenContextMenuProps {
@@ -48,9 +54,12 @@ export const TokenContextMenu = ({
     updateTokenVision,
     updateTokenVisionRange,
     removeToken,
-    setTokenOwner 
+    setTokenOwner,
+    currentPlayerId,
+    players
   } = useSessionStore();
   
+  const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
   const { profiles } = useVisionProfileStore();
   
@@ -81,8 +90,29 @@ export const TokenContextMenu = ({
     return tokens.filter(t => t.id === tokenId);
   };
 
+  // Get current player for permission checks
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  
+  // Check permissions for target tokens
+  const targetTokens = getTargetTokens();
+  const canControl = currentPlayer && targetTokens.every(token => 
+    canControlToken(token, currentPlayer, roles)
+  );
+  const canDelete = currentPlayer && targetTokens.every(token => 
+    canDeleteToken(token, currentPlayer, roles)
+  );
+  const canAssignRoles = currentPlayer && canAssignTokenRoles(currentPlayer, roles);
+  
+  const isMultiSelection = targetTokens.length > 1;
+  const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
+  const isHidden = targetTokens.every(t => t.isHidden);
+
   const handleLabelClick = () => {
-    const targetTokens = getTargetTokens();
+    if (!canControl) {
+      toast.error("You don't have permission to edit these tokens");
+      return;
+    }
+    
     if (targetTokens.length === 1) {
       setLabelValue(targetTokens[0].label || targetTokens[0].name);
     } else {
@@ -92,7 +122,11 @@ export const TokenContextMenu = ({
   };
 
   const handleColorClick = () => {
-    const targetTokens = getTargetTokens();
+    if (!canControl) {
+      toast.error("You don't have permission to edit these tokens");
+      return;
+    }
+    
     if (targetTokens.length === 1) {
       setColorValue(targetTokens[0].color || '#FF6B6B');
     } else {
@@ -102,11 +136,15 @@ export const TokenContextMenu = ({
   };
 
   const handleDeleteClick = () => {
+    if (!canDelete) {
+      toast.error("You don't have permission to delete these tokens");
+      return;
+    }
     setShowDeleteModal(true);
   };
 
+
   const applyLabel = () => {
-    const targetTokens = getTargetTokens();
     targetTokens.forEach(token => {
       updateTokenLabel(token.id, labelValue);
     });
@@ -116,7 +154,6 @@ export const TokenContextMenu = ({
   };
 
   const applyColor = () => {
-    const targetTokens = getTargetTokens();
     targetTokens.forEach(token => {
       if (onColorChange) {
         onColorChange(token.id, colorValue);
@@ -128,7 +165,6 @@ export const TokenContextMenu = ({
   };
 
   const confirmDelete = () => {
-    const targetTokens = getTargetTokens();
     targetTokens.forEach(token => {
       removeToken(token.id);
     });
@@ -148,7 +184,6 @@ export const TokenContextMenu = ({
   };
 
   const applyInitiative = () => {
-    const targetTokens = getTargetTokens();
     const initiative = parseInt(initiativeValue);
     
     if (isNaN(initiative)) {
@@ -164,11 +199,12 @@ export const TokenContextMenu = ({
     toast.success(`Added ${targetTokens.length} token(s) to initiative`);
   };
 
-  const targetTokens = getTargetTokens();
-  const isMultiSelection = targetTokens.length > 1;
-  const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
-
   const handleToggleVision = () => {
+    if (!canControl) {
+      toast.error("You don't have permission to modify vision settings");
+      return;
+    }
+    
     const newVisionState = !hasVisionEnabled;
     targetTokens.forEach(token => {
       updateTokenVision(token.id, newVisionState);
@@ -178,7 +214,11 @@ export const TokenContextMenu = ({
   };
 
   const handleVisionRangeClick = () => {
-    const targetTokens = getTargetTokens();
+    if (!canControl) {
+      toast.error("You don't have permission to modify vision settings");
+      return;
+    }
+    
     if (targetTokens.length === 1) {
       const token = targetTokens[0];
       setSelectedProfileId(token.visionProfileId || '');
@@ -192,8 +232,49 @@ export const TokenContextMenu = ({
     setShowVisionRangeModal(true);
   };
 
+  const handleAssignRole = (roleId: string) => {
+    if (!canAssignRoles) {
+      toast.error("You don't have permission to assign roles to tokens");
+      return;
+    }
+    
+    const role = roles.find(r => r.id === roleId);
+    
+    if (!role) return;
+    
+    targetTokens.forEach(token => {
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map((t) =>
+          t.id === token.id ? { ...t, roleId } : t
+        ),
+      }));
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Assigned ${targetTokens.length} token(s) to ${role.name}`);
+  };
+
+  const handleToggleHidden = () => {
+    if (!canAssignRoles) {
+      toast.error("You don't have permission to hide/show tokens");
+      return;
+    }
+    
+    const newHiddenState = !isHidden;
+    
+    targetTokens.forEach(token => {
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map((t) =>
+          t.id === token.id ? { ...t, isHidden: newHiddenState } : t
+        ),
+      }));
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`${newHiddenState ? 'Hidden' : 'Shown'} ${targetTokens.length} token(s)`);
+  };
+
   const applyVisionRange = () => {
-    const targetTokens = getTargetTokens();
     
     // Apply profile or custom settings
     targetTokens.forEach(token => {
@@ -288,29 +369,32 @@ export const TokenContextMenu = ({
         <ContextMenuTrigger asChild>
           {children}
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-56">
-          <ContextMenuItem onClick={handleLabelClick}>
+        <ContextMenuContent className="w-56 bg-popover z-[1000]">
+          <ContextMenuItem onClick={handleLabelClick} disabled={!canControl}>
             <Edit3 className="mr-2 h-4 w-4" />
             <span>Edit Label{isMultiSelection ? 's' : ''}</span>
+            {!canControl && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
-          <ContextMenuItem onClick={handleColorClick}>
+          <ContextMenuItem onClick={handleColorClick} disabled={!canControl}>
             <Palette className="mr-2 h-4 w-4" />
             <span>Change Color{isMultiSelection ? 's' : ''}</span>
+            {!canControl && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuCheckboxItem
             checked={hasVisionEnabled}
             onCheckedChange={handleToggleVision}
+            disabled={!canControl}
           >
             <Eye className="mr-2 h-4 w-4" />
             <span>Has Vision</span>
           </ContextMenuCheckboxItem>
           <ContextMenuSub>
-            <ContextMenuSubTrigger>
+            <ContextMenuSubTrigger disabled={!canControl}>
               <User className="mr-2 h-4 w-4" />
               <span>Use Profile</span>
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto">
+            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto bg-popover z-[1000]">
               {profiles.length === 0 ? (
                 <ContextMenuItem disabled>
                   <span className="text-xs text-muted-foreground">No profiles available</span>
@@ -331,18 +415,58 @@ export const TokenContextMenu = ({
               )}
             </ContextMenuSubContent>
           </ContextMenuSub>
-          <ContextMenuItem onClick={handleVisionRangeClick}>
+          <ContextMenuItem onClick={handleVisionRangeClick} disabled={!canControl}>
             <Scan className="mr-2 h-4 w-4" />
             <span>Set Vision Range</span>
           </ContextMenuItem>
           <ContextMenuSeparator />
+          {canAssignRoles && (
+            <>
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Assign to Role</span>
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
+                  {roles.map((role) => {
+                    const isCurrentRole = targetTokens.every(t => t.roleId === role.id);
+                    return (
+                      <ContextMenuItem 
+                        key={role.id}
+                        onClick={() => handleAssignRole(role.id)}
+                      >
+                        {isCurrentRole && <span className="mr-2">✓</span>}
+                        <div 
+                          className="mr-2 h-3 w-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: role.color }}
+                        />
+                        <span className="flex-1">{role.name}</span>
+                        {role.isSystem && (
+                          <span className="text-xs text-muted-foreground ml-2">System</span>
+                        )}
+                      </ContextMenuItem>
+                    );
+                  })}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+              <ContextMenuCheckboxItem
+                checked={isHidden}
+                onCheckedChange={handleToggleHidden}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                <span>{isHidden ? 'Show' : 'Hide'} Token{isMultiSelection ? 's' : ''}</span>
+              </ContextMenuCheckboxItem>
+              <ContextMenuSeparator />
+            </>
+          )}
           <ContextMenuItem onClick={handleInitiativeClick}>
             <Plus className="mr-2 h-4 w-4" />
             <span>Add to Initiative</span>
           </ContextMenuItem>
-          <ContextMenuItem onClick={handleDeleteClick} className="text-destructive">
+          <ContextMenuItem onClick={handleDeleteClick} className="text-destructive" disabled={!canDelete}>
             <Trash2 className="mr-2 h-4 w-4" />
             <span>Delete Token{isMultiSelection ? 's' : ''}</span>
+            {!canDelete && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

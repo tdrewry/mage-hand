@@ -9,6 +9,7 @@ import { useRegionStore } from '@/stores/regionStore';
 import { StylePreviewCanvas } from './StylePreviewCanvas';
 import { WATABOU_STYLES } from '@/lib/watabouStyles';
 import { toast } from 'sonner';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface NegativeSpaceControlPanelProps {
   onClose: () => void;
@@ -64,7 +65,10 @@ export const NegativeSpaceControlPanel: React.FC<NegativeSpaceControlPanelProps>
   };
 
   return (
-    <Card className="fixed bottom-4 left-4 z-50 p-4 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg">
+    <Card 
+      className="fixed bottom-4 left-4 p-4 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg"
+      style={{ zIndex: Z_INDEX.FIXED_UI.CONTROL_PANELS }}
+    >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">{isPlayMode ? 'Play Mode Styles' : 'Wall & Light Settings'}</h3>
         <Button

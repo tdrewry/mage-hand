@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Button } from './ui/button';
+import { Separator } from './ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -35,6 +35,7 @@ import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface VerticalToolbarProps {
   mode: 'edit' | 'play';
@@ -223,7 +224,10 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[998] flex flex-col gap-1 bg-background/95 backdrop-blur border border-border rounded-full px-2 py-3 shadow-lg">
+      <div 
+        className="fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-background/95 backdrop-blur border border-border rounded-full px-2 py-3 shadow-lg"
+        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
+      >
         {mode === 'edit' ? (
           <>
             {/* Edit Mode Tools */}

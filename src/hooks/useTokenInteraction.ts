@@ -1,9 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { canControlToken, canSeeToken } from '@/lib/rolePermissions';
+import { toast } from 'sonner';
 import type { Token } from '@/stores/sessionStore';
 
 export const useTokenInteraction = () => {
-  const { tokens, updateTokenPosition } = useSessionStore();
+  const { tokens, updateTokenPosition, currentPlayerId, players } = useSessionStore();
+  const { roles } = useRoleStore();
   
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
@@ -15,9 +19,18 @@ export const useTokenInteraction = () => {
 
   const getTokenAtPosition = useCallback((worldX: number, worldY: number): Token | null => {
     const baseTokenSize = 40;
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    
+    if (!currentPlayer) return null;
     
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i];
+      
+      // Check if player can see this token
+      if (!canSeeToken(token, currentPlayer, roles)) {
+        continue;
+      }
+      
       const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
       const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
       const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
@@ -32,11 +45,22 @@ export const useTokenInteraction = () => {
     }
     
     return null;
-  }, [tokens]);
+  }, [tokens, currentPlayerId, players, roles]);
 
   const startTokenDrag = useCallback((tokenId: string, worldX: number, worldY: number, isMultiSelect: boolean) => {
     const token = tokens.find(t => t.id === tokenId);
     if (!token) return;
+
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    if (!currentPlayer) return;
+
+    // Check if player can control this token
+    if (!canControlToken(token, currentPlayer, roles)) {
+      const role = roles.find(r => r.id === token.roleId);
+      const roleName = role ? role.name : 'this';
+      toast.error(`You don't have permission to move ${roleName} tokens`);
+      return;
+    }
 
     setIsDraggingToken(true);
     setDraggedTokenId(tokenId);
@@ -46,10 +70,25 @@ export const useTokenInteraction = () => {
 
     // Handle multi-selection
     if (isMultiSelect && selectedTokenIds.includes(tokenId)) {
-      const grouped = selectedTokenIds.map(id => {
-        const t = tokens.find(tk => tk.id === id);
-        return t ? { tokenId: id, startX: t.x, startY: t.y } : null;
-      }).filter(Boolean) as {tokenId: string, startX: number, startY: number}[];
+      // Filter grouped tokens to only those the player can control
+      const grouped = selectedTokenIds
+        .map(id => {
+          const t = tokens.find(tk => tk.id === id);
+          if (!t) return null;
+          
+          // Check permission for each token in the group
+          if (!canControlToken(t, currentPlayer, roles)) {
+            return null;
+          }
+          
+          return { tokenId: id, startX: t.x, startY: t.y };
+        })
+        .filter(Boolean) as {tokenId: string, startX: number, startY: number}[];
+      
+      if (grouped.length < selectedTokenIds.length) {
+        toast.warning('Some selected tokens cannot be moved due to permissions');
+      }
+      
       setGroupedTokens(grouped);
     } else {
       if (!isMultiSelect) {
@@ -57,7 +96,7 @@ export const useTokenInteraction = () => {
       }
       setGroupedTokens([]);
     }
-  }, [tokens, selectedTokenIds]);
+  }, [tokens, selectedTokenIds, currentPlayerId, players, roles]);
 
   const updateTokenDrag = useCallback((worldX: number, worldY: number) => {
     if (!isDraggingToken || !draggedTokenId) return;
@@ -88,6 +127,17 @@ export const useTokenInteraction = () => {
   }, []);
 
   const selectToken = useCallback((tokenId: string, isMultiSelect: boolean) => {
+    const token = tokens.find(t => t.id === tokenId);
+    if (!token) return;
+
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    if (!currentPlayer) return;
+
+    // Check if player can see this token
+    if (!canSeeToken(token, currentPlayer, roles)) {
+      return;
+    }
+
     if (isMultiSelect) {
       setSelectedTokenIds(prev => 
         prev.includes(tokenId) 
@@ -97,7 +147,7 @@ export const useTokenInteraction = () => {
     } else {
       setSelectedTokenIds([tokenId]);
     }
-  }, []);
+  }, [tokens, currentPlayerId, players, roles]);
 
   const clearSelection = useCallback(() => {
     setSelectedTokenIds([]);

@@ -14,6 +14,7 @@ import {
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface CircularButtonBarProps {
   mode: 'edit' | 'play';
@@ -57,7 +58,10 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg">
+      <div 
+        className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg"
+        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
+      >
         {/* Menu Toggle */}
         <Tooltip>
           <TooltipTrigger asChild>

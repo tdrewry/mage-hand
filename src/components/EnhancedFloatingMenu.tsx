@@ -1,10 +1,3 @@
-/**
- * Enhanced Floating Menu
- * 
- * Extended version of FloatingMenu that includes access to the new
- * enhanced canvas system features like project management and group operations
- */
-
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { 
@@ -22,6 +15,7 @@ import { FloatingMenu } from './FloatingMenu';
 import { GroupManagerModal } from './GroupManagerModal';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface EnhancedFloatingMenuProps {
   fabricCanvas: any;
@@ -78,7 +72,10 @@ export const EnhancedFloatingMenu: React.FC<EnhancedFloatingMenuProps> = ({
       <FloatingMenu {...floatingMenuProps} />
       
       {/* Enhanced features menu */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+      <div 
+        className="fixed top-4 right-4 flex flex-col gap-2"
+        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+      >
         <Button
           variant="outline"
           size="sm"

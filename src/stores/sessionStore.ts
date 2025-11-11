@@ -16,7 +16,8 @@ export interface Token {
   gridWidth: number;  // Width in grid units
   gridHeight: number; // Height in grid units
   label: string;      // Editable label/name
-  ownerId?: string;   // Player who owns this token
+  roleId: string;     // Role this token belongs to
+  isHidden: boolean;  // Whether token is hidden (only visible to privileged roles)
   color?: string;     // Token color (for default tokens)
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
@@ -24,13 +25,17 @@ export interface Token {
   visionRange?: number; // Vision range in grid units (uses global default if not set)
   visionProfileId?: string; // Reference to a vision profile from visionProfileStore
   useGradients?: boolean; // Whether to use gradient edges (can override profile setting)
+  // @deprecated Use roleId instead
+  ownerId?: string;   // Player who owns this token (deprecated, for backward compatibility)
 }
 
 export interface Player {
   id: string;
   name: string;
-  role: 'dm' | 'player';
+  roleIds: string[]; // Array of role IDs this player is assigned to
   isConnected: boolean;
+  // @deprecated Use roleIds instead
+  role?: 'dm' | 'player'; // Deprecated, for backward compatibility
 }
 
 export type TokenVisibility = 'all' | 'owned' | 'dm-only';
@@ -44,6 +49,7 @@ export interface SessionState {
   selectedTokenIds: string[];
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
+  movementLocked: boolean;
   addToken: (token: Token) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
@@ -56,6 +62,7 @@ export interface SessionState {
   setSelectedTokens: (tokenIds: string[]) => void;
   setTokenVisibility: (visibility: TokenVisibility) => void;
   setLabelVisibility: (visibility: LabelVisibility) => void;
+  setMovementLocked: (locked: boolean) => void;
   addPlayer: (player: Player) => void;
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
   initializeSession: (sessionId?: string) => void;
@@ -71,6 +78,7 @@ export const useSessionStore = create<SessionState>()(
       selectedTokenIds: [],
       tokenVisibility: 'all',
       labelVisibility: 'show',
+      movementLocked: false,
       
       addToken: (token) =>
         set((state) => ({
@@ -78,8 +86,14 @@ export const useSessionStore = create<SessionState>()(
         })),
       
       updateTokenPosition: (tokenId, x, y) => {
-        // Throttle position updates to prevent localStorage overflow
+        // Check if movement is locked
         const state = get();
+        if (state.movementLocked) {
+          console.warn('Token movement is locked during import/export');
+          return;
+        }
+        
+        // Throttle position updates to prevent localStorage overflow
         const existingToken = state.tokens.find(t => t.id === tokenId);
         
         // Only update if position actually changed significantly (avoid micro-movements)
@@ -167,6 +181,9 @@ export const useSessionStore = create<SessionState>()(
       setLabelVisibility: (visibility) =>
         set({ labelVisibility: visibility }),
 
+      setMovementLocked: (locked) =>
+        set({ movementLocked: locked }),
+
       addPlayer: (player) =>
         set((state) => ({
           players: [...state.players.filter(p => p.id !== player.id), player],
@@ -175,9 +192,11 @@ export const useSessionStore = create<SessionState>()(
       setCurrentPlayer: (playerId, role) => {
         set((state) => {
           const existingPlayer = state.players.find(p => p.id === playerId);
+          // Convert old role to roleIds array
+          const roleIds = role === 'dm' ? ['dm'] : ['player'];
           const updatedPlayers = existingPlayer 
-            ? state.players.map(p => p.id === playerId ? { ...p, role, isConnected: true } : p)
-            : [...state.players, { id: playerId, name: `${role === 'dm' ? 'DM' : 'Player'} ${playerId.slice(-4)}`, role, isConnected: true }];
+            ? state.players.map(p => p.id === playerId ? { ...p, roleIds, role, isConnected: true } : p)
+            : [...state.players, { id: playerId, name: `${role === 'dm' ? 'DM' : 'Player'} ${playerId.slice(-4)}`, roleIds, role, isConnected: true }];
           
           return {
             currentPlayerId: playerId,
@@ -203,8 +222,7 @@ export const useSessionStore = create<SessionState>()(
           currentPlayerId,
         });
         
-        // Set default role as DM for now (can be changed later)
-        get().setCurrentPlayer(currentPlayerId, 'dm');
+        // Don't auto-assign role here - let RoleSelectionModal handle it
         
         // Update URL if needed
         if (!urlSessionId || urlSessionId !== finalSessionId) {

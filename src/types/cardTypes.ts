@@ -16,6 +16,7 @@ export enum CardType {
   INITIATIVE_TRACKER = 'initiative_tracker',
   STYLES = 'styles',
   VISION_PROFILE_MANAGER = 'vision_profile_manager',
+  ROLE_MANAGER = 'role_manager',
 }
 
 export interface ToolsCardProps {

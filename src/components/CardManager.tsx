@@ -15,6 +15,7 @@ import { MapCardContent } from '@/components/cards/MapCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
+import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -72,6 +73,8 @@ export function CardManager({
       gridHeight,
       label: `Token ${tokenId.slice(-4)}`,
       color,
+      roleId: 'player', // Default to player role
+      isHidden: false,
     };
     addToken(newToken);
   };
@@ -131,6 +134,7 @@ function getCardTitle(type: CardType): string {
     [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
     [CardType.STYLES]: 'Styles',
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
+    [CardType.ROLE_MANAGER]: 'Role Manager',
   };
   
   return titles[type] || type;
@@ -201,6 +205,8 @@ function renderCardContent(
       );
     case CardType.VISION_PROFILE_MANAGER:
       return <VisionProfileManagerCardContent />;
+    case CardType.ROLE_MANAGER:
+      return <RoleManagerCard />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:

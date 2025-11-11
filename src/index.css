@@ -56,6 +56,27 @@
 
     --radius: 0.5rem;
 
+    /* Z-Index Layer System - Extended Ranges */
+    --z-canvas-base: 0;
+    --z-canvas-elements-base: 1000;
+    --z-canvas-elements-max: 29999;
+    --z-fixed-ui-base: 30000;
+    --z-fixed-ui-max: 30999;
+    --z-cards-base: 31000;
+    --z-cards-max: 32999;
+    --z-dropdowns-base: 33000;
+    --z-modals-base: 34000;
+    --z-popovers-base: 45000;
+    --z-critical-base: 50000;
+
+    /* Commonly used specific values */
+    --z-tokens: 20000;
+    --z-toolbars: 30700;
+    --z-context-menu: 33100;
+    --z-modal-overlay: 34000;
+    --z-tooltip: 45500;
+    --z-loading: 50000;
+
     --sidebar-background: 0 0% 98%;
 
     --sidebar-foreground: 240 5.3% 26.1%;

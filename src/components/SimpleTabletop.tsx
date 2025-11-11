@@ -17,6 +17,8 @@ import { CardManager } from './CardManager';
 import { CircularButtonBar } from './CircularButtonBar';
 import { VerticalToolbar } from './VerticalToolbar';
 import { InitiativePanel } from './InitiativePanel';
+import { BulkOperationsToolbar } from './BulkOperationsToolbar';
+import { MovementLockIndicator } from './MovementLockIndicator';
 import { useSessionStore } from '../stores/sessionStore';
 import { useMapStore } from '../stores/mapStore';
 import { useRegionStore, type CanvasRegion } from '../stores/regionStore';
@@ -59,12 +61,16 @@ import { renderFogLayers } from '../lib/fogRenderer';
 import { renderFogWithGradients, renderFogWithHardEdges } from '../lib/fogGradientRenderer';
 import { getDefaultGradientSettings } from '../lib/fogGradientHelper';
 import { useVisionProfileStore } from '../stores/visionProfileStore';
+import { useRoleStore } from '../stores/roleStore';
+import { getTokensForVisionCalculation } from '../lib/visionPermissions';
+import { canControlToken, getTokenRelationship } from '../lib/rolePermissions';
 import paper from 'paper';
 import { useFogStore } from '../stores/fogStore';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from 'lucide-react';
 import { RegionBackgroundModal } from './modals/RegionBackgroundModal';
+import { RoleSelectionModal } from './modals/RoleSelectionModal';
 import { RegionControlPanel, type TransformMode } from './RegionControlPanel';
 import { 
   generateTransformHandles, 
@@ -104,6 +110,7 @@ export const SimpleTabletop = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragPath, setDragPath] = useState<{ x: number, y: number }[]>([]);
+  const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
@@ -201,6 +208,9 @@ export const SimpleTabletop = () => {
   // Vision profiles store
   const { getProfile } = useVisionProfileStore();
   
+  // Role store
+  const { roles } = useRoleStore();
+  
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
@@ -234,6 +244,9 @@ export const SimpleTabletop = () => {
   
   // Track previous token positions to detect changes
   const prevTokenPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  // Performance optimization: Cache for token drawing to reduce redundant renders
+  const tokenDrawCache = useRef<Map<string, { lastDrawn: number, data: any }>>(new Map());
   
   // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
@@ -288,6 +301,7 @@ export const SimpleTabletop = () => {
     updateTokenColor,
     removeToken,
     currentPlayerId,
+    players,
   } = useSessionStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
@@ -479,8 +493,21 @@ export const SimpleTabletop = () => {
           if (!fogScopeRef.current) return;
           fogScopeRef.current.activate();
           
-          // Identify which tokens have moved (only consider tokens with vision)
-          const tokensWithVision = tokens.filter(t => t.hasVision !== false);
+          // Get current player to filter tokens by role permissions
+          const currentPlayer = players.find(p => p.id === currentPlayerId);
+          if (!currentPlayer || !wallGeometry) return;
+          
+          // Filter tokens based on role permissions and hostility
+          // This replaces simple ownership-based filtering with role-based logic
+          const tokensForVision = getTokensForVisionCalculation(
+            tokens,
+            currentPlayer,
+            roles,
+            wallGeometry.wallSegments
+          );
+          
+          // Only consider tokens with vision enabled
+          const tokensWithVision = tokensForVision.filter(t => t.hasVision !== false);
           const movedTokens: typeof tokens = [];
           const currentTokenIds = new Set(tokensWithVision.map(t => t.id));
           
@@ -2880,12 +2907,56 @@ export const SimpleTabletop = () => {
     const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
     const radius = tokenSize / 2;
     const isSelected = selectedTokenIds.includes(token.id);
+    const isHovered = hoveredTokenId === token.id;
+    
+    // Performance optimization: Create a simple hash of token's visual state
+    // If state hasn't changed, we can potentially skip some computations
+    const visualStateHash = `${token.x},${token.y},${token.color},${isSelected},${isHovered},${token.roleId}`;
+    const cached = tokenDrawCache.current.get(token.id);
+    const now = Date.now();
+    
+    // Cache validity check (invalidate after 100ms to keep animations smooth)
+    const isCacheValid = cached && cached.data === visualStateHash && (now - cached.lastDrawn) < 100;
+    
+    if (!isCacheValid) {
+      tokenDrawCache.current.set(token.id, {
+        lastDrawn: now,
+        data: visualStateHash
+      });
+    }
+    
+    // Get current player for permission checks
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    
+    // Check permissions and relationships
+    const isControllable = currentPlayer ? canControlToken(token, currentPlayer, roles) : false;
+    const relationship = currentPlayer ? getTokenRelationship(token, currentPlayer, roles) : 'neutral';
+    const isHostile = relationship === 'hostile';
+    
+    // Get role color for border
+    const role = roles.find(r => r.id === token.roleId);
+    const roleBorderColor = role?.color || '#000000';
     
     // Check if this is the active token in combat
     const currentEntry = initiativeOrder[currentTurnIndex];
     const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
     
-    // Draw active combat highlight (pulsing glow)
+    // Draw hostile pulsing indicator (animated red border)
+    if (isHostile) {
+      const pulseTime = Date.now() / 500;
+      const pulseIntensity = (Math.sin(pulseTime) + 1) / 2; // Oscillates between 0 and 1
+      
+      ctx.save();
+      // Outer pulsing red glow
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulseIntensity * 0.4})`; // Red with pulsing opacity
+      ctx.lineWidth = (5 + pulseIntensity * 2) / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 5, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+    
+    // Draw active combat highlight (pulsing gold glow)
     if (isActiveInCombat) {
       ctx.save();
       // Outer glow
@@ -2904,6 +2975,18 @@ export const SimpleTabletop = () => {
       ctx.restore();
     }
     
+    // Draw controllability hover glow (green/blue glow when hovering over controllable token)
+    if (isHovered && isControllable && !isDraggingToken) {
+      ctx.save();
+      const glowColor = relationship === 'friendly' ? 'rgba(34, 197, 94, 0.6)' : 'rgba(59, 130, 246, 0.6)'; // Green for friendly, blue for own
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = 4 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius + 4, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+    
     // Draw selection highlight
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -2918,9 +3001,20 @@ export const SimpleTabletop = () => {
     ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
     ctx.fill();
     
-    // Draw token border
-    ctx.strokeStyle = isSelected ? '#ffffff' : '#000000';
-    ctx.lineWidth = (isSelected ? 3 : 2) / transform.zoom;
+    // Draw token border with role color
+    if (isSelected) {
+      // Selected: white border
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3 / transform.zoom;
+    } else if (isHostile) {
+      // Hostile: red border
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3 / transform.zoom;
+    } else {
+      // Normal: role color border
+      ctx.strokeStyle = roleBorderColor;
+      ctx.lineWidth = 2 / transform.zoom;
+    }
     ctx.stroke();
     
     // Draw token label
@@ -3048,6 +3142,42 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     redrawCanvas();
   }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
+
+  // Animation loop for hostile tokens and hover effects - optimized with throttling
+  useEffect(() => {
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    if (!currentPlayer) return;
+    
+    // Check if there are any hostile tokens or if hovering over a token
+    const hasHostileTokens = tokens.some(token => {
+      const relationship = getTokenRelationship(token, currentPlayer, roles);
+      return relationship === 'hostile';
+    });
+    
+    if (!hasHostileTokens && !hoveredTokenId) return;
+    
+    // Set up throttled animation loop (limit to ~30 FPS for hostile glow)
+    let animationId: number;
+    let lastFrameTime = 0;
+    const frameDelay = 1000 / 30; // ~30 FPS
+    
+    const animate = (currentTime: number) => {
+      // Throttle to reduce CPU usage
+      if (currentTime - lastFrameTime >= frameDelay) {
+        redrawCanvas();
+        lastFrameTime = currentTime;
+      }
+      animationId = requestAnimationFrame(animate);
+    };
+    
+    animationId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [tokens, hoveredTokenId, players, currentPlayerId, roles]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -3603,6 +3733,9 @@ export const SimpleTabletop = () => {
         if (clickedLight) {
           removeLight(clickedLight.id);
           toast.success('Light source removed');
+        } else {
+          // No light clicked, handle as normal shift+click (token creation)
+          handleCanvasClick(e);
         }
       } else {
         handleCanvasClick(e);
@@ -4008,9 +4141,42 @@ export const SimpleTabletop = () => {
       // Use requestAnimationFrame for smooth rendering
       requestAnimationFrame(() => redrawCanvas());
     } else {
-      // Mouse hover - show grid highlights for potential token placement
+      // Mouse hover - detect token hover and update cursor
       const worldPos = screenToWorld(mouseX, mouseY);
       
+      // Check if hovering over a token
+      let foundHoveredToken = false;
+      const currentPlayer = players.find(p => p.id === currentPlayerId);
+      
+      for (const token of tokens) {
+        const baseTokenSize = 40;
+        const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+        const radius = tokenSize / 2;
+        const distance = Math.sqrt(
+          (worldPos.x - token.x) ** 2 + (worldPos.y - token.y) ** 2
+        );
+        
+        if (distance <= radius) {
+          setHoveredTokenId(token.id);
+          foundHoveredToken = true;
+          
+          // Update cursor based on controllability
+          if (canvas && currentPlayer) {
+            const isControllable = canControlToken(token, currentPlayer, roles);
+            canvas.style.cursor = isControllable ? 'pointer' : 'not-allowed';
+          }
+          break;
+        }
+      }
+      
+      if (!foundHoveredToken) {
+        setHoveredTokenId(null);
+        if (canvas) {
+          canvas.style.cursor = 'default';
+        }
+      }
+      
+      // Show grid highlights for potential token placement
       // Only show highlights if Shift key is held (indicating token placement mode)
       if (e.shiftKey) {
         // Use default 1x1 size for new token placement, or get size from active token in toolbar
@@ -4019,6 +4185,11 @@ export const SimpleTabletop = () => {
       } else {
         // Clear highlights when not in placement mode
         setHighlightedGrids([]);
+      }
+      
+      // Redraw to show hover effects
+      if (foundHoveredToken) {
+        redrawCanvas();
       }
     }
   };
@@ -4334,7 +4505,9 @@ export const SimpleTabletop = () => {
         gridHeight: gridHeight,
         label: `T${tokenId.slice(-4)}`,
         ownerId: currentPlayerId,
-        color: tokenColor
+        color: tokenColor,
+        roleId: 'player', // Default to player role
+        isHidden: false
       });
 
       toast.success('Token added to map');
@@ -4411,6 +4584,16 @@ export const SimpleTabletop = () => {
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel />
       
+      {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
+      <BulkOperationsToolbar 
+        selectedTokenIds={selectedTokenIds}
+        onClearSelection={() => setSelectedTokenIds([])}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
+      
+      {/* Movement Lock Indicator - Shows when token movement is locked */}
+      <MovementLockIndicator />
+      
       {/* Selected Annotation Tooltip */}
       {selectedAnnotationId && (() => {
         const annotation = annotations.find(a => a.id === selectedAnnotationId);
@@ -4460,6 +4643,9 @@ export const SimpleTabletop = () => {
         region={selectedRegionForEdit}
         onUpdateRegion={updateRegion}
       />
+
+      {/* Role Selection Modal - Shows on session entry */}
+      <RoleSelectionModal open={true} />
     </div>
   );
 };

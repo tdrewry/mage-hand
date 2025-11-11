@@ -8,10 +8,16 @@
  * - Version management for backward compatibility
  */
 
-import { Token } from '../stores/sessionStore';
+import { Token, Player } from '../stores/sessionStore';
 import { GameMap } from '../stores/mapStore';
 import { CanvasRegion } from '../stores/regionStore';
 import { TokenGroup } from './groupTransforms';
+import { InitiativeEntry } from '../stores/initiativeStore';
+import { LightSource } from '../stores/lightStore';
+import { FogSettings } from '../stores/fogStore';
+import { Role } from '../stores/roleStore';
+import { VisionProfile } from '../stores/visionProfileStore';
+import { CardState } from '../types/cardTypes';
 
 export interface ProjectMetadata {
   id: string;
@@ -42,11 +48,26 @@ export interface ProjectSettings {
 export interface ProjectData {
   metadata: ProjectMetadata;
   tokens: Token[];
+  players: Player[];
   maps: GameMap[];
   regions: CanvasRegion[];
   groups: TokenGroup[];
   viewport: ViewportState;
   settings: ProjectSettings;
+  // Additional store data
+  initiative?: {
+    isInCombat: boolean;
+    currentTurnIndex: number;
+    roundNumber: number;
+    initiativeOrder: InitiativeEntry[];
+    restrictMovement: boolean;
+  };
+  roles?: Role[];
+  visionProfiles?: VisionProfile[];
+  fogData?: FogSettings;
+  lights?: LightSource[];
+  cardStates?: CardState[];
+  dungeonData?: any; // Optional dungeon data
 }
 
 export interface SerializedProject {
@@ -294,4 +315,10 @@ export const validateProjectData = (data: any): data is ProjectData => {
     data.viewport &&
     data.settings
   );
+};
+
+// Apply loaded project data to all stores
+export const applyProjectDataToStores = (projectData: ProjectData): void => {
+  // This function will be called from the component to apply data to stores
+  // Implemented in the component to avoid circular dependencies
 };
