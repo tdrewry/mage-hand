@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { toast } from 'sonner';
 import { 
   Save, 
@@ -49,6 +50,7 @@ import {
   ProjectData,
   ProjectMetadata
 } from '../../lib/projectSerializer';
+import { cn, processInChunks } from '../../lib/utils';
 
 import { useSessionStore } from '../../stores/sessionStore';
 import { useMapStore } from '../../stores/mapStore';
@@ -385,74 +387,121 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     sessionStore.setMovementLocked(true);
 
     try {
-      // Step 1: Clear and add tokens
-      setLoadingProgress('Loading tokens...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Step 1: Clear existing tokens
+      setLoadingProgress('Clearing existing tokens...');
+      const existingTokens = [...sessionStore.tokens];
+      await processInChunks(
+        existingTokens,
+        10,
+        (token) => sessionStore.removeToken(token.id),
+        (processed, total) => setLoadingProgress(`Clearing tokens (${processed}/${total})...`)
+      );
       if (cancelRequested) throw new Error('Import cancelled by user');
       
-      const existingTokens = [...sessionStore.tokens];
-      existingTokens.forEach(token => sessionStore.removeToken(token.id));
-      (projectData.tokens || []).forEach(token => sessionStore.addToken(token));
+      // Step 2: Add new tokens
+      const tokens = projectData.tokens || [];
+      await processInChunks(
+        tokens,
+        10,
+        (token) => sessionStore.addToken(token),
+        (processed, total) => setLoadingProgress(`Loading tokens (${processed}/${total})...`)
+      );
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
-      // Add/update players
-      (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
+      // Step 3: Add/update players
+      const players = projectData.players || [];
+      await processInChunks(
+        players,
+        15,
+        (player) => sessionStore.addPlayer(player),
+        (processed, total) => setLoadingProgress(`Loading players (${processed}/${total})...`)
+      );
+      if (cancelRequested) throw new Error('Import cancelled by user');
       
-      // Apply session settings
+      // Step 4: Apply session settings
+      setLoadingProgress('Applying session settings...');
       sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
       sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
-      
-      // Step 2: Clear and add maps
-      setLoadingProgress('Loading maps...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 5: Clear existing maps
+      setLoadingProgress('Clearing existing maps...');
       const existingMaps = [...mapStore.maps];
-      existingMaps.forEach(map => mapStore.removeMap(map.id));
-      (projectData.maps || []).forEach(map => {
-        // Add map without regions first, then add regions separately
-        const { regions, ...mapData } = map;
-        mapStore.addMap({ ...mapData, regions: [] });
-      });
-      
-      // Step 3: Clear and add regions
-      setLoadingProgress('Loading regions...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await processInChunks(
+        existingMaps,
+        5,
+        (map) => mapStore.removeMap(map.id),
+        (processed, total) => setLoadingProgress(`Clearing maps (${processed}/${total})...`)
+      );
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 6: Add new maps
+      const maps = projectData.maps || [];
+      await processInChunks(
+        maps,
+        5,
+        (map) => {
+          const { regions, ...mapData } = map;
+          mapStore.addMap({ ...mapData, regions: [] });
+        },
+        (processed, total) => setLoadingProgress(`Loading maps (${processed}/${total})...`)
+      );
+      if (cancelRequested) throw new Error('Import cancelled by user');
+      
+      // Step 7: Clear and add regions
+      setLoadingProgress('Clearing regions...');
       regionStore.clearRegions();
-      (projectData.regions || []).forEach(region => regionStore.addRegion(region));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (cancelRequested) throw new Error('Import cancelled by user');
+      
+      const regions = projectData.regions || [];
+      await processInChunks(
+        regions,
+        5,
+        (region) => regionStore.addRegion(region),
+        (processed, total) => setLoadingProgress(`Loading regions (${processed}/${total})...`)
+      );
+      if (cancelRequested) throw new Error('Import cancelled by user');
     
-      // Step 4: Clear and add groups
-      setLoadingProgress('Loading groups...');
-      await new Promise(resolve => setTimeout(resolve, 50));
-      if (cancelRequested) throw new Error('Import cancelled by user');
-      
+      // Step 8: Clear and add groups
+      setLoadingProgress('Clearing groups...');
       groupStore.clearAllGroups();
-      (projectData.groups || []).forEach(group => {
-        const { name, tokenIds } = group;
-        const newGroup = groupStore.addGroup(name, tokenIds);
-        // Update the group with the full saved data
-        groupStore.updateGroup(newGroup.id, {
-          id: group.id, // Restore original ID
-          transform: group.transform,
-          pivot: group.pivot,
-          bounds: group.bounds,
-          locked: group.locked,
-          visible: group.visible,
-        });
-      });
-      
-      // Step 5: Apply initiative data
-      setLoadingProgress('Loading initiative...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
-      if (projectData.initiative) {
-        initiativeStore.endCombat(); // Clear first
-        if (projectData.initiative.isInCombat) {
-          projectData.initiative.initiativeOrder.forEach(entry => {
-            initiativeStore.addToInitiative(entry.tokenId, entry.initiative);
+      const groups = projectData.groups || [];
+      await processInChunks(
+        groups,
+        8,
+        (group) => {
+          const { name, tokenIds } = group;
+          const newGroup = groupStore.addGroup(name, tokenIds);
+          groupStore.updateGroup(newGroup.id, {
+            id: group.id,
+            transform: group.transform,
+            pivot: group.pivot,
+            bounds: group.bounds,
+            locked: group.locked,
+            visible: group.visible,
           });
+        },
+        (processed, total) => setLoadingProgress(`Loading groups (${processed}/${total})...`)
+      );
+      if (cancelRequested) throw new Error('Import cancelled by user');
+      
+      // Step 9: Apply initiative data
+      setLoadingProgress('Loading initiative...');
+      if (projectData.initiative) {
+        initiativeStore.endCombat();
+        if (projectData.initiative.isInCombat) {
+          const entries = projectData.initiative.initiativeOrder || [];
+          await processInChunks(
+            entries,
+            15,
+            (entry) => initiativeStore.addToInitiative(entry.tokenId, entry.initiative),
+            (processed, total) => setLoadingProgress(`Loading initiative (${processed}/${total})...`)
+          );
           initiativeStore.startCombat();
           // Set to correct turn
           for (let i = 0; i < projectData.initiative.currentTurnIndex; i++) {
@@ -461,34 +510,53 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }
         initiativeStore.setRestrictMovement(projectData.initiative.restrictMovement);
       }
-      
-      // Step 6: Apply roles
-      setLoadingProgress('Loading roles...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 10: Apply roles
       if (projectData.roles) {
+        setLoadingProgress('Clearing roles...');
         const existingRoles = [...roleStore.roles];
-        existingRoles.forEach(role => roleStore.removeRole(role.id));
-        projectData.roles.forEach(role => roleStore.addRole(role));
+        await processInChunks(
+          existingRoles,
+          20,
+          (role) => roleStore.removeRole(role.id),
+          (processed, total) => setLoadingProgress(`Clearing roles (${processed}/${total})...`)
+        );
+        if (cancelRequested) throw new Error('Import cancelled by user');
+        
+        await processInChunks(
+          projectData.roles,
+          20,
+          (role) => roleStore.addRole(role),
+          (processed, total) => setLoadingProgress(`Loading roles (${processed}/${total})...`)
+        );
       }
-      
-      // Step 7: Apply vision profiles
-      setLoadingProgress('Loading vision profiles...');
-      await new Promise(resolve => setTimeout(resolve, 50));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 11: Apply vision profiles
       if (projectData.visionProfiles) {
+        setLoadingProgress('Clearing vision profiles...');
         const existingProfiles = [...visionProfileStore.profiles];
-        existingProfiles.forEach(profile => visionProfileStore.removeProfile(profile.id));
-        projectData.visionProfiles.forEach(profile => visionProfileStore.addProfile(profile));
+        await processInChunks(
+          existingProfiles,
+          10,
+          (profile) => visionProfileStore.removeProfile(profile.id),
+          (processed, total) => setLoadingProgress(`Clearing vision profiles (${processed}/${total})...`)
+        );
+        if (cancelRequested) throw new Error('Import cancelled by user');
+        
+        await processInChunks(
+          projectData.visionProfiles,
+          10,
+          (profile) => visionProfileStore.addProfile(profile),
+          (processed, total) => setLoadingProgress(`Loading vision profiles (${processed}/${total})...`)
+        );
       }
-      
-      // Step 8: Apply fog data
-      setLoadingProgress('Loading fog of war...');
-      await new Promise(resolve => setTimeout(resolve, 50));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 12: Apply fog data
+      setLoadingProgress('Loading fog of war...');
       if (projectData.fogData) {
         fogStore.setEnabled(projectData.fogData.enabled);
         fogStore.setRevealAll(projectData.fogData.revealAll);
@@ -505,30 +573,31 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           fogStore.setOuterFadeStart(projectData.fogData.outerFadeStart);
         }
       }
-      
-      // Step 9: Apply lights
-      setLoadingProgress('Loading lights...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 13: Apply lights
+      setLoadingProgress('Clearing lights...');
       if (projectData.lights) {
         lightStore.clearAllLights();
-        projectData.lights.forEach(light => lightStore.addLight(light));
+        await processInChunks(
+          projectData.lights,
+          10,
+          (light) => lightStore.addLight(light),
+          (processed, total) => setLoadingProgress(`Loading lights (${processed}/${total})...`)
+        );
       }
-      
-      // Step 10: Apply card states
-      setLoadingProgress('Loading UI layout...');
-      await new Promise(resolve => setTimeout(resolve, 50));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 14: Apply card states
+      setLoadingProgress('Loading UI layout...');
       if (projectData.cardStates) {
-        // Clear and re-register cards
         const existingCards = [...cardStore.cards];
         existingCards.forEach(card => cardStore.unregisterCard(card.id));
         projectData.cardStates.forEach(card => {
           const config = {
             type: card.type,
-            title: '', // Will use default
+            title: '',
             defaultPosition: card.position,
             defaultSize: card.size,
             defaultMinimized: card.isMinimized,
@@ -539,12 +608,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           cardStore.registerCard(config);
         });
       }
-      
-      // Step 11: Apply dungeon data if present
-      setLoadingProgress('Loading dungeon features...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 15: Apply dungeon data
+      setLoadingProgress('Loading dungeon features...');
       if (projectData.dungeonData) {
         dungeonStore.clearAll();
         if (projectData.dungeonData.doors) {
@@ -575,24 +643,26 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           dungeonStore.setShadowDistance(projectData.dungeonData.shadowDistance);
         }
       }
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (cancelRequested) throw new Error('Import cancelled by user');
+      
+      setLoadingProgress('Import complete!');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
     } catch (error) {
-      // If cancelled, restore previous state
-      if (cancelRequested && previousState) {
-        setLoadingProgress('Restoring previous state...');
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Restore the previous state
-        await applyProjectDataWithoutCancel(previousState);
-        
-        toast.info('Import cancelled - previous state restored');
-      } else {
+      if (error instanceof Error && error.message === 'Import cancelled by user') {
+        // Restore previous state if available
+        if (previousState) {
+          setLoadingProgress('Restoring previous state...');
+          await applyProjectDataWithoutCancel(previousState);
+        }
         throw error;
       }
+      throw error;
     } finally {
       // Unlock movement and re-enable auto-save if it was enabled before
       sessionStore.setMovementLocked(false);
       if (wasAutoSaveEnabled) {
-        // Defer re-enabling to next tick to ensure all updates complete
         setTimeout(() => {
           autoSave.toggleAutoSave();
         }, 100);
@@ -640,9 +710,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     const loadingToast = toast.loading('Loading project...');
     
     try {
-      // Defer to next tick to allow UI to update
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
       const loadedData = loadProjectFromStorage(projectId);
       
       toast.dismiss(loadingToast);
@@ -664,36 +731,42 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const confirmLoad = async () => {
     if (!pendingLoadData) return;
     
-    // Save current state for cancel/restore
-    const currentState = createCurrentProjectData();
-    setPreviousState(currentState);
-    setCancelRequested(false);
-    
-    setLoading(true);
-    setLoadingProgress('Preparing to load project...');
-    
     try {
-      // Defer to next tick to allow UI to update with loading state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      await applyProjectData(pendingLoadData);
-      
-      setPendingLoadData(null);
       setShowLoadConfirm(false);
-      setLoading(false);
-      setLoadingProgress('');
-      setPreviousState(null);
       
-      toast.success('Project loaded successfully');
-    } catch (error) {
-      setLoading(false);
-      setLoadingProgress('');
-      setPreviousState(null);
+      // Save current state for cancel/restore
+      const currentState = createCurrentProjectData();
+      setPreviousState(currentState);
       setCancelRequested(false);
       
-      if (error instanceof Error && error.message !== 'Import cancelled by user') {
-        toast.error(`Failed to load project: ${error.message}`);
+      // Set loading state FIRST
+      setLoading(true);
+      setLoadingProgress('Preparing to load project...');
+      
+      // Force a render by waiting for next event loop tick
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // NOW start the import process
+      await applyProjectData(pendingLoadData);
+      
+      toast.success('Project loaded successfully');
+      
+      // Refresh the saved projects list
+      const projects = getSavedProjects();
+      setSavedProjects(projects);
+      
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Import cancelled by user') {
+        toast.info('Import cancelled');
+      } else {
+        toast.error(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+    } finally {
+      setLoading(false);
+      setLoadingProgress('');
+      setPreviousState(null);
+      setPendingLoadData(null);
+      setCancelRequested(false);
     }
   };
 
@@ -718,9 +791,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     const loadingToast = toast.loading('Importing project file...');
 
     try {
-      // Defer to allow UI to update
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
       const projectData = await importProjectFromFile(file);
       
       toast.dismiss(loadingToast);
@@ -767,14 +837,26 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
   return (
     <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-2 relative">
-      {/* Loading Overlay */}
-      {loading && (
-        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-[100] flex flex-col items-center justify-center gap-4 rounded-lg">
-          <div className="flex flex-col items-center gap-4">
+      {/* Loading Dialog */}
+      <Dialog open={loading} onOpenChange={() => {}}>
+        <DialogContent 
+          className="sm:max-w-md" 
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Loading Project</DialogTitle>
+            <DialogDescription>
+              Please wait while we load your project data
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
             <div className="text-center px-6">
-              <p className="text-lg font-semibold text-foreground">{loadingProgress}</p>
-              <p className="text-sm text-muted-foreground mt-1">Please wait, do not close this window</p>
+              <p className="text-base font-medium">{loadingProgress}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Do not close this window
+              </p>
             </div>
             <Button
               variant="destructive"
@@ -786,8 +868,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               {cancelRequested ? 'Cancelling...' : 'Cancel Import'}
             </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
