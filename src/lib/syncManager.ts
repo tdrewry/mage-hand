@@ -444,28 +444,24 @@ class SyncManager {
     }
 
     console.log('🌫️ Fog updated from remote:', data.action);
-    const fogStore = useFogStore.getState();
-    const set = (fogStore as any)._set || ((fogStore as any).setState);
-
-    if (!set) {
-      console.error('Cannot update fog store - no setState method');
-      return;
-    }
 
     switch (data.action) {
       case 'reveal':
         if (data.data?.serializedExploredAreas !== undefined) {
           console.log('  👁️ Applying fog reveals from remote');
-          set({ serializedExploredAreas: data.data.serializedExploredAreas });
+          // Use the store's internal setState directly from the module
+          useFogStore.setState({ serializedExploredAreas: data.data.serializedExploredAreas });
         }
         break;
       case 'update':
         console.log('  ⚙️ Applying fog settings from remote');
-        set(data.data);
+        // Use the store's internal setState directly from the module
+        useFogStore.setState(data.data);
         break;
       case 'clear':
         console.log('  🧹 Clearing fog from remote');
-        set({ serializedExploredAreas: '' });
+        // Use the store's internal setState directly from the module
+        useFogStore.setState({ serializedExploredAreas: '' });
         break;
     }
   }

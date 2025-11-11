@@ -9,6 +9,7 @@ import { useFogStore } from '@/stores/fogStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useRoleStore } from '@/stores/roleStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { getTokensForVisionCalculation } from '@/lib/visionPermissions';
 import { getFogScope, computeFogMasks, visibilityPolygonToPaperPath, addVisibleToExplored, createEmptyExplored } from '@/lib/fogGeometry';
 import { computeTokenVisibilityPaper } from '@/lib/fogOfWar';
@@ -55,6 +56,10 @@ export const MapCardContent = () => {
   const { regions } = useRegionStore();
   const fogSettings = useFogStore();
   const { roles } = useRoleStore();
+  const { visibilitySnapshot, isConnected } = useMultiplayerStore(state => ({
+    visibilitySnapshot: state.visibilitySnapshot,
+    isConnected: state.connectionStatus === 'connected'
+  }));
   const { lights, globalAmbientLight, shadowIntensity } = useLightStore();
   const { 
     renderingMode, 
@@ -86,6 +91,56 @@ export const MapCardContent = () => {
       return;
     }
 
+    // In multiplayer, non-DM players receive fog data from server
+    if (isConnected) {
+      const currentPlayer = players.find(p => p.id === currentPlayerId);
+      const isDM = roles.some(role => 
+        role.name === 'Dungeon Master' && 
+        currentPlayer?.roleIds?.includes(role.id)
+      );
+      
+      // Only DM computes fog locally, players receive it via sync
+      if (!isDM) {
+        // Players use the synced explored areas data
+        if (fogSettings.serializedExploredAreas) {
+          try {
+            const fogScope = getFogScope();
+            fogScope.activate();
+            const imported = fogScope.project.importJSON(fogSettings.serializedExploredAreas);
+            if (imported && typeof imported === 'object' && 'exploredPathData' in imported) {
+              const pathData = (imported as any).exploredPathData;
+              if (typeof pathData === 'string') {
+                const restoredPath = fogScope.project.importJSON(pathData);
+                if (restoredPath instanceof paper.CompoundPath) {
+                  setExploredArea(restoredPath);
+                  
+                  // Create full visibility from explored areas for players
+                  setCurrentVisibility(restoredPath.clone() as paper.Path);
+                  
+                  // Compute fog masks
+                  const canvasBounds = {
+                    x: -10000,
+                    y: -10000,
+                    width: 20000,
+                    height: 20000
+                  };
+                  const masks = computeFogMasks(restoredPath, restoredPath.clone() as paper.Path, canvasBounds);
+                  fogMasksRef.current = masks;
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Failed to restore fog from sync:', e);
+          }
+        } else {
+          setCurrentVisibility(null);
+          fogMasksRef.current = null;
+        }
+        return;
+      }
+    }
+
+    // DM or single-player: compute fog locally
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -138,7 +193,7 @@ export const MapCardContent = () => {
         fogMasksRef.current = masks;
       }
     });
-  }, [tokens, regions, fogSettings, renderingMode, currentPlayerId, players, roles]);
+  }, [tokens, regions, fogSettings, renderingMode, currentPlayerId, players, roles, isConnected]);
 
   // Canvas mouse handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -308,6 +363,18 @@ export const MapCardContent = () => {
     const visibleTokens = tokens.filter(token => {
       // In play mode, apply visibility filtering
       if (renderingMode === 'play') {
+        // In multiplayer, use synced visibility data
+        if (isConnected && visibilitySnapshot) {
+          const tokenVisData = visibilitySnapshot.tokens.find(t => t.tokenId === token.id);
+          if (tokenVisData) {
+            // Check if current player can see this token
+            return tokenVisData.visibleToPlayers.includes(currentPlayerId || '');
+          }
+          // If no visibility data, assume visible (fallback)
+          return true;
+        }
+        
+        // Single player mode - use local visibility rules
         // Check ownership
         if (tokenVisibility === 'owned' && token.ownerId !== currentPlayerId) {
           return false;

@@ -73,6 +73,15 @@ export interface SyncMapPayload {
   userId: string;
 }
 
+export interface SyncRegionPayload {
+  action: 'add' | 'update' | 'remove' | 'clear';
+  regionId?: string;
+  region?: any; // Full region for 'add'
+  data?: any; // Partial data for updates
+  timestamp: number;
+  userId: string;
+}
+
 // ============= Server → Client Events =============
 
 export interface SessionJoinedPayload {
@@ -108,6 +117,7 @@ export interface FullStateSyncPayload {
     initiativeOrder: any[];
   };
   maps?: any[]; // Map data
+  regions?: any[]; // Region data
   fog?: any;
   visibility?: {
     tokens: Array<{
@@ -178,6 +188,7 @@ export const ClientEvents = {
   SYNC_FOG: 'sync_fog',
   SYNC_ROLE: 'sync_role',
   SYNC_MAP: 'sync_map',
+  SYNC_REGION: 'sync_region',
   SYNC_VISIBILITY: 'sync_visibility',
   
   // Requests
@@ -205,6 +216,7 @@ export const ServerEvents = {
   FOG_UPDATED: 'fog_updated',
   ROLE_ASSIGNED: 'role_assigned',
   MAP_UPDATED: 'map_updated',
+  REGION_UPDATED: 'region_updated',
   VISIBILITY_UPDATED: 'visibility_updated',
   
   // User management
