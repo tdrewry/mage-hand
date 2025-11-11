@@ -54,6 +54,7 @@ export class SocketClient {
         });
 
         this.setupInternalHandlers();
+        this.registerPendingHandlers();
 
         this.socket.on('connect', () => {
           console.log('✅ Socket connected:', this.socket?.id);
@@ -74,6 +75,21 @@ export class SocketClient {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Register all pending event handlers with the socket
+   */
+  private registerPendingHandlers(): void {
+    if (!this.socket) return;
+    
+    this.eventHandlers.forEach((handlers, event) => {
+      handlers.forEach(handler => {
+        this.socket!.on(event, handler);
+      });
+    });
+    
+    console.log(`📡 Registered ${this.eventHandlers.size} event handlers`);
   }
 
   /**
