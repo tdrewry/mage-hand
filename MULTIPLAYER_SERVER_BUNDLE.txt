@@ -1,0 +1,916 @@
+========================================
+TABLETOP MULTIPLAYER SERVER - COMPLETE BUNDLE
+========================================
+
+This bundle contains all files needed for the Socket.io multiplayer server.
+Create each file in a new folder called "tabletop-server".
+
+========================================
+FILE: package.json
+========================================
+{
+  "name": "tabletop-multiplayer-server",
+  "version": "1.0.0",
+  "description": "Socket.io server for tabletop multiplayer sessions",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": ["socketio", "multiplayer", "tabletop"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io": "^4.8.1",
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
+
+========================================
+FILE: index.js
+========================================
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const SessionManager = require('./sessionManager');
+const { 
+  handleCreateSession, 
+  handleJoinSession, 
+  handleLeaveSession,
+  handleSyncToken,
+  handleSyncInitiative,
+  handleSyncFog,
+  handleSyncRole,
+  handleRequestFullSync,
+  handleKickUser
+} = require('./eventHandlers');
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_ORIGIN || "http://localhost:8080",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+const sessionManager = new SessionManager();
+
+// Basic health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    sessions: sessionManager.getActiveSessions(),
+    connections: io.engine.clientsCount
+  });
+});
+
+io.on('connection', (socket) => {
+  console.log(`[Connection] New connection: ${socket.id}`);
+
+  // Session Management
+  socket.on('create_session', (payload) => 
+    handleCreateSession(socket, io, sessionManager, payload)
+  );
+
+  socket.on('join_session', (payload) => 
+    handleJoinSession(socket, io, sessionManager, payload)
+  );
+
+  socket.on('leave_session', () => 
+    handleLeaveSession(socket, io, sessionManager)
+  );
+
+  // State Synchronization
+  socket.on('sync_token', (payload) => 
+    handleSyncToken(socket, io, sessionManager, payload)
+  );
+
+  socket.on('sync_initiative', (payload) => 
+    handleSyncInitiative(socket, io, sessionManager, payload)
+  );
+
+  socket.on('sync_fog', (payload) => 
+    handleSyncFog(socket, io, sessionManager, payload)
+  );
+
+  socket.on('sync_role', (payload) => 
+    handleSyncRole(socket, io, sessionManager, payload)
+  );
+
+  // Additional Events
+  socket.on('request_full_sync', () => 
+    handleRequestFullSync(socket, sessionManager)
+  );
+
+  socket.on('kick_user', (payload) => 
+    handleKickUser(socket, io, sessionManager, payload)
+  );
+
+  // Disconnection handling
+  socket.on('disconnect', () => {
+    console.log(`[Disconnect] Client disconnected: ${socket.id}`);
+    handleLeaveSession(socket, io, sessionManager);
+  });
+});
+
+const PORT = process.env.PORT || 3001;
+httpServer.listen(PORT, () => {
+  console.log(`[Server] Socket.io server running on port ${PORT}`);
+  console.log(`[Server] Accepting connections from: ${process.env.CLIENT_ORIGIN || "http://localhost:8080"}`);
+});
+
+========================================
+FILE: sessionManager.js
+========================================
+const crypto = require('crypto');
+
+class SessionManager {
+  constructor() {
+    // Map<sessionId, Session>
+    this.sessions = new Map();
+    // Map<socketId, sessionId>
+    this.socketToSession = new Map();
+  }
+
+  /**
+   * Create a new session
+   */
+  createSession(sessionCode, password, creatorSocketId, username, roleIds = []) {
+    const sessionId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+    
+    const session = {
+      sessionId,
+      sessionCode,
+      password: password || null,
+      createdAt: Date.now(),
+      users: new Map(),
+      state: {
+        tokens: [],
+        initiative: {
+          isInCombat: false,
+          currentTurnIndex: -1,
+          roundNumber: 0,
+          initiativeOrder: []
+        },
+        fog: null,
+        roles: []
+      }
+    };
+
+    // Add creator as first user
+    session.users.set(userId, {
+      userId,
+      username,
+      socketId: creatorSocketId,
+      roleIds: roleIds.length > 0 ? roleIds : ['dm'], // Creator is DM by default
+      connectedAt: Date.now()
+    });
+
+    this.sessions.set(sessionId, session);
+    this.socketToSession.set(creatorSocketId, sessionId);
+
+    return { session, userId };
+  }
+
+  /**
+   * Join an existing session
+   */
+  joinSession(sessionCode, password, socketId, username, roleIds = []) {
+    const session = this.findSessionByCode(sessionCode);
+    
+    if (!session) {
+      return { error: { code: 'NOT_FOUND', message: 'Session not found' } };
+    }
+
+    if (session.password && session.password !== password) {
+      return { error: { code: 'INVALID_PASSWORD', message: 'Invalid password' } };
+    }
+
+    const userId = crypto.randomUUID();
+    session.users.set(userId, {
+      userId,
+      username,
+      socketId,
+      roleIds: roleIds.length > 0 ? roleIds : ['player'],
+      connectedAt: Date.now()
+    });
+
+    this.socketToSession.set(socketId, session.sessionId);
+
+    return { session, userId };
+  }
+
+  /**
+   * Remove a user from their session
+   */
+  leaveSession(socketId) {
+    const sessionId = this.socketToSession.get(socketId);
+    if (!sessionId) return null;
+
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    // Find and remove the user
+    let removedUser = null;
+    for (const [userId, user] of session.users.entries()) {
+      if (user.socketId === socketId) {
+        removedUser = user;
+        session.users.delete(userId);
+        break;
+      }
+    }
+
+    this.socketToSession.delete(socketId);
+
+    // Clean up empty sessions
+    if (session.users.size === 0) {
+      this.sessions.delete(sessionId);
+      console.log(`[Session] Deleted empty session: ${sessionId}`);
+    }
+
+    return { session, removedUser };
+  }
+
+  /**
+   * Get session by socket ID
+   */
+  getSessionBySocket(socketId) {
+    const sessionId = this.socketToSession.get(socketId);
+    return sessionId ? this.sessions.get(sessionId) : null;
+  }
+
+  /**
+   * Get user by socket ID
+   */
+  getUserBySocket(socketId) {
+    const session = this.getSessionBySocket(socketId);
+    if (!session) return null;
+
+    for (const user of session.users.values()) {
+      if (user.socketId === socketId) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find session by code
+   */
+  findSessionByCode(sessionCode) {
+    for (const session of this.sessions.values()) {
+      if (session.sessionCode === sessionCode) {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Update session state
+   */
+  updateState(sessionId, stateType, data) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    switch (stateType) {
+      case 'tokens':
+        session.state.tokens = data;
+        break;
+      case 'initiative':
+        session.state.initiative = { ...session.state.initiative, ...data };
+        break;
+      case 'fog':
+        session.state.fog = data;
+        break;
+      case 'roles':
+        session.state.roles = data;
+        break;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get all users in a session as array
+   */
+  getSessionUsers(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return [];
+
+    return Array.from(session.users.values()).map(user => ({
+      userId: user.userId,
+      username: user.username,
+      roleIds: user.roleIds,
+      connectedAt: user.connectedAt
+    }));
+  }
+
+  /**
+   * Update user roles
+   */
+  updateUserRoles(sessionId, userId, roleIds) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const user = session.users.get(userId);
+    if (!user) return false;
+
+    user.roleIds = roleIds;
+    return true;
+  }
+
+  /**
+   * Kick a user from session
+   */
+  kickUser(sessionId, userId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const user = session.users.get(userId);
+    if (!user) return null;
+
+    session.users.delete(userId);
+    this.socketToSession.delete(user.socketId);
+
+    return user;
+  }
+
+  /**
+   * Get active session count
+   */
+  getActiveSessions() {
+    return this.sessions.size;
+  }
+}
+
+module.exports = SessionManager;
+
+========================================
+FILE: eventHandlers.js
+========================================
+/**
+ * Handle session creation
+ */
+function handleCreateSession(socket, io, sessionManager, payload) {
+  const { username, password } = payload;
+
+  // Generate a random 6-character session code
+  const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  const result = sessionManager.createSession(
+    sessionCode, 
+    password, 
+    socket.id, 
+    username
+  );
+
+  const users = sessionManager.getSessionUsers(result.session.sessionId);
+
+  console.log(`[Session] Created: ${sessionCode} (${result.session.sessionId})`);
+
+  // Join the socket to a room
+  socket.join(result.session.sessionId);
+
+  // Send response to creator
+  socket.emit('session_created', {
+    sessionCode,
+    sessionId: result.session.sessionId,
+    users,
+    yourUserId: result.userId
+  });
+}
+
+/**
+ * Handle joining a session
+ */
+function handleJoinSession(socket, io, sessionManager, payload) {
+  const { sessionCode, username, password, roleIds } = payload;
+
+  const result = sessionManager.joinSession(
+    sessionCode,
+    password,
+    socket.id,
+    username,
+    roleIds
+  );
+
+  if (result.error) {
+    socket.emit('session_error', result.error);
+    return;
+  }
+
+  const { session, userId } = result;
+  const users = sessionManager.getSessionUsers(session.sessionId);
+  const newUser = session.users.get(userId);
+
+  console.log(`[Session] User joined: ${username} -> ${sessionCode}`);
+
+  // Join the socket to the room
+  socket.join(session.sessionId);
+
+  // Send full state to the new user
+  socket.emit('session_joined', {
+    sessionCode: session.sessionCode,
+    sessionId: session.sessionId,
+    users,
+    yourUserId: userId
+  });
+
+  // Send full state sync
+  socket.emit('full_state_sync', {
+    tokens: session.state.tokens,
+    initiative: session.state.initiative,
+    fog: session.state.fog,
+    roles: session.state.roles,
+    players: users,
+    sessionMetadata: {
+      sessionCode: session.sessionCode,
+      createdAt: session.createdAt
+    }
+  });
+
+  // Notify other users
+  socket.to(session.sessionId).emit('user_joined', {
+    user: {
+      userId: newUser.userId,
+      username: newUser.username,
+      roleIds: newUser.roleIds,
+      connectedAt: newUser.connectedAt
+    }
+  });
+
+  // Broadcast updated user list
+  io.to(session.sessionId).emit('user_list_updated', { users });
+}
+
+/**
+ * Handle leaving a session
+ */
+function handleLeaveSession(socket, io, sessionManager) {
+  const result = sessionManager.leaveSession(socket.id);
+  
+  if (!result) return;
+
+  const { session, removedUser } = result;
+
+  console.log(`[Session] User left: ${removedUser.username}`);
+
+  // Leave the room
+  socket.leave(session.sessionId);
+
+  // Notify others
+  if (session.users.size > 0) {
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    
+    socket.to(session.sessionId).emit('user_left', {
+      userId: removedUser.userId,
+      username: removedUser.username
+    });
+
+    io.to(session.sessionId).emit('user_list_updated', { users });
+  }
+
+  socket.emit('session_left');
+}
+
+/**
+ * Handle token synchronization
+ */
+function handleSyncToken(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, tokenId, token, data, timestamp, userId } = payload;
+
+  // Update session state based on action
+  let tokens = [...session.state.tokens];
+  
+  switch (action) {
+    case 'add':
+      tokens.push(token);
+      sessionManager.updateState(session.sessionId, 'tokens', tokens);
+      
+      io.to(session.sessionId).emit('token_added', {
+        token,
+        userId,
+        timestamp
+      });
+      break;
+
+    case 'remove':
+      tokens = tokens.filter(t => t.id !== tokenId);
+      sessionManager.updateState(session.sessionId, 'tokens', tokens);
+      
+      io.to(session.sessionId).emit('token_removed', {
+        tokenId,
+        userId,
+        timestamp
+      });
+      break;
+
+    case 'update':
+    case 'updatePosition':
+    case 'updateLabel':
+    case 'updateColor':
+    case 'updateVision':
+      const tokenIndex = tokens.findIndex(t => t.id === tokenId);
+      if (tokenIndex !== -1) {
+        tokens[tokenIndex] = { ...tokens[tokenIndex], ...data };
+        sessionManager.updateState(session.sessionId, 'tokens', tokens);
+      }
+      
+      io.to(session.sessionId).emit('token_updated', {
+        action,
+        tokenId,
+        data,
+        timestamp,
+        userId
+      });
+      break;
+  }
+}
+
+/**
+ * Handle initiative synchronization
+ */
+function handleSyncInitiative(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, data, timestamp, userId } = payload;
+
+  // Update session state
+  let initiative = { ...session.state.initiative };
+
+  switch (action) {
+    case 'start':
+      initiative.isInCombat = true;
+      initiative.currentTurnIndex = 0;
+      initiative.roundNumber = 1;
+      break;
+
+    case 'end':
+      initiative.isInCombat = false;
+      initiative.currentTurnIndex = -1;
+      initiative.roundNumber = 0;
+      initiative.initiativeOrder = [];
+      break;
+
+    case 'add':
+      initiative.initiativeOrder.push(data);
+      break;
+
+    case 'remove':
+      initiative.initiativeOrder = initiative.initiativeOrder.filter(
+        entry => entry.id !== data.id
+      );
+      break;
+
+    case 'nextTurn':
+      if (initiative.currentTurnIndex < initiative.initiativeOrder.length - 1) {
+        initiative.currentTurnIndex++;
+      } else {
+        initiative.currentTurnIndex = 0;
+        initiative.roundNumber++;
+      }
+      break;
+
+    case 'previousTurn':
+      if (initiative.currentTurnIndex > 0) {
+        initiative.currentTurnIndex--;
+      } else {
+        initiative.currentTurnIndex = initiative.initiativeOrder.length - 1;
+        if (initiative.roundNumber > 1) {
+          initiative.roundNumber--;
+        }
+      }
+      break;
+
+    case 'updateOrder':
+      initiative.initiativeOrder = data;
+      break;
+  }
+
+  sessionManager.updateState(session.sessionId, 'initiative', initiative);
+
+  // Broadcast to all clients in session
+  io.to(session.sessionId).emit('initiative_updated', {
+    action,
+    data: initiative,
+    timestamp,
+    userId
+  });
+
+  // Also send combat state change for start/end/turn changes
+  if (['start', 'end', 'nextTurn', 'previousTurn'].includes(action)) {
+    io.to(session.sessionId).emit('combat_state_changed', {
+      isInCombat: initiative.isInCombat,
+      currentTurnIndex: initiative.currentTurnIndex,
+      roundNumber: initiative.roundNumber,
+      timestamp
+    });
+  }
+}
+
+/**
+ * Handle fog synchronization
+ */
+function handleSyncFog(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, data, timestamp, userId } = payload;
+
+  // Update session fog state
+  sessionManager.updateState(session.sessionId, 'fog', data);
+
+  // Broadcast to all clients
+  io.to(session.sessionId).emit('fog_updated', {
+    action,
+    data,
+    timestamp,
+    userId
+  });
+}
+
+/**
+ * Handle role synchronization
+ */
+function handleSyncRole(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, userId, roleIds, timestamp, senderId } = payload;
+
+  // Verify sender has permission (should be DM)
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can assign roles'
+    });
+    return;
+  }
+
+  if (action === 'assign') {
+    sessionManager.updateUserRoles(session.sessionId, userId, roleIds);
+    
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    
+    // Broadcast role change
+    io.to(session.sessionId).emit('user_role_changed', {
+      userId,
+      roleIds,
+      timestamp
+    });
+
+    io.to(session.sessionId).emit('user_list_updated', { users });
+  }
+}
+
+/**
+ * Handle full state sync request
+ */
+function handleRequestFullSync(socket, sessionManager) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const users = sessionManager.getSessionUsers(session.sessionId);
+
+  socket.emit('full_state_sync', {
+    tokens: session.state.tokens,
+    initiative: session.state.initiative,
+    fog: session.state.fog,
+    roles: session.state.roles,
+    players: users,
+    sessionMetadata: {
+      sessionCode: session.sessionCode,
+      createdAt: session.createdAt
+    }
+  });
+}
+
+/**
+ * Handle kicking a user
+ */
+function handleKickUser(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  // Verify sender has permission
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can kick users'
+    });
+    return;
+  }
+
+  const { userId } = payload;
+  const kickedUser = sessionManager.kickUser(session.sessionId, userId);
+
+  if (kickedUser) {
+    // Notify the kicked user
+    io.to(kickedUser.socketId).emit('session_error', {
+      code: 'KICKED',
+      message: 'You have been removed from the session'
+    });
+
+    // Force disconnect
+    const kickedSocket = io.sockets.sockets.get(kickedUser.socketId);
+    if (kickedSocket) {
+      kickedSocket.disconnect(true);
+    }
+
+    // Notify others
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    io.to(session.sessionId).emit('user_left', {
+      userId: kickedUser.userId,
+      username: kickedUser.username
+    });
+    io.to(session.sessionId).emit('user_list_updated', { users });
+
+    console.log(`[Session] User kicked: ${kickedUser.username}`);
+  }
+}
+
+module.exports = {
+  handleCreateSession,
+  handleJoinSession,
+  handleLeaveSession,
+  handleSyncToken,
+  handleSyncInitiative,
+  handleSyncFog,
+  handleSyncRole,
+  handleRequestFullSync,
+  handleKickUser
+};
+
+========================================
+FILE: .env.example
+========================================
+PORT=3001
+CLIENT_ORIGIN=http://localhost:8080
+
+========================================
+FILE: .gitignore
+========================================
+node_modules/
+.env
+*.log
+
+========================================
+FILE: README.md
+========================================
+# Tabletop Multiplayer Server
+
+Socket.io server for real-time multiplayer tabletop sessions.
+
+## Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Configure environment (optional):
+Create a `.env` file:
+```
+PORT=3001
+CLIENT_ORIGIN=http://localhost:8080
+```
+
+3. Run the server:
+```bash
+# Production
+npm start
+
+# Development (with auto-reload)
+npm run dev
+```
+
+## Architecture
+
+### Files
+- `index.js` - Main server entry point, Socket.io setup
+- `sessionManager.js` - Session and user state management
+- `eventHandlers.js` - Socket event handlers for all client events
+
+### Session Management
+Sessions are stored in memory with:
+- Unique session codes (6-character alphanumeric)
+- Optional password protection
+- User tracking with roles
+- Game state (tokens, initiative, fog)
+
+### API Events
+
+#### Client → Server
+- `create_session` - Create new session
+- `join_session` - Join existing session
+- `leave_session` - Leave current session
+- `sync_token` - Sync token changes
+- `sync_initiative` - Sync initiative/combat
+- `sync_fog` - Sync fog of war
+- `sync_role` - Assign/update user roles
+- `request_full_sync` - Request full state
+- `kick_user` - Remove user (DM only)
+
+#### Server → Client
+- `session_created` - Session created confirmation
+- `session_joined` - Joined session confirmation
+- `session_error` - Error occurred
+- `user_joined` - Another user joined
+- `user_left` - User disconnected
+- `full_state_sync` - Complete state snapshot
+- `token_added/updated/removed` - Token changes
+- `initiative_updated` - Initiative changes
+- `combat_state_changed` - Combat status
+- `fog_updated` - Fog changes
+- `user_list_updated` - User list changed
+- `user_role_changed` - User role updated
+
+## Health Check
+
+GET `/health` returns server status:
+```json
+{
+  "status": "ok",
+  "sessions": 3,
+  "connections": 12
+}
+```
+
+## State Management
+
+All game state is stored in memory per session:
+```javascript
+{
+  tokens: [],
+  initiative: {
+    isInCombat: false,
+    currentTurnIndex: -1,
+    roundNumber: 0,
+    initiativeOrder: []
+  },
+  fog: null,
+  roles: []
+}
+```
+
+Sessions are automatically cleaned up when all users disconnect.
+
+## Security Notes
+
+- Password validation for sessions
+- Role-based permission checks (DM actions)
+- Socket ID tracking for user management
+- Automatic cleanup on disconnect
+
+## Deployment
+
+For production deployment:
+1. Set `CLIENT_ORIGIN` to your client app URL
+2. Use a process manager (PM2, systemd)
+3. Configure reverse proxy (nginx)
+4. Enable HTTPS/WSS
+
+Example PM2:
+```bash
+pm2 start index.js --name tabletop-server
+pm2 save
+pm2 startup
+```
+
+========================================
+SETUP INSTRUCTIONS
+========================================
+
+1. Download this file and create a new folder called "tabletop-server"
+
+2. Create each file listed above in that folder with the exact content
+
+3. Run these commands:
+   cd tabletop-server
+   npm install
+   npm start
+
+4. The server will run on http://localhost:3001
+
+5. Update your Lovable app's multiplayerStore.ts to set:
+   serverUrl: 'http://localhost:3001'
+
+6. For production, deploy to Railway, Render, or Fly.io
+
+========================================
+END OF BUNDLE
+========================================
