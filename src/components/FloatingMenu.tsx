@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Palette, Eye, Map, Settings } from 'lucide-react';
-import { TokenPanelModal } from './modals/TokenPanelModal';
-import { BackgroundGridModal } from './modals/BackgroundGridModal';
 import { VisibilityModal } from './modals/VisibilityModal';
-import { MapControlsModal } from './modals/MapControlsModal';
 import { Canvas as FabricCanvas } from 'fabric';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 
 interface FloatingMenuProps {
   fabricCanvas: FabricCanvas | null;
@@ -29,6 +28,61 @@ export const FloatingMenu = ({
   onUpdateCanvas,
 }: FloatingMenuProps) => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+
+  useEffect(() => {
+    const card = cards.find(c => c.type === CardType.BACKGROUND_GRID);
+    if (!card) {
+      registerCard({
+        type: CardType.BACKGROUND_GRID,
+        title: 'Background & Grid',
+        defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 350, height: 450 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  }, [registerCard, cards]);
+  
+  const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
+  const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
+  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
+
+  const handleToggleTokenCard = () => {
+    if (tokenCard) {
+      setVisibility(tokenCard.id, !tokenCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.TOKENS,
+        title: 'Token Panel',
+        defaultPosition: { x: window.innerWidth - 420, y: 80 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 300, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleToggleMapControlsCard = () => {
+    if (mapControlsCard) {
+      setVisibility(mapControlsCard.id, !mapControlsCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.MAP_CONTROLS,
+        title: 'Map Controls',
+        defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+        defaultSize: { width: 400, height: 450 },
+        minSize: { width: 350, height: 400 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  };
 
   const menuItems = [
     {
@@ -63,11 +117,28 @@ export const FloatingMenu = ({
       <div className="fixed left-4 top-20 z-50 flex flex-col gap-3">
         {menuItems.map((item) => {
           const IconComponent = item.icon;
+          const isActive = 
+            (item.id === 'tokens' && tokenCard?.isVisible) ||
+            (item.id === 'maps' && mapControlsCard?.isVisible) ||
+            (item.id === 'background' && backgroundGridCard?.isVisible);
+          
           return (
             <Button
               key={item.id}
-              onClick={() => setActiveModal(item.id)}
-              className={`w-12 h-12 rounded-full ${item.color} text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl`}
+              onClick={() => {
+                if (item.id === 'tokens') {
+                  handleToggleTokenCard();
+                } else if (item.id === 'maps') {
+                  handleToggleMapControlsCard();
+                } else if (item.id === 'background') {
+                  if (backgroundGridCard) {
+                    setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
+                  }
+                } else {
+                  setActiveModal(item.id);
+                }
+              }}
+              className={`w-12 h-12 rounded-full ${isActive ? 'ring-2 ring-white' : ''} ${item.color} text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl`}
               title={item.label}
             >
               <IconComponent className="h-5 w-5" />
@@ -77,31 +148,9 @@ export const FloatingMenu = ({
       </div>
 
       {/* Modals */}
-      <TokenPanelModal
-        open={activeModal === 'tokens'}
-        onOpenChange={(open) => setActiveModal(open ? 'tokens' : null)}
-        onAddToken={onAddToken}
-      />
-
-      <BackgroundGridModal
-        open={activeModal === 'background'}
-        onOpenChange={(open) => setActiveModal(open ? 'background' : null)}
-        fabricCanvas={fabricCanvas}
-        gridColor={gridColor}
-        gridOpacity={gridOpacity}
-        onGridColorChange={onGridColorChange}
-        onGridOpacityChange={onGridOpacityChange}
-      />
-
       <VisibilityModal
         open={activeModal === 'visibility'}
         onOpenChange={(open) => setActiveModal(open ? 'visibility' : null)}
-      />
-
-      <MapControlsModal
-        open={activeModal === 'maps'}
-        onOpenChange={(open) => setActiveModal(open ? 'maps' : null)}
-        fabricCanvas={fabricCanvas}
       />
     </>
   );

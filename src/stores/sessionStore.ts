@@ -18,6 +18,12 @@ export interface Token {
   label: string;      // Editable label/name
   ownerId?: string;   // Player who owns this token
   color?: string;     // Token color (for default tokens)
+  initiative?: number; // Initiative value
+  inCombat?: boolean;  // Whether token is in combat
+  hasVision?: boolean; // Whether token can see through fog of war (default: true)
+  visionRange?: number; // Vision range in grid units (uses global default if not set)
+  visionProfileId?: string; // Reference to a vision profile from visionProfileStore
+  useGradients?: boolean; // Whether to use gradient edges (can override profile setting)
 }
 
 export interface Player {
@@ -42,6 +48,8 @@ export interface SessionState {
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
+  updateTokenVision: (tokenId: string, hasVision: boolean) => void;
+  updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   clearAllTokens: () => void;
@@ -114,6 +122,20 @@ export const useSessionStore = create<SessionState>()(
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, color } : token
+          ),
+        })),
+
+      updateTokenVision: (tokenId, hasVision) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, hasVision } : token
+          ),
+        })),
+
+      updateTokenVisionRange: (tokenId, visionRange) =>
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, visionRange } : token
           ),
         })),
 

@@ -12,7 +12,7 @@ let fogScope: paper.PaperScope | null = null;
 /**
  * Initialize or get the paper.js scope for fog operations
  */
-function getFogScope(): paper.PaperScope {
+export function getFogScope(): paper.PaperScope {
   if (!fogScope) {
     fogScope = new paper.PaperScope();
     // Create a minimal canvas for paper.js (it won't be used for rendering)

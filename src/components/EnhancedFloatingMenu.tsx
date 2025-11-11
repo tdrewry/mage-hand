@@ -5,7 +5,7 @@
  * enhanced canvas system features like project management and group operations
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { 
   FolderOpen, 
@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 
 import { FloatingMenu } from './FloatingMenu';
-import { ProjectManagerModal } from './modals/ProjectManagerModal';
 import { GroupManagerModal } from './GroupManagerModal';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 
 interface EnhancedFloatingMenuProps {
   fabricCanvas: any;
@@ -43,8 +44,33 @@ export const EnhancedFloatingMenu: React.FC<EnhancedFloatingMenuProps> = ({
   viewport,
   ...floatingMenuProps
 }) => {
-  const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+
+  useEffect(() => {
+    const card = cards.find(c => c.type === CardType.PROJECT_MANAGER);
+    if (!card) {
+      registerCard({
+        type: CardType.PROJECT_MANAGER,
+        title: 'Project Manager',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 100 },
+        defaultSize: { width: 600, height: 600 },
+        minSize: { width: 500, height: 500 },
+        isResizable: true,
+        isClosable: true,
+      });
+    }
+  }, [registerCard, cards]);
+
+  const handleToggleProjectManager = () => {
+    const card = cards.find(c => c.type === CardType.PROJECT_MANAGER);
+    if (card) {
+      setVisibility(card.id, !card.isVisible);
+    }
+  };
 
   return (
     <>
@@ -56,7 +82,7 @@ export const EnhancedFloatingMenu: React.FC<EnhancedFloatingMenuProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setProjectModalOpen(true)}
+          onClick={handleToggleProjectManager}
           className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
           title="Project Manager"
         >
@@ -75,12 +101,6 @@ export const EnhancedFloatingMenu: React.FC<EnhancedFloatingMenuProps> = ({
       </div>
 
       {/* Enhanced modals */}
-      <ProjectManagerModal
-        open={projectModalOpen}
-        onOpenChange={setProjectModalOpen}
-        viewport={viewport}
-      />
-
       <GroupManagerModal
         open={groupModalOpen}
         onOpenChange={setGroupModalOpen}
