@@ -88,6 +88,20 @@ export function renderLightSources(
     if (!light.enabled) continue;
     
     const { x, y } = light.position;
+    const colorRgb = hexToRgb(light.color) ?? { r: 255, g: 255, b: 255 };
+    const gradient = ctx.createRadialGradient(
+      x, y, 0,
+      x, y, light.radius
+    );
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(0.6, `rgba(${colorRgb.r}, ${colorRgb.g}, ${colorRgb.b}, 0.08)`);
+    gradient.addColorStop(0.85, `rgba(${colorRgb.r}, ${colorRgb.g}, ${colorRgb.b}, 0.32)`);
+    gradient.addColorStop(1, `rgba(${colorRgb.r}, ${colorRgb.g}, ${colorRgb.b}, 0.75)`);
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, light.radius, 0, Math.PI * 2);
+    ctx.fill();
     
     // Draw light radius (faint circle)
     ctx.strokeStyle = light.color + '40'; // 25% opacity
@@ -287,6 +301,30 @@ function drawEdgeShadow(
   ctx.lineTo(start.x + normalX * shadowDistance, start.y + normalY * shadowDistance);
   ctx.closePath();
   ctx.fill();
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  let sanitized = hex.replace('#', '').trim();
+  if (sanitized.length === 3) {
+    sanitized = sanitized
+      .split('')
+      .map((char) => `${char}${char}`)
+      .join('');
+  }
+
+  if (sanitized.length !== 6) {
+    return null;
+  }
+
+  const r = parseInt(sanitized.slice(0, 2), 16);
+  const g = parseInt(sanitized.slice(2, 4), 16);
+  const b = parseInt(sanitized.slice(4, 6), 16);
+
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return null;
+  }
+
+  return { r, g, b };
 }
 
 /**
