@@ -45,6 +45,7 @@ const {
   handleSyncInitiative,
   handleSyncFog,
   handleSyncRole,
+  handleSyncMap,
   handleRequestFullSync,
   handleKickUser
 } = require('./eventHandlers');
@@ -103,6 +104,10 @@ io.on('connection', (socket) => {
     handleSyncRole(socket, io, sessionManager, payload)
   );
 
+  socket.on('sync_map', (payload) => 
+    handleSyncMap(socket, io, sessionManager, payload)
+  );
+
   // Additional Events
   socket.on('request_full_sync', () => 
     handleRequestFullSync(socket, sessionManager)
@@ -159,6 +164,7 @@ class SessionManager {
           roundNumber: 0,
           initiativeOrder: []
         },
+        maps: [],
         fog: null,
         roles: []
       }
@@ -286,6 +292,9 @@ class SessionManager {
         break;
       case 'initiative':
         session.state.initiative = { ...session.state.initiative, ...data };
+        break;
+      case 'maps':
+        session.state.maps = data;
         break;
       case 'fog':
         session.state.fog = data;
@@ -428,6 +437,7 @@ function handleJoinSession(socket, io, sessionManager, payload) {
   socket.emit('full_state_sync', {
     tokens: session.state.tokens,
     initiative: session.state.initiative,
+    maps: session.state.maps,
     fog: session.state.fog,
     roles: session.state.roles,
     players: users,
@@ -677,6 +687,76 @@ function handleSyncRole(socket, io, sessionManager, payload) {
 }
 
 /**
+ * Handle map synchronization
+ */
+function handleSyncMap(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, mapId, map, data, timestamp, userId } = payload;
+
+  // Update session state based on action
+  let maps = [...session.state.maps];
+  
+  switch (action) {
+    case 'add':
+      maps.push(map);
+      sessionManager.updateState(session.sessionId, 'maps', maps);
+      
+      io.to(session.sessionId).emit('map_updated', {
+        action,
+        map,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'remove':
+      maps = maps.filter(m => m.id !== mapId);
+      sessionManager.updateState(session.sessionId, 'maps', maps);
+      
+      io.to(session.sessionId).emit('map_updated', {
+        action,
+        mapId,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'update':
+      const mapIndex = maps.findIndex(m => m.id === mapId);
+      if (mapIndex !== -1) {
+        maps[mapIndex] = { ...maps[mapIndex], ...data };
+        sessionManager.updateState(session.sessionId, 'maps', maps);
+      }
+      
+      io.to(session.sessionId).emit('map_updated', {
+        action,
+        mapId,
+        data,
+        timestamp,
+        userId
+      });
+      break;
+
+    case 'reorder':
+      if (data && data.fromIndex !== undefined && data.toIndex !== undefined) {
+        const [removed] = maps.splice(data.fromIndex, 1);
+        maps.splice(data.toIndex, 0, removed);
+        sessionManager.updateState(session.sessionId, 'maps', maps);
+        
+        io.to(session.sessionId).emit('map_updated', {
+          action,
+          data,
+          timestamp,
+          userId
+        });
+      }
+      break;
+  }
+}
+
+/**
  * Handle full state sync request
  */
 function handleRequestFullSync(socket, sessionManager) {
@@ -688,6 +768,7 @@ function handleRequestFullSync(socket, sessionManager) {
   socket.emit('full_state_sync', {
     tokens: session.state.tokens,
     initiative: session.state.initiative,
+    maps: session.state.maps,
     fog: session.state.fog,
     roles: session.state.roles,
     players: users,
@@ -751,6 +832,7 @@ module.exports = {
   handleSyncInitiative,
   handleSyncFog,
   handleSyncRole,
+  handleSyncMap,
   handleRequestFullSync,
   handleKickUser
 };
@@ -820,6 +902,7 @@ Sessions are stored in memory with:
 - `leave_session` - Leave current session
 - `sync_token` - Sync token changes
 - `sync_initiative` - Sync initiative/combat
+- `sync_map` - Sync map changes (add/update/remove/reorder)
 - `sync_fog` - Sync fog of war
 - `sync_role` - Assign/update user roles
 - `request_full_sync` - Request full state
@@ -835,6 +918,7 @@ Sessions are stored in memory with:
 - `token_added/updated/removed` - Token changes
 - `initiative_updated` - Initiative changes
 - `combat_state_changed` - Combat status
+- `map_updated` - Map changes (add/update/remove/reorder)
 - `fog_updated` - Fog changes
 - `user_list_updated` - User list changed
 - `user_role_changed` - User role updated
@@ -862,6 +946,7 @@ All game state is stored in memory per session:
     roundNumber: 0,
     initiativeOrder: []
   },
+  maps: [],
   fog: null,
   roles: []
 }
