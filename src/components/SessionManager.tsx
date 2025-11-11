@@ -81,6 +81,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       return;
     }
 
+    // Persist the current server URL to localStorage
+    setServerUrl(localServerUrl);
+
     setIsConnecting(true);
     try {
       // Initialize sync manager
@@ -110,6 +113,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       toast.error('Please enter a session code');
       return;
     }
+
+    // Persist the current server URL to localStorage
+    setServerUrl(localServerUrl);
 
     setIsConnecting(true);
     try {
