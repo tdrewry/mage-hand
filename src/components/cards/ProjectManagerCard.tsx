@@ -62,6 +62,8 @@ import { useLightStore } from '../../stores/lightStore';
 import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useSessionTemplates } from '../../hooks/useSessionTemplates';
+import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
@@ -83,6 +85,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   // Auto-save hook
   const autoSave = useAutoSave();
   const [timeSinceLastSave, setTimeSinceLastSave] = useState('Never');
+
+  // Templates
+  const templatesHook = useSessionTemplates();
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [showTemplateConfirm, setShowTemplateConfirm] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<SessionTemplate | null>(null);
 
   // Store hooks - for reading
   const sessionStore = useSessionStore();
@@ -124,6 +133,93 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     
     setPendingLoadData(autoSaveData);
     setShowLoadConfirm(true);
+  };
+
+  const handleSaveAsTemplate = () => {
+    if (!templateName.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    try {
+      const template = createTemplateFromSession(
+        templateName,
+        templateDescription,
+        {
+          maps: mapStore.maps,
+          regions: regionStore.regions,
+          roles: roleStore.roles,
+          visionProfiles: visionProfileStore.profiles,
+          fogSettings: {
+            enabled: fogStore.enabled,
+            revealAll: fogStore.revealAll,
+            visionRange: fogStore.visionRange,
+            fogOpacity: fogStore.fogOpacity,
+            exploredOpacity: fogStore.exploredOpacity,
+            showExploredAreas: fogStore.showExploredAreas,
+            serializedExploredAreas: '',
+            fogVersion: fogStore.fogVersion,
+            useGradients: fogStore.useGradients,
+            innerFadeStart: fogStore.innerFadeStart,
+            midpointPosition: fogStore.midpointPosition,
+            midpointOpacity: fogStore.midpointOpacity,
+            outerFadeStart: fogStore.outerFadeStart,
+          },
+          gridSize: 50,
+        }
+      );
+
+      templatesHook.refreshTemplates();
+      setTemplateName('');
+      setTemplateDescription('');
+      toast.success(`Template "${template.name}" saved successfully`);
+      setActiveTab('templates');
+    } catch (error) {
+      toast.error(`Failed to save template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleLoadTemplate = (template: SessionTemplate) => {
+    setPendingTemplate(template);
+    setShowTemplateConfirm(true);
+  };
+
+  const confirmTemplateLoad = () => {
+    if (!pendingTemplate) return;
+
+    try {
+      applyTemplate(pendingTemplate, {
+        mapStore,
+        regionStore,
+        roleStore,
+        visionProfileStore,
+        fogStore,
+      });
+
+      setPendingTemplate(null);
+      setShowTemplateConfirm(false);
+      toast.success(`Template "${pendingTemplate.name}" applied successfully`);
+    } catch (error) {
+      toast.error(`Failed to apply template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const cancelTemplateLoad = () => {
+    setPendingTemplate(null);
+    setShowTemplateConfirm(false);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (!confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      templatesHook.deleteTemplate(templateId);
+      toast.success('Template deleted successfully');
+    } catch (error) {
+      toast.error(`Failed to delete template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const createCurrentProjectData = (): ProjectData => ({
@@ -469,7 +565,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   return (
     <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-2">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="save" className="flex items-center gap-2 text-xs">
             <Save className="w-3 h-3" />
             Save
@@ -477,6 +573,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           <TabsTrigger value="load" className="flex items-center gap-2 text-xs">
             <Upload className="w-3 h-3" />
             Load
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="flex items-center gap-2 text-xs">
+            <FileText className="w-3 h-3" />
+            Templates
           </TabsTrigger>
           <TabsTrigger value="export" className="flex items-center gap-2 text-xs">
             <Download className="w-3 h-3" />
@@ -749,6 +849,146 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           </Card>
         </TabsContent>
 
+        <TabsContent value="templates" className="mt-4">
+          <div className="space-y-4">
+            {/* Save as Template */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Save as Template</CardTitle>
+                <CardDescription className="text-xs">
+                  Create a reusable template from your current session structure
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="template-name" className="text-xs">Template Name *</Label>
+                  <Input
+                    id="template-name"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="My Custom Template"
+                    className="text-xs"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="template-description" className="text-xs">Description</Label>
+                  <Textarea
+                    id="template-description"
+                    value={templateDescription}
+                    onChange={(e) => setTemplateDescription(e.target.value)}
+                    placeholder="Describe what this template is for..."
+                    rows={2}
+                    className="text-xs"
+                  />
+                </div>
+
+                <Button 
+                  onClick={handleSaveAsTemplate}
+                  disabled={!templateName.trim()}
+                  className="w-full text-xs"
+                  size="sm"
+                >
+                  <Save className="w-3 h-3 mr-2" />
+                  Save as Template
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Built-in Templates */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Built-in Templates</CardTitle>
+                <CardDescription className="text-xs">
+                  Pre-configured templates for common scenarios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[200px] w-full">
+                  <div className="space-y-2">
+                    {templatesHook.builtInTemplates.map((template) => (
+                      <Card key={template.id} className="p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm">{template.name}</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {template.description}
+                            </p>
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleLoadTemplate(template)}
+                            className="text-xs ml-2"
+                          >
+                            Use Template
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Custom Templates */}
+            {templatesHook.customTemplates.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Custom Templates</CardTitle>
+                  <CardDescription className="text-xs">
+                    Your saved custom templates
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[200px] w-full">
+                    <div className="space-y-2">
+                      {templatesHook.customTemplates.map((template) => (
+                        <Card key={template.id} className="p-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm">{template.name}</h4>
+                              {template.description && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {template.description}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(template.createdAt)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLoadTemplate(template)}
+                                className="text-xs"
+                              >
+                                Use
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteTemplate(template.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
         <TabsContent value="export" className="mt-4">
           <div className="space-y-4">
             <Card>
@@ -843,6 +1083,43 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
             <AlertDialogCancel onClick={cancelLoad}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmLoad}>
               Load Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Template Confirmation Dialog */}
+      <AlertDialog open={showTemplateConfirm} onOpenChange={setShowTemplateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Apply Template?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Applying this template will replace your current role and vision profile configurations. Maps, tokens, and regions will be preserved.
+              {pendingTemplate && (
+                <div className="mt-4 p-3 bg-muted rounded-lg">
+                  <div className="font-medium text-foreground mb-2">
+                    {pendingTemplate.name}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {pendingTemplate.description}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Roles: {pendingTemplate.roles.length}</div>
+                    <div>Vision Profiles: {pendingTemplate.visionProfiles.length}</div>
+                    <div>Maps: {pendingTemplate.maps.length}</div>
+                    <div>Regions: {pendingTemplate.regions.length}</div>
+                  </div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelTemplateLoad}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmTemplateLoad}>
+              Apply Template
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

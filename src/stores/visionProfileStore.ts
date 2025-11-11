@@ -31,6 +31,7 @@ interface VisionProfileState {
   addProfile: (profile: Omit<VisionProfile, 'id'>) => string;
   updateProfile: (id: string, updates: Partial<VisionProfile>) => void;
   removeProfile: (id: string) => void;
+  clearProfiles: () => void;
   getProfile: (id: string) => VisionProfile | undefined;
   resetToDefaults: () => void;
 }
@@ -174,6 +175,10 @@ export const useVisionProfileStore = create<VisionProfileState>()(
         set((state) => ({
           profiles: state.profiles.filter((p) => p.id !== id),
         }));
+      },
+      
+      clearProfiles: () => {
+        set({ profiles: [] });
       },
       
       getProfile: (id) => {

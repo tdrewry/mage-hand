@@ -49,6 +49,7 @@ export interface RoleState {
   addRole: (role: Role) => void;
   updateRole: (roleId: string, updates: Partial<Role>) => void;
   removeRole: (roleId: string) => void;
+  clearRoles: () => void;
   setHostility: (roleId: string, targetRoleId: string, isHostile: boolean, bidirectional?: boolean) => void;
   areRolesHostile: (roleId1: string, roleId2: string) => boolean;
   getRoleById: (roleId: string) => Role | undefined;
@@ -142,6 +143,10 @@ export const useRoleStore = create<RoleState>()(
         set((state) => ({
           roles: state.roles.filter((r) => r.id !== roleId),
         }));
+      },
+      
+      clearRoles: () => {
+        set({ roles: [] });
       },
       
       setHostility: (roleId, targetRoleId, isHostile, bidirectional = false) => {
