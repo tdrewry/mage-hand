@@ -80,6 +80,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [authorName, setAuthorName] = useState('');
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<string>('');
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -373,7 +374,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
-  const applyProjectData = (projectData: ProjectData) => {
+  const applyProjectData = async (projectData: ProjectData) => {
     // Temporarily disable auto-save and lock movement during import to prevent cascade
     const wasAutoSaveEnabled = autoSave.settings.enabled;
     if (wasAutoSaveEnabled) {
@@ -382,19 +383,25 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     sessionStore.setMovementLocked(true);
 
     try {
-      // Clear existing tokens and add new ones
+      // Step 1: Clear and add tokens
+      setLoadingProgress('Loading tokens...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       const existingTokens = [...sessionStore.tokens];
       existingTokens.forEach(token => sessionStore.removeToken(token.id));
       (projectData.tokens || []).forEach(token => sessionStore.addToken(token));
       
-      // Add/update players (addPlayer replaces if exists)
+      // Add/update players
       (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
       
       // Apply session settings
       sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
       sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
       
-      // Clear and add maps
+      // Step 2: Clear and add maps
+      setLoadingProgress('Loading maps...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       const existingMaps = [...mapStore.maps];
       existingMaps.forEach(map => mapStore.removeMap(map.id));
       (projectData.maps || []).forEach(map => {
@@ -403,11 +410,17 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         mapStore.addMap({ ...mapData, regions: [] });
       });
       
-      // Clear and add regions
+      // Step 3: Clear and add regions
+      setLoadingProgress('Loading regions...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       regionStore.clearRegions();
       (projectData.regions || []).forEach(region => regionStore.addRegion(region));
     
-      // Clear and add groups
+      // Step 4: Clear and add groups
+      setLoadingProgress('Loading groups...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       groupStore.clearAllGroups();
       (projectData.groups || []).forEach(group => {
         const { name, tokenIds } = group;
@@ -423,7 +436,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         });
       });
       
-      // Apply initiative data
+      // Step 5: Apply initiative data
+      setLoadingProgress('Loading initiative...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.initiative) {
         initiativeStore.endCombat(); // Clear first
         if (projectData.initiative.isInCombat) {
@@ -439,21 +455,30 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         initiativeStore.setRestrictMovement(projectData.initiative.restrictMovement);
       }
       
-      // Apply roles
+      // Step 6: Apply roles
+      setLoadingProgress('Loading roles...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.roles) {
         const existingRoles = [...roleStore.roles];
         existingRoles.forEach(role => roleStore.removeRole(role.id));
         projectData.roles.forEach(role => roleStore.addRole(role));
       }
       
-      // Apply vision profiles
+      // Step 7: Apply vision profiles
+      setLoadingProgress('Loading vision profiles...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.visionProfiles) {
         const existingProfiles = [...visionProfileStore.profiles];
         existingProfiles.forEach(profile => visionProfileStore.removeProfile(profile.id));
         projectData.visionProfiles.forEach(profile => visionProfileStore.addProfile(profile));
       }
       
-      // Apply fog data
+      // Step 8: Apply fog data
+      setLoadingProgress('Loading fog of war...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.fogData) {
         fogStore.setEnabled(projectData.fogData.enabled);
         fogStore.setRevealAll(projectData.fogData.revealAll);
@@ -471,13 +496,19 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }
       }
       
-      // Apply lights
+      // Step 9: Apply lights
+      setLoadingProgress('Loading lights...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.lights) {
         lightStore.clearAllLights();
         projectData.lights.forEach(light => lightStore.addLight(light));
       }
       
-      // Apply card states
+      // Step 10: Apply card states
+      setLoadingProgress('Loading UI layout...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.cardStates) {
         // Clear and re-register cards
         const existingCards = [...cardStore.cards];
@@ -497,7 +528,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         });
       }
       
-      // Apply dungeon data if present
+      // Step 11: Apply dungeon data if present
+      setLoadingProgress('Loading dungeon features...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       if (projectData.dungeonData) {
         dungeonStore.clearAll();
         if (projectData.dungeonData.doors) {
@@ -568,20 +602,24 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const confirmLoad = async () => {
     if (!pendingLoadData) return;
     
-    const loadingToast = toast.loading('Loading project...');
+    setLoading(true);
+    setLoadingProgress('Preparing to load project...');
     
     try {
-      // Defer to next tick to allow UI to update
-      await new Promise(resolve => setTimeout(resolve, 0));
+      // Defer to next tick to allow UI to update with loading state
+      await new Promise(resolve => setTimeout(resolve, 50));
       
-      applyProjectData(pendingLoadData);
+      await applyProjectData(pendingLoadData);
+      
       setPendingLoadData(null);
       setShowLoadConfirm(false);
+      setLoading(false);
+      setLoadingProgress('');
       
-      toast.dismiss(loadingToast);
       toast.success('Project loaded successfully');
     } catch (error) {
-      toast.dismiss(loadingToast);
+      setLoading(false);
+      setLoadingProgress('');
       toast.error(`Failed to load project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
@@ -650,7 +688,20 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   };
 
   return (
-    <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-2">
+    <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-2 relative">
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 rounded-lg">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+            <div className="text-center px-6">
+              <p className="text-lg font-semibold text-foreground">{loadingProgress}</p>
+              <p className="text-sm text-muted-foreground mt-1">Please wait, do not close this window</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="save" className="flex items-center gap-2 text-xs">
