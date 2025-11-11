@@ -349,21 +349,37 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       return;
     }
 
+    // Pause auto-save and lock movement during export
+    const wasAutoSaveEnabled = autoSave.settings.enabled;
+    if (wasAutoSaveEnabled) {
+      autoSave.toggleAutoSave();
+    }
+    sessionStore.setMovementLocked(true);
+
     try {
       const projectData = createCurrentProjectData();
       exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
       toast.success('Project exported successfully');
     } catch (error) {
       toast.error(`Failed to export project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      // Re-enable auto-save and unlock movement
+      sessionStore.setMovementLocked(false);
+      if (wasAutoSaveEnabled) {
+        setTimeout(() => {
+          autoSave.toggleAutoSave();
+        }, 100);
+      }
     }
   };
 
   const applyProjectData = (projectData: ProjectData) => {
-    // Temporarily disable auto-save during import to prevent cascade
+    // Temporarily disable auto-save and lock movement during import to prevent cascade
     const wasAutoSaveEnabled = autoSave.settings.enabled;
     if (wasAutoSaveEnabled) {
       autoSave.toggleAutoSave();
     }
+    sessionStore.setMovementLocked(true);
 
     try {
       // Clear existing tokens and add new ones
@@ -513,7 +529,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }
       }
     } finally {
-      // Re-enable auto-save if it was enabled before
+      // Unlock movement and re-enable auto-save if it was enabled before
+      sessionStore.setMovementLocked(false);
       if (wasAutoSaveEnabled) {
         // Defer re-enabling to next tick to ensure all updates complete
         setTimeout(() => {

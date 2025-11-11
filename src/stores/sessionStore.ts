@@ -49,6 +49,7 @@ export interface SessionState {
   selectedTokenIds: string[];
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
+  movementLocked: boolean;
   addToken: (token: Token) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
@@ -61,6 +62,7 @@ export interface SessionState {
   setSelectedTokens: (tokenIds: string[]) => void;
   setTokenVisibility: (visibility: TokenVisibility) => void;
   setLabelVisibility: (visibility: LabelVisibility) => void;
+  setMovementLocked: (locked: boolean) => void;
   addPlayer: (player: Player) => void;
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
   initializeSession: (sessionId?: string) => void;
@@ -76,6 +78,7 @@ export const useSessionStore = create<SessionState>()(
       selectedTokenIds: [],
       tokenVisibility: 'all',
       labelVisibility: 'show',
+      movementLocked: false,
       
       addToken: (token) =>
         set((state) => ({
@@ -83,8 +86,14 @@ export const useSessionStore = create<SessionState>()(
         })),
       
       updateTokenPosition: (tokenId, x, y) => {
-        // Throttle position updates to prevent localStorage overflow
+        // Check if movement is locked
         const state = get();
+        if (state.movementLocked) {
+          console.warn('Token movement is locked during import/export');
+          return;
+        }
+        
+        // Throttle position updates to prevent localStorage overflow
         const existingToken = state.tokens.find(t => t.id === tokenId);
         
         // Only update if position actually changed significantly (avoid micro-movements)
@@ -171,6 +180,9 @@ export const useSessionStore = create<SessionState>()(
 
       setLabelVisibility: (visibility) =>
         set({ labelVisibility: visibility }),
+
+      setMovementLocked: (locked) =>
+        set({ movementLocked: locked }),
 
       addPlayer: (player) =>
         set((state) => ({
