@@ -44,7 +44,7 @@ export interface MultiplayerState {
   reset: () => void;
 }
 
-const DEFAULT_SERVER_URL = 'http://localhost:3000';
+const DEFAULT_SERVER_URL = 'http://localhost:3001';
 
 export const useMultiplayerStore = create<MultiplayerState>()(
   persist(
