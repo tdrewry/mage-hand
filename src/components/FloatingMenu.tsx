@@ -5,6 +5,7 @@ import { VisibilityModal } from './modals/VisibilityModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface FloatingMenuProps {
   fabricCanvas: FabricCanvas | null;
@@ -114,7 +115,10 @@ export const FloatingMenu = ({
   return (
     <>
       {/* Floating Menu - Upper Left Corner */}
-      <div className="fixed left-4 top-20 z-50 flex flex-col gap-3">
+      <div 
+        className="fixed left-4 top-20 flex flex-col gap-3"
+        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+      >
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = 

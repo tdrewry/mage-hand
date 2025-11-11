@@ -17,6 +17,7 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { canAssignTokenRoles } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface BulkOperationsToolbarProps {
   selectedTokenIds: string[];
@@ -169,7 +170,10 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   
   return (
     <>
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[999] bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3">
+      <div 
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3"
+        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
+      >
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground px-2">
             {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''} selected
@@ -186,7 +190,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                   Assign Role
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-48 z-[1100] bg-popover">
+              <DropdownMenuContent className="w-48 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
                 {roles.map((role) => (
                   <DropdownMenuItem 
                     key={role.id}
@@ -215,7 +219,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                   Visibility
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="z-[1100] bg-popover">
+              <DropdownMenuContent className="bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
                 <DropdownMenuItem onClick={() => handleToggleHidden(true)}>
                   <EyeOff className="h-4 w-4 mr-2" />
                   Hide All
@@ -236,7 +240,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                 Vision
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 z-[1100] bg-popover">
+            <DropdownMenuContent className="w-56 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
               <DropdownMenuItem onClick={() => handleToggleVision(true)}>
                 Enable Vision
               </DropdownMenuItem>

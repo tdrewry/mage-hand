@@ -17,6 +17,7 @@ import {
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { CanvasRegion } from '../stores/regionStore';
+import { Z_INDEX } from '@/lib/zIndex';
 
 export type TransformMode = 'move' | 'scale' | 'rotate';
 
@@ -56,7 +57,10 @@ export const RegionControlPanel: React.FC<RegionControlPanelProps> = ({
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-80">
+    <div 
+      className="fixed bottom-4 left-4 w-80"
+      style={{ zIndex: Z_INDEX.FIXED_UI.CONTROL_PANELS }}
+    >
       <Card className="bg-background/95 backdrop-blur-sm border shadow-lg">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">

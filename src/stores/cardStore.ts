@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { CardState, CardType, CardPosition, CardSize, CardConfig } from '@/types/cardTypes';
+import { Z_INDEX } from '@/lib/zIndex';
 
 interface CardStore {
   cards: CardState[];
@@ -198,7 +199,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
 
 export const useCardStore = create<CardStore>((set, get) => ({
   cards: [],
-  nextZIndex: 1000,
+  nextZIndex: Z_INDEX.CARDS.BASE,
 
   registerCard: (config: CardConfig) => {
     const id = `${config.type}-${Date.now()}`;
@@ -284,13 +285,19 @@ export const useCardStore = create<CardStore>((set, get) => ({
       const card = state.cards.find((c) => c.id === id);
       if (!card) return state;
 
-      const maxZ = Math.max(...state.cards.map((c) => c.zIndex), state.nextZIndex - 1);
+      const maxZ = Math.max(
+        ...state.cards.map((c) => c.zIndex),
+        Z_INDEX.CARDS.BASE - 1
+      );
+      
+      // Clamp to cards max (32999)
+      const newZ = Math.min(maxZ + 1, Z_INDEX.CARDS.MAX);
       
       return {
         cards: state.cards.map((c) =>
-          c.id === id ? { ...c, zIndex: maxZ + 1 } : c
+          c.id === id ? { ...c, zIndex: newZ } : c
         ),
-        nextZIndex: maxZ + 2,
+        nextZIndex: Math.min(newZ + 1, Z_INDEX.CARDS.MAX),
       };
     });
   },
@@ -325,7 +332,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
 
   resetLayout: () => {
     localStorage.removeItem(STORAGE_KEY);
-    set({ cards: [], nextZIndex: 1000 });
+    set({ cards: [], nextZIndex: Z_INDEX.CARDS.BASE });
   },
 
   removeCardsByType: (types: CardType[]) => {
