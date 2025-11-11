@@ -4,7 +4,7 @@
  * Provides save/load functionality using the enhanced project serialization system
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
+import { Switch } from '../ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +35,7 @@ import {
   Clock, 
   User,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 import {
@@ -58,6 +61,7 @@ import { useFogStore } from '../../stores/fogStore';
 import { useLightStore } from '../../stores/lightStore';
 import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
+import { useAutoSave } from '../../hooks/useAutoSave';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
@@ -76,6 +80,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-save hook
+  const autoSave = useAutoSave();
+  const [timeSinceLastSave, setTimeSinceLastSave] = useState('Never');
+
   // Store hooks - for reading
   const sessionStore = useSessionStore();
   const mapStore = useMapStore();
@@ -90,10 +98,33 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const dungeonStore = useDungeonStore();
 
   // Load saved projects when component mounts
-  React.useEffect(() => {
+  useEffect(() => {
     const projects = getSavedProjects();
     setSavedProjects(projects);
   }, []);
+
+  // Update time since last save every 10 seconds
+  useEffect(() => {
+    const updateTime = () => {
+      setTimeSinceLastSave(autoSave.getTimeSinceLastSave());
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 10000); // Update every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, [autoSave.lastSaveTime, autoSave]);
+
+  const handleLoadAutoSave = () => {
+    const autoSaveData = autoSave.loadAutoSave();
+    if (!autoSaveData) {
+      toast.error('No auto-save found');
+      return;
+    }
+    
+    setPendingLoadData(autoSaveData);
+    setShowLoadConfirm(true);
+  };
 
   const createCurrentProjectData = (): ProjectData => ({
     metadata: createProjectMetadata(
@@ -517,9 +548,127 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               </Button>
             </CardContent>
           </Card>
+
+          {/* Auto-Save Card */}
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Auto-Save
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Automatically save your session at regular intervals
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-save-toggle" className="text-xs font-medium">
+                    Enable Auto-Save
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically backs up your work
+                  </p>
+                </div>
+                <Switch
+                  id="auto-save-toggle"
+                  checked={autoSave.settings.enabled}
+                  onCheckedChange={autoSave.toggleAutoSave}
+                />
+              </div>
+
+              {autoSave.settings.enabled && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="auto-save-interval" className="text-xs">
+                      Save Interval
+                    </Label>
+                    <Select
+                      value={autoSave.settings.intervalMinutes.toString()}
+                      onValueChange={(value) => autoSave.setInterval(parseInt(value))}
+                    >
+                      <SelectTrigger id="auto-save-interval" className="text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1" className="text-xs">1 minute</SelectItem>
+                        <SelectItem value="2" className="text-xs">2 minutes</SelectItem>
+                        <SelectItem value="5" className="text-xs">5 minutes</SelectItem>
+                        <SelectItem value="10" className="text-xs">10 minutes</SelectItem>
+                        <SelectItem value="15" className="text-xs">15 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="bg-muted p-3 rounded-lg">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Last auto-saved:</span>
+                      <span className="font-medium">{timeSinceLastSave}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={autoSave.forceAutoSave}
+                    className="w-full text-xs"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-2" />
+                    Save Now
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="load" className="mt-4">
+          {/* Auto-Save Recovery */}
+          {autoSave.hasAutoSave && (
+            <Card className="mb-4 border-primary/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Auto-Save Available
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Recover your last auto-saved session
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="bg-muted p-3 rounded-lg">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Last saved:</span>
+                    <span className="font-medium">{timeSinceLastSave}</span>
+                  </div>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleLoadAutoSave}
+                  className="w-full text-xs"
+                >
+                  <Upload className="w-3 h-3 mr-2" />
+                  Load Auto-Save
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to clear the auto-save? This cannot be undone.')) {
+                      autoSave.clearAutoSave();
+                      toast.success('Auto-save cleared');
+                    }
+                  }}
+                  className="w-full text-xs text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-3 h-3 mr-2" />
+                  Clear Auto-Save
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Saved Projects</CardTitle>
