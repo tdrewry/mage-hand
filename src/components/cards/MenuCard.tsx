@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield, Network } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
+import { syncManager } from '@/lib/syncManager';
+import { hasPermission } from '@/lib/rolePermissions';
+import { useRoleStore } from '@/stores/roleStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,12 +32,25 @@ interface MenuCardContentProps {
 }
 
 export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) => {
-  const { tokens } = useSessionStore();
+  const { tokens, players, currentPlayerId } = useSessionStore();
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode } = useDungeonStore();
-  const { isConnected, currentSession, connectedUsers } = useMultiplayerStore();
+  const { isConnected, currentSession, connectedUsers, currentUserId } = useMultiplayerStore();
+  const { currentMode, lockedByDm, setMode } = useUiModeStore();
+  const { roles } = useRoleStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+
+  // Get current player's roles
+  const currentPlayer = players.find(p => p.id === currentUserId || p.id === currentPlayerId);
+  const currentPlayerRoles = currentPlayer?.roleIds || [];
+
+  // Check if user has permission to control UI mode
+  const canControlUiMode = hasPermission(
+    currentPlayer || { id: '', name: '', roleIds: [], isConnected: false },
+    roles,
+    'canManageFog' // DM-level permission
+  );
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -153,6 +170,19 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
     setRenderingMode(newMode);
     toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'Edit'} mode`);
   };
+
+  const handleModeChange = (newMode: 'dm' | 'play') => {
+    // Update local mode
+    setMode(newMode);
+    
+    // Broadcast to all players if we're DM and connected
+    if (canControlUiMode && isConnected) {
+      syncManager.rpcSetUiMode(newMode); // Broadcast to all
+      toast.success(`Set all players to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
+    } else {
+      toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
+    }
+  };
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
@@ -223,9 +253,50 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
 
       <Separator />
 
-      {/* Mode Toggle */}
+      {/* UI Mode Toggle - DM can control all players */}
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">Mode</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">UI Mode</p>
+          {lockedByDm && (
+            <Badge variant="secondary" className="text-xs">
+              Locked by DM
+            </Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={currentMode === 'dm' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('dm')}
+            disabled={lockedByDm}
+            className="w-full"
+          >
+            <UserCircle className="h-4 w-4 mr-2" />
+            DM
+          </Button>
+          <Button
+            variant={currentMode === 'play' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('play')}
+            disabled={lockedByDm}
+            className="w-full"
+          >
+            <Monitor className="h-4 w-4 mr-2" />
+            Play
+          </Button>
+        </div>
+        {canControlUiMode && isConnected && (
+          <p className="text-xs text-muted-foreground">
+            Changes broadcast to all players
+          </p>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Rendering Mode Toggle */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Rendering Mode</p>
         <Button 
           variant={renderingMode === 'play' ? 'default' : 'outline'}
           size="sm"

@@ -79,6 +79,31 @@ export interface SyncRegionPayload extends BaseSyncPayload {
   data?: any; // Partial data for updates
 }
 
+// ============= RPC Events (Remote Procedure Calls) =============
+
+export interface SetUiModePayload {
+  messageId: string;
+  mode: 'dm' | 'play';
+  targetUserId?: string; // If undefined, broadcast to all
+  timestamp: number;
+  senderId: string;
+  senderRoleIds: string[];
+}
+
+export interface OpenCardPayload {
+  messageId: string;
+  cardType: string;
+  targetUserId?: string;
+  timestamp: number;
+  senderId: string;
+  senderRoleIds: string[];
+}
+
+export interface SyncInitiativeOrderPayload extends BaseSyncPayload {
+  action: 'set_order';
+  initiativeOrder: any[];
+}
+
 // ============= Server → Client Events =============
 
 export interface SessionJoinedPayload {
@@ -181,6 +206,11 @@ export const ClientEvents = {
   SYNC_REGION: 'sync_region',
   SYNC_LIGHT: 'sync_light',
   
+  // RPC commands
+  RPC_SET_UI_MODE: 'rpc_set_ui_mode',
+  RPC_OPEN_CARD: 'rpc_open_card',
+  RPC_SYNC_INITIATIVE_ORDER: 'rpc_sync_initiative_order',
+  
   // Requests
   REQUEST_FULL_SYNC: 'request_full_sync',
   KICK_USER: 'kick_user',
@@ -209,6 +239,11 @@ export const ServerEvents = {
   REGION_UPDATED: 'region_updated',
   LIGHT_UPDATED: 'light_updated',
   ROLE_UPDATED: 'role_updated',
+  
+  // RPC events
+  UI_MODE_CHANGED: 'ui_mode_changed',
+  CARD_OPENED: 'card_opened',
+  INITIATIVE_ORDER_SYNCED: 'initiative_order_synced',
   
   // User management
   USER_LIST_UPDATED: 'user_list_updated',

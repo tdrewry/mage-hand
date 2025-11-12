@@ -9,6 +9,8 @@ import { useMapStore } from '@/stores/mapStore';
 import { useFogStore } from '@/stores/fogStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { useLightStore } from '@/stores/lightStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
+import { useCardStore } from '@/stores/cardStore';
 import { hasPermission } from './rolePermissions';
 import type {
   JoinSessionPayload,
@@ -25,7 +27,10 @@ import type {
   SyncLightPayload,
   SyncRolePayload,
   TokenUpdatedPayload,
-  SessionErrorPayload
+  SessionErrorPayload,
+  SetUiModePayload,
+  OpenCardPayload,
+  SyncInitiativeOrderPayload
 } from '@/types/multiplayerEvents';
 
 /**
@@ -163,6 +168,11 @@ class SyncManager {
     // User management
     this.socketClient.on('user_list_updated', this.handleUserListUpdated.bind(this));
     this.socketClient.on('user_role_changed', this.handleUserRoleChanged.bind(this));
+
+    // RPC events
+    this.socketClient.on<SetUiModePayload>('ui_mode_changed', this.handleUiModeChanged.bind(this));
+    this.socketClient.on<OpenCardPayload>('card_opened', this.handleCardOpened.bind(this));
+    this.socketClient.on<SyncInitiativeOrderPayload>('initiative_order_synced', this.handleInitiativeOrderSynced.bind(this));
   }
 
   // ============= Event Handlers =============
@@ -692,6 +702,115 @@ class SyncManager {
     
     // Update the user's roles in the multiplayer store
     useMultiplayerStore.getState().updateUserRoles(data.userId, data.roleIds);
+  }
+
+  // ============= RPC Event Handlers =============
+
+  private handleUiModeChanged(data: SetUiModePayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    
+    console.log('📥 UI MODE RPC:', {
+      mode: data.mode,
+      messageId: data.messageId,
+      fromUser: data.senderId,
+      targetUser: data.targetUserId,
+      currentUser: currentUserId,
+    });
+
+    // Check if this command is for us
+    if (data.targetUserId && data.targetUserId !== currentUserId) {
+      console.log('⏭️ UI mode command not for us');
+      return;
+    }
+
+    // Check message ID
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    // Ignore our own commands (we already changed mode locally)
+    if (data.senderId === currentUserId) {
+      console.log('⏭️ IGNORING: Own UI mode command');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING UI MODE CHANGE:', data.mode);
+    
+    // Apply the mode change
+    const uiModeStore = useUiModeStore.getState();
+    const isDmCommand = data.senderId !== currentUserId;
+    uiModeStore.setModeFromRemote(data.mode, isDmCommand);
+  }
+
+  private handleCardOpened(data: OpenCardPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    
+    console.log('📥 CARD OPEN RPC:', {
+      cardType: data.cardType,
+      messageId: data.messageId,
+      fromUser: data.senderId,
+      targetUser: data.targetUserId,
+      currentUser: currentUserId,
+    });
+
+    if (data.targetUserId && data.targetUserId !== currentUserId) {
+      console.log('⏭️ Card open command not for us');
+      return;
+    }
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    if (data.senderId === currentUserId) {
+      console.log('⏭️ IGNORING: Own card open command');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING CARD OPEN:', data.cardType);
+    
+    // Open the card
+    const cardStore = useCardStore.getState();
+    const card = cardStore.getCardByType(data.cardType as any);
+    if (card) {
+      cardStore.setVisibility(card.id, true);
+      cardStore.bringToFront(card.id);
+    }
+  }
+
+  private handleInitiativeOrderSynced(data: SyncInitiativeOrderPayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    
+    console.log('📥 INITIATIVE ORDER RPC:', {
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+      orderLength: data.initiativeOrder?.length,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own initiative order sync');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING INITIATIVE ORDER SYNC');
+    
+    // Apply the initiative order without re-syncing
+    const initiativeStore = useInitiativeStore.getState();
+    const set = (initiativeStore as any)._set || ((initiativeStore as any).setState);
+    if (set) {
+      set({ initiativeOrder: data.initiativeOrder });
+    }
   }
 
   // ============= Sync Methods (Local → Server) =============
@@ -1245,6 +1364,88 @@ class SyncManager {
 
     console.log('📤 LIGHT TOGGLE:', { messageId, userId, lightId });
     this.socketClient?.emit('sync_light', payload);
+  }
+
+  // ============= RPC Methods (Remote Procedure Calls) =============
+
+  /**
+   * Send UI mode change command
+   * @param mode - The UI mode to set
+   * @param targetUserId - Specific user or undefined for all
+   */
+  rpcSetUiMode(mode: 'dm' | 'play', targetUserId?: string): void {
+    if (!this.canSync()) return;
+
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const senderId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(senderId);
+
+    const payload: SetUiModePayload = {
+      messageId,
+      mode,
+      targetUserId,
+      timestamp: Date.now(),
+      senderId,
+      senderRoleIds: currentPlayer?.roleIds || [],
+    };
+    
+    console.log('📤 RPC: Set UI mode', payload);
+    this.socketClient?.emit('rpc_set_ui_mode', payload);
+  }
+
+  /**
+   * Send card open command
+   */
+  rpcOpenCard(cardType: string, targetUserId?: string): void {
+    if (!this.canSync()) return;
+
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const senderId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(senderId);
+
+    const payload: OpenCardPayload = {
+      messageId,
+      cardType,
+      targetUserId,
+      timestamp: Date.now(),
+      senderId,
+      senderRoleIds: currentPlayer?.roleIds || [],
+    };
+    
+    console.log('📤 RPC: Open card', payload);
+    this.socketClient?.emit('rpc_open_card', payload);
+  }
+
+  /**
+   * Sync full initiative order (used when manually reordering)
+   */
+  rpcSyncInitiativeOrder(initiativeOrder: any[]): void {
+    if (!this.canSync()) return;
+
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
+    const payload: SyncInitiativeOrderPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
+      action: 'set_order',
+      initiativeOrder,
+    };
+    
+    console.log('📤 RPC: Sync initiative order', { messageId, userId, orderLength: initiativeOrder.length });
+    this.socketClient?.emit('rpc_sync_initiative_order', payload);
   }
 
   // ============= Role Sync Methods =============
