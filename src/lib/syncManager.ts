@@ -486,7 +486,11 @@ class SyncManager {
 
   private handleRegionUpdated(data: SyncRegionPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
+    
+    // Ignore our own updates (already applied locally)
+    if (data.userId === currentUserId) {
+      return;
+    }
 
     console.log('🗺️ Region updated from remote:', data.action);
     const regionStore = useRegionStore.getState();
@@ -509,7 +513,11 @@ class SyncManager {
 
   private handleLightUpdated(data: SyncLightPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
+    
+    // Ignore our own updates (already applied locally)
+    if (data.userId === currentUserId) {
+      return;
+    }
 
     console.log('💡 Light updated from remote:', data.action);
     const lightStore = useLightStore.getState();

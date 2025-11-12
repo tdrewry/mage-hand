@@ -18,7 +18,7 @@ interface LightState {
   shadowIntensity: number; // 0-1, how dark shadows are
   
   // Actions
-  addLight: (light: Omit<LightSource, 'id'>) => string;
+  addLight: (light: Omit<LightSource, 'id'> & { id?: string }) => string;
   updateLight: (id: string, updates: Partial<LightSource>) => void;
   removeLight: (id: string) => void;
   toggleLight: (id: string) => void;
@@ -37,7 +37,8 @@ export const useLightStore = create<LightState>()(
       shadowIntensity: 0.7, // Shadows are 70% opaque by default
       
       addLight: (light) => {
-        const id = `light-${nextLightId++}`;
+        // Use provided ID if available (for synced lights), otherwise generate new
+        const id = light.id || `light-${nextLightId++}`;
         const newLight: LightSource = {
           ...light,
           id,
@@ -47,8 +48,10 @@ export const useLightStore = create<LightState>()(
           lights: [...state.lights, newLight],
         }));
         
-        // Sync to multiplayer
-        syncManager.syncLightAdd(newLight);
+        // Only sync if this is a new local light (no ID provided)
+        if (!light.id) {
+          syncManager.syncLightAdd(newLight);
+        }
         
         return id;
       },
@@ -60,28 +63,38 @@ export const useLightStore = create<LightState>()(
           ),
         }));
         
-        // Sync to multiplayer
-        syncManager.syncLightUpdate(id, updates);
+        // Only sync if not a remote update
+        if (updates.id === undefined || updates.id === id) {
+          syncManager.syncLightUpdate(id, updates);
+        }
       },
       
       removeLight: (id) => {
+        const lightExists = get().lights.some(light => light.id === id);
+        
         set((state) => ({
           lights: state.lights.filter((light) => light.id !== id),
         }));
         
-        // Sync to multiplayer
-        syncManager.syncLightRemove(id);
+        // Only sync if light existed
+        if (lightExists) {
+          syncManager.syncLightRemove(id);
+        }
       },
       
       toggleLight: (id) => {
+        const lightExists = get().lights.some(light => light.id === id);
+        
         set((state) => ({
           lights: state.lights.map((light) =>
             light.id === id ? { ...light, enabled: !light.enabled } : light
           ),
         }));
         
-        // Sync to multiplayer
-        syncManager.syncLightToggle(id);
+        // Only sync if light exists
+        if (lightExists) {
+          syncManager.syncLightToggle(id);
+        }
       },
       
       setGlobalAmbientLight: (level) => {

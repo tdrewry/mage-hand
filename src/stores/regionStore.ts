@@ -36,7 +36,7 @@ interface RegionStore {
   regions: CanvasRegion[];
   
   // Region operations
-  addRegion: (region: Omit<CanvasRegion, 'id'>) => void;
+  addRegion: (region: Omit<CanvasRegion, 'id'> & { id?: string }) => void;
   updateRegion: (id: string, updates: Partial<CanvasRegion>) => void;
   removeRegion: (id: string) => void;
   clearRegions: () => void;
@@ -57,15 +57,18 @@ export const useRegionStore = create<RegionStore>()(
       addRegion: (regionData) => {
         const newRegion: CanvasRegion = {
           ...regionData,
-          id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          // Only generate ID if not provided (for synced regions)
+          id: regionData.id || `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         };
         
         set((state) => ({
           regions: [...state.regions, newRegion],
         }));
         
-        // Sync to multiplayer
-        syncManager.syncRegionAdd(newRegion);
+        // Only sync if this is a new local region (no ID provided)
+        if (!regionData.id) {
+          syncManager.syncRegionAdd(newRegion);
+        }
       },
 
       updateRegion: (id, updates) => {
@@ -75,17 +78,23 @@ export const useRegionStore = create<RegionStore>()(
           ),
         }));
         
-        // Sync to multiplayer
-        syncManager.syncRegionUpdate(id, updates);
+        // Only sync if not coming from remote (updates without sync flag)
+        if (updates.id === undefined || updates.id === id) {
+          syncManager.syncRegionUpdate(id, updates);
+        }
       },
 
       removeRegion: (id) => {
+        const regionExists = get().regions.some(region => region.id === id);
+        
         set((state) => ({
           regions: state.regions.filter((region) => region.id !== id),
         }));
         
-        // Sync to multiplayer
-        syncManager.syncRegionRemove(id);
+        // Only sync if region existed (to avoid syncing remote removals)
+        if (regionExists) {
+          syncManager.syncRegionRemove(id);
+        }
       },
 
       clearRegions: () => {
