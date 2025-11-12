@@ -330,7 +330,12 @@ class SyncManager {
         break;
       case 'updatePosition':
         if (data.tokenId && data.data) {
-          sessionStore.updateTokenPosition(data.tokenId, data.data.x, data.data.y);
+          // Directly update state without triggering sync
+          sessionStore.setTokens(
+            sessionStore.tokens.map(t => 
+              t.id === data.tokenId ? { ...t, x: data.data.x, y: data.data.y } : t
+            )
+          );
         }
         break;
       case 'remove':
