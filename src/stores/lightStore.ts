@@ -22,6 +22,7 @@ interface LightState {
   updateLight: (id: string, updates: Partial<LightSource>) => void;
   removeLight: (id: string) => void;
   toggleLight: (id: string) => void;
+  setLights: (lights: LightSource[]) => void;
   setGlobalAmbientLight: (level: number) => void;
   setShadowIntensity: (intensity: number) => void;
   clearAllLights: () => void;
@@ -95,6 +96,10 @@ export const useLightStore = create<LightState>()(
         if (lightExists) {
           syncManager.syncLightToggle(id);
         }
+      },
+      
+      setLights: (lights) => {
+        set({ lights });
       },
       
       setGlobalAmbientLight: (level) => {

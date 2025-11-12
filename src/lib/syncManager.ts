@@ -497,13 +497,26 @@ class SyncManager {
 
     switch (data.action) {
       case 'add':
-        if (data.region) regionStore.addRegion(data.region);
+        if (data.region) {
+          // Directly update state without triggering sync
+          regionStore.setRegions([...regionStore.regions, data.region]);
+        }
         break;
       case 'update':
-        if (data.regionId && data.data) regionStore.updateRegion(data.regionId, data.data);
+        if (data.regionId && data.data) {
+          // Directly update state without triggering sync
+          regionStore.setRegions(
+            regionStore.regions.map(r => 
+              r.id === data.regionId ? { ...r, ...data.data } : r
+            )
+          );
+        }
         break;
       case 'remove':
-        if (data.regionId) regionStore.removeRegion(data.regionId);
+        if (data.regionId) {
+          // Directly update state without triggering sync
+          regionStore.setRegions(regionStore.regions.filter(r => r.id !== data.regionId));
+        }
         break;
       case 'clear':
         regionStore.clearRegions();
@@ -524,16 +537,36 @@ class SyncManager {
 
     switch (data.action) {
       case 'add':
-        if (data.light) lightStore.addLight(data.light);
+        if (data.light) {
+          // Directly update state without triggering sync
+          lightStore.setLights([...lightStore.lights, data.light]);
+        }
         break;
       case 'update':
-        if (data.lightId && data.data) lightStore.updateLight(data.lightId, data.data);
+        if (data.lightId && data.data) {
+          // Directly update state without triggering sync
+          lightStore.setLights(
+            lightStore.lights.map(l => 
+              l.id === data.lightId ? { ...l, ...data.data } : l
+            )
+          );
+        }
         break;
       case 'remove':
-        if (data.lightId) lightStore.removeLight(data.lightId);
+        if (data.lightId) {
+          // Directly update state without triggering sync
+          lightStore.setLights(lightStore.lights.filter(l => l.id !== data.lightId));
+        }
         break;
       case 'toggle':
-        if (data.lightId) lightStore.toggleLight(data.lightId);
+        if (data.lightId) {
+          // Directly update state without triggering sync
+          lightStore.setLights(
+            lightStore.lights.map(l => 
+              l.id === data.lightId ? { ...l, enabled: !l.enabled } : l
+            )
+          );
+        }
         break;
     }
   }
