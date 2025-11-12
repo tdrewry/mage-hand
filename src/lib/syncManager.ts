@@ -848,6 +848,7 @@ class SyncManager {
   // ============= Region Sync Methods =============
 
   syncRegionAdd(region: any): void {
+    console.log('🔷 syncRegionAdd called, canSync:', this.canSync());
     if (!this.canSync()) return;
 
     const payload: SyncRegionPayload = {
@@ -857,6 +858,7 @@ class SyncManager {
       userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 Emitting sync_region add:', payload);
     this.socketClient?.emit('sync_region', payload);
   }
 

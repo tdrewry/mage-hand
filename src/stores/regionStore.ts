@@ -55,6 +55,7 @@ export const useRegionStore = create<RegionStore>()(
       regions: [],
 
       addRegion: (regionData) => {
+        console.log('🔷 addRegion called with:', { hasId: !!regionData.id, regionData });
         const newRegion: CanvasRegion = {
           ...regionData,
           // Only generate ID if not provided (for synced regions)
@@ -67,7 +68,10 @@ export const useRegionStore = create<RegionStore>()(
         
         // Only sync if this is a new local region (no ID provided)
         if (!regionData.id) {
+          console.log('📤 Syncing new region:', newRegion.id);
           syncManager.syncRegionAdd(newRegion);
+        } else {
+          console.log('⏭️ Skipping sync for region with existing ID:', newRegion.id);
         }
       },
 
