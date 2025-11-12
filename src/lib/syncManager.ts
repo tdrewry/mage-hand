@@ -1,5 +1,6 @@
 import { SocketClient } from './socketClient';
 import { throttle } from './throttle';
+import { messageIdManager } from './messageIdManager';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -300,12 +301,30 @@ class SyncManager {
     const sessionStore = useSessionStore.getState();
     const currentUserId = useMultiplayerStore.getState().currentUserId;
 
-    // Ignore our own updates (already applied locally)
+    console.log('📥 TOKEN EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+      fromRoles: data.userRoleIds,
+    });
+
+    // ✅ CRITICAL: Check if we've already processed this message
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return; // Already processed, skip
+    }
+
+    // ✅ CRITICAL: Ignore our own updates (belt-and-suspenders with messageId check)
     if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own token update');
+      messageIdManager.markProcessed(data.messageId); // Mark as processed to prevent re-processing
       return;
     }
 
-    console.log('🔄 Token updated from remote:', data.action);
+    // Mark message as being processed NOW (before async operations)
+    messageIdManager.markProcessed(data.messageId);
+
+    console.log('✅ PROCESSING TOKEN UPDATE:', data.action);
 
     switch (data.action) {
       case 'add':
@@ -313,14 +332,16 @@ class SyncManager {
           // Check if token already exists to prevent duplicates
           const exists = sessionStore.tokens.some(t => t.id === data.token.id);
           if (!exists) {
-            // Directly add to state without triggering sync
+            console.log('  ➕ Adding token:', data.token.id);
             sessionStore.setTokens([...sessionStore.tokens, data.token]);
+          } else {
+            console.log('  ⏭️ Token already exists:', data.token.id);
           }
         }
         break;
       case 'update':
         if (data.tokenId && data.data) {
-          // Directly update state without triggering sync
+          console.log('  ✏️ Updating token:', data.tokenId, data.data);
           sessionStore.setTokens(
             sessionStore.tokens.map(t => 
               t.id === data.tokenId ? { ...t, ...data.data } : t
@@ -330,7 +351,7 @@ class SyncManager {
         break;
       case 'updatePosition':
         if (data.tokenId && data.data) {
-          // Directly update state without triggering sync
+          console.log('  📍 Updating token position:', data.tokenId, data.data.x, data.data.y);
           sessionStore.setTokens(
             sessionStore.tokens.map(t => 
               t.id === data.tokenId ? { ...t, x: data.data.x, y: data.data.y } : t
@@ -340,7 +361,7 @@ class SyncManager {
         break;
       case 'remove':
         if (data.tokenId) {
-          // Directly remove from state without triggering sync
+          console.log('  ➖ Removing token:', data.tokenId);
           sessionStore.setTokens(sessionStore.tokens.filter(t => t.id !== data.tokenId));
         }
         break;
@@ -349,9 +370,28 @@ class SyncManager {
 
   private handleInitiativeUpdated(data: SyncInitiativePayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
 
-    console.log('🎲 Initiative updated from remote:', data.action);
+    console.log('📥 INITIATIVE EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+    });
+
+    // Check message ID
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    // Ignore own updates
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own initiative update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING INITIATIVE UPDATE:', data.action);
     const initiativeStore = useInitiativeStore.getState();
 
     switch (data.action) {
@@ -400,9 +440,26 @@ class SyncManager {
 
   private handleMapUpdated(data: SyncMapPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
 
-    console.log('🗺️ Map updated from remote:', data.action);
+    console.log('📥 MAP EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own map update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING MAP UPDATE:', data.action);
     const mapStore = useMapStore.getState();
     const set = (mapStore as any)._set || ((mapStore as any).setState);
 
@@ -454,12 +511,25 @@ class SyncManager {
   private handleFogUpdated(data: SyncFogPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
 
-    // Ignore our own updates (already applied locally)
-    if (data.userId === currentUserId) {
+    console.log('📥 FOG EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
       return;
     }
 
-    console.log('🌫️ Fog updated from remote:', data.action);
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own fog update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING FOG UPDATE:', data.action);
 
     switch (data.action) {
       case 'reveal':
@@ -484,20 +554,35 @@ class SyncManager {
 
   private handleRegionUpdated(data: SyncRegionPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    
-    // Ignore our own updates (already applied locally)
-    if (data.userId === currentUserId) {
+
+    console.log('📥 REGION EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
       return;
     }
 
-    console.log('🗺️ Region updated from remote:', data.action);
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own region update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING REGION UPDATE:', data.action);
     const regionStore = useRegionStore.getState();
 
     switch (data.action) {
       case 'add':
         if (data.region) {
-          // Directly update state without triggering sync
-          regionStore.setRegions([...regionStore.regions, data.region]);
+          console.log('  ➕ Adding region:', data.region.id);
+          // Add flag to indicate this is from remote to prevent re-syncing
+          const regionWithFlag = { ...data.region, _fromRemote: true };
+          regionStore.addRegion(regionWithFlag);
         }
         break;
       case 'update':
@@ -524,13 +609,26 @@ class SyncManager {
 
   private handleLightUpdated(data: SyncLightPayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    
-    // Ignore our own updates (already applied locally)
-    if (data.userId === currentUserId) {
+
+    console.log('📥 LIGHT EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      fromUser: data.userId,
+      currentUser: currentUserId,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
       return;
     }
 
-    console.log('💡 Light updated from remote:', data.action);
+    if (data.userId === currentUserId) {
+      console.log('⏭️ IGNORING: Own light update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING LIGHT UPDATE:', data.action);
     const lightStore = useLightStore.getState();
 
     switch (data.action) {
@@ -571,9 +669,26 @@ class SyncManager {
 
   private handleRoleUpdated(data: SyncRolePayload): void {
     const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.senderId === currentUserId) return;
 
-    console.log('🔐 Role updated from remote:', data.action);
+    console.log('📥 ROLE EVENT:', {
+      action: data.action,
+      messageId: data.messageId,
+      senderId: data.senderId,
+      currentUser: currentUserId,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    if (data.senderId === currentUserId) {
+      console.log('⏭️ IGNORING: Own role update');
+      messageIdManager.markProcessed(data.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+    console.log('✅ PROCESSING ROLE UPDATE:', data.action);
     
     // Update the user's roles in the multiplayer store
     useMultiplayerStore.getState().updateUserRoles(data.userId, data.roleIds);
@@ -596,12 +711,21 @@ class SyncManager {
   private syncTokenPosition(tokenId: string, x: number, y: number): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncTokenPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'updatePosition',
       tokenId,
       data: { x, y },
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
     this.socketClient?.emit('sync_token', payload);
@@ -613,13 +737,23 @@ class SyncManager {
   syncTokenAdd(token: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncTokenPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'add',
       token,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 TOKEN ADD:', { messageId, userId, tokenId: token.id });
     this.socketClient?.emit('sync_token', payload);
   }
 
@@ -629,14 +763,24 @@ class SyncManager {
   syncTokenUpdate(tokenId: string, updates: Partial<any>): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncTokenPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'update',
       tokenId,
       data: updates,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 TOKEN UPDATE:', { messageId, userId, tokenId });
     this.socketClient?.emit('sync_token', payload);
   }
 
@@ -646,13 +790,23 @@ class SyncManager {
   syncTokenRemove(tokenId: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncTokenPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'remove',
       tokenId,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 TOKEN REMOVE:', { messageId, userId, tokenId });
     this.socketClient?.emit('sync_token', payload);
   }
 
@@ -662,13 +816,23 @@ class SyncManager {
   syncInitiative(action: string, data?: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncInitiativePayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: action as any,
       data,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 INITIATIVE:', { messageId, userId, action });
     this.socketClient?.emit('sync_initiative', payload);
   }
 
@@ -736,13 +900,23 @@ class SyncManager {
   syncMapAdd(map: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncMapPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'add',
       map,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 MAP ADD:', { messageId, userId, mapId: map.id });
     this.socketClient?.emit('sync_map', payload);
   }
 
@@ -752,14 +926,24 @@ class SyncManager {
   syncMapUpdate(mapId: string, data: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncMapPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'update',
       mapId,
       data,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 MAP UPDATE:', { messageId, userId, mapId });
     this.socketClient?.emit('sync_map', payload);
   }
 
@@ -769,13 +953,23 @@ class SyncManager {
   syncMapRemove(mapId: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncMapPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'remove',
       mapId,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 MAP REMOVE:', { messageId, userId, mapId });
     this.socketClient?.emit('sync_map', payload);
   }
 
@@ -785,13 +979,23 @@ class SyncManager {
   syncMapReorder(fromIndex: number, toIndex: number): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncMapPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'reorder',
       data: { fromIndex, toIndex },
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 MAP REORDER:', { messageId, userId, fromIndex, toIndex });
     this.socketClient?.emit('sync_map', payload);
   }
 
@@ -803,13 +1007,23 @@ class SyncManager {
   syncFogReveal(serializedData: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncFogPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'reveal',
       data: { serializedExploredAreas: serializedData },
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 FOG REVEAL:', { messageId, userId });
     this.socketClient?.emit('sync_fog', payload);
   }
 
@@ -819,13 +1033,23 @@ class SyncManager {
   syncFogSettings(settings: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncFogPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'update',
       data: settings,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 FOG SETTINGS:', { messageId, userId });
     this.socketClient?.emit('sync_fog', payload);
   }
 
@@ -835,13 +1059,23 @@ class SyncManager {
   syncFogClear(): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncFogPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'clear',
       data: {},
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 FOG CLEAR:', { messageId, userId });
     this.socketClient?.emit('sync_fog', payload);
   }
 
@@ -851,41 +1085,70 @@ class SyncManager {
     console.log('🔷 syncRegionAdd called, canSync:', this.canSync());
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncRegionPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'add',
       region,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
-    console.log('📤 Emitting sync_region add:', payload);
+    console.log('📤 REGION ADD:', { messageId, userId, regionId: region.id });
     this.socketClient?.emit('sync_region', payload);
   }
 
   syncRegionUpdate(regionId: string, data: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncRegionPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'update',
       regionId,
       data,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 REGION UPDATE:', { messageId, userId, regionId });
     this.socketClient?.emit('sync_region', payload);
   }
 
   syncRegionRemove(regionId: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncRegionPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'remove',
       regionId,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 REGION REMOVE:', { messageId, userId, regionId });
     this.socketClient?.emit('sync_region', payload);
   }
 
@@ -894,53 +1157,93 @@ class SyncManager {
   syncLightAdd(light: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncLightPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'add',
       light,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 LIGHT ADD:', { messageId, userId, lightId: light.id });
     this.socketClient?.emit('sync_light', payload);
   }
 
   syncLightUpdate(lightId: string, data: any): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncLightPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'update',
       lightId,
       data,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 LIGHT UPDATE:', { messageId, userId, lightId });
     this.socketClient?.emit('sync_light', payload);
   }
 
   syncLightRemove(lightId: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncLightPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'remove',
       lightId,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 LIGHT REMOVE:', { messageId, userId, lightId });
     this.socketClient?.emit('sync_light', payload);
   }
 
   syncLightToggle(lightId: string): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const userId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(userId);
+
     const payload: SyncLightPayload = {
+      messageId,
+      userId,
+      userRoleIds: currentPlayer?.roleIds || [],
+      timestamp: Date.now(),
       action: 'toggle',
       lightId,
-      timestamp: Date.now(),
-      userId: useMultiplayerStore.getState().currentUserId || ''
     };
 
+    console.log('📤 LIGHT TOGGLE:', { messageId, userId, lightId });
     this.socketClient?.emit('sync_light', payload);
   }
 
@@ -949,14 +1252,24 @@ class SyncManager {
   syncRoleAssign(userId: string, roleIds: string[]): void {
     if (!this.canSync()) return;
 
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const senderId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(senderId);
+
     const payload: SyncRolePayload = {
+      messageId,
+      userRoleIds: currentPlayer?.roleIds || [],
       action: 'assign',
       userId,
       roleIds,
       timestamp: Date.now(),
-      senderId: useMultiplayerStore.getState().currentUserId || ''
+      senderId,
     };
 
+    console.log('📤 ROLE ASSIGN:', { messageId, senderId, targetUserId: userId, roleIds });
     this.socketClient?.emit('sync_role', payload);
   }
 }

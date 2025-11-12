@@ -56,9 +56,10 @@ export const useRegionStore = create<RegionStore>()(
 
       addRegion: (regionData) => {
         console.log('🔷 addRegion called with:', { hasId: !!regionData.id, regionData });
+        
+        // Generate ID if not provided
         const newRegion: CanvasRegion = {
           ...regionData,
-          // Only generate ID if not provided (for synced regions)
           id: regionData.id || `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         };
         
@@ -66,12 +67,16 @@ export const useRegionStore = create<RegionStore>()(
           regions: [...state.regions, newRegion],
         }));
         
-        // Only sync if this is a new local region (no ID provided)
-        if (!regionData.id) {
+        // Check if this is a remote sync by looking for the _fromRemote flag
+        // Remote syncs will have `_fromRemote: true` added by the handler
+        const isRemoteSync = (regionData as any)._fromRemote === true;
+        
+        // Only sync if this is a new LOCAL region (not from remote)
+        if (!isRemoteSync && syncManager.isConnected()) {
           console.log('📤 Syncing new region:', newRegion.id);
           syncManager.syncRegionAdd(newRegion);
-        } else {
-          console.log('⏭️ Skipping sync for region with existing ID:', newRegion.id);
+        } else if (isRemoteSync) {
+          console.log('⏭️ Skipping sync for remote region:', newRegion.id);
         }
       },
 

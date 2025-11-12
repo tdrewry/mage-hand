@@ -1,3 +1,16 @@
+// ============= Base Payload Interface =============
+
+/**
+ * Base interface for all sync payloads
+ * Includes message ID for deduplication and role IDs for permission verification
+ */
+export interface BaseSyncPayload {
+  messageId: string;        // Unique ID for this message (for deduplication)
+  userId: string;           // ID of user who initiated the action
+  userRoleIds: string[];    // Role IDs of the sender for permission verification
+  timestamp: number;        // Message creation time
+}
+
 // ============= Client → Server Events =============
 
 export interface JoinSessionPayload {
@@ -13,43 +26,33 @@ export interface CreateSessionPayload {
 }
 
 // State sync payloads
-export interface SyncTokenPayload {
+export interface SyncTokenPayload extends BaseSyncPayload {
   action: 'add' | 'update' | 'remove' | 'updatePosition' | 'updateLabel' | 'updateColor' | 'updateVision';
   tokenId?: string;
   token?: any; // Full token for 'add'
   data?: any;  // Partial data for updates (x, y, label, etc.)
-  timestamp: number;
-  userId: string;
 }
 
-export interface SyncInitiativePayload {
+export interface SyncInitiativePayload extends BaseSyncPayload {
   action: 'start' | 'end' | 'add' | 'remove' | 'nextTurn' | 'previousTurn' | 'updateOrder';
   data?: any;
-  timestamp: number;
-  userId: string;
 }
 
-export interface SyncCombatPayload {
+export interface SyncCombatPayload extends BaseSyncPayload {
   action: 'startCombat' | 'endCombat' | 'setTurn';
   data?: any;
-  timestamp: number;
-  userId: string;
 }
 
-export interface SyncFogPayload {
+export interface SyncFogPayload extends BaseSyncPayload {
   action: 'reveal' | 'conceal' | 'clear' | 'update';
   data: any;
-  timestamp: number;
-  userId: string;
 }
 
-export interface SyncLightPayload {
+export interface SyncLightPayload extends BaseSyncPayload {
   action: 'add' | 'update' | 'remove' | 'toggle';
   lightId?: string;
   light?: any; // Full light for 'add'
   data?: any; // Partial data for updates
-  timestamp: number;
-  userId: string;
 }
 
 export interface SyncRolePayload {
@@ -58,24 +61,22 @@ export interface SyncRolePayload {
   roleIds: string[];
   timestamp: number;
   senderId: string;
+  messageId: string;
+  userRoleIds: string[];
 }
 
-export interface SyncMapPayload {
+export interface SyncMapPayload extends BaseSyncPayload {
   action: 'add' | 'update' | 'remove' | 'reorder';
   mapId?: string;
   map?: any; // Full map for 'add'
   data?: any; // Partial data for updates
-  timestamp: number;
-  userId: string;
 }
 
-export interface SyncRegionPayload {
+export interface SyncRegionPayload extends BaseSyncPayload {
   action: 'add' | 'update' | 'remove' | 'clear';
   regionId?: string;
   region?: any; // Full region for 'add'
   data?: any; // Partial data for updates
-  timestamp: number;
-  userId: string;
 }
 
 // ============= Server → Client Events =============

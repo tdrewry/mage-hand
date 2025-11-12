@@ -221,6 +221,12 @@ export const useSessionStore = create<SessionState>()(
       removeToken: (tokenId) => {
         const existingToken = get().tokens.find(t => t.id === tokenId);
         
+        console.log('🗑️ removeToken called:', {
+          tokenId,
+          exists: !!existingToken,
+          willSync: !!existingToken && syncManager.isConnected()
+        });
+        
         set((state) => ({
           tokens: state.tokens.filter((token) => token.id !== tokenId),
           selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
@@ -228,7 +234,10 @@ export const useSessionStore = create<SessionState>()(
         
         // Only sync if token existed locally
         if (existingToken && syncManager.isConnected()) {
+          console.log('📤 Syncing token removal:', tokenId);
           syncManager.syncTokenRemove(tokenId);
+        } else if (!existingToken) {
+          console.warn('⚠️ Token not found in local store, cannot sync removal:', tokenId);
         }
       },
 
