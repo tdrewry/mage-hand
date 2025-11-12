@@ -87,7 +87,8 @@ export const useSessionStore = create<SessionState>()(
           tokens: [...state.tokens, token],
         }));
         
-        // Sync to multiplayer
+        // Only sync if this is a new local token
+        // Remote tokens will already have all fields and shouldn't re-trigger sync
         if (syncManager.isConnected()) {
           syncManager.syncTokenAdd(token);
         }
@@ -143,78 +144,90 @@ export const useSessionStore = create<SessionState>()(
       },
 
       updateTokenLabel: (tokenId, label) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, label } : token
           ),
         }));
         
-        // Sync to multiplayer - use update instead of add
-        if (syncManager.isConnected()) {
+        // Only sync if token exists locally (prevent syncing remote updates)
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { label });
         }
       },
 
       updateTokenColor: (tokenId, color) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, color } : token
           ),
         }));
         
-        // Sync to multiplayer - use update instead of add
-        if (syncManager.isConnected()) {
+        // Only sync if token exists locally
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { color });
         }
       },
 
       updateTokenVision: (tokenId, hasVision) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, hasVision } : token
           ),
         }));
         
-        // Sync to multiplayer - use update instead of add
-        if (syncManager.isConnected()) {
+        // Only sync if token exists locally
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { hasVision });
         }
       },
 
       updateTokenVisionRange: (tokenId, visionRange) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, visionRange } : token
           ),
         }));
         
-        // Sync to multiplayer - use update instead of add
-        if (syncManager.isConnected()) {
+        // Only sync if token exists locally
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { visionRange });
         }
       },
 
       setTokenOwner: (tokenId, ownerId) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.map((token) =>
             token.id === tokenId ? { ...token, ownerId } : token
           ),
         }));
         
-        // Sync to multiplayer - use update instead of add
-        if (syncManager.isConnected()) {
+        // Only sync if token exists locally
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { ownerId });
         }
       },
       
       removeToken: (tokenId) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
         set((state) => ({
           tokens: state.tokens.filter((token) => token.id !== tokenId),
           selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
         }));
         
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
+        // Only sync if token existed locally
+        if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenRemove(tokenId);
         }
       },
