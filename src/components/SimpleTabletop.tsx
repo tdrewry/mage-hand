@@ -466,10 +466,26 @@ export const SimpleTabletop = () => {
     }
   }, [fogEnabled, setSerializedExploredAreas]);
   
-  // Redraw canvas when tokens change (for sync and other updates)
+  // Redraw canvas when synced game objects change
   useEffect(() => {
     redrawCanvas();
   }, [tokens]);
+  
+  useEffect(() => {
+    redrawCanvas();
+  }, [regions]);
+  
+  useEffect(() => {
+    redrawCanvas();
+  }, [lights]);
+  
+  useEffect(() => {
+    redrawCanvas();
+  }, [maps]);
+  
+  useEffect(() => {
+    redrawCanvas();
+  }, [serializedExploredAreas]);
   
   // Compute fog of war masks when tokens move or fog settings change
   // Skip during dragging to prevent stuttering
