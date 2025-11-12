@@ -150,9 +150,7 @@ class SyncManager {
 
     // State sync events
     this.socketClient.on<FullStateSyncPayload>('full_state_sync', this.handleFullStateSync.bind(this));
-    this.socketClient.on<TokenUpdatedPayload>('token_updated', this.handleTokenUpdated.bind(this));
-    this.socketClient.on('token_added', this.handleTokenAdded.bind(this));
-    this.socketClient.on('token_removed', this.handleTokenRemoved.bind(this));
+    this.socketClient.on<SyncTokenPayload>('token_updated', this.handleTokenUpdated.bind(this));
     this.socketClient.on('initiative_updated', this.handleInitiativeUpdated.bind(this));
     this.socketClient.on('combat_state_changed', this.handleCombatStateChanged.bind(this));
     this.socketClient.on('map_updated', this.handleMapUpdated.bind(this));
@@ -298,7 +296,7 @@ class SyncManager {
     useMultiplayerStore.getState().updateLastSyncTimestamp();
   }
 
-  private handleTokenUpdated(data: TokenUpdatedPayload): void {
+  private handleTokenUpdated(data: SyncTokenPayload): void {
     const sessionStore = useSessionStore.getState();
     const currentUserId = useMultiplayerStore.getState().currentUserId;
 
@@ -310,43 +308,38 @@ class SyncManager {
     console.log('🔄 Token updated from remote:', data.action);
 
     switch (data.action) {
+      case 'add':
+        if (data.token) {
+          // Check if token already exists to prevent duplicates
+          const exists = sessionStore.tokens.some(t => t.id === data.token.id);
+          if (!exists) {
+            // Directly add to state without triggering sync
+            sessionStore.setTokens([...sessionStore.tokens, data.token]);
+          }
+        }
+        break;
+      case 'update':
+        if (data.tokenId && data.data) {
+          // Directly update state without triggering sync
+          sessionStore.setTokens(
+            sessionStore.tokens.map(t => 
+              t.id === data.tokenId ? { ...t, ...data.data } : t
+            )
+          );
+        }
+        break;
       case 'updatePosition':
         if (data.tokenId && data.data) {
           sessionStore.updateTokenPosition(data.tokenId, data.data.x, data.data.y);
         }
         break;
-      case 'updateLabel':
-        if (data.tokenId && data.data) {
-          sessionStore.updateTokenLabel(data.tokenId, data.data.label);
-        }
-        break;
-      case 'updateColor':
-        if (data.tokenId && data.data) {
-          sessionStore.updateTokenColor(data.tokenId, data.data.color);
-        }
-        break;
-      case 'updateVision':
-        if (data.tokenId && data.data) {
-          sessionStore.updateTokenVision(data.tokenId, data.data.hasVision);
+      case 'remove':
+        if (data.tokenId) {
+          // Directly remove from state without triggering sync
+          sessionStore.setTokens(sessionStore.tokens.filter(t => t.id !== data.tokenId));
         }
         break;
     }
-  }
-
-  private handleTokenAdded(data: any): void {
-    const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
-
-    console.log('➕ Token added from remote');
-    useSessionStore.getState().addToken(data.token);
-  }
-
-  private handleTokenRemoved(data: any): void {
-    const currentUserId = useMultiplayerStore.getState().currentUserId;
-    if (data.userId === currentUserId) return;
-
-    console.log('➖ Token removed from remote');
-    useSessionStore.getState().removeToken(data.tokenId);
   }
 
   private handleInitiativeUpdated(data: SyncInitiativePayload): void {
@@ -618,6 +611,23 @@ class SyncManager {
     const payload: SyncTokenPayload = {
       action: 'add',
       token,
+      timestamp: Date.now(),
+      userId: useMultiplayerStore.getState().currentUserId || ''
+    };
+
+    this.socketClient?.emit('sync_token', payload);
+  }
+
+  /**
+   * Sync token update (non-position changes)
+   */
+  syncTokenUpdate(tokenId: string, updates: Partial<any>): void {
+    if (!this.canSync()) return;
+
+    const payload: SyncTokenPayload = {
+      action: 'update',
+      tokenId,
+      data: updates,
       timestamp: Date.now(),
       userId: useMultiplayerStore.getState().currentUserId || ''
     };

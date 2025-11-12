@@ -52,6 +52,7 @@ export interface SessionState {
   labelVisibility: LabelVisibility;
   movementLocked: boolean;
   addToken: (token: Token) => void;
+  setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
@@ -90,6 +91,10 @@ export const useSessionStore = create<SessionState>()(
         if (syncManager.isConnected()) {
           syncManager.syncTokenAdd(token);
         }
+      },
+      
+      setTokens: (tokens) => {
+        set({ tokens });
       },
       
       updateTokenPosition: (tokenId, x, y) => {
@@ -144,12 +149,9 @@ export const useSessionStore = create<SessionState>()(
           ),
         }));
         
-        // Sync to multiplayer
+        // Sync to multiplayer - use update instead of add
         if (syncManager.isConnected()) {
-          const token = get().tokens.find(t => t.id === tokenId);
-          if (token) {
-            syncManager.syncTokenAdd({ ...token, label });
-          }
+          syncManager.syncTokenUpdate(tokenId, { label });
         }
       },
 
@@ -160,12 +162,9 @@ export const useSessionStore = create<SessionState>()(
           ),
         }));
         
-        // Sync to multiplayer
+        // Sync to multiplayer - use update instead of add
         if (syncManager.isConnected()) {
-          const token = get().tokens.find(t => t.id === tokenId);
-          if (token) {
-            syncManager.syncTokenAdd({ ...token, color });
-          }
+          syncManager.syncTokenUpdate(tokenId, { color });
         }
       },
 
@@ -176,12 +175,9 @@ export const useSessionStore = create<SessionState>()(
           ),
         }));
         
-        // Sync to multiplayer
+        // Sync to multiplayer - use update instead of add
         if (syncManager.isConnected()) {
-          const token = get().tokens.find(t => t.id === tokenId);
-          if (token) {
-            syncManager.syncTokenAdd({ ...token, hasVision });
-          }
+          syncManager.syncTokenUpdate(tokenId, { hasVision });
         }
       },
 
@@ -192,12 +188,9 @@ export const useSessionStore = create<SessionState>()(
           ),
         }));
         
-        // Sync to multiplayer
+        // Sync to multiplayer - use update instead of add
         if (syncManager.isConnected()) {
-          const token = get().tokens.find(t => t.id === tokenId);
-          if (token) {
-            syncManager.syncTokenAdd({ ...token, visionRange });
-          }
+          syncManager.syncTokenUpdate(tokenId, { visionRange });
         }
       },
 
@@ -208,12 +201,9 @@ export const useSessionStore = create<SessionState>()(
           ),
         }));
         
-        // Sync to multiplayer
+        // Sync to multiplayer - use update instead of add
         if (syncManager.isConnected()) {
-          const token = get().tokens.find(t => t.id === tokenId);
-          if (token) {
-            syncManager.syncTokenAdd({ ...token, ownerId });
-          }
+          syncManager.syncTokenUpdate(tokenId, { ownerId });
         }
       },
       
