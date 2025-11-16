@@ -324,10 +324,33 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         </Button>
         
         {isConnected && (
-          <Badge variant="secondary" className="w-full justify-center text-xs">
-            <Users className="h-3 w-3 mr-1" />
-            {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
-          </Badge>
+          <>
+            <Badge variant="secondary" className="w-full justify-center text-xs">
+              <Users className="h-3 w-3 mr-1" />
+              {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
+            </Badge>
+            
+            {/* Sync Button - DMs broadcast, Players request */}
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (canControlUiMode) {
+                  // DM: Broadcast full state to all players
+                  syncManager.rpcBroadcastFullState();
+                  toast.success('Broadcasting game state to all players');
+                } else {
+                  // Player: Request sync from DM
+                  syncManager.rpcRequestFullState();
+                  toast.info('Requesting game state from DM');
+                }
+              }}
+              className="w-full"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              {canControlUiMode ? 'Sync to Players' : 'Request Sync'}
+            </Button>
+          </>
         )}
       </div>
 

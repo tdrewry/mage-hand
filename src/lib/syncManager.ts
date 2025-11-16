@@ -30,7 +30,9 @@ import type {
   SessionErrorPayload,
   SetUiModePayload,
   OpenCardPayload,
-  SyncInitiativeOrderPayload
+  SyncInitiativeOrderPayload,
+  RequestFullStatePayload,
+  BroadcastFullStatePayload
 } from '@/types/multiplayerEvents';
 
 /**
@@ -173,6 +175,8 @@ class SyncManager {
     this.socketClient.on<SetUiModePayload>('ui_mode_changed', this.handleUiModeChanged.bind(this));
     this.socketClient.on<OpenCardPayload>('card_opened', this.handleCardOpened.bind(this));
     this.socketClient.on<SyncInitiativeOrderPayload>('initiative_order_synced', this.handleInitiativeOrderSynced.bind(this));
+    this.socketClient.on<RequestFullStatePayload>('full_state_requested', this.handleFullStateRequested.bind(this));
+    this.socketClient.on('full_state_broadcasted', this.handleFullStateBroadcasted.bind(this));
   }
 
   // ============= Event Handlers =============
@@ -813,6 +817,73 @@ class SyncManager {
     }
   }
 
+  private handleFullStateRequested(data: RequestFullStatePayload): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === currentUserId);
+    
+    console.log('📥 FULL STATE REQUEST:', {
+      messageId: data.messageId,
+      fromUser: data.senderId,
+      currentUser: currentUserId,
+      fromRoles: data.senderRoleIds,
+    });
+
+    if (!messageIdManager.shouldProcess(data.messageId)) {
+      return;
+    }
+
+    messageIdManager.markProcessed(data.messageId);
+
+    // Check if current user has DM permissions to respond
+    const roleStore = useRoleStore.getState();
+    const hasDMPermission = hasPermission(currentPlayer, roleStore.roles, 'canManageFog');
+    
+    if (hasDMPermission) {
+      console.log('✅ DM responding to sync request from:', data.senderId);
+      // Broadcast full state to the requesting user
+      this.rpcBroadcastFullState(data.senderId);
+    } else {
+      console.log('⏭️ Not DM, ignoring sync request');
+    }
+  }
+
+  private handleFullStateBroadcasted(data: { payload: BroadcastFullStatePayload; state: FullStateSyncPayload }): void {
+    const currentUserId = useMultiplayerStore.getState().currentUserId;
+    
+    console.log('📥 FULL STATE BROADCAST:', {
+      messageId: data.payload.messageId,
+      fromUser: data.payload.senderId,
+      currentUser: currentUserId,
+      targetUser: data.payload.targetUserId,
+      fromRoles: data.payload.senderRoleIds,
+    });
+
+    if (!messageIdManager.shouldProcess(data.payload.messageId)) {
+      return;
+    }
+
+    // If targeted at specific user and we're not that user, ignore
+    if (data.payload.targetUserId && data.payload.targetUserId !== currentUserId) {
+      console.log('⏭️ IGNORING: Broadcast not for this user');
+      messageIdManager.markProcessed(data.payload.messageId);
+      return;
+    }
+
+    // Don't apply our own broadcast
+    if (data.payload.senderId === currentUserId) {
+      console.log('⏭️ IGNORING: Own broadcast');
+      messageIdManager.markProcessed(data.payload.messageId);
+      return;
+    }
+
+    messageIdManager.markProcessed(data.payload.messageId);
+    console.log('✅ PROCESSING FULL STATE BROADCAST');
+
+    // Apply the full state (reuse the full state sync handler logic)
+    this.handleFullStateSync(data.state);
+  }
+
   // ============= Sync Methods (Local → Server) =============
 
   /**
@@ -1446,6 +1517,106 @@ class SyncManager {
     
     console.log('📤 RPC: Sync initiative order', { messageId, userId, orderLength: initiativeOrder.length });
     this.socketClient?.emit('rpc_sync_initiative_order', payload);
+  }
+
+  /**
+   * Request full state sync from DM (Player action)
+   */
+  rpcRequestFullState(): void {
+    if (!this.canSync()) return;
+
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const senderId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(senderId);
+
+    const payload: RequestFullStatePayload = {
+      messageId,
+      timestamp: Date.now(),
+      senderId,
+      senderRoleIds: currentPlayer?.roleIds || [],
+    };
+    
+    console.log('📤 RPC: Request full state', { messageId, senderId });
+    this.socketClient?.emit('rpc_request_full_state', payload);
+  }
+
+  /**
+   * Broadcast full state to all players (DM action)
+   */
+  rpcBroadcastFullState(targetUserId?: string): void {
+    if (!this.canSync()) return;
+
+    const multiplayerStore = useMultiplayerStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const currentPlayer = sessionStore.players.find(p => p.id === multiplayerStore.currentUserId);
+    
+    const senderId = multiplayerStore.currentUserId || '';
+    const messageId = messageIdManager.generateMessageId(senderId);
+
+    // Gather full state from all stores
+    const mapStore = useMapStore.getState();
+    const regionStore = useRegionStore.getState();
+    const fogStore = useFogStore.getState();
+    const lightStore = useLightStore.getState();
+    const initiativeStore = useInitiativeStore.getState();
+    const roleStore = useRoleStore.getState();
+
+    const fullState: FullStateSyncPayload = {
+      tokens: sessionStore.tokens,
+      initiative: {
+        isInCombat: initiativeStore.isInCombat,
+        currentTurnIndex: initiativeStore.currentTurnIndex,
+        roundNumber: initiativeStore.roundNumber,
+        initiativeOrder: initiativeStore.initiativeOrder,
+      },
+      maps: mapStore.maps,
+      regions: regionStore.regions,
+      fog: {
+        enabled: fogStore.enabled,
+        revealAll: fogStore.revealAll,
+        visionRange: fogStore.visionRange,
+        fogOpacity: fogStore.fogOpacity,
+        exploredOpacity: fogStore.exploredOpacity,
+        showExploredAreas: fogStore.showExploredAreas,
+        serializedExploredAreas: fogStore.serializedExploredAreas,
+        useGradients: fogStore.useGradients,
+        innerFadeStart: fogStore.innerFadeStart,
+        midpointPosition: fogStore.midpointPosition,
+        midpointOpacity: fogStore.midpointOpacity,
+        outerFadeStart: fogStore.outerFadeStart,
+      },
+      lights: lightStore.lights,
+      roles: roleStore.roles,
+      players: multiplayerStore.connectedUsers,
+      sessionMetadata: {
+        sessionCode: multiplayerStore.currentSession?.sessionCode || '',
+        createdAt: multiplayerStore.currentSession?.createdAt || Date.now(),
+      },
+    };
+
+    const payload: BroadcastFullStatePayload = {
+      messageId,
+      timestamp: Date.now(),
+      senderId,
+      senderRoleIds: currentPlayer?.roleIds || [],
+      targetUserId,
+    };
+    
+    console.log('📤 RPC: Broadcast full state', { 
+      messageId, 
+      senderId, 
+      targetUserId,
+      tokens: fullState.tokens.length,
+      maps: fullState.maps?.length || 0,
+      regions: fullState.regions?.length || 0,
+      lights: fullState.lights?.length || 0,
+    });
+    
+    // Emit both the command and the state
+    this.socketClient?.emit('rpc_broadcast_full_state', { payload, state: fullState });
   }
 
   // ============= Role Sync Methods =============

@@ -104,6 +104,21 @@ export interface SyncInitiativeOrderPayload extends BaseSyncPayload {
   initiativeOrder: any[];
 }
 
+export interface RequestFullStatePayload {
+  messageId: string;
+  timestamp: number;
+  senderId: string;
+  senderRoleIds: string[];
+}
+
+export interface BroadcastFullStatePayload {
+  messageId: string;
+  timestamp: number;
+  senderId: string;
+  senderRoleIds: string[];
+  targetUserId?: string; // If undefined, broadcast to all
+}
+
 // ============= Server → Client Events =============
 
 export interface SessionJoinedPayload {
@@ -210,6 +225,8 @@ export const ClientEvents = {
   RPC_SET_UI_MODE: 'rpc_set_ui_mode',
   RPC_OPEN_CARD: 'rpc_open_card',
   RPC_SYNC_INITIATIVE_ORDER: 'rpc_sync_initiative_order',
+  RPC_REQUEST_FULL_STATE: 'rpc_request_full_state',
+  RPC_BROADCAST_FULL_STATE: 'rpc_broadcast_full_state',
   
   // Requests
   REQUEST_FULL_SYNC: 'request_full_sync',
@@ -244,6 +261,8 @@ export const ServerEvents = {
   UI_MODE_CHANGED: 'ui_mode_changed',
   CARD_OPENED: 'card_opened',
   INITIATIVE_ORDER_SYNCED: 'initiative_order_synced',
+  FULL_STATE_REQUESTED: 'full_state_requested',
+  FULL_STATE_BROADCASTED: 'full_state_broadcasted',
   
   // User management
   USER_LIST_UPDATED: 'user_list_updated',
