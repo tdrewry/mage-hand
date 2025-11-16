@@ -158,7 +158,6 @@ class SyncManager {
     this.socketClient.on<SessionErrorPayload>('session_error', this.handleSessionError.bind(this));
 
     // State sync events
-    this.socketClient.on('request_full_sync', this.broadcastFullStateSync.bind(this));
     this.socketClient.on<FullStateSyncPayload>('full_state_sync', this.handleFullStateSync.bind(this));
     this.socketClient.on<SyncTokenPayload>('token_updated', this.handleTokenUpdated.bind(this));
     this.socketClient.on('initiative_updated', this.handleInitiativeUpdated.bind(this));
@@ -206,9 +205,6 @@ class SyncManager {
         this.syncMapAdd(map);
       });
     }
-
-    // Request full state sync
-    this.socketClient?.emit('request_full_sync');
   }
 
   private handleUserJoined(data: UserJoinedPayload): void {
