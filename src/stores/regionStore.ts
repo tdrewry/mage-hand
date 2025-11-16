@@ -66,18 +66,18 @@ export const useRegionStore = create<RegionStore>()(
         set((state) => ({
           regions: [...state.regions, newRegion],
         }));
-        
+        syncManager.syncRegionAdd(newRegion);
         // Check if this is a remote sync by looking for the _fromRemote flag
         // Remote syncs will have `_fromRemote: true` added by the handler
-        const isRemoteSync = (regionData as any)._fromRemote === true;
+        // const isRemoteSync = (regionData as any)._fromRemote === true;
         
         // Only sync if this is a new LOCAL region (not from remote)
-        if (!isRemoteSync && syncManager.isConnected()) {
-          console.log('📤 Syncing new region:', newRegion.id);
-          syncManager.syncRegionAdd(newRegion);
-        } else if (isRemoteSync) {
-          console.log('⏭️ Skipping sync for remote region:', newRegion.id);
-        }
+        // if (!isRemoteSync && syncManager.isConnected()) {
+        //   console.log('📤 Syncing new region:', newRegion.id);
+        //   syncManager.syncRegionAdd(newRegion);
+        // } else if (isRemoteSync) {
+        //   console.log('⏭️ Skipping sync for remote region:', newRegion.id);
+        // }
       },
 
       updateRegion: (id, updates) => {

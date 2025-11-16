@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { SocketClient } from './socketClient';
 import { throttle } from './throttle';
 import { messageIdManager } from './messageIdManager';
@@ -157,6 +158,7 @@ class SyncManager {
     this.socketClient.on<SessionErrorPayload>('session_error', this.handleSessionError.bind(this));
 
     // State sync events
+    this.socketClient.on('request_full_sync', this.broadcastFullStateSync.bind(this));
     this.socketClient.on<FullStateSyncPayload>('full_state_sync', this.handleFullStateSync.bind(this));
     this.socketClient.on<SyncTokenPayload>('token_updated', this.handleTokenUpdated.bind(this));
     this.socketClient.on('initiative_updated', this.handleInitiativeUpdated.bind(this));
@@ -1036,6 +1038,44 @@ class SyncManager {
     }
 
     return true;
+  }
+
+  broadcastFullStateSync(): void {
+    if (!this.socketClient?.isConnected()) return;
+    if (!this.canSync()) return;
+
+    const sessionStore = useSessionStore.getState();
+    const initiativeStore = useInitiativeStore.getState();
+    const mapStore = useMapStore.getState();
+    const regionStore = useRegionStore.getState();
+    const fogStore = useFogStore.getState();
+    const lightStore = useLightStore.getState();
+    const roleStore = useRoleStore.getState();
+    const multiplayerStore = useMultiplayerStore.getState();
+
+    const payload: FullStateSyncPayload = {
+      tokens: sessionStore.tokens,
+      initiative: {
+        initiativeOrder: initiativeStore.initiativeOrder,
+        isInCombat: initiativeStore.isInCombat,
+        currentTurnIndex: initiativeStore.currentTurnIndex,
+        roundNumber: initiativeStore.roundNumber,
+      },
+      maps: mapStore.maps,
+      regions: regionStore.regions,
+      lights: lightStore.lights,
+      fog: fogStore,
+      roles: roleStore.roles,
+      players: multiplayerStore.connectedUsers,
+      sessionMetadata: {
+        sessionCode: multiplayerStore.currentSession?.sessionCode,
+        createdAt: multiplayerStore.currentSession?.createdAt,
+      }
+    };
+
+    // Cast event name to any to satisfy ClientEventName typing when
+    // the event is not included in the ClientEventName union.
+    this.socketClient?.emit('full_state_sync' as any, payload);
   }
 
   /**

@@ -243,6 +243,7 @@ export const ServerEvents = {
   SESSION_ERROR: 'session_error',
   
   // State sync
+  BROADCAST_FULL_STATE: 'request_full_sync',
   FULL_STATE_SYNC: 'full_state_sync',
   TOKEN_UPDATED: 'token_updated',
   TOKEN_ADDED: 'token_added',
