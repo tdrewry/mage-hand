@@ -1449,10 +1449,10 @@ export const SimpleTabletop = () => {
           const midpointRemoval = Math.max(0, Math.min(1, 1 - (settings.midpointOpacity / fogOpacity)));
           const outerRemoval = Math.max(0, Math.min(1, 1 - (exploredOpacity / fogOpacity)));
           
-          canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`);
-          canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 1)`);
-          canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`);
-          canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`);
+          canvasGradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+          canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 0)`);
+          canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, 0)`);
+          canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, 0)`);
           canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
           
           ctx.save();
