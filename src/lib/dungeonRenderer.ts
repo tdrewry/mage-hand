@@ -389,7 +389,7 @@ export function renderTerrainFeatures(
     
     switch (feature.type) {
       case 'water':
-        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions);
+        renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions, feature.fluidBoundary);
         break;
       case 'column':
         renderColumnTiles(ctx, feature.tiles, zoom, regions);
@@ -412,8 +412,69 @@ function renderWaterTiles(
   zoom: number,
   dungeonMapMode: boolean = false,
   style: WatabouStyle = DEFAULT_STYLE,
-  regions: CanvasRegion[] = []
+  regions: CanvasRegion[] = [],
+  fluidBoundary?: { x: number; y: number }[]
 ) {
+  // If we have a fluid boundary, render as organic shape
+  if (dungeonMapMode && fluidBoundary && fluidBoundary.length > 2) {
+    ctx.save();
+    
+    // Create path from fluid boundary
+    ctx.beginPath();
+    ctx.moveTo(fluidBoundary[0].x, fluidBoundary[0].y);
+    for (let i = 1; i < fluidBoundary.length; i++) {
+      ctx.lineTo(fluidBoundary[i].x, fluidBoundary[i].y);
+    }
+    ctx.closePath();
+    
+    // Find region containing water for clipping
+    const containingRegion = regions.find(region => {
+      if (tiles.length > 0) {
+        const tileCenterX = tiles[0].x + 25;
+        const tileCenterY = tiles[0].y + 25;
+        return isPointInRegion(tileCenterX, tileCenterY, region);
+      }
+      return false;
+    });
+    
+    if (containingRegion) {
+      clipToRegion(ctx, containingRegion);
+    }
+    
+    // Fill with water color
+    ctx.fillStyle = style.colorWater;
+    ctx.fill();
+    
+    // Add wavy pattern across the fluid area
+    ctx.strokeStyle = style.colorInk;
+    ctx.lineWidth = style.strokeThin / zoom;
+    ctx.globalAlpha = 0.4;
+    
+    // Get bounds of fluid boundary
+    const minX = Math.min(...fluidBoundary.map(p => p.x));
+    const maxX = Math.max(...fluidBoundary.map(p => p.x));
+    const minY = Math.min(...fluidBoundary.map(p => p.y));
+    const maxY = Math.max(...fluidBoundary.map(p => p.y));
+    
+    // Draw wavy lines across the area
+    const numWaves = Math.ceil((maxY - minY) / 20);
+    for (let i = 0; i < numWaves; i++) {
+      ctx.beginPath();
+      const y = minY + (i + 1) * ((maxY - minY) / (numWaves + 1));
+      ctx.moveTo(minX, y);
+      for (let x = 0; x <= maxX - minX; x += 8) {
+        const wave = Math.sin((x / (maxX - minX)) * Math.PI * 6) * 2;
+        ctx.lineTo(minX + x, y + wave);
+      }
+      ctx.stroke();
+    }
+    
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+    return;
+  }
+  
+  // Fallback to tile-based rendering
   tiles.forEach((tile) => {
     if (dungeonMapMode) {
       // Find region containing this tile for clipping
