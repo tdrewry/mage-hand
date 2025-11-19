@@ -1,6 +1,8 @@
 import { WatabouJSON } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
 import { DoorConnection, Annotation, TerrainFeature } from './dungeonTypes';
+import { groupConnectedTiles, generateSimpleContour } from '@/utils/marchingSquares';
+import { simplifyPath, smoothPath } from '@/utils/pathSimplification';
 
 // Grid size for conversion (pixels per Watabou grid unit)
 const GRID_SIZE = 50;
@@ -229,15 +231,41 @@ function convertNote(note: WatabouJSON['notes'][0]): Omit<Annotation, 'id'> {
 }
 
 /**
- * Convert Watabou water tiles to TerrainFeature
+ * Convert Watabou water tiles to TerrainFeature with fluid boundary
  */
 function convertWater(waterTiles: { x: number; y: number }[]): Omit<TerrainFeature, 'id'> {
+  const scaledTiles = waterTiles.map((tile) => ({
+    x: tile.x * GRID_SIZE,
+    y: tile.y * GRID_SIZE,
+  }));
+  
+  // Generate fluid boundary using marching squares
+  let fluidBoundary: { x: number; y: number }[] | undefined;
+  
+  if (scaledTiles.length > 0) {
+    // Group connected tiles
+    const groups = groupConnectedTiles(scaledTiles);
+    
+    // Use the largest group for boundary (handle disconnected water separately)
+    if (groups.length > 0) {
+      const largestGroup = groups.reduce((a, b) => a.length > b.length ? a : b);
+      
+      // Generate contour
+      let contour = generateSimpleContour(largestGroup, GRID_SIZE);
+      
+      if (contour.length > 0) {
+        // Simplify and smooth the contour for organic look
+        contour = simplifyPath(contour, 3.0);
+        contour = smoothPath(contour, 3);
+        fluidBoundary = contour;
+      }
+    }
+  }
+  
   return {
     type: 'water',
-    tiles: waterTiles.map((tile) => ({
-      x: tile.x * GRID_SIZE,
-      y: tile.y * GRID_SIZE,
-    })),
+    tiles: scaledTiles,
+    fluidBoundary,
   };
 }
 
