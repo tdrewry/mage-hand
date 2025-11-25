@@ -2,6 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { syncManager } from '@/lib/syncManager';
 
+export type EffectQuality = 'performance' | 'balanced' | 'cinematic';
+
+export interface FogEffectSettings {
+  postProcessingEnabled: boolean; // Enable PixiJS post-processing
+  edgeBlur: number; // 0-20 pixels
+  bloomIntensity: number; // 0-2
+  volumetricEnabled: boolean;
+  effectQuality: EffectQuality;
+}
+
 export interface FogSettings {
   enabled: boolean;
   revealAll: boolean; // DM mode - show entire map
@@ -18,6 +28,9 @@ export interface FogSettings {
   midpointPosition: number; // 0-1, position of mid-fade (default: 0.85)
   midpointOpacity: number; // 0-1, opacity at midpoint (default: 0.2)
   outerFadeStart: number; // 0-1, where outer fade starts (default: 0.9)
+  
+  // Post-processing effect settings
+  effectSettings: FogEffectSettings;
 }
 
 interface FogState extends FogSettings {
@@ -38,6 +51,14 @@ interface FogState extends FogSettings {
   setMidpointPosition: (value: number) => void;
   setMidpointOpacity: (value: number) => void;
   setOuterFadeStart: (value: number) => void;
+  
+  // Post-processing effect actions
+  setPostProcessingEnabled: (enabled: boolean) => void;
+  setEdgeBlur: (blur: number) => void;
+  setBloomIntensity: (intensity: number) => void;
+  setVolumetricEnabled: (enabled: boolean) => void;
+  setEffectQuality: (quality: EffectQuality) => void;
+  setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
 }
 
 export const useFogStore = create<FogState>()(
@@ -59,6 +80,15 @@ export const useFogStore = create<FogState>()(
       midpointPosition: 0.85,
       midpointOpacity: 0.2,
       outerFadeStart: 0.9,
+      
+      // Post-processing effect settings
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        bloomIntensity: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as EffectQuality,
+      },
       
       // Actions
       setEnabled: (enabled) => {
@@ -151,6 +181,13 @@ export const useFogStore = create<FogState>()(
           midpointPosition: 0.85,
           midpointOpacity: 0.2,
           outerFadeStart: 0.9,
+          effectSettings: {
+            postProcessingEnabled: false,
+            edgeBlur: 8,
+            bloomIntensity: 0.5,
+            volumetricEnabled: false,
+            effectQuality: 'balanced' as EffectQuality,
+          },
         });
       },
       
@@ -199,6 +236,40 @@ export const useFogStore = create<FogState>()(
           syncManager.syncFogSettings({ outerFadeStart: clampedValue });
         }
       },
+      
+      // Post-processing effect actions
+      setPostProcessingEnabled: (enabled) => {
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, postProcessingEnabled: enabled },
+        }));
+      },
+      setEdgeBlur: (blur) => {
+        const clampedBlur = Math.max(0, Math.min(20, blur));
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, edgeBlur: clampedBlur },
+        }));
+      },
+      setBloomIntensity: (intensity) => {
+        const clampedIntensity = Math.max(0, Math.min(2, intensity));
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, bloomIntensity: clampedIntensity },
+        }));
+      },
+      setVolumetricEnabled: (enabled) => {
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, volumetricEnabled: enabled },
+        }));
+      },
+      setEffectQuality: (quality) => {
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, effectQuality: quality },
+        }));
+      },
+      setEffectSettings: (settings) => {
+        set((state) => ({
+          effectSettings: { ...state.effectSettings, ...settings },
+        }));
+      },
     }),
     {
       name: 'fog-of-war-store',
@@ -216,6 +287,7 @@ export const useFogStore = create<FogState>()(
         midpointPosition: state.midpointPosition,
         midpointOpacity: state.midpointOpacity,
         outerFadeStart: state.outerFadeStart,
+        effectSettings: state.effectSettings,
       }),
     }
   )

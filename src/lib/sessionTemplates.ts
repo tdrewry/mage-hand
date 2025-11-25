@@ -126,6 +126,13 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       midpointPosition: 0.85,
       midpointOpacity: 0.2,
       outerFadeStart: 0.9,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        bloomIntensity: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -262,6 +269,13 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       midpointPosition: 0.85,
       midpointOpacity: 0.2,
       outerFadeStart: 0.9,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        bloomIntensity: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -349,6 +363,13 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       midpointPosition: 0.85,
       midpointOpacity: 0.2,
       outerFadeStart: 0.9,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        bloomIntensity: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -453,6 +474,13 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       midpointPosition: 0.85,
       midpointOpacity: 0.2,
       outerFadeStart: 0.9,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        bloomIntensity: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
