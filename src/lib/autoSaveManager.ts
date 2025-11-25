@@ -169,6 +169,7 @@ export class AutoSaveManager {
           midpointPosition: fogState.midpointPosition,
           midpointOpacity: fogState.midpointOpacity,
           outerFadeStart: fogState.outerFadeStart,
+          effectSettings: fogState.effectSettings,
         },
         lights: lightState.lights,
         cardStates: cardState.cards,

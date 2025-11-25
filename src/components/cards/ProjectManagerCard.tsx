@@ -176,6 +176,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
             midpointPosition: fogStore.midpointPosition,
             midpointOpacity: fogStore.midpointOpacity,
             outerFadeStart: fogStore.outerFadeStart,
+            effectSettings: fogStore.effectSettings,
           },
           gridSize: 50,
         }
@@ -305,6 +306,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       midpointPosition: fogStore.midpointPosition,
       midpointOpacity: fogStore.midpointOpacity,
       outerFadeStart: fogStore.outerFadeStart,
+      effectSettings: fogStore.effectSettings,
     },
     lights: lightStore.lights,
     cardStates: cardStore.cards,

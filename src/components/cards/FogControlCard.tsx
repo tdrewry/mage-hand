@@ -2,10 +2,17 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { useFogStore } from '@/stores/fogStore';
-import { Eye, EyeOff, Circle } from 'lucide-react';
+import { useFogStore, type EffectQuality } from '@/stores/fogStore';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export function FogControlCardContent() {
   const {
@@ -19,6 +26,7 @@ export function FogControlCardContent() {
     midpointPosition,
     midpointOpacity,
     outerFadeStart,
+    effectSettings,
     setEnabled,
     setRevealAll,
     setVisionRange,
@@ -29,6 +37,11 @@ export function FogControlCardContent() {
     setMidpointPosition,
     setMidpointOpacity,
     setOuterFadeStart,
+    setPostProcessingEnabled,
+    setEdgeBlur,
+    setBloomIntensity,
+    setVolumetricEnabled,
+    setEffectQuality,
     clearExploredAreas,
     resetFog,
   } = useFogStore();
@@ -273,6 +286,134 @@ export function FogControlCardContent() {
 
       <Separator />
 
+      {/* Post-Processing Effects Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="post-processing" className="text-sm font-medium flex items-center gap-2">
+              <Sparkles className="h-3 w-3" />
+              GPU Post-Processing
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Enhanced fog effects using WebGL
+            </p>
+          </div>
+          <Switch
+            id="post-processing"
+            checked={effectSettings.postProcessingEnabled}
+            onCheckedChange={setPostProcessingEnabled}
+            disabled={!enabled}
+          />
+        </div>
+
+        {effectSettings.postProcessingEnabled && (
+          <>
+            {/* Effect Quality Preset */}
+            <div className="space-y-2 pl-4">
+              <Label htmlFor="effect-quality" className="text-xs font-medium flex items-center gap-2">
+                <MonitorPlay className="h-3 w-3" />
+                Effect Quality
+              </Label>
+              <Select
+                value={effectSettings.effectQuality}
+                onValueChange={(value) => setEffectQuality(value as EffectQuality)}
+                disabled={!enabled}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select quality" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="performance">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3 w-3" />
+                      Performance
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="balanced">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-3 w-3" />
+                      Balanced
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cinematic">
+                    <div className="flex items-center gap-2">
+                      <Film className="h-3 w-3" />
+                      Cinematic
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Edge Blur */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edge-blur" className="text-xs font-medium">
+                  Fog Edge Softness
+                </Label>
+                <span className="text-xs font-medium">{effectSettings.edgeBlur}px</span>
+              </div>
+              <Slider
+                id="edge-blur"
+                min={0}
+                max={20}
+                step={1}
+                value={[effectSettings.edgeBlur]}
+                onValueChange={([value]) => setEdgeBlur(value)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Blur amount at fog boundaries
+              </p>
+            </div>
+
+            {/* Bloom Intensity */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="bloom-intensity" className="text-xs font-medium">
+                  Light Bloom
+                </Label>
+                <span className="text-xs font-medium">{effectSettings.bloomIntensity.toFixed(1)}</span>
+              </div>
+              <Slider
+                id="bloom-intensity"
+                min={0}
+                max={200}
+                step={10}
+                value={[effectSettings.bloomIntensity * 100]}
+                onValueChange={([value]) => setBloomIntensity(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Glow effect on light sources
+              </p>
+            </div>
+
+            {/* Volumetric Fog Toggle */}
+            <div className="flex items-center justify-between pl-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="volumetric" className="text-xs font-medium">
+                  Volumetric Fog
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Atmospheric fog wisps (experimental)
+                </p>
+              </div>
+              <Switch
+                id="volumetric"
+                checked={effectSettings.volumetricEnabled}
+                onCheckedChange={setVolumetricEnabled}
+                disabled={!enabled}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <Separator />
+
       {/* Reset Buttons */}
       <div className="flex gap-2 justify-end">
         <Button
@@ -303,6 +444,9 @@ export function FogControlCardContent() {
           <strong>Tip:</strong> Fog has three states: <strong>unexplored</strong> (black), 
           <strong>explored</strong> (dimmed), and <strong>visible</strong> (clear). 
           Tokens reveal fog as they move around the map.
+          {effectSettings.postProcessingEnabled && (
+            <> GPU effects add smooth edges and atmospheric lighting.</>
+          )}
         </p>
       </div>
     </div>
