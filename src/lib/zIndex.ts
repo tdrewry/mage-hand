@@ -22,10 +22,12 @@ export const Z_INDEX = {
     WALLS: 15000,                  // Wall segments
     TOKENS_BASE: 20000,            // Token base layer
     TOKENS_MAX: 25000,             // Token max (5000 tokens possible)
+    FOG_POST_PROCESSING: 25500,    // PixiJS fog blur/effects layer
     SELECTION_HIGHLIGHT: 26000,    // Selection visuals
     DRAG_GHOST: 27000,             // Dragging preview
     MEASUREMENT_TOOLS: 28000,      // Rulers, templates
     COMBAT_INDICATORS: 29000,      // Turn indicators, status markers
+    CANVAS_UI_OVERLAY: 29500,      // Canvas-based UI (off-screen indicators)
   },
   
   // Layer 2: Fixed UI elements (30000-30999) - 1000 slots

@@ -90,6 +90,7 @@ import {
   getRegionBounds,
   type TransformHandle,
 } from "../lib/regionTransforms";
+import { Z_INDEX } from "../lib/zIndex";
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -4785,11 +4786,11 @@ export const SimpleTabletop = () => {
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
         />
-        {/* Overlay canvas for UI elements above fog post-processing (z-index: 3 is above PixiJS z-index: 2) */}
+        {/* Overlay canvas for UI elements above fog post-processing */}
         <canvas
           ref={overlayCanvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ zIndex: 3 }}
+          style={{ zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY }}
         />
       </div>
 
