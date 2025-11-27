@@ -32,26 +32,42 @@ let fogCanvas: HTMLCanvasElement | null = null;
 let fogCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
+let currentPadding = 0; // Track current padding for off-screen rendering
+
+/**
+ * Get the current edge padding value
+ */
+export function getEdgePadding(): number {
+  return currentPadding;
+}
 
 /**
  * Initialize the fog canvas used for capturing fog state
+ * Canvas is larger than viewport to allow blur edges to render off-screen
  */
-export function initFogCanvas(width: number, height: number): void {
+export function initFogCanvas(width: number, height: number, edgeBlur: number = 0): void {
+  const padding = edgeBlur * 2;
+  currentPadding = padding;
+  
   if (!fogCanvas) {
     fogCanvas = document.createElement('canvas');
   }
-  fogCanvas.width = width;
-  fogCanvas.height = height;
+  // Canvas is larger by 2x padding (padding on each side)
+  fogCanvas.width = width + padding * 2;
+  fogCanvas.height = height + padding * 2;
   fogCtx = fogCanvas.getContext('2d', { willReadFrequently: false });
 }
 
 /**
  * Resize the fog canvas
  */
-export function resizeFogCanvas(width: number, height: number): void {
+export function resizeFogCanvas(width: number, height: number, edgeBlur: number = 0): void {
+  const padding = edgeBlur * 2;
+  currentPadding = padding;
+  
   if (fogCanvas) {
-    fogCanvas.width = width;
-    fogCanvas.height = height;
+    fogCanvas.width = width + padding * 2;
+    fogCanvas.height = height + padding * 2;
   }
 }
 
@@ -88,9 +104,14 @@ export function applyFogPostProcessing(
   transform: { x: number; y: number; zoom: number },
   tokenVisibilityData: TokenVisibilityData[] = []
 ): void {
-  // Initialize fog canvas if needed
-  if (!fogCanvas || fogCanvas.width !== canvasWidth || fogCanvas.height !== canvasHeight) {
-    initFogCanvas(canvasWidth, canvasHeight);
+  const edgeBlur = getEffectSettings().edgeBlur;
+  const padding = edgeBlur * 2;
+  const paddedWidth = canvasWidth + padding * 2;
+  const paddedHeight = canvasHeight + padding * 2;
+  
+  // Initialize fog canvas if needed (with padding for off-screen blur)
+  if (!fogCanvas || fogCanvas.width !== paddedWidth || fogCanvas.height !== paddedHeight) {
+    initFogCanvas(canvasWidth, canvasHeight, edgeBlur);
   }
   
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) {
@@ -102,12 +123,13 @@ export function applyFogPostProcessing(
   if (now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
   lastUpdateTime = now;
 
-  // Clear fog canvas
-  fogCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+  // Clear fog canvas (including padding area)
+  fogCtx.clearRect(0, 0, paddedWidth, paddedHeight);
 
-  // Apply the same transform as main canvas
+  // Apply transform with padding offset
+  // Content is rendered with padding offset so blur edges are outside viewport
   fogCtx.save();
-  fogCtx.translate(transform.x, transform.y);
+  fogCtx.translate(padding + transform.x, padding + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
   // Render fog layers to off-screen canvas
@@ -131,25 +153,9 @@ export function applyFogPostProcessing(
 
   fogCtx.restore();
 
-  // Draw black perimeter to prevent edge blur bleeding
-  // The perimeter must be wider than the blur radius and FULLY OPAQUE
-  const blurRadius = getEffectSettings().edgeBlur;
-  const perimeterWidth = Math.max(blurRadius * 2, 40); // At least 40px or 2x blur
-
-  // Use full opacity for perimeter to ensure complete blackout at edges
-  fogCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-
-  // Top edge
-  fogCtx.fillRect(0, 0, canvasWidth, perimeterWidth);
-  // Bottom edge
-  fogCtx.fillRect(0, canvasHeight - perimeterWidth, canvasWidth, perimeterWidth);
-  // Left edge
-  fogCtx.fillRect(0, 0, perimeterWidth, canvasHeight);
-  // Right edge
-  fogCtx.fillRect(canvasWidth - perimeterWidth, 0, perimeterWidth, canvasHeight);
-
   // Send to PixiJS for post-processing
-  updateFogTexture(fogCanvas);
+  // The padding will be positioned off-screen by the PixiJS layer
+  updateFogTexture(fogCanvas, padding);
   renderPostProcessing();
 }
 

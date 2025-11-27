@@ -118,26 +118,34 @@ export async function initPostProcessing(
   }
 }
 
+let currentPadding = 0;
+
 /**
  * Update the fog texture from a Canvas 2D source
+ * The source canvas may be larger than the viewport to allow blur edges off-screen
  */
-export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
+export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
   if (!pixiApp || !fogSprite || !isInitialized) return;
 
   try {
+    currentPadding = padding;
+    
     // Dispose old texture
     if (fogTexture) {
       fogTexture.destroy(true);
     }
 
-    // Create texture from canvas
+    // Create texture from canvas (which includes padding)
     fogTexture = PIXI.Texture.from(sourceCanvas);
     fogSprite.texture = fogTexture;
     
-    // Scale to fit the PixiJS canvas
+    // The sprite should match the padded canvas size
+    // Position is set negative to push blur edges off-screen
     const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-    fogSprite.width = pixiApp.screen.width;
-    fogSprite.height = pixiApp.screen.height;
+    fogSprite.width = sourceCanvas.width * qualityMultiplier;
+    fogSprite.height = sourceCanvas.height * qualityMultiplier;
+    fogSprite.x = -padding * qualityMultiplier;
+    fogSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }
