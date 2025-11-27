@@ -15,7 +15,7 @@ import {
 export interface FogEffectConfig {
   enabled: boolean;
   edgeBlur: number;
-  bloomIntensity: number;
+  lightFalloff: number;
   volumetricEnabled: boolean;
   effectQuality: 'performance' | 'balanced' | 'cinematic';
 }
@@ -23,7 +23,7 @@ export interface FogEffectConfig {
 export const DEFAULT_FOG_EFFECTS: FogEffectConfig = {
   enabled: true,
   edgeBlur: 8,
-  bloomIntensity: 0.5,
+  lightFalloff: 0.5,
   volumetricEnabled: false,
   effectQuality: 'balanced',
 };
@@ -168,8 +168,8 @@ export function updateFogEffects(config: Partial<FogEffectConfig>): void {
   if (config.edgeBlur !== undefined) {
     effectSettings.edgeBlur = config.edgeBlur;
   }
-  if (config.bloomIntensity !== undefined) {
-    effectSettings.bloomIntensity = config.bloomIntensity;
+  if (config.lightFalloff !== undefined) {
+    effectSettings.lightFalloff = config.lightFalloff;
   }
   if (config.volumetricEnabled !== undefined) {
     effectSettings.volumetricEnabled = config.volumetricEnabled;
@@ -189,7 +189,7 @@ export function getFogEffectConfig(): FogEffectConfig {
   return {
     enabled: true,
     edgeBlur: settings.edgeBlur,
-    bloomIntensity: settings.bloomIntensity,
+    lightFalloff: settings.lightFalloff,
     volumetricEnabled: settings.volumetricEnabled,
     effectQuality: settings.effectQuality,
   };

@@ -7,7 +7,7 @@ export type EffectQuality = 'performance' | 'balanced' | 'cinematic';
 export interface FogEffectSettings {
   postProcessingEnabled: boolean; // Enable PixiJS post-processing
   edgeBlur: number; // 0-20 pixels
-  bloomIntensity: number; // 0-2
+  lightFalloff: number; // 0-1, percentage of light radius where inner bright zone ends
   volumetricEnabled: boolean;
   effectQuality: EffectQuality;
 }
@@ -55,7 +55,7 @@ interface FogState extends FogSettings {
   // Post-processing effect actions
   setPostProcessingEnabled: (enabled: boolean) => void;
   setEdgeBlur: (blur: number) => void;
-  setBloomIntensity: (intensity: number) => void;
+  setLightFalloff: (falloff: number) => void;
   setVolumetricEnabled: (enabled: boolean) => void;
   setEffectQuality: (quality: EffectQuality) => void;
   setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
@@ -85,7 +85,7 @@ export const useFogStore = create<FogState>()(
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        bloomIntensity: 0.5,
+        lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
         volumetricEnabled: false,
         effectQuality: 'balanced' as EffectQuality,
       },
@@ -184,7 +184,7 @@ export const useFogStore = create<FogState>()(
           effectSettings: {
             postProcessingEnabled: false,
             edgeBlur: 8,
-            bloomIntensity: 0.5,
+            lightFalloff: 0.5,
             volumetricEnabled: false,
             effectQuality: 'balanced' as EffectQuality,
           },
@@ -249,10 +249,10 @@ export const useFogStore = create<FogState>()(
           effectSettings: { ...state.effectSettings, edgeBlur: clampedBlur },
         }));
       },
-      setBloomIntensity: (intensity) => {
-        const clampedIntensity = Math.max(0, Math.min(2, intensity));
+      setLightFalloff: (falloff) => {
+        const clampedFalloff = Math.max(0, Math.min(1, falloff));
         set((state) => ({
-          effectSettings: { ...state.effectSettings, bloomIntensity: clampedIntensity },
+          effectSettings: { ...state.effectSettings, lightFalloff: clampedFalloff },
         }));
       },
       setVolumetricEnabled: (enabled) => {

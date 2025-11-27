@@ -39,7 +39,7 @@ export function FogControlCardContent() {
     setOuterFadeStart,
     setPostProcessingEnabled,
     setEdgeBlur,
-    setBloomIntensity,
+    setLightFalloff,
     setVolumetricEnabled,
     setEffectQuality,
     clearExploredAreas,
@@ -368,26 +368,26 @@ export function FogControlCardContent() {
               </p>
             </div>
 
-            {/* Bloom Intensity */}
+            {/* Light Falloff */}
             <div className="space-y-2 pl-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="bloom-intensity" className="text-xs font-medium">
-                  Light Bloom
+                <Label htmlFor="light-falloff" className="text-xs font-medium">
+                  Light Inner Zone
                 </Label>
-                <span className="text-xs font-medium">{effectSettings.bloomIntensity.toFixed(1)}</span>
+                <span className="text-xs font-medium">{Math.round(effectSettings.lightFalloff * 100)}%</span>
               </div>
               <Slider
-                id="bloom-intensity"
-                min={0}
-                max={200}
-                step={10}
-                value={[effectSettings.bloomIntensity * 100]}
-                onValueChange={([value]) => setBloomIntensity(value / 100)}
+                id="light-falloff"
+                min={10}
+                max={90}
+                step={5}
+                value={[effectSettings.lightFalloff * 100]}
+                onValueChange={([value]) => setLightFalloff(value / 100)}
                 disabled={!enabled}
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Glow effect on light sources
+                Inner bright zone radius (outer is dimmer)
               </p>
             </div>
 

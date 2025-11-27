@@ -15,15 +15,15 @@ export interface PostProcessingConfig {
 
 export interface EffectSettings {
   edgeBlur: number;        // 0-20 pixels
-  bloomIntensity: number;  // 0-2
-  bloomThreshold: number;  // 0.5-1
+  lightFalloff: number;    // 0-1, inner bright zone as percentage of light radius
+  bloomThreshold: number;  // 0.5-1 (legacy, unused)
   volumetricEnabled: boolean;
   effectQuality: 'performance' | 'balanced' | 'cinematic';
 }
 
 const DEFAULT_EFFECT_SETTINGS: EffectSettings = {
   edgeBlur: 8,
-  bloomIntensity: 0.5,
+  lightFalloff: 0.5,
   bloomThreshold: 0.7,
   volumetricEnabled: false,
   effectQuality: 'balanced',

@@ -755,6 +755,48 @@ export const SimpleTabletop = () => {
             });
           });
 
+          // Add enabled light sources to fog revelation with two-zone gradients
+          const enabledLights = lights.filter((l) => l.enabled);
+          for (const light of enabledLights) {
+            // Compute visibility for this light source using walls
+            // Pass a mock token-like object with required properties
+            const lightVision = await computeTokenVisibilityPaper(
+              [{ x: light.position.x, y: light.position.y, id: light.id, gridWidth: 1, gridHeight: 1 }],
+              wallGeometry.wallSegments,
+              wallGeometry,
+              light.radius,
+            );
+
+            if (lightVision) {
+              const lightPath2D = paperPathToPath2D(lightVision);
+              
+              // Use lightFalloff from effectSettings for two-zone lighting:
+              // - Inner zone (0 to lightFalloff): fully bright/clear
+              // - Outer zone (lightFalloff to 1.0): dimmer
+              const lightFalloff = effectSettings.lightFalloff;
+              
+              tokenVisData.push({
+                position: light.position,
+                visionRange: light.radius,
+                visibilityPath: lightPath2D,
+                useGradients: true,
+                gradientSettings: {
+                  // Inner bright zone - fully clear up to falloff point
+                  innerFadeStart: lightFalloff,
+                  // Sharp transition at falloff point
+                  midpointPosition: lightFalloff + 0.01,
+                  // Outer zone is dimmer (use explored opacity level)
+                  midpointOpacity: exploredOpacity,
+                  // Outer zone stays at dim level
+                  outerFadeStart: lightFalloff + 0.02,
+                },
+              });
+              
+              // Clean up paper.js path
+              if (lightVision.remove) lightVision.remove();
+            }
+          }
+
           tokenVisibilityDataRef.current = tokenVisData;
 
           // Clean up
@@ -778,6 +820,7 @@ export const SimpleTabletop = () => {
     return () => clearTimeout(timeoutId);
   }, [
     tokens,
+    lights,
     fogEnabled,
     fogRevealAll,
     fogVisionRange,
@@ -788,6 +831,8 @@ export const SimpleTabletop = () => {
     transform.x,
     transform.y,
     transform.zoom,
+    effectSettings.lightFalloff,
+    exploredOpacity,
   ]);
 
   // Helper function to convert screen coordinates to world coordinates

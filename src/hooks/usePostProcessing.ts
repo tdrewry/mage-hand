@@ -117,7 +117,7 @@ export function usePostProcessing({
     if (initRef.current && isPostProcessingReady()) {
       updateEffectSettings({
         edgeBlur: effectSettings.edgeBlur,
-        bloomIntensity: effectSettings.bloomIntensity,
+        lightFalloff: effectSettings.lightFalloff,
         volumetricEnabled: effectSettings.volumetricEnabled,
         effectQuality: effectSettings.effectQuality,
       });
