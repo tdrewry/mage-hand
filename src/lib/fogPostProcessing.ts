@@ -131,6 +131,22 @@ export function applyFogPostProcessing(
 
   fogCtx.restore();
 
+  // Draw black perimeter to prevent edge blur bleeding
+  // The perimeter must be wider than the blur radius
+  const blurRadius = getEffectSettings().edgeBlur;
+  const perimeterWidth = Math.max(blurRadius * 2, 30); // At least 30px or 2x blur
+
+  fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+
+  // Top edge
+  fogCtx.fillRect(0, 0, canvasWidth, perimeterWidth);
+  // Bottom edge
+  fogCtx.fillRect(0, canvasHeight - perimeterWidth, canvasWidth, perimeterWidth);
+  // Left edge
+  fogCtx.fillRect(0, 0, perimeterWidth, canvasHeight);
+  // Right edge
+  fogCtx.fillRect(canvasWidth - perimeterWidth, 0, perimeterWidth, canvasHeight);
+
   // Send to PixiJS for post-processing
   updateFogTexture(fogCanvas);
   renderPostProcessing();
