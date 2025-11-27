@@ -130,22 +130,28 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
   try {
     currentPadding = padding;
     
-    // Dispose old texture
-    if (fogTexture) {
-      fogTexture.destroy(true);
+    // Check if we can update the existing texture or need to create a new one
+    if (fogTexture && fogTexture.source && 
+        fogTexture.source.width === sourceCanvas.width && 
+        fogTexture.source.height === sourceCanvas.height) {
+      // Update existing texture in-place (much faster than recreating)
+      fogTexture.source.resource = sourceCanvas;
+      fogTexture.source.update();
+    } else {
+      // Size changed or no texture exists - need to create new texture
+      if (fogTexture) {
+        fogTexture.destroy(true);
+      }
+      fogTexture = PIXI.Texture.from(sourceCanvas);
+      fogSprite.texture = fogTexture;
+      
+      // Update sprite dimensions for new texture size
+      const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
+      fogSprite.width = sourceCanvas.width * qualityMultiplier;
+      fogSprite.height = sourceCanvas.height * qualityMultiplier;
+      fogSprite.x = -padding * qualityMultiplier;
+      fogSprite.y = -padding * qualityMultiplier;
     }
-
-    // Create texture from canvas (which includes padding)
-    fogTexture = PIXI.Texture.from(sourceCanvas);
-    fogSprite.texture = fogTexture;
-    
-    // The sprite should match the padded canvas size
-    // Position is set negative to push blur edges off-screen
-    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-    fogSprite.width = sourceCanvas.width * qualityMultiplier;
-    fogSprite.height = sourceCanvas.height * qualityMultiplier;
-    fogSprite.x = -padding * qualityMultiplier;
-    fogSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }
