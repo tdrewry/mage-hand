@@ -129,7 +129,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        bloomIntensity: 0.5,
+        lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as const,
       },
@@ -272,7 +272,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        bloomIntensity: 0.5,
+        lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as const,
       },
@@ -366,7 +366,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        bloomIntensity: 0.5,
+        lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as const,
       },
@@ -477,7 +477,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        bloomIntensity: 0.5,
+        lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as const,
       },
