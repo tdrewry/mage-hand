@@ -22,13 +22,6 @@ export interface FogSettings {
   serializedExploredAreas: string; // Paper.js JSON serialized explored geometry
   fogVersion: number; // Schema version for migration
   
-  // Gradient soft edges settings
-  useGradients: boolean; // Enable soft gradient edges on vision
-  innerFadeStart: number; // 0-1, where fade begins (default: 0.7)
-  midpointPosition: number; // 0-1, position of mid-fade (default: 0.85)
-  midpointOpacity: number; // 0-1, opacity at midpoint (default: 0.2)
-  outerFadeStart: number; // 0-1, where outer fade starts (default: 0.9)
-  
   // Post-processing effect settings
   effectSettings: FogEffectSettings;
 }
@@ -44,13 +37,6 @@ interface FogState extends FogSettings {
   setSerializedExploredAreas: (data: string) => void;
   clearExploredAreas: () => void;
   resetFog: () => void;
-  
-  // Gradient actions
-  setUseGradients: (enabled: boolean) => void;
-  setInnerFadeStart: (value: number) => void;
-  setMidpointPosition: (value: number) => void;
-  setMidpointOpacity: (value: number) => void;
-  setOuterFadeStart: (value: number) => void;
   
   // Post-processing effect actions
   setPostProcessingEnabled: (enabled: boolean) => void;
@@ -73,13 +59,6 @@ export const useFogStore = create<FogState>()(
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
-      
-      // Gradient settings
-      useGradients: true,
-      innerFadeStart: 0.7,
-      midpointPosition: 0.85,
-      midpointOpacity: 0.2,
-      outerFadeStart: 0.9,
       
       // Post-processing effect settings
       effectSettings: {
@@ -170,17 +149,12 @@ export const useFogStore = create<FogState>()(
         set({
           enabled: false,
           revealAll: false,
-          visionRange: 6, // 6 grid units default
+          visionRange: 6,
           fogOpacity: 0.95,
           exploredOpacity: 0.4,
           showExploredAreas: true,
           serializedExploredAreas: '',
           fogVersion: 1,
-          useGradients: true,
-          innerFadeStart: 0.7,
-          midpointPosition: 0.85,
-          midpointOpacity: 0.2,
-          outerFadeStart: 0.9,
           effectSettings: {
             postProcessingEnabled: false,
             edgeBlur: 8,
@@ -189,52 +163,6 @@ export const useFogStore = create<FogState>()(
             effectQuality: 'balanced' as EffectQuality,
           },
         });
-      },
-      
-      // Gradient actions
-      setUseGradients: (enabled) => {
-        set({ useGradients: enabled });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ useGradients: enabled });
-        }
-      },
-      setInnerFadeStart: (value) => {
-        const clampedValue = Math.max(0, Math.min(1, value));
-        set({ innerFadeStart: clampedValue });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ innerFadeStart: clampedValue });
-        }
-      },
-      setMidpointPosition: (value) => {
-        const clampedValue = Math.max(0, Math.min(1, value));
-        set({ midpointPosition: clampedValue });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ midpointPosition: clampedValue });
-        }
-      },
-      setMidpointOpacity: (value) => {
-        const clampedValue = Math.max(0, Math.min(1, value));
-        set({ midpointOpacity: clampedValue });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ midpointOpacity: clampedValue });
-        }
-      },
-      setOuterFadeStart: (value) => {
-        const clampedValue = Math.max(0, Math.min(1, value));
-        set({ outerFadeStart: clampedValue });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ outerFadeStart: clampedValue });
-        }
       },
       
       // Post-processing effect actions
@@ -282,11 +210,6 @@ export const useFogStore = create<FogState>()(
         showExploredAreas: state.showExploredAreas,
         serializedExploredAreas: state.serializedExploredAreas,
         fogVersion: state.fogVersion,
-        useGradients: state.useGradients,
-        innerFadeStart: state.innerFadeStart,
-        midpointPosition: state.midpointPosition,
-        midpointOpacity: state.midpointOpacity,
-        outerFadeStart: state.outerFadeStart,
         effectSettings: state.effectSettings,
       }),
     }

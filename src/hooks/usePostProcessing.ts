@@ -31,6 +31,7 @@ interface TokenVisibilityData {
   position: { x: number; y: number };
   visionRange: number;
   visibilityPath: Path2D;
+  isLightSource?: boolean; // Light sources get two-zone gradient rendering
 }
 
 export function usePostProcessing({

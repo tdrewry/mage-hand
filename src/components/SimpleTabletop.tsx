@@ -64,8 +64,6 @@ import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
 import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
-import { renderFogWithGradients, renderFogWithHardEdges } from "../lib/fogGradientRenderer";
-import { getDefaultGradientSettings } from "../lib/fogGradientHelper";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
 import { useRoleStore } from "../stores/roleStore";
 import { getTokensForVisionCalculation } from "../lib/visionPermissions";
@@ -206,11 +204,6 @@ export const SimpleTabletop = () => {
     setSerializedExploredAreas,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
-    useGradients,
-    innerFadeStart,
-    midpointPosition,
-    midpointOpacity,
-    outerFadeStart,
     effectSettings,
   } = useFogStore();
   
@@ -239,19 +232,13 @@ export const SimpleTabletop = () => {
     visibleMask: Path2D;
   } | null>(null);
 
-  // Store individual token visibility data for gradient rendering
+  // Store individual token visibility data for rendering
   const tokenVisibilityDataRef = useRef<
     Array<{
       position: { x: number; y: number };
       visionRange: number;
       visibilityPath: Path2D;
-      useGradients: boolean;
-      gradientSettings?: {
-        innerFadeStart: number;
-        midpointPosition: number;
-        midpointOpacity: number;
-        outerFadeStart: number;
-      };
+      isLightSource?: boolean; // Light sources get two-zone gradient in post-processing
     }>
   >([]);
 
@@ -677,18 +664,12 @@ export const SimpleTabletop = () => {
 
           const masks = computeFogMasks(exploredAreaRef.current, visibilityForMask, worldBounds);
 
-          // Store individual token visibility data for gradient rendering
+          // Store individual token visibility data for rendering
           const tokenVisData: Array<{
             position: { x: number; y: number };
             visionRange: number;
             visibilityPath: Path2D;
-            useGradients: boolean;
-            gradientSettings?: {
-              innerFadeStart: number;
-              midpointPosition: number;
-              midpointOpacity: number;
-              outerFadeStart: number;
-            };
+            isLightSource?: boolean;
           }> = [];
 
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
@@ -705,44 +686,6 @@ export const SimpleTabletop = () => {
             const tokenVisionRange = token.visionRange ?? fogVisionRange;
             const visionRangePixels = tokenVisionRange * gridSize;
 
-            // Check if token uses gradients (default to true if not specified)
-            const tokenUseGradients = token.useGradients !== false;
-
-            // Get token's gradient settings from profile or use defaults
-            let tokenGradientSettings:
-              | {
-                  innerFadeStart: number;
-                  midpointPosition: number;
-                  midpointOpacity: number;
-                  outerFadeStart: number;
-                }
-              | undefined;
-
-            if (tokenUseGradients) {
-              if (token.visionProfileId) {
-                // Use profile's gradient settings
-                const profile = getProfile(token.visionProfileId);
-                if (profile) {
-                  tokenGradientSettings = {
-                    innerFadeStart: profile.innerFadeStart,
-                    midpointPosition: profile.midpointPosition,
-                    midpointOpacity: profile.midpointOpacity,
-                    outerFadeStart: profile.outerFadeStart,
-                  };
-                }
-              }
-
-              // Fall back to global gradient settings if no profile or profile not found
-              if (!tokenGradientSettings) {
-                tokenGradientSettings = {
-                  innerFadeStart,
-                  midpointPosition,
-                  midpointOpacity,
-                  outerFadeStart,
-                };
-              }
-            }
-
             // Convert paper.js path to Path2D using the existing helper
             const path2D = paperPathToPath2D(cached.visionPath);
 
@@ -750,8 +693,7 @@ export const SimpleTabletop = () => {
               position: cached.position,
               visionRange: visionRangePixels,
               visibilityPath: path2D,
-              useGradients: tokenUseGradients,
-              gradientSettings: tokenGradientSettings,
+              isLightSource: false, // Tokens are not light sources
             });
           });
 
@@ -770,26 +712,13 @@ export const SimpleTabletop = () => {
             if (lightVision) {
               const lightPath2D = paperPathToPath2D(lightVision);
               
-              // Use lightFalloff from effectSettings for two-zone lighting:
-              // - Inner zone (0 to lightFalloff): fully bright/clear
-              // - Outer zone (lightFalloff to 1.0): dimmer
-              const lightFalloff = effectSettings.lightFalloff;
-              
+              // Light sources get two-zone gradient rendering in post-processing
+              // using the lightFalloff setting
               tokenVisData.push({
                 position: light.position,
                 visionRange: light.radius,
                 visibilityPath: lightPath2D,
-                useGradients: true,
-                gradientSettings: {
-                  // Inner bright zone - fully clear up to falloff point
-                  innerFadeStart: lightFalloff,
-                  // Sharp transition at falloff point
-                  midpointPosition: lightFalloff + 0.01,
-                  // Outer zone is dimmer (use explored opacity level)
-                  midpointOpacity: exploredOpacity,
-                  // Outer zone stays at dim level
-                  outerFadeStart: lightFalloff + 0.02,
-                },
+                isLightSource: true, // Mark as light source for gradient rendering
               });
               
               // Clean up paper.js path
@@ -1599,10 +1528,6 @@ export const SimpleTabletop = () => {
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
       // Check if we should use PixiJS post-processing instead of main canvas fog
       const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
-      
-      // Separate tokens by gradient preference
-      const tokensWithGradients = tokenVisibilityDataRef.current.filter((t) => t.useGradients);
-      const tokensWithoutGradients = tokenVisibilityDataRef.current.filter((t) => !t.useGradients);
 
       // Only render fog on main canvas if post-processing is disabled
       // When post-processing is enabled, PixiJS layer renders the blurred fog
@@ -1614,58 +1539,13 @@ export const SimpleTabletop = () => {
         ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
         ctx.fill(fogMasksRef.current.exploredOnlyMask);
 
-        // Render tokens with gradients if any
-        if (tokensWithGradients.length > 0) {
+        // Canvas 2D fallback: Use simple solid fills for all visibility areas
+        // (Gradient effects are only available in PixiJS post-processing mode)
+        if (tokenVisibilityDataRef.current.length > 0) {
           ctx.save();
           ctx.globalCompositeOperation = "destination-out";
 
-          tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
-            // Use token-specific gradient settings or fall back to global
-            const settings = gradientSettings || {
-              innerFadeStart,
-              midpointPosition,
-              midpointOpacity,
-              outerFadeStart,
-            };
-
-            const canvasGradient = ctx.createRadialGradient(
-              position.x,
-              position.y,
-              0,
-              position.x,
-              position.y,
-              visionRange,
-            );
-
-            // With destination-out: alpha=1 removes fog completely, alpha=0 keeps fog
-            // Calculate how much to remove at each gradient stop
-            const midpointRemoval = Math.max(0, Math.min(1, 1 - settings.midpointOpacity / fogOpacity));
-            const outerRemoval = Math.max(0, Math.min(1, 1 - exploredOpacity / fogOpacity));
-
-            // Apply gradient with proper alpha values for two-zone effect
-            canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`); // Center: fully clear
-            canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 1)`); // Inner zone: still clear
-            canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`); // Transition
-            canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`); // Outer zone
-            canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`); // Edge: keep fog
-
-            ctx.save();
-            ctx.clip(visibilityPath);
-            ctx.fillStyle = canvasGradient;
-            ctx.fillRect(position.x - visionRange, position.y - visionRange, visionRange * 2, visionRange * 2);
-            ctx.restore();
-          });
-
-          ctx.globalCompositeOperation = "source-over";
-          ctx.restore();
-        }
-
-        // Render tokens without gradients (hard edges)
-        if (tokensWithoutGradients.length > 0) {
-          ctx.save();
-          ctx.globalCompositeOperation = "destination-out";
-
-          tokensWithoutGradients.forEach(({ visibilityPath }) => {
+          tokenVisibilityDataRef.current.forEach(({ visibilityPath }) => {
             ctx.fillStyle = "rgba(255, 255, 255, 1)";
             ctx.fill(visibilityPath);
           });
@@ -1674,12 +1554,13 @@ export const SimpleTabletop = () => {
           ctx.restore();
         }
       } else {
-        // Apply PixiJS post-processing effects to fog (blur, bloom, etc.)
-        // Pass all token visibility data for cutouts
+        // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
+        // Pass all token visibility data with isLightSource flag for gradient rendering
         const allTokenVisibility = tokenVisibilityDataRef.current.map(t => ({
           position: t.position,
           visionRange: t.visionRange,
-          visibilityPath: t.visibilityPath
+          visibilityPath: t.visibilityPath,
+          isLightSource: t.isLightSource,
         }));
         
         applyPostProcessingEffects(
