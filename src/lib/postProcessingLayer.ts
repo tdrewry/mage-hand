@@ -4,6 +4,7 @@
  */
 
 import * as PIXI from 'pixi.js';
+import { Z_INDEX } from './zIndex';
 
 export interface PostProcessingConfig {
   width: number;
@@ -85,7 +86,7 @@ export async function initPostProcessing(
     canvas.style.width = `${config.width}px`;
     canvas.style.height = `${config.height}px`;
     canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '2';
+    canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.FOG_POST_PROCESSING);
 
     // Append to container
     container.appendChild(canvas);
