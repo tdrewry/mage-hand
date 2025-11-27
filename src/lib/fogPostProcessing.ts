@@ -63,6 +63,15 @@ export function getFogCanvasContext(): CanvasRenderingContext2D | null {
 }
 
 /**
+ * Token visibility data for rendering cutouts
+ */
+interface TokenVisibilityData {
+  position: { x: number; y: number };
+  visionRange: number;
+  visibilityPath: Path2D;
+}
+
+/**
  * Capture fog state from the main canvas and apply post-processing
  * This is called during the render loop when fog changes
  */
@@ -76,9 +85,17 @@ export function applyFogPostProcessing(
   exploredOpacity: number,
   canvasWidth: number,
   canvasHeight: number,
-  transform: { x: number; y: number; zoom: number }
+  transform: { x: number; y: number; zoom: number },
+  tokenVisibilityData: TokenVisibilityData[] = []
 ): void {
-  if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
+  // Initialize fog canvas if needed
+  if (!fogCanvas || fogCanvas.width !== canvasWidth || fogCanvas.height !== canvasHeight) {
+    initFogCanvas(canvasWidth, canvasHeight);
+  }
+  
+  if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) {
+    return;
+  }
 
   // Throttle updates for performance
   const now = performance.now();
@@ -99,6 +116,18 @@ export function applyFogPostProcessing(
 
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
+
+  // Cut out token visibility areas
+  if (tokenVisibilityData.length > 0) {
+    fogCtx.globalCompositeOperation = "destination-out";
+    
+    tokenVisibilityData.forEach(({ visibilityPath }) => {
+      fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
+      fogCtx.fill(visibilityPath);
+    });
+    
+    fogCtx.globalCompositeOperation = "source-over";
+  }
 
   fogCtx.restore();
 

@@ -1550,82 +1550,95 @@ export const SimpleTabletop = () => {
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
+      // Check if we should use PixiJS post-processing instead of main canvas fog
+      const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
+      
       // Separate tokens by gradient preference
       const tokensWithGradients = tokenVisibilityDataRef.current.filter((t) => t.useGradients);
       const tokensWithoutGradients = tokenVisibilityDataRef.current.filter((t) => !t.useGradients);
 
-      // First render base fog layers
-      ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
-      ctx.fill(fogMasksRef.current.unexploredMask);
+      // Only render fog on main canvas if post-processing is disabled
+      // When post-processing is enabled, PixiJS layer renders the blurred fog
+      if (!usePostProcessing) {
+        // First render base fog layers
+        ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+        ctx.fill(fogMasksRef.current.unexploredMask);
 
-      ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
-      ctx.fill(fogMasksRef.current.exploredOnlyMask);
+        ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+        ctx.fill(fogMasksRef.current.exploredOnlyMask);
 
-      // Render tokens with gradients if any
-      if (tokensWithGradients.length > 0) {
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
-
-        tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
-          // Use token-specific gradient settings or fall back to global
-          const settings = gradientSettings || {
-            innerFadeStart,
-            midpointPosition,
-            midpointOpacity,
-            outerFadeStart,
-          };
-
-          const canvasGradient = ctx.createRadialGradient(
-            position.x,
-            position.y,
-            0,
-            position.x,
-            position.y,
-            visionRange,
-          );
-
-          const midpointRemoval = Math.max(0, Math.min(1, 1 - settings.midpointOpacity / fogOpacity));
-          const outerRemoval = Math.max(0, Math.min(1, 1 - exploredOpacity / fogOpacity));
-
-          canvasGradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-          canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 0)`);
-          canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, 0)`);
-          canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, 0)`);
-          canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
-
+        // Render tokens with gradients if any
+        if (tokensWithGradients.length > 0) {
           ctx.save();
-          ctx.clip(visibilityPath);
-          ctx.fillStyle = canvasGradient;
-          ctx.fillRect(position.x - visionRange, position.y - visionRange, visionRange * 2, visionRange * 2);
+          ctx.globalCompositeOperation = "destination-out";
+
+          tokensWithGradients.forEach(({ position, visionRange, visibilityPath, gradientSettings }) => {
+            // Use token-specific gradient settings or fall back to global
+            const settings = gradientSettings || {
+              innerFadeStart,
+              midpointPosition,
+              midpointOpacity,
+              outerFadeStart,
+            };
+
+            const canvasGradient = ctx.createRadialGradient(
+              position.x,
+              position.y,
+              0,
+              position.x,
+              position.y,
+              visionRange,
+            );
+
+            const midpointRemoval = Math.max(0, Math.min(1, 1 - settings.midpointOpacity / fogOpacity));
+            const outerRemoval = Math.max(0, Math.min(1, 1 - exploredOpacity / fogOpacity));
+
+            canvasGradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+            canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 0)`);
+            canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, 0)`);
+            canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, 0)`);
+            canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
+
+            ctx.save();
+            ctx.clip(visibilityPath);
+            ctx.fillStyle = canvasGradient;
+            ctx.fillRect(position.x - visionRange, position.y - visionRange, visionRange * 2, visionRange * 2);
+            ctx.restore();
+          });
+
+          ctx.globalCompositeOperation = "source-over";
           ctx.restore();
-        });
+        }
 
-        ctx.globalCompositeOperation = "source-over";
-        ctx.restore();
-      }
+        // Render tokens without gradients (hard edges)
+        if (tokensWithoutGradients.length > 0) {
+          ctx.save();
+          ctx.globalCompositeOperation = "destination-out";
 
-      // Render tokens without gradients (hard edges)
-      if (tokensWithoutGradients.length > 0) {
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
+          tokensWithoutGradients.forEach(({ visibilityPath }) => {
+            ctx.fillStyle = "rgba(255, 255, 255, 1)";
+            ctx.fill(visibilityPath);
+          });
 
-        tokensWithoutGradients.forEach(({ visibilityPath }) => {
-          ctx.fillStyle = "rgba(255, 255, 255, 1)";
-          ctx.fill(visibilityPath);
-        });
-
-        ctx.globalCompositeOperation = "source-over";
-        ctx.restore();
-      }
-      
-      // Apply PixiJS post-processing effects to fog (blur, bloom, etc.)
-      if (isPostProcessingReady && effectSettings.postProcessingEnabled) {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.restore();
+        }
+      } else {
+        // Apply PixiJS post-processing effects to fog (blur, bloom, etc.)
+        // Pass all token visibility data for cutouts
+        const allTokenVisibility = tokenVisibilityDataRef.current.map(t => ({
+          position: t.position,
+          visionRange: t.visionRange,
+          visibilityPath: t.visibilityPath
+        }));
+        
         applyPostProcessingEffects(
           ctx,
           fogMasksRef.current,
           fogOpacity,
           exploredOpacity,
-          transform
+          transform,
+          allTokenVisibility
         );
       }
     }
