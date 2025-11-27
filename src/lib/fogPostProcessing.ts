@@ -132,11 +132,12 @@ export function applyFogPostProcessing(
   fogCtx.restore();
 
   // Draw black perimeter to prevent edge blur bleeding
-  // The perimeter must be wider than the blur radius
+  // The perimeter must be wider than the blur radius and FULLY OPAQUE
   const blurRadius = getEffectSettings().edgeBlur;
-  const perimeterWidth = Math.max(blurRadius * 2, 30); // At least 30px or 2x blur
+  const perimeterWidth = Math.max(blurRadius * 2, 40); // At least 40px or 2x blur
 
-  fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+  // Use full opacity for perimeter to ensure complete blackout at edges
+  fogCtx.fillStyle = 'rgba(0, 0, 0, 1)';
 
   // Top edge
   fogCtx.fillRect(0, 0, canvasWidth, perimeterWidth);
