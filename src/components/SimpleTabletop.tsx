@@ -10,7 +10,7 @@
  * DO NOT REMOVE these dependencies without consulting DEPENDENCIES.md
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapManager } from "./MapManager";
 import { TokenContextManager } from "./TokenContextManager";
 import { CardManager } from "./CardManager";
@@ -72,6 +72,7 @@ import { getTokensForVisionCalculation } from "../lib/visionPermissions";
 import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
 import { useFogStore } from "../stores/fogStore";
+import { usePostProcessing } from "../hooks/usePostProcessing";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
@@ -92,12 +93,16 @@ import {
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState("#333");
   const [gridOpacity, setGridOpacity] = useState(80);
+  
+  // Canvas dimensions for post-processing
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
   // Pan and zoom state
   const [transform, setTransform] = useState({
@@ -204,7 +209,16 @@ export const SimpleTabletop = () => {
     midpointPosition,
     midpointOpacity,
     outerFadeStart,
+    effectSettings,
   } = useFogStore();
+  
+  // Post-processing hook for fog effects
+  const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady } = usePostProcessing({
+    containerRef: canvasContainerRef,
+    enabled: renderingMode === 'play' && fogEnabled && effectSettings.postProcessingEnabled,
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
+  });
 
   // Vision profiles store
   const { getProfile } = useVisionProfileStore();
@@ -1602,6 +1616,17 @@ export const SimpleTabletop = () => {
 
         ctx.globalCompositeOperation = "source-over";
         ctx.restore();
+      }
+      
+      // Apply PixiJS post-processing effects to fog (blur, bloom, etc.)
+      if (isPostProcessingReady && effectSettings.postProcessingEnabled) {
+        applyPostProcessingEffects(
+          ctx,
+          fogMasksRef.current,
+          fogOpacity,
+          exploredOpacity,
+          transform
+        );
       }
     }
 
@@ -3260,6 +3285,7 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
+    setCanvasDimensions({ width: rect.width, height: rect.height });
 
     // Initial draw
     redrawCanvas();
@@ -3272,6 +3298,7 @@ export const SimpleTabletop = () => {
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.height;
+      setCanvasDimensions({ width: rect.width, height: rect.height });
       redrawCanvas();
     };
 
@@ -4690,7 +4717,7 @@ export const SimpleTabletop = () => {
       {/* Region Control Panel - removed, now using Region Controls Card */}
 
       {/* Main Canvas Container */}
-      <div className="flex-1 relative overflow-hidden">
+      <div ref={canvasContainerRef} className="flex-1 relative overflow-hidden">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full"
