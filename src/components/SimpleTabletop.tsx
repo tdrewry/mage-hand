@@ -1637,14 +1637,17 @@ export const SimpleTabletop = () => {
               visionRange,
             );
 
+            // With destination-out: alpha=1 removes fog completely, alpha=0 keeps fog
+            // Calculate how much to remove at each gradient stop
             const midpointRemoval = Math.max(0, Math.min(1, 1 - settings.midpointOpacity / fogOpacity));
             const outerRemoval = Math.max(0, Math.min(1, 1 - exploredOpacity / fogOpacity));
 
-            canvasGradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-            canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 0)`);
-            canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, 0)`);
-            canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, 0)`);
-            canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`);
+            // Apply gradient with proper alpha values for two-zone effect
+            canvasGradient.addColorStop(0, `rgba(255, 255, 255, 1)`); // Center: fully clear
+            canvasGradient.addColorStop(settings.innerFadeStart, `rgba(255, 255, 255, 1)`); // Inner zone: still clear
+            canvasGradient.addColorStop(settings.midpointPosition, `rgba(255, 255, 255, ${midpointRemoval})`); // Transition
+            canvasGradient.addColorStop(settings.outerFadeStart, `rgba(255, 255, 255, ${outerRemoval})`); // Outer zone
+            canvasGradient.addColorStop(1.0, `rgba(255, 255, 255, 0)`); // Edge: keep fog
 
             ctx.save();
             ctx.clip(visibilityPath);
