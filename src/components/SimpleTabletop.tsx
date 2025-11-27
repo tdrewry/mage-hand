@@ -3457,9 +3457,10 @@ export const SimpleTabletop = () => {
     }
 
     const menu = document.createElement("div");
-    menu.className = "region-context-menu fixed z-50 bg-popover border border-border rounded-md shadow-lg p-1";
+    menu.className = "region-context-menu fixed bg-popover border border-border rounded-md shadow-lg p-1";
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
+    menu.style.zIndex = `${Z_INDEX.DROPDOWNS.MENU}`;
 
     const menuItems = [
       {
