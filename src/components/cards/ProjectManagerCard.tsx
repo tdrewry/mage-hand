@@ -171,11 +171,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
             showExploredAreas: fogStore.showExploredAreas,
             serializedExploredAreas: '',
             fogVersion: fogStore.fogVersion,
-            useGradients: fogStore.useGradients,
-            innerFadeStart: fogStore.innerFadeStart,
-            midpointPosition: fogStore.midpointPosition,
-            midpointOpacity: fogStore.midpointOpacity,
-            outerFadeStart: fogStore.outerFadeStart,
             effectSettings: fogStore.effectSettings,
           },
           gridSize: 50,
@@ -301,11 +296,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       showExploredAreas: fogStore.showExploredAreas,
       serializedExploredAreas: fogStore.serializedExploredAreas,
       fogVersion: fogStore.fogVersion,
-      useGradients: fogStore.useGradients,
-      innerFadeStart: fogStore.innerFadeStart,
-      midpointPosition: fogStore.midpointPosition,
-      midpointOpacity: fogStore.midpointOpacity,
-      outerFadeStart: fogStore.outerFadeStart,
       effectSettings: fogStore.effectSettings,
     },
     lights: lightStore.lights,
@@ -567,13 +557,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
         fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
         fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
-        if (projectData.fogData.useGradients !== undefined) {
-          fogStore.setUseGradients(projectData.fogData.useGradients);
-          fogStore.setInnerFadeStart(projectData.fogData.innerFadeStart);
-          fogStore.setMidpointPosition(projectData.fogData.midpointPosition);
-          fogStore.setMidpointOpacity(projectData.fogData.midpointOpacity);
-          fogStore.setOuterFadeStart(projectData.fogData.outerFadeStart);
-        }
       }
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');

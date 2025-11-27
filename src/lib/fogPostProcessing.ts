@@ -85,6 +85,7 @@ interface TokenVisibilityData {
   position: { x: number; y: number };
   visionRange: number;
   visibilityPath: Path2D;
+  isLightSource?: boolean; // Light sources get two-zone gradient rendering
 }
 
 /**
@@ -139,13 +140,45 @@ export function applyFogPostProcessing(
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // Cut out token visibility areas
+  // Cut out token visibility areas with gradient support for light sources
   if (tokenVisibilityData.length > 0) {
     fogCtx.globalCompositeOperation = "destination-out";
+    const { lightFalloff } = getEffectSettings();
     
-    tokenVisibilityData.forEach(({ visibilityPath }) => {
-      fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
-      fogCtx.fill(visibilityPath);
+    tokenVisibilityData.forEach(({ position, visionRange, visibilityPath, isLightSource }) => {
+      fogCtx.save();
+      fogCtx.clip(visibilityPath);
+      
+      if (isLightSource) {
+        // Light sources use two-zone gradient rendering:
+        // - Inner zone (0 to lightFalloff): fully bright/clear
+        // - Outer zone (lightFalloff to 1.0): dimmer (partial fog removal)
+        const gradient = fogCtx.createRadialGradient(
+          position.x, position.y, 0,
+          position.x, position.y, visionRange
+        );
+        
+        // Inner bright zone - fully clear fog
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(lightFalloff, 'rgba(255, 255, 255, 1)');
+        // Outer dim zone - partial fog removal (~40% clear)
+        gradient.addColorStop(Math.min(lightFalloff + 0.01, 1.0), 'rgba(255, 255, 255, 0.4)');
+        gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0.4)');
+        
+        fogCtx.fillStyle = gradient;
+        fogCtx.fillRect(
+          position.x - visionRange,
+          position.y - visionRange,
+          visionRange * 2,
+          visionRange * 2
+        );
+      } else {
+        // Token vision - solid fill (full fog removal)
+        fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
+        fogCtx.fill(visibilityPath);
+      }
+      
+      fogCtx.restore();
     });
     
     fogCtx.globalCompositeOperation = "source-over";
