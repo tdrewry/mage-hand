@@ -94,6 +94,7 @@ import {
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
@@ -1655,9 +1656,33 @@ export const SimpleTabletop = () => {
     ctx.restore();
 
     // Draw off-screen token indicators (in screen space, after restore)
-    offScreenTokens.forEach((token) => {
-      drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
-    });
+    // When post-processing is enabled, draw to overlay canvas so they appear above fog
+    const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
+    const overlayCanvas = overlayCanvasRef.current;
+    
+    if (usePostProcessing && overlayCanvas) {
+      const overlayCtx = overlayCanvas.getContext('2d');
+      if (overlayCtx) {
+        // Clear overlay canvas
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        // Draw indicators to overlay
+        offScreenTokens.forEach((token) => {
+          drawOffScreenIndicator(overlayCtx, token, viewX, viewY, viewWidth, viewHeight);
+        });
+      }
+    } else {
+      // Clear overlay canvas when not using post-processing to avoid stale content
+      if (overlayCanvas) {
+        const overlayCtx = overlayCanvas.getContext('2d');
+        if (overlayCtx) {
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+      }
+      // Draw indicators to main canvas
+      offScreenTokens.forEach((token) => {
+        drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
+      });
+    }
   };
 
   // Function to draw drag ghost and path
@@ -3295,9 +3320,14 @@ export const SimpleTabletop = () => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
+    const overlayCanvas = overlayCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
+    if (overlayCanvas) {
+      overlayCanvas.width = rect.width;
+      overlayCanvas.height = rect.height;
+    }
     setCanvasDimensions({ width: rect.width, height: rect.height });
 
     // Initial draw
@@ -3311,6 +3341,10 @@ export const SimpleTabletop = () => {
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.height;
+      if (overlayCanvas) {
+        overlayCanvas.width = rect.width;
+        overlayCanvas.height = rect.height;
+      }
       setCanvasDimensions({ width: rect.width, height: rect.height });
       redrawCanvas();
     };
@@ -4750,6 +4784,12 @@ export const SimpleTabletop = () => {
           onDoubleClick={() => pathDrawingMode === "drawing" && pathDrawingType === "polygon" && finishPathDrawing()}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
+        />
+        {/* Overlay canvas for UI elements above fog post-processing (z-index: 3 is above PixiJS z-index: 2) */}
+        <canvas
+          ref={overlayCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ zIndex: 3 }}
         />
       </div>
 
