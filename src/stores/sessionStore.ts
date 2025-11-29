@@ -99,11 +99,18 @@ export const useSessionStore = create<SessionState>()(
       },
       
       updateTokenPosition: (tokenId, x, y) => {
-        // Check if movement is locked
+        // Check if movement is locked (but allow movement in Edit mode)
         const state = get();
         if (state.movementLocked) {
-          console.warn('Token movement is locked during import/export');
-          return;
+          // Import dungeonStore to check rendering mode
+          const { useDungeonStore } = require('@/stores/dungeonStore');
+          const renderingMode = useDungeonStore.getState().renderingMode;
+          
+          // Only block movement in Play mode
+          if (renderingMode === 'play') {
+            console.warn('Token movement is locked during import/export');
+            return;
+          }
         }
         
         // Throttle position updates to prevent localStorage overflow

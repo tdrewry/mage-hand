@@ -4,6 +4,8 @@ import {
   Edit,
   Menu as MenuIcon,
   Users,
+  Lock,
+  LockOpen,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -12,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useCardStore } from '@/stores/cardStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
 import { Z_INDEX } from '@/lib/zIndex';
@@ -28,6 +31,9 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   const registerCard = useCardStore((state) => state.registerCard);
+  
+  const movementLocked = useSessionStore((state) => state.movementLocked);
+  const setMovementLocked = useSessionStore((state) => state.setMovementLocked);
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
@@ -142,6 +148,26 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
           </TooltipTrigger>
           <TooltipContent>
             <p>Roster</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Movement Lock Toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setMovementLocked(!movementLocked)}
+              className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
+                movementLocked
+                  ? "bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90"
+                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
+              )}
+            >
+              {movementLocked ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{movementLocked ? 'Unlock Movement' : 'Lock Movement'}</p>
           </TooltipContent>
         </Tooltip>
 
