@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
 import { 
   FolderOpen, 
   Users, 
-  Settings, 
-  Grid3X3, 
-  Eye, 
-  MapPin,
-  Save,
-  Upload
 } from 'lucide-react';
 
 import { FloatingMenu } from './FloatingMenu';
 import { GroupManagerModal } from './GroupManagerModal';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
-import { Z_INDEX } from '@/lib/zIndex';
+import { Toolbar, ToolbarButton } from '@/components/toolbar';
 
 interface EnhancedFloatingMenuProps {
   fabricCanvas: any;
@@ -72,29 +65,24 @@ export const EnhancedFloatingMenu: React.FC<EnhancedFloatingMenuProps> = ({
       <FloatingMenu {...floatingMenuProps} />
       
       {/* Enhanced features menu */}
-      <div 
-        className="fixed top-4 right-4 flex flex-col gap-2"
-        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleToggleProjectManager}
-          className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-          title="Project Manager"
-        >
-          <FolderOpen className="w-4 h-4" />
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setGroupModalOpen(true)}
-          className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-          title="Group Manager"
-        >
-          <Users className="w-4 h-4" />
-        </Button>
+      <div className="fixed top-4 right-4">
+        <Toolbar position="top" className="flex-row gap-2">
+          <ToolbarButton
+            icon={FolderOpen}
+            label="Project Manager"
+            onClick={handleToggleProjectManager}
+            variant="ghost"
+            size="sm"
+          />
+          
+          <ToolbarButton
+            icon={Users}
+            label="Group Manager"
+            onClick={() => setGroupModalOpen(true)}
+            variant="ghost"
+            size="sm"
+          />
+        </Toolbar>
       </div>
 
       {/* Enhanced modals */}
