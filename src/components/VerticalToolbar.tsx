@@ -93,6 +93,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 350, height: 500 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -109,6 +110,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 250, height: 400 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -157,6 +159,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 300, height: 450 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
