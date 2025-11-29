@@ -242,7 +242,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Settings className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Map Manager</p>
               </TooltipContent>
             </Tooltip>
@@ -258,7 +258,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Plus className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Tokens</p>
               </TooltipContent>
             </Tooltip>
@@ -276,7 +276,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Square className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Add Region</p>
               </TooltipContent>
             </Tooltip>
@@ -293,7 +293,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Pen className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>{isDrawingPolygon ? 'Finish Polygon' : 'Draw Polygon'}</p>
               </TooltipContent>
             </Tooltip>
@@ -310,7 +310,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Waves className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Draw Freehand</p>
               </TooltipContent>
             </Tooltip>
@@ -328,7 +328,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Grid3X3 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>World Snap {isGridSnappingEnabled ? 'On' : 'Off'}</p>
               </TooltipContent>
             </Tooltip>
@@ -344,7 +344,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Settings2 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Styles</p>
               </TooltipContent>
             </Tooltip>
@@ -360,7 +360,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Eye className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Regions {showRegions ? 'On' : 'Off'}</p>
               </TooltipContent>
             </Tooltip>
@@ -378,7 +378,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Trash2 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Clear Tokens</p>
               </TooltipContent>
             </Tooltip>
@@ -394,7 +394,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Square className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Clear Regions</p>
               </TooltipContent>
             </Tooltip>
@@ -410,7 +410,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <FileDown className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Import Dungeon</p>
               </TooltipContent>
             </Tooltip>
@@ -426,7 +426,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Layers className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Manage Layers</p>
               </TooltipContent>
             </Tooltip>
@@ -445,7 +445,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Palette className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Styles</p>
               </TooltipContent>
             </Tooltip>
@@ -461,7 +461,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <CloudFog className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Fog of War {fogEnabled ? 'On' : 'Off'}</p>
               </TooltipContent>
             </Tooltip>
@@ -477,7 +477,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   {showRegions ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Regions {showRegions ? 'On' : 'Off'}</p>
               </TooltipContent>
             </Tooltip>
@@ -495,7 +495,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Users className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>{rosterCard?.isVisible ? 'Hide' : 'Show'} Roster</p>
               </TooltipContent>
             </Tooltip>
@@ -511,7 +511,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Swords className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>{isInCombat ? 'End' : 'Start'} Combat</p>
               </TooltipContent>
             </Tooltip>
@@ -527,7 +527,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   {restrictMovement ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>
                   {isInCombat 
                     ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 
@@ -552,7 +552,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Grid3X3 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Background & Grid</p>
               </TooltipContent>
             </Tooltip>
@@ -568,7 +568,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
                   <Layers className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" sideOffset={10}>
                 <p>Manage Layers</p>
               </TooltipContent>
             </Tooltip>
