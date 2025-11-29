@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Plus, Palette, Eye, Map, Settings } from 'lucide-react';
 import { VisibilityModal } from './modals/VisibilityModal';
 import { Canvas as FabricCanvas } from 'fabric';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
-import { Z_INDEX } from '@/lib/zIndex';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 
 interface FloatingMenuProps {
   fabricCanvas: FabricCanvas | null;
@@ -90,65 +89,66 @@ export const FloatingMenu = ({
       id: 'tokens',
       icon: Plus,
       label: 'Tokens',
-      color: 'bg-green-500 hover:bg-green-600',
     },
     {
       id: 'background',
       icon: Palette,
       label: 'Background',
-      color: 'bg-purple-500 hover:bg-purple-600',
     },
     {
       id: 'visibility',
       icon: Eye,
       label: 'Visibility',
-      color: 'bg-orange-500 hover:bg-orange-600',
     },
     {
       id: 'maps',
       icon: Map,
       label: 'Maps',
-      color: 'bg-teal-500 hover:bg-teal-600',
     },
   ];
 
   return (
     <>
-      {/* Floating Menu - Upper Left Corner */}
-      <div 
-        className="fixed left-4 top-20 flex flex-col gap-3"
-        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-      >
-        {menuItems.map((item) => {
-          const IconComponent = item.icon;
-          const isActive = 
-            (item.id === 'tokens' && tokenCard?.isVisible) ||
-            (item.id === 'maps' && mapControlsCard?.isVisible) ||
-            (item.id === 'background' && backgroundGridCard?.isVisible);
-          
-          return (
-            <Button
-              key={item.id}
-              onClick={() => {
-                if (item.id === 'tokens') {
-                  handleToggleTokenCard();
-                } else if (item.id === 'maps') {
-                  handleToggleMapControlsCard();
-                } else if (item.id === 'background') {
-                  if (backgroundGridCard) {
-                    setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
+      <div className="fixed left-4 top-20">
+        <Toolbar position="left" className="flex-col gap-1">
+          {menuItems.map((item) => {
+            const isActive = 
+              (item.id === 'tokens' && tokenCard?.isVisible) ||
+              (item.id === 'maps' && mapControlsCard?.isVisible) ||
+              (item.id === 'background' && backgroundGridCard?.isVisible);
+            
+            return (
+              <ToolbarButton
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => {
+                  if (item.id === 'tokens') {
+                    handleToggleTokenCard();
+                  } else if (item.id === 'maps') {
+                    handleToggleMapControlsCard();
+                  } else if (item.id === 'background') {
+                    if (backgroundGridCard) {
+                      setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
+                    }
+                  } else {
+                    setActiveModal(item.id);
                   }
-                } else {
-                  setActiveModal(item.id);
+                }}
+                isActive={isActive}
+                variant="ghost"
+                size="md"
+                className={
+                  item.id === 'tokens' ? 'text-green-500 hover:text-green-600' :
+                  item.id === 'background' ? 'text-purple-500 hover:text-purple-600' :
+                  item.id === 'visibility' ? 'text-orange-500 hover:text-orange-600' :
+                  item.id === 'maps' ? 'text-teal-500 hover:text-teal-600' :
+                  ''
                 }
-              }}
-              className={`w-12 h-12 rounded-full ${isActive ? 'ring-2 ring-white' : ''} ${item.color} text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl`}
-              title={item.label}
-            >
-              <IconComponent className="h-5 w-5" />
-            </Button>
-          );
-        })}
+              />
+            );
+          })}
+        </Toolbar>
       </div>
 
       {/* Modals */}

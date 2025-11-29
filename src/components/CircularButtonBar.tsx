@@ -7,17 +7,10 @@ import {
   Lock,
   LockOpen,
 } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { CardType } from '@/types/cardTypes';
-import { cn } from '@/lib/utils';
-import { Z_INDEX } from '@/lib/zIndex';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 
 interface CircularButtonBarProps {
   mode: 'edit' | 'play';
@@ -63,115 +56,49 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
 
   return (
-    <TooltipProvider>
-      <div 
-        className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg"
-        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
-      >
-        {/* Menu Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleToggleMenu}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                menuCard?.isVisible
-                  ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              <MenuIcon className="w-6 h-6" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Menu</p>
-          </TooltipContent>
-        </Tooltip>
+    <Toolbar position="top">
+      <ToolbarButton
+        icon={MenuIcon}
+        label="Menu"
+        onClick={handleToggleMenu}
+        isActive={menuCard?.isVisible}
+      />
 
-        <div className="w-px h-8 bg-border" />
+      <ToolbarSeparator />
 
-        {/* Mode Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onToggleMode}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                mode === 'play' 
-                  ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" 
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              <Play className="w-6 h-6" fill={mode === 'play' ? 'currentColor' : 'none'} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{mode === 'play' ? 'Play Mode' : 'Switch to Play Mode'}</p>
-          </TooltipContent>
-        </Tooltip>
+      <ToolbarButton
+        icon={Play}
+        label={mode === 'play' ? 'Play Mode' : 'Switch to Play Mode'}
+        onClick={onToggleMode}
+        isActive={mode === 'play'}
+        variant={mode === 'play' ? 'active' : 'default'}
+        className={mode === 'play' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+      />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onToggleMode}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                mode === 'edit' 
-                  ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" 
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              <Edit className="w-6 h-6" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{mode === 'edit' ? 'Edit Mode' : 'Switch to Edit Mode'}</p>
-          </TooltipContent>
-        </Tooltip>
+      <ToolbarButton
+        icon={Edit}
+        label={mode === 'edit' ? 'Edit Mode' : 'Switch to Edit Mode'}
+        onClick={onToggleMode}
+        isActive={mode === 'edit'}
+        variant={mode === 'edit' ? 'active' : 'default'}
+        className={mode === 'edit' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+      />
 
-        <div className="w-px h-8 bg-border" />
+      <ToolbarSeparator />
 
-        {/* Roster Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleToggleRoster}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                rosterCard?.isVisible
-                  ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90"
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              <Users className="w-6 h-6" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Roster</p>
-          </TooltipContent>
-        </Tooltip>
+      <ToolbarButton
+        icon={Users}
+        label="Roster"
+        onClick={handleToggleRoster}
+        isActive={rosterCard?.isVisible}
+      />
 
-        {/* Movement Lock Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => setMovementLocked(!movementLocked)}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                movementLocked
-                  ? "bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90"
-                  : "bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted/80"
-              )}
-            >
-              {movementLocked ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{movementLocked ? 'Unlock Movement' : 'Lock Movement'}</p>
-          </TooltipContent>
-        </Tooltip>
-
-      </div>
-    </TooltipProvider>
+      <ToolbarButton
+        icon={movementLocked ? Lock : LockOpen}
+        label={movementLocked ? 'Unlock Movement' : 'Lock Movement'}
+        onClick={() => setMovementLocked(!movementLocked)}
+        variant={movementLocked ? 'destructive' : 'default'}
+      />
+    </Toolbar>
   );
 };
