@@ -1,6 +1,4 @@
 import React from 'react';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -233,14 +231,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             {/* Edit Mode Tools */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={onOpenMapManager}
-                  className="w-10 h-10 rounded-full"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors bg-transparent hover:bg-accent hover:text-accent-foreground"
                 >
                   <Settings className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Map Manager</p>
@@ -249,14 +245,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={tokenCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleTokenCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    tokenCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Plus className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Tokens</p>
@@ -267,14 +265,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={onAddRegion}
-                  className="w-10 h-10 rounded-full"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors bg-transparent hover:bg-accent hover:text-accent-foreground"
                 >
                   <Square className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Add Region</p>
@@ -283,15 +279,17 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={isDrawingPolygon ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={isDrawingPolygon ? onFinishPolygonDraw : onStartPolygonDraw}
                   disabled={isDrawingFreehand}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDrawingPolygon 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Pen className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>{isDrawingPolygon ? 'Finish Polygon' : 'Draw Polygon'}</p>
@@ -300,15 +298,17 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={isDrawingFreehand ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={onStartFreehandDraw}
                   disabled={isDrawingPolygon}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDrawingFreehand 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Waves className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Draw Freehand</p>
@@ -319,14 +319,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={isGridSnappingEnabled ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={onToggleGridSnapping}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    isGridSnappingEnabled 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Grid3X3 className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>World Snap {isGridSnappingEnabled ? 'On' : 'Off'}</p>
@@ -335,14 +337,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={stylesCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleStylesCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    stylesCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Settings2 className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Styles</p>
@@ -351,14 +355,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={showRegions ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={onToggleRegions}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    showRegions 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Eye className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Regions {showRegions ? 'On' : 'Off'}</p>
@@ -369,14 +375,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={handleClearTokens}
-                  className="w-10 h-10 rounded-full text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors text-orange-600 hover:bg-orange-600/10"
                 >
                   <Trash2 className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Clear Tokens</p>
@@ -385,14 +389,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={handleClearRegions}
-                  className="w-10 h-10 rounded-full text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors text-orange-600 hover:bg-orange-600/10"
                 >
                   <Square className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Clear Regions</p>
@@ -401,14 +403,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={watabouCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleWatabouCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    watabouCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <FileDown className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Import Dungeon</p>
@@ -417,14 +421,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleLayerCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    layerCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Layers className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Manage Layers</p>
@@ -436,14 +442,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             {/* Play Mode Tools */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={stylesCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleStylesCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    stylesCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Palette className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Styles</p>
@@ -452,14 +460,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={fogCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleFogCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    fogCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <CloudFog className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Fog of War {fogEnabled ? 'On' : 'Off'}</p>
@@ -468,14 +478,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={showRegions ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={onToggleRegions}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    showRegions 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   {showRegions ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Regions {showRegions ? 'On' : 'Off'}</p>
@@ -486,14 +498,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={rosterCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleRosterCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    rosterCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Users className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>{rosterCard?.isVisible ? 'Hide' : 'Show'} Roster</p>
@@ -502,14 +516,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={isInCombat ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleCombatToggle}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    isInCombat 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Swords className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>{isInCombat ? 'End' : 'Start'} Combat</p>
@@ -518,14 +534,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={restrictMovement ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={() => setRestrictMovement(!restrictMovement)}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    restrictMovement 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   {restrictMovement ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>
@@ -539,18 +557,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={() => {
                     if (backgroundGridCard) {
                       setVisibility(backgroundGridCard.id, true);
                     }
                   }}
-                  className="w-10 h-10 rounded-full"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors bg-transparent hover:bg-accent hover:text-accent-foreground"
                 >
                   <Grid3X3 className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Background & Grid</p>
@@ -559,14 +575,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
+                <button
                   onClick={handleToggleLayerCard}
-                  className="w-10 h-10 rounded-full"
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                    layerCard?.isVisible 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Layers className="w-5 h-5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 <p>Manage Layers</p>
