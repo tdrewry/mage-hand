@@ -3737,10 +3737,6 @@ export const SimpleTabletop = () => {
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
 
               // Capture full initial state for undo/redo history
-              console.log('🔵 SCALE START - Capturing initial state:', {
-                regionId: selectedRegion.id,
-                initialState: selectedRegion
-              });
               setInitialRegionState({ ...selectedRegion });
               setTransformingRegionId(selectedRegion.id);
 
@@ -4478,7 +4474,8 @@ export const SimpleTabletop = () => {
       updateAllTokenHighlights();
 
       // Apply final positions and cleanup grouped dragging
-      if (dragPreview && draggedRegionId && !isTransforming) {
+      // ONLY for normal region moves (not transformations like scale/rotate)
+      if (dragPreview && draggedRegionId && !isTransforming && !transformingRegionId) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
           let finalState: Partial<CanvasRegion>;
@@ -4515,8 +4512,8 @@ export const SimpleTabletop = () => {
             updateRegion(draggedRegionId, finalState);
           }
           
-          // Create undo command for region movement
-          if (initialRegionState && transformingRegionId === draggedRegionId) {
+          // Create undo command for region movement (only for simple moves)
+          if (initialRegionState) {
             const hasChanged = 
               initialRegionState.x !== finalState.x ||
               initialRegionState.y !== finalState.y ||
@@ -4616,22 +4613,12 @@ export const SimpleTabletop = () => {
         updateRegion(draggedRegionId, updates);
         
         // Create undo command for transformation
-        console.log('🟢 SCALE END - Checking undo conditions:', {
-          initialRegionState: !!initialRegionState,
-          transformingRegionId,
-          draggedRegionId,
-          conditionMet: !!(initialRegionState && transformingRegionId === draggedRegionId)
-        });
-        
         if (initialRegionState && transformingRegionId === draggedRegionId) {
-          console.log('✅ Creating undo entry for scale transformation');
           transformRegionUndoable(
             draggedRegionId,
             initialRegionState,
             updates
           );
-        } else {
-          console.log('❌ NOT creating undo entry - condition failed');
         }
       }
 
