@@ -4474,7 +4474,7 @@ export const SimpleTabletop = () => {
       updateAllTokenHighlights();
 
       // Apply final positions and cleanup grouped dragging
-      if (dragPreview && draggedRegionId) {
+      if (dragPreview && draggedRegionId && !isTransforming) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
           let finalState: Partial<CanvasRegion>;
