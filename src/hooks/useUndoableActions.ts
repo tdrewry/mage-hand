@@ -66,32 +66,21 @@ export const useUndoableActions = () => {
 
   const moveRegionUndoable = useCallback((
     regionId: string,
+    previousPosition: { x: number; y: number },
     newPosition: { x: number; y: number }
   ) => {
-    const region = regions.find(r => r.id === regionId);
-    if (!region) return;
-
-    const previousPosition = { x: region.x, y: region.y };
     const command = new MoveRegionCommand(regionId, previousPosition, newPosition);
     undoRedoManager.execute(command);
-  }, [regions]);
+  }, []);
 
   const transformRegionUndoable = useCallback((
     regionId: string,
+    previousState: Partial<CanvasRegion>,
     newState: Partial<CanvasRegion>
   ) => {
-    const region = regions.find(r => r.id === regionId);
-    if (!region) return;
-
-    // Capture transform-related state
-    const previousState: Partial<CanvasRegion> = {};
-    (Object.keys(newState) as Array<keyof CanvasRegion>).forEach((key) => {
-      (previousState as any)[key] = region[key];
-    });
-
     const command = new TransformRegionCommand(regionId, previousState, newState);
     undoRedoManager.execute(command);
-  }, [regions]);
+  }, []);
 
   // Token actions
   const addTokenUndoable = useCallback((token: Token) => {
@@ -109,15 +98,13 @@ export const useUndoableActions = () => {
 
   const moveTokenUndoable = useCallback((
     tokenId: string,
-    newPosition: { x: number; y: number }
+    previousPosition: { x: number; y: number },
+    newPosition: { x: number; y: number },
+    tokenLabel?: string
   ) => {
-    const token = tokens.find(t => t.id === tokenId);
-    if (!token) return;
-
-    const previousPosition = { x: token.x, y: token.y };
-    const command = new MoveTokenCommand(tokenId, previousPosition, newPosition, token.label || token.name);
+    const command = new MoveTokenCommand(tokenId, previousPosition, newPosition, tokenLabel);
     undoRedoManager.execute(command);
-  }, [tokens]);
+  }, []);
 
   const updateTokenUndoable = useCallback((
     tokenId: string,
