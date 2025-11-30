@@ -71,6 +71,7 @@ import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
 import { useFogStore } from "../stores/fogStore";
 import { usePostProcessing } from "../hooks/usePostProcessing";
+import { useUndoRedo } from "../hooks/useUndoRedo";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
@@ -220,6 +221,9 @@ export const SimpleTabletop = () => {
 
   // Role store
   const { roles } = useRoleStore();
+  
+  // Enable undo/redo with keyboard shortcuts
+  useUndoRedo(true);
 
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
