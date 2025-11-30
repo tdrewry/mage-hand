@@ -3779,12 +3779,20 @@ export const SimpleTabletop = () => {
               setTransformHandle("rotate");
               setDraggedRegionId(selectedRegion.id);
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
+
+              // Capture initial state for undo
+              setInitialRegionState(captureRegionTransformState(selectedRegion));
+              setTransformingRegionId(selectedRegion.id);
               return;
             } else if (hitTestTransformHandle(worldPos, [centerHandle])) {
               setIsTransforming(true);
               setTransformHandle("center");
               setDraggedRegionId(selectedRegion.id);
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
+              
+              // Capture initial state for undo of rotation center adjustments
+              setInitialRegionState(captureRegionTransformState(selectedRegion));
+              setTransformingRegionId(selectedRegion.id);
               return;
             }
           }
