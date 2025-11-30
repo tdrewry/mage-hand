@@ -1,23 +1,24 @@
 import React from 'react';
 import {
-  Settings,
+  MapPlus,
   Square,
   Pen,
-  Waves,
-  Grid3X3,
+  LineSquiggle,
+  Magnet,
   Settings2,
   Eye,
   EyeOff,
-  Trash2,
+  CircleMinus,
   FileDown,
   Layers,
-  Plus,
+  CirclePlus,
   Palette,
   CloudFog,
   Swords,
-  Lock,
-  LockOpen,
+  Footprints,
   Users,
+  Grid2x2X,
+  Grid3X3,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -222,7 +223,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
       {mode === 'edit' ? (
         <>
           <ToolbarButton
-            icon={Settings}
+            icon={MapPlus}
             label="Map Manager"
             onClick={onOpenMapManager || (() => {})}
             variant="ghost"
@@ -230,7 +231,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={Plus}
+            icon={CirclePlus}
             label="Tokens"
             onClick={handleToggleTokenCard}
             isActive={tokenCard?.isVisible}
@@ -259,7 +260,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={Waves}
+            icon={LineSquiggle}
             label="Draw Freehand"
             onClick={onStartFreehandDraw || (() => {})}
             disabled={isDrawingPolygon}
@@ -271,7 +272,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
-            icon={Grid3X3}
+            icon={Magnet}
             label={`World Snap ${isGridSnappingEnabled ? 'On' : 'Off'}`}
             onClick={onToggleGridSnapping || (() => {})}
             isActive={isGridSnappingEnabled}
@@ -300,7 +301,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
-            icon={Trash2}
+            icon={CircleMinus}
             label="Clear Tokens"
             onClick={handleClearTokens}
             variant="ghost"
@@ -309,7 +310,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={Square}
+            icon={Grid2x2X}
             label="Clear Regions"
             onClick={handleClearRegions}
             variant="ghost"
@@ -385,7 +386,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={restrictMovement ? Lock : LockOpen}
+            icon={Footprints}
             label={
               isInCombat 
                 ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 

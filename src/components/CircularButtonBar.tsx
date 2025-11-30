@@ -4,8 +4,7 @@ import {
   Edit,
   Menu as MenuIcon,
   Users,
-  Lock,
-  LockOpen,
+  Footprints,
 } from 'lucide-react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -94,7 +93,7 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
       />
 
       <ToolbarButton
-        icon={movementLocked ? Lock : LockOpen}
+        icon={Footprints}
         label={movementLocked ? 'Unlock Movement' : 'Lock Movement'}
         onClick={() => setMovementLocked(!movementLocked)}
         variant={movementLocked ? 'destructive' : 'default'}
