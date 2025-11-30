@@ -72,6 +72,7 @@ import paper from "paper";
 import { useFogStore } from "../stores/fogStore";
 import { usePostProcessing } from "../hooks/usePostProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
+import { useUndoableActions } from "../hooks/useUndoableActions";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
@@ -224,6 +225,9 @@ export const SimpleTabletop = () => {
   
   // Enable undo/redo with keyboard shortcuts
   useUndoRedo(true);
+  
+  // Undoable actions
+  const { moveTokenUndoable, moveRegionUndoable, transformRegionUndoable } = useUndoableActions();
 
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
@@ -309,6 +313,11 @@ export const SimpleTabletop = () => {
   const [isRotatingRegion, setIsRotatingRegion] = useState(false);
   const [rotationStartAngle, setRotationStartAngle] = useState(0);
   const [tempRegionRotation, setTempRegionRotation] = useState<{ [regionId: string]: number }>({});
+  
+  // Undo/Redo: Track initial states before transformations
+  const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [initialRegionState, setInitialRegionState] = useState<Partial<CanvasRegion> | null>(null);
+  const [transformingRegionId, setTransformingRegionId] = useState<string | null>(null);
 
   const {
     sessionId,
@@ -3781,6 +3790,9 @@ export const SimpleTabletop = () => {
         // Store original position for ghost and path
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
         setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+        
+        // Capture initial state for undo
+        setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
         // If token not selected, select it
         if (!selectedTokenIds.includes(clickedToken.id)) {
@@ -3792,6 +3804,18 @@ export const SimpleTabletop = () => {
         if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
           setIsRotatingRegion(true);
           setDraggedRegionId(clickedRegion.id);
+          
+          // Capture initial state for undo
+          setInitialRegionState({
+            x: clickedRegion.x,
+            y: clickedRegion.y,
+            width: clickedRegion.width,
+            height: clickedRegion.height,
+            rotation: clickedRegion.rotation,
+            pathPoints: clickedRegion.pathPoints,
+            bezierControlPoints: clickedRegion.bezierControlPoints,
+          });
+          setTransformingRegionId(clickedRegion.id);
 
           // Calculate starting angle from region center to mouse
           const centerX = clickedRegion.x + clickedRegion.width / 2;
@@ -3820,10 +3844,32 @@ export const SimpleTabletop = () => {
             setIsResizingRegion(true);
             setResizeHandle(handle);
             setDraggedRegionId(clickedRegion.id);
+            
+            // Capture initial state for undo
+            setInitialRegionState({
+              x: clickedRegion.x,
+              y: clickedRegion.y,
+              width: clickedRegion.width,
+              height: clickedRegion.height,
+              pathPoints: clickedRegion.pathPoints,
+              bezierControlPoints: clickedRegion.bezierControlPoints,
+            });
+            setTransformingRegionId(clickedRegion.id);
           } else {
             // Start dragging the region - group tokens for smooth movement
             setIsDraggingRegion(true);
             setDraggedRegionId(clickedRegion.id);
+            
+            // Capture initial state for undo
+            setInitialRegionState({
+              x: clickedRegion.x,
+              y: clickedRegion.y,
+              width: clickedRegion.width,
+              height: clickedRegion.height,
+              pathPoints: clickedRegion.pathPoints,
+              bezierControlPoints: clickedRegion.bezierControlPoints,
+            });
+            setTransformingRegionId(clickedRegion.id);
 
             if (clickedRegion.regionType === "path" && clickedRegion.pathPoints) {
               // For path regions, use the bounding box origin as reference
@@ -4399,6 +4445,16 @@ export const SimpleTabletop = () => {
           // - Token is in a region but region snapping is disabled
           // - Token is in world space but world snapping is disabled
           // - Token is in a 'free' grid region
+          
+          // Create undo command for token movement
+          if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
+            moveTokenUndoable(
+              draggedTokenId,
+              { x: initialTokenState.x, y: initialTokenState.y },
+              { x: token.x, y: token.y },
+              token.label || token.name
+            );
+          }
         }
       }
 
@@ -4407,6 +4463,7 @@ export const SimpleTabletop = () => {
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
+      setInitialTokenState(null);
 
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
@@ -4415,6 +4472,8 @@ export const SimpleTabletop = () => {
       if (dragPreview && draggedRegionId) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
+          let finalState: Partial<CanvasRegion>;
+          
           // Update region in store with recalculated bounds for grid
           if (draggedRegion.regionType === "path" && dragPreview.pathPoints) {
             // Recalculate bounds to ensure grid is properly updated
@@ -4422,7 +4481,7 @@ export const SimpleTabletop = () => {
               ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
               : getPolygonBounds(dragPreview.pathPoints);
 
-            updateRegion(draggedRegionId, {
+            finalState = {
               x: finalBounds.x,
               y: finalBounds.y,
               width: finalBounds.width,
@@ -4431,16 +4490,36 @@ export const SimpleTabletop = () => {
               bezierControlPoints: dragPreview.bezierControlPoints,
               // Preserve rotation when dragging
               rotation: draggedRegion.rotation,
-            });
+            };
+            
+            updateRegion(draggedRegionId, finalState);
           } else {
-            updateRegion(draggedRegionId, {
+            finalState = {
               x: dragPreview.x,
               y: dragPreview.y,
               width: dragPreview.width,
               height: dragPreview.height,
               // Preserve rotation when dragging
               rotation: draggedRegion.rotation,
-            });
+            };
+            
+            updateRegion(draggedRegionId, finalState);
+          }
+          
+          // Create undo command for region movement
+          if (initialRegionState && transformingRegionId === draggedRegionId) {
+            const hasChanged = 
+              initialRegionState.x !== finalState.x ||
+              initialRegionState.y !== finalState.y ||
+              JSON.stringify(initialRegionState.pathPoints) !== JSON.stringify(finalState.pathPoints);
+              
+            if (hasChanged) {
+              moveRegionUndoable(
+                draggedRegionId,
+                { x: initialRegionState.x!, y: initialRegionState.y! },
+                { x: finalState.x!, y: finalState.y! }
+              );
+            }
           }
         }
       }
@@ -4462,14 +4541,28 @@ export const SimpleTabletop = () => {
       // Apply final rotation to region and tokens
       if (tempRegionRotation[draggedRegionId]) {
         const rotationDelta = tempRegionRotation[draggedRegionId];
+        const currentRegion = regions.find((r) => r.id === draggedRegionId);
+        const newRotation = (currentRegion?.rotation || 0) + rotationDelta;
+        
         updateRegion(draggedRegionId, {
-          rotation: (regions.find((r) => r.id === draggedRegionId)?.rotation || 0) + rotationDelta,
+          rotation: newRotation,
         });
+        
+        // Create undo command for rotation
+        if (initialRegionState && transformingRegionId === draggedRegionId && currentRegion) {
+          transformRegionUndoable(
+            draggedRegionId,
+            { rotation: initialRegionState.rotation || 0 },
+            { rotation: newRotation }
+          );
+        }
       }
 
       // Clear rotation state
       setIsRotatingRegion(false);
       setTempRegionRotation({});
+      setInitialRegionState(null);
+      setTransformingRegionId(null);
     }
 
     // Handle transformation end
@@ -4512,6 +4605,15 @@ export const SimpleTabletop = () => {
         };
 
         updateRegion(draggedRegionId, updates);
+        
+        // Create undo command for transformation
+        if (initialRegionState && transformingRegionId === draggedRegionId) {
+          transformRegionUndoable(
+            draggedRegionId,
+            initialRegionState,
+            updates
+          );
+        }
       }
 
       // Clear transformation state
@@ -4519,6 +4621,8 @@ export const SimpleTabletop = () => {
       setTransformHandle(null);
       setDragPreview(null);
       setDraggedRegionId(null);
+      setInitialRegionState(null);
+      setTransformingRegionId(null);
 
       toast.success(`Region ${transformMode}d successfully`);
     }
