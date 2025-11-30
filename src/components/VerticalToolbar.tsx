@@ -21,6 +21,7 @@ import {
   Grid3X3,
   Undo,
   Redo,
+  History,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -85,6 +86,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const stylesCard = cards.find((c) => c.type === CardType.STYLES);
+  const historyCard = cards.find((c) => c.type === CardType.HISTORY);
 
   const handleToggleStylesCard = () => {
     if (stylesCard) {
@@ -99,6 +101,23 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleHistoryCard = () => {
+    if (historyCard) {
+      setVisibility(historyCard.id, !historyCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.HISTORY,
+        title: 'History',
+        defaultPosition: { x: window.innerWidth - 380, y: 80 },
+        defaultSize: { width: 360, height: 500 },
+        minSize: { width: 320, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: false,
       });
     }
   };
@@ -359,6 +378,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="sm"
           />
+
+          <ToolbarButton
+            icon={History}
+            label="History"
+            onClick={handleToggleHistoryCard}
+            isActive={historyCard?.isVisible}
+            variant="ghost"
+            size="sm"
+          />
         </>
       ) : (
         <>
@@ -459,6 +487,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Redo (Ctrl+Shift+Z)"
             onClick={redo}
             disabled={!canRedo}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarButton
+            icon={History}
+            label="History"
+            onClick={handleToggleHistoryCard}
+            isActive={historyCard?.isVisible}
             variant="ghost"
             size="sm"
           />

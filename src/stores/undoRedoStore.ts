@@ -5,19 +5,23 @@
  */
 
 import { create } from 'zustand';
-import { undoRedoManager } from '@/lib/undoRedoManager';
+import { undoRedoManager, type Command } from '@/lib/undoRedoManager';
 
 interface UndoRedoState {
   canUndo: boolean;
   canRedo: boolean;
   undoDescription?: string;
   redoDescription?: string;
+  undoHistory: Command[];
+  redoHistory: Command[];
   
   // Actions
   undo: () => void;
   redo: () => void;
   clear: () => void;
   updateState: () => void;
+  undoToIndex: (index: number) => void;
+  redoToIndex: (index: number) => void;
 }
 
 export const useUndoRedoStore = create<UndoRedoState>((set) => ({
@@ -25,6 +29,8 @@ export const useUndoRedoStore = create<UndoRedoState>((set) => ({
   canRedo: false,
   undoDescription: undefined,
   redoDescription: undefined,
+  undoHistory: [],
+  redoHistory: [],
 
   undo: () => {
     undoRedoManager.undo();
@@ -33,6 +39,8 @@ export const useUndoRedoStore = create<UndoRedoState>((set) => ({
       canRedo: undoRedoManager.canRedo(),
       undoDescription: undoRedoManager.getUndoDescription(),
       redoDescription: undoRedoManager.getRedoDescription(),
+      undoHistory: undoRedoManager.getUndoHistory(),
+      redoHistory: undoRedoManager.getRedoHistory(),
     });
   },
 
@@ -43,6 +51,8 @@ export const useUndoRedoStore = create<UndoRedoState>((set) => ({
       canRedo: undoRedoManager.canRedo(),
       undoDescription: undoRedoManager.getUndoDescription(),
       redoDescription: undoRedoManager.getRedoDescription(),
+      undoHistory: undoRedoManager.getUndoHistory(),
+      redoHistory: undoRedoManager.getRedoHistory(),
     });
   },
 
@@ -53,6 +63,8 @@ export const useUndoRedoStore = create<UndoRedoState>((set) => ({
       canRedo: false,
       undoDescription: undefined,
       redoDescription: undefined,
+      undoHistory: [],
+      redoHistory: [],
     });
   },
 
@@ -62,6 +74,32 @@ export const useUndoRedoStore = create<UndoRedoState>((set) => ({
       canRedo: undoRedoManager.canRedo(),
       undoDescription: undoRedoManager.getUndoDescription(),
       redoDescription: undoRedoManager.getRedoDescription(),
+      undoHistory: undoRedoManager.getUndoHistory(),
+      redoHistory: undoRedoManager.getRedoHistory(),
+    });
+  },
+
+  undoToIndex: (index: number) => {
+    undoRedoManager.undoToIndex(index);
+    set({
+      canUndo: undoRedoManager.canUndo(),
+      canRedo: undoRedoManager.canRedo(),
+      undoDescription: undoRedoManager.getUndoDescription(),
+      redoDescription: undoRedoManager.getRedoDescription(),
+      undoHistory: undoRedoManager.getUndoHistory(),
+      redoHistory: undoRedoManager.getRedoHistory(),
+    });
+  },
+
+  redoToIndex: (index: number) => {
+    undoRedoManager.redoToIndex(index);
+    set({
+      canUndo: undoRedoManager.canUndo(),
+      canRedo: undoRedoManager.canRedo(),
+      undoDescription: undoRedoManager.getUndoDescription(),
+      redoDescription: undoRedoManager.getRedoDescription(),
+      undoHistory: undoRedoManager.getUndoHistory(),
+      redoHistory: undoRedoManager.getRedoHistory(),
     });
   },
 }));
