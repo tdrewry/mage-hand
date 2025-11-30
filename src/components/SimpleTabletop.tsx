@@ -4478,24 +4478,6 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
 
-      // Unified region transform undo registration
-      // Handles move, scale, rotate - all region spatial changes
-      if (initialRegionState && transformingRegionId && (dragPreview || isRotatingRegion || isTransforming)) {
-        const currentRegion = regions.find(r => r.id === transformingRegionId);
-        if (currentRegion) {
-          const currentState = captureRegionTransformState(currentRegion);
-          
-          // Only register if something actually changed
-          if (hasTransformChanged(initialRegionState, currentState)) {
-            transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
-          }
-        }
-        
-        // Always cleanup
-        setInitialRegionState(null);
-        setTransformingRegionId(null);
-      }
-
       // Apply final positions for region drag preview
       if (dragPreview && draggedRegionId && !isTransforming) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
@@ -4615,6 +4597,25 @@ export const SimpleTabletop = () => {
       setDraggedRegionId(null);
 
       toast.success(`Region ${transformMode}d successfully`);
+    }
+
+    // Unified region transform undo registration
+    // Handles move, scale, rotate - all region spatial changes
+    // MUST run AFTER all region updates have been applied above
+    if (initialRegionState && transformingRegionId) {
+      const currentRegion = regions.find(r => r.id === transformingRegionId);
+      if (currentRegion) {
+        const currentState = captureRegionTransformState(currentRegion);
+        
+        // Only register if something actually changed
+        if (hasTransformChanged(initialRegionState, currentState)) {
+          transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+        }
+      }
+      
+      // Always cleanup
+      setInitialRegionState(null);
+      setTransformingRegionId(null);
     }
 
     // Reset all region drag states (runs for normal drag, rotation, and transformation)
