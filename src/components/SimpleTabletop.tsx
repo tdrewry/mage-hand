@@ -3735,18 +3735,11 @@ export const SimpleTabletop = () => {
               setTransformHandle(hitHandle.type);
               setDraggedRegionId(selectedRegion.id);
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
-              
-              // Capture initial state for undo
-              setInitialRegionState({
-                x: selectedRegion.x,
-                y: selectedRegion.y,
-                width: selectedRegion.width,
-                height: selectedRegion.height,
-                pathPoints: selectedRegion.pathPoints,
-                bezierControlPoints: selectedRegion.bezierControlPoints,
-              });
+
+              // Capture full initial state for undo/redo history
+              setInitialRegionState({ ...selectedRegion });
               setTransformingRegionId(selectedRegion.id);
-              
+
               return;
             }
           } else if (transformMode === "rotate") {
