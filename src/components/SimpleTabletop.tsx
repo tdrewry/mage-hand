@@ -78,18 +78,7 @@ import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
-import { RegionControlPanel, type TransformMode } from "./RegionControlPanel";
-import {
-  generateTransformHandles,
-  getRotationCenterHandle,
-  hitTestTransformHandle,
-  scaleRegion,
-  rotateRegion,
-  calculateScaleFromDrag,
-  calculateRotationFromDrag,
-  getRegionBounds,
-  type TransformHandle,
-} from "../lib/regionTransforms";
+import { RegionControlBar } from "./RegionControlBar";
 import { Z_INDEX } from "../lib/zIndex";
 
 export const SimpleTabletop = () => {
@@ -154,12 +143,6 @@ export const SimpleTabletop = () => {
 
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
-
-  // Region transformation state
-  const [transformMode, setTransformMode] = useState<"move" | "scale" | "rotate">("move");
-  const [isTransforming, setIsTransforming] = useState(false);
-  const [transformHandle, setTransformHandle] = useState<string | null>(null);
-  const [rotationCenter, setRotationCenter] = useState<{ x: number; y: number } | null>(null);
 
   // Selected annotation for flavor text display
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
@@ -411,7 +394,7 @@ export const SimpleTabletop = () => {
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
-    if (isDraggingToken || isDraggingRegion || isTransforming || isPanning) {
+    if (isDraggingToken || isDraggingRegion || isPanning) {
       const handleGlobalMouseUp = () => {
         // Reset all drag states
         if (isDraggingToken) {
@@ -428,10 +411,6 @@ export const SimpleTabletop = () => {
           setDraggedRegionId(null);
           setDragPreview(null);
         }
-        if (isTransforming) {
-          setIsTransforming(false);
-          setTransformHandle(null);
-        }
         if (isPanning) {
           setIsPanning(false);
         }
@@ -446,7 +425,7 @@ export const SimpleTabletop = () => {
         window.removeEventListener("mouseup", handleGlobalMouseUp);
       };
     }
-  }, [isDraggingToken, isDraggingRegion, isTransforming, isPanning, isRotatingRegion]);
+  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion]);
 
   // Update highlights whenever tokens or regions change
   useEffect(() => {
@@ -2353,12 +2332,7 @@ export const SimpleTabletop = () => {
 
     // Draw transformation handles based on mode (handles themselves drawn in parent)
     if (isSelected) {
-      // Draw transformation handles based on mode
-      if (transformMode === "scale") {
-        drawScaleHandles(ctx, region);
-      } else if (transformMode === "rotate") {
-        drawRotationHandles(ctx, region);
-      }
+      // Transform handles removed - now using classic resize/rotate handles only
     }
 
     // Draw grid type label (only in edit mode)
@@ -2456,74 +2430,8 @@ export const SimpleTabletop = () => {
 
     // Draw transformation handles based on mode (handles themselves drawn in parent)
     if (isSelected) {
-      // Draw transformation handles based on mode
-      if (transformMode === "scale") {
-        drawScaleHandles(ctx, region);
-      } else if (transformMode === "rotate") {
-        drawRotationHandles(ctx, region);
-      }
+      // Transform handles removed - now using classic resize/rotate handles only
     }
-  };
-
-  // Function to draw scale handles for a region
-  const drawScaleHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
-    const handles = generateTransformHandles(region);
-    const scaleHandles = handles.filter((h) => h.type !== "rotate");
-
-    ctx.save();
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#333333";
-    ctx.lineWidth = 1 / transform.zoom;
-
-    scaleHandles.forEach((handle) => {
-      const size = handle.size / transform.zoom;
-      ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size);
-      ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size);
-    });
-
-    ctx.restore();
-  };
-
-  // Function to draw rotation handles for a region
-  const drawRotationHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
-    const handles = generateTransformHandles(region);
-    const rotateHandle = handles.find((h) => h.type === "rotate");
-    const centerHandle = getRotationCenterHandle(region, rotationCenter);
-
-    if (!rotateHandle) return;
-
-    ctx.save();
-
-    // Draw rotation handle (circle)
-    ctx.fillStyle = "#ff6b6b";
-    ctx.strokeStyle = "#333333";
-    ctx.lineWidth = 1 / transform.zoom;
-    ctx.beginPath();
-    ctx.arc(rotateHandle.x, rotateHandle.y, rotateHandle.size / transform.zoom, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Draw center handle (diamond)
-    ctx.fillStyle = "#4ecdc4";
-    ctx.strokeStyle = "#333333";
-    ctx.save();
-    ctx.translate(centerHandle.x, centerHandle.y);
-    ctx.rotate(Math.PI / 4);
-    const size = centerHandle.size / transform.zoom;
-    ctx.fillRect(-size / 2, -size / 2, size, size);
-    ctx.strokeRect(-size / 2, -size / 2, size, size);
-    ctx.restore();
-
-    // Draw line from center to rotation handle
-    ctx.strokeStyle = "#666666";
-    ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]);
-    ctx.beginPath();
-    ctx.moveTo(centerHandle.x, centerHandle.y);
-    ctx.lineTo(rotateHandle.x, rotateHandle.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore();
   };
 
   // Image cache to prevent re-loading images on every redraw
@@ -3747,57 +3655,6 @@ export const SimpleTabletop = () => {
         }
       }
 
-      // PRIORITY 2: Check for transformation handles on selected regions
-      // Only in edit mode
-      if (selectedRegionId && transformMode !== "move" && renderingMode === "edit") {
-        const selectedRegion = regions.find((r) => r.id === selectedRegionId && r.selected);
-        if (selectedRegion) {
-          if (transformMode === "scale") {
-            const handles = generateTransformHandles(selectedRegion);
-            const scaleHandles = handles.filter((h) => h.type !== "rotate");
-            const hitHandle = hitTestTransformHandle(worldPos, scaleHandles);
-
-            if (hitHandle) {
-              setIsTransforming(true);
-              setTransformHandle(hitHandle.type);
-              setDraggedRegionId(selectedRegion.id);
-              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
-
-              // Capture full initial state for undo/redo history
-              setInitialRegionState(captureRegionTransformState(selectedRegion));
-              setTransformingRegionId(selectedRegion.id);
-
-              return;
-            }
-          } else if (transformMode === "rotate") {
-            const handles = generateTransformHandles(selectedRegion);
-            const rotateHandle = handles.find((h) => h.type === "rotate");
-            const centerHandle = getRotationCenterHandle(selectedRegion, rotationCenter);
-
-            if (rotateHandle && hitTestTransformHandle(worldPos, [rotateHandle])) {
-              setIsTransforming(true);
-              setTransformHandle("rotate");
-              setDraggedRegionId(selectedRegion.id);
-              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
-
-              // Capture initial state for undo
-              setInitialRegionState(captureRegionTransformState(selectedRegion));
-              setTransformingRegionId(selectedRegion.id);
-              return;
-            } else if (hitTestTransformHandle(worldPos, [centerHandle])) {
-              setIsTransforming(true);
-              setTransformHandle("center");
-              setDraggedRegionId(selectedRegion.id);
-              setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
-              
-              // Capture initial state for undo of rotation center adjustments
-              setInitialRegionState(captureRegionTransformState(selectedRegion));
-              setTransformingRegionId(selectedRegion.id);
-              return;
-            }
-          }
-        }
-      }
 
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
@@ -4138,57 +3995,6 @@ export const SimpleTabletop = () => {
 
       // Use requestAnimationFrame for smooth rendering
       requestAnimationFrame(() => redrawCanvas());
-    } else if (isTransforming && draggedRegionId && transformHandle) {
-      // Handle transformation operations
-      const worldPos = screenToWorld(mouseX, mouseY);
-      const targetRegion = regions.find((r) => r.id === draggedRegionId);
-
-      if (targetRegion) {
-        if (transformMode === "scale" && transformHandle !== "rotate" && transformHandle !== "center") {
-          // Calculate scale transformation
-          const bounds = getRegionBounds(targetRegion);
-          const dragStart = regionDragOffset;
-          const dragDelta = {
-            x: worldPos.x - dragStart.x,
-            y: worldPos.y - dragStart.y,
-          };
-
-          const { scaleX, scaleY, anchor } = calculateScaleFromDrag(
-            { x: 0, y: 0, type: transformHandle as any, size: 8 },
-            dragDelta,
-            bounds,
-          );
-
-          const scaleUpdates = scaleRegion(targetRegion, scaleX, scaleY, anchor);
-
-          // Update preview
-          setDragPreview({
-            regionId: draggedRegionId,
-            ...scaleUpdates,
-          });
-        } else if (transformMode === "rotate") {
-          if (transformHandle === "center") {
-            // Moving rotation center
-            setRotationCenter({ x: worldPos.x, y: worldPos.y });
-          } else if (transformHandle === "rotate") {
-            // Rotating around center
-            const center = rotationCenter || getRegionBounds(targetRegion);
-            const dragStart = regionDragOffset;
-
-            const rotationAngle = calculateRotationFromDrag(center, worldPos, { x: dragStart.x, y: dragStart.y });
-
-            const rotateUpdates = rotateRegion(targetRegion, rotationAngle, center);
-
-            // Update preview
-            setDragPreview({
-              regionId: draggedRegionId,
-              ...rotateUpdates,
-            });
-          }
-        }
-      }
-
-      requestAnimationFrame(() => redrawCanvas());
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
       // Region resizing or path node editing - use preview for smooth updates
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -4487,7 +4293,7 @@ export const SimpleTabletop = () => {
       updateAllTokenHighlights();
 
       // Apply final positions for region drag preview (visual only; undo handled below)
-      if (dragPreview && draggedRegionId && !isTransforming) {
+      if (dragPreview && draggedRegionId) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
           let finalState: Partial<CanvasRegion>;
@@ -4556,56 +4362,6 @@ export const SimpleTabletop = () => {
       setTempRegionRotation({});
     }
 
-    // Handle transformation end
-    if (isTransforming && draggedRegionId && dragPreview) {
-      // Apply the transformation to the actual region
-      const targetRegion = regions.find((r) => r.id === draggedRegionId);
-      if (targetRegion) {
-        // Recalculate final bounds to ensure grid alignment is correct
-        let finalBounds = {
-          x: dragPreview.x,
-          y: dragPreview.y,
-          width: dragPreview.width,
-          height: dragPreview.height,
-        };
-
-        if (dragPreview.pathPoints) {
-          finalBounds = dragPreview.bezierControlPoints
-            ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
-            : getPolygonBounds(dragPreview.pathPoints);
-        }
-
-        const updates = {
-          x: finalBounds.x,
-          y: finalBounds.y,
-          width: finalBounds.width,
-          height: finalBounds.height,
-          pathPoints: dragPreview.pathPoints,
-          bezierControlPoints: dragPreview.bezierControlPoints,
-          ...(dragPreview.pathPoints ? { regionType: "path" as const } : {}),
-          // Preserve all other existing properties
-          rotation: targetRegion.rotation,
-          gridScale: targetRegion.gridScale,
-          gridSnapping: targetRegion.gridSnapping,
-          gridVisible: targetRegion.gridVisible,
-          backgroundImage: targetRegion.backgroundImage,
-          backgroundRepeat: targetRegion.backgroundRepeat,
-          backgroundOffsetX: targetRegion.backgroundOffsetX,
-          backgroundOffsetY: targetRegion.backgroundOffsetY,
-          rotationCenter: targetRegion.rotationCenter,
-        };
-
-        updateRegion(draggedRegionId, updates);
-      }
-
-      // Clear transformation state
-      setIsTransforming(false);
-      setTransformHandle(null);
-      setDragPreview(null);
-      setDraggedRegionId(null);
-
-      toast.success(`Region ${transformMode}d successfully`);
-    }
 
     // Unified region transform undo registration
     // Handles move, scale, rotate - all region spatial changes
@@ -4626,12 +4382,10 @@ export const SimpleTabletop = () => {
       setTransformingRegionId(null);
     }
 
-    // Reset all region drag states (runs for normal drag, rotation, and transformation)
-    if (isDraggingRegion || isRotatingRegion || isResizingRegion || isTransforming) {
+    // Reset all region drag states (runs for normal drag, rotation, and resize)
+    if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
-      setIsTransforming(false);
-      setTransformHandle(null);
       setDraggedRegionId(null);
       setRegionDragOffset({ x: 0, y: 0 });
       setResizeHandle(null);
@@ -4842,8 +4596,6 @@ export const SimpleTabletop = () => {
       <CardManager
         sessionId={sessionId}
         activeRegionId={activeRegionControlId}
-        transformMode={transformMode}
-        onTransformModeChange={setTransformMode}
         onToggleSnapping={toggleRegionSnapping}
         onToggleGridVisibility={toggleRegionGridVisibility}
       />
@@ -4855,6 +4607,19 @@ export const SimpleTabletop = () => {
       <BulkOperationsToolbar
         selectedTokenIds={selectedTokenIds}
         onClearSelection={() => setSelectedTokenIds([])}
+        onUpdateCanvas={handleCanvasUpdate}
+      />
+
+      {/* Region Control Bar - Shows when a region is selected */}
+      <RegionControlBar
+        selectedRegionId={selectedRegionId}
+        onClearSelection={() => {
+          if (selectedRegionId) {
+            deselectRegion(selectedRegionId);
+          }
+          setSelectedRegionId(null);
+          redrawCanvas();
+        }}
         onUpdateCanvas={handleCanvasUpdate}
       />
 
