@@ -3737,6 +3737,10 @@ export const SimpleTabletop = () => {
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
 
               // Capture full initial state for undo/redo history
+              console.log('🔵 SCALE START - Capturing initial state:', {
+                regionId: selectedRegion.id,
+                initialState: selectedRegion
+              });
               setInitialRegionState({ ...selectedRegion });
               setTransformingRegionId(selectedRegion.id);
 
@@ -4612,12 +4616,22 @@ export const SimpleTabletop = () => {
         updateRegion(draggedRegionId, updates);
         
         // Create undo command for transformation
+        console.log('🟢 SCALE END - Checking undo conditions:', {
+          initialRegionState: !!initialRegionState,
+          transformingRegionId,
+          draggedRegionId,
+          conditionMet: !!(initialRegionState && transformingRegionId === draggedRegionId)
+        });
+        
         if (initialRegionState && transformingRegionId === draggedRegionId) {
+          console.log('✅ Creating undo entry for scale transformation');
           transformRegionUndoable(
             draggedRegionId,
             initialRegionState,
             updates
           );
+        } else {
+          console.log('❌ NOT creating undo entry - condition failed');
         }
       }
 
