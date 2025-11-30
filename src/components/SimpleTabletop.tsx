@@ -98,6 +98,33 @@ export const SimpleTabletop = () => {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
   const [showMapManager, setShowMapManager] = useState(false);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
+
+  // Helper function to capture full region transform state for undo/redo
+  const captureRegionTransformState = (region: CanvasRegion): Partial<CanvasRegion> => ({
+    x: region.x,
+    y: region.y,
+    width: region.width,
+    height: region.height,
+    rotation: region.rotation || 0,
+    pathPoints: region.pathPoints ? [...region.pathPoints] : undefined,
+    bezierControlPoints: region.bezierControlPoints ? [...region.bezierControlPoints] : undefined,
+  });
+
+  // Helper function to check if transform state has changed
+  const hasTransformChanged = (
+    initial: Partial<CanvasRegion>, 
+    current: Partial<CanvasRegion>
+  ): boolean => {
+    return (
+      initial.x !== current.x ||
+      initial.y !== current.y ||
+      initial.width !== current.width ||
+      initial.height !== current.height ||
+      initial.rotation !== current.rotation ||
+      JSON.stringify(initial.pathPoints) !== JSON.stringify(current.pathPoints) ||
+      JSON.stringify(initial.bezierControlPoints) !== JSON.stringify(current.bezierControlPoints)
+    );
+  };
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState("#333");
@@ -3737,7 +3764,7 @@ export const SimpleTabletop = () => {
               setRegionDragOffset({ x: worldPos.x, y: worldPos.y });
 
               // Capture full initial state for undo/redo history
-              setInitialRegionState({ ...selectedRegion });
+              setInitialRegionState(captureRegionTransformState(selectedRegion));
               setTransformingRegionId(selectedRegion.id);
 
               return;
@@ -3811,15 +3838,7 @@ export const SimpleTabletop = () => {
           setDraggedRegionId(clickedRegion.id);
           
           // Capture initial state for undo
-          setInitialRegionState({
-            x: clickedRegion.x,
-            y: clickedRegion.y,
-            width: clickedRegion.width,
-            height: clickedRegion.height,
-            rotation: clickedRegion.rotation,
-            pathPoints: clickedRegion.pathPoints,
-            bezierControlPoints: clickedRegion.bezierControlPoints,
-          });
+          setInitialRegionState(captureRegionTransformState(clickedRegion));
           setTransformingRegionId(clickedRegion.id);
 
           // Calculate starting angle from region center to mouse
@@ -3851,14 +3870,7 @@ export const SimpleTabletop = () => {
             setDraggedRegionId(clickedRegion.id);
             
             // Capture initial state for undo
-            setInitialRegionState({
-              x: clickedRegion.x,
-              y: clickedRegion.y,
-              width: clickedRegion.width,
-              height: clickedRegion.height,
-              pathPoints: clickedRegion.pathPoints,
-              bezierControlPoints: clickedRegion.bezierControlPoints,
-            });
+            setInitialRegionState(captureRegionTransformState(clickedRegion));
             setTransformingRegionId(clickedRegion.id);
           } else {
             // Start dragging the region - group tokens for smooth movement
@@ -3866,14 +3878,7 @@ export const SimpleTabletop = () => {
             setDraggedRegionId(clickedRegion.id);
             
             // Capture initial state for undo
-            setInitialRegionState({
-              x: clickedRegion.x,
-              y: clickedRegion.y,
-              width: clickedRegion.width,
-              height: clickedRegion.height,
-              pathPoints: clickedRegion.pathPoints,
-              bezierControlPoints: clickedRegion.bezierControlPoints,
-            });
+            setInitialRegionState(captureRegionTransformState(clickedRegion));
             setTransformingRegionId(clickedRegion.id);
 
             if (clickedRegion.regionType === "path" && clickedRegion.pathPoints) {
@@ -4473,9 +4478,26 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
 
-      // Apply final positions and cleanup grouped dragging
-      // ONLY for normal region moves (not transformations like scale/rotate)
-      if (dragPreview && draggedRegionId && !isTransforming && !transformingRegionId) {
+      // Unified region transform undo registration
+      // Handles move, scale, rotate - all region spatial changes
+      if (initialRegionState && transformingRegionId && (dragPreview || isRotatingRegion || isTransforming)) {
+        const currentRegion = regions.find(r => r.id === transformingRegionId);
+        if (currentRegion) {
+          const currentState = captureRegionTransformState(currentRegion);
+          
+          // Only register if something actually changed
+          if (hasTransformChanged(initialRegionState, currentState)) {
+            transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+          }
+        }
+        
+        // Always cleanup
+        setInitialRegionState(null);
+        setTransformingRegionId(null);
+      }
+
+      // Apply final positions for region drag preview
+      if (dragPreview && draggedRegionId && !isTransforming) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
           let finalState: Partial<CanvasRegion>;
@@ -4511,22 +4533,6 @@ export const SimpleTabletop = () => {
             
             updateRegion(draggedRegionId, finalState);
           }
-          
-          // Create undo command for region movement (only for simple moves)
-          if (initialRegionState) {
-            const hasChanged = 
-              initialRegionState.x !== finalState.x ||
-              initialRegionState.y !== finalState.y ||
-              JSON.stringify(initialRegionState.pathPoints) !== JSON.stringify(finalState.pathPoints);
-              
-            if (hasChanged) {
-              moveRegionUndoable(
-                draggedRegionId,
-                { x: initialRegionState.x!, y: initialRegionState.y! },
-                { x: finalState.x!, y: finalState.y! }
-              );
-            }
-          }
         }
       }
 
@@ -4553,22 +4559,11 @@ export const SimpleTabletop = () => {
         updateRegion(draggedRegionId, {
           rotation: newRotation,
         });
-        
-        // Create undo command for rotation
-        if (initialRegionState && transformingRegionId === draggedRegionId && currentRegion) {
-          transformRegionUndoable(
-            draggedRegionId,
-            { rotation: initialRegionState.rotation || 0 },
-            { rotation: newRotation }
-          );
-        }
       }
 
-      // Clear rotation state
+      // Clear rotation state (undo handled by unified block above)
       setIsRotatingRegion(false);
       setTempRegionRotation({});
-      setInitialRegionState(null);
-      setTransformingRegionId(null);
     }
 
     // Handle transformation end
@@ -4611,24 +4606,13 @@ export const SimpleTabletop = () => {
         };
 
         updateRegion(draggedRegionId, updates);
-        
-        // Create undo command for transformation
-        if (initialRegionState && transformingRegionId === draggedRegionId) {
-          transformRegionUndoable(
-            draggedRegionId,
-            initialRegionState,
-            updates
-          );
-        }
       }
 
-      // Clear transformation state
+      // Clear transformation state (undo handled by unified block above)
       setIsTransforming(false);
       setTransformHandle(null);
       setDragPreview(null);
       setDraggedRegionId(null);
-      setInitialRegionState(null);
-      setTransformingRegionId(null);
 
       toast.success(`Region ${transformMode}d successfully`);
     }
