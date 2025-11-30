@@ -16,6 +16,7 @@ import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
+import { HistoryCard } from '@/components/cards/HistoryCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -135,6 +136,7 @@ function getCardTitle(type: CardType): string {
     [CardType.STYLES]: 'Styles',
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
     [CardType.ROLE_MANAGER]: 'Role Manager',
+    [CardType.HISTORY]: 'History',
   };
   
   return titles[type] || type;
@@ -207,6 +209,8 @@ function renderCardContent(
       return <VisionProfileManagerCardContent />;
     case CardType.ROLE_MANAGER:
       return <RoleManagerCard />;
+    case CardType.HISTORY:
+      return <HistoryCard />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:

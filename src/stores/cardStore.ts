@@ -195,6 +195,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.HISTORY]: {
+    title: 'History',
+    defaultPosition: { x: window.innerWidth - 380, y: 80 },
+    defaultSize: { width: 360, height: 500 },
+    minSize: { width: 320, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

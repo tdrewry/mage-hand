@@ -11,6 +11,7 @@ export interface Command {
   undo: () => void;
   type: string; // For debugging/logging
   description?: string; // Human-readable description
+  timestamp?: number; // When the command was executed
 }
 
 export class UndoRedoManager {
@@ -24,6 +25,9 @@ export class UndoRedoManager {
    * Execute a command and add it to undo history
    */
   execute(command: Command): void {
+    // Add timestamp
+    command.timestamp = Date.now();
+    
     command.execute();
     this.undoStack.push(command);
     
@@ -127,6 +131,69 @@ export class UndoRedoManager {
       canUndo: this.canUndo(),
       canRedo: this.canRedo(),
     };
+  }
+
+  /**
+   * Get the complete undo history for display
+   */
+  getUndoHistory(): Command[] {
+    return [...this.undoStack];
+  }
+
+  /**
+   * Get the complete redo history for display
+   */
+  getRedoHistory(): Command[] {
+    return [...this.redoStack];
+  }
+
+  /**
+   * Undo multiple commands to reach a specific point in history
+   * @param targetIndex - Index in undo stack to revert to (0 = oldest, length-1 = newest)
+   */
+  undoToIndex(targetIndex: number): boolean {
+    if (targetIndex < 0 || targetIndex >= this.undoStack.length) {
+      return false;
+    }
+
+    // Undo from current position back to target
+    const currentIndex = this.undoStack.length - 1;
+    const stepsToUndo = currentIndex - targetIndex;
+
+    for (let i = 0; i < stepsToUndo; i++) {
+      const command = this.undoStack.pop();
+      if (!command) break;
+      
+      command.undo();
+      this.redoStack.push(command);
+    }
+
+    this.notifyListeners();
+    return true;
+  }
+
+  /**
+   * Redo multiple commands to reach a specific point in future history
+   * @param targetIndex - Index in redo stack to advance to
+   */
+  redoToIndex(targetIndex: number): boolean {
+    if (targetIndex < 0 || targetIndex >= this.redoStack.length) {
+      return false;
+    }
+
+    // Redo from current position forward to target
+    const stepsToRedo = this.redoStack.length - targetIndex;
+
+    for (let i = 0; i < stepsToRedo; i++) {
+      const command = this.redoStack.pop();
+      if (!command) break;
+      
+      command.execute();
+      this.undoStack.push(command);
+    }
+
+    this.notifyListeners();
+    return true;
   }
 }
 
