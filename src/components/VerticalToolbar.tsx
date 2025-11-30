@@ -19,6 +19,8 @@ import {
   Users,
   Grid2x2X,
   Grid3X3,
+  Undo,
+  Redo,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -29,6 +31,7 @@ import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface VerticalToolbarProps {
   mode: 'edit' | 'play';
@@ -69,6 +72,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const { clearAllTokens } = useSessionStore();
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
+  const { undo, redo, canUndo, canRedo } = useUndoRedo();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -335,6 +339,26 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="sm"
           />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Undo}
+            label="Undo (Ctrl+Z)"
+            onClick={undo}
+            disabled={!canUndo}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarButton
+            icon={Redo}
+            label="Redo (Ctrl+Shift+Z)"
+            onClick={redo}
+            disabled={!canRedo}
+            variant="ghost"
+            size="sm"
+          />
         </>
       ) : (
         <>
@@ -415,6 +439,26 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Manage Layers"
             onClick={handleToggleLayerCard}
             isActive={layerCard?.isVisible}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Undo}
+            label="Undo (Ctrl+Z)"
+            onClick={undo}
+            disabled={!canUndo}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarButton
+            icon={Redo}
+            label="Redo (Ctrl+Shift+Z)"
+            onClick={redo}
+            disabled={!canRedo}
             variant="ghost"
             size="sm"
           />
