@@ -4404,9 +4404,6 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Track final state for region transform undo registration
-    let regionFinalState: Partial<CanvasRegion> | null = null;
-    
     // Handle freehand drawing completion
     if (isFreehandDrawing && pathDrawingMode === "drawing" && pathDrawingType === "freehand") {
       setIsFreehandDrawing(false);
@@ -4489,7 +4486,7 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
 
-      // Apply final positions for region drag preview
+      // Apply final positions for region drag preview (visual only; undo handled below)
       if (dragPreview && draggedRegionId && !isTransforming) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
@@ -4514,7 +4511,6 @@ export const SimpleTabletop = () => {
             };
             
             updateRegion(draggedRegionId, finalState);
-            regionFinalState = finalState;
           } else {
             finalState = {
               x: dragPreview.x,
@@ -4526,7 +4522,6 @@ export const SimpleTabletop = () => {
             };
             
             updateRegion(draggedRegionId, finalState);
-            regionFinalState = finalState;
           }
         }
       }
@@ -4551,15 +4546,9 @@ export const SimpleTabletop = () => {
         const currentRegion = regions.find((r) => r.id === draggedRegionId);
         const newRotation = (currentRegion?.rotation || 0) + rotationDelta;
         
-        const rotationUpdate = {
+        updateRegion(draggedRegionId, {
           rotation: newRotation,
-        };
-        updateRegion(draggedRegionId, rotationUpdate);
-        
-        // Store final state for undo
-        if (!regionFinalState) {
-          regionFinalState = { ...currentRegion, ...rotationUpdate };
-        }
+        });
       }
 
       // Clear rotation state
@@ -4607,7 +4596,6 @@ export const SimpleTabletop = () => {
         };
 
         updateRegion(draggedRegionId, updates);
-        regionFinalState = updates;
       }
 
       // Clear transformation state
@@ -4621,13 +4609,18 @@ export const SimpleTabletop = () => {
 
     // Unified region transform undo registration
     // Handles move, scale, rotate - all region spatial changes
-    // Uses the computed final state, not store reads (avoids async issues)
-    if (initialRegionState && transformingRegionId && regionFinalState) {
-      // Only register if something actually changed
-      if (hasTransformChanged(initialRegionState, regionFinalState)) {
-        transformRegionUndoable(transformingRegionId, initialRegionState, regionFinalState);
+    // MUST run AFTER all region updates have been applied above
+    if (initialRegionState && transformingRegionId) {
+      const currentRegion = regions.find((r) => r.id === transformingRegionId);
+      if (currentRegion) {
+        const currentState = captureRegionTransformState(currentRegion);
+
+        // Only register if something actually changed
+        if (hasTransformChanged(initialRegionState, currentState)) {
+          transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+        }
       }
-      
+
       // Always cleanup
       setInitialRegionState(null);
       setTransformingRegionId(null);
