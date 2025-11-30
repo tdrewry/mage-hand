@@ -21,15 +21,12 @@ import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { CardType } from '@/types/cardTypes';
-import { TransformMode } from '@/components/RegionControlPanel';
 
 interface CardManagerProps {
   children?: React.ReactNode;
   sessionId?: string;
   toolsCardProps?: any; // Keep for backward compatibility but not used
   activeRegionId?: string | null;
-  transformMode?: TransformMode;
-  onTransformModeChange?: (mode: TransformMode) => void;
   onToggleSnapping?: (id: string) => void;
   onToggleGridVisibility?: (id: string) => void;
 }
@@ -39,8 +36,6 @@ export function CardManager({
   sessionId, 
   toolsCardProps,
   activeRegionId,
-  transformMode = 'move',
-  onTransformModeChange = () => {},
   onToggleSnapping = () => {},
   onToggleGridVisibility = () => {}
 }: CardManagerProps) {
@@ -92,8 +87,6 @@ export function CardManager({
           handleAddToken, 
           sessionId,
           activeRegionId,
-          transformMode,
-          onTransformModeChange,
           onToggleSnapping,
           onToggleGridVisibility
         );
@@ -149,8 +142,6 @@ function renderCardContent(
   addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
   sessionId?: string,
   activeRegionId?: string | null,
-  transformMode?: TransformMode,
-  onTransformModeChange?: (mode: TransformMode) => void,
   onToggleSnapping?: (id: string) => void,
   onToggleGridVisibility?: (id: string) => void
 ): React.ReactNode {
@@ -199,10 +190,8 @@ function renderCardContent(
       return (
         <RegionControlsCardContent 
           regionId={activeRegionId || null}
-          transformMode={transformMode || 'move'}
-          onTransformModeChange={onTransformModeChange || (() => {})}
-          onToggleSnapping={onToggleSnapping || (() => {})}
-          onToggleGridVisibility={onToggleGridVisibility || (() => {})}
+          onToggleSnapping={onToggleSnapping}
+          onToggleGridVisibility={onToggleGridVisibility}
         />
       );
     case CardType.VISION_PROFILE_MANAGER:
