@@ -56,7 +56,7 @@ export const useHatchingStore = create<HatchingStore>()(
     }),
     {
       name: 'hatching-store',
-      version: 3, // Bump version for outerFade and offset options
+      version: 4, // Bump version for skipDepth option
     }
   )
 );

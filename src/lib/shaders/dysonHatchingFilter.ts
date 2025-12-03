@@ -20,6 +20,7 @@ export interface DysonHatchingOptions {
   insideThreshold?: number; // Alpha threshold for inside detection
   zoom?: number;            // Current zoom level for scaling
   outerFade?: number;       // Fade amount at outer edge (0-1, 0 = no fade)
+  skipDepth?: number;       // Depth from outer edge where random cluster skipping applies (0-1)
   offsetX?: number;         // Canvas pan offset X for world-space coords
   offsetY?: number;         // Canvas pan offset Y for world-space coords
 }
@@ -38,6 +39,7 @@ export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
   insideThreshold: 0.5,
   zoom: 1.0,
   outerFade: 0.4,
+  skipDepth: 0.3,
   offsetX: 0,
   offsetY: 0,
 };
@@ -83,6 +85,7 @@ uniform float uLineAlpha;
 uniform float uInsideThreshold;
 uniform float uZoom;
 uniform float uOuterFade;
+uniform float uSkipDepth;
 uniform vec2 uOffset;
 
 #define PI 3.14159265359
@@ -240,6 +243,29 @@ void main() {
     return;
   }
 
+  // Convert screen coords to world coords by subtracting canvas offset
+  vec2 worldP = vTextureCoord * uInputSize.xy - uOffset;
+  
+  // Random cluster skip at outer edges
+  if (uSkipDepth > 0.0) {
+    float skipThreshold = 1.0 - uSkipDepth;  // e.g., 0.3 depth means skip applies when band < 0.7
+    if (band < skipThreshold) {
+      // Calculate skip probability - higher at outer edge (band=0), lower near skipThreshold
+      float skipProbability = 1.0 - (band / skipThreshold);
+      skipProbability = skipProbability * skipProbability;  // Square for more natural falloff
+      
+      // Use cluster cell for consistent skip per cluster (not per pixel)
+      float scaledClusterSize = uClusterSize * uZoom;
+      vec2 cell = floor(worldP / scaledClusterSize);
+      float skipRand = hash12(cell + 17.31);  // Different seed than angle
+      
+      if (skipRand < skipProbability) {
+        finalColor = vec4(0.0, 0.0, 0.0, 0.0);
+        return;
+      }
+    }
+  }
+
   // Apply distance-based fade at outer edge
   float fadeFactor = 1.0;
   if (uOuterFade > 0.0) {
@@ -248,8 +274,6 @@ void main() {
     fadeFactor = smoothstep(0.0, fadeThreshold, band);
   }
 
-  // Convert screen coords to world coords by subtracting canvas offset
-  vec2 worldP = vTextureCoord * uInputSize.xy - uOffset;
   float hatch = clusterHatching(worldP);
   
   float mask = fadeFactor * hatch * uLineAlpha;
@@ -300,6 +324,7 @@ export class DysonHatchingFilter extends PIXI.Filter {
           uInsideThreshold: { value: options.insideThreshold, type: 'f32' },
           uZoom: { value: options.zoom, type: 'f32' },
           uOuterFade: { value: options.outerFade, type: 'f32' },
+          uSkipDepth: { value: options.skipDepth, type: 'f32' },
           uOffset: { value: new Float32Array([options.offsetX, options.offsetY]), type: 'vec2<f32>' },
         },
       },
@@ -459,8 +484,17 @@ export class DysonHatchingFilter extends PIXI.Filter {
     if (opts.insideThreshold !== undefined) this.insideThreshold = opts.insideThreshold;
     if (opts.zoom !== undefined) this.zoom = opts.zoom;
     if (opts.outerFade !== undefined) this.outerFade = opts.outerFade;
+    if (opts.skipDepth !== undefined) this.skipDepth = opts.skipDepth;
     if (opts.offsetX !== undefined) this.offsetX = opts.offsetX;
     if (opts.offsetY !== undefined) this.offsetY = opts.offsetY;
+  }
+
+  get skipDepth(): number {
+    return this._options.skipDepth;
+  }
+  set skipDepth(value: number) {
+    this._options.skipDepth = Math.max(0, Math.min(1, value));
+    this.resources.dysonUniforms.uniforms.uSkipDepth = this._options.skipDepth;
   }
 }
 
@@ -480,6 +514,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     inkColor: 0x000000,
     lineAlpha: 1.0,
     outerFade: 0.4,
+    skipDepth: 0.3,
   },
   'Light Sketch': {
     radius: 16,
@@ -493,6 +528,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     inkColor: 0x333333,
     lineAlpha: 0.8,
     outerFade: 0.5,
+    skipDepth: 0.4,
   },
   'Dense Cave': {
     radius: 28,
@@ -506,6 +542,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     inkColor: 0x000000,
     lineAlpha: 1.0,
     outerFade: 0.3,
+    skipDepth: 0.2,
   },
   'Heavy Ink': {
     radius: 24,
@@ -519,6 +556,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     inkColor: 0x000000,
     lineAlpha: 1.0,
     outerFade: 0.35,
+    skipDepth: 0.25,
   },
   'Stonework': {
     radius: 18,
@@ -532,5 +570,6 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     inkColor: 0x444444,
     lineAlpha: 0.9,
     outerFade: 0.45,
+    skipDepth: 0.35,
   },
 };
