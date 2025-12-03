@@ -10,6 +10,13 @@ import { HATCHING_PRESETS } from '@/lib/shaders/dysonHatchingFilter';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { EDGE_STYLES, type WallEdgeStyle } from '@/lib/wallTexturePatterns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 export const StylesCardContent: React.FC = () => {
   const { 
@@ -101,10 +108,32 @@ export const StylesCardContent: React.FC = () => {
 
             {/* Hatching Controls */}
             <div className="space-y-3">
+              {/* Stroke Count */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Strokes per Cluster</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.strokeCount} lines</span>
+                </div>
+                <Select
+                  value={String(hatchingOptions.strokeCount)}
+                  onValueChange={(value) => setHatchingOptions({ strokeCount: parseInt(value) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Lines (Light)</SelectItem>
+                    <SelectItem value="3">3 Lines (Classic)</SelectItem>
+                    <SelectItem value="4">4 Lines (Dense)</SelectItem>
+                    <SelectItem value="5">5 Lines (Heavy)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Radius */}
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <Label className="text-xs">Radius</Label>
+                  <Label className="text-xs">Edge Radius</Label>
                   <span className="text-xs text-muted-foreground">{hatchingOptions.radius}px</span>
                 </div>
                 <Slider
@@ -117,34 +146,66 @@ export const StylesCardContent: React.FC = () => {
                 />
               </div>
 
-              {/* Angle */}
+              {/* Cluster Size */}
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <Label className="text-xs">Angle</Label>
-                  <span className="text-xs text-muted-foreground">{hatchingOptions.angleDeg}°</span>
+                  <Label className="text-xs">Cluster Size</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.clusterSize}px</span>
                 </div>
                 <Slider
-                  value={[hatchingOptions.angleDeg]}
-                  onValueChange={([value]) => setHatchingOptions({ angleDeg: value })}
-                  min={0}
-                  max={180}
-                  step={5}
+                  value={[hatchingOptions.clusterSize]}
+                  onValueChange={([value]) => setHatchingOptions({ clusterSize: value })}
+                  min={6}
+                  max={30}
+                  step={1}
                   className="w-full"
                 />
               </div>
 
-              {/* Density (Group Spacing) */}
+              {/* Stroke Length */}
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <Label className="text-xs">Density</Label>
-                  <span className="text-xs text-muted-foreground">{hatchingOptions.groupSpacing}px</span>
+                  <Label className="text-xs">Stroke Length</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.strokeLength}px</span>
                 </div>
                 <Slider
-                  value={[hatchingOptions.groupSpacing]}
-                  onValueChange={([value]) => setHatchingOptions({ groupSpacing: value })}
+                  value={[hatchingOptions.strokeLength]}
+                  onValueChange={([value]) => setHatchingOptions({ strokeLength: value })}
                   min={4}
-                  max={20}
+                  max={24}
                   step={1}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Length Variation */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Length Variation</Label>
+                  <span className="text-xs text-muted-foreground">{Math.round(hatchingOptions.lengthVariation * 100)}%</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.lengthVariation]}
+                  onValueChange={([value]) => setHatchingOptions({ lengthVariation: value })}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Line Gap */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Line Gap</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.lineGap.toFixed(1)}px</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.lineGap]}
+                  onValueChange={([value]) => setHatchingOptions({ lineGap: value })}
+                  min={1}
+                  max={5}
+                  step={0.1}
                   className="w-full"
                 />
               </div>

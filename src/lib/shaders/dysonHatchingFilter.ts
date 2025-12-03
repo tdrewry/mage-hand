@@ -1,18 +1,19 @@
 /**
  * Dyson-Style Hatching Filter for PixiJS v8
- * Creates Dyson Logos-inspired triplet hatching around region edges
+ * Creates authentic Dyson Logos-inspired hatching with per-cluster random angles
+ * Based on Watabou's implementation using Poisson disk sampling concept
  */
 
 import * as PIXI from 'pixi.js';
 
 export interface DysonHatchingOptions {
   radius?: number;          // Max distance from edge (px) - in world space
-  angleDeg?: number;        // Hatching angle (degrees)
-  groupSpacing?: number;    // Distance between triplet groups (px) - in world space
-  lineGap?: number;         // Gap between lines in triplet (px)
+  clusterSize?: number;     // Size of each hatching cluster (px) - in world space
+  strokeCount?: number;     // Number of strokes per cluster (2-5)
+  lineGap?: number;         // Gap between lines in cluster (px)
   lineWidth?: number;       // Stroke width (px)
-  segmentLength?: number;   // Length of each stroke segment (px) - in world space
-  segmentSpacing?: number;  // Gap between segments (px) - in world space
+  strokeLength?: number;    // Base length of strokes (px) - in world space
+  lengthVariation?: number; // How much stroke lengths vary (0-1, center longer)
   jitter?: number;          // Hand-drawn wobble amount (px)
   inkColor?: number;        // Hex color (e.g., 0x000000)
   lineAlpha?: number;       // Opacity (0-1)
@@ -21,138 +22,19 @@ export interface DysonHatchingOptions {
 }
 
 export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
-  radius: 18,
-  angleDeg: 45,
-  groupSpacing: 10,
-  lineGap: 1.6,
-  lineWidth: 0.9,
-  segmentLength: 10,
-  segmentSpacing: 6,
-  jitter: 1.5,
+  radius: 20,
+  clusterSize: 14,
+  strokeCount: 3,
+  lineGap: 2.0,
+  lineWidth: 0.8,
+  strokeLength: 12,
+  lengthVariation: 0.35,
+  jitter: 1.2,
   inkColor: 0x000000,
   lineAlpha: 1.0,
   insideThreshold: 0.5,
   zoom: 1.0,
 };
-
-// Fragment shader for Dyson-style hatching (PixiJS v8 compatible)
-const fragmentShader = /* wgsl */ `
-struct DysonUniforms {
-  uRadius: f32,
-  uAngle: f32,
-  uGroupSpacing: f32,
-  uLineGap: f32,
-  uLineWidth: f32,
-  uSegmentLength: f32,
-  uSegmentSpacing: f32,
-  uJitter: f32,
-  uInkColor: vec3<f32>,
-  uLineAlpha: f32,
-  uInsideThreshold: f32,
-};
-
-@group(0) @binding(1) var uTexture: texture_2d<f32>;
-@group(0) @binding(2) var uSampler: sampler;
-@group(1) @binding(0) var<uniform> dysonUniforms: DysonUniforms;
-@group(2) @binding(0) var<uniform> uInputSize: vec4<f32>;
-
-fn hash12(p: vec2<f32>) -> f32 {
-  var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-  p3 = p3 + dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-fn edgeBandMask(uv: vec2<f32>) -> f32 {
-  let centerAlpha = textureSample(uTexture, uSampler, uv).a;
-  if (centerAlpha > dysonUniforms.uInsideThreshold) {
-    return 0.0;
-  }
-
-  let resolution = uInputSize.xy;
-  var found = 0.0;
-
-  for (var i = 1; i <= 32; i = i + 1) {
-    let fi = f32(i);
-    if (fi > dysonUniforms.uRadius) {
-      break;
-    }
-
-    let off = vec2<f32>(fi) / resolution;
-
-    let a1 = textureSample(uTexture, uSampler, uv + vec2<f32>(off.x, 0.0)).a;
-    let a2 = textureSample(uTexture, uSampler, uv - vec2<f32>(off.x, 0.0)).a;
-    let a3 = textureSample(uTexture, uSampler, uv + vec2<f32>(0.0, off.y)).a;
-    let a4 = textureSample(uTexture, uSampler, uv - vec2<f32>(0.0, off.y)).a;
-
-    let anyInside = max(max(a1, a2), max(a3, a4));
-    if (anyInside > dysonUniforms.uInsideThreshold) {
-      found = 1.0;
-    }
-  }
-
-  return found;
-}
-
-fn tripletHatching(p: vec2<f32>) -> f32 {
-  let dir = vec2<f32>(cos(dysonUniforms.uAngle), sin(dysonUniforms.uAngle));
-  let perp = vec2<f32>(-dir.y, dir.x);
-
-  var s = dot(p, dir);
-  var t = dot(p, perp);
-
-  let cellSize = dysonUniforms.uGroupSpacing * 1.5;
-  let cell = floor(p / cellSize);
-  let n = hash12(cell);
-
-  let jitter = (n - 0.5) * dysonUniforms.uJitter;
-  t = t + jitter;
-  s = s + jitter * 0.7;
-
-  let groupSize = dysonUniforms.uGroupSpacing;
-  let localT = t % groupSize;
-
-  let center = groupSize * 0.5;
-  let offset = dysonUniforms.uLineGap;
-  let halfW = dysonUniforms.uLineWidth;
-
-  let d1 = abs(localT - (center - offset));
-  let d2 = abs(localT - center);
-  let d3 = abs(localT - (center + offset));
-
-  let line1 = 1.0 - smoothstep(halfW, halfW + 1.0, d1);
-  let line2 = 1.0 - smoothstep(halfW, halfW + 1.0, d2);
-  let line3 = 1.0 - smoothstep(halfW, halfW + 1.0, d3);
-
-  let linesMask = max(line1, max(line2, line3));
-
-  let period = dysonUniforms.uSegmentLength + dysonUniforms.uSegmentSpacing;
-  let segPos = (s + n * period * 0.5) % period;
-  var segMask = 0.0;
-  if (segPos < dysonUniforms.uSegmentLength) {
-    segMask = 1.0;
-  }
-
-  return linesMask * segMask;
-}
-
-@fragment
-fn main(@builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-  let src = textureSample(uTexture, uSampler, uv);
-
-  let band = edgeBandMask(uv);
-
-  if (band <= 0.0) {
-    return src;
-  }
-
-  let p = uv * uInputSize.xy;
-  let hatch = tripletHatching(p);
-  let mask = band * hatch * dysonUniforms.uLineAlpha;
-
-  let color = mix(src.rgb, dysonUniforms.uInkColor, mask);
-  return vec4<f32>(color, src.a);
-}
-`;
 
 // GLSL vertex shader for WebGL (PixiJS v8)
 const glslVertexShader = /* glsl */ `
@@ -172,8 +54,7 @@ void main(void) {
 }
 `;
 
-// GLSL fragment shader for WebGL (PixiJS v8)
-// Fixed: 8-direction edge sampling for corners, zoom-aware scaling
+// GLSL fragment shader - Authentic Dyson/Watabou style hatching
 const glslFragmentShader = /* glsl */ `
 precision highp float;
 
@@ -184,22 +65,31 @@ uniform sampler2D uTexture;
 uniform vec4 uInputSize;
 
 uniform float uRadius;
-uniform float uAngle;
-uniform float uGroupSpacing;
+uniform float uClusterSize;
+uniform float uStrokeCount;
 uniform float uLineGap;
 uniform float uLineWidth;
-uniform float uSegmentLength;
-uniform float uSegmentSpacing;
+uniform float uStrokeLength;
+uniform float uLengthVariation;
 uniform float uJitter;
 uniform vec3 uInkColor;
 uniform float uLineAlpha;
 uniform float uInsideThreshold;
 uniform float uZoom;
 
+#define PI 3.14159265359
+
+// Hash functions for procedural randomness
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
+}
+
+vec2 hash22(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
 }
 
 // 8-direction edge detection for proper corner handling
@@ -220,7 +110,7 @@ float edgeBandMask(vec2 uv) {
     if (fi > scaledRadius) break;
 
     vec2 off = vec2(fi) / resolution;
-    float diagOff = fi * 0.7071 / resolution.x; // sqrt(2)/2 for diagonal
+    float diagOff = fi * 0.7071 / resolution.x;
 
     // Cardinal directions
     float a1 = texture(uTexture, uv + vec2(off.x, 0.0)).a;
@@ -243,53 +133,80 @@ float edgeBandMask(vec2 uv) {
   return found;
 }
 
-float tripletHatching(vec2 p) {
-  vec2 dir = vec2(cos(uAngle), sin(uAngle));
-  vec2 perp = vec2(-dir.y, dir.x);
-
-  float s = dot(p, dir);
-  float t = dot(p, perp);
-
-  // Scale spacing by zoom to maintain consistent world-space size
-  float scaledGroupSpacing = uGroupSpacing * uZoom;
-  float scaledSegmentLength = uSegmentLength * uZoom;
-  float scaledSegmentSpacing = uSegmentSpacing * uZoom;
+// Authentic Dyson-style cluster hatching with per-cluster random angles
+float clusterHatching(vec2 p) {
+  // Scale all parameters by zoom for world-space consistency
+  float scaledClusterSize = uClusterSize * uZoom;
+  float scaledStrokeLength = uStrokeLength * uZoom;
   float scaledJitter = uJitter * uZoom;
   float scaledLineGap = uLineGap * uZoom;
   float scaledLineWidth = uLineWidth * uZoom;
-
-  float cellSize = scaledGroupSpacing * 1.5;
-  vec2 cell = floor(p / cellSize);
-  float n = hash12(cell);
-
-  float jitter = (n - 0.5) * scaledJitter;
-  t += jitter;
-  s += jitter * 0.7;
-
-  float groupSize = scaledGroupSpacing;
-  float localT = mod(t, groupSize);
-
-  float center = groupSize * 0.5;
-  float offset = scaledLineGap;
-  float halfW = scaledLineWidth;
-
-  float d1 = abs(localT - (center - offset));
-  float d2 = abs(localT - center);
-  float d3 = abs(localT - (center + offset));
-
-  // Smoother anti-aliasing that scales with zoom
+  
+  // Determine which cluster cell we're in
+  vec2 cell = floor(p / scaledClusterSize);
+  vec2 cellCenter = (cell + 0.5) * scaledClusterSize;
+  
+  // Get random values for this cluster
+  vec2 rnd = hash22(cell);
+  
+  // Per-cluster random angle (full 180° range for variety)
+  float clusterAngle = rnd.x * PI;
+  
+  // Direction vectors for this cluster's orientation
+  vec2 dir = vec2(cos(clusterAngle), sin(clusterAngle));
+  vec2 perp = vec2(-dir.y, dir.x);
+  
+  // Transform point into cluster's local coordinate space
+  vec2 localP = p - cellCenter;
+  
+  // Add position jitter based on cluster hash
+  float jitterX = (rnd.y - 0.5) * scaledJitter;
+  float jitterY = (hash12(cell + 100.0) - 0.5) * scaledJitter;
+  localP += vec2(jitterX, jitterY);
+  
+  // Project onto cluster's local axes
+  float s = dot(localP, dir);   // Along stroke direction
+  float t = dot(localP, perp);  // Perpendicular to strokes
+  
+  // Draw N strokes with varying lengths (center longest)
+  float mask = 0.0;
+  int strokeCount = int(uStrokeCount);
+  float halfCount = float(strokeCount - 1) * 0.5;
+  
+  // Anti-aliasing scaled with zoom
   float aa = max(0.5, 1.0 / uZoom);
-  float line1 = 1.0 - smoothstep(halfW, halfW + aa, d1);
-  float line2 = 1.0 - smoothstep(halfW, halfW + aa, d2);
-  float line3 = 1.0 - smoothstep(halfW, halfW + aa, d3);
-
-  float linesMask = max(line1, max(line2, line3));
-
-  float period = scaledSegmentLength + scaledSegmentSpacing;
-  float segPos = mod(s + n * period * 0.5, period);
-  float segMask = step(segPos, scaledSegmentLength);
-
-  return linesMask * segMask;
+  
+  for (int i = 0; i < 5; i++) {
+    if (i >= strokeCount) break;
+    
+    float fi = float(i);
+    
+    // Calculate perpendicular offset for this stroke
+    float strokeOffset = (fi - halfCount) * scaledLineGap;
+    
+    // Calculate length variation - center stroke longest, edges shorter
+    float normalizedPos = abs(fi - halfCount) / max(halfCount, 0.5);
+    float lengthScale = 1.0 - normalizedPos * uLengthVariation;
+    float currentStrokeLen = scaledStrokeLength * lengthScale;
+    
+    // Add slight length jitter per stroke using hash
+    float lengthJitter = hash12(cell + vec2(fi * 7.0, fi * 13.0));
+    currentStrokeLen *= 0.85 + lengthJitter * 0.3;
+    
+    // Distance from this stroke line
+    float d = abs(t - strokeOffset);
+    
+    // Stroke line mask with anti-aliasing
+    float lineMask = 1.0 - smoothstep(scaledLineWidth * 0.5, scaledLineWidth * 0.5 + aa, d);
+    
+    // Stroke length mask - check if we're within the stroke segment
+    float segMask = 1.0 - smoothstep(currentStrokeLen * 0.5 - aa, currentStrokeLen * 0.5 + aa, abs(s));
+    
+    // Combine
+    mask = max(mask, lineMask * segMask);
+  }
+  
+  return mask;
 }
 
 void main() {
@@ -304,7 +221,7 @@ void main() {
   }
 
   vec2 p = vTextureCoord * uInputSize.xy;
-  float hatch = tripletHatching(p);
+  float hatch = clusterHatching(p);
   float mask = band * hatch * uLineAlpha;
 
   // Only output ink where hatching is drawn, fully transparent elsewhere
@@ -317,7 +234,7 @@ void main() {
 `;
 
 /**
- * PixiJS v8 Filter for Dyson-style hatching effect
+ * PixiJS v8 Filter for authentic Dyson-style hatching effect
  */
 export class DysonHatchingFilter extends PIXI.Filter {
   private _options: Required<DysonHatchingOptions>;
@@ -341,12 +258,12 @@ export class DysonHatchingFilter extends PIXI.Filter {
       resources: {
         dysonUniforms: {
           uRadius: { value: options.radius, type: 'f32' },
-          uAngle: { value: (options.angleDeg * Math.PI) / 180, type: 'f32' },
-          uGroupSpacing: { value: options.groupSpacing, type: 'f32' },
+          uClusterSize: { value: options.clusterSize, type: 'f32' },
+          uStrokeCount: { value: options.strokeCount, type: 'f32' },
           uLineGap: { value: options.lineGap, type: 'f32' },
           uLineWidth: { value: options.lineWidth, type: 'f32' },
-          uSegmentLength: { value: options.segmentLength, type: 'f32' },
-          uSegmentSpacing: { value: options.segmentSpacing, type: 'f32' },
+          uStrokeLength: { value: options.strokeLength, type: 'f32' },
+          uLengthVariation: { value: options.lengthVariation, type: 'f32' },
           uJitter: { value: options.jitter, type: 'f32' },
           uInkColor: { value: new Float32Array([r, g, b]), type: 'vec3<f32>' },
           uLineAlpha: { value: options.lineAlpha, type: 'f32' },
@@ -367,20 +284,20 @@ export class DysonHatchingFilter extends PIXI.Filter {
     this.resources.dysonUniforms.uniforms.uRadius = value;
   }
 
-  get angleDeg(): number {
-    return this._options.angleDeg;
+  get clusterSize(): number {
+    return this._options.clusterSize;
   }
-  set angleDeg(value: number) {
-    this._options.angleDeg = value;
-    this.resources.dysonUniforms.uniforms.uAngle = (value * Math.PI) / 180;
+  set clusterSize(value: number) {
+    this._options.clusterSize = value;
+    this.resources.dysonUniforms.uniforms.uClusterSize = value;
   }
 
-  get groupSpacing(): number {
-    return this._options.groupSpacing;
+  get strokeCount(): number {
+    return this._options.strokeCount;
   }
-  set groupSpacing(value: number) {
-    this._options.groupSpacing = value;
-    this.resources.dysonUniforms.uniforms.uGroupSpacing = value;
+  set strokeCount(value: number) {
+    this._options.strokeCount = Math.max(2, Math.min(5, Math.round(value)));
+    this.resources.dysonUniforms.uniforms.uStrokeCount = this._options.strokeCount;
   }
 
   get lineGap(): number {
@@ -399,20 +316,20 @@ export class DysonHatchingFilter extends PIXI.Filter {
     this.resources.dysonUniforms.uniforms.uLineWidth = value;
   }
 
-  get segmentLength(): number {
-    return this._options.segmentLength;
+  get strokeLength(): number {
+    return this._options.strokeLength;
   }
-  set segmentLength(value: number) {
-    this._options.segmentLength = value;
-    this.resources.dysonUniforms.uniforms.uSegmentLength = value;
+  set strokeLength(value: number) {
+    this._options.strokeLength = value;
+    this.resources.dysonUniforms.uniforms.uStrokeLength = value;
   }
 
-  get segmentSpacing(): number {
-    return this._options.segmentSpacing;
+  get lengthVariation(): number {
+    return this._options.lengthVariation;
   }
-  set segmentSpacing(value: number) {
-    this._options.segmentSpacing = value;
-    this.resources.dysonUniforms.uniforms.uSegmentSpacing = value;
+  set lengthVariation(value: number) {
+    this._options.lengthVariation = Math.max(0, Math.min(1, value));
+    this.resources.dysonUniforms.uniforms.uLengthVariation = this._options.lengthVariation;
   }
 
   get jitter(): number {
@@ -463,12 +380,12 @@ export class DysonHatchingFilter extends PIXI.Filter {
    */
   updateOptions(opts: Partial<DysonHatchingOptions>): void {
     if (opts.radius !== undefined) this.radius = opts.radius;
-    if (opts.angleDeg !== undefined) this.angleDeg = opts.angleDeg;
-    if (opts.groupSpacing !== undefined) this.groupSpacing = opts.groupSpacing;
+    if (opts.clusterSize !== undefined) this.clusterSize = opts.clusterSize;
+    if (opts.strokeCount !== undefined) this.strokeCount = opts.strokeCount;
     if (opts.lineGap !== undefined) this.lineGap = opts.lineGap;
     if (opts.lineWidth !== undefined) this.lineWidth = opts.lineWidth;
-    if (opts.segmentLength !== undefined) this.segmentLength = opts.segmentLength;
-    if (opts.segmentSpacing !== undefined) this.segmentSpacing = opts.segmentSpacing;
+    if (opts.strokeLength !== undefined) this.strokeLength = opts.strokeLength;
+    if (opts.lengthVariation !== undefined) this.lengthVariation = opts.lengthVariation;
     if (opts.jitter !== undefined) this.jitter = opts.jitter;
     if (opts.inkColor !== undefined) this.inkColor = opts.inkColor;
     if (opts.lineAlpha !== undefined) this.lineAlpha = opts.lineAlpha;
@@ -478,67 +395,67 @@ export class DysonHatchingFilter extends PIXI.Filter {
 }
 
 /**
- * Preset hatching styles
+ * Preset hatching styles - authentic Dyson/Watabou variations
  */
 export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
   'Dyson Classic': {
-    radius: 18,
-    angleDeg: 45,
-    groupSpacing: 10,
-    lineGap: 1.6,
-    lineWidth: 0.9,
-    segmentLength: 10,
-    segmentSpacing: 6,
-    jitter: 1.5,
+    radius: 20,
+    clusterSize: 14,
+    strokeCount: 3,
+    lineGap: 2.0,
+    lineWidth: 0.8,
+    strokeLength: 12,
+    lengthVariation: 0.35,
+    jitter: 1.2,
     inkColor: 0x000000,
     lineAlpha: 1.0,
   },
-  'Dense Sketch': {
-    radius: 24,
-    angleDeg: 30,
-    groupSpacing: 6,
-    lineGap: 1.2,
-    lineWidth: 0.7,
-    segmentLength: 8,
-    segmentSpacing: 4,
-    jitter: 2.0,
-    inkColor: 0x222222,
-    lineAlpha: 0.9,
-  },
-  'Light Touch': {
-    radius: 12,
-    angleDeg: 60,
-    groupSpacing: 14,
-    lineGap: 2.0,
+  'Light Sketch': {
+    radius: 16,
+    clusterSize: 18,
+    strokeCount: 2,
+    lineGap: 2.5,
     lineWidth: 0.6,
-    segmentLength: 12,
-    segmentSpacing: 8,
-    jitter: 0.8,
+    strokeLength: 10,
+    lengthVariation: 0.5,
+    jitter: 1.5,
     inkColor: 0x333333,
-    lineAlpha: 0.7,
+    lineAlpha: 0.8,
+  },
+  'Dense Cave': {
+    radius: 28,
+    clusterSize: 10,
+    strokeCount: 4,
+    lineGap: 1.5,
+    lineWidth: 0.7,
+    strokeLength: 8,
+    lengthVariation: 0.25,
+    jitter: 1.0,
+    inkColor: 0x000000,
+    lineAlpha: 1.0,
+  },
+  'Heavy Ink': {
+    radius: 24,
+    clusterSize: 12,
+    strokeCount: 5,
+    lineGap: 1.8,
+    lineWidth: 1.0,
+    strokeLength: 10,
+    lengthVariation: 0.3,
+    jitter: 0.8,
+    inkColor: 0x000000,
+    lineAlpha: 1.0,
   },
   'Stonework': {
-    radius: 20,
-    angleDeg: 90,
-    groupSpacing: 8,
-    lineGap: 1.4,
-    lineWidth: 1.0,
-    segmentLength: 6,
-    segmentSpacing: 4,
-    jitter: 0.5,
-    inkColor: 0x2C241D,
-    lineAlpha: 0.85,
-  },
-  'Cave': {
-    radius: 28,
-    angleDeg: 35,
-    groupSpacing: 12,
-    lineGap: 2.5,
-    lineWidth: 1.2,
-    segmentLength: 14,
-    segmentSpacing: 10,
-    jitter: 3.0,
-    inkColor: 0x1a1a1a,
-    lineAlpha: 0.75,
+    radius: 18,
+    clusterSize: 16,
+    strokeCount: 3,
+    lineGap: 2.2,
+    lineWidth: 0.9,
+    strokeLength: 14,
+    lengthVariation: 0.4,
+    jitter: 2.0,
+    inkColor: 0x444444,
+    lineAlpha: 0.9,
   },
 };
