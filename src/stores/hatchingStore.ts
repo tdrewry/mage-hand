@@ -56,7 +56,7 @@ export const useHatchingStore = create<HatchingStore>()(
     }),
     {
       name: 'hatching-store',
-      version: 1,
+      version: 2, // Bump version for new schema
     }
   )
 );
