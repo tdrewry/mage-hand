@@ -6,17 +6,18 @@
 import * as PIXI from 'pixi.js';
 
 export interface DysonHatchingOptions {
-  radius?: number;          // Max distance from edge (px)
+  radius?: number;          // Max distance from edge (px) - in world space
   angleDeg?: number;        // Hatching angle (degrees)
-  groupSpacing?: number;    // Distance between triplet groups (px)
+  groupSpacing?: number;    // Distance between triplet groups (px) - in world space
   lineGap?: number;         // Gap between lines in triplet (px)
   lineWidth?: number;       // Stroke width (px)
-  segmentLength?: number;   // Length of each stroke segment (px)
-  segmentSpacing?: number;  // Gap between segments (px)
+  segmentLength?: number;   // Length of each stroke segment (px) - in world space
+  segmentSpacing?: number;  // Gap between segments (px) - in world space
   jitter?: number;          // Hand-drawn wobble amount (px)
   inkColor?: number;        // Hex color (e.g., 0x000000)
   lineAlpha?: number;       // Opacity (0-1)
   insideThreshold?: number; // Alpha threshold for inside detection
+  zoom?: number;            // Current zoom level for scaling
 }
 
 export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
@@ -31,6 +32,7 @@ export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
   inkColor: 0x000000,
   lineAlpha: 1.0,
   insideThreshold: 0.5,
+  zoom: 1.0,
 };
 
 // Fragment shader for Dyson-style hatching (PixiJS v8 compatible)
@@ -171,6 +173,7 @@ void main(void) {
 `;
 
 // GLSL fragment shader for WebGL (PixiJS v8)
+// Fixed: 8-direction edge sampling for corners, zoom-aware scaling
 const glslFragmentShader = /* glsl */ `
 precision highp float;
 
@@ -191,6 +194,7 @@ uniform float uJitter;
 uniform vec3 uInkColor;
 uniform float uLineAlpha;
 uniform float uInsideThreshold;
+uniform float uZoom;
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -198,6 +202,7 @@ float hash12(vec2 p) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
+// 8-direction edge detection for proper corner handling
 float edgeBandMask(vec2 uv) {
   float centerAlpha = texture(uTexture, uv).a;
   if (centerAlpha > uInsideThreshold) {
@@ -206,19 +211,30 @@ float edgeBandMask(vec2 uv) {
 
   vec2 resolution = uInputSize.xy;
   float found = 0.0;
+  
+  // Scale radius by zoom so it stays consistent in world space
+  float scaledRadius = uRadius * uZoom;
 
-  for (int i = 1; i <= 32; i++) {
+  for (int i = 1; i <= 64; i++) {
     float fi = float(i);
-    if (fi > uRadius) break;
+    if (fi > scaledRadius) break;
 
     vec2 off = vec2(fi) / resolution;
+    float diagOff = fi * 0.7071 / resolution.x; // sqrt(2)/2 for diagonal
 
+    // Cardinal directions
     float a1 = texture(uTexture, uv + vec2(off.x, 0.0)).a;
     float a2 = texture(uTexture, uv - vec2(off.x, 0.0)).a;
     float a3 = texture(uTexture, uv + vec2(0.0, off.y)).a;
     float a4 = texture(uTexture, uv - vec2(0.0, off.y)).a;
+    
+    // Diagonal directions for corner detection
+    float a5 = texture(uTexture, uv + vec2(diagOff, diagOff)).a;
+    float a6 = texture(uTexture, uv + vec2(-diagOff, diagOff)).a;
+    float a7 = texture(uTexture, uv + vec2(diagOff, -diagOff)).a;
+    float a8 = texture(uTexture, uv + vec2(-diagOff, -diagOff)).a;
 
-    float anyInside = max(max(a1, a2), max(a3, a4));
+    float anyInside = max(max(max(a1, a2), max(a3, a4)), max(max(a5, a6), max(a7, a8)));
     if (anyInside > uInsideThreshold) {
       found = 1.0;
     }
@@ -234,34 +250,44 @@ float tripletHatching(vec2 p) {
   float s = dot(p, dir);
   float t = dot(p, perp);
 
-  float cellSize = uGroupSpacing * 1.5;
+  // Scale spacing by zoom to maintain consistent world-space size
+  float scaledGroupSpacing = uGroupSpacing * uZoom;
+  float scaledSegmentLength = uSegmentLength * uZoom;
+  float scaledSegmentSpacing = uSegmentSpacing * uZoom;
+  float scaledJitter = uJitter * uZoom;
+  float scaledLineGap = uLineGap * uZoom;
+  float scaledLineWidth = uLineWidth * uZoom;
+
+  float cellSize = scaledGroupSpacing * 1.5;
   vec2 cell = floor(p / cellSize);
   float n = hash12(cell);
 
-  float jitter = (n - 0.5) * uJitter;
+  float jitter = (n - 0.5) * scaledJitter;
   t += jitter;
   s += jitter * 0.7;
 
-  float groupSize = uGroupSpacing;
+  float groupSize = scaledGroupSpacing;
   float localT = mod(t, groupSize);
 
   float center = groupSize * 0.5;
-  float offset = uLineGap;
-  float halfW = uLineWidth;
+  float offset = scaledLineGap;
+  float halfW = scaledLineWidth;
 
   float d1 = abs(localT - (center - offset));
   float d2 = abs(localT - center);
   float d3 = abs(localT - (center + offset));
 
-  float line1 = 1.0 - smoothstep(halfW, halfW + 1.0, d1);
-  float line2 = 1.0 - smoothstep(halfW, halfW + 1.0, d2);
-  float line3 = 1.0 - smoothstep(halfW, halfW + 1.0, d3);
+  // Smoother anti-aliasing that scales with zoom
+  float aa = max(0.5, 1.0 / uZoom);
+  float line1 = 1.0 - smoothstep(halfW, halfW + aa, d1);
+  float line2 = 1.0 - smoothstep(halfW, halfW + aa, d2);
+  float line3 = 1.0 - smoothstep(halfW, halfW + aa, d3);
 
   float linesMask = max(line1, max(line2, line3));
 
-  float period = uSegmentLength + uSegmentSpacing;
+  float period = scaledSegmentLength + scaledSegmentSpacing;
   float segPos = mod(s + n * period * 0.5, period);
-  float segMask = step(segPos, uSegmentLength);
+  float segMask = step(segPos, scaledSegmentLength);
 
   return linesMask * segMask;
 }
@@ -272,7 +298,8 @@ void main() {
   float band = edgeBandMask(vTextureCoord);
 
   if (band <= 0.0) {
-    finalColor = src;
+    // Outside the hatching band - fully transparent
+    finalColor = vec4(0.0, 0.0, 0.0, 0.0);
     return;
   }
 
@@ -280,8 +307,12 @@ void main() {
   float hatch = tripletHatching(p);
   float mask = band * hatch * uLineAlpha;
 
-  vec3 color = mix(src.rgb, uInkColor, mask);
-  finalColor = vec4(color, src.a);
+  // Only output ink where hatching is drawn, fully transparent elsewhere
+  if (mask <= 0.01) {
+    finalColor = vec4(0.0, 0.0, 0.0, 0.0);
+  } else {
+    finalColor = vec4(uInkColor, mask);
+  }
 }
 `;
 
@@ -320,6 +351,7 @@ export class DysonHatchingFilter extends PIXI.Filter {
           uInkColor: { value: new Float32Array([r, g, b]), type: 'vec3<f32>' },
           uLineAlpha: { value: options.lineAlpha, type: 'f32' },
           uInsideThreshold: { value: options.insideThreshold, type: 'f32' },
+          uZoom: { value: options.zoom, type: 'f32' },
         },
       },
     });
@@ -418,6 +450,14 @@ export class DysonHatchingFilter extends PIXI.Filter {
     this.resources.dysonUniforms.uniforms.uInsideThreshold = value;
   }
 
+  get zoom(): number {
+    return this._options.zoom;
+  }
+  set zoom(value: number) {
+    this._options.zoom = value;
+    this.resources.dysonUniforms.uniforms.uZoom = value;
+  }
+
   /**
    * Update all options at once
    */
@@ -433,6 +473,7 @@ export class DysonHatchingFilter extends PIXI.Filter {
     if (opts.inkColor !== undefined) this.inkColor = opts.inkColor;
     if (opts.lineAlpha !== undefined) this.lineAlpha = opts.lineAlpha;
     if (opts.insideThreshold !== undefined) this.insideThreshold = opts.insideThreshold;
+    if (opts.zoom !== undefined) this.zoom = opts.zoom;
   }
 }
 

@@ -8,6 +8,7 @@ import {
   cleanupRegionEdgeProcessing,
   updateRegionTexture,
   updateHatchingSettings,
+  updateHatchingZoom,
   resizeRegionEdgeProcessing,
   setRegionEdgeVisible,
   renderRegionEdges,
@@ -89,6 +90,9 @@ export function useRegionEdgeProcessing({
   const applyEffects = useCallback(
     (regions: CanvasRegion[], transform: { x: number; y: number; zoom: number }) => {
       if (!isReady || !hatchingEnabled) return;
+
+      // Update zoom for proper scaling
+      updateHatchingZoom(transform.zoom);
 
       const updated = updateRegionTexture(regions, transform);
       if (updated) {
