@@ -9,6 +9,7 @@ import {
   updateRegionTexture,
   updateHatchingSettings,
   updateHatchingZoom,
+  updateHatchingOffset,
   resizeRegionEdgeProcessing,
   setRegionEdgeVisible,
   renderRegionEdges,
@@ -93,6 +94,9 @@ export function useRegionEdgeProcessing({
 
       // Update zoom for proper scaling
       updateHatchingZoom(transform.zoom);
+      
+      // Update offset for world-space coordinate alignment (fixes pan issues)
+      updateHatchingOffset(transform.x, transform.y);
 
       const updated = updateRegionTexture(regions, transform);
       if (updated) {

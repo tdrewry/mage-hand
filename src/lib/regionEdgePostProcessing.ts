@@ -259,6 +259,15 @@ export function updateHatchingZoom(zoom: number): void {
 }
 
 /**
+ * Update offset for world-space coordinate alignment (fixes pan issues)
+ */
+export function updateHatchingOffset(x: number, y: number): void {
+  if (hatchingFilter) {
+    hatchingFilter.setOffset(x, y);
+  }
+}
+
+/**
  * Get current hatching settings
  */
 export function getHatchingSettings(): Required<DysonHatchingOptions> {

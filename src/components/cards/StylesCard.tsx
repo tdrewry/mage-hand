@@ -242,6 +242,22 @@ export const StylesCardContent: React.FC = () => {
                 />
               </div>
 
+              {/* Outer Fade */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Outer Fade</Label>
+                  <span className="text-xs text-muted-foreground">{Math.round(hatchingOptions.outerFade * 100)}%</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.outerFade]}
+                  onValueChange={([value]) => setHatchingOptions({ outerFade: value })}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+              </div>
+
               {/* Ink Color */}
               <div className="space-y-1">
                 <Label className="text-xs">Ink Color</Label>

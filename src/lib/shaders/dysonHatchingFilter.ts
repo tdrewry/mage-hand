@@ -19,6 +19,9 @@ export interface DysonHatchingOptions {
   lineAlpha?: number;       // Opacity (0-1)
   insideThreshold?: number; // Alpha threshold for inside detection
   zoom?: number;            // Current zoom level for scaling
+  outerFade?: number;       // Fade amount at outer edge (0-1, 0 = no fade)
+  offsetX?: number;         // Canvas pan offset X for world-space coords
+  offsetY?: number;         // Canvas pan offset Y for world-space coords
 }
 
 export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
@@ -34,6 +37,9 @@ export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
   lineAlpha: 1.0,
   insideThreshold: 0.5,
   zoom: 1.0,
+  outerFade: 0.4,
+  offsetX: 0,
+  offsetY: 0,
 };
 
 // GLSL vertex shader for WebGL (PixiJS v8)
@@ -76,6 +82,8 @@ uniform vec3 uInkColor;
 uniform float uLineAlpha;
 uniform float uInsideThreshold;
 uniform float uZoom;
+uniform float uOuterFade;
+uniform vec2 uOffset;
 
 #define PI 3.14159265359
 
@@ -92,25 +100,27 @@ vec2 hash22(vec2 p) {
   return fract((p3.xx + p3.yz) * p3.zy);
 }
 
-// 8-direction edge detection for proper corner handling
+// Distance-based edge detection - returns 0.0-1.0 where 1.0 = at edge, 0.0 = at outer boundary
 float edgeBandMask(vec2 uv) {
   float centerAlpha = texture(uTexture, uv).a;
   if (centerAlpha > uInsideThreshold) {
-    return 0.0;
+    return 0.0;  // Inside region - no hatching
   }
 
   vec2 resolution = uInputSize.xy;
-  float found = 0.0;
   
   // Scale radius by zoom so it stays consistent in world space
   float scaledRadius = uRadius * uZoom;
+  float minDistance = scaledRadius + 1.0;  // Track closest distance to inside
 
+  // Sample in multiple directions to find nearest inside pixel
   for (int i = 1; i <= 64; i++) {
     float fi = float(i);
     if (fi > scaledRadius) break;
 
     vec2 off = vec2(fi) / resolution;
-    float diagOff = fi * 0.7071 / resolution.x;
+    float diagOff = fi * 0.7071;
+    vec2 diagOffVec = vec2(diagOff) / resolution;
 
     // Cardinal directions
     float a1 = texture(uTexture, uv + vec2(off.x, 0.0)).a;
@@ -119,18 +129,30 @@ float edgeBandMask(vec2 uv) {
     float a4 = texture(uTexture, uv - vec2(0.0, off.y)).a;
     
     // Diagonal directions for corner detection
-    float a5 = texture(uTexture, uv + vec2(diagOff, diagOff)).a;
-    float a6 = texture(uTexture, uv + vec2(-diagOff, diagOff)).a;
-    float a7 = texture(uTexture, uv + vec2(diagOff, -diagOff)).a;
-    float a8 = texture(uTexture, uv + vec2(-diagOff, -diagOff)).a;
+    float a5 = texture(uTexture, uv + diagOffVec).a;
+    float a6 = texture(uTexture, uv + vec2(-diagOffVec.x, diagOffVec.y)).a;
+    float a7 = texture(uTexture, uv + vec2(diagOffVec.x, -diagOffVec.y)).a;
+    float a8 = texture(uTexture, uv - diagOffVec).a;
 
-    float anyInside = max(max(max(a1, a2), max(a3, a4)), max(max(a5, a6), max(a7, a8)));
-    if (anyInside > uInsideThreshold) {
-      found = 1.0;
+    // Check cardinal directions (distance = fi)
+    if (a1 > uInsideThreshold || a2 > uInsideThreshold || 
+        a3 > uInsideThreshold || a4 > uInsideThreshold) {
+      minDistance = min(minDistance, fi);
+    }
+    
+    // Check diagonal directions (distance = fi, already scaled by 0.7071)
+    if (a5 > uInsideThreshold || a6 > uInsideThreshold || 
+        a7 > uInsideThreshold || a8 > uInsideThreshold) {
+      minDistance = min(minDistance, fi);
     }
   }
 
-  return found;
+  if (minDistance > scaledRadius) {
+    return 0.0;  // Outside hatching band
+  }
+
+  // Return distance-based value: 1.0 at edge (minDistance=1), fades to 0.0 at outer boundary
+  return 1.0 - (minDistance / scaledRadius);
 }
 
 // Authentic Dyson-style cluster hatching with per-cluster random angles
@@ -210,8 +232,6 @@ float clusterHatching(vec2 p) {
 }
 
 void main() {
-  vec4 src = texture(uTexture, vTextureCoord);
-
   float band = edgeBandMask(vTextureCoord);
 
   if (band <= 0.0) {
@@ -220,9 +240,19 @@ void main() {
     return;
   }
 
-  vec2 p = vTextureCoord * uInputSize.xy;
-  float hatch = clusterHatching(p);
-  float mask = band * hatch * uLineAlpha;
+  // Apply distance-based fade at outer edge
+  float fadeFactor = 1.0;
+  if (uOuterFade > 0.0) {
+    // Fade in smoothly from outer edge (band=0) to full opacity at fadeThreshold
+    float fadeThreshold = 1.0 - uOuterFade;
+    fadeFactor = smoothstep(0.0, fadeThreshold, band);
+  }
+
+  // Convert screen coords to world coords by subtracting canvas offset
+  vec2 worldP = vTextureCoord * uInputSize.xy - uOffset;
+  float hatch = clusterHatching(worldP);
+  
+  float mask = fadeFactor * hatch * uLineAlpha;
 
   // Only output ink where hatching is drawn, fully transparent elsewhere
   if (mask <= 0.01) {
@@ -269,6 +299,8 @@ export class DysonHatchingFilter extends PIXI.Filter {
           uLineAlpha: { value: options.lineAlpha, type: 'f32' },
           uInsideThreshold: { value: options.insideThreshold, type: 'f32' },
           uZoom: { value: options.zoom, type: 'f32' },
+          uOuterFade: { value: options.outerFade, type: 'f32' },
+          uOffset: { value: new Float32Array([options.offsetX, options.offsetY]), type: 'vec2<f32>' },
         },
       },
     });
@@ -375,6 +407,41 @@ export class DysonHatchingFilter extends PIXI.Filter {
     this.resources.dysonUniforms.uniforms.uZoom = value;
   }
 
+  get outerFade(): number {
+    return this._options.outerFade;
+  }
+  set outerFade(value: number) {
+    this._options.outerFade = Math.max(0, Math.min(1, value));
+    this.resources.dysonUniforms.uniforms.uOuterFade = this._options.outerFade;
+  }
+
+  get offsetX(): number {
+    return this._options.offsetX;
+  }
+  set offsetX(value: number) {
+    this._options.offsetX = value;
+    const currentOffset = this.resources.dysonUniforms.uniforms.uOffset as Float32Array;
+    currentOffset[0] = value;
+  }
+
+  get offsetY(): number {
+    return this._options.offsetY;
+  }
+  set offsetY(value: number) {
+    this._options.offsetY = value;
+    const currentOffset = this.resources.dysonUniforms.uniforms.uOffset as Float32Array;
+    currentOffset[1] = value;
+  }
+
+  /**
+   * Set both offset values at once (more efficient)
+   */
+  setOffset(x: number, y: number): void {
+    this._options.offsetX = x;
+    this._options.offsetY = y;
+    this.resources.dysonUniforms.uniforms.uOffset = new Float32Array([x, y]);
+  }
+
   /**
    * Update all options at once
    */
@@ -391,6 +458,9 @@ export class DysonHatchingFilter extends PIXI.Filter {
     if (opts.lineAlpha !== undefined) this.lineAlpha = opts.lineAlpha;
     if (opts.insideThreshold !== undefined) this.insideThreshold = opts.insideThreshold;
     if (opts.zoom !== undefined) this.zoom = opts.zoom;
+    if (opts.outerFade !== undefined) this.outerFade = opts.outerFade;
+    if (opts.offsetX !== undefined) this.offsetX = opts.offsetX;
+    if (opts.offsetY !== undefined) this.offsetY = opts.offsetY;
   }
 }
 
@@ -409,6 +479,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     jitter: 1.2,
     inkColor: 0x000000,
     lineAlpha: 1.0,
+    outerFade: 0.4,
   },
   'Light Sketch': {
     radius: 16,
@@ -421,6 +492,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     jitter: 1.5,
     inkColor: 0x333333,
     lineAlpha: 0.8,
+    outerFade: 0.5,
   },
   'Dense Cave': {
     radius: 28,
@@ -433,6 +505,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     jitter: 1.0,
     inkColor: 0x000000,
     lineAlpha: 1.0,
+    outerFade: 0.3,
   },
   'Heavy Ink': {
     radius: 24,
@@ -445,6 +518,7 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     jitter: 0.8,
     inkColor: 0x000000,
     lineAlpha: 1.0,
+    outerFade: 0.35,
   },
   'Stonework': {
     radius: 18,
@@ -457,5 +531,6 @@ export const HATCHING_PRESETS: Record<string, DysonHatchingOptions> = {
     jitter: 2.0,
     inkColor: 0x444444,
     lineAlpha: 0.9,
+    outerFade: 0.45,
   },
 };
