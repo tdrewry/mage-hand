@@ -62,8 +62,8 @@ export async function initRegionEdgeProcessing(
     canvas.style.width = `${config.width}px`;
     canvas.style.height = `${config.height}px`;
     canvas.style.pointerEvents = 'none';
-    // Position above regions but below fog
-    canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.REGIONS + 100);
+    // Position BELOW regions so region art shows on top of hatching
+    canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.REGIONS - 1);
 
     container.appendChild(canvas);
     containerRef = container;
@@ -246,6 +246,15 @@ export function updateHatchingSettings(opts: Partial<DysonHatchingOptions>): voi
 
   if (hatchingFilter) {
     hatchingFilter.updateOptions(opts);
+  }
+}
+
+/**
+ * Update zoom level for proper scaling
+ */
+export function updateHatchingZoom(zoom: number): void {
+  if (hatchingFilter) {
+    hatchingFilter.zoom = zoom;
   }
 }
 
