@@ -1,9 +1,12 @@
 import React from 'react';
 import { Label } from '../ui/label';
 import { Slider } from '../ui/slider';
+import { Switch } from '../ui/switch';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useRegionStore } from '@/stores/regionStore';
+import { useHatchingStore } from '@/stores/hatchingStore';
 import { WATABOU_STYLES } from '@/lib/watabouStyles';
+import { HATCHING_PRESETS } from '@/lib/shaders/dysonHatchingFilter';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { EDGE_STYLES, type WallEdgeStyle } from '@/lib/wallTexturePatterns';
@@ -22,6 +25,15 @@ export const StylesCardContent: React.FC = () => {
   } = useDungeonStore();
   
   const { regions } = useRegionStore();
+  
+  const {
+    enabled: hatchingEnabled,
+    options: hatchingOptions,
+    setEnabled: setHatchingEnabled,
+    setOptions: setHatchingOptions,
+    applyPreset: applyHatchingPreset,
+    getPresetNames,
+  } = useHatchingStore();
 
   const edgeStyleLabels: Record<WallEdgeStyle, string> = {
     stone: 'Stone',
@@ -40,8 +52,150 @@ export const StylesCardContent: React.FC = () => {
     }
   };
 
+  const applyHatchingPresetWithToast = (presetName: string) => {
+    applyHatchingPreset(presetName);
+    toast.success(`Applied ${presetName} hatching preset`);
+  };
+
+  // Convert hex color to number for shader
+  const hexToNumber = (hex: string): number => {
+    return parseInt(hex.replace('#', ''), 16);
+  };
+
+  // Convert number to hex for input
+  const numberToHex = (num: number): string => {
+    return '#' + num.toString(16).padStart(6, '0');
+  };
+
   return (
     <div className="p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
+      {/* Edge Hatching Section */}
+      <div className="space-y-3 border-b border-border pb-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Edge Hatching (GPU)</Label>
+          <Switch
+            checked={hatchingEnabled}
+            onCheckedChange={setHatchingEnabled}
+          />
+        </div>
+        
+        {hatchingEnabled && (
+          <>
+            {/* Hatching Presets */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Presets</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {getPresetNames().map((presetName) => (
+                  <Button
+                    key={presetName}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyHatchingPresetWithToast(presetName)}
+                    className="text-xs h-8"
+                  >
+                    {presetName}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hatching Controls */}
+            <div className="space-y-3">
+              {/* Radius */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Radius</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.radius}px</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.radius]}
+                  onValueChange={([value]) => setHatchingOptions({ radius: value })}
+                  min={8}
+                  max={50}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Angle */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Angle</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.angleDeg}°</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.angleDeg]}
+                  onValueChange={([value]) => setHatchingOptions({ angleDeg: value })}
+                  min={0}
+                  max={180}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Density (Group Spacing) */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Density</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.groupSpacing}px</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.groupSpacing]}
+                  onValueChange={([value]) => setHatchingOptions({ groupSpacing: value })}
+                  min={4}
+                  max={20}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Jitter */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Jitter</Label>
+                  <span className="text-xs text-muted-foreground">{hatchingOptions.jitter.toFixed(1)}px</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.jitter]}
+                  onValueChange={([value]) => setHatchingOptions({ jitter: value })}
+                  min={0}
+                  max={5}
+                  step={0.1}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Opacity */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <Label className="text-xs">Opacity</Label>
+                  <span className="text-xs text-muted-foreground">{Math.round(hatchingOptions.lineAlpha * 100)}%</span>
+                </div>
+                <Slider
+                  value={[hatchingOptions.lineAlpha]}
+                  onValueChange={([value]) => setHatchingOptions({ lineAlpha: value })}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Ink Color */}
+              <div className="space-y-1">
+                <Label className="text-xs">Ink Color</Label>
+                <input
+                  type="color"
+                  value={numberToHex(hatchingOptions.inkColor)}
+                  onChange={(e) => setHatchingOptions({ inkColor: hexToNumber(e.target.value) })}
+                  className="w-full h-8 cursor-pointer rounded border border-border"
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Quick Style Presets */}
       <div className="space-y-2">
         <Label className="text-sm font-semibold">Quick Presets</Label>
@@ -136,10 +290,6 @@ export const StylesCardContent: React.FC = () => {
             className="w-full"
           />
         </div>
-
-        {/* TODO: Light Direction and Shadow Distance
-             These controls are hidden until rendering implementation is complete.
-             See CONTRIBUTING/Card-Based-UI-Refactor.md for details. */}
       </div>
     </div>
   );

@@ -71,6 +71,7 @@ import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
 import { useFogStore } from "../stores/fogStore";
 import { usePostProcessing } from "../hooks/usePostProcessing";
+import { useRegionEdgeProcessing } from "../hooks/useRegionEdgeProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import { useUndoableActions } from "../hooks/useUndoableActions";
 import { toast } from "sonner";
@@ -223,6 +224,14 @@ export const SimpleTabletop = () => {
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady } = usePostProcessing({
     containerRef: canvasContainerRef,
     enabled: renderingMode === 'play' && fogEnabled && effectSettings.postProcessingEnabled,
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
+  });
+
+  // Region edge hatching post-processing hook
+  const { applyEffects: applyRegionEdgeEffects, isReady: isRegionEdgeReady } = useRegionEdgeProcessing({
+    containerRef: canvasContainerRef,
+    enabled: showRegions,
     width: canvasDimensions.width,
     height: canvasDimensions.height,
   });
@@ -1327,6 +1336,11 @@ export const SimpleTabletop = () => {
       regions.forEach((region) => {
         drawRegion(ctx, region, true); // skipStroke = true for both modes
       });
+      
+      // Apply GPU-accelerated edge hatching if enabled
+      if (isRegionEdgeReady) {
+        applyRegionEdgeEffects(regions, transform);
+      }
     }
 
     // 3. Then render walls (negative space) on top - ABOVE regions
