@@ -33,158 +33,256 @@ export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
   insideThreshold: 0.5,
 };
 
-// Vertex shader for PixiJS v8
-const vertexShader = /* glsl */ `
-  in vec2 aPosition;
-  out vec2 vTextureCoord;
+// Fragment shader for Dyson-style hatching (PixiJS v8 compatible)
+const fragmentShader = /* wgsl */ `
+struct DysonUniforms {
+  uRadius: f32,
+  uAngle: f32,
+  uGroupSpacing: f32,
+  uLineGap: f32,
+  uLineWidth: f32,
+  uSegmentLength: f32,
+  uSegmentSpacing: f32,
+  uJitter: f32,
+  uInkColor: vec3<f32>,
+  uLineAlpha: f32,
+  uInsideThreshold: f32,
+};
 
-  uniform vec4 uInputSize;
-  uniform vec4 uOutputFrame;
-  uniform vec4 uOutputTexture;
+@group(0) @binding(1) var uTexture: texture_2d<f32>;
+@group(0) @binding(2) var uSampler: sampler;
+@group(1) @binding(0) var<uniform> dysonUniforms: DysonUniforms;
+@group(2) @binding(0) var<uniform> uInputSize: vec4<f32>;
 
-  vec4 filterVertexPosition(void) {
-    vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
-    position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
-    position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
-    return vec4(position, 0.0, 1.0);
+fn hash12(p: vec2<f32>) -> f32 {
+  var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
+  p3 = p3 + dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+fn edgeBandMask(uv: vec2<f32>) -> f32 {
+  let centerAlpha = textureSample(uTexture, uSampler, uv).a;
+  if (centerAlpha > dysonUniforms.uInsideThreshold) {
+    return 0.0;
   }
 
-  vec2 filterTextureCoord(void) {
-    return aPosition * (uOutputFrame.zw * uInputSize.zw);
+  let resolution = uInputSize.xy;
+  var found = 0.0;
+
+  for (var i = 1; i <= 32; i = i + 1) {
+    let fi = f32(i);
+    if (fi > dysonUniforms.uRadius) {
+      break;
+    }
+
+    let off = vec2<f32>(fi) / resolution;
+
+    let a1 = textureSample(uTexture, uSampler, uv + vec2<f32>(off.x, 0.0)).a;
+    let a2 = textureSample(uTexture, uSampler, uv - vec2<f32>(off.x, 0.0)).a;
+    let a3 = textureSample(uTexture, uSampler, uv + vec2<f32>(0.0, off.y)).a;
+    let a4 = textureSample(uTexture, uSampler, uv - vec2<f32>(0.0, off.y)).a;
+
+    let anyInside = max(max(a1, a2), max(a3, a4));
+    if (anyInside > dysonUniforms.uInsideThreshold) {
+      found = 1.0;
+    }
   }
 
-  void main(void) {
-    gl_Position = filterVertexPosition();
-    vTextureCoord = filterTextureCoord();
+  return found;
+}
+
+fn tripletHatching(p: vec2<f32>) -> f32 {
+  let dir = vec2<f32>(cos(dysonUniforms.uAngle), sin(dysonUniforms.uAngle));
+  let perp = vec2<f32>(-dir.y, dir.x);
+
+  var s = dot(p, dir);
+  var t = dot(p, perp);
+
+  let cellSize = dysonUniforms.uGroupSpacing * 1.5;
+  let cell = floor(p / cellSize);
+  let n = hash12(cell);
+
+  let jitter = (n - 0.5) * dysonUniforms.uJitter;
+  t = t + jitter;
+  s = s + jitter * 0.7;
+
+  let groupSize = dysonUniforms.uGroupSpacing;
+  let localT = t % groupSize;
+
+  let center = groupSize * 0.5;
+  let offset = dysonUniforms.uLineGap;
+  let halfW = dysonUniforms.uLineWidth;
+
+  let d1 = abs(localT - (center - offset));
+  let d2 = abs(localT - center);
+  let d3 = abs(localT - (center + offset));
+
+  let line1 = 1.0 - smoothstep(halfW, halfW + 1.0, d1);
+  let line2 = 1.0 - smoothstep(halfW, halfW + 1.0, d2);
+  let line3 = 1.0 - smoothstep(halfW, halfW + 1.0, d3);
+
+  let linesMask = max(line1, max(line2, line3));
+
+  let period = dysonUniforms.uSegmentLength + dysonUniforms.uSegmentSpacing;
+  let segPos = (s + n * period * 0.5) % period;
+  var segMask = 0.0;
+  if (segPos < dysonUniforms.uSegmentLength) {
+    segMask = 1.0;
   }
+
+  return linesMask * segMask;
+}
+
+@fragment
+fn main(@builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+  let src = textureSample(uTexture, uSampler, uv);
+
+  let band = edgeBandMask(uv);
+
+  if (band <= 0.0) {
+    return src;
+  }
+
+  let p = uv * uInputSize.xy;
+  let hatch = tripletHatching(p);
+  let mask = band * hatch * dysonUniforms.uLineAlpha;
+
+  let color = mix(src.rgb, dysonUniforms.uInkColor, mask);
+  return vec4<f32>(color, src.a);
+}
 `;
 
-// Fragment shader for Dyson-style hatching
-const fragmentShader = /* glsl */ `
-  precision mediump float;
+// GLSL vertex shader for WebGL (PixiJS v8)
+const glslVertexShader = /* glsl */ `
+in vec2 aPosition;
+out vec2 vTextureCoord;
 
-  in vec2 vTextureCoord;
-  out vec4 finalColor;
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
 
-  uniform sampler2D uTexture;
-  uniform vec4 uInputSize;
+void main(void) {
+  vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+  position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+  position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+  gl_Position = vec4(position, 0.0, 1.0);
+  vTextureCoord = aPosition * (uOutputFrame.zw * uInputSize.zw);
+}
+`;
 
-  // Hatching parameters
-  uniform float uRadius;
-  uniform float uAngle;
-  uniform float uGroupSpacing;
-  uniform float uLineGap;
-  uniform float uLineWidth;
-  uniform float uSegmentLength;
-  uniform float uSegmentSpacing;
-  uniform float uJitter;
-  uniform vec3 uInkColor;
-  uniform float uLineAlpha;
-  uniform float uInsideThreshold;
+// GLSL fragment shader for WebGL (PixiJS v8)
+const glslFragmentShader = /* glsl */ `
+precision highp float;
 
-  // Hash function for noise
-  float hash12(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform vec4 uInputSize;
+
+uniform float uRadius;
+uniform float uAngle;
+uniform float uGroupSpacing;
+uniform float uLineGap;
+uniform float uLineWidth;
+uniform float uSegmentLength;
+uniform float uSegmentSpacing;
+uniform float uJitter;
+uniform vec3 uInkColor;
+uniform float uLineAlpha;
+uniform float uInsideThreshold;
+
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float edgeBandMask(vec2 uv) {
+  float centerAlpha = texture(uTexture, uv).a;
+  if (centerAlpha > uInsideThreshold) {
+    return 0.0;
   }
 
-  // Detect if pixel is in near-wall outside band
-  float edgeBandMask(vec2 uv) {
-    float centerAlpha = texture(uTexture, uv).a;
-    if (centerAlpha > uInsideThreshold) {
-      // Inside the shape, no hatching
-      return 0.0;
+  vec2 resolution = uInputSize.xy;
+  float found = 0.0;
+
+  for (int i = 1; i <= 32; i++) {
+    float fi = float(i);
+    if (fi > uRadius) break;
+
+    vec2 off = vec2(fi) / resolution;
+
+    float a1 = texture(uTexture, uv + vec2(off.x, 0.0)).a;
+    float a2 = texture(uTexture, uv - vec2(off.x, 0.0)).a;
+    float a3 = texture(uTexture, uv + vec2(0.0, off.y)).a;
+    float a4 = texture(uTexture, uv - vec2(0.0, off.y)).a;
+
+    float anyInside = max(max(a1, a2), max(a3, a4));
+    if (anyInside > uInsideThreshold) {
+      found = 1.0;
     }
-
-    vec2 resolution = uInputSize.xy;
-    const int MAX_RADIUS = 32;
-    float found = 0.0;
-
-    // Search around pixel up to uRadius in 4 cardinal directions
-    for (int i = 1; i <= MAX_RADIUS; i++) {
-      float fi = float(i);
-      if (fi > uRadius) break;
-
-      vec2 off = vec2(fi) / resolution;
-
-      float a1 = texture(uTexture, uv + vec2(off.x, 0.0)).a;
-      float a2 = texture(uTexture, uv - vec2(off.x, 0.0)).a;
-      float a3 = texture(uTexture, uv + vec2(0.0, off.y)).a;
-      float a4 = texture(uTexture, uv - vec2(0.0, off.y)).a;
-
-      float anyInside = max(max(a1, a2), max(a3, a4));
-      if (anyInside > uInsideThreshold) {
-        found = 1.0;
-      }
-    }
-
-    return found;
   }
 
-  // Generate triplet hatching pattern
-  float tripletHatching(vec2 p) {
-    vec2 dir = vec2(cos(uAngle), sin(uAngle));
-    vec2 perp = vec2(-dir.y, dir.x);
+  return found;
+}
 
-    float s = dot(p, dir);
-    float t = dot(p, perp);
+float tripletHatching(vec2 p) {
+  vec2 dir = vec2(cos(uAngle), sin(uAngle));
+  vec2 perp = vec2(-dir.y, dir.x);
 
-    // Cell-based noise for variation
-    float cellSize = uGroupSpacing * 1.5;
-    vec2 cell = floor(p / cellSize);
-    float n = hash12(cell);
+  float s = dot(p, dir);
+  float t = dot(p, perp);
 
-    float jitter = (n - 0.5) * uJitter;
-    t += jitter;
-    s += jitter * 0.7;
+  float cellSize = uGroupSpacing * 1.5;
+  vec2 cell = floor(p / cellSize);
+  float n = hash12(cell);
 
-    // Group position across lines
-    float groupSize = uGroupSpacing;
-    float localT = mod(t, groupSize);
+  float jitter = (n - 0.5) * uJitter;
+  t += jitter;
+  s += jitter * 0.7;
 
-    float center = groupSize * 0.5;
-    float offset = uLineGap;
-    float halfW = uLineWidth;
+  float groupSize = uGroupSpacing;
+  float localT = mod(t, groupSize);
 
-    float d1 = abs(localT - (center - offset));
-    float d2 = abs(localT - center);
-    float d3 = abs(localT - (center + offset));
+  float center = groupSize * 0.5;
+  float offset = uLineGap;
+  float halfW = uLineWidth;
 
-    // Narrow bands for the 3 lines
-    float line1 = 1.0 - smoothstep(halfW, halfW + 1.0, d1);
-    float line2 = 1.0 - smoothstep(halfW, halfW + 1.0, d2);
-    float line3 = 1.0 - smoothstep(halfW, halfW + 1.0, d3);
+  float d1 = abs(localT - (center - offset));
+  float d2 = abs(localT - center);
+  float d3 = abs(localT - (center + offset));
 
-    float linesMask = max(line1, max(line2, line3));
+  float line1 = 1.0 - smoothstep(halfW, halfW + 1.0, d1);
+  float line2 = 1.0 - smoothstep(halfW, halfW + 1.0, d2);
+  float line3 = 1.0 - smoothstep(halfW, halfW + 1.0, d3);
 
-    // Segment/gap pattern along the line
-    float period = uSegmentLength + uSegmentSpacing;
-    float segPos = mod(s + n * period * 0.5, period);
-    float segMask = step(segPos, uSegmentLength);
+  float linesMask = max(line1, max(line2, line3));
 
-    return linesMask * segMask;
+  float period = uSegmentLength + uSegmentSpacing;
+  float segPos = mod(s + n * period * 0.5, period);
+  float segMask = step(segPos, uSegmentLength);
+
+  return linesMask * segMask;
+}
+
+void main() {
+  vec4 src = texture(uTexture, vTextureCoord);
+
+  float band = edgeBandMask(vTextureCoord);
+
+  if (band <= 0.0) {
+    finalColor = src;
+    return;
   }
 
-  void main(void) {
-    vec4 src = texture(uTexture, vTextureCoord);
+  vec2 p = vTextureCoord * uInputSize.xy;
+  float hatch = tripletHatching(p);
+  float mask = band * hatch * uLineAlpha;
 
-    // Band of pixels outside but near the shape
-    float band = edgeBandMask(vTextureCoord);
-
-    if (band <= 0.0) {
-      finalColor = src;
-      return;
-    }
-
-    // Pixel coords
-    vec2 p = vTextureCoord * uInputSize.xy;
-    float hatch = tripletHatching(p);
-    float mask = band * hatch * uLineAlpha;
-
-    vec3 color = mix(src.rgb, uInkColor, mask);
-    finalColor = vec4(color, src.a);
-  }
+  vec3 color = mix(src.rgb, uInkColor, mask);
+  finalColor = vec4(color, src.a);
+}
 `;
 
 /**
@@ -203,15 +301,12 @@ export class DysonHatchingFilter extends PIXI.Filter {
     const g = ((options.inkColor >> 8) & 0xff) / 255;
     const b = (options.inkColor & 0xff) / 255;
 
-    // Create PixiJS v8 GlProgram
-    const glProgram = PIXI.GlProgram.from({
-      vertex: vertexShader,
-      fragment: fragmentShader,
-      name: 'dyson-hatching-filter',
-    });
-
     super({
-      glProgram,
+      glProgram: PIXI.GlProgram.from({
+        vertex: glslVertexShader,
+        fragment: glslFragmentShader,
+        name: 'dyson-hatching-filter',
+      }),
       resources: {
         dysonUniforms: {
           uRadius: { value: options.radius, type: 'f32' },
