@@ -38,7 +38,7 @@ export const DEFAULT_HATCHING_OPTIONS: Required<DysonHatchingOptions> = {
   lineAlpha: 1.0,
   insideThreshold: 0.5,
   zoom: 1.0,
-  outerFade: 0.4,
+  outerFade: 0,
   skipDepth: 0.3,
   offsetX: 0,
   offsetY: 0,
