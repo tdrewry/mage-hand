@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFogStore } from '@/stores/fogStore';
-import type { IlluminationSource } from '@/types/illumination';
+import type { IlluminationSource, IlluminationAnimationType } from '@/types/illumination';
 import { DEFAULT_ILLUMINATION } from '@/types/illumination';
 import { ILLUMINATION_PRESETS, type PresetKey, getAllPresets } from '@/lib/illuminationPresets';
 
@@ -54,6 +54,9 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   const [softEdge, setSoftEdge] = useState(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
   const [softEdgeRadius, setSoftEdgeRadius] = useState(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
   const [useGlobalBrightZone, setUseGlobalBrightZone] = useState(!currentIllumination?.brightZone);
+  const [animation, setAnimation] = useState<IlluminationAnimationType>(currentIllumination?.animation ?? DEFAULT_ILLUMINATION.animation);
+  const [animationSpeed, setAnimationSpeed] = useState(currentIllumination?.animationSpeed ?? DEFAULT_ILLUMINATION.animationSpeed);
+  const [animationIntensity, setAnimationIntensity] = useState(currentIllumination?.animationIntensity ?? DEFAULT_ILLUMINATION.animationIntensity);
 
   // Apply preset values
   const applyPreset = (presetKey: PresetKey) => {
@@ -70,6 +73,9 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
     setColorIntensity(preset.colorIntensity);
     setSoftEdge(preset.softEdge);
     setSoftEdgeRadius(preset.softEdgeRadius);
+    setAnimation(preset.animation);
+    setAnimationSpeed(preset.animationSpeed);
+    setAnimationIntensity(preset.animationIntensity);
     setUseGlobalBrightZone(false);
   };
 
@@ -87,6 +93,9 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       setSoftEdge(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
       setSoftEdgeRadius(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
       setUseGlobalBrightZone(!currentIllumination?.brightZone);
+      setAnimation(currentIllumination?.animation ?? DEFAULT_ILLUMINATION.animation);
+      setAnimationSpeed(currentIllumination?.animationSpeed ?? DEFAULT_ILLUMINATION.animationSpeed);
+      setAnimationIntensity(currentIllumination?.animationIntensity ?? DEFAULT_ILLUMINATION.animationIntensity);
     }
   }, [open, currentIllumination, effectSettings.lightFalloff]);
 
@@ -101,6 +110,9 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       colorIntensity,
       softEdge,
       softEdgeRadius,
+      animation,
+      animationSpeed,
+      animationIntensity,
     });
     onOpenChange(false);
   };
@@ -126,9 +138,10 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
                 <SelectValue placeholder="Select a preset" />
               </SelectTrigger>
               <SelectContent className="bg-popover">
-                <SelectItem value="custom">Custom</SelectItem>
-                <SelectItem value="torch">🔥 Torch (40ft)</SelectItem>
+                <SelectItem value="custom">⚙️ Custom</SelectItem>
+                <SelectItem value="torch">🔥 Torch (40ft, flickering)</SelectItem>
                 <SelectItem value="lantern">🏮 Lantern (60ft)</SelectItem>
+                <SelectItem value="candle">🕯️ Candle (15ft, gentle flicker)</SelectItem>
                 <SelectItem value="darkvision">👁️ Darkvision (60ft)</SelectItem>
                 <SelectItem value="moonlight">🌙 Moonlight (120ft)</SelectItem>
               </SelectContent>
@@ -287,6 +300,53 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
                   step={1}
                 />
               </>
+            )}
+          </div>
+
+          {/* Animation */}
+          <div className="space-y-2">
+            <Label>Animation Effect</Label>
+            <Select value={animation} onValueChange={(v) => { setAnimation(v as IlluminationAnimationType); setSelectedPreset('custom'); }}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Select animation" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="none">None (steady light)</SelectItem>
+                <SelectItem value="flicker">🔥 Flicker (torch-like)</SelectItem>
+                <SelectItem value="candle">🕯️ Candle (gentle)</SelectItem>
+                <SelectItem value="pulse">💫 Pulse (smooth)</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {animation !== 'none' && (
+              <div className="space-y-3 mt-3">
+                <div className="flex justify-between">
+                  <Label className="text-sm">Animation Speed</Label>
+                  <span className="text-xs text-muted-foreground">{animationSpeed.toFixed(1)}x</span>
+                </div>
+                <Slider
+                  value={[animationSpeed]}
+                  onValueChange={([v]) => setAnimationSpeed(v)}
+                  min={0.5}
+                  max={2}
+                  step={0.1}
+                />
+                
+                <div className="flex justify-between">
+                  <Label className="text-sm">Animation Intensity</Label>
+                  <span className="text-xs text-muted-foreground">{Math.round(animationIntensity * 100)}%</span>
+                </div>
+                <Slider
+                  value={[animationIntensity]}
+                  onValueChange={([v]) => setAnimationIntensity(v)}
+                  min={0.1}
+                  max={0.8}
+                  step={0.05}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Higher intensity creates more dramatic light variations
+                </p>
+              </div>
             )}
           </div>
         </div>

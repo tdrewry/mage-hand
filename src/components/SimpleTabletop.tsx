@@ -1689,6 +1689,9 @@ export const SimpleTabletop = () => {
             colorIntensity: tokenSettings?.colorIntensity ?? 0.5,
             softEdge: tokenSettings?.softEdge ?? true,
             softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
+            animation: tokenSettings?.animation ?? 'none',
+            animationSpeed: tokenSettings?.animationSpeed ?? 1.0,
+            animationIntensity: tokenSettings?.animationIntensity ?? 0.3,
             visibilityPolygon: t.visibilityPath,
           };
         });

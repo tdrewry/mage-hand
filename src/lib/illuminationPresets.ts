@@ -1,4 +1,4 @@
-import type { IlluminationSource } from '@/types/illumination';
+import type { IlluminationSource, IlluminationAnimationType } from '@/types/illumination';
 import { DEFAULT_ILLUMINATION } from '@/types/illumination';
 
 export interface IlluminationPreset {
@@ -14,6 +14,9 @@ export interface IlluminationPreset {
   colorIntensity: number;
   softEdge: boolean;
   softEdgeRadius: number;
+  animation: IlluminationAnimationType;
+  animationSpeed: number;
+  animationIntensity: number;
 }
 
 export const ILLUMINATION_PRESETS = {
@@ -26,7 +29,7 @@ export const ILLUMINATION_PRESETS = {
   torch: {
     name: 'Torch',
     icon: '🔥',
-    description: '40ft bright, 40ft dim',
+    description: '40ft bright, 40ft dim (flickering)',
     range: 8,
     brightZone: 0.5,
     brightIntensity: 1.0,
@@ -36,6 +39,9 @@ export const ILLUMINATION_PRESETS = {
     colorIntensity: 0.2,
     softEdge: true,
     softEdgeRadius: 6,
+    animation: 'flicker' as IlluminationAnimationType,
+    animationSpeed: 1.0,
+    animationIntensity: 0.35,
   },
   lantern: {
     name: 'Lantern',
@@ -50,6 +56,9 @@ export const ILLUMINATION_PRESETS = {
     colorIntensity: 0.15,
     softEdge: true,
     softEdgeRadius: 8,
+    animation: 'none' as IlluminationAnimationType,
+    animationSpeed: 1.0,
+    animationIntensity: 0.0,
   },
   darkvision: {
     name: 'Darkvision',
@@ -64,6 +73,9 @@ export const ILLUMINATION_PRESETS = {
     colorIntensity: 0.1,
     softEdge: true,
     softEdgeRadius: 4,
+    animation: 'none' as IlluminationAnimationType,
+    animationSpeed: 1.0,
+    animationIntensity: 0.0,
   },
   moonlight: {
     name: 'Moonlight',
@@ -78,11 +90,14 @@ export const ILLUMINATION_PRESETS = {
     colorIntensity: 0.15,
     softEdge: true,
     softEdgeRadius: 12,
+    animation: 'none' as IlluminationAnimationType,
+    animationSpeed: 1.0,
+    animationIntensity: 0.0,
   },
   candle: {
     name: 'Candle',
     icon: '🕯️',
-    description: '5ft bright, 10ft dim',
+    description: '5ft bright, 10ft dim (gentle flicker)',
     range: 3,
     brightZone: 0.5,
     brightIntensity: 0.8,
@@ -92,6 +107,9 @@ export const ILLUMINATION_PRESETS = {
     colorIntensity: 0.25,
     softEdge: true,
     softEdgeRadius: 2,
+    animation: 'candle' as IlluminationAnimationType,
+    animationSpeed: 1.2,
+    animationIntensity: 0.25,
   },
 } as const;
 
@@ -123,5 +141,8 @@ export function presetToIlluminationSource(preset: IlluminationPreset): Partial<
     colorIntensity: preset.colorIntensity,
     softEdge: preset.softEdge,
     softEdgeRadius: preset.softEdgeRadius,
+    animation: preset.animation,
+    animationSpeed: preset.animationSpeed,
+    animationIntensity: preset.animationIntensity,
   };
 }

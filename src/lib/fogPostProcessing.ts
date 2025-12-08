@@ -13,7 +13,7 @@ import {
   updateIlluminationData,
   type EffectSettings,
 } from './postProcessingLayer';
-import { createShaderData, type IlluminationSource } from '@/types/illumination';
+import { createShaderData, calculateAnimatedIntensity, type IlluminationSource } from '@/types/illumination';
 
 export interface FogEffectConfig {
   enabled: boolean;
@@ -131,7 +131,8 @@ function renderIlluminationOverlay(
   sources: IlluminationSource[],
   transform: { x: number; y: number; zoom: number },
   padding: number,
-  gridSize: number
+  gridSize: number,
+  animationTime: number
 ): void {
   if (!illuminationCtx || !illuminationCanvas) return;
   
@@ -147,6 +148,15 @@ function renderIlluminationOverlay(
   
   for (const source of sources) {
     if (!source.enabled || !source.colorEnabled || !source.visibilityPolygon) continue;
+    
+    // Calculate animated intensity modifier
+    const animMod = calculateAnimatedIntensity(
+      source.animation,
+      source.animationSpeed,
+      source.animationIntensity,
+      animationTime,
+      source.id
+    );
     
     ctx.save();
     
@@ -172,8 +182,8 @@ function renderIlluminationOverlay(
     
     const rgb = parseColorToRGB(source.color);
     
-    // Color tint intensity - use the source's colorIntensity setting
-    const intensity = source.colorIntensity ?? 0.5;
+    // Color tint intensity - modulated by animation
+    const intensity = (source.colorIntensity ?? 0.5) * animMod;
     const brightAlpha = intensity * 0.7; // Scale to max 0.7 alpha
     const dimAlpha = intensity * 0.3;    // Dim zone is ~40% of bright
     
@@ -256,6 +266,8 @@ export function applyFogPostProcessing(
   // Model:
   // - Bright zone (inner circle): fully clears fog (alpha = 1)
   // - Dim zone (outer ring): partially clears fog (alpha = dimIntensity)
+  const animationTime = performance.now();
+  
   if (illuminationData && illuminationData.sources.length > 0) {
     const gridSize = illuminationData.gridSize;
     fogCtx.globalCompositeOperation = 'destination-out';
@@ -263,11 +275,21 @@ export function applyFogPostProcessing(
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
       
+      // Calculate animated intensity modifier
+      const animMod = calculateAnimatedIntensity(
+        source.animation,
+        source.animationSpeed,
+        source.animationIntensity,
+        animationTime,
+        source.id
+      );
+      
       const pos = source.position;
       // source.range is already in pixels when gridSize is 1
-      const rangePixels = source.range;
+      // Apply animation to range for flickering effect
+      const rangePixels = source.range * (0.95 + animMod * 0.05);
       const brightZone = source.brightZone ?? 0.5;
-      const dimIntensity = source.dimIntensity ?? 0.4;
+      const dimIntensity = (source.dimIntensity ?? 0.4) * animMod;
       
       // Save context and clip to this source's visibility polygon
       fogCtx.save();
@@ -322,7 +344,7 @@ export function applyFogPostProcessing(
   // Render per-source illumination colors on Canvas 2D
   // Each source's color is clipped to its own visibility polygon
   if (illuminationData && illuminationData.sources.length > 0) {
-    renderIlluminationOverlay(illuminationData.sources, transform, padding, illuminationData.gridSize);
+    renderIlluminationOverlay(illuminationData.sources, transform, padding, illuminationData.gridSize, animationTime);
     
     // Send illumination overlay to PixiJS
     if (illuminationCanvas) {
