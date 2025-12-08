@@ -61,8 +61,8 @@ const fragment = `
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture(uTexture, vTextureCoord);
     
-    // baseVisibility: 1.0 = fully visible (inside visibility polygon), 0.0 = fogged/blocked
-    float baseVisibility = 1.0 - fogColor.a;
+    // Visibility: 1.0 = visible (fog cut out), 0.0 = fogged/blocked
+    float visibility = 1.0 - fogColor.a;
     
     // If fog is fully opaque (behind walls), no processing needed
     if (fogColor.a >= 0.99) {
@@ -70,14 +70,15 @@ const fragment = `
       return;
     }
     
-    // If no sources, just pass through
+    // If no sources, just pass through the fog
     if (uSourceCount == 0) {
       finalColor = fogColor;
       return;
     }
     
-    // Calculate dim zone darkening only - color is handled by illumination overlay
-    float minDarkening = 1.0;
+    // Calculate dim zone darkening effect for visible areas
+    // We want to ADD a slight fog overlay in dim zones (not bright zones)
+    float dimOverlay = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -88,32 +89,36 @@ const fragment = `
       if (range <= 0.0) continue;
       
       float brightZone = uBrightZones[i];
-      float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
+      float softEdge = uSoftEdgeRadii[i];
       
-      float rawIllumination = 0.0;
+      // In bright zone: no dim overlay
+      // In dim zone: gradual overlay based on distance
+      // Outside range: full overlay (but already blocked by visibility)
       
       if (dist <= range * brightZone) {
-        rawIllumination = brightIntensity;
+        // Bright zone - no dimming, this source provides full illumination
+        dimOverlay = 0.0;
+        break; // If any source puts us in bright zone, no dimming
       } else if (dist <= range) {
+        // Dim zone - apply gradual dimming
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
+        // dimProgress: 0.0 at bright zone edge, 1.0 at range edge
+        float localDim = dimProgress * (1.0 - dimIntensity);
+        dimOverlay = max(dimOverlay, localDim);
       }
-      
-      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
-      float illumination = rawIllumination * baseVisibility;
-      
-      float darkening = 1.0 - illumination;
-      minDarkening = min(minDarkening, darkening);
     }
     
-    // Apply dim zone darkening
-    float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
-    float newFogAlpha = 1.0 - darkenedVisibility;
-    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
+    // Apply dim overlay only to visible areas
+    // This adds a subtle fog tint in dim zones
+    float dimFog = dimOverlay * visibility * 0.4; // 0.4 = max dim darkness
     
-    // Output fog only - color overlay is composited separately by PixiJS
-    finalColor = vec4(fogColor.rgb, baseFogAlpha);
+    // Final fog alpha combines original fog + dim zone overlay
+    float finalFogAlpha = fogColor.a + dimFog;
+    finalFogAlpha = clamp(finalFogAlpha, 0.0, 1.0);
+    
+    // Output fog with dim overlay
+    finalColor = vec4(fogColor.rgb, finalFogAlpha);
   }
 `;
 
@@ -142,8 +147,8 @@ const fragmentGLSL100 = `
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture2D(uTexture, vTextureCoord);
     
-    // baseVisibility: 1.0 = fully visible, 0.0 = fogged/blocked
-    float baseVisibility = 1.0 - fogColor.a;
+    // Visibility: 1.0 = visible (fog cut out), 0.0 = fogged/blocked
+    float visibility = 1.0 - fogColor.a;
     
     if (fogColor.a >= 0.99) {
       gl_FragColor = fogColor;
@@ -155,7 +160,8 @@ const fragmentGLSL100 = `
       return;
     }
     
-    float minDarkening = 1.0;
+    // Calculate dim zone darkening effect for visible areas
+    float dimOverlay = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -166,31 +172,25 @@ const fragmentGLSL100 = `
       if (range <= 0.0) continue;
       
       float brightZone = uBrightZones[i];
-      float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      float rawIllumination = 0.0;
-      
       if (dist <= range * brightZone) {
-        rawIllumination = brightIntensity;
+        // Bright zone - no dimming
+        dimOverlay = 0.0;
+        break;
       } else if (dist <= range) {
+        // Dim zone - gradual dimming
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
+        float localDim = dimProgress * (1.0 - dimIntensity);
+        dimOverlay = max(dimOverlay, localDim);
       }
-      
-      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
-      float illumination = rawIllumination * baseVisibility;
-      
-      float darkening = 1.0 - illumination;
-      minDarkening = min(minDarkening, darkening);
     }
     
-    float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
-    float newFogAlpha = 1.0 - darkenedVisibility;
-    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
+    // Apply dim overlay only to visible areas
+    float dimFog = dimOverlay * visibility * 0.4;
+    float finalFogAlpha = clamp(fogColor.a + dimFog, 0.0, 1.0);
     
-    // Output fog only - color overlay is composited separately by PixiJS
-    gl_FragColor = vec4(fogColor.rgb, baseFogAlpha);
+    gl_FragColor = vec4(fogColor.rgb, finalFogAlpha);
   }
 `;
 
