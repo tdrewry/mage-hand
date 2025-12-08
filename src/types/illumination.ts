@@ -3,7 +3,12 @@
  * All light sources (token vision, placed lights) use this unified model
  */
 
-export type IlluminationAnimationType = 'none' | 'flicker' | 'pulse' | 'candle';
+export type IlluminationAnimationType = 'none' | 'flicker' | 'pulse' | 'candle' | 'glow';
+
+export interface AnimationResult {
+  intensityMod: number;  // Multiplier for intensity (0-1)
+  radiusMod: number;     // Multiplier for radius (0.8-1.2 typically)
+}
 
 export interface IlluminationSource {
   id: string;
@@ -107,8 +112,8 @@ export const DEFAULT_ILLUMINATION: Omit<IlluminationSource, 'id' | 'position'> =
 };
 
 /**
- * Calculate animated intensity multiplier based on time and animation type
- * Returns a value between 0 and 1 that should be applied to intensity values
+ * Calculate animated intensity and radius multipliers based on time and animation type
+ * Returns modifiers that should be applied to intensity and radius values
  */
 export function calculateAnimatedIntensity(
   animation: IlluminationAnimationType,
@@ -117,9 +122,23 @@ export function calculateAnimatedIntensity(
   time: number,
   sourceId: string
 ): number {
-  if (animation === 'none') return 1.0;
+  const result = calculateAnimationModifiers(animation, animationSpeed, animationIntensity, time, sourceId);
+  return result.intensityMod;
+}
+
+/**
+ * Calculate full animation modifiers including radius changes
+ */
+export function calculateAnimationModifiers(
+  animation: IlluminationAnimationType,
+  animationSpeed: number,
+  animationIntensity: number,
+  time: number,
+  sourceId: string
+): AnimationResult {
+  if (animation === 'none') return { intensityMod: 1.0, radiusMod: 1.0 };
   
-  // Use source ID to create phase offset so lights don't flicker in sync
+  // Use source ID to create phase offset so lights don't animate in sync
   const phaseOffset = hashStringToNumber(sourceId) * Math.PI * 2;
   const t = time * animationSpeed * 0.001; // Convert to seconds
   
@@ -129,10 +148,12 @@ export function calculateAnimatedIntensity(
       const flicker1 = Math.sin(t * 12 + phaseOffset) * 0.5;
       const flicker2 = Math.sin(t * 23 + phaseOffset * 1.3) * 0.3;
       const flicker3 = Math.sin(t * 37 + phaseOffset * 0.7) * 0.2;
-      // Random-ish spikes
       const spike = Math.pow(Math.sin(t * 5 + phaseOffset), 8) * 0.4;
       const combined = (flicker1 + flicker2 + flicker3 + spike) * animationIntensity;
-      return Math.max(0.3, Math.min(1.0, 1.0 - combined * 0.5));
+      return { 
+        intensityMod: Math.max(0.3, Math.min(1.0, 1.0 - combined * 0.5)),
+        radiusMod: 1.0 - combined * 0.03 // Very subtle radius flicker
+      };
     }
     
     case 'candle': {
@@ -141,17 +162,40 @@ export function calculateAnimatedIntensity(
       const gentle = Math.sin(t * 3 + phaseOffset * 1.5) * 0.1;
       const occasional = Math.pow(Math.sin(t * 1.5 + phaseOffset), 12) * 0.3;
       const combined = (base + gentle + occasional) * animationIntensity;
-      return Math.max(0.5, Math.min(1.0, 1.0 - combined));
+      return { 
+        intensityMod: Math.max(0.5, Math.min(1.0, 1.0 - combined)),
+        radiusMod: 1.0 - combined * 0.02
+      };
     }
     
     case 'pulse': {
-      // Smooth sinusoidal pulsing
+      // Smooth sinusoidal pulsing - intensity only
       const pulse = (Math.sin(t * 2 + phaseOffset) + 1) * 0.5;
-      return 1.0 - (pulse * animationIntensity * 0.4);
+      return { 
+        intensityMod: 1.0 - (pulse * animationIntensity * 0.4),
+        radiusMod: 1.0
+      };
+    }
+    
+    case 'glow': {
+      // Magical pulsing glow - primarily affects radius with subtle intensity
+      const primaryPulse = (Math.sin(t * 1.5 + phaseOffset) + 1) * 0.5;
+      const secondaryPulse = (Math.sin(t * 2.7 + phaseOffset * 1.3) + 1) * 0.5;
+      const combined = primaryPulse * 0.7 + secondaryPulse * 0.3;
+      
+      // Radius expands and contracts smoothly
+      const radiusChange = combined * animationIntensity * 0.15; // Up to 15% radius change
+      // Intensity pulses inversely - brighter when smaller for energy conservation feel
+      const intensityChange = (1 - combined) * animationIntensity * 0.2;
+      
+      return {
+        intensityMod: Math.max(0.7, Math.min(1.2, 1.0 + intensityChange)),
+        radiusMod: Math.max(0.85, Math.min(1.15, 1.0 + radiusChange - animationIntensity * 0.075))
+      };
     }
     
     default:
-      return 1.0;
+      return { intensityMod: 1.0, radiusMod: 1.0 };
   }
 }
 
