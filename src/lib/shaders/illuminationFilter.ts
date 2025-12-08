@@ -94,24 +94,26 @@ const fragment = `
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      float illumination = 0.0;
+      float rawIllumination = 0.0;
       
       if (dist <= range * brightZone) {
-        illumination = brightIntensity;
+        rawIllumination = brightIntensity;
       } else if (dist <= range) {
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        illumination = mix(brightIntensity, dimIntensity, dimProgress);
+        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
+      
+      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
+      float illumination = rawIllumination * baseVisibility;
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
       totalIllumination = max(totalIllumination, illumination);
       
-      // Color weighted by thresholded visibility to respect wall occlusion
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0 && thresholdedVisibility > 0.0) {
-        float visibilityWeightedIllum = illumination * thresholdedVisibility;
-        accumulatedColor += uColors[i] * visibilityWeightedIllum;
-        totalColorWeight += visibilityWeightedIllum;
+      // Color weighted by visibility to respect wall occlusion
+      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
+        accumulatedColor += uColors[i] * illumination;
+        totalColorWeight += illumination;
       }
     }
     
@@ -198,23 +200,25 @@ const fragmentGLSL100 = `
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      float illumination = 0.0;
+      float rawIllumination = 0.0;
       
       if (dist <= range * brightZone) {
-        illumination = brightIntensity;
+        rawIllumination = brightIntensity;
       } else if (dist <= range) {
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        illumination = mix(brightIntensity, dimIntensity, dimProgress);
+        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
+      
+      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
+      float illumination = rawIllumination * baseVisibility;
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
       totalIllumination = max(totalIllumination, illumination);
       
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0 && thresholdedVisibility > 0.0) {
-        float visibilityWeightedIllum = illumination * thresholdedVisibility;
-        accumulatedColor += uColors[i] * visibilityWeightedIllum;
-        totalColorWeight += visibilityWeightedIllum;
+      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
+        accumulatedColor += uColors[i] * illumination;
+        totalColorWeight += illumination;
       }
     }
     
