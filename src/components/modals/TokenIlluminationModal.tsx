@@ -12,9 +12,74 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useFogStore } from '@/stores/fogStore';
 import type { IlluminationSource } from '@/types/illumination';
 import { DEFAULT_ILLUMINATION } from '@/types/illumination';
+
+// Illumination presets
+const ILLUMINATION_PRESETS = {
+  custom: {
+    name: 'Custom',
+    ...DEFAULT_ILLUMINATION,
+  },
+  torch: {
+    name: 'Torch',
+    range: 8,
+    brightZone: 0.5,
+    brightIntensity: 1.0,
+    dimIntensity: 0.6,
+    color: '#FF6B00',
+    colorEnabled: true,
+    colorIntensity: 0.2,
+    softEdge: true,
+    softEdgeRadius: 6,
+  },
+  lantern: {
+    name: 'Lantern',
+    range: 12,
+    brightZone: 0.5,
+    brightIntensity: 1.0,
+    dimIntensity: 0.5,
+    color: '#FFD700',
+    colorEnabled: true,
+    colorIntensity: 0.15,
+    softEdge: true,
+    softEdgeRadius: 8,
+  },
+  darkvision: {
+    name: 'Darkvision',
+    range: 12,
+    brightZone: 0.0,
+    brightIntensity: 0.0,
+    dimIntensity: 0.7,
+    color: '#90EE90',
+    colorEnabled: true,
+    colorIntensity: 0.1,
+    softEdge: true,
+    softEdgeRadius: 4,
+  },
+  moonlight: {
+    name: 'Moonlight',
+    range: 24,
+    brightZone: 0.3,
+    brightIntensity: 0.6,
+    dimIntensity: 0.3,
+    color: '#87CEEB',
+    colorEnabled: true,
+    colorIntensity: 0.15,
+    softEdge: true,
+    softEdgeRadius: 12,
+  },
+} as const;
+
+type PresetKey = keyof typeof ILLUMINATION_PRESETS;
 
 interface TokenIlluminationModalProps {
   open: boolean;
@@ -35,6 +100,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   const isMultiple = tokenIds.length > 1;
 
   // Local state for form values
+  const [selectedPreset, setSelectedPreset] = useState<PresetKey>('custom');
   const [range, setRange] = useState(currentIllumination?.range ?? DEFAULT_ILLUMINATION.range);
   const [brightZone, setBrightZone] = useState(currentIllumination?.brightZone ?? effectSettings.lightFalloff);
   const [brightIntensity, setBrightIntensity] = useState(currentIllumination?.brightIntensity ?? DEFAULT_ILLUMINATION.brightIntensity);
@@ -46,9 +112,28 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   const [softEdgeRadius, setSoftEdgeRadius] = useState(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
   const [useGlobalBrightZone, setUseGlobalBrightZone] = useState(!currentIllumination?.brightZone);
 
+  // Apply preset values
+  const applyPreset = (presetKey: PresetKey) => {
+    setSelectedPreset(presetKey);
+    if (presetKey === 'custom') return;
+    
+    const preset = ILLUMINATION_PRESETS[presetKey];
+    setRange(preset.range);
+    setBrightZone(preset.brightZone);
+    setBrightIntensity(preset.brightIntensity);
+    setDimIntensity(preset.dimIntensity);
+    setColor(preset.color);
+    setColorEnabled(preset.colorEnabled);
+    setColorIntensity(preset.colorIntensity);
+    setSoftEdge(preset.softEdge);
+    setSoftEdgeRadius(preset.softEdgeRadius);
+    setUseGlobalBrightZone(false);
+  };
+
   // Reset form when modal opens with new token
   useEffect(() => {
     if (open) {
+      setSelectedPreset('custom');
       setRange(currentIllumination?.range ?? DEFAULT_ILLUMINATION.range);
       setBrightZone(currentIllumination?.brightZone ?? effectSettings.lightFalloff);
       setBrightIntensity(currentIllumination?.brightIntensity ?? DEFAULT_ILLUMINATION.brightIntensity);
@@ -90,6 +175,23 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-5">
+          {/* Preset Selector */}
+          <div className="space-y-2">
+            <Label>Preset</Label>
+            <Select value={selectedPreset} onValueChange={(v) => applyPreset(v as PresetKey)}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Select a preset" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="custom">Custom</SelectItem>
+                <SelectItem value="torch">🔥 Torch (40ft)</SelectItem>
+                <SelectItem value="lantern">🏮 Lantern (60ft)</SelectItem>
+                <SelectItem value="darkvision">👁️ Darkvision (60ft)</SelectItem>
+                <SelectItem value="moonlight">🌙 Moonlight (120ft)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Range */}
           <div className="space-y-2">
             <div className="flex justify-between">
@@ -98,7 +200,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
             </div>
             <Slider
               value={[range]}
-              onValueChange={([v]) => setRange(v)}
+              onValueChange={([v]) => { setRange(v); setSelectedPreset('custom'); }}
               min={1}
               max={24}
               step={1}
