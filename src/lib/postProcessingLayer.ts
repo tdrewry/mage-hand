@@ -108,8 +108,10 @@ export async function initPostProcessing(
 
     // Create a container for the fog sprite
     const fogContainer = new PIXI.Container();
-    // Apply both blur and illumination filters
-    fogContainer.filters = [illuminationFilter, blurFilter];
+    // Apply blur FIRST, then illumination. This ensures illumination
+    // clips to the already-blurred visibility boundaries, preventing
+    // color tints and dim effects from bleeding through walls.
+    fogContainer.filters = [blurFilter, illuminationFilter];
     pixiApp.stage.addChild(fogContainer);
 
     // Create fog sprite (will be updated with fog texture)
