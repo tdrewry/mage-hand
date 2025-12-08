@@ -41,6 +41,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   const [dimIntensity, setDimIntensity] = useState(currentIllumination?.dimIntensity ?? DEFAULT_ILLUMINATION.dimIntensity);
   const [color, setColor] = useState(currentIllumination?.color ?? DEFAULT_ILLUMINATION.color);
   const [colorEnabled, setColorEnabled] = useState(currentIllumination?.colorEnabled ?? DEFAULT_ILLUMINATION.colorEnabled);
+  const [colorIntensity, setColorIntensity] = useState(currentIllumination?.colorIntensity ?? DEFAULT_ILLUMINATION.colorIntensity);
   const [softEdge, setSoftEdge] = useState(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
   const [softEdgeRadius, setSoftEdgeRadius] = useState(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
   const [useGlobalBrightZone, setUseGlobalBrightZone] = useState(!currentIllumination?.brightZone);
@@ -54,6 +55,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       setDimIntensity(currentIllumination?.dimIntensity ?? DEFAULT_ILLUMINATION.dimIntensity);
       setColor(currentIllumination?.color ?? DEFAULT_ILLUMINATION.color);
       setColorEnabled(currentIllumination?.colorEnabled ?? DEFAULT_ILLUMINATION.colorEnabled);
+      setColorIntensity(currentIllumination?.colorIntensity ?? DEFAULT_ILLUMINATION.colorIntensity);
       setSoftEdge(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
       setSoftEdgeRadius(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
       setUseGlobalBrightZone(!currentIllumination?.brightZone);
@@ -68,6 +70,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       dimIntensity,
       color,
       colorEnabled,
+      colorIntensity,
       softEdge,
       softEdgeRadius,
     });
@@ -193,6 +196,21 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
                   disabled={!colorEnabled}
                 />
               ))}
+            </div>
+            {/* Color Intensity Slider */}
+            <div className={`space-y-2 ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="flex justify-between">
+                <Label className="text-sm">Color Intensity</Label>
+                <span className="text-xs text-muted-foreground">{Math.round(colorIntensity * 100)}%</span>
+              </div>
+              <Slider
+                value={[colorIntensity]}
+                onValueChange={([v]) => setColorIntensity(v)}
+                min={0.1}
+                max={1}
+                step={0.05}
+                disabled={!colorEnabled}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               {colorEnabled

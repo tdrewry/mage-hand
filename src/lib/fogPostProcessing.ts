@@ -169,10 +169,10 @@ function renderIlluminationOverlay(
     
     const rgb = parseColorToRGB(source.color);
     
-    // Color tint intensity - use solid visible colors
-    // The additive blend will combine with the background
-    const brightAlpha = 0.35; // Visible but not overpowering
-    const dimAlpha = 0.15;
+    // Color tint intensity - use the source's colorIntensity setting
+    const intensity = source.colorIntensity ?? 0.5;
+    const brightAlpha = intensity * 0.7; // Scale to max 0.7 alpha
+    const dimAlpha = intensity * 0.3;    // Dim zone is ~40% of bright
     
     gradient.addColorStop(0, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
