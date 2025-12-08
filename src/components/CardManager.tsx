@@ -11,7 +11,6 @@ import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { MenuCardContent } from '@/components/cards/MenuCard';
-import { MapCardContent } from '@/components/cards/MapCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
@@ -96,7 +95,7 @@ export function CardManager({
             id={card.id}
             title={getCardTitle(card.type)}
             isResizable={true}
-            isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
+            isClosable={card.type !== CardType.MENU}
             hideHeader={card.hideHeader}
             fullCardDraggable={card.fullCardDraggable}
           >
@@ -111,7 +110,6 @@ export function CardManager({
 // Helper function to get card titles
 function getCardTitle(type: CardType): string {
   const titles: Record<CardType, string> = {
-    [CardType.MAP]: 'Map View',
     [CardType.MENU]: 'Menu',
     [CardType.ROSTER]: 'Roster',
     [CardType.TOOLS]: 'Tools',
@@ -182,8 +180,6 @@ function renderCardContent(
       );
     case CardType.INITIATIVE_TRACKER:
       return <InitiativeTrackerCardContent />;
-    case CardType.MAP:
-      return <MapCardContent />;
     case CardType.STYLES:
       return <StylesCardContent />;
     case CardType.REGION_CONTROL:
