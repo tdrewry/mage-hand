@@ -3,7 +3,8 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useFogStore, type EffectQuality } from '@/stores/fogStore';
-import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay } from 'lucide-react';
+import { useLightStore } from '@/stores/lightStore';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
@@ -35,6 +36,9 @@ export function FogControlCardContent() {
     clearExploredAreas,
     resetFog,
   } = useFogStore();
+
+  const { lights } = useLightStore();
+  const enabledLightsCount = lights.filter(l => l.enabled).length;
 
   return (
     <div className="space-y-4">
@@ -261,6 +265,12 @@ export function FogControlCardContent() {
               <p className="text-xs text-muted-foreground">
                 Inner bright zone radius (outer is dimmer)
               </p>
+              {enabledLightsCount === 0 && (
+                <div className="flex items-center gap-1.5 mt-1 text-xs text-amber-500">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>No lights enabled — this only affects light sources</span>
+                </div>
+              )}
             </div>
 
             {/* Volumetric Fog Toggle */}
