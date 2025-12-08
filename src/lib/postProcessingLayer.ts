@@ -153,14 +153,22 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
       }
       fogTexture = PIXI.Texture.from(sourceCanvas);
       fogSprite.texture = fogTexture;
-      
-      // Update sprite dimensions for new texture size
-      const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-      fogSprite.width = sourceCanvas.width * qualityMultiplier;
-      fogSprite.height = sourceCanvas.height * qualityMultiplier;
-      fogSprite.x = -padding * qualityMultiplier;
-      fogSprite.y = -padding * qualityMultiplier;
     }
+    
+    // The fog canvas is larger than viewport by 2*padding (padding on each side).
+    // The fog content (and illumination positions) are in fog canvas coordinates,
+    // with the visible viewport area starting at (padding, padding) in those coords.
+    // 
+    // By positioning the sprite at (-padding, -padding), we offset it so that:
+    // - Fog canvas position (padding, padding) aligns with PixiJS stage position (0, 0)
+    // - Fog canvas position (0, 0) is at stage position (-padding, -padding) - off-screen
+    // 
+    // This ensures the visible fog area aligns with the viewport while allowing
+    // blur effects to extend into the padding area without hard edges.
+    fogSprite.width = sourceCanvas.width;
+    fogSprite.height = sourceCanvas.height;
+    fogSprite.x = -padding;
+    fogSprite.y = -padding;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }

@@ -148,6 +148,9 @@ export function applyFogPostProcessing(
   fogCtx.restore();
 
   // Update GPU illumination data if provided
+  // NOTE: Shader positions should be in fog canvas coordinates.
+  // The fog canvas is drawn with translate(padding + panX, padding + panY) then scale(zoom),
+  // so a world point P appears at: P * zoom + padding + pan
   if (illuminationData && illuminationData.sources.length > 0) {
     const shaderData = createShaderData(
       illuminationData.sources,
