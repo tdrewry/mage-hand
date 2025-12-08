@@ -79,13 +79,13 @@ export function createIlluminationFromTemplate(
 export const DEFAULT_ILLUMINATION: Omit<IlluminationSource, 'id' | 'position'> = {
   name: 'Light',
   enabled: true,
-  range: 6,           // 30ft (6 grid squares * 5ft)
+  range: 12,          // 60ft (12 grid squares * 5ft)
   brightZone: 0.5,    // Inner 50% is bright
   brightIntensity: 1.0,
-  dimIntensity: 0.4,
+  dimIntensity: 0.6,
   color: '#FFD700',
   colorEnabled: false, // Color tinting disabled by default
-  colorIntensity: 0.5, // Default 50% intensity when enabled
+  colorIntensity: 0.15, // Default 15% intensity when enabled
   softEdge: true,
   softEdgeRadius: 8,
 };
