@@ -22,6 +22,7 @@ export interface IlluminationSource {
   // Visual settings
   color: string;                    // Tint color (hex)
   colorEnabled: boolean;            // Whether to apply color tinting (default: false)
+  colorIntensity: number;           // 0-1, how strong the color tint is
   softEdge: boolean;                // Whether to blur the outer edge
   softEdgeRadius: number;           // Blur amount (0-20 pixels)
   
@@ -42,6 +43,7 @@ export interface IlluminationTemplate {
   dimIntensity: number;
   color: string;
   colorEnabled: boolean;
+  colorIntensity: number;
   softEdge: boolean;
   softEdgeRadius: number;
 }
@@ -65,6 +67,7 @@ export function createIlluminationFromTemplate(
     dimIntensity: template.dimIntensity,
     color: template.color,
     colorEnabled: template.colorEnabled,
+    colorIntensity: template.colorIntensity,
     softEdge: template.softEdge,
     softEdgeRadius: template.softEdgeRadius,
   };
@@ -82,6 +85,7 @@ export const DEFAULT_ILLUMINATION: Omit<IlluminationSource, 'id' | 'position'> =
   dimIntensity: 0.4,
   color: '#FFD700',
   colorEnabled: false, // Color tinting disabled by default
+  colorIntensity: 0.5, // Default 50% intensity when enabled
   softEdge: true,
   softEdgeRadius: 8,
 };

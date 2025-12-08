@@ -1678,6 +1678,7 @@ export const SimpleTabletop = () => {
             dimIntensity: tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0),
             color: tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF'),
             colorEnabled: tokenSettings?.colorEnabled ?? false,
+            colorIntensity: tokenSettings?.colorIntensity ?? 0.5,
             softEdge: tokenSettings?.softEdge ?? true,
             softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
             visibilityPolygon: t.visibilityPath,
