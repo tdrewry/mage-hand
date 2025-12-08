@@ -1,5 +1,4 @@
 export enum CardType {
-  MAP = 'map',
   MENU = 'menu',
   ROSTER = 'roster',
   TOOLS = 'tools',

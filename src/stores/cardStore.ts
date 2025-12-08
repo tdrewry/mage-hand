@@ -39,15 +39,6 @@ interface CardStore {
 const STORAGE_KEY = 'vtt-card-layout';
 
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
-  [CardType.MAP]: {
-    title: 'Player View',
-    defaultPosition: { x: 320, y: 20 },
-    defaultSize: { width: 800, height: 600 },
-    minSize: { width: 400, height: 300 },
-    isResizable: true,
-    isClosable: true,
-    defaultVisible: false,
-  },
   [CardType.MENU]: {
     title: 'Menu',
     defaultPosition: { x: 20, y: 20 },
@@ -321,7 +312,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
     if (stored) {
       try {
         const cards = JSON.parse(stored);
-        // Filter out deprecated card types (replaced by new toolbar components)
+        // Filter out deprecated card types (replaced by new toolbar components or removed)
         const deprecatedTypes = [CardType.TOOLS, CardType.INITIATIVE_TRACKER];
         // Filter out any duplicate cards by type (keep only the first of each type)
         const uniqueCards = cards.reduce((acc: CardState[], card: CardState) => {
