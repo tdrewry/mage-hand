@@ -1666,17 +1666,14 @@ export const SimpleTabletop = () => {
       } else {
         // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
         // Convert old token visibility data to new IlluminationSource format for GPU rendering
-        const defaultGridSize = maps[0]?.regions?.[0]?.gridSize || 50; // Fallback grid size
         const illuminationSources = tokenVisibilityDataRef.current.map((t, idx) => {
           // Use token's custom illumination settings if available, otherwise use global defaults
           const tokenSettings = t.tokenIllumination?.[0];
           
-          // The range stored in tokenSettings is in grid units
-          // t.visionRange is already in PIXELS (was multiplied by gridSize when computing visibility)
-          // So if no tokenSettings, we just use the pixel value directly
-          const rangePixels = tokenSettings?.range 
-            ? tokenSettings.range * defaultGridSize 
-            : t.visionRange;
+          // IMPORTANT: Always use t.visionRange which was computed with the correct
+          // per-token gridSize when the visibility polygon was created. This ensures
+          // the color gradient matches the visibility polygon exactly.
+          const rangePixels = t.visionRange;
           
           return {
             id: `vis-${idx}`,
