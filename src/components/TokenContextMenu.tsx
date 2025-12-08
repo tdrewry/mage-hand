@@ -22,12 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb, Sparkles } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
-import { useVisionProfileStore } from '../stores/visionProfileStore';
+import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '../lib/illuminationPresets';
 import { 
   canControlToken, 
   canDeleteToken, 
@@ -63,7 +63,6 @@ export const TokenContextMenu = ({
   
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
-  const { profiles } = useVisionProfileStore();
   
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
@@ -75,15 +74,7 @@ export const TokenContextMenu = ({
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [useGradientsValue, setUseGradientsValue] = useState(true);
-  
-  // Debug: Log profiles when modal opens
-  React.useEffect(() => {
-    if (showVisionRangeModal) {
-      console.log('Vision profiles loaded:', profiles.length, profiles);
-    }
-  }, [showVisionRangeModal, profiles]);
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -224,15 +215,33 @@ export const TokenContextMenu = ({
     
     if (targetTokens.length === 1) {
       const token = targetTokens[0];
-      setSelectedProfileId(token.visionProfileId || '');
       setVisionRangeValue(token.visionRange?.toString() || '');
       setUseGradientsValue(token.useGradients !== false);
     } else {
-      setSelectedProfileId('');
       setVisionRangeValue('');
       setUseGradientsValue(true);
     }
     setShowVisionRangeModal(true);
+  };
+
+  const applyIlluminationPreset = (presetKey: PresetKey) => {
+    if (!canControl) {
+      toast.error("You don't have permission to modify illumination settings");
+      return;
+    }
+    
+    const presets = getSelectablePresets();
+    const presetEntry = presets.find(p => p.key === presetKey);
+    if (!presetEntry) return;
+    
+    const illuminationSettings = presetToIlluminationSource(presetEntry.preset);
+    
+    targetTokens.forEach(token => {
+      updateTokenIllumination(token.id, illuminationSettings);
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Applied ${presetEntry.preset.icon} ${presetEntry.preset.name} to ${targetTokens.length} token(s)`);
   };
 
   const handleAssignRole = (roleId: string) => {
@@ -278,93 +287,32 @@ export const TokenContextMenu = ({
   };
 
   const applyVisionRange = () => {
+    // Apply custom settings
+    const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
     
-    // Apply profile or custom settings
-    targetTokens.forEach(token => {
-      if (selectedProfileId) {
-        // Apply profile
-        const profile = profiles.find(p => p.id === selectedProfileId);
-        if (profile) {
-          useSessionStore.setState((state) => ({
-            tokens: state.tokens.map((t) =>
-              t.id === token.id
-                ? {
-                    ...t,
-                    visionProfileId: profile.id,
-                    visionRange: profile.visionRange,
-                    useGradients: profile.useGradients,
-                  }
-                : t
-            ),
-          }));
-        }
-      } else {
-        // Apply custom settings
-        const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
-        
-        if (range !== undefined && (isNaN(range) || range < 0)) {
-          toast.error('Please enter a valid vision range');
-          return;
-        }
-        
-        useSessionStore.setState((state) => ({
-          tokens: state.tokens.map((t) =>
-            t.id === token.id
-              ? {
-                  ...t,
-                  visionProfileId: undefined,
-                  visionRange: range,
-                  useGradients: useGradientsValue,
-                }
-              : t
-          ),
-        }));
-      }
-    });
-    
-    setShowVisionRangeModal(false);
-    onUpdateCanvas?.();
-    toast.success(`Vision settings updated for ${targetTokens.length} token(s)`);
-  };
-
-  const selectProfile = (profileId: string) => {
-    setSelectedProfileId(profileId);
-    const profile = profiles.find(p => p.id === profileId);
-    if (profile) {
-      setVisionRangeValue(profile.visionRange.toString());
-      setUseGradientsValue(profile.useGradients);
+    if (range !== undefined && (isNaN(range) || range < 0)) {
+      toast.error('Please enter a valid vision range');
+      return;
     }
-  };
-
-  const applyProfileQuick = (profileId: string) => {
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile) return;
-
-    const targetTokens = getTargetTokens();
     
-    targetTokens.forEach((token) => {
+    targetTokens.forEach(token => {
       useSessionStore.setState((state) => ({
         tokens: state.tokens.map((t) =>
           t.id === token.id
             ? {
                 ...t,
-                visionProfileId: profile.id,
-                visionRange: profile.visionRange,
-                useGradients: profile.useGradients,
+                visionRange: range,
+                useGradients: useGradientsValue,
               }
             : t
         ),
       }));
     });
     
+    setShowVisionRangeModal(false);
     onUpdateCanvas?.();
-    toast.success(`Applied ${profile.name} to ${targetTokens.length} token(s)`);
+    toast.success(`Vision settings updated for ${targetTokens.length} token(s)`);
   };
-
-  // Debug: Log profiles on render
-  React.useEffect(() => {
-    console.log('TokenContextMenu - Profiles loaded:', profiles.length, profiles);
-  }, [profiles]);
 
   return (
     <>
@@ -394,28 +342,20 @@ export const TokenContextMenu = ({
           </ContextMenuCheckboxItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger disabled={!canControl}>
-              <User className="mr-2 h-4 w-4" />
-              <span>Use Profile</span>
+              <Sparkles className="mr-2 h-4 w-4" />
+              <span>Apply Illumination Preset</span>
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto bg-popover z-[1000]">
-              {profiles.length === 0 ? (
-                <ContextMenuItem disabled>
-                  <span className="text-xs text-muted-foreground">No profiles available</span>
+            <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
+              {getSelectablePresets().map(({ key, preset }) => (
+                <ContextMenuItem 
+                  key={key}
+                  onClick={() => applyIlluminationPreset(key)}
+                >
+                  <span className="mr-2">{preset.icon}</span>
+                  <span className="flex-1">{preset.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{preset.range * 5}ft</span>
                 </ContextMenuItem>
-              ) : (
-                profiles.map((profile) => (
-                  <ContextMenuItem 
-                    key={profile.id}
-                    onClick={() => applyProfileQuick(profile.id)}
-                  >
-                    <div 
-                      className="mr-2 h-3 w-3 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: profile.color }}
-                    />
-                    <span className="flex-1">{profile.name}</span>
-                  </ContextMenuItem>
-                ))
-              )}
+              ))}
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuItem onClick={handleVisionRangeClick} disabled={!canControl}>
@@ -664,77 +604,35 @@ export const TokenContextMenu = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Vision Profiles */}
+            {/* Vision Range */}
             <div>
-              <Label className="text-sm font-medium">Vision Profiles</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2">
-                {profiles.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    No vision profiles available. Create profiles in the Vision Profile Manager.
-                  </div>
-                ) : (
-                  profiles.map((profile) => (
-                    <Button
-                      key={profile.id}
-                      variant={selectedProfileId === profile.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => selectProfile(profile.id)}
-                      className="justify-start gap-2"
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: profile.color }}
-                      />
-                      <span className="flex-1 text-left">{profile.name}</span>
-                      {profile.useGradients && (
-                        <span className="text-xs text-muted-foreground">Soft</span>
-                      )}
-                    </Button>
-                  ))
-                )}
-              </div>
+              <Label htmlFor="vision-range" className="text-sm font-medium">Vision Range (grid units)</Label>
+              <Input
+                id="vision-range"
+                type="number"
+                value={visionRangeValue}
+                onChange={(e) => setVisionRangeValue(e.target.value)}
+                placeholder="Use default"
+                min="0"
+                step="1"
+                className="mt-2"
+              />
             </div>
             
-            {/* Custom Settings */}
-            <div className="border-t pt-4">
-              <Label className="text-sm font-medium">Custom Settings</Label>
-              <div className="space-y-3 mt-2">
-                <div>
-                  <Label htmlFor="vision-range" className="text-xs">Vision Range (grid units)</Label>
-                  <Input
-                    id="vision-range"
-                    type="number"
-                    value={visionRangeValue}
-                    onChange={(e) => {
-                      setVisionRangeValue(e.target.value);
-                      setSelectedProfileId(''); // Clear profile selection
-                    }}
-                    placeholder="Use default"
-                    min="0"
-                    step="1"
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="use-gradients" className="text-xs">
-                    Use Soft Gradient Edges
-                  </Label>
-                  <Switch
-                    id="use-gradients"
-                    checked={useGradientsValue}
-                    onCheckedChange={(checked) => {
-                      setUseGradientsValue(checked);
-                      setSelectedProfileId(''); // Clear profile selection
-                    }}
-                  />
-                </div>
-                
-                <p className="text-xs text-muted-foreground">
-                  Custom settings override profile selection
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="use-gradients" className="text-sm">
+                Use Soft Gradient Edges
+              </Label>
+              <Switch
+                id="use-gradients"
+                checked={useGradientsValue}
+                onCheckedChange={setUseGradientsValue}
+              />
             </div>
+            
+            <p className="text-xs text-muted-foreground">
+              For full illumination control, use "Illumination Settings" from the context menu.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowVisionRangeModal(false)}>
