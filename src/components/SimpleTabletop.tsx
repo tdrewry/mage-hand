@@ -1666,7 +1666,7 @@ export const SimpleTabletop = () => {
           enabled: true,
           position: t.position,
           range: t.visionRange / gridSize, // Convert pixels to grid units
-          brightZone: 0.5,
+          brightZone: effectSettings.lightFalloff,
           brightIntensity: 1.0,
           dimIntensity: t.isLightSource ? 0.4 : 0.0,
           color: t.isLightSource ? '#FFD700' : '#FFFFFF',
