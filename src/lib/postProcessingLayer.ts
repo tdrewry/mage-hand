@@ -34,6 +34,8 @@ const DEFAULT_EFFECT_SETTINGS: EffectSettings = {
 let pixiApp: PIXI.Application | null = null;
 let fogSprite: PIXI.Sprite | null = null;
 let fogTexture: PIXI.Texture | null = null;
+let illuminationSprite: PIXI.Sprite | null = null;
+let illuminationTexture: PIXI.Texture | null = null;
 let blurFilter: PIXI.BlurFilter | null = null;
 let illuminationFilter: IlluminationFilter | null = null;
 let containerRef: HTMLElement | null = null;
@@ -108,8 +110,10 @@ export async function initPostProcessing(
 
     // Create a container for the fog sprite
     const fogContainer = new PIXI.Container();
-    // Apply both blur and illumination filters
-    fogContainer.filters = [illuminationFilter, blurFilter];
+    // Apply blur FIRST, then illumination. This ensures illumination
+    // clips to the already-blurred visibility boundaries, preventing
+    // color tints and dim effects from bleeding through walls.
+    fogContainer.filters = [blurFilter, illuminationFilter];
     pixiApp.stage.addChild(fogContainer);
 
     // Create fog sprite (will be updated with fog texture)
@@ -117,6 +121,13 @@ export async function initPostProcessing(
     fogSprite.width = effectiveWidth;
     fogSprite.height = effectiveHeight;
     fogContainer.addChild(fogSprite);
+    
+    // Create illumination overlay sprite (rendered on top with additive blending)
+    illuminationSprite = new PIXI.Sprite();
+    illuminationSprite.width = effectiveWidth;
+    illuminationSprite.height = effectiveHeight;
+    illuminationSprite.blendMode = 'add';
+    pixiApp.stage.addChild(illuminationSprite);
 
     isInitialized = true;
     console.log('✅ PixiJS post-processing initialized with GPU illumination');
@@ -168,6 +179,42 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
     fogSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
+  }
+}
+
+/**
+ * Update the illumination overlay texture from a Canvas 2D source
+ * This contains pre-rendered per-source color tints clipped to visibility polygons
+ */
+export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
+  if (!pixiApp || !illuminationSprite || !isInitialized) return;
+
+  try {
+    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
+    
+    // Check if we can update the existing texture or need to create a new one
+    if (illuminationTexture && illuminationTexture.source && 
+        illuminationTexture.source.width === sourceCanvas.width && 
+        illuminationTexture.source.height === sourceCanvas.height) {
+      // Update existing texture in-place
+      illuminationTexture.source.resource = sourceCanvas;
+      illuminationTexture.source.update();
+    } else {
+      // Size changed or no texture exists - need to create new texture
+      if (illuminationTexture) {
+        illuminationTexture.destroy(true);
+      }
+      illuminationTexture = PIXI.Texture.from(sourceCanvas);
+      illuminationSprite.texture = illuminationTexture;
+    }
+    
+    // Scale sprite to match render resolution
+    illuminationSprite.width = sourceCanvas.width * qualityMultiplier;
+    illuminationSprite.height = sourceCanvas.height * qualityMultiplier;
+    illuminationSprite.x = -padding * qualityMultiplier;
+    illuminationSprite.y = -padding * qualityMultiplier;
+  } catch (error) {
+    console.error('Failed to update illumination texture:', error);
   }
 }
 
@@ -247,6 +294,11 @@ export function resizePostProcessing(width: number, height: number): void {
     fogSprite.width = effectiveWidth;
     fogSprite.height = effectiveHeight;
   }
+  
+  if (illuminationSprite) {
+    illuminationSprite.width = effectiveWidth;
+    illuminationSprite.height = effectiveHeight;
+  }
 }
 
 /**
@@ -282,6 +334,11 @@ export async function cleanupPostProcessing(): Promise<void> {
       fogTexture.destroy(true);
       fogTexture = null;
     }
+    
+    if (illuminationTexture) {
+      illuminationTexture.destroy(true);
+      illuminationTexture = null;
+    }
 
     if (blurFilter) {
       blurFilter.destroy();
@@ -296,6 +353,11 @@ export async function cleanupPostProcessing(): Promise<void> {
     if (fogSprite) {
       fogSprite.destroy();
       fogSprite = null;
+    }
+    
+    if (illuminationSprite) {
+      illuminationSprite.destroy();
+      illuminationSprite = null;
     }
 
     if (pixiApp) {

@@ -245,6 +245,7 @@ export const useSessionStore = create<SessionState>()(
             brightIntensity: illumination.brightIntensity ?? 1.0,
             dimIntensity: illumination.dimIntensity ?? 0.0,
             color: illumination.color ?? '#FFFFFF',
+            colorEnabled: illumination.colorEnabled ?? false,
             softEdge: illumination.softEdge ?? true,
             softEdgeRadius: illumination.softEdgeRadius ?? 8,
           }];
