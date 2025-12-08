@@ -55,16 +55,14 @@ const fragment = `
   uniform float uGlobalEdgeBlur;
   
   void main(void) {
-    // Get fragment position in pixels
     vec2 fragPos = vTextureCoord * uInputSize.xy;
-    
-    // Sample the fog texture
-    // The fog already has visibility polygons cut out (alpha = 0 inside visible areas)
-    // Areas blocked by walls have high alpha (fogged)
     vec4 fogColor = texture(uTexture, vTextureCoord);
     
-    // baseVisibility represents the fog mask: 1.0 = visible (inside visibility polygon), 0.0 = fogged/blocked
+    // baseVisibility: 1.0 = fully visible (inside visibility polygon), 0.0 = fogged/blocked
     float baseVisibility = 1.0 - fogColor.a;
+    
+    // Apply visibility threshold to prevent color bleeding at soft fog edges
+    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
     
     // If fog is fully opaque (behind walls), no processing needed
     if (fogColor.a >= 0.99) {
@@ -78,13 +76,11 @@ const fragment = `
       return;
     }
     
-    // Calculate how much to darken the visible area based on distance from light sources
+    // Calculate darkening and color accumulation
     float minDarkening = 1.0;
-    
-    // Accumulate color tinting from enabled light sources
-    // Color is weighted by BOTH distance-based illumination AND wall visibility
     vec3 accumulatedColor = vec3(0.0);
     float totalColorWeight = 0.0;
+    float totalIllumination = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -98,7 +94,6 @@ const fragment = `
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      // Calculate distance-based illumination
       float illumination = 0.0;
       
       if (dist <= range * brightZone) {
@@ -108,45 +103,40 @@ const fragment = `
         illumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
       
-      // Less darkening where there's more illumination
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
+      totalIllumination = max(totalIllumination, illumination);
       
-      // Accumulate color contribution if color is enabled
-      // CRITICAL: Multiply by baseVisibility to respect wall occlusion from fog mask
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        float visibilityWeightedIllumination = illumination * baseVisibility;
-        accumulatedColor += uColors[i] * visibilityWeightedIllumination;
-        totalColorWeight += visibilityWeightedIllumination;
+      // Color weighted by thresholded visibility to respect wall occlusion
+      if (uColorEnabled[i] > 0.5 && illumination > 0.0 && thresholdedVisibility > 0.0) {
+        float visibilityWeightedIllum = illumination * thresholdedVisibility;
+        accumulatedColor += uColors[i] * visibilityWeightedIllum;
+        totalColorWeight += visibilityWeightedIllum;
       }
     }
     
-    // Apply darkening to visible areas
+    // Apply dim zone darkening
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
+    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    // Calculate final output with optional color tinting
-    // Color is only applied where the fog mask shows visibility (baseVisibility > 0)
-    vec3 finalFogColor = fogColor.rgb;
-    
-    if (totalColorWeight > 0.0) {
-      // Normalize accumulated color
+    // Apply color tinting
+    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
       vec3 normalizedColor = accumulatedColor / totalColorWeight;
       
-      // Tint strength is proportional to actual visibility (respects walls)
-      float tintStrength = baseVisibility * 0.5;
+      // Color overlay alpha - this makes the tint VISIBLE in lit areas
+      // Scale by illumination and visibility for proper falloff
+      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
       
-      // Create colored overlay only in visible areas
-      vec3 tintOverlay = normalizedColor * tintStrength;
+      // Final alpha: max of fog, dim zone, and color tint
+      float finalAlpha = max(baseFogAlpha, tintAlpha);
       
-      // Blend: use tinted color in visible areas, original fog color in blocked areas
-      vec3 outputColor = mix(fogColor.rgb, tintOverlay, baseVisibility);
+      // Blend RGB: fog color in dark/blocked areas, tint color in lit areas
+      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
       
-      finalColor = vec4(outputColor, max(fogColor.a, newFogAlpha * 0.7));
+      finalColor = vec4(outputColor, finalAlpha);
     } else {
-      finalColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
-    }
-  }
+      finalColor = vec4(fogColor.rgb, baseFogAlpha);
     }
   }
 `;
@@ -175,27 +165,26 @@ const fragmentGLSL100 = `
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture2D(uTexture, vTextureCoord);
     
-    // baseVisibility represents the fog mask: 1.0 = visible, 0.0 = fogged/blocked by walls
+    // baseVisibility: 1.0 = fully visible, 0.0 = fogged/blocked
     float baseVisibility = 1.0 - fogColor.a;
     
-    // If fog is fully opaque (behind walls), no processing needed
+    // Threshold to prevent color bleeding at soft fog edges
+    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
+    
     if (fogColor.a >= 0.99) {
       gl_FragColor = fogColor;
       return;
     }
     
-    // If no sources, just pass through
     if (uSourceCount == 0) {
       gl_FragColor = fogColor;
       return;
     }
     
-    // Calculate darkening based on distance from light sources
     float minDarkening = 1.0;
-    
-    // Accumulate color tinting - weighted by BOTH illumination AND wall visibility
     vec3 accumulatedColor = vec3(0.0);
     float totalColorWeight = 0.0;
+    float totalIllumination = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -220,32 +209,30 @@ const fragmentGLSL100 = `
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
+      totalIllumination = max(totalIllumination, illumination);
       
-      // CRITICAL: Multiply by baseVisibility to respect wall occlusion
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        float visibilityWeightedIllumination = illumination * baseVisibility;
-        accumulatedColor += uColors[i] * visibilityWeightedIllumination;
-        totalColorWeight += visibilityWeightedIllumination;
+      if (uColorEnabled[i] > 0.5 && illumination > 0.0 && thresholdedVisibility > 0.0) {
+        float visibilityWeightedIllum = illumination * thresholdedVisibility;
+        accumulatedColor += uColors[i] * visibilityWeightedIllum;
+        totalColorWeight += visibilityWeightedIllum;
       }
     }
     
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
+    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    // Color only applied where fog mask shows visibility
-    vec3 finalFogColor = fogColor.rgb;
-    
-    if (totalColorWeight > 0.0) {
+    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
       vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      float tintStrength = baseVisibility * 0.5;
-      vec3 tintOverlay = normalizedColor * tintStrength;
       
-      // Blend: tinted color in visible areas, original fog in blocked areas
-      vec3 outputColor = mix(fogColor.rgb, tintOverlay, baseVisibility);
+      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
+      float finalAlpha = max(baseFogAlpha, tintAlpha);
       
-      gl_FragColor = vec4(outputColor, max(fogColor.a, newFogAlpha * 0.7));
+      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
+      
+      gl_FragColor = vec4(outputColor, finalAlpha);
     } else {
-      gl_FragColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
+      gl_FragColor = vec4(fogColor.rgb, baseFogAlpha);
     }
   }
 `;
