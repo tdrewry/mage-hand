@@ -34,6 +34,9 @@ const vertex = `
 // Simplified fragment shader - color tinting is now handled by a separate
 // Canvas 2D overlay that's clipped to each source's visibility polygon.
 // This shader only handles fog/visibility and dim zone darkening.
+// Simplified fragment shader - bright/dim zones are now rendered on Canvas 2D
+// with per-source visibility polygon clipping. This shader is a pass-through
+// that preserves the fog mask for compositing.
 const fragment = `
   precision highp float;
   
@@ -43,7 +46,7 @@ const fragment = `
   uniform sampler2D uTexture;
   uniform vec4 uInputSize;
   
-  // Illumination uniforms
+  // Keep uniforms for potential future effects (soft edges, etc)
   uniform int uSourceCount;
   uniform vec2 uPositions[${MAX_ILLUMINATION_SOURCES}];
   uniform float uRanges[${MAX_ILLUMINATION_SOURCES}];
@@ -53,77 +56,20 @@ const fragment = `
   uniform float uSoftEdgeRadii[${MAX_ILLUMINATION_SOURCES}];
   uniform vec3 uColors[${MAX_ILLUMINATION_SOURCES}];
   uniform float uColorEnabled[${MAX_ILLUMINATION_SOURCES}];
-  
-  // Global settings
   uniform float uGlobalEdgeBlur;
   
   void main(void) {
-    vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture(uTexture, vTextureCoord);
     
-    // Visibility: 1.0 = visible (fog cut out), 0.0 = fogged/blocked
-    float visibility = 1.0 - fogColor.a;
-    
-    // If fog is fully opaque (behind walls), no processing needed
-    if (fogColor.a >= 0.99) {
-      finalColor = fogColor;
-      return;
-    }
-    
-    // If no sources, just pass through the fog
-    if (uSourceCount == 0) {
-      finalColor = fogColor;
-      return;
-    }
-    
-    // Calculate dim zone darkening effect for visible areas
-    // We want to ADD a slight fog overlay in dim zones (not bright zones)
-    float dimOverlay = 0.0;
-    
-    for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
-      if (i >= uSourceCount) break;
-      
-      float dist = distance(fragPos, uPositions[i]);
-      float range = uRanges[i];
-      
-      if (range <= 0.0) continue;
-      
-      float brightZone = uBrightZones[i];
-      float dimIntensity = uDimIntensities[i];
-      float softEdge = uSoftEdgeRadii[i];
-      
-      // In bright zone: no dim overlay
-      // In dim zone: gradual overlay based on distance
-      // Outside range: full overlay (but already blocked by visibility)
-      
-      if (dist <= range * brightZone) {
-        // Bright zone - no dimming, this source provides full illumination
-        dimOverlay = 0.0;
-        break; // If any source puts us in bright zone, no dimming
-      } else if (dist <= range) {
-        // Dim zone - apply gradual dimming
-        float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        // dimProgress: 0.0 at bright zone edge, 1.0 at range edge
-        float localDim = dimProgress * (1.0 - dimIntensity);
-        dimOverlay = max(dimOverlay, localDim);
-      }
-    }
-    
-    // Apply dim overlay only to visible areas
-    // This adds a subtle fog tint in dim zones
-    float dimFog = dimOverlay * visibility * 0.4; // 0.4 = max dim darkness
-    
-    // Final fog alpha combines original fog + dim zone overlay
-    float finalFogAlpha = fogColor.a + dimFog;
-    finalFogAlpha = clamp(finalFogAlpha, 0.0, 1.0);
-    
-    // Output fog with dim overlay
-    finalColor = vec4(fogColor.rgb, finalFogAlpha);
+    // Pass through the fog mask - bright/dim zones are already
+    // baked in via Canvas 2D radial gradients with visibility clipping
+    finalColor = fogColor;
   }
 `;
 
 // WebGL 1 fallback (for older browsers)
 // Simplified - color tinting handled by Canvas 2D overlay
+// WebGL 1 fallback - simplified pass-through
 const fragmentGLSL100 = `
   precision highp float;
   
@@ -144,53 +90,10 @@ const fragmentGLSL100 = `
   uniform float uGlobalEdgeBlur;
   
   void main(void) {
-    vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture2D(uTexture, vTextureCoord);
     
-    // Visibility: 1.0 = visible (fog cut out), 0.0 = fogged/blocked
-    float visibility = 1.0 - fogColor.a;
-    
-    if (fogColor.a >= 0.99) {
-      gl_FragColor = fogColor;
-      return;
-    }
-    
-    if (uSourceCount == 0) {
-      gl_FragColor = fogColor;
-      return;
-    }
-    
-    // Calculate dim zone darkening effect for visible areas
-    float dimOverlay = 0.0;
-    
-    for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
-      if (i >= uSourceCount) break;
-      
-      float dist = distance(fragPos, uPositions[i]);
-      float range = uRanges[i];
-      
-      if (range <= 0.0) continue;
-      
-      float brightZone = uBrightZones[i];
-      float dimIntensity = uDimIntensities[i];
-      
-      if (dist <= range * brightZone) {
-        // Bright zone - no dimming
-        dimOverlay = 0.0;
-        break;
-      } else if (dist <= range) {
-        // Dim zone - gradual dimming
-        float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        float localDim = dimProgress * (1.0 - dimIntensity);
-        dimOverlay = max(dimOverlay, localDim);
-      }
-    }
-    
-    // Apply dim overlay only to visible areas
-    float dimFog = dimOverlay * visibility * 0.4;
-    float finalFogAlpha = clamp(fogColor.a + dimFog, 0.0, 1.0);
-    
-    gl_FragColor = vec4(fogColor.rgb, finalFogAlpha);
+    // Pass through - bright/dim zones are baked in via Canvas 2D
+    gl_FragColor = fogColor;
   }
 `;
 

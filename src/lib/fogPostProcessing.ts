@@ -246,19 +246,48 @@ export function applyFogPostProcessing(
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // CRITICAL: Cut out visibility polygons from fog BEFORE sending to shader
-  // This ensures light is blocked by walls. The shader will then apply
-  // gradient effects (bright/dim zones) within these already-cut areas.
+  // CRITICAL: Cut out visibility polygons from fog using radial gradients
+  // that respect bright/dim zones. Each source is clipped to its visibility
+  // polygon, ensuring light is blocked by walls.
+  // 
+  // Model:
+  // - Bright zone (inner circle): fully clears fog (alpha = 1)
+  // - Dim zone (outer ring): partially clears fog (alpha = dimIntensity)
   if (illuminationData && illuminationData.sources.length > 0) {
     fogCtx.globalCompositeOperation = 'destination-out';
     
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
       
-      // The visibility polygon is already a Path2D in world coordinates
-      // Our transform is already applied, so just fill it
-      fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-      fogCtx.fill(source.visibilityPolygon);
+      const pos = source.position;
+      const range = source.range;
+      const brightZone = source.brightZone ?? 0.5;
+      const brightIntensity = source.brightIntensity ?? 1.0;
+      const dimIntensity = source.dimIntensity ?? 0.4;
+      
+      // Save context and clip to this source's visibility polygon
+      fogCtx.save();
+      fogCtx.clip(source.visibilityPolygon);
+      
+      // Create radial gradient for fog removal
+      // Center to brightZone: full removal (bright area)
+      // brightZone to edge: partial removal (dim area)
+      const gradient = fogCtx.createRadialGradient(
+        pos.x, pos.y, 0,
+        pos.x, pos.y, range
+      );
+      
+      // Bright zone: full fog clear
+      gradient.addColorStop(0, `rgba(255, 255, 255, ${brightIntensity})`);
+      gradient.addColorStop(brightZone, `rgba(255, 255, 255, ${brightIntensity})`);
+      
+      // Dim zone: partial fog clear (the dimIntensity controls how much fog remains)
+      gradient.addColorStop(1, `rgba(255, 255, 255, ${dimIntensity})`);
+      
+      fogCtx.fillStyle = gradient;
+      fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+      
+      fogCtx.restore();
     }
     
     fogCtx.globalCompositeOperation = 'source-over';
