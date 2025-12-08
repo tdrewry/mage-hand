@@ -138,6 +138,7 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
 
   try {
     currentPadding = padding;
+    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
     
     // Check if we can update the existing texture or need to create a new one
     if (fogTexture && fogTexture.source && 
@@ -155,20 +156,16 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
       fogSprite.texture = fogTexture;
     }
     
-    // The fog canvas is larger than viewport by 2*padding (padding on each side).
-    // The fog content (and illumination positions) are in fog canvas coordinates,
-    // with the visible viewport area starting at (padding, padding) in those coords.
+    // Scale sprite to match reduced render resolution while maintaining
+    // correct visual positioning. The PixiJS renderer operates at 
+    // qualityMultiplier resolution for performance.
     // 
-    // By positioning the sprite at (-padding, -padding), we offset it so that:
-    // - Fog canvas position (padding, padding) aligns with PixiJS stage position (0, 0)
-    // - Fog canvas position (0, 0) is at stage position (-padding, -padding) - off-screen
-    // 
-    // This ensures the visible fog area aligns with the viewport while allowing
-    // blur effects to extend into the padding area without hard edges.
-    fogSprite.width = sourceCanvas.width;
-    fogSprite.height = sourceCanvas.height;
-    fogSprite.x = -padding;
-    fogSprite.y = -padding;
+    // Sprite dimensions are scaled to match render resolution.
+    // Padding offset is also scaled to align correctly.
+    fogSprite.width = sourceCanvas.width * qualityMultiplier;
+    fogSprite.height = sourceCanvas.height * qualityMultiplier;
+    fogSprite.x = -padding * qualityMultiplier;
+    fogSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }
@@ -192,10 +189,35 @@ export function updateEffectSettings(settings: Partial<EffectSettings>): void {
 
 /**
  * Update illumination data for GPU processing
+ * Positions must be scaled by quality multiplier to match render resolution
  */
 export function updateIlluminationData(data: IlluminationShaderData): void {
   if (!illuminationFilter || !isInitialized) return;
-  illuminationFilter.updateIllumination(data);
+  
+  const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
+  
+  // Scale positions and ranges to match the reduced render resolution
+  const scaledData: IlluminationShaderData = {
+    ...data,
+    positions: new Float32Array(data.positions.length),
+    ranges: new Float32Array(data.ranges.length),
+    softEdgeRadii: new Float32Array(data.softEdgeRadii.length),
+  };
+  
+  for (let i = 0; i < data.sourceCount; i++) {
+    scaledData.positions[i * 2] = data.positions[i * 2] * qualityMultiplier;
+    scaledData.positions[i * 2 + 1] = data.positions[i * 2 + 1] * qualityMultiplier;
+    scaledData.ranges[i] = data.ranges[i] * qualityMultiplier;
+    scaledData.softEdgeRadii[i] = data.softEdgeRadii[i] * qualityMultiplier;
+  }
+  
+  // Copy the rest unchanged
+  scaledData.brightZones = data.brightZones;
+  scaledData.brightIntensities = data.brightIntensities;
+  scaledData.dimIntensities = data.dimIntensities;
+  scaledData.colors = data.colors;
+  
+  illuminationFilter.updateIllumination(scaledData);
 }
 
 /**
