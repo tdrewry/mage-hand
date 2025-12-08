@@ -3,6 +3,8 @@
  * All light sources (token vision, placed lights) use this unified model
  */
 
+export type IlluminationAnimationType = 'none' | 'flicker' | 'pulse' | 'candle';
+
 export interface IlluminationSource {
   id: string;
   name: string;
@@ -26,6 +28,11 @@ export interface IlluminationSource {
   softEdge: boolean;                // Whether to blur the outer edge
   softEdgeRadius: number;           // Blur amount (0-20 pixels)
   
+  // Animation settings
+  animation: IlluminationAnimationType;  // Type of animation effect
+  animationSpeed: number;           // Animation speed multiplier (0.5-2.0)
+  animationIntensity: number;       // How strong the animation effect is (0-1)
+  
   // Pre-computed visibility polygon (set by visibility engine)
   visibilityPolygon?: Path2D;
 }
@@ -46,6 +53,9 @@ export interface IlluminationTemplate {
   colorIntensity: number;
   softEdge: boolean;
   softEdgeRadius: number;
+  animation: IlluminationAnimationType;
+  animationSpeed: number;
+  animationIntensity: number;
 }
 
 /**
@@ -70,6 +80,9 @@ export function createIlluminationFromTemplate(
     colorIntensity: template.colorIntensity,
     softEdge: template.softEdge,
     softEdgeRadius: template.softEdgeRadius,
+    animation: template.animation,
+    animationSpeed: template.animationSpeed,
+    animationIntensity: template.animationIntensity,
   };
 }
 
@@ -88,7 +101,72 @@ export const DEFAULT_ILLUMINATION: Omit<IlluminationSource, 'id' | 'position'> =
   colorIntensity: 0.15, // Default 15% intensity when enabled
   softEdge: true,
   softEdgeRadius: 8,
+  animation: 'none',
+  animationSpeed: 1.0,
+  animationIntensity: 0.3,
 };
+
+/**
+ * Calculate animated intensity multiplier based on time and animation type
+ * Returns a value between 0 and 1 that should be applied to intensity values
+ */
+export function calculateAnimatedIntensity(
+  animation: IlluminationAnimationType,
+  animationSpeed: number,
+  animationIntensity: number,
+  time: number,
+  sourceId: string
+): number {
+  if (animation === 'none') return 1.0;
+  
+  // Use source ID to create phase offset so lights don't flicker in sync
+  const phaseOffset = hashStringToNumber(sourceId) * Math.PI * 2;
+  const t = time * animationSpeed * 0.001; // Convert to seconds
+  
+  switch (animation) {
+    case 'flicker': {
+      // Irregular flickering using multiple sine waves
+      const flicker1 = Math.sin(t * 12 + phaseOffset) * 0.5;
+      const flicker2 = Math.sin(t * 23 + phaseOffset * 1.3) * 0.3;
+      const flicker3 = Math.sin(t * 37 + phaseOffset * 0.7) * 0.2;
+      // Random-ish spikes
+      const spike = Math.pow(Math.sin(t * 5 + phaseOffset), 8) * 0.4;
+      const combined = (flicker1 + flicker2 + flicker3 + spike) * animationIntensity;
+      return Math.max(0.3, Math.min(1.0, 1.0 - combined * 0.5));
+    }
+    
+    case 'candle': {
+      // Gentler, more organic flicker with occasional dips
+      const base = Math.sin(t * 8 + phaseOffset) * 0.15;
+      const gentle = Math.sin(t * 3 + phaseOffset * 1.5) * 0.1;
+      const occasional = Math.pow(Math.sin(t * 1.5 + phaseOffset), 12) * 0.3;
+      const combined = (base + gentle + occasional) * animationIntensity;
+      return Math.max(0.5, Math.min(1.0, 1.0 - combined));
+    }
+    
+    case 'pulse': {
+      // Smooth sinusoidal pulsing
+      const pulse = (Math.sin(t * 2 + phaseOffset) + 1) * 0.5;
+      return 1.0 - (pulse * animationIntensity * 0.4);
+    }
+    
+    default:
+      return 1.0;
+  }
+}
+
+/**
+ * Simple hash function to convert string to number (for phase offset)
+ */
+function hashStringToNumber(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return (hash >>> 0) / 0xFFFFFFFF; // Normalize to 0-1
+}
 
 /**
  * GPU shader data structure for passing to PixiJS

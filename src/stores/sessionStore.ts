@@ -249,6 +249,9 @@ export const useSessionStore = create<SessionState>()(
             colorIntensity: illumination.colorIntensity ?? 0.5,
             softEdge: illumination.softEdge ?? true,
             softEdgeRadius: illumination.softEdgeRadius ?? 8,
+            animation: illumination.animation ?? 'none',
+            animationSpeed: illumination.animationSpeed ?? 1.0,
+            animationIntensity: illumination.animationIntensity ?? 0.3,
           }];
         }
 

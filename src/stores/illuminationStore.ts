@@ -66,6 +66,9 @@ export const useIlluminationStore = create<IlluminationState>()(
           colorIntensity: lightData.colorIntensity ?? defaults.colorIntensity,
           softEdge: lightData.softEdge ?? defaults.softEdge,
           softEdgeRadius: lightData.softEdgeRadius ?? get().defaultSoftEdgeRadius,
+          animation: lightData.animation ?? defaults.animation,
+          animationSpeed: lightData.animationSpeed ?? defaults.animationSpeed,
+          animationIntensity: lightData.animationIntensity ?? defaults.animationIntensity,
         };
         
         set((state) => ({
@@ -191,5 +194,8 @@ export function migrateLegacyLight(oldLight: {
     colorIntensity: 0.5,
     softEdge: true,
     softEdgeRadius: 8,
+    animation: 'none',
+    animationSpeed: 1.0,
+    animationIntensity: 0.3,
   };
 }
