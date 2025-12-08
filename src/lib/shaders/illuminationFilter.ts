@@ -126,19 +126,29 @@ const fragment = `
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
     
-    // Calculate final fog color with optional color tinting
+    // Calculate final output with optional color tinting
     vec3 finalFogColor = fogColor.rgb;
-    if (totalColorWeight > 0.0) {
-      // Normalize accumulated color and blend with the base fog color
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      // Apply color tint to visible areas by modulating the fog color
-      // The tint is stronger where there's more visibility
-      float tintStrength = baseVisibility * 0.4; // 40% max tint strength
-      finalFogColor = mix(fogColor.rgb, fogColor.rgb * normalizedColor, tintStrength);
-    }
     
-    // Blend: areas inside visibility get gradient, areas outside stay fogged
-    finalColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
+    if (totalColorWeight > 0.0 && baseVisibility > 0.0) {
+      // Normalize accumulated color
+      vec3 normalizedColor = accumulatedColor / totalColorWeight;
+      
+      // Apply color tint as additive/overlay on visible areas
+      // We render colored light by overlaying a tinted color on top of the visible area
+      // The tint strength is proportional to visibility and illumination
+      float tintStrength = baseVisibility * 0.5; // 50% max tint strength
+      
+      // Create a colored overlay that blends with the scene
+      // This adds the light color to visible areas rather than multiplying
+      vec3 tintOverlay = normalizedColor * tintStrength;
+      
+      // Output: semi-transparent colored overlay in visible areas
+      // Lower alpha in visible areas + color tint creates the lighting effect
+      finalColor = vec4(tintOverlay, max(fogColor.a, newFogAlpha * 0.7));
+    } else {
+      // No color tinting, standard fog output
+      finalColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
+    }
   }
 `;
 
@@ -220,15 +230,25 @@ const fragmentGLSL100 = `
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
     
-    // Calculate final fog color with optional color tinting
+    // Calculate final output with optional color tinting
     vec3 finalFogColor = fogColor.rgb;
-    if (totalColorWeight > 0.0) {
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      float tintStrength = baseVisibility * 0.4;
-      finalFogColor = mix(fogColor.rgb, fogColor.rgb * normalizedColor, tintStrength);
-    }
     
-    gl_FragColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
+    if (totalColorWeight > 0.0 && baseVisibility > 0.0) {
+      // Normalize accumulated color
+      vec3 normalizedColor = accumulatedColor / totalColorWeight;
+      
+      // Apply color tint as additive/overlay on visible areas
+      float tintStrength = baseVisibility * 0.5;
+      
+      // Create a colored overlay that blends with the scene
+      vec3 tintOverlay = normalizedColor * tintStrength;
+      
+      // Output: semi-transparent colored overlay in visible areas
+      gl_FragColor = vec4(tintOverlay, max(fogColor.a, newFogAlpha * 0.7));
+    } else {
+      // No color tinting, standard fog output
+      gl_FragColor = vec4(finalFogColor, max(fogColor.a, newFogAlpha * 0.7));
+    }
   }
 `;
 
