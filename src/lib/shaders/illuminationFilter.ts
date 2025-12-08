@@ -49,22 +49,19 @@ const fragment = `
   uniform float uDimIntensities[${MAX_ILLUMINATION_SOURCES}];
   uniform float uSoftEdgeRadii[${MAX_ILLUMINATION_SOURCES}];
   uniform vec3 uColors[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uColorEnabled[${MAX_ILLUMINATION_SOURCES}];
   
   // Global settings
   uniform float uGlobalEdgeBlur;
   
   void main(void) {
+    // Get fragment position in pixels
     vec2 fragPos = vTextureCoord * uInputSize.xy;
+    
+    // Sample the fog texture
+    // The fog already has visibility polygons cut out (alpha = 0 inside visible areas)
     vec4 fogColor = texture(uTexture, vTextureCoord);
     
-    // baseVisibility: 1.0 = fully visible (inside visibility polygon), 0.0 = fogged/blocked
-    float baseVisibility = 1.0 - fogColor.a;
-    
-    // Apply visibility threshold to prevent color bleeding at soft fog edges
-    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
-    
-    // If fog is fully opaque (behind walls), no processing needed
+    // If fog is fully opaque, no illumination processing needed
     if (fogColor.a >= 0.99) {
       finalColor = fogColor;
       return;
@@ -76,11 +73,10 @@ const fragment = `
       return;
     }
     
-    // Calculate darkening and color accumulation
-    float minDarkening = 1.0;
-    vec3 accumulatedColor = vec3(0.0);
-    float totalColorWeight = 0.0;
-    float totalIllumination = 0.0;
+    // Calculate how much to darken the visible area based on distance from light sources
+    // Areas close to light centers stay fully visible (alpha = 0)
+    // Areas at the dim zone edge get partial fog added back
+    float minDarkening = 1.0; // Start with full darkening, reduce based on light proximity
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -94,52 +90,33 @@ const fragment = `
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      float rawIllumination = 0.0;
+      // Calculate how much this light illuminates this point
+      float illumination = 0.0;
       
       if (dist <= range * brightZone) {
-        rawIllumination = brightIntensity;
+        // In bright zone - full illumination (no darkening)
+        illumination = brightIntensity;
       } else if (dist <= range) {
+        // In dim zone - fade from bright to dim intensity
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
+        illumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
+      // Beyond range: illumination stays 0
       
-      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
-      float illumination = rawIllumination * baseVisibility;
-      
+      // Less darkening where there's more illumination
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
-      totalIllumination = max(totalIllumination, illumination);
-      
-      // Color weighted by visibility to respect wall occlusion
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        accumulatedColor += uColors[i] * illumination;
-        totalColorWeight += illumination;
-      }
     }
     
-    // Apply dim zone darkening
+    // Apply darkening to visible areas (where fog alpha is low)
+    // This adds fog back at the edges of visibility, creating the dim zone effect
+    // fogColor.a is 0 in fully visible areas, so we add darkness there
+    float baseVisibility = 1.0 - fogColor.a; // How visible this pixel currently is
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
-    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    // Apply color tinting
-    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      
-      // Color overlay alpha - this makes the tint VISIBLE in lit areas
-      // Scale by illumination and visibility for proper falloff
-      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
-      
-      // Final alpha: max of fog, dim zone, and color tint
-      float finalAlpha = max(baseFogAlpha, tintAlpha);
-      
-      // Blend RGB: fog color in dark/blocked areas, tint color in lit areas
-      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
-      
-      finalColor = vec4(outputColor, finalAlpha);
-    } else {
-      finalColor = vec4(fogColor.rgb, baseFogAlpha);
-    }
+    // Blend: areas inside visibility get gradient, areas outside stay fogged
+    finalColor = vec4(fogColor.rgb, max(fogColor.a, newFogAlpha * 0.7));
   }
 `;
 
@@ -160,33 +137,26 @@ const fragmentGLSL100 = `
   uniform float uDimIntensities[${MAX_ILLUMINATION_SOURCES}];
   uniform float uSoftEdgeRadii[${MAX_ILLUMINATION_SOURCES}];
   uniform vec3 uColors[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uColorEnabled[${MAX_ILLUMINATION_SOURCES}];
   uniform float uGlobalEdgeBlur;
   
   void main(void) {
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture2D(uTexture, vTextureCoord);
     
-    // baseVisibility: 1.0 = fully visible, 0.0 = fogged/blocked
-    float baseVisibility = 1.0 - fogColor.a;
-    
-    // Threshold to prevent color bleeding at soft fog edges
-    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
-    
+    // If fog is fully opaque, no illumination processing needed
     if (fogColor.a >= 0.99) {
       gl_FragColor = fogColor;
       return;
     }
     
+    // If no sources, just pass through
     if (uSourceCount == 0) {
       gl_FragColor = fogColor;
       return;
     }
     
+    // Calculate darkening based on distance from light sources
     float minDarkening = 1.0;
-    vec3 accumulatedColor = vec3(0.0);
-    float totalColorWeight = 0.0;
-    float totalIllumination = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -200,44 +170,24 @@ const fragmentGLSL100 = `
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
       
-      float rawIllumination = 0.0;
+      float illumination = 0.0;
       
       if (dist <= range * brightZone) {
-        rawIllumination = brightIntensity;
+        illumination = brightIntensity;
       } else if (dist <= range) {
         float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
-        rawIllumination = mix(brightIntensity, dimIntensity, dimProgress);
+        illumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
-      
-      // CRITICAL: Clip illumination by visibility - light cannot pass through walls
-      float illumination = rawIllumination * baseVisibility;
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
-      totalIllumination = max(totalIllumination, illumination);
-      
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        accumulatedColor += uColors[i] * illumination;
-        totalColorWeight += illumination;
-      }
     }
     
+    float baseVisibility = 1.0 - fogColor.a;
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
-    float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      
-      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
-      float finalAlpha = max(baseFogAlpha, tintAlpha);
-      
-      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
-      
-      gl_FragColor = vec4(outputColor, finalAlpha);
-    } else {
-      gl_FragColor = vec4(fogColor.rgb, baseFogAlpha);
-    }
+    gl_FragColor = vec4(fogColor.rgb, max(fogColor.a, newFogAlpha * 0.7));
   }
 `;
 
@@ -277,7 +227,6 @@ export class IlluminationFilter extends Filter {
     const defaultDimIntensities = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(0.4);
     const defaultSoftEdgeRadii = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(8);
     const defaultColors = new Float32Array(MAX_ILLUMINATION_SOURCES * 3);
-    const defaultColorEnabled = new Float32Array(MAX_ILLUMINATION_SOURCES);
     
     super({
       glProgram,
@@ -291,7 +240,6 @@ export class IlluminationFilter extends Filter {
           uDimIntensities: { value: defaultDimIntensities, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
           uSoftEdgeRadii: { value: defaultSoftEdgeRadii, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
           uColors: { value: defaultColors, type: 'vec3<f32>', size: MAX_ILLUMINATION_SOURCES },
-          uColorEnabled: { value: defaultColorEnabled, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
           uGlobalEdgeBlur: { value: options.globalEdgeBlur ?? 8, type: 'f32' },
         },
       },
@@ -312,7 +260,6 @@ export class IlluminationFilter extends Filter {
     uniforms.uDimIntensities = data.dimIntensities;
     uniforms.uSoftEdgeRadii = data.softEdgeRadii;
     uniforms.uColors = data.colors;
-    uniforms.uColorEnabled = data.colorEnabled;
   }
   
   /**
