@@ -137,20 +137,36 @@ export function applyFogPostProcessing(
   fogCtx.translate(padding + transform.x, padding + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
-  // Render fog layers to off-screen canvas (just the masks, no cutouts)
-  // The GPU shader will handle illumination cutouts
+  // Render fog layers to off-screen canvas
   fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
   fogCtx.fill(fogMasks.unexploredMask);
 
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
+  // CRITICAL: Cut out visibility polygons from fog BEFORE sending to shader
+  // This ensures light is blocked by walls. The shader will then apply
+  // gradient effects (bright/dim zones) within these already-cut areas.
+  if (illuminationData && illuminationData.sources.length > 0) {
+    fogCtx.globalCompositeOperation = 'destination-out';
+    
+    for (const source of illuminationData.sources) {
+      if (!source.enabled || !source.visibilityPolygon) continue;
+      
+      // The visibility polygon is already a Path2D in world coordinates
+      // Our transform is already applied, so just fill it
+      fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
+      fogCtx.fill(source.visibilityPolygon);
+    }
+    
+    fogCtx.globalCompositeOperation = 'source-over';
+  }
+
   fogCtx.restore();
 
-  // Update GPU illumination data if provided
-  // NOTE: Shader positions should be in fog canvas coordinates.
-  // The fog canvas is drawn with translate(padding + panX, padding + panY) then scale(zoom),
-  // so a world point P appears at: P * zoom + padding + pan
+  // Update GPU illumination data for gradient effects (bright/dim zones)
+  // NOTE: The shader now only applies gradient modulation within the
+  // already-cut visibility areas, not circular distance-based cutouts
   if (illuminationData && illuminationData.sources.length > 0) {
     const shaderData = createShaderData(
       illuminationData.sources,
@@ -165,7 +181,7 @@ export function applyFogPostProcessing(
   }
 
   // Send fog mask to PixiJS for GPU post-processing
-  // The illumination filter will handle bright/dim zones and soft edges
+  // The illumination filter will apply blur and gradient effects
   updateFogTexture(fogCanvas, padding);
   renderPostProcessing();
 }
