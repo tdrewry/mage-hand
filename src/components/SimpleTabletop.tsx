@@ -66,6 +66,7 @@ import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializ
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
 import { useRoleStore } from "../stores/roleStore";
+import { useUiModeStore } from "../stores/uiModeStore";
 import { getTokensForVisionCalculation } from "../lib/visionPermissions";
 import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
@@ -3364,20 +3365,30 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
 
-  // Animation loop for hostile tokens and hover effects - optimized with throttling
+  // Animation loop for hostile tokens, hover effects, and illumination animations
+  const animationsPaused = useUiModeStore((state) => state.animationsPaused);
+  
   useEffect(() => {
+    // If animations are paused, don't run the loop
+    if (animationsPaused) return;
+    
     const currentPlayer = players.find((p) => p.id === currentPlayerId);
-    if (!currentPlayer) return;
 
-    // Check if there are any hostile tokens or if hovering over a token
-    const hasHostileTokens = tokens.some((token) => {
+    // Check if there are any hostile tokens
+    const hasHostileTokens = currentPlayer ? tokens.some((token) => {
       const relationship = getTokenRelationship(token, currentPlayer, roles);
       return relationship === "hostile";
-    });
+    }) : false;
+    
+    // Check if there are any animated illumination sources (on tokens or standalone)
+    const hasAnimatedIllumination = tokens.some((token) => 
+      token.illuminationSources?.some((source) => source.animation && source.animation !== 'none')
+    );
 
-    if (!hasHostileTokens && !hoveredTokenId) return;
+    // Only run animation loop if there's something to animate
+    if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination) return;
 
-    // Set up throttled animation loop (limit to ~30 FPS for hostile glow)
+    // Set up throttled animation loop (limit to ~30 FPS)
     let animationId: number;
     let lastFrameTime = 0;
     const frameDelay = 1000 / 30; // ~30 FPS
@@ -3400,7 +3411,7 @@ export const SimpleTabletop = () => {
     };
     // Include transform in dependencies so animation loop recreates with fresh transform values
     // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
-  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform]);
+  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
