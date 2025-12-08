@@ -463,8 +463,10 @@ export const SimpleTabletop = () => {
     };
   }, [tokens, transform.zoom]);
 
-  // Keyboard zoom with + and - keys
+  // Keyboard zoom with + and - keys, and panning with arrow keys/WASD
   useEffect(() => {
+    const PAN_SPEED = 50; // Pixels to pan per keypress
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -507,6 +509,23 @@ export const SimpleTabletop = () => {
           y: centerY - (centerY - transform.y) * zoomRatio,
           zoom: newZoom,
         });
+      }
+      // Arrow keys and WASD for panning
+      else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setTransform(prev => ({ ...prev, y: prev.y + PAN_SPEED }));
+      }
+      else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setTransform(prev => ({ ...prev, y: prev.y - PAN_SPEED }));
+      }
+      else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setTransform(prev => ({ ...prev, x: prev.x + PAN_SPEED }));
+      }
+      else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setTransform(prev => ({ ...prev, x: prev.x - PAN_SPEED }));
       }
     };
 
@@ -4691,7 +4710,14 @@ export const SimpleTabletop = () => {
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
 
-      {/* Selected Annotation Tooltip */}
+      {/* Zoom Level Indicator */}
+      <div 
+        className="absolute bottom-4 right-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground shadow-sm select-none"
+        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+      >
+        {Math.round(transform.zoom * 100)}%
+      </div>
+
       {selectedAnnotationId &&
         (() => {
           const annotation = annotations.find((a) => a.id === selectedAnnotationId);
