@@ -1,6 +1,6 @@
 /**
  * Fog Post-Processing Effects
- * Specialized effects for fog of war rendering using PixiJS
+ * Specialized effects for fog of war rendering using PixiJS GPU acceleration
  */
 
 import {
@@ -9,8 +9,10 @@ import {
   getEffectSettings,
   isPostProcessingReady,
   renderPostProcessing,
+  updateIlluminationData,
   type EffectSettings,
 } from './postProcessingLayer';
+import { createShaderData, type IlluminationSource } from '@/types/illumination';
 
 export interface FogEffectConfig {
   enabled: boolean;
@@ -79,18 +81,20 @@ export function getFogCanvasContext(): CanvasRenderingContext2D | null {
 }
 
 /**
- * Token visibility data for rendering cutouts
+ * Illumination source data for GPU rendering
  */
-interface TokenVisibilityData {
-  position: { x: number; y: number };
-  visionRange: number;
-  visibilityPath: Path2D;
-  isLightSource?: boolean; // Light sources get two-zone gradient rendering
+interface IlluminationData {
+  sources: IlluminationSource[];
+  gridSize: number;
+  transform: { x: number; y: number; zoom: number };
 }
 
 /**
- * Capture fog state from the main canvas and apply post-processing
+ * Capture fog state from the main canvas and apply GPU post-processing
  * This is called during the render loop when fog changes
+ * 
+ * The fog mask is rendered on Canvas 2D, then passed to PixiJS GPU shader
+ * for illumination calculations (bright/dim zones, soft edges, stacking)
  */
 export function applyFogPostProcessing(
   sourceCtx: CanvasRenderingContext2D,
@@ -103,7 +107,7 @@ export function applyFogPostProcessing(
   canvasWidth: number,
   canvasHeight: number,
   transform: { x: number; y: number; zoom: number },
-  tokenVisibilityData: TokenVisibilityData[] = []
+  illuminationData?: IlluminationData
 ): void {
   const edgeBlur = getEffectSettings().edgeBlur;
   const padding = edgeBlur * 2;
@@ -133,61 +137,32 @@ export function applyFogPostProcessing(
   fogCtx.translate(padding + transform.x, padding + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
-  // Render fog layers to off-screen canvas
+  // Render fog layers to off-screen canvas (just the masks, no cutouts)
+  // The GPU shader will handle illumination cutouts
   fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
   fogCtx.fill(fogMasks.unexploredMask);
 
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // Cut out token visibility areas with gradient support for light sources
-  if (tokenVisibilityData.length > 0) {
-    fogCtx.globalCompositeOperation = "destination-out";
-    const { lightFalloff } = getEffectSettings();
-    
-    tokenVisibilityData.forEach(({ position, visionRange, visibilityPath, isLightSource }) => {
-      fogCtx.save();
-      fogCtx.clip(visibilityPath);
-      
-      if (isLightSource) {
-        // Light sources use two-zone gradient rendering:
-        // - Inner zone (0 to lightFalloff): fully bright/clear
-        // - Outer zone (lightFalloff to 1.0): dimmer (partial fog removal)
-        const gradient = fogCtx.createRadialGradient(
-          position.x, position.y, 0,
-          position.x, position.y, visionRange
-        );
-        
-        // Inner bright zone - fully clear fog
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(lightFalloff, 'rgba(255, 255, 255, 1)');
-        // Outer dim zone - partial fog removal (~40% clear)
-        gradient.addColorStop(Math.min(lightFalloff + 0.01, 1.0), 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0.4)');
-        
-        fogCtx.fillStyle = gradient;
-        fogCtx.fillRect(
-          position.x - visionRange,
-          position.y - visionRange,
-          visionRange * 2,
-          visionRange * 2
-        );
-      } else {
-        // Token vision - solid fill (full fog removal)
-        fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-        fogCtx.fill(visibilityPath);
-      }
-      
-      fogCtx.restore();
-    });
-    
-    fogCtx.globalCompositeOperation = "source-over";
-  }
-
   fogCtx.restore();
 
-  // Send to PixiJS for post-processing
-  // The padding will be positioned off-screen by the PixiJS layer
+  // Update GPU illumination data if provided
+  if (illuminationData && illuminationData.sources.length > 0) {
+    const shaderData = createShaderData(
+      illuminationData.sources,
+      illuminationData.gridSize,
+      { 
+        x: padding + transform.x, 
+        y: padding + transform.y, 
+        zoom: transform.zoom 
+      }
+    );
+    updateIlluminationData(shaderData);
+  }
+
+  // Send fog mask to PixiJS for GPU post-processing
+  // The illumination filter will handle bright/dim zones and soft edges
   updateFogTexture(fogCanvas, padding);
   renderPostProcessing();
 }
