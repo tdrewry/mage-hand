@@ -22,12 +22,15 @@ import {
   Undo,
   Redo,
   History,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useCardStore } from '@/stores/cardStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
@@ -74,6 +77,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
+  const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -313,6 +317,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
+            icon={animationsPaused ? Play : Pause}
+            label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
+            onClick={toggleAnimationsPaused}
+            isActive={animationsPaused}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarButton
             icon={Eye}
             label={`Regions ${showRegions ? 'On' : 'Off'}`}
             onClick={onToggleRegions}
@@ -395,6 +408,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Styles"
             onClick={handleToggleStylesCard}
             isActive={stylesCard?.isVisible}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarButton
+            icon={animationsPaused ? Play : Pause}
+            label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
+            onClick={toggleAnimationsPaused}
+            isActive={animationsPaused}
             variant="ghost"
             size="sm"
           />

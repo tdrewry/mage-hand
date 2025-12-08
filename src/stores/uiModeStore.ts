@@ -6,9 +6,12 @@ export type UiMode = 'dm' | 'play';
 interface UiModeState {
   currentMode: UiMode;
   lockedByDm: boolean; // If DM has locked the mode remotely
+  animationsPaused: boolean; // Whether illumination animations are paused
   
   setMode: (mode: UiMode) => void;
   setModeFromRemote: (mode: UiMode, locked: boolean) => void;
+  toggleAnimationsPaused: () => void;
+  setAnimationsPaused: (paused: boolean) => void;
   reset: () => void;
 }
 
@@ -17,6 +20,7 @@ export const useUiModeStore = create<UiModeState>()(
     (set) => ({
       currentMode: 'dm',
       lockedByDm: false,
+      animationsPaused: false,
       
       setMode: (mode) => {
         console.log('🎮 Setting UI mode locally:', mode);
@@ -28,8 +32,16 @@ export const useUiModeStore = create<UiModeState>()(
         set({ currentMode: mode, lockedByDm: locked });
       },
       
+      toggleAnimationsPaused: () => {
+        set((state) => ({ animationsPaused: !state.animationsPaused }));
+      },
+      
+      setAnimationsPaused: (paused) => {
+        set({ animationsPaused: paused });
+      },
+      
       reset: () => {
-        set({ currentMode: 'dm', lockedByDm: false });
+        set({ currentMode: 'dm', lockedByDm: false, animationsPaused: false });
       },
     }),
     {
