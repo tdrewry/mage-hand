@@ -19,6 +19,7 @@ import {
   applyFogPostProcessing,
   cleanupFogPostProcessing,
 } from '@/lib/fogPostProcessing';
+import type { IlluminationSource } from '@/types/illumination';
 
 interface UsePostProcessingOptions {
   containerRef: React.RefObject<HTMLElement>;
@@ -27,11 +28,10 @@ interface UsePostProcessingOptions {
   height: number;
 }
 
-interface TokenVisibilityData {
-  position: { x: number; y: number };
-  visionRange: number;
-  visibilityPath: Path2D;
-  isLightSource?: boolean; // Light sources get two-zone gradient rendering
+export interface IlluminationData {
+  sources: IlluminationSource[];
+  gridSize: number;
+  transform: { x: number; y: number; zoom: number };
 }
 
 export function usePostProcessing({
@@ -133,7 +133,7 @@ export function usePostProcessing({
       fogOpacity: number,
       exploredOpacity: number,
       transform: { x: number; y: number; zoom: number },
-      tokenVisibilityData: TokenVisibilityData[] = []
+      illuminationData?: IlluminationData
     ) => {
       if (!initRef.current || !isPostProcessingReady() || !effectSettings.postProcessingEnabled) {
         return;
@@ -147,7 +147,7 @@ export function usePostProcessing({
         width,
         height,
         transform,
-        tokenVisibilityData
+        illuminationData
       );
     },
     [width, height, effectSettings.postProcessingEnabled]
