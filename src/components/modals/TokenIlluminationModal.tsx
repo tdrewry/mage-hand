@@ -22,64 +22,7 @@ import {
 import { useFogStore } from '@/stores/fogStore';
 import type { IlluminationSource } from '@/types/illumination';
 import { DEFAULT_ILLUMINATION } from '@/types/illumination';
-
-// Illumination presets
-const ILLUMINATION_PRESETS = {
-  custom: {
-    name: 'Custom',
-    ...DEFAULT_ILLUMINATION,
-  },
-  torch: {
-    name: 'Torch',
-    range: 8,
-    brightZone: 0.5,
-    brightIntensity: 1.0,
-    dimIntensity: 0.6,
-    color: '#FF6B00',
-    colorEnabled: true,
-    colorIntensity: 0.2,
-    softEdge: true,
-    softEdgeRadius: 6,
-  },
-  lantern: {
-    name: 'Lantern',
-    range: 12,
-    brightZone: 0.5,
-    brightIntensity: 1.0,
-    dimIntensity: 0.5,
-    color: '#FFD700',
-    colorEnabled: true,
-    colorIntensity: 0.15,
-    softEdge: true,
-    softEdgeRadius: 8,
-  },
-  darkvision: {
-    name: 'Darkvision',
-    range: 12,
-    brightZone: 0.0,
-    brightIntensity: 0.0,
-    dimIntensity: 0.7,
-    color: '#90EE90',
-    colorEnabled: true,
-    colorIntensity: 0.1,
-    softEdge: true,
-    softEdgeRadius: 4,
-  },
-  moonlight: {
-    name: 'Moonlight',
-    range: 24,
-    brightZone: 0.3,
-    brightIntensity: 0.6,
-    dimIntensity: 0.3,
-    color: '#87CEEB',
-    colorEnabled: true,
-    colorIntensity: 0.15,
-    softEdge: true,
-    softEdgeRadius: 12,
-  },
-} as const;
-
-type PresetKey = keyof typeof ILLUMINATION_PRESETS;
+import { ILLUMINATION_PRESETS, type PresetKey, getAllPresets } from '@/lib/illuminationPresets';
 
 interface TokenIlluminationModalProps {
   open: boolean;
