@@ -3356,8 +3356,9 @@ export const SimpleTabletop = () => {
   const animationsPaused = useUiModeStore((state) => state.animationsPaused);
   
   useEffect(() => {
-    // If animations are paused, don't run the loop
-    if (animationsPaused) return;
+    // If animations are paused or in edit mode, don't run the loop
+    // Edit mode needs stable rendering for region controls
+    if (animationsPaused || renderingMode === 'edit') return;
     
     const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
@@ -3398,7 +3399,7 @@ export const SimpleTabletop = () => {
     };
     // Include transform in dependencies so animation loop recreates with fresh transform values
     // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
-  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused]);
+  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
