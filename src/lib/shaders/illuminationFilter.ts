@@ -58,59 +58,65 @@ const fragment = `
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     
     // Sample the fog texture
+    // The fog already has visibility polygons cut out (alpha = 0 inside visible areas)
     vec4 fogColor = texture(uTexture, vTextureCoord);
     
-    // Calculate total illumination from all sources
-    float totalIllumination = 0.0;
+    // If fog is fully opaque, no illumination processing needed
+    if (fogColor.a >= 0.99) {
+      finalColor = fogColor;
+      return;
+    }
+    
+    // If no sources, just pass through
+    if (uSourceCount == 0) {
+      finalColor = fogColor;
+      return;
+    }
+    
+    // Calculate how much to darken the visible area based on distance from light sources
+    // Areas close to light centers stay fully visible (alpha = 0)
+    // Areas at the dim zone edge get partial fog added back
+    float minDarkening = 1.0; // Start with full darkening, reduce based on light proximity
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
       
-      // Calculate distance from this source
       float dist = distance(fragPos, uPositions[i]);
       float range = uRanges[i];
       
-      if (range <= 0.0 || dist > range) continue;
+      if (range <= 0.0) continue;
       
       float brightZone = uBrightZones[i];
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
-      float softRadius = uSoftEdgeRadii[i];
       
-      // Normalize distance (0 = center, 1 = edge)
-      float normalizedDist = dist / range;
-      
-      // Calculate illumination based on zone
+      // Calculate how much this light illuminates this point
       float illumination = 0.0;
       
-      if (normalizedDist <= brightZone) {
-        // In bright zone - full bright intensity
+      if (dist <= range * brightZone) {
+        // In bright zone - full illumination (no darkening)
         illumination = brightIntensity;
-      } else {
-        // In dim zone - interpolate from bright to dim
-        float dimProgress = (normalizedDist - brightZone) / (1.0 - brightZone);
+      } else if (dist <= range) {
+        // In dim zone - fade from bright to dim intensity
+        float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
         illumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
+      // Beyond range: illumination stays 0
       
-      // Apply soft edge falloff at outer boundary
-      if (softRadius > 0.0) {
-        float edgeDist = range - dist;
-        if (edgeDist < softRadius) {
-          float edgeFactor = edgeDist / softRadius;
-          illumination *= smoothstep(0.0, 1.0, edgeFactor);
-        }
-      }
-      
-      // Stack illumination (additive, clamped to 1.0)
-      totalIllumination = min(1.0, totalIllumination + illumination);
+      // Less darkening where there's more illumination
+      float darkening = 1.0 - illumination;
+      minDarkening = min(minDarkening, darkening);
     }
     
-    // Apply illumination to fog
-    // illumination = 1.0 means fully lit (remove fog)
-    // illumination = 0.0 means no light (keep fog)
-    float finalAlpha = fogColor.a * (1.0 - totalIllumination);
+    // Apply darkening to visible areas (where fog alpha is low)
+    // This adds fog back at the edges of visibility, creating the dim zone effect
+    // fogColor.a is 0 in fully visible areas, so we add darkness there
+    float baseVisibility = 1.0 - fogColor.a; // How visible this pixel currently is
+    float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
+    float newFogAlpha = 1.0 - darkenedVisibility;
     
-    finalColor = vec4(fogColor.rgb, finalAlpha);
+    // Blend: areas inside visibility get gradient, areas outside stay fogged
+    finalColor = vec4(fogColor.rgb, max(fogColor.a, newFogAlpha * 0.7));
   }
 `;
 
@@ -137,7 +143,20 @@ const fragmentGLSL100 = `
     vec2 fragPos = vTextureCoord * uInputSize.xy;
     vec4 fogColor = texture2D(uTexture, vTextureCoord);
     
-    float totalIllumination = 0.0;
+    // If fog is fully opaque, no illumination processing needed
+    if (fogColor.a >= 0.99) {
+      gl_FragColor = fogColor;
+      return;
+    }
+    
+    // If no sources, just pass through
+    if (uSourceCount == 0) {
+      gl_FragColor = fogColor;
+      return;
+    }
+    
+    // Calculate darkening based on distance from light sources
+    float minDarkening = 1.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -145,36 +164,30 @@ const fragmentGLSL100 = `
       float dist = distance(fragPos, uPositions[i]);
       float range = uRanges[i];
       
-      if (range <= 0.0 || dist > range) continue;
+      if (range <= 0.0) continue;
       
       float brightZone = uBrightZones[i];
       float brightIntensity = uBrightIntensities[i];
       float dimIntensity = uDimIntensities[i];
-      float softRadius = uSoftEdgeRadii[i];
       
-      float normalizedDist = dist / range;
       float illumination = 0.0;
       
-      if (normalizedDist <= brightZone) {
+      if (dist <= range * brightZone) {
         illumination = brightIntensity;
-      } else {
-        float dimProgress = (normalizedDist - brightZone) / (1.0 - brightZone);
+      } else if (dist <= range) {
+        float dimProgress = (dist - range * brightZone) / (range * (1.0 - brightZone));
         illumination = mix(brightIntensity, dimIntensity, dimProgress);
       }
       
-      if (softRadius > 0.0) {
-        float edgeDist = range - dist;
-        if (edgeDist < softRadius) {
-          float edgeFactor = edgeDist / softRadius;
-          illumination *= smoothstep(0.0, 1.0, edgeFactor);
-        }
-      }
-      
-      totalIllumination = min(1.0, totalIllumination + illumination);
+      float darkening = 1.0 - illumination;
+      minDarkening = min(minDarkening, darkening);
     }
     
-    float finalAlpha = fogColor.a * (1.0 - totalIllumination);
-    gl_FragColor = vec4(fogColor.rgb, finalAlpha);
+    float baseVisibility = 1.0 - fogColor.a;
+    float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
+    float newFogAlpha = 1.0 - darkenedVisibility;
+    
+    gl_FragColor = vec4(fogColor.rgb, max(fogColor.a, newFogAlpha * 0.7));
   }
 `;
 
