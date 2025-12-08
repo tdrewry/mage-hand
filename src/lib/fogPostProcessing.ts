@@ -168,13 +168,11 @@ function renderIlluminationOverlay(
     );
     
     const rgb = parseColorToRGB(source.color);
-    const brightIntensity = source.brightIntensity ?? 1.0;
-    const dimIntensity = source.dimIntensity ?? 0.4;
     
-    // Tint intensity: stronger in bright zone, fades in dim zone
-    // Using higher alpha values so color is visible
-    const brightAlpha = Math.min(brightIntensity * 0.5, 0.6);
-    const dimAlpha = Math.min(dimIntensity * 0.3, 0.3);
+    // Color tint intensity - use solid visible colors
+    // The additive blend will combine with the background
+    const brightAlpha = 0.35; // Visible but not overpowering
+    const dimAlpha = 0.15;
     
     gradient.addColorStop(0, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
@@ -182,7 +180,7 @@ function renderIlluminationOverlay(
     
     // Fill the full area - clipping will constrain to visibility polygon
     ctx.fillStyle = gradient;
-    ctx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+    ctx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2)
     
     ctx.restore();
   }
@@ -269,25 +267,37 @@ export function applyFogPostProcessing(
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
       
-      // Create radial gradient for fog removal
-      // Center to brightZone: full removal (bright area)
-      // brightZone to edge: partial removal (dim area)
-      const gradient = fogCtx.createRadialGradient(
-        pos.x, pos.y, 0,
-        pos.x, pos.y, range
-      );
-      
-      // Bright zone: full fog clear
-      gradient.addColorStop(0, `rgba(255, 255, 255, ${brightIntensity})`);
-      gradient.addColorStop(brightZone, `rgba(255, 255, 255, ${brightIntensity})`);
-      
-      // Dim zone: partial fog clear (the dimIntensity controls how much fog remains)
-      gradient.addColorStop(1, `rgba(255, 255, 255, ${dimIntensity})`);
-      
-      fogCtx.fillStyle = gradient;
+      // First, fully remove fog in the entire visible area
+      fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
       fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
       
       fogCtx.restore();
+      
+      // Now ADD BACK fog in the dim zone (outside bright zone but inside range)
+      // This creates the "dim ring" effect
+      if (dimIntensity < 1.0) {
+        fogCtx.save();
+        fogCtx.globalCompositeOperation = 'source-over'; // Add fog back
+        fogCtx.clip(source.visibilityPolygon);
+        
+        // Create a donut-shaped gradient: transparent in bright zone, foggy in dim zone
+        const dimGradient = fogCtx.createRadialGradient(
+          pos.x, pos.y, 0,
+          pos.x, pos.y, range
+        );
+        
+        // Bright zone: no additional fog (transparent)
+        const fogAlpha = 1.0 - dimIntensity; // How much fog to add back (0.65 if dimIntensity is 0.35)
+        dimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        dimGradient.addColorStop(Math.max(0.01, brightZone - 0.05), 'rgba(0, 0, 0, 0)');
+        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.3})`); // Start dim
+        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha * 0.7})`); // Outer edge is dimmer
+        
+        fogCtx.fillStyle = dimGradient;
+        fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+        
+        fogCtx.restore();
+      }
     }
     
     fogCtx.globalCompositeOperation = 'source-over';
