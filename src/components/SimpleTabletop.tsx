@@ -463,6 +463,57 @@ export const SimpleTabletop = () => {
     };
   }, [tokens, transform.zoom]);
 
+  // Keyboard zoom with + and - keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      // + or = (with or without shift) to zoom in
+      if (e.key === '+' || e.key === '=' || (e.key === '=' && e.shiftKey)) {
+        e.preventDefault();
+        const zoomFactor = 1.15;
+        const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
+        
+        // Zoom towards center of viewport
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const zoomRatio = newZoom / transform.zoom;
+        
+        setTransform({
+          x: centerX - (centerX - transform.x) * zoomRatio,
+          y: centerY - (centerY - transform.y) * zoomRatio,
+          zoom: newZoom,
+        });
+      }
+      // - or _ to zoom out
+      else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        const zoomFactor = 0.87;
+        const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
+        
+        // Zoom towards center of viewport
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const zoomRatio = newZoom / transform.zoom;
+        
+        setTransform({
+          x: centerX - (centerX - transform.x) * zoomRatio,
+          y: centerY - (centerY - transform.y) * zoomRatio,
+          zoom: newZoom,
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [transform]);
+
   // Canvas rendering now auto-updates via dependencies - no manual event listening needed
 
   // Initialize paper.js scope and load explored areas
