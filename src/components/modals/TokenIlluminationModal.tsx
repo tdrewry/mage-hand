@@ -146,6 +146,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
                 <SelectItem value="moonlight">🌙 Moonlight (120ft)</SelectItem>
                 <SelectItem value="magicLight">✨ Magic Light (50ft, pulsing glow)</SelectItem>
                 <SelectItem value="faerieLight">🧚 Faerie Fire (30ft, ethereal glow)</SelectItem>
+                <SelectItem value="dancingLights">💫 Dancing Lights (10ft, rapid flicker)</SelectItem>
               </SelectContent>
             </Select>
           </div>

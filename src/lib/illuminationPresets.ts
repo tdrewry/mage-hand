@@ -145,6 +145,23 @@ export const ILLUMINATION_PRESETS = {
     animationSpeed: 1.0,
     animationIntensity: 0.4,
   },
+  dancingLights: {
+    name: 'Dancing Lights',
+    icon: '💫',
+    description: '10ft rapid flickering spell light',
+    range: 2,
+    brightZone: 0.6,
+    brightIntensity: 0.9,
+    dimIntensity: 0.3,
+    color: '#FFFFFF',
+    colorEnabled: true,
+    colorIntensity: 0.4,
+    softEdge: true,
+    softEdgeRadius: 3,
+    animation: 'flicker' as IlluminationAnimationType,
+    animationSpeed: 2.5,
+    animationIntensity: 0.6,
+  },
 } as const;
 
 export type PresetKey = keyof typeof ILLUMINATION_PRESETS;
