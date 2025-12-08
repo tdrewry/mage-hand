@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { syncManager } from '@/lib/syncManager';
+import type { IlluminationSource } from '@/types/illumination';
 
 export interface Token {
   id: string;
@@ -22,12 +23,18 @@ export interface Token {
   color?: string;     // Token color (for default tokens)
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
-  hasVision?: boolean; // Whether token can see through fog of war (default: true)
-  visionRange?: number; // Vision range in grid units (uses global default if not set)
-  visionProfileId?: string; // Reference to a vision profile from visionProfileStore
-  useGradients?: boolean; // Whether to use gradient edges (can override profile setting)
+  
+  // Unified illumination system - array of attached light/vision sources
+  illuminationSources?: IlluminationSource[];
+
+  // @deprecated Legacy fields - kept for migration, will be removed in future
+  hasVision?: boolean;
+  visionRange?: number;
+  visionProfileId?: string;
+  useGradients?: boolean;
+  
   // @deprecated Use roleId instead
-  ownerId?: string;   // Player who owns this token (deprecated, for backward compatibility)
+  ownerId?: string;
 }
 
 export interface Player {

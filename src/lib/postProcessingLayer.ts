@@ -1,10 +1,12 @@
 /**
  * Post-Processing Layer using PixiJS
- * Provides WebGL-based effects for fog of war and lighting
+ * Provides WebGL-based effects for fog of war and unified illumination
  */
 
 import * as PIXI from 'pixi.js';
 import { Z_INDEX } from './zIndex';
+import { IlluminationFilter } from './shaders/illuminationFilter';
+import type { IlluminationShaderData } from '@/types/illumination';
 
 export interface PostProcessingConfig {
   width: number;
@@ -15,7 +17,7 @@ export interface PostProcessingConfig {
 
 export interface EffectSettings {
   edgeBlur: number;        // 0-20 pixels
-  lightFalloff: number;    // 0-1, inner bright zone as percentage of light radius
+  lightFalloff: number;    // 0-1, default bright zone for new sources
   bloomThreshold: number;  // 0.5-1 (legacy, unused)
   volumetricEnabled: boolean;
   effectQuality: 'performance' | 'balanced' | 'cinematic';
@@ -33,6 +35,7 @@ let pixiApp: PIXI.Application | null = null;
 let fogSprite: PIXI.Sprite | null = null;
 let fogTexture: PIXI.Texture | null = null;
 let blurFilter: PIXI.BlurFilter | null = null;
+let illuminationFilter: IlluminationFilter | null = null;
 let containerRef: HTMLElement | null = null;
 let isInitialized = false;
 let currentSettings: EffectSettings = { ...DEFAULT_EFFECT_SETTINGS };
@@ -97,10 +100,16 @@ export async function initPostProcessing(
       strength: currentSettings.edgeBlur,
       quality: currentSettings.effectQuality === 'performance' ? 2 : 4,
     });
+    
+    // Create illumination filter for GPU-based light calculations
+    illuminationFilter = new IlluminationFilter({
+      globalEdgeBlur: currentSettings.edgeBlur,
+    });
 
     // Create a container for the fog sprite
     const fogContainer = new PIXI.Container();
-    fogContainer.filters = [blurFilter];
+    // Apply both blur and illumination filters
+    fogContainer.filters = [illuminationFilter, blurFilter];
     pixiApp.stage.addChild(fogContainer);
 
     // Create fog sprite (will be updated with fog texture)
@@ -110,7 +119,7 @@ export async function initPostProcessing(
     fogContainer.addChild(fogSprite);
 
     isInitialized = true;
-    console.log('✅ PixiJS post-processing initialized');
+    console.log('✅ PixiJS post-processing initialized with GPU illumination');
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize post-processing:', error);
@@ -167,6 +176,18 @@ export function updateEffectSettings(settings: Partial<EffectSettings>): void {
     blurFilter.strength = currentSettings.edgeBlur;
     blurFilter.quality = currentSettings.effectQuality === 'performance' ? 2 : 4;
   }
+  
+  if (illuminationFilter) {
+    illuminationFilter.globalEdgeBlur = currentSettings.edgeBlur;
+  }
+}
+
+/**
+ * Update illumination data for GPU processing
+ */
+export function updateIlluminationData(data: IlluminationShaderData): void {
+  if (!illuminationFilter || !isInitialized) return;
+  illuminationFilter.updateIllumination(data);
 }
 
 /**
@@ -235,6 +256,11 @@ export async function cleanupPostProcessing(): Promise<void> {
     if (blurFilter) {
       blurFilter.destroy();
       blurFilter = null;
+    }
+    
+    if (illuminationFilter) {
+      illuminationFilter.destroy();
+      illuminationFilter = null;
     }
 
     if (fogSprite) {
