@@ -125,6 +125,7 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
 /**
  * Render per-source illumination colors to the illumination canvas
  * Each source's color is clipped to its visibility polygon
+ * The tint fills the entire visibility polygon with gradient from center
  */
 function renderIlluminationOverlay(
   sources: IlluminationSource[],
@@ -154,10 +155,9 @@ function renderIlluminationOverlay(
     
     // Clip to this source's visibility polygon
     ctx.beginPath();
-    // The visibility polygon is a Path2D, we need to trace it
     ctx.clip(source.visibilityPolygon);
     
-    // Create radial gradient from source position
+    // Create radial gradient from source position covering the full range
     const range = source.range;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
@@ -171,15 +171,16 @@ function renderIlluminationOverlay(
     const brightIntensity = source.brightIntensity ?? 1.0;
     const dimIntensity = source.dimIntensity ?? 0.4;
     
-    // Gradient stops: center to bright zone edge to range edge
-    // Use 0.35 base alpha like the shader was using
-    const brightAlpha = brightIntensity * 0.35;
-    const dimAlpha = dimIntensity * 0.35;
+    // Tint intensity: stronger in bright zone, fades in dim zone
+    // Using higher alpha values so color is visible
+    const brightAlpha = Math.min(brightIntensity * 0.5, 0.6);
+    const dimAlpha = Math.min(dimIntensity * 0.3, 0.3);
     
     gradient.addColorStop(0, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
-    gradient.addColorStop(1, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${dimAlpha * 0.3})`);
+    gradient.addColorStop(1, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${dimAlpha})`);
     
+    // Fill the full area - clipping will constrain to visibility polygon
     ctx.fillStyle = gradient;
     ctx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
     
