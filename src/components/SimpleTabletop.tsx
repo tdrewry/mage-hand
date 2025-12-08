@@ -129,6 +129,13 @@ export const SimpleTabletop = () => {
     y: 0,
     zoom: 1,
   });
+  
+  // Keep a ref to track the latest transform for animation loops
+  // This prevents stale closure issues when wheel zoom occurs during animation
+  const transformRef = useRef(transform);
+  useEffect(() => {
+    transformRef.current = transform;
+  }, [transform]);
 
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
@@ -3391,7 +3398,9 @@ export const SimpleTabletop = () => {
         cancelAnimationFrame(animationId);
       }
     };
-  }, [tokens, hoveredTokenId, players, currentPlayerId, roles]);
+    // Include transform in dependencies so animation loop recreates with fresh transform values
+    // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
+  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
