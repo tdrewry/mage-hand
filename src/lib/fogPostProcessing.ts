@@ -130,7 +130,8 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
 function renderIlluminationOverlay(
   sources: IlluminationSource[],
   transform: { x: number; y: number; zoom: number },
-  padding: number
+  padding: number,
+  gridSize: number
 ): void {
   if (!illuminationCtx || !illuminationCanvas) return;
   
@@ -158,13 +159,13 @@ function renderIlluminationOverlay(
     ctx.clip(source.visibilityPolygon);
     
     // Create radial gradient from source position covering the full range
-    const range = source.range;
+    const rangePixels = source.range * gridSize; // Convert grid units to pixels
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
     
     const gradient = ctx.createRadialGradient(
       pos.x, pos.y, 0,
-      pos.x, pos.y, range
+      pos.x, pos.y, rangePixels
     );
     
     const rgb = parseColorToRGB(source.color);
@@ -180,7 +181,7 @@ function renderIlluminationOverlay(
     
     // Fill the full area - clipping will constrain to visibility polygon
     ctx.fillStyle = gradient;
-    ctx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2)
+    ctx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2)
     
     ctx.restore();
   }
@@ -252,15 +253,15 @@ export function applyFogPostProcessing(
   // - Bright zone (inner circle): fully clears fog (alpha = 1)
   // - Dim zone (outer ring): partially clears fog (alpha = dimIntensity)
   if (illuminationData && illuminationData.sources.length > 0) {
+    const gridSize = illuminationData.gridSize;
     fogCtx.globalCompositeOperation = 'destination-out';
     
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
       
       const pos = source.position;
-      const range = source.range;
+      const rangePixels = source.range * gridSize; // Convert grid units to pixels
       const brightZone = source.brightZone ?? 0.5;
-      const brightIntensity = source.brightIntensity ?? 1.0;
       const dimIntensity = source.dimIntensity ?? 0.4;
       
       // Save context and clip to this source's visibility polygon
@@ -269,7 +270,7 @@ export function applyFogPostProcessing(
       
       // First, fully remove fog in the entire visible area
       fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-      fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+      fogCtx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2);
       
       fogCtx.restore();
       
@@ -283,7 +284,7 @@ export function applyFogPostProcessing(
         // Create a donut-shaped gradient: transparent in bright zone, foggy in dim zone
         const dimGradient = fogCtx.createRadialGradient(
           pos.x, pos.y, 0,
-          pos.x, pos.y, range
+          pos.x, pos.y, rangePixels
         );
         
         // fogAlpha is how much fog to add back in dim zone
@@ -298,7 +299,7 @@ export function applyFogPostProcessing(
         dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`); // Maintain until edge
         
         fogCtx.fillStyle = dimGradient;
-        fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+        fogCtx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2);
         
         fogCtx.restore();
       }
@@ -312,7 +313,7 @@ export function applyFogPostProcessing(
   // Render per-source illumination colors on Canvas 2D
   // Each source's color is clipped to its own visibility polygon
   if (illuminationData && illuminationData.sources.length > 0) {
-    renderIlluminationOverlay(illuminationData.sources, transform, padding);
+    renderIlluminationOverlay(illuminationData.sources, transform, padding, illuminationData.gridSize);
     
     // Send illumination overlay to PixiJS
     if (illuminationCanvas) {
