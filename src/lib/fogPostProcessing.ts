@@ -159,7 +159,9 @@ function renderIlluminationOverlay(
     ctx.clip(source.visibilityPolygon);
     
     // Create radial gradient from source position covering the full range
-    const rangePixels = source.range * gridSize; // Convert grid units to pixels
+    // source.range is already in pixels, gridSize is 1
+    // Don't apply gridSize here since range is pre-calculated in pixels
+    const rangePixels = source.range;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
     
@@ -260,7 +262,8 @@ export function applyFogPostProcessing(
       if (!source.enabled || !source.visibilityPolygon) continue;
       
       const pos = source.position;
-      const rangePixels = source.range * gridSize; // Convert grid units to pixels
+      // source.range is already in pixels when gridSize is 1
+      const rangePixels = source.range;
       const brightZone = source.brightZone ?? 0.5;
       const dimIntensity = source.dimIntensity ?? 0.4;
       
