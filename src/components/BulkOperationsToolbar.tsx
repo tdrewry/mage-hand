@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,8 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -18,6 +20,7 @@ import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { canAssignTokenRoles } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
+import { IlluminationSource } from '@/types/illumination';
 
 interface BulkOperationsToolbarProps {
   selectedTokenIds: string[];
@@ -30,7 +33,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   onClearSelection,
   onUpdateCanvas
 }) => {
-  const { tokens, currentPlayerId, players, removeToken } = useSessionStore();
+  const { tokens, currentPlayerId, players, removeToken, updateTokenIllumination } = useSessionStore();
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
   const { profiles } = useVisionProfileStore();
@@ -40,6 +43,16 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   const [initiativeValue, setInitiativeValue] = useState('');
   const [showColorModal, setShowColorModal] = useState(false);
   const [colorValue, setColorValue] = useState('#FF6B6B');
+  const [showIlluminationModal, setShowIlluminationModal] = useState(false);
+  
+  // Illumination settings state
+  const [illumRange, setIllumRange] = useState(6);
+  const [illumBrightZone, setIllumBrightZone] = useState(0.5);
+  const [illumBrightIntensity, setIllumBrightIntensity] = useState(1.0);
+  const [illumDimIntensity, setIllumDimIntensity] = useState(0.4);
+  const [illumColor, setIllumColor] = useState('#FFD700');
+  const [illumSoftEdge, setIllumSoftEdge] = useState(true);
+  const [illumSoftEdgeRadius, setIllumSoftEdgeRadius] = useState(8);
   
   const selectedTokens = tokens.filter(t => selectedTokenIds.includes(t.id));
   const currentPlayer = players.find(p => p.id === currentPlayerId);
@@ -241,6 +254,11 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
+              <DropdownMenuItem onClick={() => setShowIlluminationModal(true)}>
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Illumination Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleToggleVision(true)}>
                 Enable Vision
               </DropdownMenuItem>
@@ -394,6 +412,126 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
             </Button>
             <Button onClick={handleApplyColor}>
               Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Illumination Settings Modal */}
+      <Dialog open={showIlluminationModal} onOpenChange={setShowIlluminationModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Illumination Settings</DialogTitle>
+            <DialogDescription>
+              Configure illumination for {selectedTokens.length} token(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Range (grid units): {illumRange}</Label>
+              <Slider
+                value={[illumRange]}
+                onValueChange={([v]) => setIllumRange(v)}
+                min={1}
+                max={24}
+                step={1}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Bright Zone: {Math.round(illumBrightZone * 100)}%</Label>
+              <Slider
+                value={[illumBrightZone]}
+                onValueChange={([v]) => setIllumBrightZone(v)}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Bright Intensity: {Math.round(illumBrightIntensity * 100)}%</Label>
+              <Slider
+                value={[illumBrightIntensity]}
+                onValueChange={([v]) => setIllumBrightIntensity(v)}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Dim Intensity: {Math.round(illumDimIntensity * 100)}%</Label>
+              <Slider
+                value={[illumDimIntensity]}
+                onValueChange={([v]) => setIllumDimIntensity(v)}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  value={illumColor}
+                  onChange={(e) => setIllumColor(e.target.value)}
+                  className="w-16 h-10"
+                />
+                <Input
+                  type="text"
+                  value={illumColor}
+                  onChange={(e) => setIllumColor(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label>Soft Edge</Label>
+              <Switch
+                checked={illumSoftEdge}
+                onCheckedChange={setIllumSoftEdge}
+              />
+            </div>
+            
+            {illumSoftEdge && (
+              <div className="space-y-2">
+                <Label>Soft Edge Radius: {illumSoftEdgeRadius}px</Label>
+                <Slider
+                  value={[illumSoftEdgeRadius]}
+                  onValueChange={([v]) => setIllumSoftEdgeRadius(v)}
+                  min={0}
+                  max={20}
+                  step={1}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowIlluminationModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              selectedTokens.forEach(token => {
+                const illumination: Partial<IlluminationSource> = {
+                  range: illumRange,
+                  brightZone: illumBrightZone,
+                  brightIntensity: illumBrightIntensity,
+                  dimIntensity: illumDimIntensity,
+                  color: illumColor,
+                  softEdge: illumSoftEdge,
+                  softEdgeRadius: illumSoftEdgeRadius,
+                };
+                updateTokenIllumination(token.id, illumination);
+              });
+              setShowIlluminationModal(false);
+              onUpdateCanvas?.();
+              toast.success(`Updated illumination for ${selectedTokens.length} token(s)`);
+            }}>
+              Apply to All
             </Button>
           </DialogFooter>
         </DialogContent>
