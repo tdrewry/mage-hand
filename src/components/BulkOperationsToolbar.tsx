@@ -51,6 +51,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   const [illumBrightIntensity, setIllumBrightIntensity] = useState(1.0);
   const [illumDimIntensity, setIllumDimIntensity] = useState(0.4);
   const [illumColor, setIllumColor] = useState('#FFD700');
+  const [illumColorEnabled, setIllumColorEnabled] = useState(false);
   const [illumSoftEdge, setIllumSoftEdge] = useState(true);
   const [illumSoftEdgeRadius, setIllumSoftEdgeRadius] = useState(8);
   
@@ -472,21 +473,34 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
             </div>
             
             <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="flex gap-2">
+              <div className="flex items-center justify-between">
+                <Label>Enable Color Tint</Label>
+                <Switch
+                  checked={illumColorEnabled}
+                  onCheckedChange={setIllumColorEnabled}
+                />
+              </div>
+              <div className={`flex gap-2 ${!illumColorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Input
                   type="color"
                   value={illumColor}
                   onChange={(e) => setIllumColor(e.target.value)}
                   className="w-16 h-10"
+                  disabled={!illumColorEnabled}
                 />
                 <Input
                   type="text"
                   value={illumColor}
                   onChange={(e) => setIllumColor(e.target.value)}
                   className="flex-1"
+                  disabled={!illumColorEnabled}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                {illumColorEnabled
+                  ? 'Light will be tinted with the selected color'
+                  : 'Color tinting disabled - neutral light'}
+              </p>
             </div>
             
             <div className="flex items-center justify-between">
@@ -522,6 +536,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
                   brightIntensity: illumBrightIntensity,
                   dimIntensity: illumDimIntensity,
                   color: illumColor,
+                  colorEnabled: illumColorEnabled,
                   softEdge: illumSoftEdge,
                   softEdgeRadius: illumSoftEdgeRadius,
                 };

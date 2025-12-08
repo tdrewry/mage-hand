@@ -21,6 +21,7 @@ export interface IlluminationSource {
   
   // Visual settings
   color: string;                    // Tint color (hex)
+  colorEnabled: boolean;            // Whether to apply color tinting (default: false)
   softEdge: boolean;                // Whether to blur the outer edge
   softEdgeRadius: number;           // Blur amount (0-20 pixels)
   
@@ -40,6 +41,7 @@ export interface IlluminationTemplate {
   brightIntensity: number;
   dimIntensity: number;
   color: string;
+  colorEnabled: boolean;
   softEdge: boolean;
   softEdgeRadius: number;
 }
@@ -62,6 +64,7 @@ export function createIlluminationFromTemplate(
     brightIntensity: template.brightIntensity,
     dimIntensity: template.dimIntensity,
     color: template.color,
+    colorEnabled: template.colorEnabled,
     softEdge: template.softEdge,
     softEdgeRadius: template.softEdgeRadius,
   };
@@ -78,6 +81,7 @@ export const DEFAULT_ILLUMINATION: Omit<IlluminationSource, 'id' | 'position'> =
   brightIntensity: 1.0,
   dimIntensity: 0.4,
   color: '#FFD700',
+  colorEnabled: false, // Color tinting disabled by default
   softEdge: true,
   softEdgeRadius: 8,
 };
@@ -97,6 +101,7 @@ export interface IlluminationShaderData {
   dimIntensities: Float32Array;
   softEdgeRadii: Float32Array;
   colors: Float32Array;         // vec3 array [r1, g1, b1, r2, g2, b2, ...]
+  colorEnabled: Float32Array;   // float array (0.0 = disabled, 1.0 = enabled)
 }
 
 /**
@@ -127,6 +132,7 @@ export function createShaderData(
     dimIntensities: new Float32Array(MAX_ILLUMINATION_SOURCES),
     softEdgeRadii: new Float32Array(MAX_ILLUMINATION_SOURCES),
     colors: new Float32Array(MAX_ILLUMINATION_SOURCES * 3),
+    colorEnabled: new Float32Array(MAX_ILLUMINATION_SOURCES),
   };
   
   const activeSources = sources.filter(s => s.enabled).slice(0, MAX_ILLUMINATION_SOURCES);
@@ -156,6 +162,9 @@ export function createShaderData(
     data.colors[i * 3] = r;
     data.colors[i * 3 + 1] = g;
     data.colors[i * 3 + 2] = b;
+    
+    // Color enabled flag
+    data.colorEnabled[i] = source.colorEnabled ? 1.0 : 0.0;
   });
   
   return data;

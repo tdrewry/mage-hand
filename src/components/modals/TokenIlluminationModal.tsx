@@ -40,6 +40,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   const [brightIntensity, setBrightIntensity] = useState(currentIllumination?.brightIntensity ?? DEFAULT_ILLUMINATION.brightIntensity);
   const [dimIntensity, setDimIntensity] = useState(currentIllumination?.dimIntensity ?? DEFAULT_ILLUMINATION.dimIntensity);
   const [color, setColor] = useState(currentIllumination?.color ?? DEFAULT_ILLUMINATION.color);
+  const [colorEnabled, setColorEnabled] = useState(currentIllumination?.colorEnabled ?? DEFAULT_ILLUMINATION.colorEnabled);
   const [softEdge, setSoftEdge] = useState(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
   const [softEdgeRadius, setSoftEdgeRadius] = useState(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
   const [useGlobalBrightZone, setUseGlobalBrightZone] = useState(!currentIllumination?.brightZone);
@@ -52,6 +53,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       setBrightIntensity(currentIllumination?.brightIntensity ?? DEFAULT_ILLUMINATION.brightIntensity);
       setDimIntensity(currentIllumination?.dimIntensity ?? DEFAULT_ILLUMINATION.dimIntensity);
       setColor(currentIllumination?.color ?? DEFAULT_ILLUMINATION.color);
+      setColorEnabled(currentIllumination?.colorEnabled ?? DEFAULT_ILLUMINATION.colorEnabled);
       setSoftEdge(currentIllumination?.softEdge ?? DEFAULT_ILLUMINATION.softEdge);
       setSoftEdgeRadius(currentIllumination?.softEdgeRadius ?? DEFAULT_ILLUMINATION.softEdgeRadius);
       setUseGlobalBrightZone(!currentIllumination?.brightZone);
@@ -65,6 +67,7 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
       brightIntensity,
       dimIntensity,
       color,
+      colorEnabled,
       softEdge,
       softEdgeRadius,
     });
@@ -162,27 +165,40 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
 
           {/* Color */}
           <div className="space-y-2">
-            <Label>Light Color</Label>
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center justify-between">
+              <Label>Enable Color Tint</Label>
+              <Switch
+                checked={colorEnabled}
+                onCheckedChange={setColorEnabled}
+              />
+            </div>
+            <div className={`flex gap-2 items-center ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               <Input
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 className="w-14 h-10 p-1 cursor-pointer"
+                disabled={!colorEnabled}
               />
               <span className="text-sm text-muted-foreground">{color}</span>
             </div>
             {/* Color presets */}
-            <div className="flex gap-2 flex-wrap">
+            <div className={`flex gap-2 flex-wrap ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               {['#FFFFFF', '#FFD700', '#FFA500', '#87CEEB', '#90EE90', '#FF6B6B'].map((c) => (
                 <button
                   key={c}
                   className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
                   style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
+                  onClick={() => colorEnabled && setColor(c)}
+                  disabled={!colorEnabled}
                 />
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {colorEnabled
+                ? 'Light will be tinted with the selected color (warm torch, cool moonlight, etc.)'
+                : 'Color tinting is disabled - light will appear neutral'}
+            </p>
           </div>
 
           {/* Soft Edge */}
