@@ -31,6 +31,9 @@ const vertex = `
   }
 `;
 
+// Simplified fragment shader - color tinting is now handled by a separate
+// Canvas 2D overlay that's clipped to each source's visibility polygon.
+// This shader only handles fog/visibility and dim zone darkening.
 const fragment = `
   precision highp float;
   
@@ -61,9 +64,6 @@ const fragment = `
     // baseVisibility: 1.0 = fully visible (inside visibility polygon), 0.0 = fogged/blocked
     float baseVisibility = 1.0 - fogColor.a;
     
-    // Apply visibility threshold to prevent color bleeding at soft fog edges
-    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
-    
     // If fog is fully opaque (behind walls), no processing needed
     if (fogColor.a >= 0.99) {
       finalColor = fogColor;
@@ -76,11 +76,8 @@ const fragment = `
       return;
     }
     
-    // Calculate darkening and color accumulation
+    // Calculate dim zone darkening only - color is handled by illumination overlay
     float minDarkening = 1.0;
-    vec3 accumulatedColor = vec3(0.0);
-    float totalColorWeight = 0.0;
-    float totalIllumination = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -108,13 +105,6 @@ const fragment = `
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
-      totalIllumination = max(totalIllumination, illumination);
-      
-      // Color weighted by visibility to respect wall occlusion
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        accumulatedColor += uColors[i] * illumination;
-        totalColorWeight += illumination;
-      }
     }
     
     // Apply dim zone darkening
@@ -122,28 +112,13 @@ const fragment = `
     float newFogAlpha = 1.0 - darkenedVisibility;
     float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    // Apply color tinting
-    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      
-      // Color overlay alpha - this makes the tint VISIBLE in lit areas
-      // Scale by illumination and visibility for proper falloff
-      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
-      
-      // Final alpha: max of fog, dim zone, and color tint
-      float finalAlpha = max(baseFogAlpha, tintAlpha);
-      
-      // Blend RGB: fog color in dark/blocked areas, tint color in lit areas
-      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
-      
-      finalColor = vec4(outputColor, finalAlpha);
-    } else {
-      finalColor = vec4(fogColor.rgb, baseFogAlpha);
-    }
+    // Output fog only - color overlay is composited separately by PixiJS
+    finalColor = vec4(fogColor.rgb, baseFogAlpha);
   }
 `;
 
 // WebGL 1 fallback (for older browsers)
+// Simplified - color tinting handled by Canvas 2D overlay
 const fragmentGLSL100 = `
   precision highp float;
   
@@ -170,9 +145,6 @@ const fragmentGLSL100 = `
     // baseVisibility: 1.0 = fully visible, 0.0 = fogged/blocked
     float baseVisibility = 1.0 - fogColor.a;
     
-    // Threshold to prevent color bleeding at soft fog edges
-    float thresholdedVisibility = baseVisibility > 0.1 ? baseVisibility : 0.0;
-    
     if (fogColor.a >= 0.99) {
       gl_FragColor = fogColor;
       return;
@@ -184,9 +156,6 @@ const fragmentGLSL100 = `
     }
     
     float minDarkening = 1.0;
-    vec3 accumulatedColor = vec3(0.0);
-    float totalColorWeight = 0.0;
-    float totalIllumination = 0.0;
     
     for (int i = 0; i < ${MAX_ILLUMINATION_SOURCES}; i++) {
       if (i >= uSourceCount) break;
@@ -214,30 +183,14 @@ const fragmentGLSL100 = `
       
       float darkening = 1.0 - illumination;
       minDarkening = min(minDarkening, darkening);
-      totalIllumination = max(totalIllumination, illumination);
-      
-      if (uColorEnabled[i] > 0.5 && illumination > 0.0) {
-        accumulatedColor += uColors[i] * illumination;
-        totalColorWeight += illumination;
-      }
     }
     
     float darkenedVisibility = baseVisibility * (1.0 - minDarkening);
     float newFogAlpha = 1.0 - darkenedVisibility;
     float baseFogAlpha = max(fogColor.a, newFogAlpha * 0.7);
     
-    if (totalColorWeight > 0.0 && thresholdedVisibility > 0.0) {
-      vec3 normalizedColor = accumulatedColor / totalColorWeight;
-      
-      float tintAlpha = totalIllumination * thresholdedVisibility * 0.35;
-      float finalAlpha = max(baseFogAlpha, tintAlpha);
-      
-      vec3 outputColor = mix(fogColor.rgb, normalizedColor, thresholdedVisibility * totalIllumination);
-      
-      gl_FragColor = vec4(outputColor, finalAlpha);
-    } else {
-      gl_FragColor = vec4(fogColor.rgb, baseFogAlpha);
-    }
+    // Output fog only - color overlay is composited separately by PixiJS
+    gl_FragColor = vec4(fogColor.rgb, baseFogAlpha);
   }
 `;
 

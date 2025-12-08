@@ -5,6 +5,7 @@
 
 import {
   updateFogTexture,
+  updateIlluminationTexture,
   updateEffectSettings,
   getEffectSettings,
   isPostProcessingReady,
@@ -32,6 +33,8 @@ export const DEFAULT_FOG_EFFECTS: FogEffectConfig = {
 
 let fogCanvas: HTMLCanvasElement | null = null;
 let fogCtx: CanvasRenderingContext2D | null = null;
+let illuminationCanvas: HTMLCanvasElement | null = null;
+let illuminationCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
 let currentPadding = 0; // Track current padding for off-screen rendering
@@ -58,6 +61,14 @@ export function initFogCanvas(width: number, height: number, edgeBlur: number = 
   fogCanvas.width = width + padding * 2;
   fogCanvas.height = height + padding * 2;
   fogCtx = fogCanvas.getContext('2d', { willReadFrequently: false });
+  
+  // Initialize illumination canvas at same size
+  if (!illuminationCanvas) {
+    illuminationCanvas = document.createElement('canvas');
+  }
+  illuminationCanvas.width = width + padding * 2;
+  illuminationCanvas.height = height + padding * 2;
+  illuminationCtx = illuminationCanvas.getContext('2d', { willReadFrequently: false });
 }
 
 /**
@@ -70,6 +81,10 @@ export function resizeFogCanvas(width: number, height: number, edgeBlur: number 
   if (fogCanvas) {
     fogCanvas.width = width + padding * 2;
     fogCanvas.height = height + padding * 2;
+  }
+  if (illuminationCanvas) {
+    illuminationCanvas.width = width + padding * 2;
+    illuminationCanvas.height = height + padding * 2;
   }
 }
 
@@ -87,6 +102,92 @@ interface IlluminationData {
   sources: IlluminationSource[];
   gridSize: number;
   transform: { x: number; y: number; zoom: number };
+}
+
+/**
+ * Parse color string to RGB values (0-1 range)
+ */
+function parseColorToRGB(color: string): { r: number; g: number; b: number } {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const bigint = parseInt(hex, 16);
+    return {
+      r: ((bigint >> 16) & 255) / 255,
+      g: ((bigint >> 8) & 255) / 255,
+      b: (bigint & 255) / 255,
+    };
+  }
+  // Default to white
+  return { r: 1, g: 1, b: 1 };
+}
+
+/**
+ * Render per-source illumination colors to the illumination canvas
+ * Each source's color is clipped to its visibility polygon
+ */
+function renderIlluminationOverlay(
+  sources: IlluminationSource[],
+  transform: { x: number; y: number; zoom: number },
+  padding: number
+): void {
+  if (!illuminationCtx || !illuminationCanvas) return;
+  
+  const ctx = illuminationCtx;
+  const width = illuminationCanvas.width;
+  const height = illuminationCanvas.height;
+  
+  // Clear the illumination canvas
+  ctx.clearRect(0, 0, width, height);
+  
+  // Use lighter blend mode to stack colors additively
+  ctx.globalCompositeOperation = 'lighter';
+  
+  for (const source of sources) {
+    if (!source.enabled || !source.colorEnabled || !source.visibilityPolygon) continue;
+    
+    ctx.save();
+    
+    // Apply transform with padding offset
+    ctx.translate(padding + transform.x, padding + transform.y);
+    ctx.scale(transform.zoom, transform.zoom);
+    
+    // Clip to this source's visibility polygon
+    ctx.beginPath();
+    // The visibility polygon is a Path2D, we need to trace it
+    ctx.clip(source.visibilityPolygon);
+    
+    // Create radial gradient from source position
+    const range = source.range;
+    const brightZone = source.brightZone ?? 0.5;
+    const pos = source.position;
+    
+    const gradient = ctx.createRadialGradient(
+      pos.x, pos.y, 0,
+      pos.x, pos.y, range
+    );
+    
+    const rgb = parseColorToRGB(source.color);
+    const brightIntensity = source.brightIntensity ?? 1.0;
+    const dimIntensity = source.dimIntensity ?? 0.4;
+    
+    // Gradient stops: center to bright zone edge to range edge
+    // Use 0.35 base alpha like the shader was using
+    const brightAlpha = brightIntensity * 0.35;
+    const dimAlpha = dimIntensity * 0.35;
+    
+    gradient.addColorStop(0, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
+    gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
+    gradient.addColorStop(1, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${dimAlpha * 0.3})`);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
+    
+    ctx.restore();
+  }
+  
+  // Reset composite operation
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 /**
@@ -164,9 +265,20 @@ export function applyFogPostProcessing(
 
   fogCtx.restore();
 
-  // Update GPU illumination data for gradient effects (bright/dim zones)
-  // NOTE: The shader now only applies gradient modulation within the
-  // already-cut visibility areas, not circular distance-based cutouts
+  // Render per-source illumination colors on Canvas 2D
+  // Each source's color is clipped to its own visibility polygon
+  if (illuminationData && illuminationData.sources.length > 0) {
+    renderIlluminationOverlay(illuminationData.sources, transform, padding);
+    
+    // Send illumination overlay to PixiJS
+    if (illuminationCanvas) {
+      updateIlluminationTexture(illuminationCanvas, padding);
+    }
+  }
+
+  // Update GPU illumination data for bright/dim zone calculations
+  // NOTE: Color is now handled by the illumination texture, but we still
+  // need source positions/ranges for dim zone darkening effects
   if (illuminationData && illuminationData.sources.length > 0) {
     const shaderData = createShaderData(
       illuminationData.sources,
@@ -261,5 +373,9 @@ export function cleanupFogPostProcessing(): void {
   if (fogCanvas) {
     fogCanvas = null;
     fogCtx = null;
+  }
+  if (illuminationCanvas) {
+    illuminationCanvas = null;
+    illuminationCtx = null;
   }
 }
