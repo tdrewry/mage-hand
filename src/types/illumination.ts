@@ -102,6 +102,15 @@ export interface IlluminationShaderData {
 /**
  * Create shader data from illumination sources
  */
+/**
+ * Create shader data from illumination sources
+ * 
+ * IMPORTANT: Positions are transformed to match the fog canvas coordinate system.
+ * The fog canvas applies: translate(padding + transform.x, padding + transform.y) then scale(zoom)
+ * So world coordinates become: worldPos * zoom + (padding + transform.x/y)
+ * 
+ * The transform.x/y passed here should already include the padding offset.
+ */
 export function createShaderData(
   sources: IlluminationSource[],
   gridSize: number,
@@ -123,14 +132,16 @@ export function createShaderData(
   const activeSources = sources.filter(s => s.enabled).slice(0, MAX_ILLUMINATION_SOURCES);
   
   activeSources.forEach((source, i) => {
-    // Transform position to screen coordinates
+    // Transform world position to fog canvas coordinates
+    // The fog canvas uses: ctx.translate(offset.x, offset.y); ctx.scale(zoom, zoom);
+    // So a world point P appears at: P * zoom + offset
     const screenX = (source.position.x * transform.zoom) + transform.x;
     const screenY = (source.position.y * transform.zoom) + transform.y;
     
     data.positions[i * 2] = screenX;
     data.positions[i * 2 + 1] = screenY;
     
-    // Convert range from grid units to pixels
+    // Range is stored in grid units, convert to screen pixels
     data.ranges[i] = source.range * gridSize * transform.zoom;
     data.brightZones[i] = source.brightZone;
     data.brightIntensities[i] = source.brightIntensity;
