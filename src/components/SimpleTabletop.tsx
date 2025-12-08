@@ -1658,12 +1658,21 @@ export const SimpleTabletop = () => {
         }
       } else {
         // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
-        // Pass all token visibility data with isLightSource flag for gradient rendering
-        const allTokenVisibility = tokenVisibilityDataRef.current.map(t => ({
+        // Convert old token visibility data to new IlluminationSource format for GPU rendering
+        const gridSize = maps[0]?.regions?.[0]?.gridSize || 50; // Default grid size
+        const illuminationSources = tokenVisibilityDataRef.current.map((t, idx) => ({
+          id: `vis-${idx}`,
+          name: t.isLightSource ? 'Light' : 'Vision',
+          enabled: true,
           position: t.position,
-          visionRange: t.visionRange,
-          visibilityPath: t.visibilityPath,
-          isLightSource: t.isLightSource,
+          range: t.visionRange / gridSize, // Convert pixels to grid units
+          brightZone: 0.5,
+          brightIntensity: 1.0,
+          dimIntensity: t.isLightSource ? 0.4 : 0.0,
+          color: t.isLightSource ? '#FFD700' : '#FFFFFF',
+          softEdge: true,
+          softEdgeRadius: 8,
+          visibilityPolygon: t.visibilityPath,
         }));
         
         applyPostProcessingEffects(
@@ -1672,7 +1681,11 @@ export const SimpleTabletop = () => {
           fogOpacity,
           exploredOpacity,
           transform,
-          allTokenVisibility
+          {
+            sources: illuminationSources,
+            gridSize,
+            transform,
+          }
         );
       }
     }
