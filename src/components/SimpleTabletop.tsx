@@ -19,7 +19,7 @@ import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { MovementLockIndicator } from "./MovementLockIndicator";
-import { useSessionStore } from "../stores/sessionStore";
+import { useSessionStore, type Token } from "../stores/sessionStore";
 import { useMapStore } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
@@ -266,6 +266,7 @@ export const SimpleTabletop = () => {
       visionRange: number;
       visibilityPath: Path2D;
       isLightSource?: boolean; // Light sources get two-zone gradient in post-processing
+      tokenIllumination?: Token['illuminationSources']; // Token's custom illumination settings
     }>
   >([]);
 
@@ -768,6 +769,7 @@ export const SimpleTabletop = () => {
             visionRange: number;
             visibilityPath: Path2D;
             isLightSource?: boolean;
+            tokenIllumination?: typeof tokens[0]['illuminationSources'];
           }> = [];
 
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
@@ -792,6 +794,7 @@ export const SimpleTabletop = () => {
               visionRange: visionRangePixels,
               visibilityPath: path2D,
               isLightSource: false, // Tokens are not light sources
+              tokenIllumination: token.illuminationSources,
             });
           });
 
@@ -1660,20 +1663,25 @@ export const SimpleTabletop = () => {
         // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
         // Convert old token visibility data to new IlluminationSource format for GPU rendering
         const gridSize = maps[0]?.regions?.[0]?.gridSize || 50; // Default grid size
-        const illuminationSources = tokenVisibilityDataRef.current.map((t, idx) => ({
-          id: `vis-${idx}`,
-          name: t.isLightSource ? 'Light' : 'Vision',
-          enabled: true,
-          position: t.position,
-          range: t.visionRange / gridSize, // Convert pixels to grid units
-          brightZone: effectSettings.lightFalloff,
-          brightIntensity: 1.0,
-          dimIntensity: t.isLightSource ? 0.4 : 0.0,
-          color: t.isLightSource ? '#FFD700' : '#FFFFFF',
-          softEdge: true,
-          softEdgeRadius: 8,
-          visibilityPolygon: t.visibilityPath,
-        }));
+        const illuminationSources = tokenVisibilityDataRef.current.map((t, idx) => {
+          // Use token's custom illumination settings if available, otherwise use global defaults
+          const tokenSettings = t.tokenIllumination?.[0];
+          
+          return {
+            id: `vis-${idx}`,
+            name: t.isLightSource ? 'Light' : 'Vision',
+            enabled: true,
+            position: t.position,
+            range: tokenSettings?.range ?? (t.visionRange / gridSize), // Use token setting or convert pixels to grid units
+            brightZone: tokenSettings?.brightZone ?? effectSettings.lightFalloff, // Use token setting or global
+            brightIntensity: tokenSettings?.brightIntensity ?? 1.0,
+            dimIntensity: tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0),
+            color: tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF'),
+            softEdge: tokenSettings?.softEdge ?? true,
+            softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
+            visibilityPolygon: t.visibilityPath,
+          };
+        });
         
         applyPostProcessingEffects(
           ctx,

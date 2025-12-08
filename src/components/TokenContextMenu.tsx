@@ -22,7 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb } from 'lucide-react';
+import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
@@ -53,6 +54,7 @@ export const TokenContextMenu = ({
     updateTokenLabel,
     updateTokenVision,
     updateTokenVisionRange,
+    updateTokenIllumination,
     removeToken,
     setTokenOwner,
     currentPlayerId,
@@ -68,6 +70,7 @@ export const TokenContextMenu = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [showVisionRangeModal, setShowVisionRangeModal] = useState(false);
+  const [showIlluminationModal, setShowIlluminationModal] = useState(false);
   const [labelValue, setLabelValue] = useState('');
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
@@ -419,6 +422,10 @@ export const TokenContextMenu = ({
             <Scan className="mr-2 h-4 w-4" />
             <span>Set Vision Range</span>
           </ContextMenuItem>
+          <ContextMenuItem onClick={() => setShowIlluminationModal(true)} disabled={!canControl}>
+            <Lightbulb className="mr-2 h-4 w-4" />
+            <span>Illumination Settings</span>
+          </ContextMenuItem>
           <ContextMenuSeparator />
           {canAssignRoles && (
             <>
@@ -739,6 +746,21 @@ export const TokenContextMenu = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Illumination Settings Modal */}
+      <TokenIlluminationModal
+        open={showIlluminationModal}
+        onOpenChange={setShowIlluminationModal}
+        tokenIds={targetTokens.map(t => t.id)}
+        currentIllumination={targetTokens[0]?.illuminationSources?.[0]}
+        onApply={(settings) => {
+          targetTokens.forEach((token) => {
+            updateTokenIllumination(token.id, settings);
+          });
+          onUpdateCanvas?.();
+          toast.success(`Illumination updated for ${targetTokens.length} token(s)`);
+        }}
+      />
     </>
   );
 };

@@ -65,6 +65,7 @@ export interface SessionState {
   updateTokenColor: (tokenId: string, color: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
+  updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
   setTokenOwner: (tokenId: string, ownerId: string) => void;
   removeToken: (tokenId: string) => void;
   clearAllTokens: () => void;
@@ -214,6 +215,52 @@ export const useSessionStore = create<SessionState>()(
         // Only sync if token exists locally
         if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { visionRange });
+        }
+      },
+
+      updateTokenIllumination: (tokenId, illumination) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        if (!existingToken) return;
+
+        // Merge illumination into the first source, or create one if none exists
+        const existingSources = existingToken.illuminationSources || [];
+        let updatedSources: IlluminationSource[];
+
+        if (existingSources.length > 0) {
+          // Update the first source with the new settings
+          updatedSources = existingSources.map((source, index) =>
+            index === 0
+              ? { ...source, ...illumination }
+              : source
+          );
+        } else {
+          // Create a new illumination source
+          updatedSources = [{
+            id: `illum-${tokenId}-${Date.now()}`,
+            name: 'Vision',
+            enabled: true,
+            position: { x: existingToken.x, y: existingToken.y },
+            range: illumination.range ?? 6,
+            brightZone: illumination.brightZone ?? 0.5,
+            brightIntensity: illumination.brightIntensity ?? 1.0,
+            dimIntensity: illumination.dimIntensity ?? 0.0,
+            color: illumination.color ?? '#FFFFFF',
+            softEdge: illumination.softEdge ?? true,
+            softEdgeRadius: illumination.softEdgeRadius ?? 8,
+          }];
+        }
+
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId
+              ? { ...token, illuminationSources: updatedSources }
+              : token
+          ),
+        }));
+
+        // Sync to multiplayer
+        if (syncManager.isConnected()) {
+          syncManager.syncTokenUpdate(tokenId, { illuminationSources: updatedSources });
         }
       },
 
