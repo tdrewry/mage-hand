@@ -274,7 +274,7 @@ export function applyFogPostProcessing(
       fogCtx.restore();
       
       // Now ADD BACK fog in the dim zone (outside bright zone but inside range)
-      // This creates the "dim ring" effect
+      // This creates the "dim ring" effect - the outer area should be visibly darker
       if (dimIntensity < 1.0) {
         fogCtx.save();
         fogCtx.globalCompositeOperation = 'source-over'; // Add fog back
@@ -286,12 +286,16 @@ export function applyFogPostProcessing(
           pos.x, pos.y, range
         );
         
-        // Bright zone: no additional fog (transparent)
-        const fogAlpha = 1.0 - dimIntensity; // How much fog to add back (0.65 if dimIntensity is 0.35)
+        // fogAlpha is how much fog to add back in dim zone
+        // At dimIntensity=0.35, we want 65% fog opacity in dim zone
+        const fogAlpha = 1.0 - dimIntensity;
+        
+        // Bright zone stays fully clear (no fog added)
         dimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        dimGradient.addColorStop(Math.max(0.01, brightZone - 0.05), 'rgba(0, 0, 0, 0)');
-        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.3})`); // Start dim
-        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha * 0.7})`); // Outer edge is dimmer
+        dimGradient.addColorStop(brightZone * 0.95, 'rgba(0, 0, 0, 0)'); // Stay clear until just before bright zone ends
+        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.5})`); // Start transitioning
+        dimGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(0, 0, 0, ${fogAlpha})`); // Full dim
+        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`); // Maintain until edge
         
         fogCtx.fillStyle = dimGradient;
         fogCtx.fillRect(pos.x - range, pos.y - range, range * 2, range * 2);
