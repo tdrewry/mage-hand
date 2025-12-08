@@ -181,9 +181,11 @@ function renderIlluminationOverlay(
     gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(1, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${dimAlpha})`);
     
-    // Fill the full area - clipping will constrain to visibility polygon
+    // Fill a circular area to ensure circular light boundary
     ctx.fillStyle = gradient;
-    ctx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2)
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+    ctx.fill();
     
     ctx.restore();
   }
@@ -271,9 +273,11 @@ export function applyFogPostProcessing(
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
       
-      // First, fully remove fog in the entire visible area
+      // First, fully remove fog in the entire visible area (circular)
       fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-      fogCtx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2);
+      fogCtx.beginPath();
+      fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+      fogCtx.fill();
       
       fogCtx.restore();
       
@@ -302,7 +306,9 @@ export function applyFogPostProcessing(
         dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`); // Maintain until edge
         
         fogCtx.fillStyle = dimGradient;
-        fogCtx.fillRect(pos.x - rangePixels, pos.y - rangePixels, rangePixels * 2, rangePixels * 2);
+        fogCtx.beginPath();
+        fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+        fogCtx.fill();
         
         fogCtx.restore();
       }

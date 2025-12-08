@@ -680,8 +680,10 @@ export const SimpleTabletop = () => {
               (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height,
             );
             const gridSize = tokenRegion?.gridSize || 40;
-            // Use token's individual vision range, or fall back to global default
-            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            // Priority: per-token illumination range > token visionRange > global fogVisionRange
+            // illuminationSources[0].range is in grid units
+            const perTokenIlluminationRange = token.illuminationSources?.[0]?.range;
+            const tokenVisionRange = perTokenIlluminationRange ?? token.visionRange ?? fogVisionRange;
             const visionRangePixels = tokenVisionRange * gridSize;
 
             // Remove old cached vision for this token
@@ -783,7 +785,9 @@ export const SimpleTabletop = () => {
               (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height,
             );
             const gridSize = tokenRegion?.gridSize || 40;
-            const tokenVisionRange = token.visionRange ?? fogVisionRange;
+            // Priority: per-token illumination range > token visionRange > global fogVisionRange
+            const perTokenIlluminationRange = token.illuminationSources?.[0]?.range;
+            const tokenVisionRange = perTokenIlluminationRange ?? token.visionRange ?? fogVisionRange;
             const visionRangePixels = tokenVisionRange * gridSize;
 
             // Convert paper.js path to Path2D using the existing helper
