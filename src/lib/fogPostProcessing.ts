@@ -13,7 +13,7 @@ import {
   updateIlluminationData,
   type EffectSettings,
 } from './postProcessingLayer';
-import { createShaderData, calculateAnimatedIntensity, type IlluminationSource } from '@/types/illumination';
+import { createShaderData, calculateAnimationModifiers, type IlluminationSource } from '@/types/illumination';
 
 export interface FogEffectConfig {
   enabled: boolean;
@@ -149,8 +149,8 @@ function renderIlluminationOverlay(
   for (const source of sources) {
     if (!source.enabled || !source.colorEnabled || !source.visibilityPolygon) continue;
     
-    // Calculate animated intensity modifier
-    const animMod = calculateAnimatedIntensity(
+    // Calculate animated modifiers (intensity and radius)
+    const animResult = calculateAnimationModifiers(
       source.animation,
       source.animationSpeed,
       source.animationIntensity,
@@ -170,8 +170,8 @@ function renderIlluminationOverlay(
     
     // Create radial gradient from source position covering the full range
     // source.range is already in pixels, gridSize is 1
-    // Don't apply gridSize here since range is pre-calculated in pixels
-    const rangePixels = source.range;
+    // Apply radius modifier for glow animation
+    const rangePixels = source.range * animResult.radiusMod;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
     
@@ -183,7 +183,7 @@ function renderIlluminationOverlay(
     const rgb = parseColorToRGB(source.color);
     
     // Color tint intensity - modulated by animation
-    const intensity = (source.colorIntensity ?? 0.5) * animMod;
+    const intensity = (source.colorIntensity ?? 0.5) * animResult.intensityMod;
     const brightAlpha = intensity * 0.7; // Scale to max 0.7 alpha
     const dimAlpha = intensity * 0.3;    // Dim zone is ~40% of bright
     
@@ -275,8 +275,8 @@ export function applyFogPostProcessing(
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
       
-      // Calculate animated intensity modifier
-      const animMod = calculateAnimatedIntensity(
+      // Calculate animated modifiers (intensity and radius)
+      const animResult = calculateAnimationModifiers(
         source.animation,
         source.animationSpeed,
         source.animationIntensity,
@@ -286,10 +286,10 @@ export function applyFogPostProcessing(
       
       const pos = source.position;
       // source.range is already in pixels when gridSize is 1
-      // Apply animation to range for flickering effect
-      const rangePixels = source.range * (0.95 + animMod * 0.05);
+      // Apply radius modifier for glow/flicker effects
+      const rangePixels = source.range * animResult.radiusMod;
       const brightZone = source.brightZone ?? 0.5;
-      const dimIntensity = (source.dimIntensity ?? 0.4) * animMod;
+      const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
       
       // Save context and clip to this source's visibility polygon
       fogCtx.save();
