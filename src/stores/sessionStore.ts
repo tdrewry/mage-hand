@@ -49,6 +49,12 @@ export interface Player {
 export type TokenVisibility = 'all' | 'owned' | 'dm-only';
 export type LabelVisibility = 'show' | 'hide' | 'selected';
 
+export interface ViewportTransform {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface SessionState {
   sessionId: string;
   tokens: Token[];
@@ -58,6 +64,8 @@ export interface SessionState {
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
   movementLocked: boolean;
+  // Per-map viewport transforms (mapId -> transform)
+  viewportTransforms: Record<string, ViewportTransform>;
   addToken: (token: Token) => void;
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
@@ -76,6 +84,9 @@ export interface SessionState {
   addPlayer: (player: Player) => void;
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
   initializeSession: (sessionId?: string) => void;
+  // Viewport transform methods
+  setViewportTransform: (mapId: string, transform: ViewportTransform) => void;
+  getViewportTransform: (mapId: string) => ViewportTransform;
 }
 
 export const useSessionStore = create<SessionState>()(
@@ -89,6 +100,7 @@ export const useSessionStore = create<SessionState>()(
       tokenVisibility: 'all',
       labelVisibility: 'show',
       movementLocked: false,
+      viewportTransforms: {},
       
       addToken: (token) => {
         set((state) => ({
@@ -372,6 +384,20 @@ export const useSessionStore = create<SessionState>()(
           window.history.replaceState({}, '', newUrl.toString());
         }
       },
+
+      setViewportTransform: (mapId, transform) => {
+        set((state) => ({
+          viewportTransforms: {
+            ...state.viewportTransforms,
+            [mapId]: transform,
+          },
+        }));
+      },
+
+      getViewportTransform: (mapId) => {
+        const transforms = get().viewportTransforms;
+        return transforms[mapId] || { x: 0, y: 0, zoom: 1 };
+      },
     }),
     {
       name: 'vtt-session-storage',
@@ -382,6 +408,7 @@ export const useSessionStore = create<SessionState>()(
         currentPlayerId: state.currentPlayerId,
         tokenVisibility: state.tokenVisibility,
         labelVisibility: state.labelVisibility,
+        viewportTransforms: state.viewportTransforms,
       }),
     }
   )

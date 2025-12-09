@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useViewportStore, getViewportTransform } from '@/stores/viewportStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
 
 export interface Transform {
@@ -11,8 +11,8 @@ export interface Transform {
 export const useCanvasTransform = (initialZoom = 1) => {
   // Get current map ID for per-map viewport persistence
   const selectedMapId = useMapStore((state) => state.selectedMapId);
-  const transforms = useViewportStore((state) => state.transforms);
-  const setPersistedTransform = useViewportStore((state) => state.setTransform);
+  const viewportTransforms = useSessionStore((state) => state.viewportTransforms);
+  const setPersistedTransform = useSessionStore((state) => state.setViewportTransform);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserInteracting = useRef(false);
   const lastRestoredMapId = useRef<string | null>(null);
@@ -29,7 +29,7 @@ export const useCanvasTransform = (initialZoom = 1) => {
     
     // Only restore if map changed or on initial load
     if (selectedMapId && selectedMapId !== lastRestoredMapId.current) {
-      const persisted = transforms[selectedMapId];
+      const persisted = viewportTransforms[selectedMapId];
       console.log('[useCanvasTransform] Restoring transform for map:', selectedMapId, persisted);
       
       if (persisted) {
@@ -41,7 +41,7 @@ export const useCanvasTransform = (initialZoom = 1) => {
         console.log('[useCanvasTransform] No saved transform, using default');
       }
     }
-  }, [selectedMapId, transforms]);
+  }, [selectedMapId, viewportTransforms]);
   
   // Save transform to persisted store whenever it changes (throttled)
   const saveTransform = useCallback((newTransform: Transform) => {
