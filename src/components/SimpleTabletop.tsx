@@ -1921,26 +1921,13 @@ export const SimpleTabletop = () => {
       targetCtx.lineWidth = 3 / transform.zoom;
       targetCtx.stroke();
 
-      // Draw token label if visible
-      if (token.labelVisibility !== 'hidden') {
-        const label = token.name || token.id.slice(0, 6);
-        const labelFontSize = 11 / transform.zoom;
-        targetCtx.font = `bold ${labelFontSize}px Arial`;
+      // Draw token label if visible (inside the token circle, matching original drawToken)
+      if (token.label) {
+        targetCtx.fillStyle = "#000000";
+        targetCtx.font = `${12 / transform.zoom}px Arial`;
         targetCtx.textAlign = "center";
-        targetCtx.textBaseline = "top";
-        
-        const labelY = token.y + radius + 6 / transform.zoom;
-        targetCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        const textMetrics = targetCtx.measureText(label);
-        const labelPadding = 3 / transform.zoom;
-        targetCtx.fillRect(
-          token.x - textMetrics.width / 2 - labelPadding,
-          labelY - labelPadding,
-          textMetrics.width + labelPadding * 2,
-          labelFontSize + labelPadding * 2
-        );
-        targetCtx.fillStyle = "#ffffff";
-        targetCtx.fillText(label, token.x, labelY);
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText(token.label, token.x, token.y);
       }
 
       targetCtx.restore();
