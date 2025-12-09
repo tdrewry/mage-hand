@@ -10,12 +10,8 @@ export interface ViewportTransform {
 interface ViewportStore {
   // Map ID -> Transform mapping
   transforms: Record<string, ViewportTransform>;
-  // Currently active map ID
-  activeMapId: string | null;
   
-  getTransform: (mapId: string) => ViewportTransform;
   setTransform: (mapId: string, transform: ViewportTransform) => void;
-  setActiveMapId: (mapId: string | null) => void;
 }
 
 const DEFAULT_TRANSFORM: ViewportTransform = { x: 0, y: 0, zoom: 1 };
@@ -24,13 +20,9 @@ export const useViewportStore = create<ViewportStore>()(
   persist(
     (set, get) => ({
       transforms: {},
-      activeMapId: null,
-      
-      getTransform: (mapId: string) => {
-        return get().transforms[mapId] || DEFAULT_TRANSFORM;
-      },
       
       setTransform: (mapId: string, transform: ViewportTransform) => {
+        console.log('[ViewportStore] Saving transform for map:', mapId, transform);
         set((state) => ({
           transforms: {
             ...state.transforms,
@@ -38,14 +30,32 @@ export const useViewportStore = create<ViewportStore>()(
           },
         }));
       },
-      
-      setActiveMapId: (mapId: string | null) => {
-        set({ activeMapId: mapId });
-      },
     }),
     {
       name: 'viewport-store',
-      version: 2, // Bump version for new structure
+      version: 1,
+      // Migrate from old structure if needed
+      migrate: (persistedState: any, version: number) => {
+        console.log('[ViewportStore] Migrating from version:', version, persistedState);
+        if (version === 0 || !persistedState) {
+          return { transforms: {} };
+        }
+        // Handle old single transform structure
+        if (persistedState.transform && !persistedState.transforms) {
+          return { transforms: {} };
+        }
+        return persistedState;
+      },
+      onRehydrateStorage: () => (state) => {
+        console.log('[ViewportStore] Rehydrated:', state?.transforms);
+      },
     }
   )
 );
+
+// Helper to get transform with default fallback
+export const getViewportTransform = (mapId: string | null): ViewportTransform => {
+  if (!mapId) return DEFAULT_TRANSFORM;
+  const state = useViewportStore.getState();
+  return state.transforms[mapId] || DEFAULT_TRANSFORM;
+};
