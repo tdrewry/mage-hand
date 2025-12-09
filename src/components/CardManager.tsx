@@ -17,7 +17,7 @@ import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfil
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
 import { useCardStore } from '@/stores/cardStore';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { CardType } from '@/types/cardTypes';
 
@@ -67,6 +67,7 @@ export function CardManager({
       gridWidth,
       gridHeight,
       label: `Token ${tokenId.slice(-4)}`,
+      labelPosition: 'below' as LabelPosition,
       color,
       roleId: 'player', // Default to player role
       isHidden: false,
