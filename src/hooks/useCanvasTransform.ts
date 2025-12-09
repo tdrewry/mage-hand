@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useViewportStore } from '@/stores/viewportStore';
+import { useMapStore } from '@/stores/mapStore';
 
 export interface Transform {
   x: number;
@@ -8,18 +9,31 @@ export interface Transform {
 }
 
 export const useCanvasTransform = (initialZoom = 1) => {
-  // Load initial transform from persisted store
-  const persistedTransform = useViewportStore((state) => state.transform);
+  // Get current map ID for per-map viewport persistence
+  const selectedMapId = useMapStore((state) => state.selectedMapId);
+  const getTransform = useViewportStore((state) => state.getTransform);
   const setPersistedTransform = useViewportStore((state) => state.setTransform);
   const hasInitialized = useRef(false);
+  const currentMapIdRef = useRef<string | null>(null);
   
   const [transform, setTransform] = useState<Transform>(() => {
-    // Use persisted transform if available, otherwise use defaults
-    if (persistedTransform.zoom !== 1 || persistedTransform.x !== 0 || persistedTransform.y !== 0) {
-      return persistedTransform;
+    if (selectedMapId) {
+      const persisted = getTransform(selectedMapId);
+      if (persisted.zoom !== 1 || persisted.x !== 0 || persisted.y !== 0) {
+        return persisted;
+      }
     }
     return { x: 0, y: 0, zoom: initialZoom };
   });
+  
+  // Load transform when map changes
+  useEffect(() => {
+    if (selectedMapId && selectedMapId !== currentMapIdRef.current) {
+      currentMapIdRef.current = selectedMapId;
+      const persisted = getTransform(selectedMapId);
+      setTransform(persisted);
+    }
+  }, [selectedMapId, getTransform]);
   
   // Save transform to persisted store whenever it changes (throttled)
   useEffect(() => {
@@ -29,12 +43,14 @@ export const useCanvasTransform = (initialZoom = 1) => {
       return;
     }
     
+    if (!selectedMapId) return;
+    
     const timeoutId = setTimeout(() => {
-      setPersistedTransform(transform);
+      setPersistedTransform(selectedMapId, transform);
     }, 500); // Throttle saves to every 500ms
     
     return () => clearTimeout(timeoutId);
-  }, [transform, setPersistedTransform]);
+  }, [transform, selectedMapId, setPersistedTransform]);
   
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
