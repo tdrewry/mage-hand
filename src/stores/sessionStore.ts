@@ -76,6 +76,7 @@ export interface SessionState {
   updateTokenName: (tokenId: string, name: string) => void;
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
+  updateTokenImage: (tokenId: string, imageUrl: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
   updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
@@ -230,6 +231,21 @@ export const useSessionStore = create<SessionState>()(
         // Only sync if token exists locally
         if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { color });
+        }
+      },
+
+      updateTokenImage: (tokenId, imageUrl) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, imageUrl } : token
+          ),
+        }));
+        
+        // Only sync if token exists locally
+        if (existingToken && syncManager.isConnected()) {
+          syncManager.syncTokenUpdate(tokenId, { imageUrl });
         }
       },
 

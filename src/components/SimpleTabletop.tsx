@@ -1910,16 +1910,39 @@ export const SimpleTabletop = () => {
         targetCtx.shadowBlur = 0;
       }
 
-      // Draw main token
-      targetCtx.fillStyle = token.color || "#ffffff";
-      targetCtx.beginPath();
-      targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
-      targetCtx.fill();
+      // Draw main token (image or color fill)
+      const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
+      
+      if (tokenImg) {
+        // Draw circular clipped image
+        targetCtx.save();
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.clip();
+        
+        // Draw image centered and scaled to fit
+        const size = radius * 2;
+        targetCtx.drawImage(tokenImg, token.x - radius, token.y - radius, size, size);
+        targetCtx.restore();
+        
+        // Draw border on top
+        targetCtx.strokeStyle = roleBorderColor;
+        targetCtx.lineWidth = 3 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.stroke();
+      } else {
+        // Fallback to color fill
+        targetCtx.fillStyle = token.color || "#ffffff";
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.fill();
 
-      // Draw role border
-      targetCtx.strokeStyle = roleBorderColor;
-      targetCtx.lineWidth = 3 / transform.zoom;
-      targetCtx.stroke();
+        // Draw role border
+        targetCtx.strokeStyle = roleBorderColor;
+        targetCtx.lineWidth = 3 / transform.zoom;
+        targetCtx.stroke();
+      }
 
       // Draw token label based on position setting
       const displayText = token.label || token.name;
@@ -2935,6 +2958,29 @@ export const SimpleTabletop = () => {
   // Image cache to prevent re-loading images on every redraw
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
+  // Helper to get or load a cached image
+  const getCachedImage = (url: string): HTMLImageElement | null => {
+    if (!url) return null;
+    
+    let img = imageCache.current.get(url);
+    
+    if (!img) {
+      img = new Image();
+      img.crossOrigin = "anonymous";
+      imageCache.current.set(url, img);
+      
+      img.onload = () => {
+        redrawCanvas();
+      };
+      
+      img.src = url;
+      return null; // Image not ready yet
+    }
+    
+    if (!img.complete || img.naturalHeight === 0) return null;
+    return img;
+  };
+
   // Function to draw region background image
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
@@ -3585,27 +3631,55 @@ export const SimpleTabletop = () => {
       ctx.fill();
     }
 
-    // Draw token circle
-    ctx.fillStyle = token.color || "#ffffff";
-    ctx.beginPath();
-    ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Draw token border with role color
-    if (isSelected) {
-      // Selected: white border
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 3 / transform.zoom;
-    } else if (isHostile) {
-      // Hostile: red border
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 3 / transform.zoom;
+    // Draw main token (image or color fill)
+    const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
+    
+    if (tokenImg) {
+      // Draw circular clipped image
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+      ctx.clip();
+      
+      // Draw image centered and scaled to fit
+      const size = radius * 2;
+      ctx.drawImage(tokenImg, token.x - radius, token.y - radius, size, size);
+      ctx.restore();
+      
+      // Draw border on top
+      if (isSelected) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3 / transform.zoom;
+      } else if (isHostile) {
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3 / transform.zoom;
+      } else {
+        ctx.strokeStyle = roleBorderColor;
+        ctx.lineWidth = 2 / transform.zoom;
+      }
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+      ctx.stroke();
     } else {
-      // Normal: role color border
-      ctx.strokeStyle = roleBorderColor;
-      ctx.lineWidth = 2 / transform.zoom;
+      // Fallback to color fill
+      ctx.fillStyle = token.color || "#ffffff";
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Draw token border with role color
+      if (isSelected) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3 / transform.zoom;
+      } else if (isHostile) {
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3 / transform.zoom;
+      } else {
+        ctx.strokeStyle = roleBorderColor;
+        ctx.lineWidth = 2 / transform.zoom;
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
 
     // Draw token label based on position setting
     const displayText = token.label || token.name;
