@@ -66,7 +66,7 @@ import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializ
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
 import { useRoleStore } from "../stores/roleStore";
-import { useUiModeStore } from "../stores/uiModeStore";
+import { useUiModeStore, type DmFogVisibility } from "../stores/uiModeStore";
 import { getTokensForVisionCalculation } from "../lib/visionPermissions";
 import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
@@ -401,6 +401,9 @@ export const SimpleTabletop = () => {
   // Check if current user is a DM (bypasses fog visibility restrictions)
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+  
+  // Get DM fog visibility preference
+  const { dmFogVisibility } = useUiModeStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
 
@@ -1064,8 +1067,8 @@ export const SimpleTabletop = () => {
 
       if (distance <= maxRadius) {
         // In play mode with fog enabled, only allow interaction with tokens in revealed areas
-        // DM role bypasses this check - can interact with all tokens
-        if (isPlayMode && fogEnabled && !fogRevealAll && !isDM) {
+        // DM role can bypass based on dmFogVisibility setting
+        if (isPlayMode && fogEnabled && !fogRevealAll) {
           const tokenPoint = { x: token.x, y: token.y };
           const isRevealed = isPointInRevealedArea(
             tokenPoint,
@@ -1074,8 +1077,11 @@ export const SimpleTabletop = () => {
           );
           
           if (!isRevealed) {
-            // Token is in fog - skip it for non-DM users
-            continue;
+            // Token is in fog - check if DM can interact based on visibility setting
+            if (!isDM || dmFogVisibility === 'hidden') {
+              continue; // Skip - either not DM, or DM wants hidden mode
+            }
+            // DM with 'semi-transparent' or 'full' mode can interact
           }
         }
         
@@ -1728,7 +1734,7 @@ export const SimpleTabletop = () => {
     annotations.forEach((annotation) => {
       const { x, y } = annotation.position;
       
-      // Check if annotation is in revealed area (for DM semi-transparency effect)
+      // Check if annotation is in revealed area (for visibility and DM effects)
       let isInFog = false;
       if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
         const annotationPoint = { x, y };
@@ -1739,16 +1745,20 @@ export const SimpleTabletop = () => {
         );
         if (!isRevealed) {
           if (!isDM) {
-            return; // Skip rendering this annotation - it's in fog (non-DM)
+            return; // Skip rendering - non-DM can't see fog-hidden annotations
           }
-          isInFog = true; // DM sees it semi-transparent
+          // DM visibility modes
+          if (dmFogVisibility === 'hidden') {
+            return; // DM chose to hide fog-hidden elements
+          }
+          isInFog = dmFogVisibility === 'semi-transparent'; // Only fade if semi-transparent mode
         }
       }
       
       ctx.save();
       
-      // Apply semi-transparency for DM viewing fog-covered annotations
-      if (isInFog && isDM) {
+      // Apply semi-transparency for DM viewing fog-covered annotations (only in semi-transparent mode)
+      if (isInFog) {
         ctx.globalAlpha = 0.4;
       }
       
@@ -1908,23 +1918,38 @@ export const SimpleTabletop = () => {
     }
 
     // Draw visible tokens AFTER fog so they appear on top of darkness
-    // For DM in play mode with fog, tokens in fog appear semi-transparent
+    // For DM in play mode with fog, tokens in fog appear based on dmFogVisibility setting
     visibleTokens.forEach((token) => {
       // Use temporary position if available (during region drag)
       const tempPos = tempTokenPositions?.[token.id];
       const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
       
-      // Check if token is in fog (for DM semi-transparency)
+      // Check if token is in fog (for DM visibility modes)
       let tokenInFog = false;
-      if (isPlayMode && fogEnabled && !fogRevealAll && isDM) {
+      let shouldSkipToken = false;
+      if (isPlayMode && fogEnabled && !fogRevealAll) {
         const tokenPoint = { x: renderToken.x, y: renderToken.y };
         const isRevealed = isPointInRevealedArea(
           tokenPoint,
           exploredAreaRef.current,
           currentVisibilityRef.current
         );
-        tokenInFog = !isRevealed;
+        if (!isRevealed) {
+          if (!isDM) {
+            shouldSkipToken = true; // Non-DM can't see fog-hidden tokens
+          } else {
+            // DM visibility modes
+            if (dmFogVisibility === 'hidden') {
+              shouldSkipToken = true; // DM chose to hide fog-hidden elements
+            } else if (dmFogVisibility === 'semi-transparent') {
+              tokenInFog = true; // Show with semi-transparency
+            }
+            // 'full' mode: tokenInFog stays false, token renders normally
+          }
+        }
       }
+      
+      if (shouldSkipToken) return;
       
       drawToken(ctx, renderToken, tokenInFog);
     });
@@ -3957,15 +3982,21 @@ export const SimpleTabletop = () => {
         if (Math.sqrt(dx * dx + dy * dy) > radius) return false;
         
         // In play mode with fog enabled, check if annotation is in revealed area
-        // DM role bypasses this check - can interact with all annotations
-        if (renderingMode === 'play' && fogEnabled && !fogRevealAll && !isDM) {
+        // DM role can bypass based on dmFogVisibility setting
+        if (renderingMode === 'play' && fogEnabled && !fogRevealAll) {
           const annotationPoint = { x: ann.position.x, y: ann.position.y };
           const isRevealed = isPointInRevealedArea(
             annotationPoint,
             exploredAreaRef.current,
             currentVisibilityRef.current
           );
-          if (!isRevealed) return false;
+          if (!isRevealed) {
+            // Annotation is in fog - check DM visibility setting
+            if (!isDM || dmFogVisibility === 'hidden') {
+              return false; // Not DM, or DM chose hidden mode
+            }
+            // DM with 'semi-transparent' or 'full' mode can interact
+          }
         }
         
         return true;
