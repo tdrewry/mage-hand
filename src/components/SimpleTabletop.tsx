@@ -4770,10 +4770,11 @@ export const SimpleTabletop = () => {
 
           return (
             <div
-              className="absolute z-50 bg-card/95 backdrop-blur border border-border rounded-lg p-3 shadow-lg max-w-xs"
+              className="absolute bg-card/95 backdrop-blur border border-border rounded-lg p-3 shadow-lg max-w-xs"
               style={{
                 left: `${screenX + 20}px`,
                 top: `${screenY - 10}px`,
+                zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY,
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
