@@ -17,6 +17,7 @@ export interface CanvasRegion {
   gridVisible: boolean; // Per-region grid visibility toggle
   backgroundImage?: string; // URL or data URI for background texture
   backgroundRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
+  backgroundScale?: number; // Scale factor for background image (1 = original size)
   backgroundOffsetX?: number; // Offset for background alignment
   backgroundOffsetY?: number; // Offset for background alignment
   backgroundColor?: string; // Background color for region

@@ -3006,13 +3006,8 @@ export const SimpleTabletop = () => {
 
       // Only set up onload for new images
       img.onload = () => {
-        // Don't trigger another full redraw, just mark canvas as dirty
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const rect = canvas.getBoundingClientRect();
-          const devicePixelRatio = window.devicePixelRatio || 1;
-          redrawCanvas();
-        }
+        // Trigger re-render when image loads
+        setImageLoadCounter(c => c + 1);
       };
 
       img.src = region.backgroundImage;
@@ -3025,22 +3020,36 @@ export const SimpleTabletop = () => {
     const { x, y, width, height } = region;
     const offsetX = region.backgroundOffsetX || 0;
     const offsetY = region.backgroundOffsetY || 0;
-    const repeat = region.backgroundRepeat || "no-repeat";
+    const scale = region.backgroundScale || 1;
+    const repeat = region.backgroundRepeat || "repeat";
+
+    // Calculate scaled image dimensions
+    const scaledWidth = img.naturalWidth * scale;
+    const scaledHeight = img.naturalHeight * scale;
 
     if (repeat === "no-repeat") {
-      // For no-repeat, just draw the image once at the offset position
-      ctx.drawImage(img, x + offsetX, y + offsetY, Math.min(img.width, width), Math.min(img.height, height));
+      // For no-repeat, draw the scaled image once at the offset position
+      ctx.drawImage(img, x + offsetX, y + offsetY, scaledWidth, scaledHeight);
     } else {
-      // For repeat patterns, use createPattern
-      const pattern = ctx.createPattern(img, repeat);
-      if (pattern) {
-        // Apply offset to the pattern
-        const matrix = new DOMMatrix();
-        matrix.translateSelf(offsetX, offsetY);
-        pattern.setTransform(matrix);
+      // For repeat patterns, create an offscreen canvas with the scaled image
+      const patternCanvas = document.createElement('canvas');
+      patternCanvas.width = scaledWidth;
+      patternCanvas.height = scaledHeight;
+      const patternCtx = patternCanvas.getContext('2d');
+      
+      if (patternCtx) {
+        patternCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+        const pattern = ctx.createPattern(patternCanvas, repeat);
+        
+        if (pattern) {
+          // Apply offset to the pattern
+          const matrix = new DOMMatrix();
+          matrix.translateSelf(x + offsetX, y + offsetY);
+          pattern.setTransform(matrix);
 
-        ctx.fillStyle = pattern;
-        ctx.fillRect(x, y, width, height);
+          ctx.fillStyle = pattern;
+          ctx.fillRect(x, y, width, height);
+        }
       }
     }
   };
