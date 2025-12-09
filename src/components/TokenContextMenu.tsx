@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb, Sparkles } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb, Sparkles, Upload, Link, X } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { useSessionStore, type LabelPosition } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
@@ -54,6 +54,7 @@ export const TokenContextMenu = ({
     updateTokenLabel,
     updateTokenName,
     updateTokenLabelPosition,
+    updateTokenImage,
     updateTokenVision,
     updateTokenVisionRange,
     updateTokenIllumination,
@@ -75,10 +76,15 @@ export const TokenContextMenu = ({
   const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
+  const [imageUrlValue, setImageUrlValue] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageInputMode, setImageInputMode] = useState<'file' | 'url'>('file');
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
   const [useGradientsValue, setUseGradientsValue] = useState(true);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -115,12 +121,62 @@ export const TokenContextMenu = ({
       setNameValue(targetTokens[0].name || '');
       setLabelValue(targetTokens[0].label || '');
       setLabelPositionValue(targetTokens[0].labelPosition || 'below');
+      setImageUrlValue(targetTokens[0].imageUrl || '');
+      setImagePreview(targetTokens[0].imageUrl || null);
     } else {
       setNameValue('');
       setLabelValue('');
       setLabelPositionValue('below');
+      setImageUrlValue('');
+      setImagePreview(null);
     }
+    setImageInputMode('file');
     setShowTokenEditModal(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setImagePreview(dataUrl);
+      setImageUrlValue(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUrlSubmit = () => {
+    if (!imageUrlValue.trim()) return;
+    
+    // Basic URL validation
+    try {
+      new URL(imageUrlValue);
+      setImagePreview(imageUrlValue);
+    } catch {
+      toast.error('Please enter a valid URL');
+    }
+  };
+
+  const clearImage = () => {
+    setImagePreview(null);
+    setImageUrlValue('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleColorClick = () => {
@@ -155,6 +211,11 @@ export const TokenContextMenu = ({
         updateTokenLabel(token.id, labelValue);
       }
       updateTokenLabelPosition(token.id, labelPositionValue);
+      
+      // Apply image if set (or clear it if empty)
+      if (imageUrlValue !== undefined) {
+        updateTokenImage(token.id, imageUrlValue);
+      }
     });
     setShowTokenEditModal(false);
     onUpdateCanvas?.();
@@ -482,6 +543,93 @@ export const TokenContextMenu = ({
                   </Button>
                 ))}
               </div>
+            </div>
+            
+            {/* Token Image Section */}
+            <div>
+              <Label>Token Image</Label>
+              <div className="flex gap-2 mt-2 mb-2">
+                <Button
+                  variant={imageInputMode === 'file' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setImageInputMode('file')}
+                  className="flex-1"
+                >
+                  <Upload className="mr-1 h-3 w-3" />
+                  Upload
+                </Button>
+                <Button
+                  variant={imageInputMode === 'url' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setImageInputMode('url')}
+                  className="flex-1"
+                >
+                  <Link className="mr-1 h-3 w-3" />
+                  URL
+                </Button>
+              </div>
+              
+              {imageInputMode === 'file' ? (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="token-image-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Choose Image File
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={imageUrlValue}
+                    onChange={(e) => setImageUrlValue(e.target.value)}
+                    placeholder="https://example.com/token.png"
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={handleUrlSubmit}>
+                    Load
+                  </Button>
+                </div>
+              )}
+              
+              {/* Image Preview */}
+              {imagePreview && (
+                <div className="mt-2 relative">
+                  <div className="border rounded-lg p-2 bg-muted/50">
+                    <img 
+                      src={imagePreview} 
+                      alt="Token preview" 
+                      className="w-16 h-16 object-cover rounded-full mx-auto"
+                      onError={() => {
+                        toast.error('Failed to load image');
+                        setImagePreview(null);
+                      }}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-1 right-1 h-6 w-6 p-0"
+                    onClick={clearImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {isMultiSelection ? 'Image will be applied to all selected tokens' : 'Optional image for the token'}
+              </p>
             </div>
           </div>
           <DialogFooter>
