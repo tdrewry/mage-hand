@@ -385,6 +385,11 @@ export const SimpleTabletop = () => {
   const [rotationStartAngle, setRotationStartAngle] = useState(0);
   const [tempRegionRotation, setTempRegionRotation] = useState<{ [regionId: string]: number }>({});
   
+  // Marquee selection state
+  const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
+  
   // Undo/Redo: Track initial states before transformations
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
   const [initialRegionState, setInitialRegionState] = useState<Partial<CanvasRegion> | null>(null);
@@ -574,6 +579,28 @@ export const SimpleTabletop = () => {
       else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         setTransform(prev => ({ ...prev, x: prev.x - PAN_SPEED }));
+      }
+      // Ctrl+A to select all regions (Edit mode only)
+      else if ((e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey) && renderingMode === 'edit') {
+        e.preventDefault();
+        if (regions.length > 0) {
+          regions.forEach(region => selectRegion(region.id));
+          setSelectedRegionIds(regions.map(r => r.id));
+          setSelectedTokenIds([]); // Deselect tokens
+          redrawCanvas();
+          toast.success(`Selected all ${regions.length} region(s)`);
+        }
+      }
+      // Escape to clear selection
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (selectedRegionIds.length > 0 || selectedTokenIds.length > 0) {
+          selectedRegionIds.forEach(id => deselectRegion(id));
+          setSelectedRegionIds([]);
+          setSelectedTokenIds([]);
+          clearSelection();
+          redrawCanvas();
+        }
       }
     };
 
@@ -1796,6 +1823,27 @@ export const SimpleTabletop = () => {
 
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
+    
+    // Draw marquee selection rectangle (in edit mode only)
+    if (isMarqueeSelecting && marqueeStart && marqueeEnd && renderingMode === 'edit') {
+      const minX = Math.min(marqueeStart.x, marqueeEnd.x);
+      const minY = Math.min(marqueeStart.y, marqueeEnd.y);
+      const width = Math.abs(marqueeEnd.x - marqueeStart.x);
+      const height = Math.abs(marqueeEnd.y - marqueeStart.y);
+      
+      ctx.save();
+      // Draw filled background
+      ctx.fillStyle = 'rgba(79, 70, 229, 0.15)'; // Indigo with transparency
+      ctx.fillRect(minX, minY, width, height);
+      
+      // Draw dashed border
+      ctx.strokeStyle = '#4f46e5';
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+      ctx.strokeRect(minX, minY, width, height);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     // Helper to draw annotations to a given context (with world-space transform applied)
     const drawAnnotationsToContext = (targetCtx: CanvasRenderingContext2D) => {
@@ -4045,12 +4093,21 @@ export const SimpleTabletop = () => {
         }
         // In play mode, clicking regions does nothing
       } else {
-        // Clicked on empty space: deselect all or add token
+        // Clicked on empty space
         if (e.shiftKey) {
           // Shift+click: add token at clicked position
           addTokenToCanvas("", worldPos.x, worldPos.y);
+        } else if (renderingMode === 'edit') {
+          // In edit mode: start marquee selection
+          setIsMarqueeSelecting(true);
+          setMarqueeStart(worldPos);
+          setMarqueeEnd(worldPos);
+          // Clear existing selection when starting new marquee
+          selectedRegionIds.forEach(id => deselectRegion(id));
+          setSelectedRegionIds([]);
+          setSelectedTokenIds([]);
         } else {
-          // Normal click: deselect all
+          // Play mode: just deselect
           setSelectedTokenIds([]);
           clearSelection();
           setSelectedRegionIds([]);
@@ -4603,6 +4660,14 @@ export const SimpleTabletop = () => {
       return;
     }
 
+    // Handle marquee selection dragging
+    if (isMarqueeSelecting && marqueeStart) {
+      const worldPos = screenToWorld(mouseX, mouseY);
+      setMarqueeEnd(worldPos);
+      redrawCanvas();
+      return;
+    }
+
     if (isPanning) {
       const deltaX = e.clientX - lastPanPoint.x;
       const deltaY = e.clientY - lastPanPoint.y;
@@ -4966,6 +5031,64 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Handle marquee selection completion
+    if (isMarqueeSelecting && marqueeStart && marqueeEnd) {
+      // Calculate marquee bounds in world space
+      const minX = Math.min(marqueeStart.x, marqueeEnd.x);
+      const maxX = Math.max(marqueeStart.x, marqueeEnd.x);
+      const minY = Math.min(marqueeStart.y, marqueeEnd.y);
+      const maxY = Math.max(marqueeStart.y, marqueeEnd.y);
+      
+      // Only select if marquee is large enough (not just a click)
+      const marqueeWidth = maxX - minX;
+      const marqueeHeight = maxY - minY;
+      
+      if (marqueeWidth > 5 && marqueeHeight > 5) {
+        // Find all regions that intersect with the marquee
+        const selectedIds: string[] = [];
+        
+        regions.forEach(region => {
+          // Get region bounds
+          let regionMinX: number, regionMinY: number, regionMaxX: number, regionMaxY: number;
+          
+          if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+            const xs = region.pathPoints.map(p => p.x);
+            const ys = region.pathPoints.map(p => p.y);
+            regionMinX = Math.min(...xs);
+            regionMinY = Math.min(...ys);
+            regionMaxX = Math.max(...xs);
+            regionMaxY = Math.max(...ys);
+          } else {
+            regionMinX = region.x;
+            regionMinY = region.y;
+            regionMaxX = region.x + region.width;
+            regionMaxY = region.y + region.height;
+          }
+          
+          // Check if region intersects with marquee (AABB intersection)
+          const intersects = !(regionMaxX < minX || regionMinX > maxX || 
+                              regionMaxY < minY || regionMinY > maxY);
+          
+          if (intersects) {
+            selectedIds.push(region.id);
+            selectRegion(region.id);
+          }
+        });
+        
+        if (selectedIds.length > 0) {
+          setSelectedRegionIds(selectedIds);
+          toast.success(`Selected ${selectedIds.length} region(s)`);
+        }
+      }
+      
+      // Reset marquee state
+      setIsMarqueeSelecting(false);
+      setMarqueeStart(null);
+      setMarqueeEnd(null);
+      redrawCanvas();
+      return;
+    }
+    
     // Handle freehand drawing completion
     if (isFreehandDrawing && pathDrawingMode === "drawing" && pathDrawingType === "freehand") {
       setIsFreehandDrawing(false);
