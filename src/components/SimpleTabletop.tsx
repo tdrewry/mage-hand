@@ -1398,8 +1398,43 @@ export const SimpleTabletop = () => {
       squares: { gridX: number; gridY: number; size: number }[];
     }[] = [];
 
+    // Determine if we're in play mode with fog active
+    const isPlayMode = renderingMode === "play";
+
     // Check each token against each region
     tokens.forEach((token) => {
+      // Skip tokens that aren't visible to the current player (same logic as token rendering)
+      if (isPlayMode && fogEnabled && !fogRevealAll) {
+        const tokenPoint = { x: token.x, y: token.y };
+        
+        // Use stable visibility snapshot during drag to prevent flashing
+        const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
+          ? stableVisibilityRef.current
+          : currentVisibilityRef.current;
+        
+        const isCurrentlyIlluminated = isPointInVisibleArea(tokenPoint, visibilityToCheck);
+        
+        // Check token ownership - friendly tokens always visible to their owner
+        const tokenPlayer = players.find((p) => p.id === currentPlayerId);
+        const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roles) : 'neutral';
+        const isFriendlyToken = relationship === 'friendly';
+        
+        if (!isCurrentlyIlluminated) {
+          if (!isDM) {
+            // Players don't see grid highlights for hidden non-friendly tokens
+            if (!isFriendlyToken) {
+              return; // Skip this token
+            }
+          } else {
+            // DM visibility modes
+            if (dmFogVisibility === 'hidden') {
+              return; // Skip this token
+            }
+            // 'semi-transparent' and 'full' modes: continue to show highlight
+          }
+        }
+      }
+
       regions.forEach((region) => {
         if (region.gridType === "hex" || region.gridType === "square") {
           // Always calculate token highlights for grid regions
