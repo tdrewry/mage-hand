@@ -249,7 +249,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   };
 
   return (
-    <Toolbar position="left" className="gap-1 px-2 py-3">
+    <Toolbar position="left" className="gap-0.5 px-1.5 py-2">
       {mode === 'edit' ? (
         <>
           <ToolbarButton
@@ -257,7 +257,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Map Manager"
             onClick={onOpenMapManager || (() => {})}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -266,7 +266,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={handleToggleTokenCard}
             isActive={tokenCard?.isVisible}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarSeparator orientation="horizontal" />
@@ -276,7 +276,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Add Region"
             onClick={onAddRegion || (() => {})}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -286,7 +286,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             disabled={isDrawingFreehand}
             isActive={isDrawingPolygon}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -296,7 +296,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             disabled={isDrawingPolygon}
             isActive={isDrawingFreehand}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarSeparator orientation="horizontal" />
@@ -307,7 +307,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={onToggleGridSnapping || (() => {})}
             isActive={isGridSnappingEnabled}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -316,7 +316,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={handleToggleStylesCard}
             isActive={stylesCard?.isVisible}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -325,7 +325,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={toggleAnimationsPaused}
             isActive={animationsPaused}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -334,7 +334,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={onToggleRegions}
             isActive={showRegions}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarSeparator orientation="horizontal" />
@@ -344,7 +344,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Clear Tokens"
             onClick={handleClearTokens}
             variant="ghost"
-            size="sm"
+            size="xs"
             className="text-orange-600 hover:bg-orange-600/10"
           />
 
@@ -353,7 +353,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Clear Regions"
             onClick={handleClearRegions}
             variant="ghost"
-            size="sm"
+            size="xs"
             className="text-orange-600 hover:bg-orange-600/10"
           />
 
@@ -363,7 +363,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={handleToggleWatabouCard}
             isActive={watabouCard?.isVisible}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -372,7 +372,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={handleToggleLayerCard}
             isActive={layerCard?.isVisible}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarSeparator orientation="horizontal" />
@@ -383,7 +383,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={undo}
             disabled={!canUndo}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -392,7 +392,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={redo}
             disabled={!canRedo}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarButton
@@ -401,7 +401,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={handleToggleHistoryCard}
             isActive={historyCard?.isVisible}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
 
           <ToolbarSeparator orientation="horizontal" />
@@ -411,7 +411,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Fit to View"
             onClick={onFitToView || (() => {})}
             variant="ghost"
-            size="sm"
+            size="xs"
           />
         </>
       ) : (
