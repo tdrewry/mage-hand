@@ -173,9 +173,10 @@ export const useSessionStore = create<SessionState>()(
       updateTokenLabel: (tokenId, label) => {
         const existingToken = get().tokens.find(t => t.id === tokenId);
         
+        // Update both label and name to keep them in sync
         set((state) => ({
           tokens: state.tokens.map((token) =>
-            token.id === tokenId ? { ...token, label } : token
+            token.id === tokenId ? { ...token, label, name: label } : token
           ),
         }));
         
