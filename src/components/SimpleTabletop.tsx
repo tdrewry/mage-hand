@@ -3009,13 +3009,26 @@ export const SimpleTabletop = () => {
         // Trigger re-render when image loads
         setImageLoadCounter(c => c + 1);
       };
+      
+      img.onerror = () => {
+        console.warn('Failed to load region background image:', region.backgroundImage?.substring(0, 50));
+      };
 
       img.src = region.backgroundImage;
-      return; // Image not ready yet
+      
+      // Draw placeholder while loading (blue = loading)
+      ctx.fillStyle = "rgba(100, 100, 200, 0.5)";
+      ctx.fillRect(region.x, region.y, region.width, region.height);
+      return;
     }
 
     // Only draw if image is fully loaded with valid dimensions
-    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
+    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+      // Draw placeholder while loading (green = waiting for dimensions)
+      ctx.fillStyle = "rgba(100, 200, 100, 0.5)";
+      ctx.fillRect(region.x, region.y, region.width, region.height);
+      return;
+    }
 
     // Calculate bounds - for path regions use bounding box from pathPoints
     let x = region.x;

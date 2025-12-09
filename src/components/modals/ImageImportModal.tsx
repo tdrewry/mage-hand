@@ -113,33 +113,14 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Handle URL submit - convert to data URL to avoid CORS issues with canvas
-  const handleUrlSubmit = async () => {
+  // Handle URL submit
+  const handleUrlSubmit = () => {
     if (!urlInput.trim()) return;
     
     try {
       new URL(urlInput);
+      setImageUrl(urlInput);
       setImageLoaded(false);
-      
-      // Try to fetch and convert to data URL to avoid CORS issues
-      try {
-        const response = await fetch(urlInput);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onload = () => {
-          setImageUrl(reader.result as string);
-        };
-        reader.onerror = () => {
-          // Fallback to direct URL if fetch fails
-          toast.warning('Could not convert image - using direct URL (may not work in canvas)');
-          setImageUrl(urlInput);
-        };
-        reader.readAsDataURL(blob);
-      } catch {
-        // Fallback to direct URL if fetch fails (CORS blocked)
-        toast.warning('Could not fetch image due to CORS - trying direct URL');
-        setImageUrl(urlInput);
-      }
     } catch {
       toast.error('Please enter a valid URL');
     }
