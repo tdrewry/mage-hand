@@ -398,6 +398,10 @@ export const SimpleTabletop = () => {
     players,
   } = useSessionStore();
 
+  // Check if current user is a DM (bypasses fog visibility restrictions)
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
 
   const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore();
@@ -1060,7 +1064,8 @@ export const SimpleTabletop = () => {
 
       if (distance <= maxRadius) {
         // In play mode with fog enabled, only allow interaction with tokens in revealed areas
-        if (isPlayMode && fogEnabled && !fogRevealAll) {
+        // DM role bypasses this check - can interact with all tokens
+        if (isPlayMode && fogEnabled && !fogRevealAll && !isDM) {
           const tokenPoint = { x: token.x, y: token.y };
           const isRevealed = isPointInRevealedArea(
             tokenPoint,
@@ -1069,7 +1074,7 @@ export const SimpleTabletop = () => {
           );
           
           if (!isRevealed) {
-            // Token is in fog - skip it
+            // Token is in fog - skip it for non-DM users
             continue;
           }
         }
@@ -1718,12 +1723,13 @@ export const SimpleTabletop = () => {
     drawHighlightedGrids(ctx);
 
     // Draw annotations (markers) below tokens so tokens are visible
-    // In play mode with fog, only show annotations that are in revealed areas
+    // In play mode with fog, only show annotations that are in revealed areas (unless DM)
     const isPlayModeForAnnotations = renderingMode === 'play';
     annotations.forEach((annotation) => {
       const { x, y } = annotation.position;
       
-      // In play mode with fog enabled, check if annotation is in revealed area
+      // Check if annotation is in revealed area (for DM semi-transparency effect)
+      let isInFog = false;
       if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
         const annotationPoint = { x, y };
         const isRevealed = isPointInRevealedArea(
@@ -1732,11 +1738,20 @@ export const SimpleTabletop = () => {
           currentVisibilityRef.current
         );
         if (!isRevealed) {
-          return; // Skip rendering this annotation - it's in fog
+          if (!isDM) {
+            return; // Skip rendering this annotation - it's in fog (non-DM)
+          }
+          isInFog = true; // DM sees it semi-transparent
         }
       }
       
       ctx.save();
+      
+      // Apply semi-transparency for DM viewing fog-covered annotations
+      if (isInFog && isDM) {
+        ctx.globalAlpha = 0.4;
+      }
+      
       const radius = 12 / transform.zoom;
       const fontSize = 10 / transform.zoom;
       const isSelected = selectedAnnotationId === annotation.id;
@@ -1893,11 +1908,25 @@ export const SimpleTabletop = () => {
     }
 
     // Draw visible tokens AFTER fog so they appear on top of darkness
+    // For DM in play mode with fog, tokens in fog appear semi-transparent
     visibleTokens.forEach((token) => {
       // Use temporary position if available (during region drag)
       const tempPos = tempTokenPositions?.[token.id];
       const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-      drawToken(ctx, renderToken);
+      
+      // Check if token is in fog (for DM semi-transparency)
+      let tokenInFog = false;
+      if (isPlayMode && fogEnabled && !fogRevealAll && isDM) {
+        const tokenPoint = { x: renderToken.x, y: renderToken.y };
+        const isRevealed = isPointInRevealedArea(
+          tokenPoint,
+          exploredAreaRef.current,
+          currentVisibilityRef.current
+        );
+        tokenInFog = !isRevealed;
+      }
+      
+      drawToken(ctx, renderToken, tokenInFog);
     });
 
     // Restore context after all world-space rendering
@@ -3286,7 +3315,7 @@ export const SimpleTabletop = () => {
     }
   };
 
-  const drawToken = (ctx: CanvasRenderingContext2D, token: any) => {
+  const drawToken = (ctx: CanvasRenderingContext2D, token: any, isInFog: boolean = false) => {
     const baseTokenSize = 40; // Base size for 1x1 token
     // Use the larger dimension for circular token radius
     const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
@@ -3296,7 +3325,7 @@ export const SimpleTabletop = () => {
 
     // Performance optimization: Create a simple hash of token's visual state
     // If state hasn't changed, we can potentially skip some computations
-    const visualStateHash = `${token.x},${token.y},${token.color},${isSelected},${isHovered},${token.roleId}`;
+    const visualStateHash = `${token.x},${token.y},${token.color},${isSelected},${isHovered},${token.roleId},${isInFog}`;
     const cached = tokenDrawCache.current.get(token.id);
     const now = Date.now();
 
@@ -3311,11 +3340,11 @@ export const SimpleTabletop = () => {
     }
 
     // Get current player for permission checks
-    const currentPlayer = players.find((p) => p.id === currentPlayerId);
+    const tokenPlayer = players.find((p) => p.id === currentPlayerId);
 
     // Check permissions and relationships
-    const isControllable = currentPlayer ? canControlToken(token, currentPlayer, roles) : false;
-    const relationship = currentPlayer ? getTokenRelationship(token, currentPlayer, roles) : "neutral";
+    const isControllable = tokenPlayer ? canControlToken(token, tokenPlayer, roles) : false;
+    const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roles) : "neutral";
     const isHostile = relationship === "hostile";
 
     // Get role color for border
@@ -3326,8 +3355,14 @@ export const SimpleTabletop = () => {
     const currentEntry = initiativeOrder[currentTurnIndex];
     const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
 
+    // Apply semi-transparency for DM viewing fog-covered tokens
+    ctx.save();
+    if (isInFog) {
+      ctx.globalAlpha = 0.4;
+    }
+
     // Draw hostile pulsing indicator (animated red border)
-    if (isHostile) {
+    if (isHostile && !isInFog) {
       const pulseTime = Date.now() / 500;
       const pulseIntensity = (Math.sin(pulseTime) + 1) / 2; // Oscillates between 0 and 1
 
@@ -3342,7 +3377,7 @@ export const SimpleTabletop = () => {
     }
 
     // Draw active combat highlight (pulsing gold glow)
-    if (isActiveInCombat) {
+    if (isActiveInCombat && !isInFog) {
       ctx.save();
       // Outer glow
       ctx.strokeStyle = "rgba(255, 215, 0, 0.6)"; // Gold
@@ -3361,7 +3396,7 @@ export const SimpleTabletop = () => {
     }
 
     // Draw controllability hover glow (green/blue glow when hovering over controllable token)
-    if (isHovered && isControllable && !isDraggingToken) {
+    if (isHovered && isControllable && !isDraggingToken && !isInFog) {
       ctx.save();
       const glowColor = relationship === "friendly" ? "rgba(34, 197, 94, 0.6)" : "rgba(59, 130, 246, 0.6)"; // Green for friendly, blue for own
       ctx.strokeStyle = glowColor;
@@ -3410,6 +3445,8 @@ export const SimpleTabletop = () => {
       ctx.textBaseline = "middle";
       ctx.fillText(token.label, token.x, token.y);
     }
+
+    ctx.restore();
   };
 
   // Function to draw off-screen token indicator
@@ -3920,7 +3957,8 @@ export const SimpleTabletop = () => {
         if (Math.sqrt(dx * dx + dy * dy) > radius) return false;
         
         // In play mode with fog enabled, check if annotation is in revealed area
-        if (renderingMode === 'play' && fogEnabled && !fogRevealAll) {
+        // DM role bypasses this check - can interact with all annotations
+        if (renderingMode === 'play' && fogEnabled && !fogRevealAll && !isDM) {
           const annotationPoint = { x: ann.position.x, y: ann.position.y };
           const isRevealed = isPointInRevealedArea(
             annotationPoint,
