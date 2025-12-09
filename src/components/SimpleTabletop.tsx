@@ -81,6 +81,7 @@ import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog 
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
+import { SelectionModeIndicator } from "./SelectionModeIndicator";
 import { Z_INDEX } from "../lib/zIndex";
 
 export const SimpleTabletop = () => {
@@ -389,6 +390,7 @@ export const SimpleTabletop = () => {
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeMode, setMarqueeMode] = useState<'regions' | 'tokens' | 'both'>('both');
   
   // Undo/Redo: Track initial states before transformations
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -5044,40 +5046,82 @@ export const SimpleTabletop = () => {
       const marqueeHeight = maxY - minY;
       
       if (marqueeWidth > 5 && marqueeHeight > 5) {
-        // Find all regions that intersect with the marquee
-        const selectedIds: string[] = [];
+        const selectedRegionIdsList: string[] = [];
+        const selectedTokenIdsList: string[] = [];
         
-        regions.forEach(region => {
-          // Get region bounds
-          let regionMinX: number, regionMinY: number, regionMaxX: number, regionMaxY: number;
+        // Select regions (in edit mode)
+        if (renderingMode === 'edit') {
+          regions.forEach(region => {
+            // Get region bounds
+            let regionMinX: number, regionMinY: number, regionMaxX: number, regionMaxY: number;
+            
+            if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+              const xs = region.pathPoints.map(p => p.x);
+              const ys = region.pathPoints.map(p => p.y);
+              regionMinX = Math.min(...xs);
+              regionMinY = Math.min(...ys);
+              regionMaxX = Math.max(...xs);
+              regionMaxY = Math.max(...ys);
+            } else {
+              regionMinX = region.x;
+              regionMinY = region.y;
+              regionMaxX = region.x + region.width;
+              regionMaxY = region.y + region.height;
+            }
+            
+            // Check if region intersects with marquee (AABB intersection)
+            const intersects = !(regionMaxX < minX || regionMinX > maxX || 
+                                regionMaxY < minY || regionMinY > maxY);
+            
+            if (intersects) {
+              selectedRegionIdsList.push(region.id);
+              selectRegion(region.id);
+            }
+          });
+        }
+        
+        // Select tokens (both edit and play mode)
+        const baseTokenSize = 40; // Base size for 1x1 token
+        tokens.forEach(token => {
+          const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+          const radius = tokenSize / 2;
           
-          if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
-            const xs = region.pathPoints.map(p => p.x);
-            const ys = region.pathPoints.map(p => p.y);
-            regionMinX = Math.min(...xs);
-            regionMinY = Math.min(...ys);
-            regionMaxX = Math.max(...xs);
-            regionMaxY = Math.max(...ys);
-          } else {
-            regionMinX = region.x;
-            regionMinY = region.y;
-            regionMaxX = region.x + region.width;
-            regionMaxY = region.y + region.height;
-          }
+          // Token bounds (circle approximated as square for intersection)
+          const tokenMinX = token.x - radius;
+          const tokenMinY = token.y - radius;
+          const tokenMaxX = token.x + radius;
+          const tokenMaxY = token.y + radius;
           
-          // Check if region intersects with marquee (AABB intersection)
-          const intersects = !(regionMaxX < minX || regionMinX > maxX || 
-                              regionMaxY < minY || regionMinY > maxY);
+          // Check if token intersects with marquee
+          const intersects = !(tokenMaxX < minX || tokenMinX > maxX || 
+                              tokenMaxY < minY || tokenMinY > maxY);
           
           if (intersects) {
-            selectedIds.push(region.id);
-            selectRegion(region.id);
+            // Check if player can control this token
+            if (currentPlayer && canControlToken(token, currentPlayer, roles)) {
+              selectedTokenIdsList.push(token.id);
+            }
           }
         });
         
-        if (selectedIds.length > 0) {
-          setSelectedRegionIds(selectedIds);
-          toast.success(`Selected ${selectedIds.length} region(s)`);
+        // Update state based on what was selected
+        if (selectedRegionIdsList.length > 0) {
+          setSelectedRegionIds(selectedRegionIdsList);
+        }
+        if (selectedTokenIdsList.length > 0) {
+          setSelectedTokenIds(selectedTokenIdsList);
+        }
+        
+        // Show feedback
+        const parts: string[] = [];
+        if (selectedRegionIdsList.length > 0) {
+          parts.push(`${selectedRegionIdsList.length} region${selectedRegionIdsList.length !== 1 ? 's' : ''}`);
+        }
+        if (selectedTokenIdsList.length > 0) {
+          parts.push(`${selectedTokenIdsList.length} token${selectedTokenIdsList.length !== 1 ? 's' : ''}`);
+        }
+        if (parts.length > 0) {
+          toast.success(`Selected ${parts.join(' and ')}`);
         }
       }
       
@@ -5518,6 +5562,12 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds(regions.map(r => r.id));
           redrawCanvas();
         }}
+      />
+
+      {/* Selection Mode Indicator - Shows what type of selection is active */}
+      <SelectionModeIndicator
+        selectedRegionCount={selectedRegionIds.length}
+        selectedTokenCount={selectedTokenIds.length}
       />
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
