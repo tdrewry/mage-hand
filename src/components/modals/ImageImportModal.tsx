@@ -396,15 +396,21 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
             />
             
-            {/* Hidden image for loading */}
+            {/* Hidden image for loading - crossOrigin required for canvas usage */}
             {imageUrl && (
               <img
                 src={imageUrl}
                 alt="Loading"
                 className="hidden"
+                crossOrigin="anonymous"
                 onLoad={handleImageLoad}
                 onError={() => {
-                  toast.error('Failed to load image');
+                  // Check if it's a data URL (these shouldn't fail)
+                  if (imageUrl.startsWith('data:')) {
+                    toast.error('Failed to load image data');
+                  } else {
+                    toast.error('Failed to load image - the server may block cross-origin requests. Try uploading the image file instead.');
+                  }
                   setImageLoaded(false);
                 }}
               />
