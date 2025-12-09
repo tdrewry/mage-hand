@@ -3014,18 +3014,32 @@ export const SimpleTabletop = () => {
       return; // Image not ready yet
     }
 
-    // Only draw if image is fully loaded
-    if (!img.complete || img.naturalHeight === 0) return;
+    // Only draw if image is fully loaded with valid dimensions
+    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
 
-    const { x, y, width, height } = region;
+    // Calculate bounds - for path regions use bounding box from pathPoints
+    let x = region.x;
+    let y = region.y;
+    let width = region.width;
+    let height = region.height;
+
+    if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+      const xs = region.pathPoints.map(p => p.x);
+      const ys = region.pathPoints.map(p => p.y);
+      x = Math.min(...xs);
+      y = Math.min(...ys);
+      width = Math.max(...xs) - x;
+      height = Math.max(...ys) - y;
+    }
+
     const offsetX = region.backgroundOffsetX || 0;
     const offsetY = region.backgroundOffsetY || 0;
     const scale = region.backgroundScale || 1;
     const repeat = region.backgroundRepeat || "repeat";
 
     // Calculate scaled image dimensions
-    const scaledWidth = img.naturalWidth * scale;
-    const scaledHeight = img.naturalHeight * scale;
+    const scaledWidth = Math.max(1, img.naturalWidth * scale);
+    const scaledHeight = Math.max(1, img.naturalHeight * scale);
 
     if (repeat === "no-repeat") {
       // For no-repeat, draw the scaled image once at the offset position
@@ -3033,8 +3047,8 @@ export const SimpleTabletop = () => {
     } else {
       // For repeat patterns, create an offscreen canvas with the scaled image
       const patternCanvas = document.createElement('canvas');
-      patternCanvas.width = scaledWidth;
-      patternCanvas.height = scaledHeight;
+      patternCanvas.width = Math.ceil(scaledWidth);
+      patternCanvas.height = Math.ceil(scaledHeight);
       const patternCtx = patternCanvas.getContext('2d');
       
       if (patternCtx) {
@@ -3042,13 +3056,14 @@ export const SimpleTabletop = () => {
         const pattern = ctx.createPattern(patternCanvas, repeat);
         
         if (pattern) {
-          // Apply offset to the pattern
+          // Apply offset to the pattern - translate to position the pattern correctly
           const matrix = new DOMMatrix();
-          matrix.translateSelf(x + offsetX, y + offsetY);
+          matrix.translateSelf(offsetX, offsetY);
           pattern.setTransform(matrix);
 
           ctx.fillStyle = pattern;
-          ctx.fillRect(x, y, width, height);
+          // Fill a larger area to ensure coverage with offset
+          ctx.fillRect(x - scaledWidth, y - scaledHeight, width + scaledWidth * 2, height + scaledHeight * 2);
         }
       }
     }
