@@ -167,10 +167,19 @@ export const RegionBulkTextureModal = ({
       return;
     }
 
+    // Re-fetch regions fresh from store to ensure we have latest state
+    const currentRegions = useRegionStore.getState().regions;
+    const regionsToUpdate = currentRegions.filter(r => selectedRegionIds.includes(r.id));
+    
+    if (regionsToUpdate.length === 0) {
+      toast.error('No regions selected');
+      return;
+    }
+
     const scaledWidth = previewImage.naturalWidth * backgroundScale;
     const scaledHeight = previewImage.naturalHeight * backgroundScale;
 
-    selectedRegions.forEach(region => {
+    regionsToUpdate.forEach(region => {
       let regionMinX = region.x;
       let regionMinY = region.y;
       if (region.regionType === 'path' && region.pathPoints) {
@@ -194,7 +203,7 @@ export const RegionBulkTextureModal = ({
     });
 
     onUpdateCanvas?.();
-    toast.success(`Applied texture to ${selectedRegions.length} region(s)`);
+    toast.success(`Applied texture to ${regionsToUpdate.length} region(s)`);
     onOpenChange(false);
   };
 
