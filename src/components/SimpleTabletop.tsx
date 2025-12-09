@@ -1921,13 +1921,13 @@ export const SimpleTabletop = () => {
       targetCtx.lineWidth = 3 / transform.zoom;
       targetCtx.stroke();
 
-      // Draw token label if visible (inside the token circle, matching original drawToken)
-      if (token.label) {
+      // Draw token name if set (inside the token circle)
+      if (token.name) {
         targetCtx.fillStyle = "#000000";
         targetCtx.font = `${12 / transform.zoom}px Arial`;
         targetCtx.textAlign = "center";
         targetCtx.textBaseline = "middle";
-        targetCtx.fillText(token.label, token.x, token.y);
+        targetCtx.fillText(token.name, token.x, token.y);
       }
 
       targetCtx.restore();
@@ -3595,13 +3595,13 @@ export const SimpleTabletop = () => {
     }
     ctx.stroke();
 
-    // Draw token label
-    if (token.label) {
+    // Draw token name if set
+    if (token.name) {
       ctx.fillStyle = "#000000";
       ctx.font = `${12 / transform.zoom}px Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(token.label, token.x, token.y);
+      ctx.fillText(token.name, token.x, token.y);
     }
 
     ctx.restore();
