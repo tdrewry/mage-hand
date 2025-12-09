@@ -9,6 +9,8 @@ import { persist } from 'zustand/middleware';
 import { syncManager } from '@/lib/syncManager';
 import type { IlluminationSource } from '@/types/illumination';
 
+export type LabelPosition = 'above' | 'center' | 'below';
+
 export interface Token {
   id: string;
   name: string;
@@ -17,7 +19,8 @@ export interface Token {
   y: number;
   gridWidth: number;  // Width in grid units
   gridHeight: number; // Height in grid units
-  label: string;      // Editable label/name
+  label: string;      // Editable label displayed on/near token
+  labelPosition: LabelPosition; // Where to draw the label (default: below)
   roleId: string;     // Role this token belongs to
   isHidden: boolean;  // Whether token is hidden (only visible to privileged roles)
   color?: string;     // Token color (for default tokens)
@@ -70,6 +73,8 @@ export interface SessionState {
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
+  updateTokenName: (tokenId: string, name: string) => void;
+  updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
@@ -173,16 +178,43 @@ export const useSessionStore = create<SessionState>()(
       updateTokenLabel: (tokenId, label) => {
         const existingToken = get().tokens.find(t => t.id === tokenId);
         
-        // Update both label and name to keep them in sync
         set((state) => ({
           tokens: state.tokens.map((token) =>
-            token.id === tokenId ? { ...token, label, name: label } : token
+            token.id === tokenId ? { ...token, label } : token
           ),
         }));
         
         // Only sync if token exists locally (prevent syncing remote updates)
         if (existingToken && syncManager.isConnected()) {
           syncManager.syncTokenUpdate(tokenId, { label });
+        }
+      },
+
+      updateTokenName: (tokenId, name) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, name } : token
+          ),
+        }));
+        
+        if (existingToken && syncManager.isConnected()) {
+          syncManager.syncTokenUpdate(tokenId, { name });
+        }
+      },
+
+      updateTokenLabelPosition: (tokenId, labelPosition) => {
+        const existingToken = get().tokens.find(t => t.id === tokenId);
+        
+        set((state) => ({
+          tokens: state.tokens.map((token) =>
+            token.id === tokenId ? { ...token, labelPosition } : token
+          ),
+        }));
+        
+        if (existingToken && syncManager.isConnected()) {
+          syncManager.syncTokenUpdate(tokenId, { labelPosition });
         }
       },
 

@@ -1921,13 +1921,25 @@ export const SimpleTabletop = () => {
       targetCtx.lineWidth = 3 / transform.zoom;
       targetCtx.stroke();
 
-      // Draw token name if set (inside the token circle)
-      if (token.name) {
+      // Draw token label based on position setting
+      const displayText = token.label || token.name;
+      if (displayText) {
+        const labelPos = token.labelPosition || 'below';
         targetCtx.fillStyle = "#000000";
         targetCtx.font = `${12 / transform.zoom}px Arial`;
         targetCtx.textAlign = "center";
-        targetCtx.textBaseline = "middle";
-        targetCtx.fillText(token.name, token.x, token.y);
+        
+        if (labelPos === 'center') {
+          targetCtx.textBaseline = "middle";
+          targetCtx.fillText(displayText, token.x, token.y);
+        } else if (labelPos === 'above') {
+          targetCtx.textBaseline = "bottom";
+          targetCtx.fillText(displayText, token.x, token.y - radius - 4 / transform.zoom);
+        } else {
+          // below (default)
+          targetCtx.textBaseline = "top";
+          targetCtx.fillText(displayText, token.x, token.y + radius + 4 / transform.zoom);
+        }
       }
 
       targetCtx.restore();
@@ -3595,13 +3607,25 @@ export const SimpleTabletop = () => {
     }
     ctx.stroke();
 
-    // Draw token name if set
-    if (token.name) {
+    // Draw token label based on position setting
+    const displayText = token.label || token.name;
+    if (displayText) {
+      const labelPos = token.labelPosition || 'below';
       ctx.fillStyle = "#000000";
       ctx.font = `${12 / transform.zoom}px Arial`;
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(token.name, token.x, token.y);
+      
+      if (labelPos === 'center') {
+        ctx.textBaseline = "middle";
+        ctx.fillText(displayText, token.x, token.y);
+      } else if (labelPos === 'above') {
+        ctx.textBaseline = "bottom";
+        ctx.fillText(displayText, token.x, token.y - radius - 4 / transform.zoom);
+      } else {
+        // below (default)
+        ctx.textBaseline = "top";
+        ctx.fillText(displayText, token.x, token.y + radius + 4 / transform.zoom);
+      }
     }
 
     ctx.restore();
@@ -5041,6 +5065,7 @@ export const SimpleTabletop = () => {
         gridWidth: gridWidth,
         gridHeight: gridHeight,
         label: `T${tokenId.slice(-4)}`,
+        labelPosition: 'below',
         ownerId: currentPlayerId,
         color: tokenColor,
         roleId: "player", // Default to player role

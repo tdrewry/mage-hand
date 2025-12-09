@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield, Lightbulb, Sparkles } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
-import { useSessionStore } from '../stores/sessionStore';
+import { useSessionStore, type LabelPosition } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '../lib/illuminationPresets';
@@ -52,6 +52,8 @@ export const TokenContextMenu = ({
     tokens, 
     selectedTokenIds, 
     updateTokenLabel,
+    updateTokenName,
+    updateTokenLabelPosition,
     updateTokenVision,
     updateTokenVisionRange,
     updateTokenIllumination,
@@ -64,13 +66,15 @@ export const TokenContextMenu = ({
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
   
-  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [showTokenEditModal, setShowTokenEditModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [showVisionRangeModal, setShowVisionRangeModal] = useState(false);
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
+  const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
+  const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
@@ -101,18 +105,22 @@ export const TokenContextMenu = ({
   const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
   const isHidden = targetTokens.every(t => t.isHidden);
 
-  const handleLabelClick = () => {
+  const handleEditTokenClick = () => {
     if (!canControl) {
       toast.error("You don't have permission to edit these tokens");
       return;
     }
     
     if (targetTokens.length === 1) {
-      setLabelValue(targetTokens[0].label || targetTokens[0].name);
+      setNameValue(targetTokens[0].name || '');
+      setLabelValue(targetTokens[0].label || '');
+      setLabelPositionValue(targetTokens[0].labelPosition || 'below');
     } else {
-      setLabelValue(''); // Empty for multi-edit
+      setNameValue('');
+      setLabelValue('');
+      setLabelPositionValue('below');
     }
-    setShowLabelModal(true);
+    setShowTokenEditModal(true);
   };
 
   const handleColorClick = () => {
@@ -138,13 +146,19 @@ export const TokenContextMenu = ({
   };
 
 
-  const applyLabel = () => {
+  const applyTokenEdit = () => {
     targetTokens.forEach(token => {
-      updateTokenLabel(token.id, labelValue);
+      if (nameValue) {
+        updateTokenName(token.id, nameValue);
+      }
+      if (labelValue) {
+        updateTokenLabel(token.id, labelValue);
+      }
+      updateTokenLabelPosition(token.id, labelPositionValue);
     });
-    setShowLabelModal(false);
+    setShowTokenEditModal(false);
     onUpdateCanvas?.();
-    toast.success(`Label updated for ${targetTokens.length} token(s)`);
+    toast.success(`Token${targetTokens.length > 1 ? 's' : ''} updated`);
   };
 
   const applyColor = () => {
@@ -321,9 +335,9 @@ export const TokenContextMenu = ({
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className="w-56 bg-popover z-[1000]">
-          <ContextMenuItem onClick={handleLabelClick} disabled={!canControl}>
+          <ContextMenuItem onClick={handleEditTokenClick} disabled={!canControl}>
             <Edit3 className="mr-2 h-4 w-4" />
-            <span>Edit Label{isMultiSelection ? 's' : ''}</span>
+            <span>Edit Token{isMultiSelection ? 's' : ''}</span>
             {!canControl && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
           <ContextMenuItem onClick={handleColorClick} disabled={!canControl}>
@@ -418,41 +432,64 @@ export const TokenContextMenu = ({
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Label Edit Modal */}
-      <Dialog open={showLabelModal} onOpenChange={setShowLabelModal}>
+      {/* Token Edit Modal */}
+      <Dialog open={showTokenEditModal} onOpenChange={setShowTokenEditModal}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Edit Label{isMultiSelection ? 's' : ''}
+              Edit Token{isMultiSelection ? 's' : ''}
             </DialogTitle>
             <DialogDescription>
               {isMultiSelection 
-                ? `Set label for ${targetTokens.length} tokens`
-                : 'Enter a new label for this token'
+                ? `Edit properties for ${targetTokens.length} tokens`
+                : 'Edit token name, label, and display settings'
               }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="token-label">Token Label</Label>
+              <Label htmlFor="token-name">Token Name</Label>
+              <Input
+                id="token-name"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                placeholder={isMultiSelection ? 'Enter name for all tokens' : 'Enter token name'}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Internal identifier for the token</p>
+            </div>
+            <div>
+              <Label htmlFor="token-label">Display Label</Label>
               <Input
                 id="token-label"
                 value={labelValue}
                 onChange={(e) => setLabelValue(e.target.value)}
-                placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter token label'}
-                style={{ 
-                  color: targetTokens[0]?.color || '#FFFFFF',
-                  borderColor: targetTokens[0]?.color || '#444444'
-                }}
+                placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter display label'}
               />
+              <p className="text-xs text-muted-foreground mt-1">Text displayed on/near the token</p>
+            </div>
+            <div>
+              <Label>Label Position</Label>
+              <div className="flex gap-2 mt-2">
+                {(['above', 'center', 'below'] as LabelPosition[]).map((pos) => (
+                  <Button
+                    key={pos}
+                    variant={labelPositionValue === pos ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLabelPositionValue(pos)}
+                    className="flex-1 capitalize"
+                  >
+                    {pos}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLabelModal(false)}>
+            <Button variant="outline" onClick={() => setShowTokenEditModal(false)}>
               Cancel
             </Button>
-            <Button onClick={applyLabel}>
-              Apply Label{isMultiSelection ? 's' : ''}
+            <Button onClick={applyTokenEdit}>
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
