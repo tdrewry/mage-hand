@@ -567,6 +567,114 @@ export const SimpleTabletop = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [transform]);
 
+  // Fit to View - calculates bounds of all content and zooms to fit
+  const handleFitToView = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Calculate bounding box of all content
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+
+    // Include tokens with their illumination radius
+    tokens.forEach(token => {
+      hasContent = true;
+      const tokenCenterX = token.x;
+      const tokenCenterY = token.y;
+      
+      // Get illumination radius (use the largest one if multiple sources)
+      let maxRadius = 0;
+      if (token.illuminationSources && token.illuminationSources.length > 0) {
+        token.illuminationSources.forEach(source => {
+          if (source.enabled && source.range > maxRadius) {
+            maxRadius = source.range;
+          }
+        });
+      }
+      // Also consider legacy visionRange
+      if (token.visionRange && token.visionRange > maxRadius) {
+        maxRadius = token.visionRange;
+      }
+      // Fallback to fog vision range
+      if (maxRadius === 0 && token.hasVision) {
+        maxRadius = fogVisionRange * 40; // Convert grid units to pixels
+      }
+      
+      // Expand bounds by token size and illumination radius
+      const tokenRadius = Math.max(token.gridWidth, token.gridHeight) * 20; // Approximate token size
+      const totalRadius = tokenRadius + maxRadius;
+      
+      minX = Math.min(minX, tokenCenterX - totalRadius);
+      minY = Math.min(minY, tokenCenterY - totalRadius);
+      maxX = Math.max(maxX, tokenCenterX + totalRadius);
+      maxY = Math.max(maxY, tokenCenterY + totalRadius);
+    });
+
+    // Include explored fog areas if available
+    if (exploredAreaRef.current) {
+      const bounds = exploredAreaRef.current.bounds;
+      if (bounds && bounds.width > 0 && bounds.height > 0) {
+        hasContent = true;
+        minX = Math.min(minX, bounds.left);
+        minY = Math.min(minY, bounds.top);
+        maxX = Math.max(maxX, bounds.right);
+        maxY = Math.max(maxY, bounds.bottom);
+      }
+    }
+
+    // Include visible regions
+    regions.forEach(region => {
+      hasContent = true;
+      
+      const regionX = region.x;
+      const regionY = region.y;
+      const regionW = region.width;
+      const regionH = region.height;
+      
+      minX = Math.min(minX, regionX);
+      minY = Math.min(minY, regionY);
+      maxX = Math.max(maxX, regionX + regionW);
+      maxY = Math.max(maxY, regionY + regionH);
+    });
+
+    if (!hasContent) {
+      toast.info('No content to fit');
+      return;
+    }
+
+    // Add padding (10% on each side)
+    const padding = 0.1;
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    minX -= contentWidth * padding;
+    maxX += contentWidth * padding;
+    minY -= contentHeight * padding;
+    maxY += contentHeight * padding;
+
+    const paddedWidth = maxX - minX;
+    const paddedHeight = maxY - minY;
+
+    // Calculate zoom to fit
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const zoomX = canvasWidth / paddedWidth;
+    const zoomY = canvasHeight / paddedHeight;
+    const newZoom = Math.min(zoomX, zoomY, 5); // Cap at max zoom of 5
+
+    // Calculate center of content
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+
+    // Set transform to center on content at calculated zoom
+    setTransform({
+      x: canvasWidth / 2 - contentCenterX * newZoom,
+      y: canvasHeight / 2 - contentCenterY * newZoom,
+      zoom: Math.max(0.1, newZoom),
+    });
+
+    toast.success(`Fit to view (${Math.round(newZoom * 100)}%)`);
+  }, [tokens, regions, fogVisionRange, setTransform]);
+
   // Canvas rendering now auto-updates via dependencies - no manual event listening needed
 
   // Initialize paper.js scope and load explored areas
@@ -4713,6 +4821,7 @@ export const SimpleTabletop = () => {
         onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
         showRegions={showRegions}
         onToggleRegions={() => setShowRegions(!showRegions)}
+        onFitToView={handleFitToView}
       />
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
