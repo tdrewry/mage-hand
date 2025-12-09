@@ -336,6 +336,9 @@ export const SimpleTabletop = () => {
 
   // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
+  
+  // Counter to force re-render when images load
+  const [imageLoadCounter, setImageLoadCounter] = useState(0);
 
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
@@ -1496,7 +1499,8 @@ export const SimpleTabletop = () => {
       imageCache.current.set(url, img);
       
       img.onload = () => {
-        redrawCanvas();
+        // Increment counter to trigger re-render when image loads
+        setImageLoadCounter(c => c + 1);
       };
       
       img.src = url;
@@ -3836,7 +3840,7 @@ export const SimpleTabletop = () => {
   // Redraw when transform, tokens, regions, path, or combat state changes
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex]);
+  }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
 
   // Animation loop for hostile tokens, hover effects, and illumination animations
   const animationsPaused = useUiModeStore((state) => state.animationsPaused);
