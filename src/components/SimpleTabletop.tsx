@@ -61,7 +61,7 @@ import { computeIllumination, renderShadows, renderLightSources, notifyObstacles
 import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache } from "../lib/visibilityEngine";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea } from "../lib/fogGeometry";
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
@@ -1836,18 +1836,30 @@ export const SimpleTabletop = () => {
         const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
         
         // Check if token is in fog (for DM visibility modes)
+        // "Darkness returns" rule: tokens require active illumination to be visible
+        // Exception: players always see their own (friendly) tokens
         let tokenInFog = false;
         let shouldSkipToken = false;
         if (isPlayMode && fogEnabled && !fogRevealAll) {
           const tokenPoint = { x: renderToken.x, y: renderToken.y };
-          const isRevealed = isPointInRevealedArea(
+          
+          // Check if token is currently illuminated (in active light/vision)
+          const isCurrentlyIlluminated = isPointInVisibleArea(
             tokenPoint,
-            exploredAreaRef.current,
             currentVisibilityRef.current
           );
-          if (!isRevealed) {
+          
+          // Check token ownership - friendly tokens always visible to their owner
+          const tokenPlayer = players.find((p) => p.id === currentPlayerId);
+          const relationship = tokenPlayer ? getTokenRelationship(renderToken, tokenPlayer, roles) : 'neutral';
+          const isFriendlyToken = relationship === 'friendly';
+          
+          if (!isCurrentlyIlluminated) {
             if (!isDM) {
-              shouldSkipToken = true; // Non-DM can't see fog-hidden tokens
+              // Players always see their own (friendly) tokens, even in darkness
+              if (!isFriendlyToken) {
+                shouldSkipToken = true; // Non-friendly tokens hidden in darkness
+              }
             } else {
               // DM visibility modes
               if (dmFogVisibility === 'hidden') {
