@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,46 +8,57 @@ import { Switch } from '@/components/ui/switch';
 import { useRegionStore } from '@/stores/regionStore';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
+import { RegionBulkTextureModal } from './modals/RegionBulkTextureModal';
 
 interface RegionControlBarProps {
-  selectedRegionId: string | null;
+  selectedRegionIds: string[];
   onClearSelection: () => void;
   onUpdateCanvas?: () => void;
+  onSelectAll?: () => void;
 }
 
 export const RegionControlBar: React.FC<RegionControlBarProps> = ({
-  selectedRegionId,
+  selectedRegionIds,
   onClearSelection,
-  onUpdateCanvas
+  onUpdateCanvas,
+  onSelectAll
 }) => {
   const { regions, updateRegion, removeRegion } = useRegionStore();
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
+  const [showTextureModal, setShowTextureModal] = useState(false);
   const [colorValue, setColorValue] = useState('#4F46E5');
   
-  const selectedRegion = selectedRegionId ? regions.find(r => r.id === selectedRegionId) : null;
-  const [gridSizeInput, setGridSizeInput] = useState(selectedRegion?.gridSize?.toString() || '50');
+  const selectedRegions = regions.filter(r => selectedRegionIds.includes(r.id));
+  const firstRegion = selectedRegions[0];
+  const [gridSizeInput, setGridSizeInput] = useState(firstRegion?.gridSize?.toString() || '50');
   
   // Update grid size input when region changes
   React.useEffect(() => {
-    if (selectedRegion) {
-      setGridSizeInput(selectedRegion.gridSize?.toString() || '50');
+    if (firstRegion) {
+      setGridSizeInput(firstRegion.gridSize?.toString() || '50');
     }
-  }, [selectedRegion?.id, selectedRegion?.gridSize]);
+  }, [firstRegion?.id, firstRegion?.gridSize]);
   
-  if (!selectedRegion) return null;
+  if (selectedRegions.length === 0) return null;
+  
+  const isSingleSelection = selectedRegions.length === 1;
   
   const handleToggleGridSnap = (enabled: boolean) => {
-    updateRegion(selectedRegion.id, { gridSnapping: enabled });
+    selectedRegions.forEach(region => {
+      updateRegion(region.id, { gridSnapping: enabled });
+    });
     onUpdateCanvas?.();
-    toast.success(`Grid snapping ${enabled ? 'enabled' : 'disabled'}`);
+    toast.success(`Grid snapping ${enabled ? 'enabled' : 'disabled'} for ${selectedRegions.length} region(s)`);
   };
   
   const handleToggleGridVisible = (visible: boolean) => {
-    updateRegion(selectedRegion.id, { gridVisible: visible });
+    selectedRegions.forEach(region => {
+      updateRegion(region.id, { gridVisible: visible });
+    });
     onUpdateCanvas?.();
-    toast.success(`Grid ${visible ? 'shown' : 'hidden'}`);
+    toast.success(`Grid ${visible ? 'shown' : 'hidden'} for ${selectedRegions.length} region(s)`);
   };
   
   const handleUpdateGridSize = () => {
@@ -57,24 +68,30 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       return;
     }
     
-    updateRegion(selectedRegion.id, { gridSize: size });
+    selectedRegions.forEach(region => {
+      updateRegion(region.id, { gridSize: size });
+    });
     onUpdateCanvas?.();
-    toast.success(`Grid size updated to ${size}`);
+    toast.success(`Grid size updated to ${size} for ${selectedRegions.length} region(s)`);
   };
   
   const handleApplyColor = () => {
-    updateRegion(selectedRegion.id, { color: colorValue });
+    selectedRegions.forEach(region => {
+      updateRegion(region.id, { color: colorValue });
+    });
     setShowColorModal(false);
     onUpdateCanvas?.();
-    toast.success('Region color updated');
+    toast.success(`Color updated for ${selectedRegions.length} region(s)`);
   };
   
   const handleDeleteConfirm = () => {
-    removeRegion(selectedRegion.id);
+    selectedRegions.forEach(region => {
+      removeRegion(region.id);
+    });
     setShowDeleteModal(false);
     onClearSelection();
     onUpdateCanvas?.();
-    toast.success('Region deleted');
+    toast.success(`Deleted ${selectedRegions.length} region(s)`);
   };
   
   return (
@@ -85,16 +102,24 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       >
         <div className="flex items-center gap-1">
           <span className="text-xs font-medium text-foreground px-1.5">
-            {selectedRegion.regionType === 'path' ? 'Path' : 'Rect'}
+            {selectedRegions.length} region{selectedRegions.length > 1 ? 's' : ''}
           </span>
           
           <div className="h-4 w-px bg-border" />
+          
+          {/* Select All */}
+          {onSelectAll && (
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onSelectAll}>
+              <CheckSquare className="h-3 w-3 mr-1" />
+              All
+            </Button>
+          )}
           
           {/* Grid Snapping */}
           <div className="flex items-center gap-1 px-1">
             <Grid3X3 className="h-3 w-3 text-muted-foreground" />
             <Switch
-              checked={selectedRegion.gridSnapping ?? false}
+              checked={firstRegion?.gridSnapping ?? false}
               onCheckedChange={handleToggleGridSnap}
               className="scale-75"
             />
@@ -102,13 +127,13 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
           
           {/* Grid Visibility */}
           <div className="flex items-center gap-1 px-1">
-            {selectedRegion.gridVisible ? (
+            {firstRegion?.gridVisible ? (
               <Eye className="h-3 w-3 text-muted-foreground" />
             ) : (
               <EyeOff className="h-3 w-3 text-muted-foreground" />
             )}
             <Switch
-              checked={selectedRegion.gridVisible ?? true}
+              checked={firstRegion?.gridVisible ?? true}
               onCheckedChange={handleToggleGridVisible}
               className="scale-75"
             />
@@ -131,9 +156,15 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
           
           <div className="h-4 w-px bg-border" />
           
+          {/* Texture */}
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setShowTextureModal(true)}>
+            <Image className="h-3 w-3 mr-1" />
+            Texture
+          </Button>
+          
           {/* Background Color */}
           <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => {
-            setColorValue(selectedRegion.color || '#4F46E5');
+            setColorValue(firstRegion?.color || '#4F46E5');
             setShowColorModal(true);
           }}>
             <Palette className="h-3 w-3 mr-1" />
@@ -169,9 +200,9 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Region</DialogTitle>
+            <DialogTitle>Delete {selectedRegions.length > 1 ? `${selectedRegions.length} Regions` : 'Region'}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this region? This action cannot be undone.
+              Are you sure you want to delete {selectedRegions.length > 1 ? 'these regions' : 'this region'}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -191,7 +222,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
           <DialogHeader>
             <DialogTitle>Change Region Color</DialogTitle>
             <DialogDescription>
-              Set the background color for this region
+              Set the background color for {selectedRegions.length > 1 ? `${selectedRegions.length} regions` : 'this region'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -224,6 +255,14 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Bulk Texture Modal */}
+      <RegionBulkTextureModal
+        open={showTextureModal}
+        onOpenChange={setShowTextureModal}
+        selectedRegionIds={selectedRegionIds}
+        onUpdateCanvas={onUpdateCanvas}
+      />
     </>
   );
 };

@@ -341,7 +341,7 @@ export const SimpleTabletop = () => {
   // Counter to force re-render when images load
   const [imageLoadCounter, setImageLoadCounter] = useState(0);
 
-  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>([]);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
   const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
@@ -3125,13 +3125,16 @@ export const SimpleTabletop = () => {
         const pattern = ctx.createPattern(patternCanvas, repeat);
         
         if (pattern) {
-          // Apply offset to the pattern - translate to position the pattern correctly
+          // Apply world-space positioning for continuous texture tiling
+          // offsetX/offsetY are pre-calculated to align with world origin (0,0)
+          // This ensures textures appear continuous across multiple regions
           const matrix = new DOMMatrix();
-          matrix.translateSelf(offsetX, offsetY);
+          // Translate pattern to start at region's top-left with the calculated offset
+          matrix.translateSelf(x + offsetX, y + offsetY);
           pattern.setTransform(matrix);
 
           ctx.fillStyle = pattern;
-          // Fill a larger area to ensure coverage with offset
+          // Fill the region area with enough padding for the offset
           ctx.fillRect(x - scaledWidth, y - scaledHeight, width + scaledWidth * 2, height + scaledHeight * 2);
         }
       }
@@ -4022,10 +4025,22 @@ export const SimpleTabletop = () => {
             return;
           }
 
-          // Region selection logic
-          clearSelection();
-          selectRegion(clickedRegion.id);
-          setSelectedRegionId(clickedRegion.id);
+          // Region selection logic - handle multi-select with shift key
+          if (e.shiftKey) {
+            // Shift+click: toggle region in selection
+            if (selectedRegionIds.includes(clickedRegion.id)) {
+              setSelectedRegionIds(prev => prev.filter(id => id !== clickedRegion.id));
+              deselectRegion(clickedRegion.id);
+            } else {
+              setSelectedRegionIds(prev => [...prev, clickedRegion.id]);
+              selectRegion(clickedRegion.id);
+            }
+          } else {
+            // Normal click: single select, deselect others
+            clearSelection();
+            selectRegion(clickedRegion.id);
+            setSelectedRegionIds([clickedRegion.id]);
+          }
           setSelectedTokenIds([]); // Deselect tokens when selecting region
         }
         // In play mode, clicking regions does nothing
@@ -4038,7 +4053,7 @@ export const SimpleTabletop = () => {
           // Normal click: deselect all
           setSelectedTokenIds([]);
           clearSelection();
-          setSelectedRegionId(null);
+          setSelectedRegionIds([]);
         }
       }
     }
@@ -4231,8 +4246,8 @@ export const SimpleTabletop = () => {
   // Function to delete region
   const deleteSelectedRegion = (regionId: string) => {
     removeRegion(regionId);
-    if (selectedRegionId === regionId) {
-      setSelectedRegionId(null);
+    if (selectedRegionIds.includes(regionId)) {
+      setSelectedRegionIds(prev => prev.filter(id => id !== regionId));
     }
     toast.success("Region deleted");
   };
@@ -4268,9 +4283,9 @@ export const SimpleTabletop = () => {
         }
       }
 
-      // Handle path editing mode
-      if (pathDrawingMode === "editing" && selectedRegionId) {
-        const selectedRegion = regions.find((r) => r.id === selectedRegionId);
+      // Handle path editing mode - only for single selection
+      if (pathDrawingMode === "editing" && selectedRegionIds.length === 1) {
+        const selectedRegion = regions.find((r) => r.id === selectedRegionIds[0]);
         if (selectedRegion && selectedRegion.regionType === "path" && selectedRegion.pathPoints) {
           // Check if clicking on a Bezier control point first
           if (selectedRegion.bezierControlPoints) {
@@ -4340,15 +4355,16 @@ export const SimpleTabletop = () => {
       if (clickedAnnotation) {
         setSelectedAnnotationId(selectedAnnotationId === clickedAnnotation.id ? null : clickedAnnotation.id);
         setSelectedTokenIds([]);
-        setSelectedRegionId(null);
+        setSelectedRegionIds([]);
         return;
       }
 
       // PRIORITY 2: Check for ANY handle on selected region first
       // This prevents deselection when clicking handles outside the shape boundary
       // But only in edit mode - no region manipulation in play mode
-      if (selectedRegionId && renderingMode === "edit") {
-        const selectedRegion = regions.find((r) => r.id === selectedRegionId && r.selected);
+      // Only works for single selection
+      if (selectedRegionIds.length === 1 && renderingMode === "edit") {
+        const selectedRegion = regions.find((r) => r.id === selectedRegionIds[0] && r.selected);
         if (selectedRegion) {
           // Check for resize/anchor/bezier handles
           const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
@@ -5364,17 +5380,21 @@ export const SimpleTabletop = () => {
         onUpdateCanvas={handleCanvasUpdate}
       />
 
-      {/* Region Control Bar - Shows when a region is selected */}
+      {/* Region Control Bar - Shows when region(s) are selected */}
       <RegionControlBar
-        selectedRegionId={selectedRegionId}
+        selectedRegionIds={selectedRegionIds}
         onClearSelection={() => {
-          if (selectedRegionId) {
-            deselectRegion(selectedRegionId);
-          }
-          setSelectedRegionId(null);
+          selectedRegionIds.forEach(id => deselectRegion(id));
+          setSelectedRegionIds([]);
           redrawCanvas();
         }}
         onUpdateCanvas={handleCanvasUpdate}
+        onSelectAll={() => {
+          // Select all regions
+          regions.forEach(region => selectRegion(region.id));
+          setSelectedRegionIds(regions.map(r => r.id));
+          redrawCanvas();
+        }}
       />
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
