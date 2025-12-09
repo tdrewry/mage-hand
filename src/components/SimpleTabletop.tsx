@@ -61,7 +61,7 @@ import { computeIllumination, renderShadows, renderLightSources, notifyObstacles
 import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache } from "../lib/visibilityEngine";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D } from "../lib/fogGeometry";
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
@@ -296,6 +296,7 @@ export const SimpleTabletop = () => {
 
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
+  const currentVisibilityRef = useRef<paper.Path | null>(null); // Current visibility for interaction checks
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
 
   // Pre-computed fog masks (updated outside render loop)
@@ -710,6 +711,7 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     if (!fogEnabled) {
       exploredAreaRef.current = null;
+      currentVisibilityRef.current = null;
       fogMasksRef.current = null;
       setSerializedExploredAreas("");
     }
@@ -864,6 +866,12 @@ export const SimpleTabletop = () => {
           });
 
           if (!combinedVisibility) return;
+
+          // Store current visibility for interaction checks (clone before merging)
+          if (currentVisibilityRef.current && currentVisibilityRef.current.remove) {
+            currentVisibilityRef.current.remove();
+          }
+          currentVisibilityRef.current = combinedVisibility.clone({ insert: false }) as paper.Path;
 
           // Merge into explored areas
           exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, combinedVisibility);
@@ -1029,6 +1037,7 @@ export const SimpleTabletop = () => {
   // Hit test for tokens
   const getTokenAtPosition = (worldX: number, worldY: number): any | null => {
     const baseTokenSize = 40; // Base size for 1x1 token
+    const isPlayMode = renderingMode === 'play';
 
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -1050,6 +1059,21 @@ export const SimpleTabletop = () => {
       const distance = Math.sqrt(Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2));
 
       if (distance <= maxRadius) {
+        // In play mode with fog enabled, only allow interaction with tokens in revealed areas
+        if (isPlayMode && fogEnabled && !fogRevealAll) {
+          const tokenPoint = { x: token.x, y: token.y };
+          const isRevealed = isPointInRevealedArea(
+            tokenPoint,
+            exploredAreaRef.current,
+            currentVisibilityRef.current
+          );
+          
+          if (!isRevealed) {
+            // Token is in fog - skip it
+            continue;
+          }
+        }
+        
         return token;
       }
     }
