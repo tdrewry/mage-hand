@@ -15,33 +15,48 @@ export const useCanvasTransform = (initialZoom = 1) => {
   const setPersistedTransform = useSessionStore((state) => state.setViewportTransform);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserInteracting = useRef(false);
-  const lastRestoredMapId = useRef<string | null>(null);
+  const hasRestoredInitial = useRef(false);
+  const lastMapId = useRef<string | null>(null);
   
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, zoom: initialZoom });
   
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
 
-  // Restore transform from persisted store when map changes or on initial hydration
+  // Restore transform from persisted store
+  // This effect needs to handle:
+  // 1. Initial hydration (viewportTransforms becomes populated)
+  // 2. Map switching (selectedMapId changes)
   useEffect(() => {
-    // Don't restore if user is actively interacting (panning/zooming)
+    // Don't restore if user is actively interacting
     if (isUserInteracting.current) return;
+    if (!selectedMapId) return;
     
-    // Only restore if map changed or on initial load
-    if (selectedMapId && selectedMapId !== lastRestoredMapId.current) {
-      const persisted = viewportTransforms[selectedMapId];
-      console.log('[useCanvasTransform] Restoring transform for map:', selectedMapId, persisted);
+    const persisted = viewportTransforms[selectedMapId];
+    const mapChanged = selectedMapId !== lastMapId.current;
+    const hasPersistedData = persisted && (persisted.x !== 0 || persisted.y !== 0 || persisted.zoom !== 1);
+    
+    // Restore if:
+    // 1. Map changed to a different map
+    // 2. OR we haven't restored initial state yet AND we now have persisted data
+    if (mapChanged || (!hasRestoredInitial.current && hasPersistedData)) {
+      console.log('[useCanvasTransform] Restoring transform for map:', selectedMapId, persisted, {
+        mapChanged,
+        hasRestoredInitial: hasRestoredInitial.current,
+        hasPersistedData
+      });
+      
+      lastMapId.current = selectedMapId;
       
       if (persisted) {
-        lastRestoredMapId.current = selectedMapId;
+        hasRestoredInitial.current = true;
         setTransform(persisted);
-      } else {
-        // No saved transform, use default
-        lastRestoredMapId.current = selectedMapId;
-        console.log('[useCanvasTransform] No saved transform, using default');
+      } else if (mapChanged) {
+        // Map changed but no saved data - reset to default
+        setTransform({ x: 0, y: 0, zoom: initialZoom });
       }
     }
-  }, [selectedMapId, viewportTransforms]);
+  }, [selectedMapId, viewportTransforms, initialZoom]);
   
   // Save transform to persisted store whenever it changes (throttled)
   const saveTransform = useCallback((newTransform: Transform) => {
