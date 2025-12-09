@@ -269,3 +269,60 @@ export function getExploredBounds(explored: paper.CompoundPath): {
     height: bounds.height
   };
 }
+
+/**
+ * Check if a point is inside the explored area
+ * @param point - The point to check (world coordinates)
+ * @param explored - The explored area compound path
+ * @returns true if the point is inside the explored area
+ */
+export function isPointInExploredArea(
+  point: Point,
+  explored: paper.CompoundPath | null
+): boolean {
+  if (!explored || explored.isEmpty()) {
+    return false;
+  }
+  
+  const scope = getFogScope();
+  scope.activate();
+  
+  const paperPoint = new scope.Point(point.x, point.y);
+  return explored.contains(paperPoint);
+}
+
+/**
+ * Check if a point is inside the current visibility area
+ * @param point - The point to check (world coordinates)
+ * @param visible - The current visibility path
+ * @returns true if the point is currently visible
+ */
+export function isPointInVisibleArea(
+  point: Point,
+  visible: paper.Path | null
+): boolean {
+  if (!visible || visible.isEmpty()) {
+    return false;
+  }
+  
+  const scope = getFogScope();
+  scope.activate();
+  
+  const paperPoint = new scope.Point(point.x, point.y);
+  return visible.contains(paperPoint);
+}
+
+/**
+ * Check if a point is in either the explored or visible area
+ * @param point - The point to check (world coordinates)
+ * @param explored - The explored area compound path
+ * @param visible - The current visibility path
+ * @returns true if the point is explored or visible
+ */
+export function isPointInRevealedArea(
+  point: Point,
+  explored: paper.CompoundPath | null,
+  visible: paper.Path | null
+): boolean {
+  return isPointInExploredArea(point, explored) || isPointInVisibleArea(point, visible);
+}
