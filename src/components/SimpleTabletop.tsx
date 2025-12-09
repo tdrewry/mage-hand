@@ -1480,6 +1480,33 @@ export const SimpleTabletop = () => {
       return null;
     }
   };
+
+  // Image cache to prevent re-loading images on every redraw
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Helper to get or load a cached image (must be defined before redrawCanvas)
+  const getCachedImage = (url: string): HTMLImageElement | null => {
+    if (!url) return null;
+    
+    let img = imageCache.current.get(url);
+    
+    if (!img) {
+      img = new Image();
+      img.crossOrigin = "anonymous";
+      imageCache.current.set(url, img);
+      
+      img.onload = () => {
+        redrawCanvas();
+      };
+      
+      img.src = url;
+      return null; // Image not ready yet
+    }
+    
+    if (!img.complete || img.naturalHeight === 0) return null;
+    return img;
+  };
+
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
 
@@ -2954,33 +2981,6 @@ export const SimpleTabletop = () => {
       // Transform handles removed - now using classic resize/rotate handles only
     }
   };
-
-  // Image cache to prevent re-loading images on every redraw
-  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
-
-  // Helper to get or load a cached image
-  const getCachedImage = (url: string): HTMLImageElement | null => {
-    if (!url) return null;
-    
-    let img = imageCache.current.get(url);
-    
-    if (!img) {
-      img = new Image();
-      img.crossOrigin = "anonymous";
-      imageCache.current.set(url, img);
-      
-      img.onload = () => {
-        redrawCanvas();
-      };
-      
-      img.src = url;
-      return null; // Image not ready yet
-    }
-    
-    if (!img.complete || img.naturalHeight === 0) return null;
-    return img;
-  };
-
   // Function to draw region background image
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
