@@ -24,6 +24,7 @@ import {
   History,
   Pause,
   Play,
+  Maximize,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -55,6 +56,7 @@ interface VerticalToolbarProps {
   // Shared props
   showRegions: boolean;
   onToggleRegions: () => void;
+  onFitToView?: () => void;
 }
 
 export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
@@ -71,6 +73,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   onToggleGridSnapping,
   showRegions,
   onToggleRegions,
+  onFitToView,
 }) => {
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
@@ -400,6 +403,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="sm"
           />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Maximize}
+            label="Fit to View"
+            onClick={onFitToView || (() => {})}
+            variant="ghost"
+            size="sm"
+          />
         </>
       ) : (
         <>
@@ -518,6 +531,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="History"
             onClick={handleToggleHistoryCard}
             isActive={historyCard?.isVisible}
+            variant="ghost"
+            size="sm"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Maximize}
+            label="Fit to View"
+            onClick={onFitToView || (() => {})}
             variant="ghost"
             size="sm"
           />
