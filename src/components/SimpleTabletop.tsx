@@ -1728,73 +1728,232 @@ export const SimpleTabletop = () => {
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
 
-    // Draw annotations (markers) below tokens so tokens are visible
-    // In play mode with fog, only show annotations that are in revealed areas (unless DM)
-    const isPlayModeForAnnotations = renderingMode === 'play';
-    annotations.forEach((annotation) => {
-      const { x, y } = annotation.position;
-      
-      // Check if annotation is in revealed area (for visibility and DM effects)
-      let isInFog = false;
-      if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
-        const annotationPoint = { x, y };
-        const isRevealed = isPointInRevealedArea(
-          annotationPoint,
-          exploredAreaRef.current,
-          currentVisibilityRef.current
-        );
-        if (!isRevealed) {
-          if (!isDM) {
-            return; // Skip rendering - non-DM can't see fog-hidden annotations
+    // Helper to draw annotations to a given context (with world-space transform applied)
+    const drawAnnotationsToContext = (targetCtx: CanvasRenderingContext2D) => {
+      const isPlayModeForAnnotations = renderingMode === 'play';
+      annotations.forEach((annotation) => {
+        const { x, y } = annotation.position;
+        
+        // Check if annotation is in revealed area (for visibility and DM effects)
+        let isInFog = false;
+        if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
+          const annotationPoint = { x, y };
+          const isRevealed = isPointInRevealedArea(
+            annotationPoint,
+            exploredAreaRef.current,
+            currentVisibilityRef.current
+          );
+          if (!isRevealed) {
+            if (!isDM) {
+              return; // Skip rendering - non-DM can't see fog-hidden annotations
+            }
+            // DM visibility modes
+            if (dmFogVisibility === 'hidden') {
+              return; // DM chose to hide fog-hidden elements
+            }
+            isInFog = dmFogVisibility === 'semi-transparent'; // Only fade if semi-transparent mode
           }
-          // DM visibility modes
-          if (dmFogVisibility === 'hidden') {
-            return; // DM chose to hide fog-hidden elements
-          }
-          isInFog = dmFogVisibility === 'semi-transparent'; // Only fade if semi-transparent mode
         }
-      }
-      
-      ctx.save();
-      
-      // Apply semi-transparency for DM viewing fog-covered annotations (only in semi-transparent mode)
+        
+        targetCtx.save();
+        
+        // Apply semi-transparency for DM viewing fog-covered annotations (only in semi-transparent mode)
+        if (isInFog) {
+          targetCtx.globalAlpha = 0.4;
+        }
+        
+        const radius = 12 / transform.zoom;
+        const fontSize = 10 / transform.zoom;
+        const isSelected = selectedAnnotationId === annotation.id;
+
+        // Draw selection ring if selected
+        if (isSelected) {
+          targetCtx.strokeStyle = "#fbbf24";
+          targetCtx.lineWidth = 3 / transform.zoom;
+          targetCtx.beginPath();
+          targetCtx.arc(x, y, radius + 4 / transform.zoom, 0, 2 * Math.PI);
+          targetCtx.stroke();
+        }
+
+        // Draw circle background
+        targetCtx.fillStyle = "#3b82f6";
+        targetCtx.beginPath();
+        targetCtx.arc(x, y, radius, 0, 2 * Math.PI);
+        targetCtx.fill();
+
+        // Draw white border
+        targetCtx.strokeStyle = "#ffffff";
+        targetCtx.lineWidth = 2 / transform.zoom;
+        targetCtx.stroke();
+
+        // Draw reference number
+        targetCtx.fillStyle = "#ffffff";
+        targetCtx.font = `bold ${fontSize}px Arial`;
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText(annotation.reference, x, y);
+
+        targetCtx.restore();
+      });
+    };
+
+    // Helper to draw tokens to a given context (with world-space transform applied)
+    const drawTokensToContext = (targetCtx: CanvasRenderingContext2D) => {
+      visibleTokens.forEach((token) => {
+        // Use temporary position if available (during region drag)
+        const tempPos = tempTokenPositions?.[token.id];
+        const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
+        
+        // Check if token is in fog (for DM visibility modes)
+        let tokenInFog = false;
+        let shouldSkipToken = false;
+        if (isPlayMode && fogEnabled && !fogRevealAll) {
+          const tokenPoint = { x: renderToken.x, y: renderToken.y };
+          const isRevealed = isPointInRevealedArea(
+            tokenPoint,
+            exploredAreaRef.current,
+            currentVisibilityRef.current
+          );
+          if (!isRevealed) {
+            if (!isDM) {
+              shouldSkipToken = true; // Non-DM can't see fog-hidden tokens
+            } else {
+              // DM visibility modes
+              if (dmFogVisibility === 'hidden') {
+                shouldSkipToken = true; // DM chose to hide fog-hidden elements
+              } else if (dmFogVisibility === 'semi-transparent') {
+                tokenInFog = true; // Show with semi-transparency
+              }
+              // 'full' mode: tokenInFog stays false, token renders normally
+            }
+          }
+        }
+        
+        if (shouldSkipToken) return;
+        
+        // Draw token - need to use drawToken with correct context
+        drawTokenToContext(targetCtx, renderToken, tokenInFog);
+      });
+    };
+
+    // Helper to draw a single token to a specific context
+    const drawTokenToContext = (targetCtx: CanvasRenderingContext2D, token: any, isInFog: boolean = false) => {
+      const baseTokenSize = 40;
+      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+      const radius = tokenSize / 2;
+      const isSelected = selectedTokenIds.includes(token.id);
+      const isHovered = hoveredTokenId === token.id;
+
+      const tokenPlayer = players.find((p) => p.id === currentPlayerId);
+      const isControllable = tokenPlayer ? canControlToken(token, tokenPlayer, roles) : false;
+      const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roles) : "neutral";
+      const isHostile = relationship === "hostile";
+      const role = roles.find((r) => r.id === token.roleId);
+      const roleBorderColor = role?.color || "#000000";
+      const currentEntry = initiativeOrder[currentTurnIndex];
+      const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
+
+      targetCtx.save();
       if (isInFog) {
-        ctx.globalAlpha = 0.4;
+        targetCtx.globalAlpha = 0.4;
       }
-      
-      const radius = 12 / transform.zoom;
-      const fontSize = 10 / transform.zoom;
-      const isSelected = selectedAnnotationId === annotation.id;
 
-      // Draw selection ring if selected
+      // Draw hostile pulsing indicator
+      if (isHostile && !isInFog) {
+        const pulseTime = Date.now() / 500;
+        const pulseIntensity = (Math.sin(pulseTime) + 1) / 2;
+        targetCtx.save();
+        targetCtx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulseIntensity * 0.4})`;
+        targetCtx.lineWidth = (5 + pulseIntensity * 2) / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius + 5, 0, 2 * Math.PI);
+        targetCtx.stroke();
+        targetCtx.restore();
+      }
+
+      // Draw active combat highlight
+      if (isActiveInCombat && !isInFog) {
+        targetCtx.save();
+        targetCtx.strokeStyle = "rgba(255, 215, 0, 0.6)";
+        targetCtx.lineWidth = 6 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius + 6, 0, 2 * Math.PI);
+        targetCtx.stroke();
+        targetCtx.strokeStyle = "rgba(255, 215, 0, 0.8)";
+        targetCtx.lineWidth = 3 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius + 3, 0, 2 * Math.PI);
+        targetCtx.stroke();
+        targetCtx.restore();
+      }
+
+      // Draw controllability hover glow
+      if (isHovered && isControllable && !isDraggingToken && !isInFog) {
+        targetCtx.save();
+        targetCtx.strokeStyle = "rgba(34, 197, 94, 0.6)";
+        targetCtx.lineWidth = 4 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius + 4, 0, 2 * Math.PI);
+        targetCtx.stroke();
+        targetCtx.restore();
+      }
+
+      // Draw selection highlight
       if (isSelected) {
-        ctx.strokeStyle = "#fbbf24";
-        ctx.lineWidth = 3 / transform.zoom;
-        ctx.beginPath();
-        ctx.arc(x, y, radius + 4 / transform.zoom, 0, 2 * Math.PI);
-        ctx.stroke();
+        targetCtx.shadowColor = "#fbbf24";
+        targetCtx.shadowBlur = 15 / transform.zoom;
+        targetCtx.strokeStyle = "#fbbf24";
+        targetCtx.lineWidth = 3 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.arc(token.x, token.y, radius + 3 / transform.zoom, 0, 2 * Math.PI);
+        targetCtx.stroke();
+        targetCtx.shadowBlur = 0;
       }
 
-      // Draw circle background
-      ctx.fillStyle = "#3b82f6";
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
-      ctx.fill();
+      // Draw main token
+      targetCtx.fillStyle = token.color || "#ffffff";
+      targetCtx.beginPath();
+      targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+      targetCtx.fill();
 
-      // Draw white border
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2 / transform.zoom;
-      ctx.stroke();
+      // Draw role border
+      targetCtx.strokeStyle = roleBorderColor;
+      targetCtx.lineWidth = 3 / transform.zoom;
+      targetCtx.stroke();
 
-      // Draw reference number
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${fontSize}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(annotation.reference, x, y);
+      // Draw token label if visible
+      if (token.labelVisibility !== 'hidden') {
+        const label = token.name || token.id.slice(0, 6);
+        const labelFontSize = 11 / transform.zoom;
+        targetCtx.font = `bold ${labelFontSize}px Arial`;
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "top";
+        
+        const labelY = token.y + radius + 6 / transform.zoom;
+        targetCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        const textMetrics = targetCtx.measureText(label);
+        const labelPadding = 3 / transform.zoom;
+        targetCtx.fillRect(
+          token.x - textMetrics.width / 2 - labelPadding,
+          labelY - labelPadding,
+          textMetrics.width + labelPadding * 2,
+          labelFontSize + labelPadding * 2
+        );
+        targetCtx.fillStyle = "#ffffff";
+        targetCtx.fillText(label, token.x, labelY);
+      }
 
-      ctx.restore();
-    });
+      targetCtx.restore();
+    };
+
+    // Determine if we should use the overlay canvas for tokens/annotations
+    const useOverlayForTokens = isPostProcessingReady && effectSettings.postProcessingEnabled && fogEnabled;
+
+    // If NOT using post-processing (or fog disabled), draw annotations and tokens to main canvas here
+    if (!useOverlayForTokens) {
+      // Draw annotations (markers) below tokens so tokens are visible
+      drawAnnotationsToContext(ctx);
+    }
 
     // Draw light sources in edit mode using new system
     if (renderingMode === "edit" && lights.length > 0) {
@@ -1917,70 +2076,57 @@ export const SimpleTabletop = () => {
       }
     }
 
-    // Draw visible tokens AFTER fog so they appear on top of darkness
-    // For DM in play mode with fog, tokens in fog appear based on dmFogVisibility setting
-    visibleTokens.forEach((token) => {
-      // Use temporary position if available (during region drag)
-      const tempPos = tempTokenPositions?.[token.id];
-      const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-      
-      // Check if token is in fog (for DM visibility modes)
-      let tokenInFog = false;
-      let shouldSkipToken = false;
-      if (isPlayMode && fogEnabled && !fogRevealAll) {
-        const tokenPoint = { x: renderToken.x, y: renderToken.y };
-        const isRevealed = isPointInRevealedArea(
-          tokenPoint,
-          exploredAreaRef.current,
-          currentVisibilityRef.current
-        );
-        if (!isRevealed) {
-          if (!isDM) {
-            shouldSkipToken = true; // Non-DM can't see fog-hidden tokens
-          } else {
-            // DM visibility modes
-            if (dmFogVisibility === 'hidden') {
-              shouldSkipToken = true; // DM chose to hide fog-hidden elements
-            } else if (dmFogVisibility === 'semi-transparent') {
-              tokenInFog = true; // Show with semi-transparency
-            }
-            // 'full' mode: tokenInFog stays false, token renders normally
-          }
-        }
-      }
-      
-      if (shouldSkipToken) return;
-      
-      drawToken(ctx, renderToken, tokenInFog);
-    });
+    // Draw visible tokens AFTER fog - but only if NOT using overlay canvas
+    // When post-processing is enabled with fog, tokens are drawn to overlay canvas to appear above PixiJS
+    if (!useOverlayForTokens) {
+      drawTokensToContext(ctx);
+    }
 
     // Restore context after all world-space rendering
     ctx.restore();
 
-    // Draw off-screen token indicators (in screen space, after restore)
-    // When post-processing is enabled, draw to overlay canvas so they appear above fog
+    // Draw off-screen token indicators and overlay content
+    // When post-processing is enabled with fog, also draw tokens/annotations to overlay canvas
     const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
     const overlayCanvas = overlayCanvasRef.current;
     
-    if (usePostProcessing && overlayCanvas) {
+    if (overlayCanvas) {
       const overlayCtx = overlayCanvas.getContext('2d');
       if (overlayCtx) {
         // Clear overlay canvas
         overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        // Draw indicators to overlay
-        offScreenTokens.forEach((token) => {
-          drawOffScreenIndicator(overlayCtx, token, viewX, viewY, viewWidth, viewHeight);
-        });
-      }
-    } else {
-      // Clear overlay canvas when not using post-processing to avoid stale content
-      if (overlayCanvas) {
-        const overlayCtx = overlayCanvas.getContext('2d');
-        if (overlayCtx) {
-          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        
+        if (usePostProcessing) {
+          // Draw off-screen indicators to overlay
+          offScreenTokens.forEach((token) => {
+            drawOffScreenIndicator(overlayCtx, token, viewX, viewY, viewWidth, viewHeight);
+          });
+          
+          // When fog is enabled with post-processing, draw tokens/annotations to overlay
+          // so they appear above the PixiJS fog layer
+          if (fogEnabled) {
+            // Apply world-space transform for tokens/annotations
+            overlayCtx.save();
+            overlayCtx.translate(transform.x, transform.y);
+            overlayCtx.scale(transform.zoom, transform.zoom);
+            
+            // Draw annotations first (below tokens)
+            drawAnnotationsToContext(overlayCtx);
+            
+            // Draw tokens on top
+            drawTokensToContext(overlayCtx);
+            
+            overlayCtx.restore();
+          }
+        } else {
+          // Not using post-processing - draw indicators to main canvas
+          offScreenTokens.forEach((token) => {
+            drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
+          });
         }
       }
-      // Draw indicators to main canvas
+    } else if (!usePostProcessing) {
+      // No overlay canvas, draw indicators to main canvas
       offScreenTokens.forEach((token) => {
         drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
       });
