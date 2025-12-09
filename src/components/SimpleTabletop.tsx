@@ -1718,9 +1718,25 @@ export const SimpleTabletop = () => {
     drawHighlightedGrids(ctx);
 
     // Draw annotations (markers) below tokens so tokens are visible
+    // In play mode with fog, only show annotations that are in revealed areas
+    const isPlayModeForAnnotations = renderingMode === 'play';
     annotations.forEach((annotation) => {
-      ctx.save();
       const { x, y } = annotation.position;
+      
+      // In play mode with fog enabled, check if annotation is in revealed area
+      if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
+        const annotationPoint = { x, y };
+        const isRevealed = isPointInRevealedArea(
+          annotationPoint,
+          exploredAreaRef.current,
+          currentVisibilityRef.current
+        );
+        if (!isRevealed) {
+          return; // Skip rendering this annotation - it's in fog
+        }
+      }
+      
+      ctx.save();
       const radius = 12 / transform.zoom;
       const fontSize = 10 / transform.zoom;
       const isSelected = selectedAnnotationId === annotation.id;
@@ -3896,11 +3912,25 @@ export const SimpleTabletop = () => {
       }
 
       // PRIORITY 1: Check for annotation clicks (markers)
+      // In play mode with fog, only allow clicking annotations in revealed areas
       const clickedAnnotation = annotations.find((ann) => {
         const dx = worldPos.x - ann.position.x;
         const dy = worldPos.y - ann.position.y;
         const radius = 12;
-        return Math.sqrt(dx * dx + dy * dy) <= radius;
+        if (Math.sqrt(dx * dx + dy * dy) > radius) return false;
+        
+        // In play mode with fog enabled, check if annotation is in revealed area
+        if (renderingMode === 'play' && fogEnabled && !fogRevealAll) {
+          const annotationPoint = { x: ann.position.x, y: ann.position.y };
+          const isRevealed = isPointInRevealedArea(
+            annotationPoint,
+            exploredAreaRef.current,
+            currentVisibilityRef.current
+          );
+          if (!isRevealed) return false;
+        }
+        
+        return true;
       });
 
       if (clickedAnnotation) {
