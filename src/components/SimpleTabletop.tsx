@@ -482,10 +482,12 @@ export const SimpleTabletop = () => {
     }
   }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion]);
 
-  // Update highlights whenever tokens or regions change
+  // Update highlights whenever tokens or regions change (but not during drag - handled separately)
   useEffect(() => {
+    // Skip during drag - updateGridHighlights handles the dragged token specifically
+    if (isDraggingToken || isDraggingRegion) return;
     updateAllTokenHighlights();
-  }, [tokens, regions]); // Re-run when tokens positions change or regions change
+  }, [tokens, regions, isDraggingToken, isDraggingRegion]); // Re-run when tokens positions change or regions change
 
   // Listen for center on token events
   useEffect(() => {
