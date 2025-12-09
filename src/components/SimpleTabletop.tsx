@@ -124,12 +124,50 @@ export const SimpleTabletop = () => {
   // Canvas dimensions for post-processing
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
-  // Pan and zoom state
-  const [transform, setTransform] = useState({
-    x: 0,
-    y: 0,
-    zoom: 1,
+  // Pan and zoom state - initialize from session store
+  const selectedMapId = useMapStore((state) => state.selectedMapId);
+  const viewportTransforms = useSessionStore((state) => state.viewportTransforms);
+  const setViewportTransform = useSessionStore((state) => state.setViewportTransform);
+  
+  const [transform, setTransformState] = useState(() => {
+    // Try to restore from session store on initial load
+    if (selectedMapId && viewportTransforms[selectedMapId]) {
+      return viewportTransforms[selectedMapId];
+    }
+    return { x: 0, y: 0, zoom: 1 };
   });
+  
+  // Wrapper that saves to session store
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const setTransform = useCallback((updater: React.SetStateAction<{ x: number; y: number; zoom: number }>) => {
+    setTransformState(prev => {
+      const newTransform = typeof updater === 'function' ? updater(prev) : updater;
+      
+      // Save to session store (throttled)
+      if (selectedMapId) {
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          setViewportTransform(selectedMapId, newTransform);
+        }, 300);
+      }
+      
+      return newTransform;
+    });
+  }, [selectedMapId, setViewportTransform]);
+  
+  // Restore transform when map changes or on hydration
+  const lastMapIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedMapId && viewportTransforms[selectedMapId]) {
+      const persisted = viewportTransforms[selectedMapId];
+      // Only restore if map changed or this is initial hydration with data
+      if (selectedMapId !== lastMapIdRef.current || 
+          (persisted.x !== 0 || persisted.y !== 0 || persisted.zoom !== 1)) {
+        lastMapIdRef.current = selectedMapId;
+        setTransformState(persisted);
+      }
+    }
+  }, [selectedMapId, viewportTransforms]);
   
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
