@@ -80,43 +80,42 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   return (
     <>
       <div 
-        className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3"
+        className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
         style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground px-2">
-            Region: {selectedRegion.regionType === 'path' ? 'Path' : 'Rectangle'}
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium text-foreground px-1.5">
+            {selectedRegion.regionType === 'path' ? 'Path' : 'Rect'}
           </span>
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 w-px bg-border" />
           
           {/* Grid Snapping */}
-          <div className="flex items-center gap-2 px-2">
-            <Grid3X3 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Snap:</span>
+          <div className="flex items-center gap-1 px-1">
+            <Grid3X3 className="h-3 w-3 text-muted-foreground" />
             <Switch
               checked={selectedRegion.gridSnapping ?? false}
               onCheckedChange={handleToggleGridSnap}
+              className="scale-75"
             />
           </div>
           
           {/* Grid Visibility */}
-          <div className="flex items-center gap-2 px-2">
+          <div className="flex items-center gap-1 px-1">
             {selectedRegion.gridVisible ? (
-              <Eye className="h-4 w-4 text-muted-foreground" />
+              <Eye className="h-3 w-3 text-muted-foreground" />
             ) : (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              <EyeOff className="h-3 w-3 text-muted-foreground" />
             )}
-            <span className="text-sm text-muted-foreground">Grid:</span>
             <Switch
               checked={selectedRegion.gridVisible ?? true}
               onCheckedChange={handleToggleGridVisible}
+              className="scale-75"
             />
           </div>
           
           {/* Grid Size */}
-          <div className="flex items-center gap-2">
-            <Label htmlFor="grid-size" className="text-sm text-muted-foreground">Size:</Label>
+          <div className="flex items-center gap-1">
             <Input
               id="grid-size"
               type="number"
@@ -124,42 +123,44 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
               onChange={(e) => setGridSizeInput(e.target.value)}
               onBlur={handleUpdateGridSize}
               onKeyDown={(e) => e.key === 'Enter' && handleUpdateGridSize()}
-              className="w-16 h-8 text-sm"
+              className="w-12 h-5 text-xs px-1"
               min={10}
               max={500}
             />
           </div>
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 w-px bg-border" />
           
           {/* Background Color */}
-          <Button variant="outline" size="sm" onClick={() => {
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => {
             setColorValue(selectedRegion.color || '#4F46E5');
             setShowColorModal(true);
           }}>
-            <Palette className="h-4 w-4 mr-2" />
+            <Palette className="h-3 w-3 mr-1" />
             Color
           </Button>
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 w-px bg-border" />
           
           {/* Delete */}
           <Button 
-            variant="destructive" 
-            size="sm" 
+            variant="ghost" 
+            size="sm"
+            className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={() => setShowDeleteModal(true)}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
+            <Trash2 className="h-3 w-3 mr-1" />
+            Del
           </Button>
           
           {/* Clear Selection */}
           <Button 
             variant="ghost" 
-            size="sm" 
+            size="sm"
+            className="h-6 px-2 text-xs"
             onClick={onClearSelection}
           >
-            Clear
+            ✕
           </Button>
         </div>
       </div>

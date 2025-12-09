@@ -55,12 +55,14 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
 
   return (
-    <Toolbar position="top">
+    <Toolbar position="top" className="gap-0.5 px-1.5 py-1">
       <ToolbarButton
         icon={MenuIcon}
         label="Menu"
         onClick={handleToggleMenu}
         isActive={menuCard?.isVisible}
+        variant="ghost"
+        size="xs"
       />
 
       <ToolbarSeparator />
@@ -70,7 +72,8 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         label={mode === 'play' ? 'Play Mode' : 'Switch to Play Mode'}
         onClick={onToggleMode}
         isActive={mode === 'play'}
-        variant={mode === 'play' ? 'active' : 'default'}
+        variant={mode === 'play' ? 'active' : 'ghost'}
+        size="xs"
         className={mode === 'play' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
       />
 
@@ -79,7 +82,8 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         label={mode === 'edit' ? 'Edit Mode' : 'Switch to Edit Mode'}
         onClick={onToggleMode}
         isActive={mode === 'edit'}
-        variant={mode === 'edit' ? 'active' : 'default'}
+        variant={mode === 'edit' ? 'active' : 'ghost'}
+        size="xs"
         className={mode === 'edit' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
       />
 
@@ -90,13 +94,16 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         label="Roster"
         onClick={handleToggleRoster}
         isActive={rosterCard?.isVisible}
+        variant="ghost"
+        size="xs"
       />
 
       <ToolbarButton
         icon={Footprints}
         label={movementLocked ? 'Unlock Movement' : 'Lock Movement'}
         onClick={() => setMovementLocked(!movementLocked)}
-        variant={movementLocked ? 'destructive' : 'default'}
+        variant={movementLocked ? 'destructive' : 'ghost'}
+        size="xs"
       />
     </Toolbar>
   );
