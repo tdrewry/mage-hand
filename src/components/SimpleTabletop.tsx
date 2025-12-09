@@ -297,6 +297,7 @@ export const SimpleTabletop = () => {
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const currentVisibilityRef = useRef<paper.Path | null>(null); // Current visibility for interaction checks
+  const stableVisibilityRef = useRef<paper.Path | null>(null); // Snapshot of visibility for stable checks during drag
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
 
   // Pre-computed fog masks (updated outside render loop)
@@ -1843,10 +1844,16 @@ export const SimpleTabletop = () => {
         if (isPlayMode && fogEnabled && !fogRevealAll) {
           const tokenPoint = { x: renderToken.x, y: renderToken.y };
           
+          // Use stable visibility snapshot during drag to prevent flashing
+          // The stable snapshot is captured at drag start and doesn't change during movement
+          const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
+            ? stableVisibilityRef.current
+            : currentVisibilityRef.current;
+          
           // Check if token is currently illuminated (in active light/vision)
           const isCurrentlyIlluminated = isPointInVisibleArea(
             tokenPoint,
-            currentVisibilityRef.current
+            visibilityToCheck
           );
           
           // Check token ownership - friendly tokens always visible to their owner
@@ -4374,6 +4381,11 @@ export const SimpleTabletop = () => {
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
         setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
         
+        // Capture stable visibility snapshot at drag start to prevent flashing
+        if (currentVisibilityRef.current) {
+          stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+        }
+        
         // Capture initial state for undo
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
@@ -4427,6 +4439,11 @@ export const SimpleTabletop = () => {
             // Start dragging the region - group tokens for smooth movement
             setIsDraggingRegion(true);
             setDraggedRegionId(clickedRegion.id);
+            
+            // Capture stable visibility snapshot at drag start to prevent flashing
+            if (currentVisibilityRef.current) {
+              stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+            }
             
             // Capture initial state for undo
             setInitialRegionState(captureRegionTransformState(clickedRegion));
@@ -4974,6 +4991,12 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
       setInitialTokenState(null);
+      
+      // Clear stable visibility snapshot after drag ends
+      if (stableVisibilityRef.current) {
+        stableVisibilityRef.current.remove();
+        stableVisibilityRef.current = null;
+      }
 
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
@@ -5079,6 +5102,12 @@ export const SimpleTabletop = () => {
 
       // Clear tokens moved by region tracking
       setTokensMovedByRegion([]);
+      
+      // Clear stable visibility snapshot after drag ends
+      if (stableVisibilityRef.current) {
+        stableVisibilityRef.current.remove();
+        stableVisibilityRef.current = null;
+      }
 
       // Redraw canvas to clear ghost token and path
       redrawCanvas();
