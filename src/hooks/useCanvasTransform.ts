@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useViewportStore } from '@/stores/viewportStore';
 
 export interface Transform {
   x: number;
@@ -7,11 +8,33 @@ export interface Transform {
 }
 
 export const useCanvasTransform = (initialZoom = 1) => {
-  const [transform, setTransform] = useState<Transform>({
-    x: 0,
-    y: 0,
-    zoom: initialZoom
+  // Load initial transform from persisted store
+  const persistedTransform = useViewportStore((state) => state.transform);
+  const setPersistedTransform = useViewportStore((state) => state.setTransform);
+  const hasInitialized = useRef(false);
+  
+  const [transform, setTransform] = useState<Transform>(() => {
+    // Use persisted transform if available, otherwise use defaults
+    if (persistedTransform.zoom !== 1 || persistedTransform.x !== 0 || persistedTransform.y !== 0) {
+      return persistedTransform;
+    }
+    return { x: 0, y: 0, zoom: initialZoom };
   });
+  
+  // Save transform to persisted store whenever it changes (throttled)
+  useEffect(() => {
+    // Skip initial render to avoid overwriting with default values
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      return;
+    }
+    
+    const timeoutId = setTimeout(() => {
+      setPersistedTransform(transform);
+    }, 500); // Throttle saves to every 500ms
+    
+    return () => clearTimeout(timeoutId);
+  }, [transform, setPersistedTransform]);
   
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
