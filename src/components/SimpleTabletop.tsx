@@ -2042,10 +2042,7 @@ export const SimpleTabletop = () => {
       ctx.restore();
     }
 
-    // Draw ghost token and drag path if dragging
-    if (isDraggingToken && draggedTokenId) {
-      drawDragGhostAndPath(ctx);
-    }
+    // NOTE: Drag ghost and path is drawn AFTER fog (see below) to ensure it appears on top
 
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
@@ -2129,6 +2126,11 @@ export const SimpleTabletop = () => {
     // When post-processing is enabled with fog, tokens are drawn to overlay canvas to appear above PixiJS
     if (!useOverlayForTokens) {
       drawTokensToContext(ctx);
+      
+      // Draw drag ghost and path on top of tokens (only for non-overlay mode)
+      if (isDraggingToken && draggedTokenId) {
+        drawDragGhostAndPath(ctx);
+      }
     }
 
     // Restore context after all world-space rendering
@@ -2164,6 +2166,11 @@ export const SimpleTabletop = () => {
             
             // Draw tokens on top
             drawTokensToContext(overlayCtx);
+            
+            // Draw drag ghost and path on overlay so it appears above fog
+            if (isDraggingToken && draggedTokenId) {
+              drawDragGhostAndPath(overlayCtx);
+            }
             
             overlayCtx.restore();
           }

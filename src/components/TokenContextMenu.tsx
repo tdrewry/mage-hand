@@ -130,6 +130,7 @@ export const TokenContextMenu = ({
   };
 
   const handleImageImportConfirm = (result: ImageImportResult) => {
+    console.log('ImageImportModal confirmed with URL:', result.imageUrl?.substring(0, 50) + '...');
     setImageUrlValue(result.imageUrl);
     // Note: scale and offset could be stored on the token if needed for texture tiling
   };
@@ -166,6 +167,7 @@ export const TokenContextMenu = ({
 
 
   const applyTokenEdit = () => {
+    console.log('Applying token edit with imageUrlValue:', imageUrlValue?.substring(0, 50) + '...');
     targetTokens.forEach(token => {
       if (nameValue) {
         updateTokenName(token.id, nameValue);
@@ -175,10 +177,9 @@ export const TokenContextMenu = ({
       }
       updateTokenLabelPosition(token.id, labelPositionValue);
       
-      // Apply image if set (or clear it if empty)
-      if (imageUrlValue !== undefined) {
-        updateTokenImage(token.id, imageUrlValue);
-      }
+      // Apply image - always update (even if empty to allow clearing)
+      updateTokenImage(token.id, imageUrlValue);
+      console.log('Updated token', token.id, 'with imageUrl:', imageUrlValue?.substring(0, 50) + '...');
     });
     setShowTokenEditModal(false);
     onUpdateCanvas?.();
