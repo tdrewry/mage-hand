@@ -11,49 +11,49 @@ export interface Transform {
 export const useCanvasTransform = (initialZoom = 1) => {
   // Get current map ID for per-map viewport persistence
   const selectedMapId = useMapStore((state) => state.selectedMapId);
-  const getTransform = useViewportStore((state) => state.getTransform);
+  const transforms = useViewportStore((state) => state.transforms);
   const setPersistedTransform = useViewportStore((state) => state.setTransform);
-  const hasInitialized = useRef(false);
-  const currentMapIdRef = useRef<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserInteracting = useRef(false);
   
-  const [transform, setTransform] = useState<Transform>(() => {
-    if (selectedMapId) {
-      const persisted = getTransform(selectedMapId);
-      if (persisted.zoom !== 1 || persisted.x !== 0 || persisted.y !== 0) {
-        return persisted;
-      }
-    }
-    return { x: 0, y: 0, zoom: initialZoom };
-  });
-  
-  // Load transform when map changes
-  useEffect(() => {
-    if (selectedMapId && selectedMapId !== currentMapIdRef.current) {
-      currentMapIdRef.current = selectedMapId;
-      const persisted = getTransform(selectedMapId);
-      setTransform(persisted);
-    }
-  }, [selectedMapId, getTransform]);
-  
-  // Save transform to persisted store whenever it changes (throttled)
-  useEffect(() => {
-    // Skip initial render to avoid overwriting with default values
-    if (!hasInitialized.current) {
-      hasInitialized.current = true;
-      return;
-    }
-    
-    if (!selectedMapId) return;
-    
-    const timeoutId = setTimeout(() => {
-      setPersistedTransform(selectedMapId, transform);
-    }, 500); // Throttle saves to every 500ms
-    
-    return () => clearTimeout(timeoutId);
-  }, [transform, selectedMapId, setPersistedTransform]);
+  const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, zoom: initialZoom });
   
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+
+  // Restore transform from persisted store when map changes or on initial hydration
+  useEffect(() => {
+    // Don't restore if user is actively interacting (panning/zooming)
+    if (isUserInteracting.current) return;
+    
+    if (selectedMapId && transforms[selectedMapId]) {
+      const persisted = transforms[selectedMapId];
+      setTransform(persisted);
+    }
+  }, [selectedMapId, transforms]);
+  
+  // Save transform to persisted store whenever it changes (throttled)
+  const saveTransform = useCallback((newTransform: Transform) => {
+    if (!selectedMapId) return;
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      setPersistedTransform(selectedMapId, newTransform);
+      saveTimeoutRef.current = null;
+    }, 300);
+  }, [selectedMapId, setPersistedTransform]);
+
+  // Wrapper for setTransform that also saves
+  const setTransformAndSave = useCallback((updater: Transform | ((prev: Transform) => Transform)) => {
+    setTransform(prev => {
+      const newTransform = typeof updater === 'function' ? updater(prev) : updater;
+      saveTransform(newTransform);
+      return newTransform;
+    });
+  }, [saveTransform]);
 
   const screenToWorld = useCallback((screenX: number, screenY: number) => {
     return {
@@ -70,6 +70,7 @@ export const useCanvasTransform = (initialZoom = 1) => {
   }, [transform]);
 
   const startPan = useCallback((x: number, y: number) => {
+    isUserInteracting.current = true;
     setIsPanning(true);
     setLastPanPoint({ x, y });
   }, []);
@@ -80,21 +81,26 @@ export const useCanvasTransform = (initialZoom = 1) => {
     const dx = x - lastPanPoint.x;
     const dy = y - lastPanPoint.y;
     
-    setTransform(prev => ({
+    setTransformAndSave(prev => ({
       ...prev,
       x: prev.x + dx,
       y: prev.y + dy
     }));
     
     setLastPanPoint({ x, y });
-  }, [isPanning, lastPanPoint]);
+  }, [isPanning, lastPanPoint, setTransformAndSave]);
 
   const endPan = useCallback(() => {
     setIsPanning(false);
+    // Delay resetting interaction flag to allow save to complete
+    setTimeout(() => {
+      isUserInteracting.current = false;
+    }, 400);
   }, []);
 
   const zoom = useCallback((delta: number, centerX: number, centerY: number) => {
-    setTransform(prev => {
+    isUserInteracting.current = true;
+    setTransformAndSave(prev => {
       const zoomFactor = delta > 0 ? 1.1 : 0.9;
       const newZoom = Math.max(0.1, Math.min(5, prev.zoom * zoomFactor));
       
@@ -108,11 +114,16 @@ export const useCanvasTransform = (initialZoom = 1) => {
         zoom: newZoom
       };
     });
-  }, []);
+    // Delay resetting interaction flag
+    setTimeout(() => {
+      isUserInteracting.current = false;
+    }, 400);
+  }, [setTransformAndSave]);
 
   // Keyboard zoom with + and - keys (zooms toward center of viewport)
   const zoomByKey = useCallback((zoomIn: boolean) => {
-    setTransform(prev => {
+    isUserInteracting.current = true;
+    setTransformAndSave(prev => {
       const zoomFactor = zoomIn ? 1.15 : 0.87;
       const newZoom = Math.max(0.1, Math.min(5, prev.zoom * zoomFactor));
       
@@ -129,7 +140,10 @@ export const useCanvasTransform = (initialZoom = 1) => {
         zoom: newZoom
       };
     });
-  }, []);
+    setTimeout(() => {
+      isUserInteracting.current = false;
+    }, 400);
+  }, [setTransformAndSave]);
 
   // Listen for + and - key presses
   useEffect(() => {
@@ -156,16 +170,16 @@ export const useCanvasTransform = (initialZoom = 1) => {
   }, [zoomByKey]);
 
   const centerOn = useCallback((worldX: number, worldY: number, canvasWidth: number, canvasHeight: number) => {
-    setTransform(prev => ({
+    setTransformAndSave(prev => ({
       x: canvasWidth / 2 - worldX * prev.zoom,
       y: canvasHeight / 2 - worldY * prev.zoom,
       zoom: prev.zoom
     }));
-  }, []);
+  }, [setTransformAndSave]);
 
   return {
     transform,
-    setTransform,
+    setTransform: setTransformAndSave,
     isPanning,
     screenToWorld,
     worldToScreen,
