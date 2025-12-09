@@ -4,7 +4,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useFogStore, type EffectQuality } from '@/stores/fogStore';
 import { useLightStore } from '@/stores/lightStore';
-import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle } from 'lucide-react';
+import { useUiModeStore, type DmFogVisibility } from '@/stores/uiModeStore';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle, Ghost } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
@@ -14,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 export function FogControlCardContent() {
   const {
@@ -39,6 +41,8 @@ export function FogControlCardContent() {
 
   const { lights } = useLightStore();
   const enabledLightsCount = lights.filter(l => l.enabled).length;
+  
+  const { dmFogVisibility, setDmFogVisibility } = useUiModeStore();
 
   return (
     <div className="space-y-4">
@@ -82,6 +86,36 @@ export function FogControlCardContent() {
           onCheckedChange={setRevealAll}
           disabled={!enabled}
         />
+      </div>
+
+      <Separator />
+
+      {/* DM Fog-Hidden Element Visibility */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <Ghost className="h-3 w-3" />
+          DM Hidden Element View
+        </Label>
+        <p className="text-xs text-muted-foreground mb-2">
+          How fog-hidden tokens/annotations appear to DM
+        </p>
+        <ToggleGroup
+          type="single"
+          value={dmFogVisibility}
+          onValueChange={(value) => value && setDmFogVisibility(value as DmFogVisibility)}
+          className="justify-start"
+          disabled={!enabled}
+        >
+          <ToggleGroupItem value="hidden" aria-label="Hidden" className="text-xs px-3">
+            Hidden
+          </ToggleGroupItem>
+          <ToggleGroupItem value="semi-transparent" aria-label="Semi-Transparent" className="text-xs px-3">
+            Faded
+          </ToggleGroupItem>
+          <ToggleGroupItem value="full" aria-label="Full Visibility" className="text-xs px-3">
+            Full
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       <Separator />
