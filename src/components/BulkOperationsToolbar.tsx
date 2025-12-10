@@ -174,7 +174,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   return (
     <>
       <div 
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
         style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
       >
         <div className="flex items-center gap-1">
