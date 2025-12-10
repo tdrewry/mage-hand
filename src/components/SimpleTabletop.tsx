@@ -319,7 +319,7 @@ export const SimpleTabletop = () => {
   
   // Real-time vision preview during drag
   const dragPreviewVisibilityRef = useRef<Path2D | null>(null);
-  const dragPreviewPositionRef = useRef<{ x: number; y: number; range: number } | null>(null);
+  const [dragPreviewPosition, setDragPreviewPosition] = useState<{ x: number; y: number; range: number } | null>(null);
 
   // Pre-computed fog masks (updated outside render loop)
   const fogMasksRef = useRef<{
@@ -489,7 +489,7 @@ export const SimpleTabletop = () => {
           setTempTokenPositions(undefined);
           // Clear real-time vision preview
           dragPreviewVisibilityRef.current = null;
-          dragPreviewPositionRef.current = null;
+          setDragPreviewPosition(null);
         }
         if (isDraggingRegion) {
           setIsDraggingRegion(false);
@@ -2272,7 +2272,7 @@ export const SimpleTabletop = () => {
         });
         
         // Add real-time drag preview as an additional illumination source
-        if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && dragPreviewPositionRef.current && draggedTokenId) {
+        if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && dragPreviewPosition && draggedTokenId) {
           const draggedToken = tokens.find(t => t.id === draggedTokenId);
           if (draggedToken) {
             const tokenSettings = draggedToken.illuminationSources?.[0];
@@ -2282,10 +2282,10 @@ export const SimpleTabletop = () => {
               name: 'Drag Preview',
               enabled: true,
               position: {
-                x: dragPreviewPositionRef.current.x,
-                y: dragPreviewPositionRef.current.y,
+                x: dragPreviewPosition.x,
+                y: dragPreviewPosition.y,
               },
-              range: dragPreviewPositionRef.current.range,
+              range: dragPreviewPosition.range,
               brightZone: tokenSettings?.brightZone ?? effectSettings.lightFalloff,
               brightIntensity: tokenSettings?.brightIntensity ?? 1.0,
               dimIntensity: tokenSettings?.dimIntensity ?? 0.0,
@@ -4837,8 +4837,8 @@ export const SimpleTabletop = () => {
             const tokenCenterX = newX + (draggedToken.gridWidth || 1) * gridSize / 2;
             const tokenCenterY = newY + (draggedToken.gridHeight || 1) * gridSize / 2;
             
-            // Store the position for rendering (post-processing path needs this)
-            dragPreviewPositionRef.current = { x: tokenCenterX, y: tokenCenterY, range: tokenVisionRange };
+            // Store the position for rendering (post-processing path needs this) - use state to trigger re-render
+            setDragPreviewPosition({ x: tokenCenterX, y: tokenCenterY, range: tokenVisionRange });
             
             // Get wall segments, default to empty array if not available
             const wallSegments = wallGeometryRef.current?.wallSegments ?? [];
