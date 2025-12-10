@@ -251,4 +251,11 @@ export class SocketClient {
   getSocketId(): string | undefined {
     return this.socket?.id;
   }
+
+  /**
+   * Get raw socket instance (for patch transport integration)
+   */
+  getSocket(): typeof this.socket {
+    return this.socket;
+  }
 }
