@@ -28,10 +28,10 @@ export const TurnCard: React.FC<TurnCardProps> = ({
         "relative flex flex-row items-center gap-3 rounded-lg border-2 border-primary bg-primary/10",
         isCompact ? "p-2" : "p-3"
       )}
-      style={size ? { 
-        minWidth: `${size}px`,
-        width: `${size}px`
-      } : { minWidth: '120px' }}
+      style={{ 
+        width: '85px',
+        minWidth: '85px'
+      }}
     >
       {onResetRound && (
         <Button
