@@ -5,7 +5,7 @@ import { TurnCard } from '@/components/TurnCard';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
 
@@ -100,20 +100,20 @@ export function InitiativeTrackerCardContent() {
   };
 
   return (
-    <div className="flex items-end gap-1.5 p-1.5">
+    <div className="flex flex-col items-center gap-1.5 p-1.5">
       <Button
         variant="ghost"
         size="icon"
         onClick={previousTurn}
         disabled={currentTurnIndex === 0 && roundNumber === 1}
-        className="shrink-0 h-7 w-7 self-center"
+        className="shrink-0 h-7 w-7"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronUp className="h-4 w-4" />
       </Button>
 
       <div 
         ref={scrollContainerRef}
-        className="flex items-end gap-1.5 overflow-x-auto flex-1 pb-2"
+        className="flex flex-col items-center gap-1.5 overflow-y-auto flex-1 px-2"
       >
         <TurnCard
           turnNumber={currentTurnIndex + 1}
@@ -166,9 +166,9 @@ export function InitiativeTrackerCardContent() {
         variant="default"
         size="icon"
         onClick={handleNextTurn}
-        className="shrink-0 h-7 w-7 self-center"
+        className="shrink-0 h-7 w-7"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronDown className="h-4 w-4" />
       </Button>
     </div>
   );
