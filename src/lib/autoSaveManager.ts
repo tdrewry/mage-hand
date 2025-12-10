@@ -164,6 +164,8 @@ export class AutoSaveManager {
           showExploredAreas: fogState.showExploredAreas,
           serializedExploredAreas: fogState.serializedExploredAreas,
           fogVersion: fogState.fogVersion,
+          realtimeVisionDuringDrag: fogState.realtimeVisionDuringDrag,
+          realtimeVisionThrottleMs: fogState.realtimeVisionThrottleMs,
           effectSettings: fogState.effectSettings,
         },
         lights: lightState.lights,
