@@ -22,6 +22,10 @@ export interface FogSettings {
   serializedExploredAreas: string; // Paper.js JSON serialized explored geometry
   fogVersion: number; // Schema version for migration
   
+  // Real-time vision during drag feature flag
+  realtimeVisionDuringDrag: boolean;
+  realtimeVisionThrottleMs: number; // Throttle interval in ms (16-100)
+  
   // Post-processing effect settings
   effectSettings: FogEffectSettings;
 }
@@ -37,6 +41,10 @@ interface FogState extends FogSettings {
   setSerializedExploredAreas: (data: string) => void;
   clearExploredAreas: () => void;
   resetFog: () => void;
+  
+  // Real-time vision during drag actions
+  setRealtimeVisionDuringDrag: (enabled: boolean) => void;
+  setRealtimeVisionThrottleMs: (ms: number) => void;
   
   // Post-processing effect actions
   setPostProcessingEnabled: (enabled: boolean) => void;
@@ -59,6 +67,10 @@ export const useFogStore = create<FogState>()(
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
+      
+      // Real-time vision during drag (feature flag - disabled by default)
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32, // ~30fps default
       
       // Post-processing effect settings
       effectSettings: {
@@ -155,6 +167,8 @@ export const useFogStore = create<FogState>()(
           showExploredAreas: true,
           serializedExploredAreas: '',
           fogVersion: 1,
+          realtimeVisionDuringDrag: false,
+          realtimeVisionThrottleMs: 32,
           effectSettings: {
             postProcessingEnabled: false,
             edgeBlur: 8,
@@ -163,6 +177,15 @@ export const useFogStore = create<FogState>()(
             effectQuality: 'balanced' as EffectQuality,
           },
         });
+      },
+      
+      // Real-time vision during drag actions
+      setRealtimeVisionDuringDrag: (enabled) => {
+        set({ realtimeVisionDuringDrag: enabled });
+      },
+      setRealtimeVisionThrottleMs: (ms) => {
+        const clampedMs = Math.max(16, Math.min(100, ms));
+        set({ realtimeVisionThrottleMs: clampedMs });
       },
       
       // Post-processing effect actions
@@ -210,6 +233,8 @@ export const useFogStore = create<FogState>()(
         showExploredAreas: state.showExploredAreas,
         serializedExploredAreas: state.serializedExploredAreas,
         fogVersion: state.fogVersion,
+        realtimeVisionDuringDrag: state.realtimeVisionDuringDrag,
+        realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,
         effectSettings: state.effectSettings,
       }),
     }

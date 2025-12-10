@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useFogStore, type EffectQuality } from '@/stores/fogStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useUiModeStore, type DmFogVisibility } from '@/stores/uiModeStore';
-import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle, Ghost } from 'lucide-react';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle, Ghost, Move } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
@@ -25,11 +25,15 @@ export function FogControlCardContent() {
     fogOpacity,
     exploredOpacity,
     effectSettings,
+    realtimeVisionDuringDrag,
+    realtimeVisionThrottleMs,
     setEnabled,
     setRevealAll,
     setVisionRange,
     setFogOpacity,
     setExploredOpacity,
+    setRealtimeVisionDuringDrag,
+    setRealtimeVisionThrottleMs,
     setPostProcessingEnabled,
     setEdgeBlur,
     setLightFalloff,
@@ -142,6 +146,53 @@ export function FogControlCardContent() {
         <p className="text-xs text-muted-foreground">
           How far tokens can see through fog
         </p>
+      </div>
+
+      <Separator />
+
+      {/* Real-time Vision During Drag */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="realtime-vision" className="text-sm font-medium flex items-center gap-2">
+              <Move className="h-3 w-3" />
+              Live Vision Preview
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Update lighting while dragging tokens
+            </p>
+          </div>
+          <Switch
+            id="realtime-vision"
+            checked={realtimeVisionDuringDrag}
+            onCheckedChange={setRealtimeVisionDuringDrag}
+            disabled={!enabled}
+          />
+        </div>
+        
+        {realtimeVisionDuringDrag && (
+          <div className="space-y-2 pl-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="throttle-ms" className="text-xs font-medium">
+                Update Rate
+              </Label>
+              <span className="text-xs font-medium">{Math.round(1000 / realtimeVisionThrottleMs)} fps</span>
+            </div>
+            <Slider
+              id="throttle-ms"
+              min={16}
+              max={100}
+              step={1}
+              value={[realtimeVisionThrottleMs]}
+              onValueChange={([value]) => setRealtimeVisionThrottleMs(value)}
+              disabled={!enabled}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Lower = smoother but more CPU intensive
+            </p>
+          </div>
+        )}
       </div>
 
       <Separator />

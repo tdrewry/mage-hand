@@ -59,7 +59,8 @@ import { simplifyPath } from "../utils/pathSimplification";
 import { generateBezierControlPoints, getBezierBounds } from "../utils/bezierUtils";
 import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged } from "../lib/lightSystem";
 import { useLightStore } from "../stores/lightStore";
-import { clearVisibilityCache } from "../lib/visibilityEngine";
+import { clearVisibilityCache, computeVisibilityFromSegments, visibilityPolygonToPath2D } from "../lib/visibilityEngine";
+import { throttle } from "../lib/throttle";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
 import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
@@ -275,6 +276,8 @@ export const SimpleTabletop = () => {
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
     effectSettings,
+    realtimeVisionDuringDrag,
+    realtimeVisionThrottleMs,
   } = useFogStore();
   
   // Post-processing hook for fog effects
@@ -313,6 +316,9 @@ export const SimpleTabletop = () => {
   const currentVisibilityRef = useRef<paper.Path | null>(null); // Current visibility for interaction checks
   const stableVisibilityRef = useRef<paper.Path | null>(null); // Snapshot of visibility for stable checks during drag
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
+  
+  // Real-time vision preview during drag
+  const dragPreviewVisibilityRef = useRef<Path2D | null>(null);
 
   // Pre-computed fog masks (updated outside render loop)
   const fogMasksRef = useRef<{
@@ -480,6 +486,8 @@ export const SimpleTabletop = () => {
           setDragPath([]);
           setGroupedTokens([]);
           setTempTokenPositions(undefined);
+          // Clear real-time vision preview
+          dragPreviewVisibilityRef.current = null;
         }
         if (isDraggingRegion) {
           setIsDraggingRegion(false);
@@ -4743,6 +4751,42 @@ export const SimpleTabletop = () => {
 
       // Update token position in store
       updateTokenPosition(draggedTokenId, newX, newY);
+
+      // Real-time vision preview during drag (if enabled)
+      if (realtimeVisionDuringDrag && fogEnabled && !fogRevealAll && wallGeometryRef.current) {
+        const draggedToken = tokens.find((t) => t.id === draggedTokenId);
+        if (draggedToken && draggedToken.hasVision !== false) {
+          // Compute vision range in pixels - use base token size
+          const baseTokenSize = 40;
+          const tokenVisionRange = draggedToken.illuminationSources?.[0]?.range || 
+            (draggedToken.visionRange ?? fogVisionRange) * baseTokenSize;
+          
+          // Throttled visibility computation
+          const now = Date.now();
+          const lastUpdateKey = 'lastVisionUpdate';
+          const lastUpdate = (window as any)[lastUpdateKey] || 0;
+          
+          if (now - lastUpdate >= realtimeVisionThrottleMs) {
+            (window as any)[lastUpdateKey] = now;
+            
+            // Compute visibility for the dragged token at its new position
+            const baseTokenSize = 40;
+            const tokenCenterX = newX + (draggedToken.gridWidth || 1) * baseTokenSize / 2;
+            const tokenCenterY = newY + (draggedToken.gridHeight || 1) * baseTokenSize / 2;
+            
+            try {
+              const visibility = computeVisibilityFromSegments(
+                { x: tokenCenterX, y: tokenCenterY },
+                wallGeometryRef.current.wallSegments,
+                tokenVisionRange
+              );
+              dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
+            } catch (e) {
+              // Silently fail - will just not show preview
+            }
+          }
+        }
+      }
 
       // Force immediate redraw for smooth dragging feedback
       redrawCanvas();

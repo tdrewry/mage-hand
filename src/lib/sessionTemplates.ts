@@ -121,6 +121,8 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
@@ -259,6 +261,8 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
@@ -348,6 +352,8 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: false,
       serializedExploredAreas: '',
       fogVersion: 1,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
@@ -454,6 +460,8 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: false,
       serializedExploredAreas: '',
       fogVersion: 1,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
