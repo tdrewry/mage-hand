@@ -68,6 +68,11 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(TOKEN_MAPPINGS_STORE)) {
         db.createObjectStore(TOKEN_MAPPINGS_STORE, { keyPath: 'tokenId' });
       }
+
+      // Store for region-to-texture mappings (ensure it exists for shared DB)
+      if (!db.objectStoreNames.contains('region-mappings')) {
+        db.createObjectStore('region-mappings', { keyPath: 'regionId' });
+      }
     };
   });
 }
