@@ -4806,10 +4806,21 @@ export const SimpleTabletop = () => {
         console.log('[DRAG VISION] Found token:', draggedToken?.name, 'hasVision:', draggedToken?.hasVision);
         
         if (draggedToken && draggedToken.hasVision !== false) {
-          // Compute vision range in pixels - use base token size
-          const baseTokenSize = 40;
-          const tokenVisionRange = draggedToken.illuminationSources?.[0]?.range || 
-            (draggedToken.visionRange ?? fogVisionRange) * baseTokenSize;
+          // Compute vision range in pixels
+          // Illumination source range is already in pixels
+          // Token visionRange and fogVisionRange are in grid units - need conversion
+          const gridSize = 40; // Default grid unit size
+          const illuminationRange = draggedToken.illuminationSources?.[0]?.range;
+          const gridBasedRange = (draggedToken.visionRange ?? fogVisionRange) * gridSize;
+          const tokenVisionRange = illuminationRange || gridBasedRange;
+          
+          console.log('[DRAG VISION] Range calculation:', {
+            illuminationRange,
+            gridBasedRange,
+            finalRange: tokenVisionRange,
+            gridSize,
+            fogVisionRange
+          });
           
           // Throttled visibility computation
           const now = Date.now();
@@ -4820,8 +4831,8 @@ export const SimpleTabletop = () => {
             (window as any)[lastUpdateKey] = now;
             
             // Compute visibility for the dragged token at its new position
-            const tokenCenterX = newX + (draggedToken.gridWidth || 1) * baseTokenSize / 2;
-            const tokenCenterY = newY + (draggedToken.gridHeight || 1) * baseTokenSize / 2;
+            const tokenCenterX = newX + (draggedToken.gridWidth || 1) * gridSize / 2;
+            const tokenCenterY = newY + (draggedToken.gridHeight || 1) * gridSize / 2;
             
             // Get wall segments, default to empty array if not available
             const wallSegments = wallGeometryRef.current?.wallSegments ?? [];
