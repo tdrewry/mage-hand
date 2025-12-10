@@ -101,46 +101,45 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           </div>
         )}
 
-        {/* Content overlay */}
-        <div className="relative z-10 p-1.5 flex items-end justify-between gap-1">
-          {/* Token Name */}
+        {/* Initiative Number - Upper right corner */}
+        <div 
+          className="absolute -top-1 -right-1 bg-background/90 border border-primary rounded-full min-w-[20px] h-[20px] flex items-center justify-center z-10"
+          style={{ fontSize: `${initFontSize}px` }}
+        >
+          {isEditingInitiative && !isCompact ? (
+            <Input
+              type="number"
+              value={initiativeValue}
+              onChange={(e) => setInitiativeValue(e.target.value)}
+              onBlur={handleInitiativeSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleInitiativeSubmit();
+                if (e.key === 'Escape') setIsEditingInitiative(false);
+              }}
+              className="w-8 h-5 text-center text-sm font-bold p-0 border-0"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isCompact) setIsEditingInitiative(true);
+              }}
+              className="font-bold text-primary cursor-pointer hover:text-primary/80 px-1"
+            >
+              {initiative}
+            </span>
+          )}
+        </div>
+
+        {/* Token Name - Bottom */}
+        <div className="relative z-10 p-1.5">
           <div 
-            className="font-medium text-white truncate flex-1 leading-tight drop-shadow-md"
+            className="font-medium text-white truncate leading-tight drop-shadow-md"
             style={{ fontSize: `${fontSize}px` }}
           >
             {token.label || token.name}
-          </div>
-
-          {/* Initiative Number */}
-          <div 
-            className="bg-background/90 border border-primary rounded-full min-w-[20px] h-[20px] flex items-center justify-center shrink-0"
-            style={{ fontSize: `${initFontSize}px` }}
-          >
-            {isEditingInitiative && !isCompact ? (
-              <Input
-                type="number"
-                value={initiativeValue}
-                onChange={(e) => setInitiativeValue(e.target.value)}
-                onBlur={handleInitiativeSubmit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleInitiativeSubmit();
-                  if (e.key === 'Escape') setIsEditingInitiative(false);
-                }}
-                className="w-8 h-5 text-center text-sm font-bold p-0 border-0"
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isCompact) setIsEditingInitiative(true);
-                }}
-                className="font-bold text-primary cursor-pointer hover:text-primary/80 px-1"
-              >
-                {initiative}
-              </span>
-            )}
           </div>
         </div>
 
