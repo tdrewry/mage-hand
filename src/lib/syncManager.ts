@@ -2,6 +2,7 @@
 import { SocketClient } from './socketClient';
 import { throttle } from './throttle';
 import { messageIdManager } from './messageIdManager';
+import { patchTransport } from './sync/patchTransport';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -84,6 +85,12 @@ class SyncManager {
     }
 
     await this.socketClient.connect();
+    
+    // Initialize patch transport with socket for JSON Patch sync
+    const socket = this.socketClient.getSocket();
+    if (socket) {
+      patchTransport.setSocket(socket);
+    }
   }
 
   /**
@@ -140,6 +147,7 @@ class SyncManager {
    * Disconnect from server
    */
   disconnect(): void {
+    patchTransport.clearSocket();
     this.socketClient?.disconnect();
     useMultiplayerStore.getState().reset();
   }
