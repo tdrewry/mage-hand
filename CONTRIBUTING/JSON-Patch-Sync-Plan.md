@@ -79,6 +79,8 @@ Migrated stores:
 - [x] Removed throttledSyncTokenPosition
 - [x] Removed manual sync calls from illuminationStore
 - [x] Updated handleSessionJoined to use JSON Patch middleware
+- [x] Removed legacy server event handlers (sync_token, sync_initiative, sync_fog, sync_map, sync_region, sync_light)
+- [x] Updated MULTIPLAYER_SERVER_BUNDLE.txt to use only sync:patch for state synchronization
 
 ## Integration with syncManager
 
