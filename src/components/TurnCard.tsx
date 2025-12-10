@@ -46,7 +46,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
       )}
       <Swords 
         className="text-primary shrink-0" 
-        size={Math.max(24, imageSize * 0.6)}
+        size={18}
       />
       <div className="flex flex-col whitespace-nowrap">
         <div 
