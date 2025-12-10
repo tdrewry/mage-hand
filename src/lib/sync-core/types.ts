@@ -1,6 +1,8 @@
 /**
- * JSON Patch Sync Types
- * RFC 6902 compliant JSON Patch types and sync middleware configuration
+ * Sync-Core Types
+ * Generic JSON Patch (RFC 6902) synchronization types
+ * 
+ * This library is designed to be framework-agnostic and reusable across projects.
  */
 
 import type { Operation } from 'fast-json-patch';
@@ -46,18 +48,32 @@ export interface SyncMiddlewareConfig {
 
 /**
  * Transport adapter interface for pluggable transports
+ * Implement this interface for Socket.io, WebSocket, gRPC, etc.
  */
 export interface TransportAdapter {
   /** Send patches to other clients */
   send(payload: SyncPatchPayload): void;
-  /** Subscribe to incoming patches */
+  /** Subscribe to incoming patches for a channel */
   subscribe(channel: string, handler: (payload: SyncPatchPayload) => void): void;
   /** Unsubscribe from incoming patches */
   unsubscribe(channel: string): void;
-  /** Check if connected */
+  /** Check if transport is connected */
   isConnected(): boolean;
   /** Get current user ID */
   getUserId(): string | undefined;
+}
+
+/**
+ * Message deduplication interface
+ * Implement this for custom deduplication strategies
+ */
+export interface DeduplicationAdapter {
+  /** Generate a unique message ID */
+  generateMessageId(userId: string): string;
+  /** Check if a message should be processed (not a duplicate) */
+  shouldProcess(messageId: string): boolean;
+  /** Mark a message as processed */
+  markProcessed(messageId: string): void;
 }
 
 /**
@@ -90,4 +106,14 @@ export interface SyncEvent {
   channel?: string;
   payload?: unknown;
   error?: Error;
+}
+
+/**
+ * Options for creating a sync patch middleware instance
+ */
+export interface CreateSyncPatchOptions {
+  /** Transport adapter for sending/receiving patches */
+  transport: TransportAdapter;
+  /** Deduplication adapter (optional, uses built-in if not provided) */
+  deduplication?: DeduplicationAdapter;
 }

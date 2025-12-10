@@ -7,11 +7,18 @@ Zustand middleware that automatically captures state changes, generates JSON Pat
 
 ## Files Created
 
-### Core Infrastructure (`src/lib/sync/`)
-- `types.ts` - Type definitions (JsonPatchOperation, SyncPatchPayload, SyncMiddlewareConfig, TransportAdapter)
-- `patchTransport.ts` - Socket.io transport adapter (sends/receives patches, deduplication)
-- `syncPatchMiddleware.ts` - Zustand middleware factory (wraps set(), generates patches, applies remote patches)
-- `index.ts` - Barrel export
+### Reusable Core Library (`src/lib/sync-core/`)
+- `types.ts` - Generic type definitions (JsonPatchOperation, SyncPatchPayload, TransportAdapter, DeduplicationAdapter)
+- `deduplication.ts` - Built-in TTL-based message deduplication
+- `middleware.ts` - Zustand middleware factory with dependency injection
+- `transports/base.ts` - Abstract base class for transport adapters
+- `transports/socketio.ts` - Socket.io transport implementation
+- `transports/index.ts` - Transport barrel exports
+- `index.ts` - Library barrel export
+- `README.md` - Documentation and usage examples
+
+### Project Integration (`src/lib/sync/`)
+- `index.ts` - Project-specific bindings (wraps sync-core with messageIdManager and multiplayerStore)
 
 ### Dependencies Added
 - `fast-json-patch` - RFC 6902 compliant JSON Patch library
