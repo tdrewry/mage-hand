@@ -172,6 +172,20 @@ export const TokenContextMenu = ({
   const applyTokenEdit = async () => {
     console.log('Applying token edit with imageUrlValue:', imageUrlValue?.substring(0, 50) + '...');
     
+    // Calculate max token size for compression
+    let maxTokenWidth = 0;
+    let maxTokenHeight = 0;
+    targetTokens.forEach(token => {
+      // Token size in pixels (gridWidth * gridSize approximation - use 50px per grid unit as reasonable default)
+      const tokenPixelWidth = token.gridWidth * 50;
+      const tokenPixelHeight = token.gridHeight * 50;
+      maxTokenWidth = Math.max(maxTokenWidth, tokenPixelWidth);
+      maxTokenHeight = Math.max(maxTokenHeight, tokenPixelHeight);
+    });
+    // Minimum reasonable size for tokens
+    maxTokenWidth = Math.max(maxTokenWidth, 128);
+    maxTokenHeight = Math.max(maxTokenHeight, 128);
+    
     for (const token of targetTokens) {
       if (nameValue) {
         updateTokenName(token.id, nameValue);
@@ -186,8 +200,8 @@ export const TokenContextMenu = ({
         try {
           // Save to IndexedDB and get hash
           const hash = await saveTokenTexture(token.id, imageUrlValue);
-          // Upload to server for multiplayer sync
-          await uploadTexture(hash, imageUrlValue);
+          // Upload to server for multiplayer sync with compression
+          await uploadTexture(hash, imageUrlValue, maxTokenWidth, maxTokenHeight);
           // Update token with both imageUrl and hash
           updateTokenImage(token.id, imageUrlValue, hash);
           console.log('Updated token', token.id, 'with imageUrl and hash:', hash);

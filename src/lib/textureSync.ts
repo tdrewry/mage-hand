@@ -4,6 +4,8 @@
  */
 
 import { patchTransport } from '@/lib/sync';
+import { compressTexture, updateTextureMaxSize, type CompressionResult } from './textureCompression';
+import { hashImageData } from './textureStorage';
 
 // Pending texture requests to avoid duplicates
 const pendingRequests = new Map<string, Promise<string | null>>();
@@ -11,28 +13,80 @@ const pendingRequests = new Map<string, Promise<string | null>>();
 // Local texture lookup (hash -> dataUrl) - populated from IndexedDB
 const localTextureCache = new Map<string, string>();
 
+// Track which hashes have been uploaded with their compression info
+const uploadedTextures = new Map<string, { width: number; height: number; size: number }>();
+
 /**
  * Upload a texture to the server for other clients to access
+ * @param hash - The texture hash (before compression - identifies the original image)
+ * @param dataUrl - The original image data URL
+ * @param usageWidth - Width the texture will be displayed at
+ * @param usageHeight - Height the texture will be displayed at
  */
-export async function uploadTexture(hash: string, dataUrl: string): Promise<void> {
+export async function uploadTexture(
+  hash: string, 
+  dataUrl: string,
+  usageWidth?: number,
+  usageHeight?: number
+): Promise<void> {
   const socket = patchTransport.getSocket();
   if (!socket) {
     console.warn('[TextureSync] No socket connection, skipping upload');
     return;
   }
 
-  // Cache locally
+  // Default usage size if not provided
+  const width = usageWidth || 512;
+  const height = usageHeight || 512;
+
+  // Check if we need to re-upload at higher resolution
+  const existingUpload = uploadedTextures.get(hash);
+  const sizeIncreased = updateTextureMaxSize(hash, width, height);
+  
+  if (existingUpload && !sizeIncreased) {
+    // Already uploaded at sufficient resolution
+    console.log(`[TextureSync] Texture ${hash} already uploaded at sufficient resolution`);
+    return;
+  }
+
+  // Compress based on usage size
+  let uploadData = dataUrl;
+  let compressionResult: CompressionResult | null = null;
+  
+  try {
+    compressionResult = await compressTexture(dataUrl, width, height);
+    uploadData = compressionResult.dataUrl;
+    
+    if (compressionResult.compressionRatio > 1) {
+      console.log(
+        `[TextureSync] Compressed texture: ${(compressionResult.originalSize / 1024).toFixed(1)}KB → ${(compressionResult.compressedSize / 1024).toFixed(1)}KB ` +
+        `(${compressionResult.compressionRatio.toFixed(1)}x, ${compressionResult.width}x${compressionResult.height})`
+      );
+    }
+  } catch (error) {
+    console.warn('[TextureSync] Compression failed, using original:', error);
+  }
+
+  // Cache locally (original for local rendering)
   localTextureCache.set(hash, dataUrl);
 
-  // Send to server
+  // Send compressed version to server
   socket.emit('texture:upload', {
     hash,
-    dataUrl,
-    size: dataUrl.length,
-    timestamp: Date.now()
+    dataUrl: uploadData,
+    size: uploadData.length,
+    timestamp: Date.now(),
+    dimensions: compressionResult ? { width: compressionResult.width, height: compressionResult.height } : undefined
   });
 
-  console.log(`[TextureSync] Uploaded texture: ${hash} (${(dataUrl.length / 1024).toFixed(1)}KB)`);
+  // Track upload
+  uploadedTextures.set(hash, {
+    width: compressionResult?.width || width,
+    height: compressionResult?.height || height,
+    size: uploadData.length
+  });
+
+  console.log(`[TextureSync] Uploaded texture: ${hash} (${(uploadData.length / 1024).toFixed(1)}KB)`);
 }
 
 /**

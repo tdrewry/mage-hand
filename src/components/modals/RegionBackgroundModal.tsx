@@ -91,9 +91,9 @@ export const RegionBackgroundModal = ({
     try {
       textureHash = await saveRegionTexture(region.id, backgroundUrl);
       
-      // Upload to server for multiplayer sync
+      // Upload to server for multiplayer sync with compression based on region size
       if (textureHash) {
-        await uploadTexture(textureHash, backgroundUrl);
+        await uploadTexture(textureHash, backgroundUrl, region.width, region.height);
       }
     } catch (error) {
       console.error('Failed to persist texture to IndexedDB:', error);
