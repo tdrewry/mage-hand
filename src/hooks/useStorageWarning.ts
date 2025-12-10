@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { checkStorageWarning } from '@/lib/storageManager';
 
 /**
@@ -14,17 +14,13 @@ export const useStorageWarning = () => {
         
         // Only show warning if level is 'warning' or 'critical'
         if (warning.level === 'warning') {
-          toast({
-            title: "Storage Warning",
+          toast.warning("Storage Warning", {
             description: warning.message,
-            variant: "default",
             duration: 10000, // Show for 10 seconds
           });
         } else if (warning.level === 'critical') {
-          toast({
-            title: "Critical Storage Warning",
+          toast.error("Critical Storage Warning", {
             description: warning.message,
-            variant: "destructive",
             duration: 15000, // Show for 15 seconds
           });
         }

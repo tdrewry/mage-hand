@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { syncManager } from '@/lib/syncManager';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
@@ -38,17 +38,14 @@ export function useAutoReconnect() {
           currentUsername
         );
 
-        toast({
-          title: "Reconnected",
+        toast.success("Reconnected", {
           description: `Rejoined session ${currentSession.sessionCode}`,
         });
       } catch (error) {
         console.error('❌ Auto-reconnect failed:', error);
         
-        toast({
-          title: "Reconnection Failed",
+        toast.error("Reconnection Failed", {
           description: "Could not reconnect to previous session",
-          variant: "destructive",
         });
 
         // Clear the stale session data

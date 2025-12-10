@@ -40,7 +40,7 @@ import {
   clearAllCustomTemplates, 
   getCustomTemplates 
 } from '@/lib/sessionTemplates';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { 
   HardDrive, 
   AlertTriangle, 
@@ -131,8 +131,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       'Clear old auto-save data (older than 7 days)?',
       () => {
         autoSaveManager.clearOldAutoSaves();
-        toast({
-          title: 'Auto-saves cleared',
+        toast.success('Auto-saves cleared', {
           description: 'Old auto-save data has been removed.',
         });
       }
@@ -144,8 +143,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       'Clear all auto-save data? This cannot be undone.',
       () => {
         autoSaveManager.clearAutoSave();
-        toast({
-          title: 'Auto-saves cleared',
+        toast.success('Auto-saves cleared', {
           description: 'All auto-save data has been removed.',
         });
       }
@@ -157,8 +155,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       'Clear old history versions (older than 30 days)?',
       () => {
         const count = clearOldHistoryVersions();
-        toast({
-          title: 'History cleared',
+        toast.success('History cleared', {
           description: `Removed ${count} old version(s).`,
         });
       }
@@ -170,8 +167,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       'Clear ALL project history? This cannot be undone.',
       () => {
         const count = clearAllHistory();
-        toast({
-          title: 'History cleared',
+        toast.success('History cleared', {
           description: `Removed ${count} version(s).`,
         });
       }
@@ -183,8 +179,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       'Clear all custom templates? Built-in templates will not be affected.',
       () => {
         const count = clearAllCustomTemplates();
-        toast({
-          title: 'Templates cleared',
+        toast.success('Templates cleared', {
           description: `Removed ${count} custom template(s).`,
         });
       }
@@ -197,15 +192,12 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       () => {
         try {
           localStorage.removeItem(key);
-          toast({
-            title: 'Item deleted',
+          toast.success('Item deleted', {
             description: `Removed "${key}".`,
           });
         } catch (error) {
-          toast({
-            title: 'Error',
+          toast.error('Error', {
             description: 'Failed to delete item.',
-            variant: 'destructive',
           });
         }
       }
