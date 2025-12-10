@@ -61,7 +61,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
+          "relative rounded-lg border-2 transition-all duration-200 cursor-pointer active:cursor-grabbing hover:scale-105",
           isActive && "border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/50",
           !isActive && hasGone && "opacity-60 border-border",
           !isActive && !hasGone && "border-border hover:border-primary/50",
