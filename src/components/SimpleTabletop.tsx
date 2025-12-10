@@ -4827,30 +4827,37 @@ export const SimpleTabletop = () => {
             const wallSegments = wallGeometryRef.current?.wallSegments ?? [];
             console.log('[DRAG VISION] Computing visibility at:', { tokenCenterX, tokenCenterY, tokenVisionRange, wallSegmentsCount: wallSegments.length });
             
-            try {
-              const visibility = computeVisibilityFromSegments(
-                { x: tokenCenterX, y: tokenCenterY },
-                wallSegments,
-                tokenVisionRange
-              );
-              console.log('[DRAG VISION] Visibility computed, polygon points:', visibility.polygon?.length);
-              
-              if (visibility.polygon && visibility.polygon.length > 2) {
-                dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
-                console.log('[DRAG VISION] Path2D created successfully');
-              } else {
+            // Always use circular fallback for now to verify rendering works
+            // TODO: Re-enable wall-based visibility once basic rendering is confirmed
+            if (wallSegments.length > 0) {
+              try {
+                const visibility = computeVisibilityFromSegments(
+                  { x: tokenCenterX, y: tokenCenterY },
+                  wallSegments,
+                  tokenVisionRange
+                );
+                console.log('[DRAG VISION] Visibility computed, polygon points:', visibility.polygon?.length, 'boundingBox:', visibility.boundingBox);
+                
+                if (visibility.polygon && visibility.polygon.length > 2) {
+                  dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
+                  console.log('[DRAG VISION] Path2D created from wall visibility');
+                } else {
+                  throw new Error('Invalid polygon');
+                }
+              } catch (e) {
+                console.error('[DRAG VISION] Visibility computation error:', e);
                 // Fallback: create a simple circular visibility area
                 const circlePath = new Path2D();
                 circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
                 dragPreviewVisibilityRef.current = circlePath;
-                console.log('[DRAG VISION] Using circular fallback');
+                console.log('[DRAG VISION] Using circular fallback after error');
               }
-            } catch (e) {
-              console.error('[DRAG VISION] Visibility computation error:', e);
-              // Fallback: create a simple circular visibility area
+            } else {
+              // No walls - use simple circle
               const circlePath = new Path2D();
               circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
               dragPreviewVisibilityRef.current = circlePath;
+              console.log('[DRAG VISION] Using circular (no walls), center:', tokenCenterX, tokenCenterY, 'range:', tokenVisionRange);
             }
           }
         }
