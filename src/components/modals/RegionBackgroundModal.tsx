@@ -7,6 +7,7 @@ import { CanvasRegion } from '@/stores/regionStore';
 import { ImageImportModal, ImageImportResult, ShapeConfig } from './ImageImportModal';
 import { toast } from 'sonner';
 import { Image, Trash2 } from 'lucide-react';
+import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
 
 interface RegionBackgroundModalProps {
   open: boolean;
@@ -81,8 +82,15 @@ export const RegionBackgroundModal = ({
     setShowImageImport(false);
   };
 
-  const applyBackground = () => {
+  const applyBackground = async () => {
     if (!region) return;
+
+    // Save to IndexedDB for persistence
+    try {
+      await saveRegionTexture(region.id, backgroundUrl);
+    } catch (error) {
+      console.error('Failed to persist texture to IndexedDB:', error);
+    }
 
     onUpdateRegion(region.id, {
       backgroundImage: backgroundUrl,
@@ -96,8 +104,15 @@ export const RegionBackgroundModal = ({
     onOpenChange(false);
   };
 
-  const clearBackground = () => {
+  const clearBackground = async () => {
     if (!region) return;
+
+    // Remove from IndexedDB
+    try {
+      await removeRegionTexture(region.id);
+    } catch (error) {
+      console.error('Failed to remove texture from IndexedDB:', error);
+    }
 
     onUpdateRegion(region.id, {
       backgroundImage: undefined,
