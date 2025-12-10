@@ -10,6 +10,7 @@ import { ImageImportModal, ImageImportResult } from './ImageImportModal';
 import { toast } from 'sonner';
 import { Image, Trash2, Upload, Grid } from 'lucide-react';
 import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
+import { uploadTexture } from '@/lib/textureSync';
 
 interface RegionBulkTextureModalProps {
   open: boolean;
@@ -181,9 +182,19 @@ export const RegionBulkTextureModal = ({
     const scaledHeight = previewImage.naturalHeight * backgroundScale;
 
     // Save texture to IndexedDB for persistence (with deduplication)
+    // All regions will share the same texture hash
+    let textureHash: string | undefined;
     try {
-      // Save once - all regions will reference the same texture via hash
-      await Promise.all(regionsToUpdate.map(region => 
+      // Save for first region to get the hash
+      textureHash = await saveRegionTexture(regionsToUpdate[0].id, backgroundUrl);
+      
+      // Upload to server for multiplayer sync
+      if (textureHash) {
+        await uploadTexture(textureHash, backgroundUrl);
+      }
+      
+      // Save for remaining regions
+      await Promise.all(regionsToUpdate.slice(1).map(region => 
         saveRegionTexture(region.id, backgroundUrl)
       ));
     } catch (error) {
@@ -207,6 +218,7 @@ export const RegionBulkTextureModal = ({
 
       updateRegion(region.id, {
         backgroundImage: backgroundUrl,
+        textureHash, // Include hash for sync
         backgroundScale,
         backgroundRepeat,
         backgroundOffsetX: offsetX,
@@ -236,6 +248,7 @@ export const RegionBulkTextureModal = ({
     regionsToUpdate.forEach(region => {
       updateRegion(region.id, {
         backgroundImage: undefined,
+        textureHash: undefined, // Clear hash for sync
         backgroundScale: 1,
         backgroundRepeat: 'repeat',
         backgroundOffsetX: 0,

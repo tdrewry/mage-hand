@@ -69,7 +69,9 @@ const {
   handleSyncRole,
   handleRequestFullSync,
   handleKickUser,
-  handleSyncPatch
+  handleSyncPatch,
+  handleTextureUpload,
+  handleTextureRequest
 } = require('./eventHandlers');
 
 const app = express();
@@ -79,17 +81,20 @@ const io = new Server(httpServer, {
     origin: process.env.CLIENT_ORIGIN || "http://localhost:8080",
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  maxHttpBufferSize: 10 * 1024 * 1024 // 10MB for texture uploads
 });
 
 const sessionManager = new SessionManager();
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {
+  const textureStats = sessionManager.getTextureStats();
   res.json({ 
     status: 'ok', 
     sessions: sessionManager.getActiveSessions(),
-    connections: io.engine.clientsCount
+    connections: io.engine.clientsCount,
+    textures: textureStats
   });
 });
 
@@ -117,6 +122,15 @@ io.on('connection', (socket) => {
   // JSON Patch Sync (unified sync system for all stores)
   socket.on('sync:patch', (payload) => 
     handleSyncPatch(socket, io, sessionManager, payload)
+  );
+
+  // Texture Sync
+  socket.on('texture:upload', (payload) =>
+    handleTextureUpload(socket, io, sessionManager, payload)
+  );
+
+  socket.on('texture:request', (payload) =>
+    handleTextureRequest(socket, io, sessionManager, payload)
   );
 
   // Additional Events
@@ -152,6 +166,8 @@ class SessionManager {
     this.sessions = new Map();
     // Map<socketId, sessionId>
     this.socketToSession = new Map();
+    // Map<hash, { dataUrl, refCount, uploadedAt }> - Global texture storage
+    this.textures = new Map();
   }
 
   /**
@@ -167,6 +183,7 @@ class SessionManager {
       password: password || null,
       createdAt: Date.now(),
       users: new Map(),
+      textureHashes: new Set(), // Track which textures this session uses
       state: {
         tokens: [],
         initiative: {
@@ -250,11 +267,80 @@ class SessionManager {
 
     // Clean up empty sessions
     if (session.users.size === 0) {
+      // Clean up textures used by this session
+      this.cleanupSessionTextures(session);
       this.sessions.delete(sessionId);
       console.log(`[Session] Deleted empty session: ${sessionId}`);
     }
 
     return { session, removedUser };
+  }
+
+  /**
+   * Store a texture (with deduplication)
+   */
+  storeTexture(hash, dataUrl, sessionId) {
+    const existing = this.textures.get(hash);
+    
+    if (existing) {
+      existing.refCount++;
+      existing.sessions.add(sessionId);
+    } else {
+      this.textures.set(hash, {
+        dataUrl,
+        refCount: 1,
+        uploadedAt: Date.now(),
+        sessions: new Set([sessionId])
+      });
+    }
+
+    // Track in session
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.textureHashes.add(hash);
+    }
+
+    return hash;
+  }
+
+  /**
+   * Get a texture by hash
+   */
+  getTexture(hash) {
+    return this.textures.get(hash) || null;
+  }
+
+  /**
+   * Cleanup textures when session ends
+   */
+  cleanupSessionTextures(session) {
+    for (const hash of session.textureHashes) {
+      const texture = this.textures.get(hash);
+      if (texture) {
+        texture.sessions.delete(session.sessionId);
+        texture.refCount--;
+        
+        if (texture.refCount <= 0 || texture.sessions.size === 0) {
+          this.textures.delete(hash);
+          console.log(`[Texture] Deleted unused texture: ${hash}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get texture storage statistics
+   */
+  getTextureStats() {
+    let totalSize = 0;
+    for (const texture of this.textures.values()) {
+      totalSize += texture.dataUrl.length;
+    }
+    return {
+      count: this.textures.size,
+      totalSizeBytes: totalSize,
+      totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2)
+    };
   }
 
   /**
@@ -665,6 +751,71 @@ function getSocketIdByUserId(session, userId) {
   return user ? user.socketId : null;
 }
 
+/**
+ * Handle texture upload from DM
+ */
+function handleTextureUpload(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { hash, dataUrl, size } = payload;
+
+  if (!hash || !dataUrl) {
+    console.warn('[Texture] Invalid upload payload');
+    return;
+  }
+
+  // Verify sender has permission (should be DM)
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can upload textures'
+    });
+    return;
+  }
+
+  // Store texture
+  sessionManager.storeTexture(hash, dataUrl, session.sessionId);
+
+  console.log(`[Texture] Uploaded: ${hash} (${(size / 1024).toFixed(1)}KB) by ${sender.username}`);
+
+  // Notify other clients that a texture is available
+  socket.to(session.sessionId).emit('texture:available', {
+    hash,
+    size: size || dataUrl.length,
+    uploadedBy: sender.userId
+  });
+}
+
+/**
+ * Handle texture request from client
+ */
+function handleTextureRequest(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { hash } = payload;
+
+  if (!hash) {
+    console.warn('[Texture] Invalid request payload');
+    return;
+  }
+
+  const texture = sessionManager.getTexture(hash);
+
+  if (texture) {
+    socket.emit('texture:data', {
+      hash,
+      dataUrl: texture.dataUrl
+    });
+    console.log(`[Texture] Sent: ${hash}`);
+  } else {
+    socket.emit('texture:not_found', { hash });
+    console.log(`[Texture] Not found: ${hash}`);
+  }
+}
+
 module.exports = {
   handleCreateSession,
   handleJoinSession,
@@ -672,7 +823,9 @@ module.exports = {
   handleSyncRole,
   handleRequestFullSync,
   handleKickUser,
-  handleSyncPatch
+  handleSyncPatch,
+  handleTextureUpload,
+  handleTextureRequest
 };
 
 ========================================

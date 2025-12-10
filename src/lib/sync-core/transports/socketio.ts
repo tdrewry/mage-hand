@@ -44,6 +44,13 @@ export class SocketIOTransport extends BaseTransport {
   }
 
   /**
+   * Get the current socket instance
+   */
+  getSocket(): any {
+    return this.socket;
+  }
+
+  /**
    * Clear socket reference on disconnect
    */
   clearSocket(): void {

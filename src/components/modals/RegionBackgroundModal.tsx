@@ -8,6 +8,7 @@ import { ImageImportModal, ImageImportResult, ShapeConfig } from './ImageImportM
 import { toast } from 'sonner';
 import { Image, Trash2 } from 'lucide-react';
 import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
+import { uploadTexture } from '@/lib/textureSync';
 
 interface RegionBackgroundModalProps {
   open: boolean;
@@ -85,15 +86,22 @@ export const RegionBackgroundModal = ({
   const applyBackground = async () => {
     if (!region) return;
 
-    // Save to IndexedDB for persistence
+    // Save to IndexedDB for persistence and get the hash
+    let textureHash: string | undefined;
     try {
-      await saveRegionTexture(region.id, backgroundUrl);
+      textureHash = await saveRegionTexture(region.id, backgroundUrl);
+      
+      // Upload to server for multiplayer sync
+      if (textureHash) {
+        await uploadTexture(textureHash, backgroundUrl);
+      }
     } catch (error) {
       console.error('Failed to persist texture to IndexedDB:', error);
     }
 
     onUpdateRegion(region.id, {
       backgroundImage: backgroundUrl,
+      textureHash, // Include hash for sync
       backgroundScale,
       backgroundRepeat,
       backgroundOffsetX: offsetX,
@@ -116,6 +124,7 @@ export const RegionBackgroundModal = ({
 
     onUpdateRegion(region.id, {
       backgroundImage: undefined,
+      textureHash: undefined, // Clear hash for sync
       backgroundScale: 1,
       backgroundRepeat: 'repeat',
       backgroundOffsetX: 0,

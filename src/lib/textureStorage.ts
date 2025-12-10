@@ -28,8 +28,9 @@ let dbInstance: IDBDatabase | null = null;
 
 /**
  * Generate a fast hash for image data (for deduplication)
+ * Exported so it can be used by textureSync
  */
-async function hashImageData(dataUrl: string): Promise<string> {
+export async function hashImageData(dataUrl: string): Promise<string> {
   // Use a simple but effective hash for base64 data
   const encoder = new TextEncoder();
   const data = encoder.encode(dataUrl);
@@ -430,4 +431,100 @@ export function getCachedTexture(hash: string): string | undefined {
 export function isTextureCached(regionId: string): boolean {
   // This is a quick check - actual regionId to hash mapping requires async lookup
   return false; // For now, always load from IndexedDB on first access
+}
+
+/**
+ * Load a texture directly by its hash (for multiplayer sync)
+ */
+export async function loadTextureByHash(hash: string): Promise<string | null> {
+  // Check cache first
+  if (textureCache.has(hash)) {
+    return textureCache.get(hash)!;
+  }
+
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve) => {
+      const transaction = db.transaction([TEXTURES_STORE], 'readonly');
+      const store = transaction.objectStore(TEXTURES_STORE);
+      const request = store.get(hash);
+
+      request.onsuccess = () => {
+        const texture = request.result as TextureEntry | undefined;
+        if (texture) {
+          textureCache.set(hash, texture.dataUrl);
+          resolve(texture.dataUrl);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => resolve(null);
+    });
+  } catch (error) {
+    console.error('Failed to load texture by hash:', error);
+    return null;
+  }
+}
+
+/**
+ * Save a texture directly by hash (for multiplayer sync - when receiving from server)
+ */
+export async function saveTextureByHash(hash: string, dataUrl: string): Promise<void> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TEXTURES_STORE], 'readwrite');
+      const store = transaction.objectStore(TEXTURES_STORE);
+
+      // Check if already exists
+      const getRequest = store.get(hash);
+      
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result as TextureEntry | undefined;
+        if (!existing) {
+          // New texture - save it
+          store.put({
+            hash,
+            dataUrl,
+            refCount: 0, // Not tied to any specific region yet
+            createdAt: Date.now(),
+          });
+        }
+        textureCache.set(hash, dataUrl);
+      };
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to save texture by hash:', error);
+  }
+}
+
+/**
+ * Get hash for a region (used to check what texture a region needs)
+ */
+export async function getRegionTextureHash(regionId: string): Promise<string | null> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve) => {
+      const transaction = db.transaction([REGION_MAPPINGS_STORE], 'readonly');
+      const store = transaction.objectStore(REGION_MAPPINGS_STORE);
+      const request = store.get(regionId);
+
+      request.onsuccess = () => {
+        const mapping = request.result as RegionMapping | undefined;
+        resolve(mapping?.textureHash || null);
+      };
+
+      request.onerror = () => resolve(null);
+    });
+  } catch (error) {
+    console.error('Failed to get region texture hash:', error);
+    return null;
+  }
 }
