@@ -208,6 +208,20 @@ class SyncManager {
   private handleUserJoined(data: UserJoinedPayload): void {
     console.log('👋 User joined:', data.user.username);
     useMultiplayerStore.getState().addConnectedUser(data.user);
+    
+    // Auto-broadcast full state to new player if current user is DM
+    const multiplayerStore = useMultiplayerStore.getState();
+    const currentUser = multiplayerStore.connectedUsers.find(
+      u => u.userId === multiplayerStore.currentUserId
+    );
+    
+    if (currentUser?.roleIds.includes('dm')) {
+      console.log('📤 DM auto-broadcasting full state to new player:', data.user.username);
+      // Small delay to ensure the new player is fully connected
+      setTimeout(() => {
+        this.broadcastFullStateSync();
+      }, 500);
+    }
   }
 
   private handleUserLeft(data: UserLeftPayload): void {
