@@ -15,7 +15,8 @@ export interface CanvasRegion {
   gridScale: number; // Decimal multiplier for grid size (1 = default)
   gridSnapping: boolean; // Per-region snapping toggle
   gridVisible: boolean; // Per-region grid visibility toggle
-  backgroundImage?: string; // URL or data URI for background texture
+  backgroundImage?: string; // URL or data URI for background texture (in-memory only, excluded from sync)
+  textureHash?: string; // Hash for texture sync - this is what gets synced to other clients
   backgroundRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
   backgroundScale?: number; // Scale factor for background image (1 = original size)
   backgroundOffsetX?: number; // Offset for background alignment
@@ -122,7 +123,7 @@ const regionStoreCreator: StateCreator<RegionStore> = (set, get) => ({
 // Wrap with syncPatch middleware
 const withSyncPatch = syncPatch<RegionStore>({ 
   channel: 'regions',
-  excludePaths: [], // Sync all region data (selection is part of region object)
+  excludePaths: ['regions.*.backgroundImage'], // Exclude large image data, sync textureHash instead
   debug: false,
 })(regionStoreCreator);
 

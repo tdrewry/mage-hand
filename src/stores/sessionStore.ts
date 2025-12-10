@@ -14,7 +14,8 @@ export type LabelPosition = 'above' | 'center' | 'below';
 export interface Token {
   id: string;
   name: string;
-  imageUrl: string;
+  imageUrl: string; // In-memory image data (excluded from sync)
+  imageHash?: string; // Hash for texture sync - this is what gets synced to other clients
   x: number;
   y: number;
   gridWidth: number;  // Width in grid units
@@ -378,7 +379,7 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
 const withSyncPatch = syncPatch<SessionState>({ 
   channel: 'tokens',
   throttleMs: 50, // Throttle for position updates
-  excludePaths: ['selectedTokenIds', 'viewportTransforms', 'currentPlayerId'], // Local-only state
+  excludePaths: ['selectedTokenIds', 'viewportTransforms', 'currentPlayerId', 'tokens.*.imageUrl'], // Local-only state + large image data
   debug: false,
 })(sessionStoreCreator);
 
