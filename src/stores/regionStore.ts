@@ -144,7 +144,16 @@ export const useRegionStore = create<RegionStore>()(
     }),
     {
       name: 'canvas-regions-store',
-      version: 1,
+      version: 2,
+      partialize: (state) => ({
+        ...state,
+        // Exclude backgroundImage from persistence to avoid localStorage quota issues
+        // Base64 images are too large for localStorage (~5MB limit)
+        regions: state.regions.map(region => ({
+          ...region,
+          backgroundImage: undefined,
+        })),
+      }),
     }
   )
 );
