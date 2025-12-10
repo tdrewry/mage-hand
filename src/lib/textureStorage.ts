@@ -4,9 +4,10 @@
  */
 
 const DB_NAME = 'canvas-textures-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Synced with tokenTextureStorage
 const TEXTURES_STORE = 'textures';
 const REGION_MAPPINGS_STORE = 'region-mappings';
+const TOKEN_MAPPINGS_STORE = 'token-mappings';
 
 interface TextureEntry {
   hash: string;
@@ -69,6 +70,11 @@ function openDatabase(): Promise<IDBDatabase> {
       // Store for region-to-texture mappings
       if (!db.objectStoreNames.contains(REGION_MAPPINGS_STORE)) {
         db.createObjectStore(REGION_MAPPINGS_STORE, { keyPath: 'regionId' });
+      }
+
+      // Store for token-to-texture mappings (ensure it exists for shared DB)
+      if (!db.objectStoreNames.contains(TOKEN_MAPPINGS_STORE)) {
+        db.createObjectStore(TOKEN_MAPPINGS_STORE, { keyPath: 'tokenId' });
       }
     };
   });
