@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { syncManager } from '@/lib/syncManager';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 
 export interface LightSource {
   id: string;
@@ -30,97 +30,86 @@ interface LightState {
 
 let nextLightId = 1;
 
+// Define the store creator separately for better type inference
+const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
+  lights: [],
+  globalAmbientLight: 0.2, // 20% ambient light by default
+  shadowIntensity: 0.7, // Shadows are 70% opaque by default
+  
+  addLight: (light) => {
+    // Use provided ID if available (for synced lights), otherwise generate new
+    const id = light.id || `light-${nextLightId++}`;
+    const newLight: LightSource = {
+      ...light,
+      id,
+    };
+    
+    set((state) => ({
+      lights: [...state.lights, newLight],
+    }));
+    // Sync happens automatically via syncPatch middleware
+    
+    return id;
+  },
+  
+  updateLight: (id, updates) => {
+    set((state) => ({
+      lights: state.lights.map((light) =>
+        light.id === id ? { ...light, ...updates } : light
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+  
+  removeLight: (id) => {
+    set((state) => ({
+      lights: state.lights.filter((light) => light.id !== id),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+  
+  toggleLight: (id) => {
+    set((state) => ({
+      lights: state.lights.map((light) =>
+        light.id === id ? { ...light, enabled: !light.enabled } : light
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+  
+  setLights: (lights) => {
+    set({ lights });
+  },
+  
+  setGlobalAmbientLight: (level) => {
+    set({ globalAmbientLight: Math.max(0, Math.min(1, level)) });
+  },
+  
+  setShadowIntensity: (intensity) => {
+    set({ shadowIntensity: Math.max(0, Math.min(1, intensity)) });
+  },
+  
+  clearAllLights: () => {
+    set({ lights: [] });
+  },
+});
+
+// Wrap with syncPatch middleware
+const withSyncPatch = syncPatch<LightState>({ 
+  channel: 'lights',
+  debug: false,
+})(lightStoreCreator);
+
+// Persist options
+const persistOptions: PersistOptions<LightState, Partial<LightState>> = {
+  name: 'light-store',
+  partialize: (state) => ({
+    lights: state.lights,
+    globalAmbientLight: state.globalAmbientLight,
+    shadowIntensity: state.shadowIntensity,
+  }),
+};
+
 export const useLightStore = create<LightState>()(
-  persist(
-    (set, get) => ({
-      lights: [],
-      globalAmbientLight: 0.2, // 20% ambient light by default
-      shadowIntensity: 0.7, // Shadows are 70% opaque by default
-      
-      addLight: (light) => {
-        // Use provided ID if available (for synced lights), otherwise generate new
-        const id = light.id || `light-${nextLightId++}`;
-        const newLight: LightSource = {
-          ...light,
-          id,
-        };
-        
-        set((state) => ({
-          lights: [...state.lights, newLight],
-        }));
-        
-        // Only sync if this is a new local light (no ID provided)
-        if (!light.id) {
-          syncManager.syncLightAdd(newLight);
-        }
-        
-        return id;
-      },
-      
-      updateLight: (id, updates) => {
-        set((state) => ({
-          lights: state.lights.map((light) =>
-            light.id === id ? { ...light, ...updates } : light
-          ),
-        }));
-        
-        // Only sync if not a remote update
-        if (updates.id === undefined || updates.id === id) {
-          syncManager.syncLightUpdate(id, updates);
-        }
-      },
-      
-      removeLight: (id) => {
-        const lightExists = get().lights.some(light => light.id === id);
-        
-        set((state) => ({
-          lights: state.lights.filter((light) => light.id !== id),
-        }));
-        
-        // Only sync if light existed
-        if (lightExists) {
-          syncManager.syncLightRemove(id);
-        }
-      },
-      
-      toggleLight: (id) => {
-        const lightExists = get().lights.some(light => light.id === id);
-        
-        set((state) => ({
-          lights: state.lights.map((light) =>
-            light.id === id ? { ...light, enabled: !light.enabled } : light
-          ),
-        }));
-        
-        // Only sync if light exists
-        if (lightExists) {
-          syncManager.syncLightToggle(id);
-        }
-      },
-      
-      setLights: (lights) => {
-        set({ lights });
-      },
-      
-      setGlobalAmbientLight: (level) => {
-        set({ globalAmbientLight: Math.max(0, Math.min(1, level)) });
-      },
-      
-      setShadowIntensity: (intensity) => {
-        set({ shadowIntensity: Math.max(0, Math.min(1, intensity)) });
-      },
-      
-      clearAllLights: () => {
-        set({ lights: [] });
-      },
-    }),
-    {
-      name: 'light-store',
-      partialize: (state) => ({
-        lights: state.lights,
-        globalAmbientLight: state.globalAmbientLight,
-        shadowIntensity: state.shadowIntensity,
-      }),
-    }
-  )
+  persist(withSyncPatch as StateCreator<LightState, [], []>, persistOptions)
 );

@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { syncManager } from '@/lib/syncManager';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 
 export type EffectQuality = 'performance' | 'balanced' | 'cinematic';
 
@@ -55,188 +55,158 @@ interface FogState extends FogSettings {
   setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
 }
 
-export const useFogStore = create<FogState>()(
-  persist(
-    (set) => ({
-      // Initial state
+// Define the store creator separately for better type inference
+const fogStoreCreator: StateCreator<FogState> = (set) => ({
+  // Initial state
+  enabled: false,
+  revealAll: false,
+  visionRange: 6, // 6 grid units default
+  fogOpacity: 0.95,
+  exploredOpacity: 0.4,
+  showExploredAreas: true,
+  serializedExploredAreas: '',
+  fogVersion: 1,
+  
+  // Real-time vision during drag (feature flag - disabled by default)
+  realtimeVisionDuringDrag: false,
+  realtimeVisionThrottleMs: 32, // ~30fps default
+  
+  // Post-processing effect settings
+  effectSettings: {
+    postProcessingEnabled: false,
+    edgeBlur: 8,
+    lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
+    volumetricEnabled: false,
+    effectQuality: 'balanced' as EffectQuality,
+  },
+  
+  // Actions - sync happens automatically via syncPatch middleware
+  setEnabled: (enabled) => {
+    set({ enabled });
+  },
+  
+  setRevealAll: (revealAll) => {
+    set({ revealAll });
+  },
+  
+  setVisionRange: (range) => {
+    const clampedRange = Math.max(1, Math.min(50, range));
+    set({ visionRange: clampedRange });
+  },
+  
+  setFogOpacity: (opacity) => {
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+    set({ fogOpacity: clampedOpacity });
+  },
+  
+  setExploredOpacity: (opacity) => {
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+    set({ exploredOpacity: clampedOpacity });
+  },
+  
+  setShowExploredAreas: (show) => {
+    set({ showExploredAreas: show });
+  },
+  
+  setSerializedExploredAreas: (data) => {
+    set({ serializedExploredAreas: data });
+  },
+  
+  clearExploredAreas: () => {
+    set({ serializedExploredAreas: '' });
+  },
+  
+  resetFog: () => {
+    set({
       enabled: false,
       revealAll: false,
-      visionRange: 6, // 6 grid units default
+      visionRange: 6,
       fogOpacity: 0.95,
       exploredOpacity: 0.4,
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
-      
-      // Real-time vision during drag (feature flag - disabled by default)
       realtimeVisionDuringDrag: false,
-      realtimeVisionThrottleMs: 32, // ~30fps default
-      
-      // Post-processing effect settings
+      realtimeVisionThrottleMs: 32,
       effectSettings: {
         postProcessingEnabled: false,
         edgeBlur: 8,
-        lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
+        lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as EffectQuality,
       },
-      
-      // Actions
-      setEnabled: (enabled) => {
-        set({ enabled });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ enabled });
-        }
-      },
-      
-      setRevealAll: (revealAll) => {
-        set({ revealAll });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ revealAll });
-        }
-      },
-      
-      setVisionRange: (range) => {
-        const clampedRange = Math.max(1, Math.min(50, range));
-        set({ visionRange: clampedRange });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ visionRange: clampedRange });
-        }
-      },
-      
-      setFogOpacity: (opacity) => {
-        const clampedOpacity = Math.max(0, Math.min(1, opacity));
-        set({ fogOpacity: clampedOpacity });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ fogOpacity: clampedOpacity });
-        }
-      },
-      
-      setExploredOpacity: (opacity) => {
-        const clampedOpacity = Math.max(0, Math.min(1, opacity));
-        set({ exploredOpacity: clampedOpacity });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ exploredOpacity: clampedOpacity });
-        }
-      },
-      
-      setShowExploredAreas: (show) => {
-        set({ showExploredAreas: show });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogSettings({ showExploredAreas: show });
-        }
-      },
-      
-      setSerializedExploredAreas: (data) => {
-        set({ serializedExploredAreas: data });
-        
-        // Sync to multiplayer (fog reveals)
-        if (syncManager.isConnected()) {
-          syncManager.syncFogReveal(data);
-        }
-      },
-      
-      clearExploredAreas: () => {
-        set({ serializedExploredAreas: '' });
-        
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncFogClear();
-        }
-      },
-      
-      resetFog: () => {
-        set({
-          enabled: false,
-          revealAll: false,
-          visionRange: 6,
-          fogOpacity: 0.95,
-          exploredOpacity: 0.4,
-          showExploredAreas: true,
-          serializedExploredAreas: '',
-          fogVersion: 1,
-          realtimeVisionDuringDrag: false,
-          realtimeVisionThrottleMs: 32,
-          effectSettings: {
-            postProcessingEnabled: false,
-            edgeBlur: 8,
-            lightFalloff: 0.5,
-            volumetricEnabled: false,
-            effectQuality: 'balanced' as EffectQuality,
-          },
-        });
-      },
-      
-      // Real-time vision during drag actions
-      setRealtimeVisionDuringDrag: (enabled) => {
-        set({ realtimeVisionDuringDrag: enabled });
-      },
-      setRealtimeVisionThrottleMs: (ms) => {
-        const clampedMs = Math.max(16, Math.min(100, ms));
-        set({ realtimeVisionThrottleMs: clampedMs });
-      },
-      
-      // Post-processing effect actions
-      setPostProcessingEnabled: (enabled) => {
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, postProcessingEnabled: enabled },
-        }));
-      },
-      setEdgeBlur: (blur) => {
-        const clampedBlur = Math.max(0, Math.min(20, blur));
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, edgeBlur: clampedBlur },
-        }));
-      },
-      setLightFalloff: (falloff) => {
-        const clampedFalloff = Math.max(0, Math.min(1, falloff));
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, lightFalloff: clampedFalloff },
-        }));
-      },
-      setVolumetricEnabled: (enabled) => {
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, volumetricEnabled: enabled },
-        }));
-      },
-      setEffectQuality: (quality) => {
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, effectQuality: quality },
-        }));
-      },
-      setEffectSettings: (settings) => {
-        set((state) => ({
-          effectSettings: { ...state.effectSettings, ...settings },
-        }));
-      },
-    }),
-    {
-      name: 'fog-of-war-store',
-      partialize: (state) => ({
-        enabled: state.enabled,
-        revealAll: state.revealAll,
-        visionRange: state.visionRange,
-        fogOpacity: state.fogOpacity,
-        exploredOpacity: state.exploredOpacity,
-        showExploredAreas: state.showExploredAreas,
-        serializedExploredAreas: state.serializedExploredAreas,
-        fogVersion: state.fogVersion,
-        realtimeVisionDuringDrag: state.realtimeVisionDuringDrag,
-        realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,
-        effectSettings: state.effectSettings,
-      }),
-    }
-  )
+    });
+  },
+  
+  // Real-time vision during drag actions (local-only, not synced)
+  setRealtimeVisionDuringDrag: (enabled) => {
+    set({ realtimeVisionDuringDrag: enabled });
+  },
+  setRealtimeVisionThrottleMs: (ms) => {
+    const clampedMs = Math.max(16, Math.min(100, ms));
+    set({ realtimeVisionThrottleMs: clampedMs });
+  },
+  
+  // Post-processing effect actions (local-only, not synced)
+  setPostProcessingEnabled: (enabled) => {
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, postProcessingEnabled: enabled },
+    }));
+  },
+  setEdgeBlur: (blur) => {
+    const clampedBlur = Math.max(0, Math.min(20, blur));
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, edgeBlur: clampedBlur },
+    }));
+  },
+  setLightFalloff: (falloff) => {
+    const clampedFalloff = Math.max(0, Math.min(1, falloff));
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, lightFalloff: clampedFalloff },
+    }));
+  },
+  setVolumetricEnabled: (enabled) => {
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, volumetricEnabled: enabled },
+    }));
+  },
+  setEffectQuality: (quality) => {
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, effectQuality: quality },
+    }));
+  },
+  setEffectSettings: (settings) => {
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, ...settings },
+    }));
+  },
+});
+
+// Wrap with syncPatch middleware - exclude local-only settings
+const withSyncPatch = syncPatch<FogState>({ 
+  channel: 'fog',
+  excludePaths: ['realtimeVisionDuringDrag', 'realtimeVisionThrottleMs', 'effectSettings'], // Local-only settings
+  debug: false,
+})(fogStoreCreator);
+
+// Persist options
+const persistOptions: PersistOptions<FogState, Partial<FogState>> = {
+  name: 'fog-of-war-store',
+  partialize: (state) => ({
+    enabled: state.enabled,
+    revealAll: state.revealAll,
+    visionRange: state.visionRange,
+    fogOpacity: state.fogOpacity,
+    exploredOpacity: state.exploredOpacity,
+    showExploredAreas: state.showExploredAreas,
+    serializedExploredAreas: state.serializedExploredAreas,
+    fogVersion: state.fogVersion,
+    realtimeVisionDuringDrag: state.realtimeVisionDuringDrag,
+    realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,
+    effectSettings: state.effectSettings,
+  }),
+};
+
+export const useFogStore = create<FogState>()(
+  persist(withSyncPatch as StateCreator<FogState, [], []>, persistOptions)
 );
