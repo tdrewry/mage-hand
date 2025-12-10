@@ -181,6 +181,14 @@ export const RegionBulkTextureModal = ({
     const scaledWidth = previewImage.naturalWidth * backgroundScale;
     const scaledHeight = previewImage.naturalHeight * backgroundScale;
 
+    // Calculate the largest region dimensions for compression
+    let maxRegionWidth = 0;
+    let maxRegionHeight = 0;
+    regionsToUpdate.forEach(region => {
+      maxRegionWidth = Math.max(maxRegionWidth, region.width);
+      maxRegionHeight = Math.max(maxRegionHeight, region.height);
+    });
+
     // Save texture to IndexedDB for persistence (with deduplication)
     // All regions will share the same texture hash
     let textureHash: string | undefined;
@@ -188,9 +196,9 @@ export const RegionBulkTextureModal = ({
       // Save for first region to get the hash
       textureHash = await saveRegionTexture(regionsToUpdate[0].id, backgroundUrl);
       
-      // Upload to server for multiplayer sync
+      // Upload to server for multiplayer sync - use largest region size for compression
       if (textureHash) {
-        await uploadTexture(textureHash, backgroundUrl);
+        await uploadTexture(textureHash, backgroundUrl, maxRegionWidth, maxRegionHeight);
       }
       
       // Save for remaining regions
