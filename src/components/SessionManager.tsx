@@ -9,7 +9,8 @@ import {
   Plus,
   Wifi,
   WifiOff,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -148,6 +149,11 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     toast.info('Left session');
   };
 
+  const handleRequestSync = () => {
+    syncManager.rpcRequestFullState();
+    toast.info('Requesting full state sync from DM...');
+  };
+
   const handleCopySessionCode = () => {
     if (currentSession?.sessionCode) {
       navigator.clipboard.writeText(currentSession.sessionCode);
@@ -271,13 +277,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
             )}
 
-            <Button
-              variant="outline"
-              onClick={handleLeaveSession}
-              className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            >
-              Leave Session
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRequestSync}
+                className="flex-1"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Request Sync
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleLeaveSession}
+                className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                Leave Session
+              </Button>
+            </div>
           </div>
         ) : (
           // Session Creation/Join View
