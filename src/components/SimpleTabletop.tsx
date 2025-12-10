@@ -80,6 +80,13 @@ import { texturePatternCache } from "../lib/texturePatternCache";
 import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
@@ -5580,12 +5587,67 @@ export const SimpleTabletop = () => {
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
 
-      {/* Zoom Level Indicator */}
+      {/* Zoom Level Indicator with Menu */}
       <div 
-        className="absolute bottom-4 right-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground shadow-sm select-none"
+        className="absolute bottom-4 right-4"
         style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
       >
-        {Math.round(transform.zoom * 100)}%
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button 
+              className="bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground shadow-sm select-none hover:bg-card/90 transition-colors cursor-pointer"
+            >
+              {Math.round(transform.zoom * 100)}%
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" className="min-w-[100px]">
+            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 4.0 }))}>
+              400%
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 2.0 }))}>
+              200%
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 1.0 }))}>
+              100%
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.5 }))}>
+              50%
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.25 }))}>
+              25%
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => {
+              // Fit to view - calculate zoom to fit all regions
+              if (regions.length === 0) return;
+              const bounds = regions.reduce((acc, r) => ({
+                minX: Math.min(acc.minX, r.x),
+                minY: Math.min(acc.minY, r.y),
+                maxX: Math.max(acc.maxX, r.x + r.width),
+                maxY: Math.max(acc.maxY, r.y + r.height),
+              }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+              
+              const contentWidth = bounds.maxX - bounds.minX;
+              const contentHeight = bounds.maxY - bounds.minY;
+              const padding = 50;
+              
+              const zoomX = (window.innerWidth - padding * 2) / contentWidth;
+              const zoomY = (window.innerHeight - padding * 2) / contentHeight;
+              const newZoom = Math.min(zoomX, zoomY, 2.0);
+              
+              const centerX = (bounds.minX + bounds.maxX) / 2;
+              const centerY = (bounds.minY + bounds.maxY) / 2;
+              
+              setTransform({
+                zoom: newZoom,
+                x: window.innerWidth / 2 - centerX * newZoom,
+                y: window.innerHeight / 2 - centerY * newZoom,
+              });
+            }}>
+              Fit to View
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {selectedAnnotationId &&
