@@ -76,6 +76,8 @@ import { useRegionEdgeProcessing } from "../hooks/useRegionEdgeProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import { useUndoableActions } from "../hooks/useUndoableActions";
 import { useTextureLoader } from "../hooks/useTextureLoader";
+import { texturePatternCache } from "../lib/texturePatternCache";
+import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
@@ -1687,8 +1689,33 @@ export const SimpleTabletop = () => {
 
     // 2. First render floor regions - ABOVE terrain features
     // Skip region strokes since decorative walls will handle the edges
+    // Use viewport culling for performance optimization
+    const viewport: ViewportBounds = { x: viewX, y: viewY, width: viewWidth, height: viewHeight };
+    
     if (showRegions) {
       regions.forEach((region) => {
+        // Get region bounds for viewport culling
+        let regionBounds: { x: number; y: number; width: number; height: number };
+        if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+          const xs = region.pathPoints.map(p => p.x);
+          const ys = region.pathPoints.map(p => p.y);
+          const minX = Math.min(...xs);
+          const minY = Math.min(...ys);
+          regionBounds = {
+            x: minX,
+            y: minY,
+            width: Math.max(...xs) - minX,
+            height: Math.max(...ys) - minY
+          };
+        } else {
+          regionBounds = { x: region.x, y: region.y, width: region.width, height: region.height };
+        }
+        
+        // Skip rendering if region is outside viewport (with margin for textures)
+        if (!isInViewport(regionBounds, viewport, 200)) {
+          return;
+        }
+        
         drawRegion(ctx, region, true); // skipStroke = true for both modes
       });
       
@@ -3078,7 +3105,7 @@ export const SimpleTabletop = () => {
       // Transform handles removed - now using classic resize/rotate handles only
     }
   };
-  // Function to draw region background image
+  // Function to draw region background image (optimized with pattern caching)
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
 
@@ -3092,6 +3119,8 @@ export const SimpleTabletop = () => {
 
       // Only set up onload for new images
       img.onload = () => {
+        // Invalidate any cached patterns for this image since it just loaded
+        texturePatternCache.invalidateImage(region.backgroundImage!);
         // Trigger re-render when image loads
         setImageLoadCounter(c => c + 1);
       };
@@ -3144,29 +3173,27 @@ export const SimpleTabletop = () => {
       // For no-repeat, draw the scaled image once at the offset position
       ctx.drawImage(img, x + offsetX, y + offsetY, scaledWidth, scaledHeight);
     } else {
-      // For repeat patterns, create an offscreen canvas with the scaled image
-      const patternCanvas = document.createElement('canvas');
-      patternCanvas.width = Math.ceil(scaledWidth);
-      patternCanvas.height = Math.ceil(scaledHeight);
-      const patternCtx = patternCanvas.getContext('2d');
+      // Use cached pattern for repeat modes (major performance optimization)
+      const pattern = texturePatternCache.getPattern(
+        ctx,
+        img,
+        region.backgroundImage,
+        scale,
+        repeat
+      );
       
-      if (patternCtx) {
-        patternCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-        const pattern = ctx.createPattern(patternCanvas, repeat);
-        
-        if (pattern) {
-          // Apply world-space positioning for continuous texture tiling
-          // offsetX/offsetY are pre-calculated to align with world origin (0,0)
-          // This ensures textures appear continuous across multiple regions
-          const matrix = new DOMMatrix();
-          // Translate pattern to start at region's top-left with the calculated offset
-          matrix.translateSelf(x + offsetX, y + offsetY);
-          pattern.setTransform(matrix);
+      if (pattern) {
+        // Apply world-space positioning for continuous texture tiling
+        // offsetX/offsetY are pre-calculated to align with world origin (0,0)
+        // This ensures textures appear continuous across multiple regions
+        const matrix = new DOMMatrix();
+        // Translate pattern to start at region's top-left with the calculated offset
+        matrix.translateSelf(x + offsetX, y + offsetY);
+        pattern.setTransform(matrix);
 
-          ctx.fillStyle = pattern;
-          // Fill the region area with enough padding for the offset
-          ctx.fillRect(x - scaledWidth, y - scaledHeight, width + scaledWidth * 2, height + scaledHeight * 2);
-        }
+        ctx.fillStyle = pattern;
+        // Fill the region area with enough padding for the offset
+        ctx.fillRect(x - scaledWidth, y - scaledHeight, width + scaledWidth * 2, height + scaledHeight * 2);
       }
     }
   };
