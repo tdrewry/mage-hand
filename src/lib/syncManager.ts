@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { SocketClient } from './socketClient';
 import { messageIdManager } from './messageIdManager';
-import { patchTransport } from './sync/patchTransport';
+import { patchTransport } from './sync';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
