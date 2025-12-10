@@ -61,7 +61,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col justify-end rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
+          "relative rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
           isActive && "border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/50",
           !isActive && hasGone && "opacity-60 border-border",
           !isActive && !hasGone && "border-border hover:border-primary/50",
@@ -69,22 +69,29 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         )}
         style={{ 
           width: isActive ? '85px' : '60px',
-          height: isActive ? '60px' : '45px',
-          backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
-          backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
+          height: isActive ? '60px' : '45px'
         }}
       >
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent rounded-md" />
+        {/* Background image wrapper with overflow hidden */}
+        <div 
+          className="absolute inset-0 rounded-md overflow-hidden"
+          style={{
+            backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
+            backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        </div>
 
         {/* Remove Button */}
         {!isCompact && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground z-10"
+            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground z-20"
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
@@ -103,7 +110,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
         {/* Initiative Number - Upper right corner */}
         <div 
-          className="absolute -top-1 -right-1 bg-background/90 border border-primary rounded-full min-w-[20px] h-[20px] flex items-center justify-center z-10"
+          className="absolute -top-2 -right-2 bg-background border-2 border-primary rounded-full min-w-[22px] h-[22px] flex items-center justify-center z-10"
           style={{ fontSize: `${initFontSize}px` }}
         >
           {isEditingInitiative && !isCompact ? (
@@ -134,7 +141,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         </div>
 
         {/* Token Name - Bottom */}
-        <div className="relative z-10 p-1.5">
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-1.5">
           <div 
             className="font-medium text-white truncate leading-tight drop-shadow-md"
             style={{ fontSize: `${fontSize}px` }}
