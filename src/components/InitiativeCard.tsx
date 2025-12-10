@@ -68,7 +68,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           isHidden && "opacity-50 border-dashed"
         )}
         style={{ 
-          width: isActive ? '140px' : '100px'
+          width: isActive ? '85px' : '60px'
         }}
       >
         {/* Remove Button */}
