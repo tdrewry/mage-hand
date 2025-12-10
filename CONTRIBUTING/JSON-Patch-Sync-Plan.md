@@ -1,6 +1,6 @@
 # JSON Patch Sync Middleware Implementation
 
-## Status: Phase 1 Complete (Core Infrastructure)
+## Status: Phase 2 Complete (Store Migration)
 
 ## Overview
 Zustand middleware that automatically captures state changes, generates JSON Patches (RFC 6902), and synchronizes them via Socket.io. Provides Yjs-like developer experience (automatic sync) with deterministic conflict resolution.
@@ -56,15 +56,15 @@ export const useTokenStore = create(
 
 ## Next Steps
 
-### Phase 2: Store Migration
-Migrate stores one at a time:
-1. [ ] `sessionStore.ts` (tokens) - Most critical
-2. [ ] `regionStore.ts` (regions)
-3. [ ] `mapStore.ts` (maps)
-4. [ ] `fogStore.ts` (fog settings)
-5. [ ] `lightStore.ts` (lights)
-6. [ ] `initiativeStore.ts` (combat)
-7. [ ] `roleStore.ts` (permissions)
+### Phase 2: Store Migration ✅ COMPLETE
+Migrated stores:
+1. [x] `sessionStore.ts` (tokens) - channel: 'tokens', throttle: 50ms
+2. [x] `regionStore.ts` (regions) - channel: 'regions'
+3. [x] `mapStore.ts` (maps) - channel: 'maps'
+4. [x] `fogStore.ts` (fog settings) - channel: 'fog'
+5. [x] `lightStore.ts` (lights) - channel: 'lights'
+6. [x] `initiativeStore.ts` (combat) - channel: 'initiative'
+7. [ ] `roleStore.ts` (permissions) - skipped (security-sensitive)
 
 ### Phase 3: Server Updates
 - [ ] Add `sync:patch` handler to multiplayer server

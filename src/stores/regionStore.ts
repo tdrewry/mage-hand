@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { syncManager } from '@/lib/syncManager';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 
 export interface CanvasRegion {
   id: string;
@@ -50,110 +50,97 @@ interface RegionStore {
   getSelectedRegions: () => CanvasRegion[];
 }
 
+// Define the store creator separately for better type inference
+const regionStoreCreator: StateCreator<RegionStore> = (set, get) => ({
+  regions: [],
+
+  addRegion: (regionData) => {
+    // Generate ID if not provided
+    const newRegion: CanvasRegion = {
+      ...regionData,
+      id: regionData.id || `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
+    
+    set((state) => ({
+      regions: [...state.regions, newRegion],
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateRegion: (id, updates) => {
+    set((state) => ({
+      regions: state.regions.map((region) =>
+        region.id === id ? { ...region, ...updates } : region
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  removeRegion: (id) => {
+    set((state) => ({
+      regions: state.regions.filter((region) => region.id !== id),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  clearRegions: () => {
+    set({ regions: [] });
+  },
+
+  setRegions: (regions) => {
+    set({ regions });
+  },
+
+  selectRegion: (id) => {
+    set((state) => ({
+      regions: state.regions.map((region) =>
+        region.id === id ? { ...region, selected: true } : region
+      ),
+    }));
+  },
+
+  deselectRegion: (id) => {
+    set((state) => ({
+      regions: state.regions.map((region) =>
+        region.id === id ? { ...region, selected: false } : region
+      ),
+    }));
+  },
+
+  clearSelection: () => {
+    set((state) => ({
+      regions: state.regions.map((region) => ({ ...region, selected: false })),
+    }));
+  },
+
+  getSelectedRegions: () => {
+    const { regions } = get();
+    return regions.filter((region) => region.selected);
+  },
+});
+
+// Wrap with syncPatch middleware
+const withSyncPatch = syncPatch<RegionStore>({ 
+  channel: 'regions',
+  excludePaths: [], // Sync all region data (selection is part of region object)
+  debug: false,
+})(regionStoreCreator);
+
+// Persist options
+const persistOptions: PersistOptions<RegionStore, Partial<RegionStore>> = {
+  name: 'canvas-regions-store',
+  version: 2,
+  partialize: (state) => ({
+    ...state,
+    // Exclude backgroundImage from persistence to avoid localStorage quota issues
+    // Base64 images are too large for localStorage (~5MB limit)
+    regions: state.regions.map(region => ({
+      ...region,
+      backgroundImage: undefined,
+    })),
+  }),
+};
+
 export const useRegionStore = create<RegionStore>()(
-  persist(
-    (set, get) => ({
-      regions: [],
-
-      addRegion: (regionData) => {
-        console.log('🔷 addRegion called with:', { hasId: !!regionData.id, regionData });
-        
-        // Generate ID if not provided
-        const newRegion: CanvasRegion = {
-          ...regionData,
-          id: regionData.id || `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        };
-        
-        set((state) => ({
-          regions: [...state.regions, newRegion],
-        }));
-        syncManager.syncRegionAdd(newRegion);
-        // Check if this is a remote sync by looking for the _fromRemote flag
-        // Remote syncs will have `_fromRemote: true` added by the handler
-        // const isRemoteSync = (regionData as any)._fromRemote === true;
-        
-        // Only sync if this is a new LOCAL region (not from remote)
-        // if (!isRemoteSync && syncManager.isConnected()) {
-        //   console.log('📤 Syncing new region:', newRegion.id);
-        //   syncManager.syncRegionAdd(newRegion);
-        // } else if (isRemoteSync) {
-        //   console.log('⏭️ Skipping sync for remote region:', newRegion.id);
-        // }
-      },
-
-      updateRegion: (id, updates) => {
-        set((state) => ({
-          regions: state.regions.map((region) =>
-            region.id === id ? { ...region, ...updates } : region
-          ),
-        }));
-        
-        // Only sync if not coming from remote (updates without sync flag)
-        if (updates.id === undefined || updates.id === id) {
-          syncManager.syncRegionUpdate(id, updates);
-        }
-      },
-
-      removeRegion: (id) => {
-        const regionExists = get().regions.some(region => region.id === id);
-        
-        set((state) => ({
-          regions: state.regions.filter((region) => region.id !== id),
-        }));
-        
-        // Only sync if region existed (to avoid syncing remote removals)
-        if (regionExists) {
-          syncManager.syncRegionRemove(id);
-        }
-      },
-
-      clearRegions: () => {
-        set({ regions: [] });
-      },
-
-      setRegions: (regions) => {
-        set({ regions });
-      },
-
-      selectRegion: (id) => {
-        set((state) => ({
-          regions: state.regions.map((region) =>
-            region.id === id ? { ...region, selected: true } : region
-          ),
-        }));
-      },
-
-      deselectRegion: (id) => {
-        set((state) => ({
-          regions: state.regions.map((region) =>
-            region.id === id ? { ...region, selected: false } : region
-          ),
-        }));
-      },
-
-      clearSelection: () => {
-        set((state) => ({
-          regions: state.regions.map((region) => ({ ...region, selected: false })),
-        }));
-      },
-
-      getSelectedRegions: () => {
-        const { regions } = get();
-        return regions.filter((region) => region.selected);
-      },
-    }),
-    {
-      name: 'canvas-regions-store',
-      version: 2,
-      partialize: (state) => ({
-        ...state,
-        // Exclude backgroundImage from persistence to avoid localStorage quota issues
-        // Base64 images are too large for localStorage (~5MB limit)
-        regions: state.regions.map(region => ({
-          ...region,
-          backgroundImage: undefined,
-        })),
-      }),
-    }
-  )
+  persist(withSyncPatch as StateCreator<RegionStore, [], []>, persistOptions)
 );
