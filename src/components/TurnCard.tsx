@@ -25,7 +25,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   return (
     <div
       className={cn(
-        "relative flex flex-row items-center gap-2 rounded-lg border-2 border-primary bg-primary/10",
+        "relative flex flex-row items-center gap-3 rounded-lg border-2 border-primary bg-primary/10",
         isCompact ? "p-2" : "p-3"
       )}
       style={size ? { 
@@ -46,9 +46,9 @@ export const TurnCard: React.FC<TurnCardProps> = ({
       )}
       <Swords 
         className="text-primary shrink-0" 
-        size={Math.max(20, imageSize * 0.5)}
+        size={Math.max(24, imageSize * 0.6)}
       />
-      <div className="flex flex-col text-right">
+      <div className="flex flex-col whitespace-nowrap">
         <div 
           className="font-bold text-primary leading-tight"
           style={{ fontSize: `${fontSize}px` }}
