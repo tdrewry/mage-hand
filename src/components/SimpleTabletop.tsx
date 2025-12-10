@@ -4793,8 +4793,18 @@ export const SimpleTabletop = () => {
       updateTokenPosition(draggedTokenId, newX, newY);
 
       // Real-time vision preview during drag (if enabled)
-      if (realtimeVisionDuringDrag && fogEnabled && !fogRevealAll && wallGeometryRef.current) {
+      console.log('[DRAG VISION] Checking conditions:', {
+        realtimeVisionDuringDrag,
+        fogEnabled,
+        fogRevealAll,
+        hasWallGeometry: !!wallGeometryRef.current,
+        wallSegmentsCount: wallGeometryRef.current?.wallSegments?.length ?? 0
+      });
+      
+      if (realtimeVisionDuringDrag && fogEnabled && !fogRevealAll) {
         const draggedToken = tokens.find((t) => t.id === draggedTokenId);
+        console.log('[DRAG VISION] Found token:', draggedToken?.name, 'hasVision:', draggedToken?.hasVision);
+        
         if (draggedToken && draggedToken.hasVision !== false) {
           // Compute vision range in pixels - use base token size
           const baseTokenSize = 40;
@@ -4810,19 +4820,37 @@ export const SimpleTabletop = () => {
             (window as any)[lastUpdateKey] = now;
             
             // Compute visibility for the dragged token at its new position
-            const baseTokenSize = 40;
             const tokenCenterX = newX + (draggedToken.gridWidth || 1) * baseTokenSize / 2;
             const tokenCenterY = newY + (draggedToken.gridHeight || 1) * baseTokenSize / 2;
+            
+            // Get wall segments, default to empty array if not available
+            const wallSegments = wallGeometryRef.current?.wallSegments ?? [];
+            console.log('[DRAG VISION] Computing visibility at:', { tokenCenterX, tokenCenterY, tokenVisionRange, wallSegmentsCount: wallSegments.length });
             
             try {
               const visibility = computeVisibilityFromSegments(
                 { x: tokenCenterX, y: tokenCenterY },
-                wallGeometryRef.current.wallSegments,
+                wallSegments,
                 tokenVisionRange
               );
-              dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
+              console.log('[DRAG VISION] Visibility computed, polygon points:', visibility.polygon?.length);
+              
+              if (visibility.polygon && visibility.polygon.length > 2) {
+                dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
+                console.log('[DRAG VISION] Path2D created successfully');
+              } else {
+                // Fallback: create a simple circular visibility area
+                const circlePath = new Path2D();
+                circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
+                dragPreviewVisibilityRef.current = circlePath;
+                console.log('[DRAG VISION] Using circular fallback');
+              }
             } catch (e) {
-              // Silently fail - will just not show preview
+              console.error('[DRAG VISION] Visibility computation error:', e);
+              // Fallback: create a simple circular visibility area
+              const circlePath = new Path2D();
+              circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
+              dragPreviewVisibilityRef.current = circlePath;
             }
           }
         }
