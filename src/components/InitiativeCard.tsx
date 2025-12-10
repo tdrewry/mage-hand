@@ -61,22 +61,30 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing p-1.5",
-          isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
-          !isActive && hasGone && "opacity-60 border-border bg-muted/50",
-          !isActive && !hasGone && "border-border bg-card hover:border-primary/50",
+          "relative flex flex-col justify-end rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing overflow-hidden",
+          isActive && "border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/50",
+          !isActive && hasGone && "opacity-60 border-border",
+          !isActive && !hasGone && "border-border hover:border-primary/50",
           isHidden && "opacity-50 border-dashed"
         )}
         style={{ 
-          width: isActive ? '85px' : '60px'
+          width: isActive ? '85px' : '60px',
+          height: isActive ? '60px' : '45px',
+          backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
+          backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
         }}
       >
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
         {/* Remove Button */}
         {!isCompact && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground z-10"
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
@@ -88,24 +96,24 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
         {/* Hidden Indicator */}
         {isHidden && (
-          <div className="absolute top-1 left-1">
-            <EyeOff className="h-3 w-3 text-muted-foreground" />
+          <div className="absolute top-1 left-1 z-10">
+            <EyeOff className="h-3 w-3 text-white/70" />
           </div>
         )}
 
-        {/* Token Name - Top row */}
-        <div 
-          className="font-medium text-foreground truncate w-full leading-tight mb-1"
-          style={{ fontSize: `${fontSize}px` }}
-        >
-          {token.label || token.name}
-        </div>
+        {/* Content overlay */}
+        <div className="relative z-10 p-1.5 flex items-end justify-between gap-1">
+          {/* Token Name */}
+          <div 
+            className="font-medium text-white truncate flex-1 leading-tight drop-shadow-md"
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {token.label || token.name}
+          </div>
 
-        {/* Bottom row: Initiative number + Token Image */}
-        <div className="flex items-center gap-1.5">
           {/* Initiative Number */}
           <div 
-            className="bg-background border-2 border-primary rounded-full min-w-[24px] h-[24px] flex items-center justify-center"
+            className="bg-background/90 border border-primary rounded-full min-w-[20px] h-[20px] flex items-center justify-center shrink-0"
             style={{ fontSize: `${initFontSize}px` }}
           >
             {isEditingInitiative && !isCompact ? (
@@ -132,28 +140,6 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
               >
                 {initiative}
               </span>
-            )}
-          </div>
-
-          {/* Token Image or Color */}
-          <div 
-            className="relative rounded-md overflow-hidden border border-border shrink-0"
-            style={{ 
-              width: `${imageSize}px`, 
-              height: `${imageSize}px` 
-            }}
-          >
-            {token.imageUrl ? (
-              <img
-                src={token.imageUrl}
-                alt={token.label || token.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full"
-                style={{ backgroundColor: token.color || '#888' }}
-              />
             )}
           </div>
         </div>
