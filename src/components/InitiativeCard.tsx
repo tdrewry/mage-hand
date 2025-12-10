@@ -150,9 +150,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           </div>
         </div>
 
-        {/* Active Indicator */}
+        {/* Active Indicator - Triangle pointing right */}
         {isActive && (
-          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          <div 
+            className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[8px] border-l-primary"
+          />
         )}
       </div>
     </TokenContextMenu>
