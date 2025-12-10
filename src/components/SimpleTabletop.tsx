@@ -75,6 +75,7 @@ import { usePostProcessing } from "../hooks/usePostProcessing";
 import { useRegionEdgeProcessing } from "../hooks/useRegionEdgeProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import { useUndoableActions } from "../hooks/useUndoableActions";
+import { useTextureLoader } from "../hooks/useTextureLoader";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
@@ -294,6 +295,9 @@ export const SimpleTabletop = () => {
   
   // Undoable actions
   const { moveTokenUndoable, moveRegionUndoable, transformRegionUndoable } = useUndoableActions();
+  
+  // Texture loader for persistent region backgrounds
+  useTextureLoader();
 
   // Track explored areas (accumulated visibility) using paper.js
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);

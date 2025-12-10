@@ -9,6 +9,7 @@ import { useRegionStore, type CanvasRegion } from '@/stores/regionStore';
 import { ImageImportModal, ImageImportResult } from './ImageImportModal';
 import { toast } from 'sonner';
 import { Image, Trash2, Upload, Grid } from 'lucide-react';
+import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
 
 interface RegionBulkTextureModalProps {
   open: boolean;
@@ -161,7 +162,7 @@ export const RegionBulkTextureModal = ({
     setShowImageImport(false);
   };
 
-  const applyTexture = () => {
+  const applyTexture = async () => {
     if (!backgroundUrl || !previewImage) {
       toast.error('Please select an image first');
       return;
@@ -178,6 +179,17 @@ export const RegionBulkTextureModal = ({
 
     const scaledWidth = previewImage.naturalWidth * backgroundScale;
     const scaledHeight = previewImage.naturalHeight * backgroundScale;
+
+    // Save texture to IndexedDB for persistence (with deduplication)
+    try {
+      // Save once - all regions will reference the same texture via hash
+      await Promise.all(regionsToUpdate.map(region => 
+        saveRegionTexture(region.id, backgroundUrl)
+      ));
+    } catch (error) {
+      console.error('Failed to persist texture to IndexedDB:', error);
+      // Continue anyway - texture will work in current session
+    }
 
     regionsToUpdate.forEach(region => {
       let regionMinX = region.x;
@@ -207,10 +219,19 @@ export const RegionBulkTextureModal = ({
     onOpenChange(false);
   };
 
-  const clearTexture = () => {
+  const clearTexture = async () => {
     // Re-fetch regions fresh from store to ensure we have latest state
     const currentRegions = useRegionStore.getState().regions;
     const regionsToUpdate = currentRegions.filter(r => selectedRegionIds.includes(r.id));
+    
+    // Remove from IndexedDB
+    try {
+      await Promise.all(regionsToUpdate.map(region => 
+        removeRegionTexture(region.id)
+      ));
+    } catch (error) {
+      console.error('Failed to remove textures from IndexedDB:', error);
+    }
     
     regionsToUpdate.forEach(region => {
       updateRegion(region.id, {
