@@ -2218,7 +2218,7 @@ export const SimpleTabletop = () => {
 
         // Canvas 2D fallback: Use simple solid fills for all visibility areas
         // (Gradient effects are only available in PixiJS post-processing mode)
-        if (tokenVisibilityDataRef.current.length > 0) {
+        if (tokenVisibilityDataRef.current.length > 0 || dragPreviewVisibilityRef.current) {
           ctx.save();
           ctx.globalCompositeOperation = "destination-out";
 
@@ -2226,6 +2226,12 @@ export const SimpleTabletop = () => {
             ctx.fillStyle = "rgba(255, 255, 255, 1)";
             ctx.fill(visibilityPath);
           });
+          
+          // Composite real-time drag preview visibility (when feature enabled)
+          if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current) {
+            ctx.fillStyle = "rgba(255, 255, 255, 1)";
+            ctx.fill(dragPreviewVisibilityRef.current);
+          }
 
           ctx.globalCompositeOperation = "source-over";
           ctx.restore();
@@ -2262,6 +2268,40 @@ export const SimpleTabletop = () => {
             visibilityPolygon: t.visibilityPath,
           };
         });
+        
+        // Add real-time drag preview as an additional illumination source
+        if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && draggedTokenId) {
+          const draggedToken = tokens.find(t => t.id === draggedTokenId);
+          if (draggedToken) {
+            const baseTokenSize = 40;
+            const tokenVisionRange = draggedToken.illuminationSources?.[0]?.range || 
+              (draggedToken.visionRange ?? fogVisionRange) * baseTokenSize;
+            const tokenSettings = draggedToken.illuminationSources?.[0];
+            
+            illuminationSources.push({
+              id: 'drag-preview',
+              name: 'Drag Preview',
+              enabled: true,
+              position: {
+                x: draggedToken.x + (draggedToken.gridWidth || 1) * baseTokenSize / 2,
+                y: draggedToken.y + (draggedToken.gridHeight || 1) * baseTokenSize / 2,
+              },
+              range: tokenVisionRange,
+              brightZone: tokenSettings?.brightZone ?? effectSettings.lightFalloff,
+              brightIntensity: tokenSettings?.brightIntensity ?? 1.0,
+              dimIntensity: tokenSettings?.dimIntensity ?? 0.0,
+              color: tokenSettings?.color ?? '#FFFFFF',
+              colorEnabled: tokenSettings?.colorEnabled ?? false,
+              colorIntensity: tokenSettings?.colorIntensity ?? 0.5,
+              softEdge: tokenSettings?.softEdge ?? true,
+              softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
+              animation: 'none',
+              animationSpeed: 1.0,
+              animationIntensity: 0.3,
+              visibilityPolygon: dragPreviewVisibilityRef.current,
+            });
+          }
+        }
         
         applyPostProcessingEffects(
           ctx,
