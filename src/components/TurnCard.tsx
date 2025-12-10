@@ -25,7 +25,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   return (
     <div
       className={cn(
-        "relative flex flex-row items-center gap-1.5 rounded-lg border-2 border-primary bg-primary/10",
+        "relative flex flex-row items-center gap-1.5 rounded-lg border-2 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-background",
         isCompact ? "p-2" : "p-3"
       )}
       style={{ 
