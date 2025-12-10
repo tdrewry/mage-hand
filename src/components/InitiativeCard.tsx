@@ -61,7 +61,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col justify-end rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing overflow-hidden",
+          "relative flex flex-col justify-end rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
           isActive && "border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/50",
           !isActive && hasGone && "opacity-60 border-border",
           !isActive && !hasGone && "border-border hover:border-primary/50",
@@ -77,7 +77,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         }}
       >
         {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent rounded-md" />
 
         {/* Remove Button */}
         {!isCompact && (
