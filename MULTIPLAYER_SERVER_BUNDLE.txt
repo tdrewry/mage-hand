@@ -74,7 +74,8 @@ const {
   handleSyncRegion,
   handleSyncLight,
   handleRequestFullSync,
-  handleKickUser
+  handleKickUser,
+  handleSyncPatch
 } = require('./eventHandlers');
 
 const app = express();
@@ -141,6 +142,11 @@ io.on('connection', (socket) => {
 
   socket.on('sync_light', (payload) => 
     handleSyncLight(socket, io, sessionManager, payload)
+  );
+
+  // JSON Patch Sync (new unified sync system)
+  socket.on('sync:patch', (payload) => 
+    handleSyncPatch(socket, io, sessionManager, payload)
   );
 
   // Additional Events
@@ -1027,6 +1033,54 @@ function handleKickUser(socket, io, sessionManager, payload) {
   }
 }
 
+/**
+ * Handle JSON Patch sync (unified sync for all stores)
+ * Simply broadcasts patches to all other clients in the session
+ */
+function handleSyncPatch(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { channel, patches, messageId, userId, timestamp, targetUserId } = payload;
+
+  // Validate payload
+  if (!channel || !patches || !Array.isArray(patches)) {
+    console.warn('[SyncPatch] Invalid payload received:', { channel, patchCount: patches?.length });
+    return;
+  }
+
+  console.log(`[SyncPatch] ${channel}: ${patches.length} patches from ${userId}`);
+
+  // Build the outbound payload
+  const outPayload = {
+    channel,
+    patches,
+    messageId,
+    userId,
+    timestamp: timestamp || Date.now()
+  };
+
+  // If targeting specific user, send only to them
+  if (targetUserId) {
+    const targetSocketId = getSocketIdByUserId(session, targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('sync:patch_received', outPayload);
+    }
+    return;
+  }
+
+  // Broadcast to all other clients in the session (excluding sender)
+  socket.to(session.sessionId).emit('sync:patch_received', outPayload);
+}
+
+/**
+ * Helper to find socket ID by user ID
+ */
+function getSocketIdByUserId(session, userId) {
+  const user = session.users.get(userId);
+  return user ? user.socketId : null;
+}
+
 module.exports = {
   handleCreateSession,
   handleJoinSession,
@@ -1039,7 +1093,8 @@ module.exports = {
   handleSyncRegion,
   handleSyncLight,
   handleRequestFullSync,
-  handleKickUser
+  handleKickUser,
+  handleSyncPatch
 };
 
 ========================================
@@ -1105,11 +1160,12 @@ Sessions are stored in memory with:
 - `create_session` - Create new session
 - `join_session` - Join existing session
 - `leave_session` - Leave current session
-- `sync_token` - Sync token changes
-- `sync_initiative` - Sync initiative/combat
-- `sync_map` - Sync map changes (add/update/remove/reorder)
-- `sync_fog` - Sync fog of war
-- `sync_role` - Assign/update user roles
+- `sync:patch` - **NEW** JSON Patch sync (unified for all stores)
+- `sync_token` - Sync token changes (legacy)
+- `sync_initiative` - Sync initiative/combat (legacy)
+- `sync_map` - Sync map changes (legacy)
+- `sync_fog` - Sync fog of war (legacy)
+- `sync_role` - Assign/update user roles (legacy)
 - `request_full_sync` - Request full state
 - `kick_user` - Remove user (DM only)
 
@@ -1120,11 +1176,12 @@ Sessions are stored in memory with:
 - `user_joined` - Another user joined
 - `user_left` - User disconnected
 - `full_state_sync` - Complete state snapshot
-- `token_added/updated/removed` - Token changes
-- `initiative_updated` - Initiative changes
-- `combat_state_changed` - Combat status
-- `map_updated` - Map changes (add/update/remove/reorder)
-- `fog_updated` - Fog changes
+- `sync:patch_received` - **NEW** JSON Patch received from another client
+- `token_added/updated/removed` - Token changes (legacy)
+- `initiative_updated` - Initiative changes (legacy)
+- `combat_state_changed` - Combat status (legacy)
+- `map_updated` - Map changes (legacy)
+- `fog_updated` - Fog changes (legacy)
 - `user_list_updated` - User list changed
 - `user_role_changed` - User role updated
 
