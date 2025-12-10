@@ -344,7 +344,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
-  const handleExportToFile = () => {
+  const handleExportToFile = async () => {
     if (!projectName.trim()) {
       toast.error('Please enter a project name');
       return;
@@ -359,8 +359,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
     try {
       const projectData = createCurrentProjectData();
-      exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
-      toast.success('Project exported successfully');
+      await exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
+      toast.success('Project exported successfully (with textures)');
     } catch (error) {
       toast.error(`Failed to export project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {

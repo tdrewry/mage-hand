@@ -622,3 +622,88 @@ export async function clearUnusedTextures(): Promise<number> {
     return 0;
   }
 }
+
+/**
+ * Get all region-to-texture mappings for export
+ */
+export async function getAllRegionMappings(): Promise<Map<string, string>> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([REGION_MAPPINGS_STORE], 'readonly');
+      const store = transaction.objectStore(REGION_MAPPINGS_STORE);
+      const mappings = new Map<string, string>();
+
+      const request = store.openCursor();
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          const mapping = cursor.value as RegionMapping;
+          mappings.set(mapping.regionId, mapping.textureHash);
+          cursor.continue();
+        }
+      };
+
+      transaction.oncomplete = () => resolve(mappings);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to get region mappings:', error);
+    return new Map();
+  }
+}
+
+/**
+ * Import textures from project export (restores to IndexedDB)
+ */
+export async function importTextures(
+  textures: Record<string, string>,
+  regionMappings: Record<string, string>
+): Promise<void> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TEXTURES_STORE, REGION_MAPPINGS_STORE], 'readwrite');
+      const texturesStore = transaction.objectStore(TEXTURES_STORE);
+      const mappingsStore = transaction.objectStore(REGION_MAPPINGS_STORE);
+
+      // Import textures
+      for (const [hash, dataUrl] of Object.entries(textures)) {
+        const getRequest = texturesStore.get(hash);
+        getRequest.onsuccess = () => {
+          const existing = getRequest.result as TextureEntry | undefined;
+          if (!existing) {
+            texturesStore.put({
+              hash,
+              dataUrl,
+              refCount: 0,
+              createdAt: Date.now(),
+            });
+          }
+          textureCache.set(hash, dataUrl);
+        };
+      }
+
+      // Import region mappings and update refCounts
+      for (const [regionId, textureHash] of Object.entries(regionMappings)) {
+        mappingsStore.put({ regionId, textureHash });
+        
+        // Increment refCount for this texture
+        const getRequest = texturesStore.get(textureHash);
+        getRequest.onsuccess = () => {
+          const texture = getRequest.result as TextureEntry | undefined;
+          if (texture) {
+            texturesStore.put({ ...texture, refCount: texture.refCount + 1 });
+          }
+        };
+      }
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to import textures:', error);
+  }
+}
