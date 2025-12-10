@@ -100,7 +100,7 @@ export function InitiativeTrackerCardContent() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-1.5 p-1.5">
+    <div className="flex flex-col items-center gap-1.5 p-1.5 bg-background/80 backdrop-blur-sm rounded-lg">
       <Button
         variant="ghost"
         size="icon"
