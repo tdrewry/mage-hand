@@ -1,0 +1,357 @@
+/**
+ * Handle session creation
+ */
+function handleCreateSession(socket, io, sessionManager, payload) {
+  const { username, password } = payload;
+
+  // Generate a random 6-character session code
+  const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  const result = sessionManager.createSession(
+    sessionCode, 
+    password, 
+    socket.id, 
+    username
+  );
+
+  const users = sessionManager.getSessionUsers(result.session.sessionId);
+
+  console.log(`[Session] Created: ${sessionCode} (${result.session.sessionId})`);
+
+  // Join the socket to a room
+  socket.join(result.session.sessionId);
+
+  // Send response to creator
+  socket.emit('session_created', {
+    sessionCode,
+    sessionId: result.session.sessionId,
+    users,
+    yourUserId: result.userId
+  });
+}
+
+/**
+ * Handle joining a session
+ */
+function handleJoinSession(socket, io, sessionManager, payload) {
+  const { sessionCode, username, password, roleIds } = payload;
+
+  const result = sessionManager.joinSession(
+    sessionCode,
+    password,
+    socket.id,
+    username,
+    roleIds
+  );
+
+  if (result.error) {
+    socket.emit('session_error', result.error);
+    return;
+  }
+
+  const { session, userId } = result;
+  const users = sessionManager.getSessionUsers(session.sessionId);
+  const newUser = session.users.get(userId);
+
+  console.log(`[Session] User joined: ${username} -> ${sessionCode}`);
+
+  // Join the socket to the room
+  socket.join(session.sessionId);
+
+  // Send full state to the new user
+  socket.emit('session_joined', {
+    sessionCode: session.sessionCode,
+    sessionId: session.sessionId,
+    users,
+    yourUserId: userId
+  });
+
+  // Send full state sync
+  socket.emit('full_state_sync', {
+    tokens: session.state.tokens,
+    initiative: session.state.initiative,
+    maps: session.state.maps,
+    regions: session.state.regions,
+    lights: session.state.lights,
+    fog: session.state.fog,
+    roles: session.state.roles,
+    players: users,
+    sessionMetadata: {
+      sessionCode: session.sessionCode,
+      createdAt: session.createdAt
+    }
+  });
+
+  // Notify other users
+  socket.to(session.sessionId).emit('user_joined', {
+    user: {
+      userId: newUser.userId,
+      username: newUser.username,
+      roleIds: newUser.roleIds,
+      connectedAt: newUser.connectedAt
+    }
+  });
+
+  // Broadcast updated user list
+  io.to(session.sessionId).emit('user_list_updated', { users });
+}
+
+/**
+ * Handle leaving a session
+ */
+function handleLeaveSession(socket, io, sessionManager) {
+  const result = sessionManager.leaveSession(socket.id);
+  
+  if (!result) return;
+
+  const { session, removedUser } = result;
+
+  console.log(`[Session] User left: ${removedUser.username}`);
+
+  // Leave the room
+  socket.leave(session.sessionId);
+
+  // Notify others
+  if (session.users.size > 0) {
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    
+    socket.to(session.sessionId).emit('user_left', {
+      userId: removedUser.userId,
+      username: removedUser.username
+    });
+
+    io.to(session.sessionId).emit('user_list_updated', { users });
+  }
+
+  socket.emit('session_left');
+}
+
+/**
+ * Handle role synchronization (kept for DM permission management)
+ */
+function handleSyncRole(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { action, userId, roleIds, timestamp, senderId } = payload;
+
+  // Verify sender has permission (should be DM)
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can assign roles'
+    });
+    return;
+  }
+
+  if (action === 'assign') {
+    sessionManager.updateUserRoles(session.sessionId, userId, roleIds);
+    
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    
+    // Broadcast role change
+    io.to(session.sessionId).emit('user_role_changed', {
+      userId,
+      roleIds,
+      timestamp
+    });
+
+    io.to(session.sessionId).emit('user_list_updated', { users });
+  }
+}
+
+/**
+ * Handle full state sync request
+ */
+function handleRequestFullSync(socket, sessionManager) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const users = sessionManager.getSessionUsers(session.sessionId);
+
+  socket.emit('full_state_sync', {
+    tokens: session.state.tokens,
+    initiative: session.state.initiative,
+    maps: session.state.maps,
+    regions: session.state.regions,
+    lights: session.state.lights,
+    fog: session.state.fog,
+    roles: session.state.roles,
+    players: users,
+    sessionMetadata: {
+      sessionCode: session.sessionCode,
+      createdAt: session.createdAt
+    }
+  });
+}
+
+/**
+ * Handle kicking a user
+ */
+function handleKickUser(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  // Verify sender has permission
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can kick users'
+    });
+    return;
+  }
+
+  const { userId } = payload;
+  const kickedUser = sessionManager.kickUser(session.sessionId, userId);
+
+  if (kickedUser) {
+    // Notify the kicked user
+    io.to(kickedUser.socketId).emit('session_error', {
+      code: 'KICKED',
+      message: 'You have been removed from the session'
+    });
+
+    // Force disconnect
+    const kickedSocket = io.sockets.sockets.get(kickedUser.socketId);
+    if (kickedSocket) {
+      kickedSocket.disconnect(true);
+    }
+
+    // Notify others
+    const users = sessionManager.getSessionUsers(session.sessionId);
+    io.to(session.sessionId).emit('user_left', {
+      userId: kickedUser.userId,
+      username: kickedUser.username
+    });
+    io.to(session.sessionId).emit('user_list_updated', { users });
+
+    console.log(`[Session] User kicked: ${kickedUser.username}`);
+  }
+}
+
+/**
+ * Handle JSON Patch sync (unified sync for all stores)
+ * Simply broadcasts patches to all other clients in the session
+ */
+function handleSyncPatch(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { channel, patches, messageId, userId, timestamp, targetUserId } = payload;
+
+  // Validate payload
+  if (!channel || !patches || !Array.isArray(patches)) {
+    console.warn('[SyncPatch] Invalid payload received:', { channel, patchCount: patches?.length });
+    return;
+  }
+
+  console.log(`[SyncPatch] ${channel}: ${patches.length} patches from ${userId}`);
+
+  // Build the outbound payload
+  const outPayload = {
+    channel,
+    patches,
+    messageId,
+    userId,
+    timestamp: timestamp || Date.now()
+  };
+
+  // If targeting specific user, send only to them
+  if (targetUserId) {
+    const targetSocketId = getSocketIdByUserId(session, targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('sync:patch_received', outPayload);
+    }
+    return;
+  }
+
+  // Broadcast to all other clients in the session (excluding sender)
+  socket.to(session.sessionId).emit('sync:patch_received', outPayload);
+}
+
+/**
+ * Helper to find socket ID by user ID
+ */
+function getSocketIdByUserId(session, userId) {
+  const user = session.users.get(userId);
+  return user ? user.socketId : null;
+}
+
+/**
+ * Handle texture upload from DM
+ */
+function handleTextureUpload(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { hash, dataUrl, size } = payload;
+
+  if (!hash || !dataUrl) {
+    console.warn('[Texture] Invalid upload payload');
+    return;
+  }
+
+  // Verify sender has permission (should be DM)
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can upload textures'
+    });
+    return;
+  }
+
+  // Store texture
+  sessionManager.storeTexture(hash, dataUrl, session.sessionId);
+
+  console.log(`[Texture] Uploaded: ${hash} (${(size / 1024).toFixed(1)}KB) by ${sender.username}`);
+
+  // Notify other clients that a texture is available
+  socket.to(session.sessionId).emit('texture:available', {
+    hash,
+    size: size || dataUrl.length,
+    uploadedBy: sender.userId
+  });
+}
+
+/**
+ * Handle texture request from client
+ */
+function handleTextureRequest(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  const { hash } = payload;
+
+  if (!hash) {
+    console.warn('[Texture] Invalid request payload');
+    return;
+  }
+
+  const texture = sessionManager.getTexture(hash);
+
+  if (texture) {
+    socket.emit('texture:data', {
+      hash,
+      dataUrl: texture.dataUrl
+    });
+    console.log(`[Texture] Sent: ${hash}`);
+  } else {
+    socket.emit('texture:not_found', { hash });
+    console.log(`[Texture] Not found: ${hash}`);
+  }
+}
+
+module.exports = {
+  handleCreateSession,
+  handleJoinSession,
+  handleLeaveSession,
+  handleSyncRole,
+  handleRequestFullSync,
+  handleKickUser,
+  handleSyncPatch,
+  handleTextureUpload,
+  handleTextureRequest
+};

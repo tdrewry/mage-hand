@@ -1,0 +1,308 @@
+const crypto = require('crypto');
+
+class SessionManager {
+  constructor() {
+    // Map<sessionId, Session>
+    this.sessions = new Map();
+    // Map<socketId, sessionId>
+    this.socketToSession = new Map();
+    // Map<hash, { dataUrl, refCount, uploadedAt }> - Global texture storage
+    this.textures = new Map();
+  }
+
+  /**
+   * Create a new session
+   */
+  createSession(sessionCode, password, creatorSocketId, username, roleIds = []) {
+    const sessionId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+    
+    const session = {
+      sessionId,
+      sessionCode,
+      password: password || null,
+      createdAt: Date.now(),
+      users: new Map(),
+      textureHashes: new Set(), // Track which textures this session uses
+      state: {
+        tokens: [],
+        initiative: {
+          isInCombat: false,
+          currentTurnIndex: -1,
+          roundNumber: 0,
+          initiativeOrder: []
+        },
+        maps: [],
+        regions: [],
+        lights: [],
+        fog: null,
+        roles: []
+      }
+    };
+
+    // Add creator as first user
+    session.users.set(userId, {
+      userId,
+      username,
+      socketId: creatorSocketId,
+      roleIds: roleIds.length > 0 ? roleIds : ['dm'], // Creator is DM by default
+      connectedAt: Date.now()
+    });
+
+    this.sessions.set(sessionId, session);
+    this.socketToSession.set(creatorSocketId, sessionId);
+
+    return { session, userId };
+  }
+
+  /**
+   * Join an existing session
+   */
+  joinSession(sessionCode, password, socketId, username, roleIds = []) {
+    const session = this.findSessionByCode(sessionCode);
+    
+    if (!session) {
+      return { error: { code: 'NOT_FOUND', message: 'Session not found' } };
+    }
+
+    if (session.password && session.password !== password) {
+      return { error: { code: 'INVALID_PASSWORD', message: 'Invalid password' } };
+    }
+
+    const userId = crypto.randomUUID();
+    session.users.set(userId, {
+      userId,
+      username,
+      socketId,
+      roleIds: roleIds.length > 0 ? roleIds : ['player'],
+      connectedAt: Date.now()
+    });
+
+    this.socketToSession.set(socketId, session.sessionId);
+
+    return { session, userId };
+  }
+
+  /**
+   * Remove a user from their session
+   */
+  leaveSession(socketId) {
+    const sessionId = this.socketToSession.get(socketId);
+    if (!sessionId) return null;
+
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    // Find and remove the user
+    let removedUser = null;
+    for (const [userId, user] of session.users.entries()) {
+      if (user.socketId === socketId) {
+        removedUser = user;
+        session.users.delete(userId);
+        break;
+      }
+    }
+
+    this.socketToSession.delete(socketId);
+
+    // Clean up empty sessions
+    if (session.users.size === 0) {
+      // Clean up textures used by this session
+      this.cleanupSessionTextures(session);
+      this.sessions.delete(sessionId);
+      console.log(`[Session] Deleted empty session: ${sessionId}`);
+    }
+
+    return { session, removedUser };
+  }
+
+  /**
+   * Store a texture (with deduplication)
+   */
+  storeTexture(hash, dataUrl, sessionId) {
+    const existing = this.textures.get(hash);
+    
+    if (existing) {
+      existing.refCount++;
+      existing.sessions.add(sessionId);
+    } else {
+      this.textures.set(hash, {
+        dataUrl,
+        refCount: 1,
+        uploadedAt: Date.now(),
+        sessions: new Set([sessionId])
+      });
+    }
+
+    // Track in session
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.textureHashes.add(hash);
+    }
+
+    return hash;
+  }
+
+  /**
+   * Get a texture by hash
+   */
+  getTexture(hash) {
+    return this.textures.get(hash) || null;
+  }
+
+  /**
+   * Cleanup textures when session ends
+   */
+  cleanupSessionTextures(session) {
+    for (const hash of session.textureHashes) {
+      const texture = this.textures.get(hash);
+      if (texture) {
+        texture.sessions.delete(session.sessionId);
+        texture.refCount--;
+        
+        if (texture.refCount <= 0 || texture.sessions.size === 0) {
+          this.textures.delete(hash);
+          console.log(`[Texture] Deleted unused texture: ${hash}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get texture storage statistics
+   */
+  getTextureStats() {
+    let totalSize = 0;
+    for (const texture of this.textures.values()) {
+      totalSize += texture.dataUrl.length;
+    }
+    return {
+      count: this.textures.size,
+      totalSizeBytes: totalSize,
+      totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2)
+    };
+  }
+
+  /**
+   * Get session by socket ID
+   */
+  getSessionBySocket(socketId) {
+    const sessionId = this.socketToSession.get(socketId);
+    return sessionId ? this.sessions.get(sessionId) : null;
+  }
+
+  /**
+   * Get user by socket ID
+   */
+  getUserBySocket(socketId) {
+    const session = this.getSessionBySocket(socketId);
+    if (!session) return null;
+
+    for (const user of session.users.values()) {
+      if (user.socketId === socketId) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find session by code
+   */
+  findSessionByCode(sessionCode) {
+    for (const session of this.sessions.values()) {
+      if (session.sessionCode === sessionCode) {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Update session state
+   */
+  updateState(sessionId, stateType, data) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    switch (stateType) {
+      case 'tokens':
+        session.state.tokens = data;
+        break;
+      case 'initiative':
+        session.state.initiative = { ...session.state.initiative, ...data };
+        break;
+      case 'maps':
+        session.state.maps = data;
+        break;
+      case 'regions':
+        session.state.regions = data;
+        break;
+      case 'lights':
+        session.state.lights = data;
+        break;
+      case 'fog':
+        session.state.fog = data;
+        break;
+      case 'roles':
+        session.state.roles = data;
+        break;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get all users in a session as array
+   */
+  getSessionUsers(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return [];
+
+    return Array.from(session.users.values()).map(user => ({
+      userId: user.userId,
+      username: user.username,
+      roleIds: user.roleIds,
+      connectedAt: user.connectedAt
+    }));
+  }
+
+  /**
+   * Update user roles
+   */
+  updateUserRoles(sessionId, userId, roleIds) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const user = session.users.get(userId);
+    if (!user) return false;
+
+    user.roleIds = roleIds;
+    return true;
+  }
+
+  /**
+   * Kick a user from session
+   */
+  kickUser(sessionId, userId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const user = session.users.get(userId);
+    if (!user) return null;
+
+    session.users.delete(userId);
+    this.socketToSession.delete(user.socketId);
+
+    return user;
+  }
+
+  /**
+   * Get active session count
+   */
+  getActiveSessions() {
+    return this.sessions.size;
+  }
+}
+
+module.exports = SessionManager;
