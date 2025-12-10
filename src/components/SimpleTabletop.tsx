@@ -3004,18 +3004,6 @@ export const SimpleTabletop = () => {
       // Transform handles removed - now using classic resize/rotate handles only
     }
 
-    // Draw grid type label (only in edit mode)
-    if (renderingMode === "edit" && region.gridType !== "free" && region.pathPoints && region.pathPoints.length > 0) {
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${10 / transform.zoom}px Arial`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(
-        `${region.gridType.toUpperCase()} ${region.gridScale}x`,
-        region.pathPoints[0].x + 4 / transform.zoom,
-        region.pathPoints[0].y + 4 / transform.zoom,
-      );
-    }
   };
 
   // Function to draw rectangle regions
@@ -3082,18 +3070,6 @@ export const SimpleTabletop = () => {
       ctx.strokeRect(region.x, region.y, region.width, region.height);
     }
 
-    // Draw grid type label (only in edit mode)
-    if (renderingMode === "edit" && region.gridType !== "free") {
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${10 / transform.zoom}px Arial`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(
-        `${region.gridType.toUpperCase()} ${region.gridScale}x`,
-        region.x + 4 / transform.zoom,
-        region.y + 4 / transform.zoom,
-      );
-    }
 
     ctx.restore();
 
