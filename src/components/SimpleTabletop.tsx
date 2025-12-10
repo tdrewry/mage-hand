@@ -4150,6 +4150,30 @@ export const SimpleTabletop = () => {
     const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
     const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
+    // In play mode with fog enabled, check visibility before showing context menus
+    const isPlayMode = renderingMode === 'play';
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    
+    if (isPlayMode && fogEnabled && currentPlayer) {
+      // Check if player has DM-level permissions to bypass fog
+      const hasFogBypass = roles.some(role => 
+        currentPlayer.roleIds.includes(role.id) && role.permissions.canSeeAllFog
+      );
+      
+      if (!hasFogBypass) {
+        const point = { x: worldPos.x, y: worldPos.y };
+        const isVisible = isPointInVisibleArea(point, currentVisibilityRef.current);
+        const isExplored = exploredAreaRef.current 
+          ? isPointInRevealedArea(point, exploredAreaRef.current, currentVisibilityRef.current)
+          : false;
+        
+        // For tokens and regions hidden by fog, block context menu for players
+        if (!isVisible && !isExplored) {
+          return; // Block context menu entirely
+        }
+      }
+    }
+
     if (clickedToken) {
       // Dispatch custom event for TokenContextManager
       const event = new CustomEvent("showTokenContextMenu", {
