@@ -2,11 +2,12 @@
  * Unified Illumination Store
  * Manages all light sources (standalone lights) using the unified IlluminationSource model
  * Token-attached illumination is stored in sessionStore on each token
+ * 
+ * NOTE: Sync is handled automatically via JSON Patch middleware on related stores
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { syncManager } from '@/lib/syncManager';
 import { 
   type IlluminationSource, 
   type IlluminationTemplate,
@@ -75,11 +76,6 @@ export const useIlluminationStore = create<IlluminationState>()(
           lights: [...state.lights, newLight],
         }));
         
-        // Sync to multiplayer
-        if (syncManager.isConnected()) {
-          syncManager.syncLightAdd(newLight as any);
-        }
-        
         return id;
       },
       
@@ -89,37 +85,20 @@ export const useIlluminationStore = create<IlluminationState>()(
             light.id === id ? { ...light, ...updates } : light
           ),
         }));
-        
-        if (syncManager.isConnected()) {
-          syncManager.syncLightUpdate(id, updates as any);
-        }
       },
       
       removeLight: (id) => {
-        const lightExists = get().lights.some(light => light.id === id);
-        
         set((state) => ({
           lights: state.lights.filter((light) => light.id !== id),
         }));
-        
-        if (lightExists && syncManager.isConnected()) {
-          syncManager.syncLightRemove(id);
-        }
       },
       
       toggleLight: (id) => {
-        const light = get().lights.find(l => l.id === id);
-        if (!light) return;
-        
         set((state) => ({
           lights: state.lights.map((l) =>
             l.id === id ? { ...l, enabled: !l.enabled } : l
           ),
         }));
-        
-        if (syncManager.isConnected()) {
-          syncManager.syncLightToggle(id);
-        }
       },
       
       setLights: (lights) => {
@@ -148,10 +127,6 @@ export const useIlluminationStore = create<IlluminationState>()(
         set((state) => ({
           lights: [...state.lights, newLight],
         }));
-        
-        if (syncManager.isConnected()) {
-          syncManager.syncLightAdd(newLight as any);
-        }
         
         return newLight.id;
       },

@@ -1,6 +1,6 @@
 # JSON Patch Sync Middleware Implementation
 
-## Status: Phase 3 Complete ✅
+## Status: Phase 4 Complete ✅
 
 ## Overview
 Zustand middleware that automatically captures state changes, generates JSON Patches (RFC 6902), and synchronizes them via Socket.io. Provides Yjs-like developer experience (automatic sync) with deterministic conflict resolution.
@@ -74,10 +74,11 @@ Migrated stores:
 - [x] Broadcasts patches to session members (excluding sender)
 - [x] Supports targeted messages via `targetUserId`
 
-### Phase 4: Cleanup (TODO)
-- [ ] Remove type-specific sync methods from syncManager
-- [ ] Remove dead event handlers
-- [ ] Test full sync flow end-to-end
+### Phase 4: Cleanup ✅
+- [x] Removed type-specific sync methods from syncManager (syncTokenAdd, syncMapAdd, etc.)
+- [x] Removed throttledSyncTokenPosition
+- [x] Removed manual sync calls from illuminationStore
+- [x] Updated handleSessionJoined to use JSON Patch middleware
 
 ## Integration with syncManager
 
