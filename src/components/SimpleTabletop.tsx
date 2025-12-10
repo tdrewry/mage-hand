@@ -4808,8 +4808,12 @@ export const SimpleTabletop = () => {
         if (draggedToken && draggedToken.hasVision !== false) {
           // Compute vision range in pixels
           // Illumination source range is already in pixels
-          // Token visionRange and fogVisionRange are in grid units - need conversion
-          const gridSize = 40; // Default grid unit size
+          // Token visionRange and fogVisionRange are in grid units - need conversion using region's gridSize
+          const tokenRegion = regions.find(
+            (r) => draggedToken.x >= r.x && draggedToken.x <= r.x + r.width && 
+                   draggedToken.y >= r.y && draggedToken.y <= r.y + r.height,
+          );
+          const gridSize = tokenRegion?.gridSize || 40;
           const illuminationRange = draggedToken.illuminationSources?.[0]?.range;
           const gridBasedRange = (draggedToken.visionRange ?? fogVisionRange) * gridSize;
           const tokenVisionRange = illuminationRange || gridBasedRange;
