@@ -77,7 +77,7 @@ export interface SessionState {
   updateTokenName: (tokenId: string, name: string) => void;
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
-  updateTokenImage: (tokenId: string, imageUrl: string) => void;
+  updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
   updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
@@ -203,10 +203,10 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     // Sync happens automatically via syncPatch middleware
   },
 
-  updateTokenImage: (tokenId, imageUrl) => {
+  updateTokenImage: (tokenId, imageUrl, imageHash) => {
     set((state) => ({
       tokens: state.tokens.map((token) =>
-        token.id === tokenId ? { ...token, imageUrl } : token
+        token.id === tokenId ? { ...token, imageUrl, imageHash } : token
       ),
     }));
     // Sync happens automatically via syncPatch middleware

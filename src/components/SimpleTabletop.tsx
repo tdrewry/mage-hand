@@ -77,6 +77,7 @@ import { useRegionEdgeProcessing } from "../hooks/useRegionEdgeProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import { useUndoableActions } from "../hooks/useUndoableActions";
 import { useTextureLoader } from "../hooks/useTextureLoader";
+import { TextureDownloadProgress } from "./TextureDownloadProgress";
 import { texturePatternCache } from "../lib/texturePatternCache";
 import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
 import { toast } from "sonner";
@@ -5638,6 +5639,9 @@ export const SimpleTabletop = () => {
 
   return (
     <div className="w-full h-screen bg-surface flex flex-col relative">
+      {/* Texture Download Progress Indicator */}
+      <TextureDownloadProgress />
+
       {/* Circular Button Bar - Always visible at top */}
       <CircularButtonBar
         mode={renderingMode}

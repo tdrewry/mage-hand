@@ -35,6 +35,9 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
+import { saveTokenTexture } from '@/lib/tokenTextureStorage';
+import { uploadTexture } from '@/lib/textureSync';
+import { hashImageData } from '@/lib/tokenTextureStorage';
 
 interface TokenContextMenuProps {
   children: React.ReactNode;
@@ -166,9 +169,10 @@ export const TokenContextMenu = ({
   };
 
 
-  const applyTokenEdit = () => {
+  const applyTokenEdit = async () => {
     console.log('Applying token edit with imageUrlValue:', imageUrlValue?.substring(0, 50) + '...');
-    targetTokens.forEach(token => {
+    
+    for (const token of targetTokens) {
       if (nameValue) {
         updateTokenName(token.id, nameValue);
       }
@@ -177,10 +181,27 @@ export const TokenContextMenu = ({
       }
       updateTokenLabelPosition(token.id, labelPositionValue);
       
-      // Apply image - always update (even if empty to allow clearing)
-      updateTokenImage(token.id, imageUrlValue);
-      console.log('Updated token', token.id, 'with imageUrl:', imageUrlValue?.substring(0, 50) + '...');
-    });
+      // Apply image with texture sync
+      if (imageUrlValue) {
+        try {
+          // Save to IndexedDB and get hash
+          const hash = await saveTokenTexture(token.id, imageUrlValue);
+          // Upload to server for multiplayer sync
+          await uploadTexture(hash, imageUrlValue);
+          // Update token with both imageUrl and hash
+          updateTokenImage(token.id, imageUrlValue, hash);
+          console.log('Updated token', token.id, 'with imageUrl and hash:', hash);
+        } catch (error) {
+          console.error('Failed to sync token texture:', error);
+          // Still update the local image
+          updateTokenImage(token.id, imageUrlValue);
+        }
+      } else {
+        // Clear image
+        updateTokenImage(token.id, '', undefined);
+      }
+    }
+    
     setShowTokenEditModal(false);
     onUpdateCanvas?.();
     toast.success(`Token${targetTokens.length > 1 ? 's' : ''} updated`);
