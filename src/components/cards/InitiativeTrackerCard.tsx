@@ -113,7 +113,8 @@ export function InitiativeTrackerCardContent() {
 
       <div 
         ref={scrollContainerRef}
-        className="flex flex-col items-center gap-1.5 overflow-y-auto flex-1 px-2"
+        className="flex flex-col items-end gap-1.5 overflow-y-auto flex-1 px-2 scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         <TurnCard
           turnNumber={currentTurnIndex + 1}

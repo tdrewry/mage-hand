@@ -40,11 +40,9 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
   const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
 
-  // Scale down to 75% of original sizes
-  const scaleFactor = 0.75;
-  const imageSize = size ? size * 0.5 * scaleFactor : (isCompact ? 36 : 48);
-  const fontSize = size ? Math.max(10, size * 0.12) : (isCompact ? 10 : 12);
-  const initFontSize = size ? Math.max(10, size * 0.14) : (isCompact ? 12 : 14);
+  const imageSize = 32;
+  const fontSize = 11;
+  const initFontSize = 12;
   
   const handleInitiativeSubmit = () => {
     const value = parseInt(initiativeValue);
@@ -63,30 +61,28 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
-          isCompact ? "gap-0.5 p-1.5 pb-3" : "gap-1 p-2 pb-4",
+          "relative flex flex-col rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing p-1.5",
           isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
           !isActive && hasGone && "opacity-60 border-border bg-muted/50",
           !isActive && !hasGone && "border-border bg-card hover:border-primary/50",
           isHidden && "opacity-50 border-dashed"
         )}
-        style={size ? { 
-          minWidth: `${size * scaleFactor}px`,
-          width: `${size * scaleFactor}px`
-        } : { minWidth: '90px' }}
+        style={{ 
+          width: isActive ? '140px' : '100px'
+        }}
       >
         {/* Remove Button */}
         {!isCompact && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
             }}
           >
-            <X className="h-3 w-3" />
+            <X className="h-2.5 w-2.5" />
           </Button>
         )}
 
@@ -97,74 +93,74 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           </div>
         )}
 
-        {/* Token Name - Now on top */}
+        {/* Token Name - Top row */}
         <div 
-          className="font-medium text-center text-foreground truncate max-w-full px-1 leading-tight"
+          className="font-medium text-foreground truncate w-full leading-tight mb-1"
           style={{ fontSize: `${fontSize}px` }}
         >
           {token.label || token.name}
         </div>
 
-        {/* Token Image or Color */}
-        <div 
-          className="relative rounded-lg overflow-hidden border-2 border-border"
-          style={{ 
-            width: `${imageSize}px`, 
-            height: `${imageSize}px` 
-          }}
-        >
-          {token.imageUrl ? (
-            <img
-              src={token.imageUrl}
-              alt={token.label || token.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div
-              className="w-full h-full"
-              style={{ backgroundColor: token.color || '#888' }}
-            />
-          )}
-        </div>
+        {/* Bottom row: Initiative number + Token Image */}
+        <div className="flex items-center gap-1.5">
+          {/* Initiative Number */}
+          <div 
+            className="bg-background border-2 border-primary rounded-full min-w-[24px] h-[24px] flex items-center justify-center"
+            style={{ fontSize: `${initFontSize}px` }}
+          >
+            {isEditingInitiative && !isCompact ? (
+              <Input
+                type="number"
+                value={initiativeValue}
+                onChange={(e) => setInitiativeValue(e.target.value)}
+                onBlur={handleInitiativeSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleInitiativeSubmit();
+                  if (e.key === 'Escape') setIsEditingInitiative(false);
+                }}
+                className="w-8 h-5 text-center text-sm font-bold p-0 border-0"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isCompact) setIsEditingInitiative(true);
+                }}
+                className="font-bold text-primary cursor-pointer hover:text-primary/80 px-1"
+              >
+                {initiative}
+              </span>
+            )}
+          </div>
 
-        {/* Initiative Number - Below image, overlapping bottom edge */}
-        <div 
-          className="absolute left-1/2 -translate-x-1/2 bg-background border-2 border-primary rounded-full px-2 py-0.5 min-w-[24px] text-center"
-          style={{ 
-            bottom: '-8px',
-            fontSize: `${initFontSize}px`
-          }}
-        >
-          {isEditingInitiative && !isCompact ? (
-            <Input
-              type="number"
-              value={initiativeValue}
-              onChange={(e) => setInitiativeValue(e.target.value)}
-              onBlur={handleInitiativeSubmit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleInitiativeSubmit();
-                if (e.key === 'Escape') setIsEditingInitiative(false);
-              }}
-              className="w-10 h-5 text-center text-sm font-bold p-0 border-0"
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isCompact) setIsEditingInitiative(true);
-              }}
-              className="font-bold text-primary cursor-pointer hover:text-primary/80"
-            >
-              {initiative}
-            </span>
-          )}
+          {/* Token Image or Color */}
+          <div 
+            className="relative rounded-md overflow-hidden border border-border shrink-0"
+            style={{ 
+              width: `${imageSize}px`, 
+              height: `${imageSize}px` 
+            }}
+          >
+            {token.imageUrl ? (
+              <img
+                src={token.imageUrl}
+                alt={token.label || token.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full"
+                style={{ backgroundColor: token.color || '#888' }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Active Indicator */}
         {isActive && (
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
         )}
       </div>
     </TokenContextMenu>
