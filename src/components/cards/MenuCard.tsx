@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
+import { StorageManagerModal } from '@/components/StorageManagerModal';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { syncManager } from '@/lib/syncManager';
@@ -40,6 +41,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const { roles } = useRoleStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+  const [storageManagerOpen, setStorageManagerOpen] = useState(false);
 
   // Get current player's roles
   const currentPlayer = players.find(p => p.id === currentUserId || p.id === currentPlayerId);
@@ -440,6 +442,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Shield className="h-4 w-4 mr-2" />
           Role Manager
         </Button>
+
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={() => setStorageManagerOpen(true)}
+          className="w-full"
+        >
+          <HardDrive className="h-4 w-4 mr-2" />
+          Storage Manager
+        </Button>
       </div>
 
       <Separator />
@@ -484,6 +496,12 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
       <SessionManager 
         open={sessionManagerOpen} 
         onOpenChange={setSessionManagerOpen} 
+      />
+
+      {/* Storage Manager Modal */}
+      <StorageManagerModal
+        open={storageManagerOpen}
+        onOpenChange={setStorageManagerOpen}
       />
     </div>
   );
