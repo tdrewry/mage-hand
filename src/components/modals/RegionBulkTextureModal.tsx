@@ -208,7 +208,11 @@ export const RegionBulkTextureModal = ({
   };
 
   const clearTexture = () => {
-    selectedRegions.forEach(region => {
+    // Re-fetch regions fresh from store to ensure we have latest state
+    const currentRegions = useRegionStore.getState().regions;
+    const regionsToUpdate = currentRegions.filter(r => selectedRegionIds.includes(r.id));
+    
+    regionsToUpdate.forEach(region => {
       updateRegion(region.id, {
         backgroundImage: undefined,
         backgroundScale: 1,
@@ -222,7 +226,7 @@ export const RegionBulkTextureModal = ({
     setBackgroundScale(1);
     setBackgroundRepeat('repeat');
     onUpdateCanvas?.();
-    toast.success(`Cleared texture from ${selectedRegions.length} region(s)`);
+    toast.success(`Cleared texture from ${regionsToUpdate.length} region(s)`);
   };
 
   return (
