@@ -528,3 +528,91 @@ export async function getRegionTextureHash(regionId: string): Promise<string | n
     return null;
   }
 }
+
+/**
+ * Get all textures with details for management UI
+ */
+export interface TextureDetails {
+  hash: string;
+  dataUrl: string;
+  refCount: number;
+  createdAt: number;
+  sizeBytes: number;
+  type: 'region' | 'token' | 'unknown';
+}
+
+export async function getAllTextures(): Promise<TextureDetails[]> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TEXTURES_STORE], 'readonly');
+      const store = transaction.objectStore(TEXTURES_STORE);
+      const textures: TextureDetails[] = [];
+
+      const request = store.openCursor();
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          const entry = cursor.value as TextureEntry;
+          textures.push({
+            hash: entry.hash,
+            dataUrl: entry.dataUrl,
+            refCount: entry.refCount,
+            createdAt: entry.createdAt,
+            sizeBytes: new Blob([entry.dataUrl]).size,
+            type: 'unknown', // Will be determined by caller if needed
+          });
+          cursor.continue();
+        }
+      };
+
+      transaction.oncomplete = () => resolve(textures);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to get all textures:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear unused textures (refCount === 0)
+ */
+export async function clearUnusedTextures(): Promise<number> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TEXTURES_STORE], 'readwrite');
+      const store = transaction.objectStore(TEXTURES_STORE);
+      let deletedCount = 0;
+      const hashesToDelete: string[] = [];
+
+      const request = store.openCursor();
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          const entry = cursor.value as TextureEntry;
+          if (entry.refCount <= 0) {
+            hashesToDelete.push(entry.hash);
+          }
+          cursor.continue();
+        } else {
+          // Delete all unused textures
+          hashesToDelete.forEach(hash => {
+            store.delete(hash);
+            textureCache.delete(hash);
+            deletedCount++;
+          });
+        }
+      };
+
+      transaction.oncomplete = () => resolve(deletedCount);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to clear unused textures:', error);
+    return 0;
+  }
+}

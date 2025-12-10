@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,12 @@ import {
   clearAllCustomTemplates, 
   getCustomTemplates 
 } from '@/lib/sessionTemplates';
+import { 
+  getAllTextures, 
+  clearUnusedTextures,
+  clearAllTextures,
+  type TextureDetails 
+} from '@/lib/textureStorage';
 import { toast } from 'sonner';
 import { 
   HardDrive, 
@@ -52,7 +59,8 @@ import {
   FolderOpen,
   Package,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Image
 } from 'lucide-react';
 
 interface StorageManagerModalProps {
@@ -83,6 +91,7 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
   const [storageWarning, setStorageWarning] = useState<StorageWarning | null>(null);
   const [breakdown, setBreakdown] = useState<StorageBreakdown | null>(null);
   const [storageItems, setStorageItems] = useState<StorageItem[]>([]);
+  const [textures, setTextures] = useState<TextureDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteAction, setDeleteAction] = useState<(() => void) | null>(null);
@@ -100,10 +109,12 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
       const status = await getStorageStatus();
       const storageBreakdown = await getStorageBreakdown();
       const items = getAllStorageItems();
+      const textureList = await getAllTextures();
       setStorageInfo(status.info);
       setStorageWarning(status.warning);
       setBreakdown(storageBreakdown);
       setStorageItems(items);
+      setTextures(textureList);
     } catch (error) {
       console.error('Failed to load storage data:', error);
     } finally {
@@ -202,6 +213,47 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
         }
       }
     );
+  };
+
+  const handleClearUnusedTextures = () => {
+    const unusedCount = textures.filter(t => t.refCount <= 0).length;
+    if (unusedCount === 0) {
+      toast.info('No unused textures to clear');
+      return;
+    }
+    confirmDelete(
+      `Clear ${unusedCount} unused texture(s)? This cannot be undone.`,
+      async () => {
+        const count = await clearUnusedTextures();
+        toast.success('Unused textures cleared', {
+          description: `Removed ${count} texture(s).`,
+        });
+        loadStorageData();
+      }
+    );
+  };
+
+  const handleClearAllTextures = () => {
+    if (textures.length === 0) {
+      toast.info('No textures to clear');
+      return;
+    }
+    confirmDelete(
+      `Clear ALL ${textures.length} texture(s)? This will remove images from all regions and tokens. This cannot be undone.`,
+      async () => {
+        await clearAllTextures();
+        toast.success('All textures cleared', {
+          description: `Removed all texture data.`,
+        });
+        loadStorageData();
+      }
+    );
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
   const formatSize = (kb: number): string => {
@@ -307,8 +359,9 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
           )}
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="textures">Textures</TabsTrigger>
               <TabsTrigger value="management">Management</TabsTrigger>
             </TabsList>
 
@@ -545,6 +598,92 @@ export function StorageManagerModal({ open, onOpenChange }: StorageManagerModalP
                   })}
                 </div>
               </div>
+            </TabsContent>
+
+            {/* Textures Tab */}
+            <TabsContent value="textures" className="space-y-4 mt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium">Texture Storage (IndexedDB)</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {textures.length} texture(s) • {formatBytes(textures.reduce((sum, t) => sum + t.sizeBytes, 0))} total
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadStorageData}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              {/* Texture Actions */}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClearUnusedTextures}
+                  disabled={textures.filter(t => t.refCount <= 0).length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear Unused ({textures.filter(t => t.refCount <= 0).length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleClearAllTextures}
+                  disabled={textures.length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Texture List */}
+              {textures.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Image className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No textures stored</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pr-4">
+                    {textures.map((texture) => (
+                      <div
+                        key={texture.hash}
+                        className={`rounded-lg border p-2 space-y-2 ${
+                          texture.refCount <= 0 ? 'border-yellow-500/50 bg-yellow-500/5' : ''
+                        }`}
+                      >
+                        <div className="aspect-square rounded overflow-hidden bg-muted">
+                          <img
+                            src={texture.dataUrl}
+                            alt={`Texture ${texture.hash.slice(0, 8)}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-mono truncate" title={texture.hash}>
+                            {texture.hash.slice(0, 12)}...
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{formatBytes(texture.sizeBytes)}</span>
+                            <span className={texture.refCount <= 0 ? 'text-yellow-600' : ''}>
+                              {texture.refCount} ref{texture.refCount !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </TabsContent>
           </Tabs>
         </DialogContent>
