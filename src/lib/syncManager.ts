@@ -957,9 +957,17 @@ class SyncManager {
     const roleStore = useRoleStore.getState();
     const multiplayerStore = useMultiplayerStore.getState();
 
+    // Strip large data URIs from regions/tokens - texture sync handles images separately
+    const cleanRegions = regionStore.regions.map(({ backgroundImage, ...rest }) => rest);
+    const cleanTokens = sessionStore.tokens.map(({ imageUrl, ...rest }) => ({
+      ...rest,
+      // Keep textureHash for texture sync, strip actual image data
+      textureHash: (rest as any).textureHash,
+    }));
+
     // Only essential game state - clients render with their own preferences
     const payload: FullStateSyncPayload = {
-      tokens: sessionStore.tokens,
+      tokens: cleanTokens,
       initiative: {
         initiativeOrder: initiativeStore.initiativeOrder,
         isInCombat: initiativeStore.isInCombat,
@@ -967,7 +975,7 @@ class SyncManager {
         roundNumber: initiativeStore.roundNumber,
       },
       maps: mapStore.maps,
-      regions: regionStore.regions,
+      regions: cleanRegions,
       lights: lightStore.lights,
       fog: {
         enabled: fogStore.enabled,
@@ -982,13 +990,17 @@ class SyncManager {
       }
     };
 
-    // Emit to server which broadcasts to other clients
-    this.socketClient?.emit('broadcast_full_state' as any, payload);
+    // Log payload size for debugging
+    const payloadSize = JSON.stringify(payload).length;
     console.log('📤 Broadcasting full state:', {
       tokens: payload.tokens?.length || 0,
       maps: payload.maps?.length || 0,
-      regions: payload.regions?.length || 0
+      regions: payload.regions?.length || 0,
+      sizeKB: Math.round(payloadSize / 1024)
     });
+
+    // Emit to server which broadcasts to other clients
+    this.socketClient?.emit('broadcast_full_state' as any, payload);
   }
 
   /**
@@ -1162,8 +1174,15 @@ class SyncManager {
     const initiativeStore = useInitiativeStore.getState();
     const roleStore = useRoleStore.getState();
 
+    // Strip large data URIs - texture sync handles images separately
+    const cleanRegions = regionStore.regions.map(({ backgroundImage, ...rest }) => rest);
+    const cleanTokens = sessionStore.tokens.map(({ imageUrl, ...rest }) => ({
+      ...rest,
+      textureHash: (rest as any).textureHash,
+    }));
+
     const fullState: FullStateSyncPayload = {
-      tokens: sessionStore.tokens,
+      tokens: cleanTokens,
       initiative: {
         isInCombat: initiativeStore.isInCombat,
         currentTurnIndex: initiativeStore.currentTurnIndex,
@@ -1171,7 +1190,7 @@ class SyncManager {
         initiativeOrder: initiativeStore.initiativeOrder,
       },
       maps: mapStore.maps,
-      regions: regionStore.regions,
+      regions: cleanRegions,
       fog: {
         enabled: fogStore.enabled,
         visionRange: fogStore.visionRange,
