@@ -199,6 +199,30 @@ class SyncManager {
     multiplayerStore.setCurrentUserId(data.yourUserId);
     multiplayerStore.setConnectedUsers(data.users);
 
+    // Check if current user is DM (by role or by having local state to share)
+    const currentUser = data.users.find(u => u.userId === data.yourUserId);
+    const isDMByRole = currentUser?.roleIds.includes('dm');
+    
+    const mapStore = useMapStore.getState();
+    const regionStore = useRegionStore.getState();
+    const sessionStore = useSessionStore.getState();
+    
+    const hasLocalState = mapStore.maps.length > 0 || 
+                         regionStore.regions.length > 0 || 
+                         sessionStore.tokens.length > 0;
+
+    // If user has local state and there are other users, offer to broadcast
+    // This handles DM reconnecting (even if role says 'player' due to rejoin)
+    if (hasLocalState && data.users.length > 1) {
+      console.log('📤 User with local state joined session with other users - broadcasting');
+      setTimeout(() => {
+        this.broadcastFullStateSync();
+        toast.success('Auto-synced your state to connected players', {
+          description: `${mapStore.maps.length} maps, ${regionStore.regions.length} regions, ${sessionStore.tokens.length} tokens`
+        });
+      }, 1000);
+    }
+
     // If this is the first user (session creator), initial state sync
     // is handled by JSON Patch middleware automatically
     if (data.users.length === 1) {
