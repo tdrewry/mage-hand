@@ -977,9 +977,13 @@ class SyncManager {
       }
     };
 
-    // Cast event name to any to satisfy ClientEventName typing when
-    // the event is not included in the ClientEventName union.
-    this.socketClient?.emit('full_state_sync' as any, payload);
+    // Emit to server which broadcasts to other clients
+    this.socketClient?.emit('broadcast_full_state' as any, payload);
+    console.log('📤 Broadcasting full state:', {
+      tokens: payload.tokens?.length || 0,
+      maps: payload.maps?.length || 0,
+      regions: payload.regions?.length || 0
+    });
   }
 
   /**
