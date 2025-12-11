@@ -957,21 +957,7 @@ class SyncManager {
     const roleStore = useRoleStore.getState();
     const multiplayerStore = useMultiplayerStore.getState();
 
-    // Extract only serializable state from fogStore (no functions)
-    const fogState = {
-      enabled: fogStore.enabled,
-      revealAll: fogStore.revealAll,
-      visionRange: fogStore.visionRange,
-      fogOpacity: fogStore.fogOpacity,
-      exploredOpacity: fogStore.exploredOpacity,
-      showExploredAreas: fogStore.showExploredAreas,
-      serializedExploredAreas: fogStore.serializedExploredAreas,
-      fogVersion: fogStore.fogVersion,
-      realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
-      realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
-      effectSettings: fogStore.effectSettings,
-    };
-
+    // Only essential game state - clients render with their own preferences
     const payload: FullStateSyncPayload = {
       tokens: sessionStore.tokens,
       initiative: {
@@ -983,7 +969,11 @@ class SyncManager {
       maps: mapStore.maps,
       regions: regionStore.regions,
       lights: lightStore.lights,
-      fog: fogState,
+      fog: {
+        enabled: fogStore.enabled,
+        visionRange: fogStore.visionRange,
+        serializedExploredAreas: fogStore.serializedExploredAreas,
+      },
       roles: roleStore.roles,
       players: multiplayerStore.connectedUsers,
       sessionMetadata: {
@@ -1184,16 +1174,8 @@ class SyncManager {
       regions: regionStore.regions,
       fog: {
         enabled: fogStore.enabled,
-        revealAll: fogStore.revealAll,
         visionRange: fogStore.visionRange,
-        fogOpacity: fogStore.fogOpacity,
-        exploredOpacity: fogStore.exploredOpacity,
-        showExploredAreas: fogStore.showExploredAreas,
         serializedExploredAreas: fogStore.serializedExploredAreas,
-        fogVersion: fogStore.fogVersion,
-        realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
-        realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
-        effectSettings: fogStore.effectSettings,
       },
       lights: lightStore.lights,
       roles: roleStore.roles,
