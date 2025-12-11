@@ -84,6 +84,23 @@ class SyncManager {
     const socket = this.socketClient.getSocket();
     if (socket) {
       patchTransport.setSocket(socket);
+      
+      // Handle reconnection - update patchTransport with the socket
+      socket.on('reconnect', () => {
+        console.log('🔄 Reconnected - updating patchTransport');
+        patchTransport.setSocket(socket);
+        
+        // Auto-rejoin session if we were in one
+        const session = useMultiplayerStore.getState().currentSession;
+        const username = useMultiplayerStore.getState().currentUsername;
+        if (session && username) {
+          console.log('🔄 Attempting to rejoin session:', session.sessionCode);
+          this.socketClient?.emit('join_session', {
+            sessionCode: session.sessionCode,
+            username,
+          });
+        }
+      });
     }
   }
 

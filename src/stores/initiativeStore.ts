@@ -199,7 +199,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
 const withSyncPatch = syncPatch<InitiativeState>({ 
   channel: 'initiative',
   excludePaths: ['isTrackerVisible', 'restrictMovement'], // Local UI state
-  debug: false,
+  debug: true, // Enable debug logging to diagnose sync issues
 })(initiativeStoreCreator);
 
 // Persist options

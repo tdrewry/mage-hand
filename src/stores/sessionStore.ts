@@ -380,7 +380,7 @@ const withSyncPatch = syncPatch<SessionState>({
   channel: 'tokens',
   throttleMs: 50, // Throttle for position updates
   excludePaths: ['selectedTokenIds', 'viewportTransforms', 'currentPlayerId', 'tokens.*.imageUrl'], // Local-only state + large image data
-  debug: false,
+  debug: true, // Enable debug logging to diagnose sync issues
 })(sessionStoreCreator);
 
 // Persist options
