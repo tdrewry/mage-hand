@@ -11,7 +11,8 @@ const {
   handleKickUser,
   handleSyncPatch,
   handleTextureUpload,
-  handleTextureRequest
+  handleTextureRequest,
+  handleBroadcastFullState
 } = require('./eventHandlers');
 
 const app = express();
@@ -80,6 +81,11 @@ io.on('connection', (socket) => {
 
   socket.on('kick_user', (payload) => 
     handleKickUser(socket, io, sessionManager, payload)
+  );
+
+  // Full state broadcast from DM
+  socket.on('broadcast_full_state', (payload) =>
+    handleBroadcastFullState(socket, io, sessionManager, payload)
   );
 
   // Disconnection handling

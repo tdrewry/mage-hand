@@ -344,6 +344,33 @@ function handleTextureRequest(socket, io, sessionManager, payload) {
   }
 }
 
+/**
+ * Handle full state broadcast from DM to all players
+ */
+function handleBroadcastFullState(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  // Verify sender has permission (should be DM)
+  const sender = sessionManager.getUserBySocket(socket.id);
+  if (!sender || !sender.roleIds.includes('dm')) {
+    socket.emit('session_error', {
+      code: 'PERMISSION_DENIED',
+      message: 'Only DM can broadcast full state'
+    });
+    return;
+  }
+
+  console.log(`[Broadcast] Full state from DM ${sender.username}:`, {
+    tokens: payload.tokens?.length || 0,
+    maps: payload.maps?.length || 0,
+    regions: payload.regions?.length || 0
+  });
+
+  // Broadcast to all other clients in the session
+  socket.to(session.sessionId).emit('full_state_sync', payload);
+}
+
 module.exports = {
   handleCreateSession,
   handleJoinSession,
@@ -353,5 +380,6 @@ module.exports = {
   handleKickUser,
   handleSyncPatch,
   handleTextureUpload,
-  handleTextureRequest
+  handleTextureRequest,
+  handleBroadcastFullState
 };
