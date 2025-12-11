@@ -13,6 +13,7 @@ import { useLightStore } from '@/stores/lightStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCardStore } from '@/stores/cardStore';
 import { hasPermission } from './rolePermissions';
+import { toast } from 'sonner';
 import type {
   JoinSessionPayload,
   CreateSessionPayload,
@@ -220,6 +221,7 @@ class SyncManager {
       // Small delay to ensure the new player is fully connected
       setTimeout(() => {
         this.broadcastFullStateSync();
+        toast.success(`Synced state to ${data.user.username}`);
       }, 500);
     }
   }
@@ -319,6 +321,14 @@ class SyncManager {
     }
 
     useMultiplayerStore.getState().updateLastSyncTimestamp();
+    
+    // Notify player that sync completed
+    const itemCount = (data.tokens?.length || 0) + (data.maps?.length || 0) + (data.regions?.length || 0);
+    if (itemCount > 0) {
+      toast.success('Session synced', {
+        description: `Received ${data.tokens?.length || 0} tokens, ${data.maps?.length || 0} maps, ${data.regions?.length || 0} regions`
+      });
+    }
   }
 
   private handleTokenUpdated(data: SyncTokenPayload): void {
