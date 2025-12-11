@@ -107,10 +107,17 @@ export function createSyncPatch(options: CreateSyncPatchOptions) {
          */
         const sendPatches = (patches: JsonPatchOperation[]) => {
           if (!enabled || patches.length === 0) return;
-          if (!transport.isConnected()) return;
+          
+          if (!transport.isConnected()) {
+            log('⚠️ Cannot send - not connected');
+            return;
+          }
 
           const userId = transport.getUserId();
-          if (!userId) return;
+          if (!userId) {
+            log('⚠️ Cannot send - no userId');
+            return;
+          }
 
           const payload: SyncPatchPayload = {
             messageId: deduplication.generateMessageId(userId),
