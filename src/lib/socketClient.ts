@@ -125,6 +125,9 @@ export class SocketClient {
       console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
       this.reconnectAttempts = 0;
       this.updateStatus('connected');
+      
+      // Emit custom event for reconnection handling
+      this.socket?.emit('client_reconnected');
     });
 
     this.socket.on('reconnect_attempt', (attemptNumber) => {
