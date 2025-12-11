@@ -957,6 +957,21 @@ class SyncManager {
     const roleStore = useRoleStore.getState();
     const multiplayerStore = useMultiplayerStore.getState();
 
+    // Extract only serializable state from fogStore (no functions)
+    const fogState = {
+      enabled: fogStore.enabled,
+      revealAll: fogStore.revealAll,
+      visionRange: fogStore.visionRange,
+      fogOpacity: fogStore.fogOpacity,
+      exploredOpacity: fogStore.exploredOpacity,
+      showExploredAreas: fogStore.showExploredAreas,
+      serializedExploredAreas: fogStore.serializedExploredAreas,
+      fogVersion: fogStore.fogVersion,
+      realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
+      realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
+      effectSettings: fogStore.effectSettings,
+    };
+
     const payload: FullStateSyncPayload = {
       tokens: sessionStore.tokens,
       initiative: {
@@ -968,7 +983,7 @@ class SyncManager {
       maps: mapStore.maps,
       regions: regionStore.regions,
       lights: lightStore.lights,
-      fog: fogStore,
+      fog: fogState,
       roles: roleStore.roles,
       players: multiplayerStore.connectedUsers,
       sessionMetadata: {
@@ -1175,6 +1190,10 @@ class SyncManager {
         exploredOpacity: fogStore.exploredOpacity,
         showExploredAreas: fogStore.showExploredAreas,
         serializedExploredAreas: fogStore.serializedExploredAreas,
+        fogVersion: fogStore.fogVersion,
+        realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
+        realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
+        effectSettings: fogStore.effectSettings,
       },
       lights: lightStore.lights,
       roles: roleStore.roles,
