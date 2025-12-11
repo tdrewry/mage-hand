@@ -10,7 +10,8 @@ import {
   Wifi,
   WifiOff,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +50,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     connectedUsers,
     setServerUrl,
     setCurrentUsername,
+    currentUserId,
   } = useMultiplayerStore();
+
+  // Check if current user has DM role
+  const currentUser = connectedUsers.find(u => u.userId === currentUserId);
+  const isDM = currentUser?.roleIds.includes('dm') ?? false;
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
   const [username, setUsername] = useState(currentUsername || '');
@@ -152,6 +158,11 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   const handleRequestSync = () => {
     syncManager.rpcRequestFullState();
     toast.info('Requesting full state sync from DM...');
+  };
+
+  const handleBroadcastState = () => {
+    syncManager.broadcastFullStateSync();
+    toast.success('Broadcasting full state to all players');
   };
 
   const handleCopySessionCode = () => {
@@ -277,22 +288,34 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
             )}
 
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleRequestSync}
-                className="flex-1"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Request Sync
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleLeaveSession}
-                className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              >
-                Leave Session
-              </Button>
+            <div className="flex flex-col gap-2">
+              {isDM && (
+                <Button
+                  variant="default"
+                  onClick={handleBroadcastState}
+                  className="w-full"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Broadcast State
+                </Button>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleRequestSync}
+                  className="flex-1"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Request Sync
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleLeaveSession}
+                  className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  Leave Session
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
