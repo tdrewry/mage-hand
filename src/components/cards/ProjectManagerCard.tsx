@@ -197,6 +197,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const confirmTemplateLoad = () => {
     if (!pendingTemplate) return;
 
+    const templateName = pendingTemplate.name;
+    
     try {
       applyTemplate(pendingTemplate, {
         mapStore,
@@ -208,7 +210,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
       setPendingTemplate(null);
       setShowTemplateConfirm(false);
-      toast.success(`Template "${pendingTemplate.name}" applied successfully`);
+      toast.success(`Template "${templateName}" applied successfully`);
     } catch (error) {
       toast.error(`Failed to apply template: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
