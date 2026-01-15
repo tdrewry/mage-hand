@@ -1,9 +1,15 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type ToolbarButtonVariant = 'default' | 'ghost' | 'active' | 'destructive';
 export type ToolbarButtonSize = 'xs' | 'sm' | 'md' | 'lg';
+export type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
 
 interface ToolbarButtonProps {
   icon: LucideIcon;
@@ -14,6 +20,7 @@ interface ToolbarButtonProps {
   disabled?: boolean;
   isActive?: boolean;
   className?: string;
+  tooltipSide?: TooltipSide;
 }
 
 const sizeStyles: Record<ToolbarButtonSize, string> = {
@@ -46,23 +53,30 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
   disabled = false,
   isActive = false,
   className,
+  tooltipSide = 'right',
 }) => {
   const effectiveVariant = isActive ? 'active' : variant;
 
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className={cn(
-        'rounded-full flex items-center justify-center transition-all border-2',
-        sizeStyles[size],
-        variantStyles[effectiveVariant],
-        disabled && 'opacity-50 cursor-not-allowed',
-        className
-      )}
-    >
-      <Icon className={iconSizeStyles[size]} />
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className={cn(
+            'rounded-full flex items-center justify-center transition-all border-2',
+            sizeStyles[size],
+            variantStyles[effectiveVariant],
+            disabled && 'opacity-50 cursor-not-allowed',
+            className
+          )}
+        >
+          <Icon className={iconSizeStyles[size]} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side={tooltipSide} sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 };
