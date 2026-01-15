@@ -62,6 +62,7 @@ export const useGroupStore = create<GroupStore>()(
           gridWidth: 1,
           gridHeight: 1,
           label: 'Token',
+          labelPosition: 'below',
           color: '#ffffff',
           roleId: 'player',
           isHidden: false

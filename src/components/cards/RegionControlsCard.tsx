@@ -3,9 +3,6 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { 
-  Move, 
-  RotateCcw, 
-  Scaling, 
   Grid3X3, 
   Eye, 
   Trash2,
@@ -14,20 +11,15 @@ import {
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { useRegionStore, CanvasRegion } from '@/stores/regionStore';
-import { TransformMode } from '../RegionControlPanel';
 
 interface RegionControlsCardContentProps {
   regionId: string | null;
-  transformMode: TransformMode;
-  onTransformModeChange: (mode: TransformMode) => void;
   onToggleSnapping: (id: string) => void;
   onToggleGridVisibility: (id: string) => void;
 }
 
 export const RegionControlsCardContent: React.FC<RegionControlsCardContentProps> = ({
   regionId,
-  transformMode,
-  onTransformModeChange,
   onToggleSnapping,
   onToggleGridVisibility
 }) => {
@@ -108,45 +100,6 @@ export const RegionControlsCardContent: React.FC<RegionControlsCardContentProps>
               </Button>
             </>
           )}
-        </div>
-      </div>
-
-      {/* Transformation Mode */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">Transform Mode</Label>
-        <div className="flex gap-1">
-          <Button
-            variant={transformMode === 'move' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onTransformModeChange('move')}
-            className="flex-1 text-xs h-8"
-            title="Move Mode"
-          >
-            <Move className="w-3 h-3 mr-1" />
-            Move
-          </Button>
-          
-          <Button
-            variant={transformMode === 'scale' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onTransformModeChange('scale')}
-            className="flex-1 text-xs h-8"
-            title="Scale Mode"
-          >
-            <Scaling className="w-3 h-3 mr-1" />
-            Scale
-          </Button>
-          
-          <Button
-            variant={transformMode === 'rotate' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onTransformModeChange('rotate')}
-            className="flex-1 text-xs h-8"
-            title="Rotate Mode"
-          >
-            <RotateCcw className="w-3 h-3 mr-1" />
-            Rotate
-          </Button>
         </div>
       </div>
 

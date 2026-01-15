@@ -87,6 +87,12 @@ export function canControlToken(
     return true;
   }
   
+  // Unowned tokens (no roleId and no ownerId) can be controlled by anyone with canControlOwnTokens
+  const isUnownedToken = !token.roleId && !token.ownerId;
+  if (isUnownedToken && hasPermission(player, allRoles, 'canControlOwnTokens')) {
+    return true;
+  }
+  
   // Check if player can control own tokens and owns this token
   if (hasPermission(player, allRoles, 'canControlOwnTokens')) {
     // Token belongs to player if it has the same role as the player

@@ -1,0 +1,19 @@
+========================================
+SETUP INSTRUCTIONS
+========================================
+
+1. Download this file and create a new folder called "tabletop-server"
+
+2. Create each file listed above in that folder with the exact content
+
+3. Run these commands:
+   cd tabletop-server
+   npm install
+   npm start
+
+4. The server will run on http://localhost:3001
+
+5. Update your Lovable app's multiplayerStore.ts to set:
+   serverUrl: 'http://localhost:3001'
+
+6. For production, deploy to Railway, Render, or Fly.io

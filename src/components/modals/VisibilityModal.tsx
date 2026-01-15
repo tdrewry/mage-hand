@@ -27,7 +27,7 @@ export const VisibilityModal = ({ open, onOpenChange }: VisibilityModalProps) =>
   } = useSessionStore();
   
   const currentPlayer = players.find(p => p.id === currentPlayerId);
-  const isDM = currentPlayer?.role === 'dm';
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
 
   const handleTokenVisibilityChange = (value: TokenVisibility) => {
     setTokenVisibility(value);

@@ -11,7 +11,7 @@ export const InitiativePanel: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-2xl shadow-lg max-w-[90vw]"
+      className="fixed right-4 top-1/2 -translate-y-1/2 bg-background/60 backdrop-blur-md border border-border rounded-2xl shadow-lg max-h-[80vh] overflow-hidden"
       style={{ zIndex: Z_INDEX.FIXED_UI.SIDE_PANELS }}
     >
       <InitiativeTrackerCardContent />

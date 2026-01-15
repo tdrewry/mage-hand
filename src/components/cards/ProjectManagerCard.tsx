@@ -171,11 +171,9 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
             showExploredAreas: fogStore.showExploredAreas,
             serializedExploredAreas: '',
             fogVersion: fogStore.fogVersion,
-            useGradients: fogStore.useGradients,
-            innerFadeStart: fogStore.innerFadeStart,
-            midpointPosition: fogStore.midpointPosition,
-            midpointOpacity: fogStore.midpointOpacity,
-            outerFadeStart: fogStore.outerFadeStart,
+            realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
+            realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
+            effectSettings: fogStore.effectSettings,
           },
           gridSize: 50,
         }
@@ -199,6 +197,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const confirmTemplateLoad = () => {
     if (!pendingTemplate) return;
 
+    const templateName = pendingTemplate.name;
+    
     try {
       applyTemplate(pendingTemplate, {
         mapStore,
@@ -210,7 +210,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
       setPendingTemplate(null);
       setShowTemplateConfirm(false);
-      toast.success(`Template "${pendingTemplate.name}" applied successfully`);
+      toast.success(`Template "${templateName}" applied successfully`);
     } catch (error) {
       toast.error(`Failed to apply template: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -300,11 +300,9 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       showExploredAreas: fogStore.showExploredAreas,
       serializedExploredAreas: fogStore.serializedExploredAreas,
       fogVersion: fogStore.fogVersion,
-      useGradients: fogStore.useGradients,
-      innerFadeStart: fogStore.innerFadeStart,
-      midpointPosition: fogStore.midpointPosition,
-      midpointOpacity: fogStore.midpointOpacity,
-      outerFadeStart: fogStore.outerFadeStart,
+      realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
+      realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
+      effectSettings: fogStore.effectSettings,
     },
     lights: lightStore.lights,
     cardStates: cardStore.cards,
@@ -348,7 +346,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
-  const handleExportToFile = () => {
+  const handleExportToFile = async () => {
     if (!projectName.trim()) {
       toast.error('Please enter a project name');
       return;
@@ -363,8 +361,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
     try {
       const projectData = createCurrentProjectData();
-      exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
-      toast.success('Project exported successfully');
+      await exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
+      toast.success('Project exported successfully (with textures)');
     } catch (error) {
       toast.error(`Failed to export project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -565,13 +563,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
         fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
         fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
-        if (projectData.fogData.useGradients !== undefined) {
-          fogStore.setUseGradients(projectData.fogData.useGradients);
-          fogStore.setInnerFadeStart(projectData.fogData.innerFadeStart);
-          fogStore.setMidpointPosition(projectData.fogData.midpointPosition);
-          fogStore.setMidpointOpacity(projectData.fogData.midpointOpacity);
-          fogStore.setOuterFadeStart(projectData.fogData.outerFadeStart);
-        }
       }
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');

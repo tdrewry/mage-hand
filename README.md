@@ -1,73 +1,142 @@
-# Welcome to your Lovable project
+# Tabletop Multiplayer Server
 
-## Project info
+Socket.io server for real-time multiplayer tabletop sessions.
 
-**URL**: https://lovable.dev/projects/18355e8d-6d2f-44e2-bba0-d86272c39dc2
+## Setup
 
-## How can I edit this code?
+1. Install dependencies:
+```bash
+npm install
+```
 
-There are several ways of editing your application.
+2. Configure environment (optional):
+Create a `.env` file:
+```
+PORT=3001
+CLIENT_ORIGIN=http://localhost:8080
+```
 
-**Use Lovable**
+3. Run the server:
+```bash
+# Production
+npm start
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/18355e8d-6d2f-44e2-bba0-d86272c39dc2) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Development (with auto-reload)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Architecture
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Files
+- `index.js` - Main server entry point, Socket.io setup
+- `sessionManager.js` - Session and user state management
+- `eventHandlers.js` - Socket event handlers for all client events
 
-**Use GitHub Codespaces**
+### Session Management
+Sessions are stored in memory with:
+- Unique session codes (6-character alphanumeric)
+- Optional password protection
+- User tracking with roles
+- Game state (tokens, initiative, fog)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### API Events
 
-## What technologies are used for this project?
+#### Client → Server
+- `create_session` - Create new session
+- `join_session` - Join existing session
+- `leave_session` - Leave current session
+- `sync_token` - Sync token changes
+- `sync_initiative` - Sync initiative/combat
+- `sync_map` - Sync map changes (add/update/remove/reorder)
+- `sync_fog` - Sync fog of war
+- `sync_role` - Assign/update user roles
+- `request_full_sync` - Request full state
+- `kick_user` - Remove user (DM only)
 
-This project is built with:
+#### Server → Client
+- `session_created` - Session created confirmation
+- `session_joined` - Joined session confirmation
+- `session_error` - Error occurred
+- `user_joined` - Another user joined
+- `user_left` - User disconnected
+- `full_state_sync` - Complete state snapshot
+- `token_added/updated/removed` - Token changes
+- `initiative_updated` - Initiative changes
+- `combat_state_changed` - Combat status
+- `map_updated` - Map changes (add/update/remove/reorder)
+- `fog_updated` - Fog changes
+- `user_list_updated` - User list changed
+- `user_role_changed` - User role updated
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Health Check
 
-## How can I deploy this project?
+GET `/health` returns server status:
+```json
+{
+  "status": "ok",
+  "sessions": 3,
+  "connections": 12
+}
+```
 
-Simply open [Lovable](https://lovable.dev/projects/18355e8d-6d2f-44e2-bba0-d86272c39dc2) and click on Share -> Publish.
+## State Management
 
-## Can I connect a custom domain to my Lovable project?
+All game state is stored in memory per session:
+```javascript
+{
+  tokens: [],
+  initiative: {
+    isInCombat: false,
+    currentTurnIndex: -1,
+    roundNumber: 0,
+    initiativeOrder: []
+  },
+  maps: [],
+  fog: null,
+  roles: []
+}
+```
 
-Yes, you can!
+Sessions are automatically cleaned up when all users disconnect.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Security Notes
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- Password validation for sessions
+- Role-based permission checks (DM actions)
+- Socket ID tracking for user management
+- Automatic cleanup on disconnect
+
+## Deployment
+
+For production deployment:
+1. Set `CLIENT_ORIGIN` to your client app URL
+2. Use a process manager (PM2, systemd)
+3. Configure reverse proxy (nginx)
+4. Enable HTTPS/WSS
+
+Example PM2:
+```bash
+pm2 start index.js --name tabletop-server
+pm2 save
+pm2 startup
+```
+
+========================================
+SETUP INSTRUCTIONS
+========================================
+
+1. Download this file and create a new folder called "tabletop-server"
+
+2. Create each file listed above in that folder with the exact content
+
+3. Run these commands:
+   cd tabletop-server
+   npm install
+   npm start
+
+4. The server will run on http://localhost:3001
+
+5. Update your Lovable app's multiplayerStore.ts to set:
+   serverUrl: 'http://localhost:3001'
+
+6. For production, deploy to Railway, Render, or Fly.io

@@ -25,13 +25,13 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-primary/10",
+        "relative flex flex-row items-center gap-1.5 rounded-lg border-2 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-background",
         isCompact ? "p-2" : "p-3"
       )}
-      style={size ? { 
-        minWidth: `${size}px`,
-        width: `${size}px`
-      } : { minWidth: '120px' }}
+      style={{ 
+        width: '85px',
+        minWidth: '85px'
+      }}
     >
       {onResetRound && (
         <Button
@@ -45,25 +45,19 @@ export const TurnCard: React.FC<TurnCardProps> = ({
         </Button>
       )}
       <Swords 
-        className="text-primary" 
-        size={Math.max(16, imageSize * 0.4)}
+        className="text-primary shrink-0" 
+        size={18}
       />
-      <div className="text-center">
+      <div className="flex flex-col whitespace-nowrap">
         <div 
-          className="font-bold text-primary"
+          className="font-bold text-primary leading-tight"
           style={{ fontSize: `${fontSize}px` }}
         >
-          {turnNumber}
+          {turnNumber} of {totalTokens}
         </div>
         <div 
-          className="text-muted-foreground"
-          style={{ fontSize: `${Math.max(10, fontSize * 0.5)}px` }}
-        >
-          of {totalTokens}
-        </div>
-        <div 
-          className="text-muted-foreground font-medium"
-          style={{ fontSize: `${Math.max(10, fontSize * 0.5)}px` }}
+          className="text-muted-foreground font-medium leading-tight"
+          style={{ fontSize: `${Math.max(10, fontSize * 0.7)}px` }}
         >
           Round {roundNumber}
         </div>

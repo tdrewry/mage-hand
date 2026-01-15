@@ -22,17 +22,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, User, Shield } from 'lucide-react';
-import { useSessionStore } from '../stores/sessionStore';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X } from 'lucide-react';
+import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
+import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
+import { useSessionStore, type LabelPosition } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
-import { useVisionProfileStore } from '../stores/visionProfileStore';
+import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '../lib/illuminationPresets';
 import { 
   canControlToken, 
   canDeleteToken, 
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
+import { saveTokenTexture } from '@/lib/tokenTextureStorage';
+import { uploadTexture } from '@/lib/textureSync';
+import { hashImageData } from '@/lib/tokenTextureStorage';
 
 interface TokenContextMenuProps {
   children: React.ReactNode;
@@ -51,8 +56,12 @@ export const TokenContextMenu = ({
     tokens, 
     selectedTokenIds, 
     updateTokenLabel,
+    updateTokenName,
+    updateTokenLabelPosition,
+    updateTokenImage,
     updateTokenVision,
     updateTokenVisionRange,
+    updateTokenIllumination,
     removeToken,
     setTokenOwner,
     currentPlayerId,
@@ -61,26 +70,22 @@ export const TokenContextMenu = ({
   
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
-  const { profiles } = useVisionProfileStore();
   
-  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [showTokenEditModal, setShowTokenEditModal] = useState(false);
+  const [showImageImportModal, setShowImageImportModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [showVisionRangeModal, setShowVisionRangeModal] = useState(false);
+  const [showIlluminationModal, setShowIlluminationModal] = useState(false);
+  const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
+  const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
+  const [imageUrlValue, setImageUrlValue] = useState('');
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [useGradientsValue, setUseGradientsValue] = useState(true);
-  
-  // Debug: Log profiles when modal opens
-  React.useEffect(() => {
-    if (showVisionRangeModal) {
-      console.log('Vision profiles loaded:', profiles.length, profiles);
-    }
-  }, [showVisionRangeModal, profiles]);
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -107,18 +112,38 @@ export const TokenContextMenu = ({
   const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
   const isHidden = targetTokens.every(t => t.isHidden);
 
-  const handleLabelClick = () => {
+  const handleEditTokenClick = () => {
     if (!canControl) {
       toast.error("You don't have permission to edit these tokens");
       return;
     }
     
     if (targetTokens.length === 1) {
-      setLabelValue(targetTokens[0].label || targetTokens[0].name);
+      setNameValue(targetTokens[0].name || '');
+      setLabelValue(targetTokens[0].label || '');
+      setLabelPositionValue(targetTokens[0].labelPosition || 'below');
+      setImageUrlValue(targetTokens[0].imageUrl || '');
     } else {
-      setLabelValue(''); // Empty for multi-edit
+      setNameValue('');
+      setLabelValue('');
+      setLabelPositionValue('below');
+      setImageUrlValue('');
     }
-    setShowLabelModal(true);
+    setShowTokenEditModal(true);
+  };
+
+  const handleImageImportConfirm = (result: ImageImportResult) => {
+    console.log('ImageImportModal confirmed with URL:', result.imageUrl?.substring(0, 50) + '...');
+    setImageUrlValue(result.imageUrl);
+    // Note: scale and offset could be stored on the token if needed for texture tiling
+  };
+
+  const openImageImport = () => {
+    setShowImageImportModal(true);
+  };
+
+  const clearImage = () => {
+    setImageUrlValue('');
   };
 
   const handleColorClick = () => {
@@ -144,13 +169,56 @@ export const TokenContextMenu = ({
   };
 
 
-  const applyLabel = () => {
+  const applyTokenEdit = async () => {
+    console.log('Applying token edit with imageUrlValue:', imageUrlValue?.substring(0, 50) + '...');
+    
+    // Calculate max token size for compression
+    let maxTokenWidth = 0;
+    let maxTokenHeight = 0;
     targetTokens.forEach(token => {
-      updateTokenLabel(token.id, labelValue);
+      // Token size in pixels (gridWidth * gridSize approximation - use 50px per grid unit as reasonable default)
+      const tokenPixelWidth = token.gridWidth * 50;
+      const tokenPixelHeight = token.gridHeight * 50;
+      maxTokenWidth = Math.max(maxTokenWidth, tokenPixelWidth);
+      maxTokenHeight = Math.max(maxTokenHeight, tokenPixelHeight);
     });
-    setShowLabelModal(false);
+    // Minimum reasonable size for tokens
+    maxTokenWidth = Math.max(maxTokenWidth, 128);
+    maxTokenHeight = Math.max(maxTokenHeight, 128);
+    
+    for (const token of targetTokens) {
+      if (nameValue) {
+        updateTokenName(token.id, nameValue);
+      }
+      if (labelValue) {
+        updateTokenLabel(token.id, labelValue);
+      }
+      updateTokenLabelPosition(token.id, labelPositionValue);
+      
+      // Apply image with texture sync
+      if (imageUrlValue) {
+        try {
+          // Save to IndexedDB and get hash
+          const hash = await saveTokenTexture(token.id, imageUrlValue);
+          // Upload to server for multiplayer sync with compression
+          await uploadTexture(hash, imageUrlValue, maxTokenWidth, maxTokenHeight);
+          // Update token with both imageUrl and hash
+          updateTokenImage(token.id, imageUrlValue, hash);
+          console.log('Updated token', token.id, 'with imageUrl and hash:', hash);
+        } catch (error) {
+          console.error('Failed to sync token texture:', error);
+          // Still update the local image
+          updateTokenImage(token.id, imageUrlValue);
+        }
+      } else {
+        // Clear image
+        updateTokenImage(token.id, '', undefined);
+      }
+    }
+    
+    setShowTokenEditModal(false);
     onUpdateCanvas?.();
-    toast.success(`Label updated for ${targetTokens.length} token(s)`);
+    toast.success(`Token${targetTokens.length > 1 ? 's' : ''} updated`);
   };
 
   const applyColor = () => {
@@ -221,15 +289,33 @@ export const TokenContextMenu = ({
     
     if (targetTokens.length === 1) {
       const token = targetTokens[0];
-      setSelectedProfileId(token.visionProfileId || '');
       setVisionRangeValue(token.visionRange?.toString() || '');
       setUseGradientsValue(token.useGradients !== false);
     } else {
-      setSelectedProfileId('');
       setVisionRangeValue('');
       setUseGradientsValue(true);
     }
     setShowVisionRangeModal(true);
+  };
+
+  const applyIlluminationPreset = (presetKey: PresetKey) => {
+    if (!canControl) {
+      toast.error("You don't have permission to modify illumination settings");
+      return;
+    }
+    
+    const presets = getSelectablePresets();
+    const presetEntry = presets.find(p => p.key === presetKey);
+    if (!presetEntry) return;
+    
+    const illuminationSettings = presetToIlluminationSource(presetEntry.preset);
+    
+    targetTokens.forEach(token => {
+      updateTokenIllumination(token.id, illuminationSettings);
+    });
+    
+    onUpdateCanvas?.();
+    toast.success(`Applied ${presetEntry.preset.icon} ${presetEntry.preset.name} to ${targetTokens.length} token(s)`);
   };
 
   const handleAssignRole = (roleId: string) => {
@@ -275,93 +361,32 @@ export const TokenContextMenu = ({
   };
 
   const applyVisionRange = () => {
+    // Apply custom settings
+    const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
     
-    // Apply profile or custom settings
-    targetTokens.forEach(token => {
-      if (selectedProfileId) {
-        // Apply profile
-        const profile = profiles.find(p => p.id === selectedProfileId);
-        if (profile) {
-          useSessionStore.setState((state) => ({
-            tokens: state.tokens.map((t) =>
-              t.id === token.id
-                ? {
-                    ...t,
-                    visionProfileId: profile.id,
-                    visionRange: profile.visionRange,
-                    useGradients: profile.useGradients,
-                  }
-                : t
-            ),
-          }));
-        }
-      } else {
-        // Apply custom settings
-        const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
-        
-        if (range !== undefined && (isNaN(range) || range < 0)) {
-          toast.error('Please enter a valid vision range');
-          return;
-        }
-        
-        useSessionStore.setState((state) => ({
-          tokens: state.tokens.map((t) =>
-            t.id === token.id
-              ? {
-                  ...t,
-                  visionProfileId: undefined,
-                  visionRange: range,
-                  useGradients: useGradientsValue,
-                }
-              : t
-          ),
-        }));
-      }
-    });
-    
-    setShowVisionRangeModal(false);
-    onUpdateCanvas?.();
-    toast.success(`Vision settings updated for ${targetTokens.length} token(s)`);
-  };
-
-  const selectProfile = (profileId: string) => {
-    setSelectedProfileId(profileId);
-    const profile = profiles.find(p => p.id === profileId);
-    if (profile) {
-      setVisionRangeValue(profile.visionRange.toString());
-      setUseGradientsValue(profile.useGradients);
+    if (range !== undefined && (isNaN(range) || range < 0)) {
+      toast.error('Please enter a valid vision range');
+      return;
     }
-  };
-
-  const applyProfileQuick = (profileId: string) => {
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile) return;
-
-    const targetTokens = getTargetTokens();
     
-    targetTokens.forEach((token) => {
+    targetTokens.forEach(token => {
       useSessionStore.setState((state) => ({
         tokens: state.tokens.map((t) =>
           t.id === token.id
             ? {
                 ...t,
-                visionProfileId: profile.id,
-                visionRange: profile.visionRange,
-                useGradients: profile.useGradients,
+                visionRange: range,
+                useGradients: useGradientsValue,
               }
             : t
         ),
       }));
     });
     
+    setShowVisionRangeModal(false);
     onUpdateCanvas?.();
-    toast.success(`Applied ${profile.name} to ${targetTokens.length} token(s)`);
+    toast.success(`Vision settings updated for ${targetTokens.length} token(s)`);
   };
-
-  // Debug: Log profiles on render
-  React.useEffect(() => {
-    console.log('TokenContextMenu - Profiles loaded:', profiles.length, profiles);
-  }, [profiles]);
 
   return (
     <>
@@ -370,9 +395,9 @@ export const TokenContextMenu = ({
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className="w-56 bg-popover z-[1000]">
-          <ContextMenuItem onClick={handleLabelClick} disabled={!canControl}>
+          <ContextMenuItem onClick={handleEditTokenClick} disabled={!canControl}>
             <Edit3 className="mr-2 h-4 w-4" />
-            <span>Edit Label{isMultiSelection ? 's' : ''}</span>
+            <span>Edit Token{isMultiSelection ? 's' : ''}</span>
             {!canControl && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
           <ContextMenuItem onClick={handleColorClick} disabled={!canControl}>
@@ -391,33 +416,29 @@ export const TokenContextMenu = ({
           </ContextMenuCheckboxItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger disabled={!canControl}>
-              <User className="mr-2 h-4 w-4" />
-              <span>Use Profile</span>
+              <Sparkles className="mr-2 h-4 w-4" />
+              <span>Apply Illumination Preset</span>
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-48 max-h-[400px] overflow-y-auto bg-popover z-[1000]">
-              {profiles.length === 0 ? (
-                <ContextMenuItem disabled>
-                  <span className="text-xs text-muted-foreground">No profiles available</span>
+            <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
+              {getSelectablePresets().map(({ key, preset }) => (
+                <ContextMenuItem 
+                  key={key}
+                  onClick={() => applyIlluminationPreset(key)}
+                >
+                  <span className="mr-2">{preset.icon}</span>
+                  <span className="flex-1">{preset.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{preset.range * 5}ft</span>
                 </ContextMenuItem>
-              ) : (
-                profiles.map((profile) => (
-                  <ContextMenuItem 
-                    key={profile.id}
-                    onClick={() => applyProfileQuick(profile.id)}
-                  >
-                    <div 
-                      className="mr-2 h-3 w-3 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: profile.color }}
-                    />
-                    <span className="flex-1">{profile.name}</span>
-                  </ContextMenuItem>
-                ))
-              )}
+              ))}
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuItem onClick={handleVisionRangeClick} disabled={!canControl}>
             <Scan className="mr-2 h-4 w-4" />
             <span>Set Vision Range</span>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => setShowIlluminationModal(true)} disabled={!canControl}>
+            <Lightbulb className="mr-2 h-4 w-4" />
+            <span>Illumination Settings</span>
           </ContextMenuItem>
           <ContextMenuSeparator />
           {canAssignRoles && (
@@ -471,41 +492,109 @@ export const TokenContextMenu = ({
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Label Edit Modal */}
-      <Dialog open={showLabelModal} onOpenChange={setShowLabelModal}>
+      {/* Token Edit Modal */}
+      <Dialog open={showTokenEditModal} onOpenChange={setShowTokenEditModal}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Edit Label{isMultiSelection ? 's' : ''}
+              Edit Token{isMultiSelection ? 's' : ''}
             </DialogTitle>
             <DialogDescription>
               {isMultiSelection 
-                ? `Set label for ${targetTokens.length} tokens`
-                : 'Enter a new label for this token'
+                ? `Edit properties for ${targetTokens.length} tokens`
+                : 'Edit token name, label, and display settings'
               }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="token-label">Token Label</Label>
+              <Label htmlFor="token-name">Token Name</Label>
+              <Input
+                id="token-name"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                placeholder={isMultiSelection ? 'Enter name for all tokens' : 'Enter token name'}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Internal identifier for the token</p>
+            </div>
+            <div>
+              <Label htmlFor="token-label">Display Label</Label>
               <Input
                 id="token-label"
                 value={labelValue}
                 onChange={(e) => setLabelValue(e.target.value)}
-                placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter token label'}
-                style={{ 
-                  color: targetTokens[0]?.color || '#FFFFFF',
-                  borderColor: targetTokens[0]?.color || '#444444'
-                }}
+                placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter display label'}
               />
+              <p className="text-xs text-muted-foreground mt-1">Text displayed on/near the token</p>
+            </div>
+            <div>
+              <Label>Label Position</Label>
+              <div className="flex gap-2 mt-2">
+                {(['above', 'center', 'below'] as LabelPosition[]).map((pos) => (
+                  <Button
+                    key={pos}
+                    variant={labelPositionValue === pos ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setLabelPositionValue(pos)}
+                    className="flex-1 capitalize"
+                  >
+                    {pos}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Token Image Section */}
+            <div>
+              <Label>Token Image</Label>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={openImageImport}
+                >
+                  <Upload className="mr-1 h-3 w-3" />
+                  {imageUrlValue ? 'Change Image' : 'Add Image'}
+                </Button>
+                {imageUrlValue && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              
+              {/* Image Preview */}
+              {imageUrlValue && (
+                <div className="mt-2">
+                  <div className="border rounded-lg p-2 bg-muted/50">
+                    <img 
+                      src={imageUrlValue} 
+                      alt="Token preview" 
+                      className="w-16 h-16 object-cover rounded-full mx-auto"
+                      onError={() => {
+                        toast.error('Failed to load image');
+                        setImageUrlValue('');
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {isMultiSelection ? 'Image will be applied to all selected tokens' : 'Optional image for the token'}
+              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLabelModal(false)}>
+            <Button variant="outline" onClick={() => setShowTokenEditModal(false)}>
               Cancel
             </Button>
-            <Button onClick={applyLabel}>
-              Apply Label{isMultiSelection ? 's' : ''}
+            <Button onClick={applyTokenEdit}>
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -657,77 +746,35 @@ export const TokenContextMenu = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Vision Profiles */}
+            {/* Vision Range */}
             <div>
-              <Label className="text-sm font-medium">Vision Profiles</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2">
-                {profiles.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    No vision profiles available. Create profiles in the Vision Profile Manager.
-                  </div>
-                ) : (
-                  profiles.map((profile) => (
-                    <Button
-                      key={profile.id}
-                      variant={selectedProfileId === profile.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => selectProfile(profile.id)}
-                      className="justify-start gap-2"
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: profile.color }}
-                      />
-                      <span className="flex-1 text-left">{profile.name}</span>
-                      {profile.useGradients && (
-                        <span className="text-xs text-muted-foreground">Soft</span>
-                      )}
-                    </Button>
-                  ))
-                )}
-              </div>
+              <Label htmlFor="vision-range" className="text-sm font-medium">Vision Range (grid units)</Label>
+              <Input
+                id="vision-range"
+                type="number"
+                value={visionRangeValue}
+                onChange={(e) => setVisionRangeValue(e.target.value)}
+                placeholder="Use default"
+                min="0"
+                step="1"
+                className="mt-2"
+              />
             </div>
             
-            {/* Custom Settings */}
-            <div className="border-t pt-4">
-              <Label className="text-sm font-medium">Custom Settings</Label>
-              <div className="space-y-3 mt-2">
-                <div>
-                  <Label htmlFor="vision-range" className="text-xs">Vision Range (grid units)</Label>
-                  <Input
-                    id="vision-range"
-                    type="number"
-                    value={visionRangeValue}
-                    onChange={(e) => {
-                      setVisionRangeValue(e.target.value);
-                      setSelectedProfileId(''); // Clear profile selection
-                    }}
-                    placeholder="Use default"
-                    min="0"
-                    step="1"
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="use-gradients" className="text-xs">
-                    Use Soft Gradient Edges
-                  </Label>
-                  <Switch
-                    id="use-gradients"
-                    checked={useGradientsValue}
-                    onCheckedChange={(checked) => {
-                      setUseGradientsValue(checked);
-                      setSelectedProfileId(''); // Clear profile selection
-                    }}
-                  />
-                </div>
-                
-                <p className="text-xs text-muted-foreground">
-                  Custom settings override profile selection
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="use-gradients" className="text-sm">
+                Use Soft Gradient Edges
+              </Label>
+              <Switch
+                id="use-gradients"
+                checked={useGradientsValue}
+                onCheckedChange={setUseGradientsValue}
+              />
             </div>
+            
+            <p className="text-xs text-muted-foreground">
+              For full illumination control, use "Illumination Settings" from the context menu.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowVisionRangeModal(false)}>
@@ -739,6 +786,36 @@ export const TokenContextMenu = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Illumination Settings Modal */}
+      <TokenIlluminationModal
+        open={showIlluminationModal}
+        onOpenChange={setShowIlluminationModal}
+        tokenIds={targetTokens.map(t => t.id)}
+        currentIllumination={targetTokens[0]?.illuminationSources?.[0]}
+        onApply={(settings) => {
+          targetTokens.forEach((token) => {
+            updateTokenIllumination(token.id, settings);
+          });
+          onUpdateCanvas?.();
+          toast.success(`Illumination updated for ${targetTokens.length} token(s)`);
+        }}
+      />
+
+      {/* Image Import Modal */}
+      <ImageImportModal
+        open={showImageImportModal}
+        onOpenChange={setShowImageImportModal}
+        onConfirm={handleImageImportConfirm}
+        shape={{
+          type: 'circle',
+          width: 50, // Token diameter in pixels (approximate)
+          height: 50,
+        }}
+        title="Import Token Image"
+        description="Select an image and position it within the token circle."
+        initialImageUrl={imageUrlValue}
+      />
     </>
   );
 };

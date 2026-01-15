@@ -22,10 +22,12 @@ export const Z_INDEX = {
     WALLS: 15000,                  // Wall segments
     TOKENS_BASE: 20000,            // Token base layer
     TOKENS_MAX: 25000,             // Token max (5000 tokens possible)
+    FOG_POST_PROCESSING: 25500,    // PixiJS fog blur/effects layer
     SELECTION_HIGHLIGHT: 26000,    // Selection visuals
     DRAG_GHOST: 27000,             // Dragging preview
     MEASUREMENT_TOOLS: 28000,      // Rulers, templates
     COMBAT_INDICATORS: 29000,      // Turn indicators, status markers
+    CANVAS_UI_OVERLAY: 29500,      // Canvas-based UI (off-screen indicators)
   },
   
   // Layer 2: Fixed UI elements (30000-30999) - 1000 slots
@@ -46,18 +48,7 @@ export const Z_INDEX = {
     MAX: 32999,
   },
   
-  // Layer 4: Dropdowns & context menus (33000-33999)
-  DROPDOWNS: {
-    BASE: 33000,
-    MAX: 33999,
-    
-    MENU: 33100,                   // Base context/dropdown menu
-    SUBMENU: 33300,                // Nested submenus
-    NESTED: 33500,                 // Deep nesting if needed
-    COMMAND_PALETTE: 33700,        // Command palette, search
-  },
-  
-  // Layer 5: Modals & dialogs (34000-44999) - 11,000 slots
+  // Layer 4: Modals & dialogs (34000-44999) - 11,000 slots
   MODALS: {
     BASE: 34000,
     MAX: 44999,
@@ -69,15 +60,26 @@ export const Z_INDEX = {
     FULLSCREEN_MODAL: 40000,       // Fullscreen takeover modals
   },
   
-  // Layer 6: Popovers & tooltips (45000-49999) - 5000 slots
-  POPOVERS: {
+  // Layer 5: Dropdowns & context menus (45000-45999) - Must be above modals
+  DROPDOWNS: {
     BASE: 45000,
+    MAX: 45999,
+    
+    MENU: 45100,                   // Base context/dropdown menu
+    SUBMENU: 45300,                // Nested submenus
+    NESTED: 45500,                 // Deep nesting if needed
+    COMMAND_PALETTE: 45700,        // Command palette, search
+  },
+  
+  // Layer 6: Popovers & tooltips (46000-49999) - 4000 slots
+  POPOVERS: {
+    BASE: 46000,
     MAX: 49999,
     
-    POPOVER: 45100,                // Standard popovers
-    TOOLTIP: 45500,                // Tooltips
-    HOVER_CARD: 45700,             // Hover cards with details
-    CONTEXT_TOOLTIP: 46000,        // Context-sensitive help
+    POPOVER: 46100,                // Standard popovers
+    TOOLTIP: 46500,                // Tooltips
+    HOVER_CARD: 46700,             // Hover cards with details
+    CONTEXT_TOOLTIP: 47000,        // Context-sensitive help
   },
   
   // Layer 7: Critical overlays (50000+) - Highest priority

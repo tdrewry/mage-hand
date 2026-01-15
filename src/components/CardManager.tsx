@@ -11,24 +11,21 @@ import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { MenuCardContent } from '@/components/cards/MenuCard';
-import { MapCardContent } from '@/components/cards/MapCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
+import { HistoryCard } from '@/components/cards/HistoryCard';
 import { useCardStore } from '@/stores/cardStore';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { CardType } from '@/types/cardTypes';
-import { TransformMode } from '@/components/RegionControlPanel';
 
 interface CardManagerProps {
   children?: React.ReactNode;
   sessionId?: string;
   toolsCardProps?: any; // Keep for backward compatibility but not used
   activeRegionId?: string | null;
-  transformMode?: TransformMode;
-  onTransformModeChange?: (mode: TransformMode) => void;
   onToggleSnapping?: (id: string) => void;
   onToggleGridVisibility?: (id: string) => void;
 }
@@ -38,8 +35,6 @@ export function CardManager({
   sessionId, 
   toolsCardProps,
   activeRegionId,
-  transformMode = 'move',
-  onTransformModeChange = () => {},
   onToggleSnapping = () => {},
   onToggleGridVisibility = () => {}
 }: CardManagerProps) {
@@ -72,6 +67,7 @@ export function CardManager({
       gridWidth,
       gridHeight,
       label: `Token ${tokenId.slice(-4)}`,
+      labelPosition: 'below' as LabelPosition,
       color,
       roleId: 'player', // Default to player role
       isHidden: false,
@@ -91,8 +87,6 @@ export function CardManager({
           handleAddToken, 
           sessionId,
           activeRegionId,
-          transformMode,
-          onTransformModeChange,
           onToggleSnapping,
           onToggleGridVisibility
         );
@@ -102,7 +96,7 @@ export function CardManager({
             id={card.id}
             title={getCardTitle(card.type)}
             isResizable={true}
-            isClosable={card.type !== CardType.MAP && card.type !== CardType.MENU}
+            isClosable={card.type !== CardType.MENU}
             hideHeader={card.hideHeader}
             fullCardDraggable={card.fullCardDraggable}
           >
@@ -117,7 +111,6 @@ export function CardManager({
 // Helper function to get card titles
 function getCardTitle(type: CardType): string {
   const titles: Record<CardType, string> = {
-    [CardType.MAP]: 'Map View',
     [CardType.MENU]: 'Menu',
     [CardType.ROSTER]: 'Roster',
     [CardType.TOOLS]: 'Tools',
@@ -135,6 +128,7 @@ function getCardTitle(type: CardType): string {
     [CardType.STYLES]: 'Styles',
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
     [CardType.ROLE_MANAGER]: 'Role Manager',
+    [CardType.HISTORY]: 'History',
   };
   
   return titles[type] || type;
@@ -147,8 +141,6 @@ function renderCardContent(
   addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
   sessionId?: string,
   activeRegionId?: string | null,
-  transformMode?: TransformMode,
-  onTransformModeChange?: (mode: TransformMode) => void,
   onToggleSnapping?: (id: string) => void,
   onToggleGridVisibility?: (id: string) => void
 ): React.ReactNode {
@@ -189,24 +181,22 @@ function renderCardContent(
       );
     case CardType.INITIATIVE_TRACKER:
       return <InitiativeTrackerCardContent />;
-    case CardType.MAP:
-      return <MapCardContent />;
     case CardType.STYLES:
       return <StylesCardContent />;
     case CardType.REGION_CONTROL:
       return (
         <RegionControlsCardContent 
           regionId={activeRegionId || null}
-          transformMode={transformMode || 'move'}
-          onTransformModeChange={onTransformModeChange || (() => {})}
-          onToggleSnapping={onToggleSnapping || (() => {})}
-          onToggleGridVisibility={onToggleGridVisibility || (() => {})}
+          onToggleSnapping={onToggleSnapping}
+          onToggleGridVisibility={onToggleGridVisibility}
         />
       );
     case CardType.VISION_PROFILE_MANAGER:
       return <VisionProfileManagerCardContent />;
     case CardType.ROLE_MANAGER:
       return <RoleManagerCard />;
+    case CardType.HISTORY:
+      return <HistoryCard />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:

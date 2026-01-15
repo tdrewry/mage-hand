@@ -1,41 +1,42 @@
 import React from 'react';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  Settings,
+  MapPlus,
   Square,
   Pen,
-  Waves,
-  Grid3X3,
+  LineSquiggle,
+  Magnet,
   Settings2,
   Eye,
   EyeOff,
-  Trash2,
+  CircleMinus,
   FileDown,
   Layers,
-  Plus,
+  CirclePlus,
   Palette,
   CloudFog,
   Swords,
-  Lock,
-  LockOpen,
+  Footprints,
   Users,
+  Grid2x2X,
+  Grid3X3,
+  Undo,
+  Redo,
+  History,
+  Pause,
+  Play,
+  Maximize,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useCardStore } from '@/stores/cardStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
-import { Z_INDEX } from '@/lib/zIndex';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface VerticalToolbarProps {
   mode: 'edit' | 'play';
@@ -55,6 +56,7 @@ interface VerticalToolbarProps {
   // Shared props
   showRegions: boolean;
   onToggleRegions: () => void;
+  onFitToView?: () => void;
 }
 
 export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
@@ -71,11 +73,14 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   onToggleGridSnapping,
   showRegions,
   onToggleRegions,
+  onFitToView,
 }) => {
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
+  const { undo, redo, canUndo, canRedo } = useUndoRedo();
+  const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -88,6 +93,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const stylesCard = cards.find((c) => c.type === CardType.STYLES);
+  const historyCard = cards.find((c) => c.type === CardType.HISTORY);
 
   const handleToggleStylesCard = () => {
     if (stylesCard) {
@@ -101,6 +107,24 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 350, height: 500 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleHistoryCard = () => {
+    if (historyCard) {
+      setVisibility(historyCard.id, !historyCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.HISTORY,
+        title: 'History',
+        defaultPosition: { x: window.innerWidth - 380, y: 80 },
+        defaultSize: { width: 360, height: 500 },
+        minSize: { width: 320, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: false,
       });
     }
   };
@@ -117,6 +141,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 250, height: 400 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -165,6 +190,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 300, height: 450 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -223,358 +249,303 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   };
 
   return (
-    <TooltipProvider>
-      <div 
-        className="fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-background/95 backdrop-blur border border-border rounded-full px-2 py-3 shadow-lg"
-        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
-      >
-        {mode === 'edit' ? (
-          <>
-            {/* Edit Mode Tools */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onOpenMapManager}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Map Manager</p>
-              </TooltipContent>
-            </Tooltip>
+    <Toolbar position="left" className="gap-0.5 px-1.5 py-2">
+      {mode === 'edit' ? (
+        <>
+          <ToolbarButton
+            icon={MapPlus}
+            label="Map Manager"
+            onClick={onOpenMapManager || (() => {})}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={tokenCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleTokenCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Plus className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Tokens</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={CirclePlus}
+            label="Tokens"
+            onClick={handleToggleTokenCard}
+            isActive={tokenCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <div className="h-px w-8 mx-auto bg-border my-1" />
+          <ToolbarSeparator orientation="horizontal" />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onAddRegion}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Square className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Add Region</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Square}
+            label="Add Region"
+            onClick={onAddRegion || (() => {})}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isDrawingPolygon ? "default" : "ghost"}
-                  size="icon"
-                  onClick={isDrawingPolygon ? onFinishPolygonDraw : onStartPolygonDraw}
-                  disabled={isDrawingFreehand}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Pen className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>{isDrawingPolygon ? 'Finish Polygon' : 'Draw Polygon'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Pen}
+            label={isDrawingPolygon ? 'Finish Polygon' : 'Draw Polygon'}
+            onClick={isDrawingPolygon ? (onFinishPolygonDraw || (() => {})) : (onStartPolygonDraw || (() => {}))}
+            disabled={isDrawingFreehand}
+            isActive={isDrawingPolygon}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isDrawingFreehand ? "default" : "ghost"}
-                  size="icon"
-                  onClick={onStartFreehandDraw}
-                  disabled={isDrawingPolygon}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Waves className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Draw Freehand</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={LineSquiggle}
+            label="Draw Freehand"
+            onClick={onStartFreehandDraw || (() => {})}
+            disabled={isDrawingPolygon}
+            isActive={isDrawingFreehand}
+            variant="ghost"
+            size="xs"
+          />
 
-            <div className="h-px w-8 mx-auto bg-border my-1" />
+          <ToolbarSeparator orientation="horizontal" />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isGridSnappingEnabled ? "default" : "ghost"}
-                  size="icon"
-                  onClick={onToggleGridSnapping}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Grid3X3 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>World Snap {isGridSnappingEnabled ? 'On' : 'Off'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Magnet}
+            label={`World Snap ${isGridSnappingEnabled ? 'On' : 'Off'}`}
+            onClick={onToggleGridSnapping || (() => {})}
+            isActive={isGridSnappingEnabled}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={stylesCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleStylesCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Settings2 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Styles</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Settings2}
+            label="Styles"
+            onClick={handleToggleStylesCard}
+            isActive={stylesCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showRegions ? "default" : "ghost"}
-                  size="icon"
-                  onClick={onToggleRegions}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Eye className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Regions {showRegions ? 'On' : 'Off'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={animationsPaused ? Play : Pause}
+            label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
+            onClick={toggleAnimationsPaused}
+            isActive={animationsPaused}
+            variant="ghost"
+            size="xs"
+          />
 
-            <div className="h-px w-8 mx-auto bg-border my-1" />
+          <ToolbarButton
+            icon={Eye}
+            label={`Regions ${showRegions ? 'On' : 'Off'}`}
+            onClick={onToggleRegions}
+            isActive={showRegions}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleClearTokens}
-                  className="w-10 h-10 rounded-full text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Clear Tokens</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarSeparator orientation="horizontal" />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleClearRegions}
-                  className="w-10 h-10 rounded-full text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
-                >
-                  <Square className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Clear Regions</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={CircleMinus}
+            label="Clear Tokens"
+            onClick={handleClearTokens}
+            variant="ghost"
+            size="xs"
+            className="text-orange-600 hover:bg-orange-600/10"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={watabouCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleWatabouCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <FileDown className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Import Dungeon</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Grid2x2X}
+            label="Clear Regions"
+            onClick={handleClearRegions}
+            variant="ghost"
+            size="xs"
+            className="text-orange-600 hover:bg-orange-600/10"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleLayerCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Layers className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Manage Layers</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
-        ) : (
-          <>
-            {/* Play Mode Tools */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={stylesCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleStylesCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Palette className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Styles</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={FileDown}
+            label="Import Dungeon"
+            onClick={handleToggleWatabouCard}
+            isActive={watabouCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={fogCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleFogCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <CloudFog className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Fog of War {fogEnabled ? 'On' : 'Off'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Layers}
+            label="Manage Layers"
+            onClick={handleToggleLayerCard}
+            isActive={layerCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showRegions ? "default" : "ghost"}
-                  size="icon"
-                  onClick={onToggleRegions}
-                  className="w-10 h-10 rounded-full"
-                >
-                  {showRegions ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Regions {showRegions ? 'On' : 'Off'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarSeparator orientation="horizontal" />
 
-            <div className="h-px w-8 mx-auto bg-border my-1" />
+          <ToolbarButton
+            icon={Undo}
+            label="Undo (Ctrl+Z)"
+            onClick={undo}
+            disabled={!canUndo}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={rosterCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleRosterCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Users className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>{rosterCard?.isVisible ? 'Hide' : 'Show'} Roster</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Redo}
+            label="Redo (Ctrl+Shift+Z)"
+            onClick={redo}
+            disabled={!canRedo}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={isInCombat ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleCombatToggle}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Swords className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>{isInCombat ? 'End' : 'Start'} Combat</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={History}
+            label="History"
+            onClick={handleToggleHistoryCard}
+            isActive={historyCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={restrictMovement ? "default" : "ghost"}
-                  size="icon"
-                  onClick={() => setRestrictMovement(!restrictMovement)}
-                  className="w-10 h-10 rounded-full"
-                >
-                  {restrictMovement ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>
-                  {isInCombat 
-                    ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 
-                    : (restrictMovement ? 'GM Only' : 'Free Movement')
-                  }
-                </p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarSeparator orientation="horizontal" />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    if (backgroundGridCard) {
-                      setVisibility(backgroundGridCard.id, true);
-                    }
-                  }}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Grid3X3 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Background & Grid</p>
-              </TooltipContent>
-            </Tooltip>
+          <ToolbarButton
+            icon={Maximize}
+            label="Fit to View"
+            onClick={onFitToView || (() => {})}
+            variant="ghost"
+            size="xs"
+          />
+        </>
+      ) : (
+        <>
+          <ToolbarButton
+            icon={Palette}
+            label="Styles"
+            onClick={handleToggleStylesCard}
+            isActive={stylesCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleLayerCard}
-                  className="w-10 h-10 rounded-full"
-                >
-                  <Layers className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Manage Layers</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
-      </div>
-    </TooltipProvider>
+          <ToolbarButton
+            icon={animationsPaused ? Play : Pause}
+            label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
+            onClick={toggleAnimationsPaused}
+            isActive={animationsPaused}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={CloudFog}
+            label={`Fog of War ${fogEnabled ? 'On' : 'Off'}`}
+            onClick={handleToggleFogCard}
+            isActive={fogCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={showRegions ? Eye : EyeOff}
+            label={`Regions ${showRegions ? 'On' : 'Off'}`}
+            onClick={onToggleRegions}
+            isActive={showRegions}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Users}
+            label={`${rosterCard?.isVisible ? 'Hide' : 'Show'} Roster`}
+            onClick={handleToggleRosterCard}
+            isActive={rosterCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Swords}
+            label={`${isInCombat ? 'End' : 'Start'} Combat`}
+            onClick={handleCombatToggle}
+            isActive={isInCombat}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Footprints}
+            label={
+              isInCombat 
+                ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 
+                : (restrictMovement ? 'GM Only' : 'Free Movement')
+            }
+            onClick={() => setRestrictMovement(!restrictMovement)}
+            isActive={restrictMovement}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Grid3X3}
+            label="Background & Grid"
+            onClick={() => {
+              if (backgroundGridCard) {
+                setVisibility(backgroundGridCard.id, true);
+              }
+            }}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Layers}
+            label="Manage Layers"
+            onClick={handleToggleLayerCard}
+            isActive={layerCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Undo}
+            label="Undo (Ctrl+Z)"
+            onClick={undo}
+            disabled={!canUndo}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Redo}
+            label="Redo (Ctrl+Shift+Z)"
+            onClick={redo}
+            disabled={!canRedo}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={History}
+            label="History"
+            onClick={handleToggleHistoryCard}
+            isActive={historyCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={Maximize}
+            label="Fit to View"
+            onClick={onFitToView || (() => {})}
+            variant="ghost"
+            size="xs"
+          />
+        </>
+      )}
+    </Toolbar>
   );
 };

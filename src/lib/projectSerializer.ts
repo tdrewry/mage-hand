@@ -5,6 +5,7 @@
  * - Maps, regions, and tokens
  * - Viewport states and camera positions  
  * - User preferences and settings
+ * - Textures (embedded as base64)
  * - Version management for backward compatibility
  */
 
@@ -18,6 +19,8 @@ import { FogSettings } from '../stores/fogStore';
 import { Role } from '../stores/roleStore';
 import { VisionProfile } from '../stores/visionProfileStore';
 import { CardState } from '../types/cardTypes';
+import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
+import { getAllTokenMappings, importTokenTextures } from './tokenTextureStorage';
 
 export interface ProjectMetadata {
   id: string;
@@ -45,6 +48,16 @@ export interface ProjectSettings {
   defaultGridSize: number;
 }
 
+// Embedded texture data for self-contained exports
+export interface EmbeddedTextures {
+  // Hash -> base64 data URL
+  textures: Record<string, string>;
+  // Region ID -> texture hash
+  regionMappings: Record<string, string>;
+  // Token ID -> texture hash
+  tokenMappings: Record<string, string>;
+}
+
 export interface ProjectData {
   metadata: ProjectMetadata;
   tokens: Token[];
@@ -68,6 +81,8 @@ export interface ProjectData {
   lights?: LightSource[];
   cardStates?: CardState[];
   dungeonData?: any; // Optional dungeon data
+  // Embedded textures for self-contained exports
+  embeddedTextures?: EmbeddedTextures;
 }
 
 export interface SerializedProject {
@@ -148,9 +163,65 @@ const migrateProjectVersion = (serialized: SerializedProject): ProjectData => {
   }
 };
 
-// Export project to downloadable file
-export const exportProjectToFile = (projectData: ProjectData, filename?: string): void => {
-  const serialized = serializeProject(projectData);
+/**
+ * Collect all textures from IndexedDB for embedding in export
+ */
+export async function collectTexturesForExport(): Promise<EmbeddedTextures> {
+  const [allTextures, regionMappings, tokenMappings] = await Promise.all([
+    getAllTextures(),
+    getAllRegionMappings(),
+    getAllTokenMappings(),
+  ]);
+
+  // Build texture hash -> dataUrl map
+  const textures: Record<string, string> = {};
+  allTextures.forEach(t => {
+    textures[t.hash] = t.dataUrl;
+  });
+
+  // Convert Maps to Records
+  const regionMappingsRecord: Record<string, string> = {};
+  regionMappings.forEach((hash, regionId) => {
+    regionMappingsRecord[regionId] = hash;
+  });
+
+  const tokenMappingsRecord: Record<string, string> = {};
+  tokenMappings.forEach((hash, tokenId) => {
+    tokenMappingsRecord[tokenId] = hash;
+  });
+
+  return {
+    textures,
+    regionMappings: regionMappingsRecord,
+    tokenMappings: tokenMappingsRecord,
+  };
+}
+
+/**
+ * Restore textures from imported project to IndexedDB
+ */
+export async function restoreTexturesFromImport(embeddedTextures: EmbeddedTextures): Promise<void> {
+  const { textures, regionMappings, tokenMappings } = embeddedTextures;
+
+  // Import region textures
+  await importTextures(textures, regionMappings);
+  
+  // Import token textures (textures may already exist, will be deduplicated)
+  await importTokenTextures(textures, tokenMappings);
+}
+
+// Export project to downloadable file (with embedded textures)
+export const exportProjectToFile = async (projectData: ProjectData, filename?: string): Promise<void> => {
+  // Collect textures from IndexedDB
+  const embeddedTextures = await collectTexturesForExport();
+  
+  // Add textures to project data
+  const projectWithTextures: ProjectData = {
+    ...projectData,
+    embeddedTextures,
+  };
+
+  const serialized = serializeProject(projectWithTextures);
   const json = JSON.stringify(serialized, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   
@@ -166,12 +237,12 @@ export const exportProjectToFile = (projectData: ProjectData, filename?: string)
   URL.revokeObjectURL(url);
 };
 
-// Import project from file
+// Import project from file (restores embedded textures)
 export const importProjectFromFile = (file: File): Promise<ProjectData> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const result = event.target?.result;
         if (typeof result !== 'string') {
@@ -179,6 +250,12 @@ export const importProjectFromFile = (file: File): Promise<ProjectData> => {
         }
         
         const projectData = deserializeProject(result);
+        
+        // Restore textures to IndexedDB if present
+        if (projectData.embeddedTextures) {
+          await restoreTexturesFromImport(projectData.embeddedTextures);
+        }
+        
         resolve(projectData);
       } catch (error) {
         reject(new Error(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`));

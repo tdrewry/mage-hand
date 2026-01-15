@@ -1,5 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 
 export interface GridRegion {
   id: string;
@@ -80,154 +81,171 @@ const createDefaultMap = (): GameMap => ({
   ]
 });
 
-export const useMapStore = create<MapStore>()(
-  persist(
-    (set, get) => ({
-      maps: [createDefaultMap()],
-      selectedMapId: 'default-map',
+// Define the store creator separately for better type inference
+const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
+  maps: [createDefaultMap()],
+  selectedMapId: 'default-map',
 
-      addMap: (mapData) => {
-        const newMap: GameMap = {
-          ...mapData,
-          id: `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          regions: mapData.regions.map(region => ({
-            ...region,
-            id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          }))
-        };
-        
-        set((state) => ({
-          maps: [...state.maps, newMap],
-        }));
-      },
+  addMap: (mapData) => {
+    const newMap: GameMap = {
+      ...mapData,
+      id: `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      regions: mapData.regions.map(region => ({
+        ...region,
+        id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }))
+    };
+    
+    set((state) => ({
+      maps: [...state.maps, newMap],
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
 
-      updateMap: (id, updates) => {
-        set((state) => ({
-          maps: state.maps.map((map) =>
-            map.id === id ? { ...map, ...updates } : map
-          ),
-        }));
-      },
+  updateMap: (id, updates) => {
+    set((state) => ({
+      maps: state.maps.map((map) =>
+        map.id === id ? { ...map, ...updates } : map
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
 
-      removeMap: (id) => {
-        set((state) => {
-          const newMaps = state.maps.filter((map) => map.id !== id);
-          return {
-            maps: newMaps,
-            selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
-          };
-        });
-      },
+  removeMap: (id) => {
+    set((state) => {
+      const newMaps = state.maps.filter((map) => map.id !== id);
+      return {
+        maps: newMaps,
+        selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
+      };
+    });
+    // Sync happens automatically via syncPatch middleware
+  },
 
-      setSelectedMap: (id) => {
-        set({ selectedMapId: id });
-      },
+  setSelectedMap: (id) => {
+    set({ selectedMapId: id });
+  },
 
-      reorderMaps: (fromIndex, toIndex) => {
-        set((state) => {
-          const newMaps = [...state.maps];
-          const [removed] = newMaps.splice(fromIndex, 1);
-          newMaps.splice(toIndex, 0, removed);
-          
-          // Update z-indices based on new order
-          newMaps.forEach((map, index) => {
-            map.zIndex = index;
-          });
-          
-          return { maps: newMaps };
-        });
-      },
+  reorderMaps: (fromIndex, toIndex) => {
+    set((state) => {
+      const newMaps = [...state.maps];
+      const [removed] = newMaps.splice(fromIndex, 1);
+      newMaps.splice(toIndex, 0, removed);
+      
+      // Update z-indices based on new order
+      newMaps.forEach((map, index) => {
+        map.zIndex = index;
+      });
+      
+      return { maps: newMaps };
+    });
+    // Sync happens automatically via syncPatch middleware
+  },
 
-      addRegion: (mapId, regionData) => {
-        const newRegion: GridRegion = {
-          ...regionData,
-          id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        };
-        
-        set((state) => ({
-          maps: state.maps.map((map) =>
-            map.id === mapId
-              ? { ...map, regions: [...map.regions, newRegion] }
-              : map
-          ),
-        }));
-      },
+  addRegion: (mapId, regionData) => {
+    const newRegion: GridRegion = {
+      ...regionData,
+      id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
+    
+    set((state) => ({
+      maps: state.maps.map((map) =>
+        map.id === mapId
+          ? { ...map, regions: [...map.regions, newRegion] }
+          : map
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
 
-      updateRegion: (mapId, regionId, updates) => {
-        set((state) => ({
-          maps: state.maps.map((map) =>
-            map.id === mapId
-              ? {
-                  ...map,
-                  regions: map.regions.map((region) =>
-                    region.id === regionId ? { ...region, ...updates } : region
-                  ),
-                }
-              : map
-          ),
-        }));
-      },
-
-      removeRegion: (mapId, regionId) => {
-        set((state) => ({
-          maps: state.maps.map((map) =>
-            map.id === mapId
-              ? {
-                  ...map,
-                  regions: map.regions.filter((region) => region.id !== regionId),
-                }
-              : map
-          ),
-        }));
-      },
-
-      getActiveRegionAt: (x, y) => {
-        const { maps } = get();
-        const visibleMaps = maps
-          .filter((map) => map.visible)
-          .sort((a, b) => b.zIndex - a.zIndex); // Higher z-index first
-
-        for (const map of visibleMaps) {
-          // Check if point is within map bounds
-          if (
-            x >= map.bounds.x &&
-            x <= map.bounds.x + map.bounds.width &&
-            y >= map.bounds.y &&
-            y <= map.bounds.y + map.bounds.height
-          ) {
-            // Find the smallest visible region at this point (most specific)
-            const matchingRegions = map.regions
-              .filter((region) => region.visible)
-              .filter((region) => isPointInPolygon(x, y, region.points));
-
-            if (matchingRegions.length > 0) {
-              // Sort by area (smallest first) to get the most specific region
-              const smallestRegion = matchingRegions.sort((a, b) => {
-                const areaA = calculatePolygonArea(a.points);
-                const areaB = calculatePolygonArea(b.points);
-                return areaA - areaB;
-              })[0];
-
-              return { map, region: smallestRegion };
+  updateRegion: (mapId, regionId, updates) => {
+    set((state) => ({
+      maps: state.maps.map((map) =>
+        map.id === mapId
+          ? {
+              ...map,
+              regions: map.regions.map((region) =>
+                region.id === regionId ? { ...region, ...updates } : region
+              ),
             }
-          }
+          : map
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  removeRegion: (mapId, regionId) => {
+    set((state) => ({
+      maps: state.maps.map((map) =>
+        map.id === mapId
+          ? {
+              ...map,
+              regions: map.regions.filter((region) => region.id !== regionId),
+            }
+          : map
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  getActiveRegionAt: (x, y) => {
+    const { maps } = get();
+    const visibleMaps = maps
+      .filter((map) => map.visible)
+      .sort((a, b) => b.zIndex - a.zIndex); // Higher z-index first
+
+    for (const map of visibleMaps) {
+      // Check if point is within map bounds
+      if (
+        x >= map.bounds.x &&
+        x <= map.bounds.x + map.bounds.width &&
+        y >= map.bounds.y &&
+        y <= map.bounds.y + map.bounds.height
+      ) {
+        // Find the smallest visible region at this point (most specific)
+        const matchingRegions = map.regions
+          .filter((region) => region.visible)
+          .filter((region) => isPointInPolygon(x, y, region.points));
+
+        if (matchingRegions.length > 0) {
+          // Sort by area (smallest first) to get the most specific region
+          const smallestRegion = matchingRegions.sort((a, b) => {
+            const areaA = calculatePolygonArea(a.points);
+            const areaB = calculatePolygonArea(b.points);
+            return areaA - areaB;
+          })[0];
+
+          return { map, region: smallestRegion };
         }
-
-        return null;
-      },
-
-      getVisibleMaps: () => {
-        const { maps } = get();
-        return maps
-          .filter((map) => map.visible)
-          .sort((a, b) => a.zIndex - b.zIndex); // Lower z-index first for rendering
-      },
-    }),
-    {
-      name: 'map-store',
-      version: 2, // Increment version for polygon migration
+      }
     }
-  )
+
+    return null;
+  },
+
+  getVisibleMaps: () => {
+    const { maps } = get();
+    return maps
+      .filter((map) => map.visible)
+      .sort((a, b) => a.zIndex - b.zIndex); // Lower z-index first for rendering
+  },
+});
+
+// Wrap with syncPatch middleware
+const withSyncPatch = syncPatch<MapStore>({ 
+  channel: 'maps',
+  excludePaths: ['selectedMapId'], // Local selection state
+  debug: false,
+})(mapStoreCreator);
+
+// Persist options
+const persistOptions: PersistOptions<MapStore, Partial<MapStore>> = {
+  name: 'map-store',
+  version: 2, // Increment version for polygon migration
+};
+
+export const useMapStore = create<MapStore>()(
+  persist(withSyncPatch as StateCreator<MapStore, [], []>, persistOptions)
 );
 
 // Utility functions for polygon operations

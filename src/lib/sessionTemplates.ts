@@ -121,11 +121,15 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
-      useGradients: true,
-      innerFadeStart: 0.7,
-      midpointPosition: 0.85,
-      midpointOpacity: 0.2,
-      outerFadeStart: 0.9,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        lightFalloff: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -257,11 +261,15 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: true,
       serializedExploredAreas: '',
       fogVersion: 1,
-      useGradients: true,
-      innerFadeStart: 0.7,
-      midpointPosition: 0.85,
-      midpointOpacity: 0.2,
-      outerFadeStart: 0.9,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        lightFalloff: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -344,11 +352,15 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: false,
       serializedExploredAreas: '',
       fogVersion: 1,
-      useGradients: false,
-      innerFadeStart: 0.7,
-      midpointPosition: 0.85,
-      midpointOpacity: 0.2,
-      outerFadeStart: 0.9,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        lightFalloff: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -448,11 +460,15 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
       showExploredAreas: false,
       serializedExploredAreas: '',
       fogVersion: 1,
-      useGradients: false,
-      innerFadeStart: 0.7,
-      midpointPosition: 0.85,
-      midpointOpacity: 0.2,
-      outerFadeStart: 0.9,
+      realtimeVisionDuringDrag: false,
+      realtimeVisionThrottleMs: 32,
+      effectSettings: {
+        postProcessingEnabled: false,
+        edgeBlur: 8,
+        lightFalloff: 0.5,
+        volumetricEnabled: false,
+        effectQuality: 'balanced' as const,
+      },
     },
     defaultTokenSize: { width: 1, height: 1 },
     gridSettings: {
@@ -635,11 +651,6 @@ export const applyTemplate = (
   stores.fogStore.setFogOpacity(template.fogSettings.fogOpacity);
   stores.fogStore.setExploredOpacity(template.fogSettings.exploredOpacity);
   stores.fogStore.setShowExploredAreas(template.fogSettings.showExploredAreas);
-  stores.fogStore.setUseGradients(template.fogSettings.useGradients);
-  stores.fogStore.setInnerFadeStart(template.fogSettings.innerFadeStart);
-  stores.fogStore.setMidpointPosition(template.fogSettings.midpointPosition);
-  stores.fogStore.setMidpointOpacity(template.fogSettings.midpointOpacity);
-  stores.fogStore.setOuterFadeStart(template.fogSettings.outerFadeStart);
   stores.fogStore.clearExploredAreas();
 
   // Apply template maps (with new IDs)

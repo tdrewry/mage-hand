@@ -2,7 +2,15 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Eye, Layers, Grid3x3, Sparkles, Shield } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive } from 'lucide-react';
+import { SessionManager } from '@/components/SessionManager';
+import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
+import { StorageManagerModal } from '@/components/StorageManagerModal';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
+import { syncManager } from '@/lib/syncManager';
+import { hasPermission } from '@/lib/rolePermissions';
+import { useRoleStore } from '@/stores/roleStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +33,26 @@ interface MenuCardContentProps {
 }
 
 export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) => {
-  const { tokens } = useSessionStore();
+  const { tokens, players, currentPlayerId } = useSessionStore();
   const { regions } = useRegionStore();
   const { renderingMode, setRenderingMode } = useDungeonStore();
+  const { isConnected, currentSession, connectedUsers, currentUserId } = useMultiplayerStore();
+  const { currentMode, lockedByDm, setMode } = useUiModeStore();
+  const { roles } = useRoleStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+  const [storageManagerOpen, setStorageManagerOpen] = useState(false);
+
+  // Get current player's roles
+  const currentPlayer = players.find(p => p.id === currentUserId || p.id === currentPlayerId);
+  const currentPlayerRoles = currentPlayer?.roleIds || [];
+
+  // Check if user has permission to control UI mode
+  const canControlUiMode = hasPermission(
+    currentPlayer || { id: '', name: '', roleIds: [], isConnected: false },
+    roles,
+    'canManageFog' // DM-level permission
+  );
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -37,7 +61,6 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
   const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
   const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
-  const playerViewCard = cards.find((c) => c.type === CardType.MAP);
   const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
   const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
   const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
@@ -54,23 +77,6 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         minSize: { width: 350, height: 400 },
         isResizable: true,
         isClosable: true,
-      });
-    }
-  };
-
-  const handleTogglePlayerView = () => {
-    if (playerViewCard) {
-      setVisibility(playerViewCard.id, !playerViewCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.MAP,
-        title: 'Player View',
-        defaultPosition: { x: 320, y: 20 },
-        defaultSize: { width: 800, height: 600 },
-        minSize: { width: 400, height: 300 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
       });
     }
   };
@@ -148,6 +154,19 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
     setRenderingMode(newMode);
     toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'Edit'} mode`);
   };
+
+  const handleModeChange = (newMode: 'dm' | 'play') => {
+    // Update local mode
+    setMode(newMode);
+    
+    // Broadcast to all players if we're DM and connected
+    if (canControlUiMode && isConnected) {
+      syncManager.rpcSetUiMode(newMode); // Broadcast to all
+      toast.success(`Set all players to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
+    } else {
+      toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
+    }
+  };
   
   const shareSession = () => {
     const url = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
@@ -218,9 +237,50 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
 
       <Separator />
 
-      {/* Mode Toggle */}
+      {/* UI Mode Toggle - DM can control all players */}
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">Mode</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">UI Mode</p>
+          {lockedByDm && (
+            <Badge variant="secondary" className="text-xs">
+              Locked by DM
+            </Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={currentMode === 'dm' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('dm')}
+            disabled={lockedByDm}
+            className="w-full"
+          >
+            <UserCircle className="h-4 w-4 mr-2" />
+            DM
+          </Button>
+          <Button
+            variant={currentMode === 'play' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('play')}
+            disabled={lockedByDm}
+            className="w-full"
+          >
+            <Monitor className="h-4 w-4 mr-2" />
+            Play
+          </Button>
+        </div>
+        {canControlUiMode && isConnected && (
+          <p className="text-xs text-muted-foreground">
+            Changes broadcast to all players
+          </p>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Rendering Mode Toggle */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Rendering Mode</p>
         <Button 
           variant={renderingMode === 'play' ? 'default' : 'outline'}
           size="sm"
@@ -230,6 +290,52 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Castle className="h-4 w-4 mr-2" />
           {renderingMode === 'play' ? 'Play Mode' : 'Edit Mode'}
         </Button>
+      </div>
+
+      <Separator />
+
+      {/* Multiplayer Controls */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Multiplayer</p>
+        <Button 
+          variant={isConnected ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSessionManagerOpen(true)}
+          className="w-full"
+        >
+          <Network className="h-4 w-4 mr-2" />
+          {isConnected ? `Session: ${currentSession?.sessionCode}` : 'Connect to Session'}
+        </Button>
+        
+        {isConnected && (
+          <>
+            <Badge variant="secondary" className="w-full justify-center text-xs">
+              <Users className="h-3 w-3 mr-1" />
+              {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
+            </Badge>
+            
+            {/* Sync Button - DMs broadcast, Players request */}
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (canControlUiMode) {
+                  // DM: Broadcast full state to all players
+                  syncManager.rpcBroadcastFullState();
+                  toast.success('Broadcasting game state to all players');
+                } else {
+                  // Player: Request sync from DM
+                  syncManager.rpcRequestFullState();
+                  toast.info('Requesting game state from DM');
+                }
+              }}
+              className="w-full"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              {canControlUiMode ? 'Sync to Players' : 'Request Sync'}
+            </Button>
+          </>
+        )}
       </div>
 
       <Separator />
@@ -247,13 +353,18 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             Share
           </Button>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Players (1)
-          </Button>
+          <ConnectedUsersPanel
+            trigger={
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={!isConnected}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Players ({isConnected ? connectedUsers.length : 0})
+              </Button>
+            }
+          />
         </div>
       </div>
 
@@ -290,16 +401,6 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Map className="h-4 w-4 mr-2" />
           Map Controls
-        </Button>
-
-        <Button 
-          variant={playerViewCard?.isVisible ? "default" : "outline"}
-          size="sm"
-          onClick={handleTogglePlayerView}
-          className="w-full"
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          Player View
         </Button>
 
         <Button 
@@ -341,6 +442,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Shield className="h-4 w-4 mr-2" />
           Role Manager
         </Button>
+
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={() => setStorageManagerOpen(true)}
+          className="w-full"
+        >
+          <HardDrive className="h-4 w-4 mr-2" />
+          Storage Manager
+        </Button>
       </div>
 
       <Separator />
@@ -380,6 +491,18 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Session Manager Modal */}
+      <SessionManager 
+        open={sessionManagerOpen} 
+        onOpenChange={setSessionManagerOpen} 
+      />
+
+      {/* Storage Manager Modal */}
+      <StorageManagerModal
+        open={storageManagerOpen}
+        onOpenChange={setStorageManagerOpen}
+      />
     </div>
   );
 };

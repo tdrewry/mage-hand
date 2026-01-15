@@ -2,10 +2,20 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { useFogStore } from '@/stores/fogStore';
-import { Eye, EyeOff, Circle } from 'lucide-react';
+import { useFogStore, type EffectQuality } from '@/stores/fogStore';
+import { useLightStore } from '@/stores/lightStore';
+import { useUiModeStore, type DmFogVisibility } from '@/stores/uiModeStore';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, AlertCircle, Ghost, Move } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 export function FogControlCardContent() {
   const {
@@ -14,24 +24,29 @@ export function FogControlCardContent() {
     visionRange,
     fogOpacity,
     exploredOpacity,
-    useGradients,
-    innerFadeStart,
-    midpointPosition,
-    midpointOpacity,
-    outerFadeStart,
+    effectSettings,
+    realtimeVisionDuringDrag,
+    realtimeVisionThrottleMs,
     setEnabled,
     setRevealAll,
     setVisionRange,
     setFogOpacity,
     setExploredOpacity,
-    setUseGradients,
-    setInnerFadeStart,
-    setMidpointPosition,
-    setMidpointOpacity,
-    setOuterFadeStart,
+    setRealtimeVisionDuringDrag,
+    setRealtimeVisionThrottleMs,
+    setPostProcessingEnabled,
+    setEdgeBlur,
+    setLightFalloff,
+    setVolumetricEnabled,
+    setEffectQuality,
     clearExploredAreas,
     resetFog,
   } = useFogStore();
+
+  const { lights } = useLightStore();
+  const enabledLightsCount = lights.filter(l => l.enabled).length;
+  
+  const { dmFogVisibility, setDmFogVisibility } = useUiModeStore();
 
   return (
     <div className="space-y-4">
@@ -79,6 +94,36 @@ export function FogControlCardContent() {
 
       <Separator />
 
+      {/* DM Fog-Hidden Element Visibility */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <Ghost className="h-3 w-3" />
+          DM Hidden Element View
+        </Label>
+        <p className="text-xs text-muted-foreground mb-2">
+          How fog-hidden tokens/annotations appear to DM
+        </p>
+        <ToggleGroup
+          type="single"
+          value={dmFogVisibility}
+          onValueChange={(value) => value && setDmFogVisibility(value as DmFogVisibility)}
+          className="justify-start"
+          disabled={!enabled}
+        >
+          <ToggleGroupItem value="hidden" aria-label="Hidden" className="text-xs px-3">
+            Hidden
+          </ToggleGroupItem>
+          <ToggleGroupItem value="semi-transparent" aria-label="Semi-Transparent" className="text-xs px-3">
+            Faded
+          </ToggleGroupItem>
+          <ToggleGroupItem value="full" aria-label="Full Visibility" className="text-xs px-3">
+            Full
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
+      <Separator />
+
       {/* Vision Range */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -101,6 +146,53 @@ export function FogControlCardContent() {
         <p className="text-xs text-muted-foreground">
           How far tokens can see through fog
         </p>
+      </div>
+
+      <Separator />
+
+      {/* Real-time Vision During Drag */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="realtime-vision" className="text-sm font-medium flex items-center gap-2">
+              <Move className="h-3 w-3" />
+              Live Vision Preview
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Update lighting while dragging tokens
+            </p>
+          </div>
+          <Switch
+            id="realtime-vision"
+            checked={realtimeVisionDuringDrag}
+            onCheckedChange={setRealtimeVisionDuringDrag}
+            disabled={!enabled}
+          />
+        </div>
+        
+        {realtimeVisionDuringDrag && (
+          <div className="space-y-2 pl-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="throttle-ms" className="text-xs font-medium">
+                Update Rate
+              </Label>
+              <span className="text-xs font-medium">{Math.round(1000 / realtimeVisionThrottleMs)} fps</span>
+            </div>
+            <Slider
+              id="throttle-ms"
+              min={16}
+              max={100}
+              step={1}
+              value={[realtimeVisionThrottleMs]}
+              onValueChange={([value]) => setRealtimeVisionThrottleMs(value)}
+              disabled={!enabled}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Lower = smoother but more CPU intensive
+            </p>
+          </div>
+        )}
       </div>
 
       <Separator />
@@ -155,117 +247,133 @@ export function FogControlCardContent() {
 
       <Separator />
 
-      {/* Soft Edges - Gradient Settings */}
+      {/* Post-Processing Effects Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label htmlFor="use-gradients" className="text-sm font-medium">
-              Soft Vision Edges
+            <Label htmlFor="post-processing" className="text-sm font-medium flex items-center gap-2">
+              <Sparkles className="h-3 w-3" />
+              GPU Post-Processing
             </Label>
             <p className="text-xs text-muted-foreground">
-              Smooth gradient fade at vision boundaries
+              Enhanced fog effects using WebGL
             </p>
           </div>
           <Switch
-            id="use-gradients"
-            checked={useGradients}
-            onCheckedChange={setUseGradients}
+            id="post-processing"
+            checked={effectSettings.postProcessingEnabled}
+            onCheckedChange={setPostProcessingEnabled}
             disabled={!enabled}
           />
         </div>
 
-        {useGradients && (
+        {effectSettings.postProcessingEnabled && (
           <>
-            {/* Inner Fade Start */}
+            {/* Effect Quality Preset */}
+            <div className="space-y-2 pl-4">
+              <Label htmlFor="effect-quality" className="text-xs font-medium flex items-center gap-2">
+                <MonitorPlay className="h-3 w-3" />
+                Effect Quality
+              </Label>
+              <Select
+                value={effectSettings.effectQuality}
+                onValueChange={(value) => setEffectQuality(value as EffectQuality)}
+                disabled={!enabled}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select quality" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="performance">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3 w-3" />
+                      Performance
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="balanced">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-3 w-3" />
+                      Balanced
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cinematic">
+                    <div className="flex items-center gap-2">
+                      <Film className="h-3 w-3" />
+                      Cinematic
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Edge Blur */}
             <div className="space-y-2 pl-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="inner-fade" className="text-xs font-medium">
-                  Inner Clear Zone
+                <Label htmlFor="edge-blur" className="text-xs font-medium">
+                  Fog Edge Softness
                 </Label>
-                <span className="text-xs font-medium">{Math.round(innerFadeStart * 100)}%</span>
+                <span className="text-xs font-medium">{effectSettings.edgeBlur}px</span>
               </div>
               <Slider
-                id="inner-fade"
+                id="edge-blur"
                 min={0}
-                max={100}
-                step={5}
-                value={[innerFadeStart * 100]}
-                onValueChange={([value]) => setInnerFadeStart(value / 100)}
+                max={20}
+                step={1}
+                value={[effectSettings.edgeBlur]}
+                onValueChange={([value]) => setEdgeBlur(value)}
                 disabled={!enabled}
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Radius where vision is perfectly clear
+                Blur amount at fog boundaries
               </p>
             </div>
 
-            {/* Midpoint Position */}
+            {/* Light Falloff */}
             <div className="space-y-2 pl-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="midpoint-pos" className="text-xs font-medium">
-                  Midpoint Distance
+                <Label htmlFor="light-falloff" className="text-xs font-medium">
+                  Light Inner Zone
                 </Label>
-                <span className="text-xs font-medium">{Math.round(midpointPosition * 100)}%</span>
+                <span className="text-xs font-medium">{Math.round(effectSettings.lightFalloff * 100)}%</span>
               </div>
               <Slider
-                id="midpoint-pos"
-                min={0}
-                max={100}
+                id="light-falloff"
+                min={10}
+                max={90}
                 step={5}
-                value={[midpointPosition * 100]}
-                onValueChange={([value]) => setMidpointPosition(value / 100)}
+                value={[effectSettings.lightFalloff * 100]}
+                onValueChange={([value]) => setLightFalloff(value / 100)}
                 disabled={!enabled}
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Where the mid-fade transition occurs
+                Inner bright zone radius (outer is dimmer)
               </p>
+              {enabledLightsCount === 0 && (
+                <div className="flex items-center gap-1.5 mt-1 text-xs text-amber-500">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>No lights enabled — this only affects light sources</span>
+                </div>
+              )}
             </div>
 
-            {/* Midpoint Opacity */}
-            <div className="space-y-2 pl-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="midpoint-opacity" className="text-xs font-medium">
-                  Midpoint Darkness
+            {/* Volumetric Fog Toggle */}
+            <div className="flex items-center justify-between pl-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="volumetric" className="text-xs font-medium">
+                  Volumetric Fog
                 </Label>
-                <span className="text-xs font-medium">{Math.round(midpointOpacity * 100)}%</span>
+                <p className="text-xs text-muted-foreground">
+                  Atmospheric fog wisps (experimental)
+                </p>
               </div>
-              <Slider
-                id="midpoint-opacity"
-                min={0}
-                max={100}
-                step={5}
-                value={[midpointOpacity * 100]}
-                onValueChange={([value]) => setMidpointOpacity(value / 100)}
+              <Switch
+                id="volumetric"
+                checked={effectSettings.volumetricEnabled}
+                onCheckedChange={setVolumetricEnabled}
                 disabled={!enabled}
-                className="w-full"
               />
-              <p className="text-xs text-muted-foreground">
-                Darkness level at midpoint
-              </p>
-            </div>
-
-            {/* Outer Fade Start */}
-            <div className="space-y-2 pl-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="outer-fade" className="text-xs font-medium">
-                  Outer Fade Start
-                </Label>
-                <span className="text-xs font-medium">{Math.round(outerFadeStart * 100)}%</span>
-              </div>
-              <Slider
-                id="outer-fade"
-                min={0}
-                max={100}
-                step={5}
-                value={[outerFadeStart * 100]}
-                onValueChange={([value]) => setOuterFadeStart(value / 100)}
-                disabled={!enabled}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Where final fade to full darkness begins
-              </p>
             </div>
           </>
         )}
@@ -303,6 +411,9 @@ export function FogControlCardContent() {
           <strong>Tip:</strong> Fog has three states: <strong>unexplored</strong> (black), 
           <strong>explored</strong> (dimmed), and <strong>visible</strong> (clear). 
           Tokens reveal fog as they move around the map.
+          {effectSettings.postProcessingEnabled && (
+            <> GPU effects add smooth edges and atmospheric lighting.</>
+          )}
         </p>
       </div>
     </div>

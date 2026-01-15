@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,8 @@ import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { canAssignTokenRoles } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
+import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
+import type { IlluminationSource } from '@/types/illumination';
 
 interface BulkOperationsToolbarProps {
   selectedTokenIds: string[];
@@ -30,7 +32,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   onClearSelection,
   onUpdateCanvas
 }) => {
-  const { tokens, currentPlayerId, players, removeToken } = useSessionStore();
+  const { tokens, currentPlayerId, players, removeToken, updateTokenIllumination } = useSessionStore();
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
   const { profiles } = useVisionProfileStore();
@@ -40,6 +42,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   const [initiativeValue, setInitiativeValue] = useState('');
   const [showColorModal, setShowColorModal] = useState(false);
   const [colorValue, setColorValue] = useState('#FF6B6B');
+  const [showIlluminationModal, setShowIlluminationModal] = useState(false);
   
   const selectedTokens = tokens.filter(t => selectedTokenIds.includes(t.id));
   const currentPlayer = players.find(p => p.id === currentPlayerId);
@@ -171,23 +174,23 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   return (
     <>
       <div 
-        className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-xl shadow-lg p-3"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
         style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground px-2">
-            {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''} selected
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium text-foreground px-1.5">
+            {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''}
           </span>
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 w-px bg-border" />
           
           {/* Role Assignment */}
           {canAssignRoles && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Assign Role
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Role
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-48 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
@@ -214,9 +217,9 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
           {canAssignRoles && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Visibility
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Vis
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
@@ -235,12 +238,17 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
           {/* Vision Settings */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Scan className="h-4 w-4 mr-2" />
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <Scan className="h-3 w-3 mr-1" />
                 Vision
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
+              <DropdownMenuItem onClick={() => setShowIlluminationModal(true)}>
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Illumination Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleToggleVision(true)}>
                 Enable Vision
               </DropdownMenuItem>
@@ -268,36 +276,38 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
           </DropdownMenu>
           
           {/* Color */}
-          <Button variant="outline" size="sm" onClick={() => setShowColorModal(true)}>
-            <Palette className="h-4 w-4 mr-2" />
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setShowColorModal(true)}>
+            <Palette className="h-3 w-3 mr-1" />
             Color
           </Button>
           
           {/* Initiative */}
-          <Button variant="outline" size="sm" onClick={() => setShowInitiativeModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Initiative
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setShowInitiativeModal(true)}>
+            <Plus className="h-3 w-3 mr-1" />
+            Init
           </Button>
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 w-px bg-border" />
           
           {/* Delete */}
           <Button 
-            variant="destructive" 
-            size="sm" 
+            variant="ghost" 
+            size="sm"
+            className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={() => setShowDeleteModal(true)}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
+            <Trash2 className="h-3 w-3 mr-1" />
+            Del
           </Button>
           
           {/* Clear Selection */}
           <Button 
             variant="ghost" 
-            size="sm" 
+            size="sm"
+            className="h-6 px-2 text-xs"
             onClick={onClearSelection}
           >
-            Clear
+            ✕
           </Button>
         </div>
       </div>
@@ -398,6 +408,21 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Illumination Settings Modal - shared component */}
+      <TokenIlluminationModal
+        open={showIlluminationModal}
+        onOpenChange={setShowIlluminationModal}
+        tokenIds={selectedTokenIds}
+        currentIllumination={selectedTokens[0]?.illuminationSources?.[0]}
+        onApply={(settings) => {
+          selectedTokens.forEach((token) => {
+            updateTokenIllumination(token.id, settings);
+          });
+          onUpdateCanvas?.();
+          toast.success(`Updated illumination for ${selectedTokens.length} token(s)`);
+        }}
+      />
     </>
   );
 };

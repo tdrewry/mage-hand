@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Token } from '@/stores/sessionStore';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { X } from 'lucide-react';
+import { X, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TokenContextMenu } from './TokenContextMenu';
 
@@ -11,6 +11,7 @@ interface InitiativeCardProps {
   initiative: number;
   isActive: boolean;
   hasGone?: boolean;
+  isHidden?: boolean;
   onClick?: () => void;
   onRemove: () => void;
   onInitiativeChange: (newInitiative: number) => void;
@@ -26,6 +27,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   initiative,
   isActive,
   hasGone,
+  isHidden,
   onClick,
   onRemove,
   onInitiativeChange,
@@ -38,8 +40,10 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
   const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
 
-  const imageSize = size ? size * 0.5 : (isCompact ? 48 : 64);
-  const fontSize = size ? Math.max(12, size * 0.15) : (isCompact ? 18 : 24);
+  const imageSize = 32;
+  const fontSize = 11;
+  const initFontSize = 12;
+  
   const handleInitiativeSubmit = () => {
     const value = parseInt(initiativeValue);
     if (!isNaN(value)) {
@@ -57,98 +61,101 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col items-center rounded-lg border-2 transition-all cursor-pointer active:cursor-grabbing",
-          isCompact ? "gap-1 p-2" : "gap-2 p-3",
-          isActive && "border-primary bg-primary/10 shadow-lg shadow-primary/20 ring-2 ring-primary/50",
-          !isActive && hasGone && "opacity-60 border-border bg-muted/50",
-          !isActive && !hasGone && "border-border bg-card hover:border-primary/50"
+          "relative rounded-lg border-2 transition-all duration-200 cursor-pointer active:cursor-grabbing hover:scale-105",
+          isActive && "border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/50",
+          !isActive && hasGone && "opacity-60 border-border",
+          !isActive && !hasGone && "border-border hover:border-primary/50",
+          isHidden && "opacity-50 border-dashed"
         )}
-        style={size ? { 
-          minWidth: `${size}px`,
-          width: `${size}px`
-        } : { minWidth: '120px' }}
-      >
-      {/* Remove Button */}
-      {!isCompact && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-        >
-          <X className="h-3 w-3" />
-        </Button>
-      )}
-
-      {/* Initiative Number */}
-      <div className="flex items-center justify-center w-full">
-        {isEditingInitiative && !isCompact ? (
-          <Input
-            type="number"
-            value={initiativeValue}
-            onChange={(e) => setInitiativeValue(e.target.value)}
-            onBlur={handleInitiativeSubmit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleInitiativeSubmit();
-              if (e.key === 'Escape') setIsEditingInitiative(false);
-            }}
-            className="w-16 h-8 text-center text-xl font-bold"
-            autoFocus
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : (
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isCompact) setIsEditingInitiative(true);
-            }}
-            className="font-bold text-primary cursor-pointer hover:text-primary/80"
-            style={{ fontSize: `${fontSize}px` }}
-          >
-            {initiative}
-          </div>
-        )}
-      </div>
-
-      {/* Token Image or Color */}
-      <div 
-        className="rounded-lg overflow-hidden border-2 border-border"
         style={{ 
-          width: `${imageSize}px`, 
-          height: `${imageSize}px` 
+          width: isActive ? '85px' : '60px',
+          height: isActive ? '60px' : '45px'
         }}
       >
-        {token.imageUrl ? (
-          <img
-            src={token.imageUrl}
-            alt={token.label || token.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="w-full h-full"
-            style={{ backgroundColor: token.color || '#888' }}
+        {/* Background image wrapper with overflow hidden */}
+        <div 
+          className="absolute inset-0 rounded-md overflow-hidden"
+          style={{
+            backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
+            backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        </div>
+
+        {/* Remove Button */}
+        {!isCompact && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground z-20"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+          >
+            <X className="h-2.5 w-2.5" />
+          </Button>
+        )}
+
+        {/* Hidden Indicator */}
+        {isHidden && (
+          <div className="absolute top-1 left-1 z-10">
+            <EyeOff className="h-3 w-3 text-white/70" />
+          </div>
+        )}
+
+        {/* Initiative Number - Upper right corner */}
+        <div 
+          className="absolute -top-2 -right-2 bg-background border-2 border-primary rounded-full min-w-[22px] h-[22px] flex items-center justify-center z-10"
+          style={{ fontSize: `${initFontSize}px` }}
+        >
+          {isEditingInitiative && !isCompact ? (
+            <Input
+              type="number"
+              value={initiativeValue}
+              onChange={(e) => setInitiativeValue(e.target.value)}
+              onBlur={handleInitiativeSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleInitiativeSubmit();
+                if (e.key === 'Escape') setIsEditingInitiative(false);
+              }}
+              className="w-8 h-5 text-center text-sm font-bold p-0 border-0"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isCompact) setIsEditingInitiative(true);
+              }}
+              className="font-bold text-primary cursor-pointer hover:text-primary/80 px-1"
+            >
+              {initiative}
+            </span>
+          )}
+        </div>
+
+        {/* Token Name - Bottom */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-1.5">
+          <div 
+            className="font-medium text-white truncate leading-tight drop-shadow-md"
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {token.label || token.name}
+          </div>
+        </div>
+
+        {/* Active Indicator - Triangle pointing right */}
+        {isActive && (
+          <div 
+            className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[8px] border-l-primary"
           />
         )}
-      </div>
-
-      {/* Token Label */}
-      {!isCompact && (
-        <div 
-          className="font-medium text-center text-foreground truncate max-w-full px-1"
-          style={{ fontSize: `${Math.max(10, fontSize * 0.6)}px` }}
-        >
-          {token.label || token.name}
-        </div>
-      )}
-
-      {/* Active Indicator */}
-      {isActive && (
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full animate-pulse" />
-      )}
       </div>
     </TokenContextMenu>
   );
