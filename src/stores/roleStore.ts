@@ -223,10 +223,22 @@ export const useRoleStore = create<RoleState>()(
       partialize: (state) => ({
         roles: state.roles,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && state.roles.length === 0) {
+          state.initializeDefaultRoles();
+        } else if (state) {
+          // Deduplicate roles by id
+          const seen = new Set<string>();
+          const uniqueRoles = state.roles.filter((role) => {
+            if (seen.has(role.id)) return false;
+            seen.add(role.id);
+            return true;
+          });
+          if (uniqueRoles.length !== state.roles.length) {
+            useRoleStore.setState({ roles: uniqueRoles });
+          }
+        }
+      },
     }
   )
 );
-
-// Initialize default roles on store creation
-const { initializeDefaultRoles } = useRoleStore.getState();
-initializeDefaultRoles();
