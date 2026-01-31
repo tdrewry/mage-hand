@@ -93,7 +93,7 @@ import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog 
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
-import { SelectionModeIndicator } from "./SelectionModeIndicator";
+
 import { Z_INDEX } from "../lib/zIndex";
 
 export const SimpleTabletop = () => {
@@ -5866,11 +5866,6 @@ export const SimpleTabletop = () => {
         }}
       />
 
-      {/* Selection Mode Indicator - Shows what type of selection is active */}
-      <SelectionModeIndicator
-        selectedRegionCount={selectedRegionIds.length}
-        selectedTokenCount={selectedTokenIds.length}
-      />
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
