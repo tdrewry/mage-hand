@@ -274,20 +274,18 @@ export function applyFogPostProcessing(
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // CRITICAL: Cut out visibility polygons from fog using radial gradients
-  // that respect bright/dim zones. Each source is clipped to its visibility
-  // polygon, ensuring light is blocked by walls.
+  // CRITICAL: Render illumination zones with proper bright/dim gradient
+  // Each source is clipped to its visibility polygon, ensuring light is blocked by walls.
   // 
   // Model:
-  // - Bright zone (inner circle): fully clears fog (alpha = 1)
-  // - Dim zone (outer ring): partially clears fog (alpha = dimIntensity)
-  // - Overlapping dim zones use 'lighten' blend so they never get darker
+  // - Bright zone (inner circle): fully clears fog
+  // - Dim zone (outer ring): partially clears fog based on dimIntensity
+  // - Overlapping sources: the brightest value wins (using intermediate canvas)
   const animationTime = performance.now();
   
   if (illuminationData && illuminationData.sources.length > 0) {
-    const gridSize = illuminationData.gridSize;
-    
-    // PHASE 1: Clear fog completely in all visibility areas
+    // Use destination-out to cut illuminated areas from the fog
+    // We'll draw radial gradients that define bright center -> dim edge
     fogCtx.globalCompositeOperation = 'destination-out';
     
     for (const source of illuminationData.sources) {
@@ -304,13 +302,34 @@ export function applyFogPostProcessing(
       
       const pos = source.position;
       const rangePixels = source.range * animResult.radiusMod;
+      const brightZone = source.brightZone ?? 0.5;
+      const brightIntensity = (source.brightIntensity ?? 1.0) * animResult.intensityMod;
+      const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
       
       // Save context and clip to this source's visibility polygon
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
       
-      // Fully remove fog in the entire visible area (circular)
-      fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
+      // Create gradient that cuts through fog:
+      // - Center to brightZone: high alpha removes most fog (bright area)
+      // - brightZone to edge: lower alpha removes less fog (dim area)
+      const clearGradient = fogCtx.createRadialGradient(
+        pos.x, pos.y, 0,
+        pos.x, pos.y, rangePixels
+      );
+      
+      // Bright zone: full visibility (alpha = brightIntensity)
+      clearGradient.addColorStop(0, `rgba(255, 255, 255, ${brightIntensity})`);
+      clearGradient.addColorStop(brightZone * 0.9, `rgba(255, 255, 255, ${brightIntensity})`);
+      
+      // Transition from bright to dim
+      clearGradient.addColorStop(brightZone, `rgba(255, 255, 255, ${(brightIntensity + dimIntensity) / 2})`);
+      
+      // Dim zone: partial visibility (alpha = dimIntensity)
+      clearGradient.addColorStop(Math.min(1, brightZone + 0.1), `rgba(255, 255, 255, ${dimIntensity})`);
+      clearGradient.addColorStop(1, `rgba(255, 255, 255, ${dimIntensity})`);
+      
+      fogCtx.fillStyle = clearGradient;
       fogCtx.beginPath();
       fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
       fogCtx.fill();
@@ -319,106 +338,6 @@ export function applyFogPostProcessing(
     }
     
     fogCtx.globalCompositeOperation = 'source-over';
-    
-    // PHASE 2: Render dim zones to fog canvas
-    // Use intermediate canvas to ensure overlapping dim zones blend correctly
-    // (overlapping areas should be no darker than the brightest individual source)
-    if (dimZoneCtx && dimZoneCanvas) {
-      // Clear dim zone canvas to fully opaque black (maximum fog)
-      // We'll use destination-out to "punch" brightness into it
-      dimZoneCtx.clearRect(0, 0, dimZoneCanvas.width, dimZoneCanvas.height);
-      
-      // Start with maximum fog opacity in all visibility areas
-      dimZoneCtx.save();
-      dimZoneCtx.translate(padding + transform.x, padding + transform.y);
-      dimZoneCtx.scale(transform.zoom, transform.zoom);
-      
-      // First, fill all visibility areas with exploredOpacity fog
-      dimZoneCtx.globalCompositeOperation = 'source-over';
-      dimZoneCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
-      
-      for (const source of illuminationData.sources) {
-        if (!source.enabled || !source.visibilityPolygon) continue;
-        
-        const animResult = calculateAnimationModifiers(
-          source.animation,
-          source.animationSpeed,
-          source.animationIntensity,
-          animationTime,
-          source.id
-        );
-        
-        const pos = source.position;
-        const rangePixels = source.range * animResult.radiusMod;
-        
-        dimZoneCtx.save();
-        dimZoneCtx.clip(source.visibilityPolygon);
-        dimZoneCtx.beginPath();
-        dimZoneCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
-        dimZoneCtx.fill();
-        dimZoneCtx.restore();
-      }
-      
-      // Second pass: Use destination-out to remove fog based on brightness
-      // Each source "punches" transparency into the fog - overlapping sources
-      // will punch MORE transparency (brighter result, less fog)
-      dimZoneCtx.globalCompositeOperation = 'destination-out';
-      
-      for (const source of illuminationData.sources) {
-        if (!source.enabled || !source.visibilityPolygon) continue;
-        
-        const animResult = calculateAnimationModifiers(
-          source.animation,
-          source.animationSpeed,
-          source.animationIntensity,
-          animationTime,
-          source.id
-        );
-        
-        const pos = source.position;
-        const rangePixels = source.range * animResult.radiusMod;
-        const brightZone = source.brightZone ?? 0.5;
-        const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
-        
-        // How much fog to remove in dim zone (inverse of fog we want to keep)
-        // If dimIntensity = 0.6, we want 40% fog, so remove 60% of exploredOpacity
-        const dimRemoval = dimIntensity * exploredOpacity;
-        
-        dimZoneCtx.save();
-        dimZoneCtx.clip(source.visibilityPolygon);
-        
-        // Create gradient that removes fog
-        // Bright zone: remove all fog (alpha = exploredOpacity to fully clear)
-        // Dim zone: remove proportional fog (alpha = dimRemoval)
-        const removalGradient = dimZoneCtx.createRadialGradient(
-          pos.x, pos.y, 0,
-          pos.x, pos.y, rangePixels
-        );
-        
-        // Bright zone removes all fog
-        removalGradient.addColorStop(0, `rgba(255, 255, 255, ${exploredOpacity})`);
-        removalGradient.addColorStop(brightZone * 0.95, `rgba(255, 255, 255, ${exploredOpacity})`);
-        // Transition to dim zone
-        removalGradient.addColorStop(brightZone, `rgba(255, 255, 255, ${(exploredOpacity + dimRemoval) / 2})`);
-        removalGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(255, 255, 255, ${dimRemoval})`);
-        removalGradient.addColorStop(1, `rgba(255, 255, 255, ${dimRemoval})`);
-        
-        dimZoneCtx.fillStyle = removalGradient;
-        dimZoneCtx.beginPath();
-        dimZoneCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
-        dimZoneCtx.fill();
-        
-        dimZoneCtx.restore();
-      }
-      
-      dimZoneCtx.restore();
-      
-      // PHASE 3: Composite the dim zone layer onto the fog canvas
-      fogCtx.save();
-      fogCtx.globalCompositeOperation = 'source-over';
-      fogCtx.drawImage(dimZoneCanvas, 0, 0);
-      fogCtx.restore();
-    }
   }
 
   fogCtx.restore();
