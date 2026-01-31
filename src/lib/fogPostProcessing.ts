@@ -35,6 +35,8 @@ let fogCanvas: HTMLCanvasElement | null = null;
 let fogCtx: CanvasRenderingContext2D | null = null;
 let illuminationCanvas: HTMLCanvasElement | null = null;
 let illuminationCtx: CanvasRenderingContext2D | null = null;
+let dimZoneCanvas: HTMLCanvasElement | null = null; // Intermediate canvas for dim zone blending
+let dimZoneCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
 let currentPadding = 0; // Track current padding for off-screen rendering
@@ -69,6 +71,14 @@ export function initFogCanvas(width: number, height: number, edgeBlur: number = 
   illuminationCanvas.width = width + padding * 2;
   illuminationCanvas.height = height + padding * 2;
   illuminationCtx = illuminationCanvas.getContext('2d', { willReadFrequently: false });
+  
+  // Initialize dim zone canvas for proper blending of overlapping dim areas
+  if (!dimZoneCanvas) {
+    dimZoneCanvas = document.createElement('canvas');
+  }
+  dimZoneCanvas.width = width + padding * 2;
+  dimZoneCanvas.height = height + padding * 2;
+  dimZoneCtx = dimZoneCanvas.getContext('2d', { willReadFrequently: false });
 }
 
 /**
@@ -85,6 +95,10 @@ export function resizeFogCanvas(width: number, height: number, edgeBlur: number 
   if (illuminationCanvas) {
     illuminationCanvas.width = width + padding * 2;
     illuminationCanvas.height = height + padding * 2;
+  }
+  if (dimZoneCanvas) {
+    dimZoneCanvas.width = width + padding * 2;
+    dimZoneCanvas.height = height + padding * 2;
   }
 }
 
@@ -266,10 +280,13 @@ export function applyFogPostProcessing(
   // Model:
   // - Bright zone (inner circle): fully clears fog (alpha = 1)
   // - Dim zone (outer ring): partially clears fog (alpha = dimIntensity)
+  // - Overlapping dim zones use 'lighten' blend so they never get darker
   const animationTime = performance.now();
   
   if (illuminationData && illuminationData.sources.length > 0) {
     const gridSize = illuminationData.gridSize;
+    
+    // PHASE 1: Clear fog completely in all visibility areas
     fogCtx.globalCompositeOperation = 'destination-out';
     
     for (const source of illuminationData.sources) {
@@ -285,60 +302,99 @@ export function applyFogPostProcessing(
       );
       
       const pos = source.position;
-      // source.range is already in pixels when gridSize is 1
-      // Apply radius modifier for glow/flicker effects
       const rangePixels = source.range * animResult.radiusMod;
-      const brightZone = source.brightZone ?? 0.5;
-      const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
       
       // Save context and clip to this source's visibility polygon
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
       
-      // First, fully remove fog in the entire visible area (circular)
+      // Fully remove fog in the entire visible area (circular)
       fogCtx.fillStyle = 'rgba(255, 255, 255, 1)';
       fogCtx.beginPath();
       fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
       fogCtx.fill();
       
       fogCtx.restore();
+    }
+    
+    fogCtx.globalCompositeOperation = 'source-over';
+    
+    // PHASE 2: Render all dim zones to intermediate canvas using 'lighten' blend
+    // This ensures overlapping dim areas take the MINIMUM darkness (brightest wins)
+    if (dimZoneCtx && dimZoneCanvas) {
+      // Clear dim zone canvas - start with full opacity (maximum fog)
+      dimZoneCtx.clearRect(0, 0, dimZoneCanvas.width, dimZoneCanvas.height);
       
-      // Now ADD BACK fog in the dim zone (outside bright zone but inside range)
-      // This creates the "dim ring" effect - the outer area should be visibly darker
-      if (dimIntensity < 1.0) {
-        fogCtx.save();
-        fogCtx.globalCompositeOperation = 'source-over'; // Add fog back
-        fogCtx.clip(source.visibilityPolygon);
+      // Fill with black at exploredOpacity - this is the "worst case" dim fog
+      // We'll use 'lighten' to reduce this where dim zones exist
+      dimZoneCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+      dimZoneCtx.fillRect(0, 0, dimZoneCanvas.width, dimZoneCanvas.height);
+      
+      // Apply same transform
+      dimZoneCtx.save();
+      dimZoneCtx.translate(padding + transform.x, padding + transform.y);
+      dimZoneCtx.scale(transform.zoom, transform.zoom);
+      
+      // Use 'lighten' blend mode - takes the BRIGHTER (less dark) pixel at each position
+      // This means overlapping dim zones will use the brightest (least fog) value
+      dimZoneCtx.globalCompositeOperation = 'lighten';
+      
+      for (const source of illuminationData.sources) {
+        if (!source.enabled || !source.visibilityPolygon) continue;
         
-        // Create a donut-shaped gradient: transparent in bright zone, foggy in dim zone
-        const dimGradient = fogCtx.createRadialGradient(
+        const animResult = calculateAnimationModifiers(
+          source.animation,
+          source.animationSpeed,
+          source.animationIntensity,
+          animationTime,
+          source.id
+        );
+        
+        const pos = source.position;
+        const rangePixels = source.range * animResult.radiusMod;
+        const brightZone = source.brightZone ?? 0.5;
+        const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
+        
+        // Calculate fog alpha for dim zone, capped at exploredOpacity
+        const rawFogAlpha = 1.0 - dimIntensity;
+        const fogAlpha = Math.min(rawFogAlpha, exploredOpacity);
+        
+        dimZoneCtx.save();
+        dimZoneCtx.clip(source.visibilityPolygon);
+        
+        // Create gradient: bright zone is fully transparent (no fog),
+        // dim zone has partial fog, outside is left as-is (will be masked anyway)
+        const dimGradient = dimZoneCtx.createRadialGradient(
           pos.x, pos.y, 0,
           pos.x, pos.y, rangePixels
         );
         
-        // fogAlpha is how much fog to add back in dim zone
-        // IMPORTANT: Cap fogAlpha to exploredOpacity so dim zones are never darker than explored areas
-        // At dimIntensity=0.35, we want 65% fog opacity in dim zone, but never more than exploredOpacity
-        const rawFogAlpha = 1.0 - dimIntensity;
-        const fogAlpha = Math.min(rawFogAlpha, exploredOpacity);
-        
-        // Bright zone stays fully clear (no fog added)
+        // Bright zone: no fog (transparent black = light)
         dimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        dimGradient.addColorStop(brightZone * 0.95, 'rgba(0, 0, 0, 0)'); // Stay clear until just before bright zone ends
-        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.5})`); // Start transitioning
-        dimGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(0, 0, 0, ${fogAlpha})`); // Full dim
-        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`); // Maintain until edge
+        dimGradient.addColorStop(brightZone * 0.95, 'rgba(0, 0, 0, 0)');
+        // Transition into dim zone
+        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.5})`);
+        dimGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(0, 0, 0, ${fogAlpha})`);
+        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`);
         
-        fogCtx.fillStyle = dimGradient;
-        fogCtx.beginPath();
-        fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
-        fogCtx.fill();
+        dimZoneCtx.fillStyle = dimGradient;
+        dimZoneCtx.beginPath();
+        dimZoneCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+        dimZoneCtx.fill();
         
-        fogCtx.restore();
+        dimZoneCtx.restore();
       }
+      
+      dimZoneCtx.restore();
+      
+      // PHASE 3: Composite the dim zone layer onto the fog canvas
+      // Only apply where we cleared fog (the visibility areas)
+      // Use 'source-atop' to only affect the cleared regions
+      fogCtx.save();
+      fogCtx.globalCompositeOperation = 'source-over';
+      fogCtx.drawImage(dimZoneCanvas, 0, 0);
+      fogCtx.restore();
     }
-    
-    fogCtx.globalCompositeOperation = 'source-over';
   }
 
   fogCtx.restore();
@@ -455,5 +511,9 @@ export function cleanupFogPostProcessing(): void {
   if (illuminationCanvas) {
     illuminationCanvas = null;
     illuminationCtx = null;
+  }
+  if (dimZoneCanvas) {
+    dimZoneCanvas = null;
+    dimZoneCtx = null;
   }
 }
