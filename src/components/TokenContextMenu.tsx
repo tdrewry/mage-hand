@@ -58,6 +58,7 @@ export const TokenContextMenu = ({
     updateTokenLabel,
     updateTokenName,
     updateTokenLabelPosition,
+    updateTokenLabelStyle,
     updateTokenImage,
     updateTokenVision,
     updateTokenVisionRange,
@@ -82,10 +83,22 @@ export const TokenContextMenu = ({
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
   const [imageUrlValue, setImageUrlValue] = useState('');
+  const [labelColorValue, setLabelColorValue] = useState('#FFFFFF');
+  const [labelBackgroundValue, setLabelBackgroundValue] = useState('rgba(30, 30, 30, 0.75)');
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
   const [useGradientsValue, setUseGradientsValue] = useState(true);
+  
+  // Label style presets - each has a text color and background color
+  const labelStylePresets = [
+    { name: 'Default', labelColor: '#FFFFFF', bgColor: 'rgba(30, 30, 30, 0.75)' },
+    { name: 'Hostile', labelColor: '#FFFFFF', bgColor: 'rgba(180, 40, 40, 0.85)' },
+    { name: 'Friendly', labelColor: '#FFFFFF', bgColor: 'rgba(40, 120, 40, 0.85)' },
+    { name: 'Neutral', labelColor: '#FFFFFF', bgColor: 'rgba(40, 80, 140, 0.85)' },
+    { name: 'Warning', labelColor: '#1a1a1a', bgColor: 'rgba(240, 180, 40, 0.9)' },
+    { name: 'Stealth', labelColor: '#a0a0a0', bgColor: 'rgba(20, 20, 20, 0.6)' },
+  ];
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
@@ -122,11 +135,15 @@ export const TokenContextMenu = ({
       setNameValue(targetTokens[0].name || '');
       setLabelValue(targetTokens[0].label || '');
       setLabelPositionValue(targetTokens[0].labelPosition || 'below');
+      setLabelColorValue(targetTokens[0].labelColor || '#FFFFFF');
+      setLabelBackgroundValue(targetTokens[0].labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
       setImageUrlValue(targetTokens[0].imageUrl || '');
     } else {
       setNameValue('');
       setLabelValue('');
       setLabelPositionValue('below');
+      setLabelColorValue('#FFFFFF');
+      setLabelBackgroundValue('rgba(30, 30, 30, 0.75)');
       setImageUrlValue('');
     }
     setShowTokenEditModal(true);
@@ -194,6 +211,7 @@ export const TokenContextMenu = ({
         updateTokenLabel(token.id, labelValue);
       }
       updateTokenLabelPosition(token.id, labelPositionValue);
+      updateTokenLabelStyle(token.id, labelColorValue, labelBackgroundValue);
       
       // Apply image with texture sync
       if (imageUrlValue) {
@@ -542,6 +560,34 @@ export const TokenContextMenu = ({
                   </Button>
                 ))}
               </div>
+            </div>
+            
+            {/* Label Style Presets */}
+            <div>
+              <Label>Label Style</Label>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {labelStylePresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    className={`px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                      labelColorValue === preset.labelColor && labelBackgroundValue === preset.bgColor
+                        ? 'ring-2 ring-primary ring-offset-1'
+                        : 'hover:opacity-80'
+                    }`}
+                    style={{
+                      backgroundColor: preset.bgColor,
+                      color: preset.labelColor,
+                    }}
+                    onClick={() => {
+                      setLabelColorValue(preset.labelColor);
+                      setLabelBackgroundValue(preset.bgColor);
+                    }}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Choose a label style preset</p>
             </div>
             
             {/* Token Image Section */}

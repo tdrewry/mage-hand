@@ -129,6 +129,64 @@ export const SimpleTabletop = () => {
       JSON.stringify(initial.bezierControlPoints) !== JSON.stringify(current.bezierControlPoints)
     );
   };
+
+  // Helper function to draw token label with rounded rect background
+  const drawTokenLabel = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    labelPos: 'above' | 'center' | 'below',
+    radius: number,
+    zoom: number,
+    labelColor?: string,
+    labelBackgroundColor?: string
+  ) => {
+    const fontSize = 12 / zoom;
+    const paddingX = 4 / zoom;
+    const paddingY = 2 / zoom;
+    const borderRadius = 3 / zoom;
+    
+    ctx.font = `${fontSize}px Arial`;
+    const textMetrics = ctx.measureText(text);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize;
+    
+    // Calculate label position
+    let labelX = x;
+    let labelY: number;
+    let textBaseline: CanvasTextBaseline;
+    
+    if (labelPos === 'center') {
+      labelY = y;
+      textBaseline = 'middle';
+    } else if (labelPos === 'above') {
+      labelY = y - radius - 4 / zoom - textHeight / 2;
+      textBaseline = 'middle';
+    } else {
+      // below (default)
+      labelY = y + radius + 4 / zoom + textHeight / 2;
+      textBaseline = 'middle';
+    }
+    
+    // Draw rounded rect background
+    const bgColor = labelBackgroundColor || 'rgba(30, 30, 30, 0.75)';
+    const bgX = labelX - textWidth / 2 - paddingX;
+    const bgY = labelY - textHeight / 2 - paddingY;
+    const bgWidth = textWidth + paddingX * 2;
+    const bgHeight = textHeight + paddingY * 2;
+    
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius);
+    ctx.fill();
+    
+    // Draw text
+    ctx.fillStyle = labelColor || '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = textBaseline;
+    ctx.fillText(text, labelX, labelY);
+  };
   const [selectedRegionForEdit, setSelectedRegionForEdit] = useState<CanvasRegion | null>(null);
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState("#333");
@@ -2134,21 +2192,17 @@ export const SimpleTabletop = () => {
       const displayText = token.label || token.name;
       if (displayText) {
         const labelPos = token.labelPosition || 'below';
-        targetCtx.fillStyle = "#000000";
-        targetCtx.font = `${12 / transform.zoom}px Arial`;
-        targetCtx.textAlign = "center";
-        
-        if (labelPos === 'center') {
-          targetCtx.textBaseline = "middle";
-          targetCtx.fillText(displayText, token.x, token.y);
-        } else if (labelPos === 'above') {
-          targetCtx.textBaseline = "bottom";
-          targetCtx.fillText(displayText, token.x, token.y - radius - 4 / transform.zoom);
-        } else {
-          // below (default)
-          targetCtx.textBaseline = "top";
-          targetCtx.fillText(displayText, token.x, token.y + radius + 4 / transform.zoom);
-        }
+        drawTokenLabel(
+          targetCtx,
+          displayText,
+          token.x,
+          token.y,
+          labelPos,
+          radius,
+          transform.zoom,
+          token.labelColor,
+          token.labelBackgroundColor
+        );
       }
 
       targetCtx.restore();
@@ -3935,21 +3989,17 @@ export const SimpleTabletop = () => {
     const displayText = token.label || token.name;
     if (displayText) {
       const labelPos = token.labelPosition || 'below';
-      ctx.fillStyle = "#000000";
-      ctx.font = `${12 / transform.zoom}px Arial`;
-      ctx.textAlign = "center";
-      
-      if (labelPos === 'center') {
-        ctx.textBaseline = "middle";
-        ctx.fillText(displayText, token.x, token.y);
-      } else if (labelPos === 'above') {
-        ctx.textBaseline = "bottom";
-        ctx.fillText(displayText, token.x, token.y - radius - 4 / transform.zoom);
-      } else {
-        // below (default)
-        ctx.textBaseline = "top";
-        ctx.fillText(displayText, token.x, token.y + radius + 4 / transform.zoom);
-      }
+      drawTokenLabel(
+        ctx,
+        displayText,
+        token.x,
+        token.y,
+        labelPos,
+        radius,
+        transform.zoom,
+        token.labelColor,
+        token.labelBackgroundColor
+      );
     }
 
     ctx.restore();

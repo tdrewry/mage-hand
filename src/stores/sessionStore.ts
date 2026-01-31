@@ -22,6 +22,8 @@ export interface Token {
   gridHeight: number; // Height in grid units
   label: string;      // Editable label displayed on/near token
   labelPosition: LabelPosition; // Where to draw the label (default: below)
+  labelColor?: string;          // Label text color (default: white)
+  labelBackgroundColor?: string; // Label background color (default: semi-transparent dark gray)
   roleId: string;     // Role this token belongs to
   isHidden: boolean;  // Whether token is hidden (only visible to privileged roles)
   color?: string;     // Token color (for default tokens)
@@ -76,6 +78,7 @@ export interface SessionState {
   updateTokenLabel: (tokenId: string, label: string) => void;
   updateTokenName: (tokenId: string, name: string) => void;
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
+  updateTokenLabelStyle: (tokenId: string, labelColor?: string, labelBackgroundColor?: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
   updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
@@ -189,6 +192,15 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, labelPosition } : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateTokenLabelStyle: (tokenId, labelColor, labelBackgroundColor) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, labelColor, labelBackgroundColor } : token
       ),
     }));
     // Sync happens automatically via syncPatch middleware
