@@ -320,19 +320,20 @@ export function applyFogPostProcessing(
     
     fogCtx.globalCompositeOperation = 'source-over';
     
-    // PHASE 2: Render all dim zones to intermediate canvas using 'darken' blend
-    // 'darken' takes MIN alpha, so overlapping dim areas get LESS fog (brighter)
+    // PHASE 2: Render dim zones to fog canvas
+    // Use intermediate canvas to ensure overlapping dim zones blend correctly
+    // (overlapping areas should be no darker than the brightest individual source)
     if (dimZoneCtx && dimZoneCanvas) {
-      // Clear dim zone canvas to transparent
+      // Clear dim zone canvas to fully opaque black (maximum fog)
+      // We'll use destination-out to "punch" brightness into it
       dimZoneCtx.clearRect(0, 0, dimZoneCanvas.width, dimZoneCanvas.height);
       
-      // Apply same transform
+      // Start with maximum fog opacity in all visibility areas
       dimZoneCtx.save();
       dimZoneCtx.translate(padding + transform.x, padding + transform.y);
       dimZoneCtx.scale(transform.zoom, transform.zoom);
       
-      // First pass: Fill all visibility polygons with worst-case fog (exploredOpacity)
-      // This establishes the "baseline" fog that dim zones will reduce from
+      // First, fill all visibility areas with exploredOpacity fog
       dimZoneCtx.globalCompositeOperation = 'source-over';
       dimZoneCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
       
@@ -358,10 +359,10 @@ export function applyFogPostProcessing(
         dimZoneCtx.restore();
       }
       
-      // Second pass: Use 'darken' to apply each source's radial gradient
-      // 'darken' takes MIN of each channel - for alpha, MIN = less fog = brighter
-      // This ensures overlapping dim zones use the LEAST fog (brightest value)
-      dimZoneCtx.globalCompositeOperation = 'darken';
+      // Second pass: Use destination-out to remove fog based on brightness
+      // Each source "punches" transparency into the fog - overlapping sources
+      // will punch MORE transparency (brighter result, less fog)
+      dimZoneCtx.globalCompositeOperation = 'destination-out';
       
       for (const source of illuminationData.sources) {
         if (!source.enabled || !source.visibilityPolygon) continue;
@@ -379,29 +380,30 @@ export function applyFogPostProcessing(
         const brightZone = source.brightZone ?? 0.5;
         const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
         
-        // Calculate fog alpha for dim zone, capped at exploredOpacity
-        const rawFogAlpha = 1.0 - dimIntensity;
-        const fogAlpha = Math.min(rawFogAlpha, exploredOpacity);
+        // How much fog to remove in dim zone (inverse of fog we want to keep)
+        // If dimIntensity = 0.6, we want 40% fog, so remove 60% of exploredOpacity
+        const dimRemoval = dimIntensity * exploredOpacity;
         
         dimZoneCtx.save();
         dimZoneCtx.clip(source.visibilityPolygon);
         
-        // Create gradient: bright zone is fully transparent (no fog),
-        // dim zone has partial fog. 'darken' will keep the LOWER alpha (less fog)
-        const dimGradient = dimZoneCtx.createRadialGradient(
+        // Create gradient that removes fog
+        // Bright zone: remove all fog (alpha = exploredOpacity to fully clear)
+        // Dim zone: remove proportional fog (alpha = dimRemoval)
+        const removalGradient = dimZoneCtx.createRadialGradient(
           pos.x, pos.y, 0,
           pos.x, pos.y, rangePixels
         );
         
-        // Bright zone: no fog (alpha = 0)
-        dimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        dimGradient.addColorStop(brightZone * 0.95, 'rgba(0, 0, 0, 0)');
-        // Smooth transition into dim zone
-        dimGradient.addColorStop(brightZone, `rgba(0, 0, 0, ${fogAlpha * 0.5})`);
-        dimGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(0, 0, 0, ${fogAlpha})`);
-        dimGradient.addColorStop(1, `rgba(0, 0, 0, ${fogAlpha})`);
+        // Bright zone removes all fog
+        removalGradient.addColorStop(0, `rgba(255, 255, 255, ${exploredOpacity})`);
+        removalGradient.addColorStop(brightZone * 0.95, `rgba(255, 255, 255, ${exploredOpacity})`);
+        // Transition to dim zone
+        removalGradient.addColorStop(brightZone, `rgba(255, 255, 255, ${(exploredOpacity + dimRemoval) / 2})`);
+        removalGradient.addColorStop(Math.min(1, brightZone + 0.15), `rgba(255, 255, 255, ${dimRemoval})`);
+        removalGradient.addColorStop(1, `rgba(255, 255, 255, ${dimRemoval})`);
         
-        dimZoneCtx.fillStyle = dimGradient;
+        dimZoneCtx.fillStyle = removalGradient;
         dimZoneCtx.beginPath();
         dimZoneCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
         dimZoneCtx.fill();
@@ -412,7 +414,6 @@ export function applyFogPostProcessing(
       dimZoneCtx.restore();
       
       // PHASE 3: Composite the dim zone layer onto the fog canvas
-      // This only affects visibility areas (where we drew to dimZoneCanvas)
       fogCtx.save();
       fogCtx.globalCompositeOperation = 'source-over';
       fogCtx.drawImage(dimZoneCanvas, 0, 0);
