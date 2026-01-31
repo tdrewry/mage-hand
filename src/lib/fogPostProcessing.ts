@@ -317,8 +317,10 @@ export function applyFogPostProcessing(
         );
         
         // fogAlpha is how much fog to add back in dim zone
-        // At dimIntensity=0.35, we want 65% fog opacity in dim zone
-        const fogAlpha = 1.0 - dimIntensity;
+        // IMPORTANT: Cap fogAlpha to exploredOpacity so dim zones are never darker than explored areas
+        // At dimIntensity=0.35, we want 65% fog opacity in dim zone, but never more than exploredOpacity
+        const rawFogAlpha = 1.0 - dimIntensity;
+        const fogAlpha = Math.min(rawFogAlpha, exploredOpacity);
         
         // Bright zone stays fully clear (no fog added)
         dimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
