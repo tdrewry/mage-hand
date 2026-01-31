@@ -106,7 +106,24 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
     
+    // Convert legacy vision profile to illumination format
+    const illuminationSettings: Partial<IlluminationSource> = {
+      range: profile.visionRange,
+      brightZone: 0.5,
+      brightIntensity: 1.0,
+      dimIntensity: profile.useGradients ? 0.4 : 0.0, // Gradients = dim zone visible
+      color: profile.color,
+      colorEnabled: false,
+      colorIntensity: 0.15,
+      softEdge: profile.useGradients,
+      softEdgeRadius: 8,
+      animation: 'none' as const,
+      animationSpeed: 1.0,
+      animationIntensity: 0.3,
+    };
+    
     selectedTokens.forEach(token => {
+      // Update legacy fields for backward compatibility
       useSessionStore.setState((state) => ({
         tokens: state.tokens.map((t) =>
           t.id === token.id
@@ -119,6 +136,9 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
             : t
         ),
       }));
+      
+      // CRITICAL: Also update illuminationSources so renderer sees the change
+      updateTokenIllumination(token.id, illuminationSettings);
     });
     
     onUpdateCanvas?.();

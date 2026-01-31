@@ -304,7 +304,9 @@ export function applyFogPostProcessing(
       const rangePixels = source.range * animResult.radiusMod;
       const brightZone = source.brightZone ?? 0.5;
       const brightIntensity = (source.brightIntensity ?? 1.0) * animResult.intensityMod;
-      const dimIntensity = (source.dimIntensity ?? 0.4) * animResult.intensityMod;
+      // Use global dimZoneOpacity as fallback when source doesn't specify dimIntensity
+      const globalDimOpacity = getEffectSettings().dimZoneOpacity ?? 0.4;
+      const dimIntensity = (source.dimIntensity ?? globalDimOpacity) * animResult.intensityMod;
       
       // Save context and clip to this source's visibility polygon
       fogCtx.save();

@@ -21,6 +21,7 @@ export interface EffectSettings {
   bloomThreshold: number;  // 0.5-1 (legacy, unused)
   volumetricEnabled: boolean;
   effectQuality: 'performance' | 'balanced' | 'cinematic';
+  dimZoneOpacity: number;  // 0-1, how much fog remains in dim zone (default 0.4)
 }
 
 const DEFAULT_EFFECT_SETTINGS: EffectSettings = {
@@ -29,6 +30,7 @@ const DEFAULT_EFFECT_SETTINGS: EffectSettings = {
   bloomThreshold: 0.7,
   volumetricEnabled: false,
   effectQuality: 'balanced',
+  dimZoneOpacity: 0.4,
 };
 
 let pixiApp: PIXI.Application | null = null;

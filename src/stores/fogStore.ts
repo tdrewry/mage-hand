@@ -10,6 +10,7 @@ export interface FogEffectSettings {
   lightFalloff: number; // 0-1, percentage of light radius where inner bright zone ends
   volumetricEnabled: boolean;
   effectQuality: EffectQuality;
+  dimZoneOpacity: number; // 0-1, how much fog remains in dim zone (default 0.4)
 }
 
 export interface FogSettings {
@@ -52,6 +53,7 @@ interface FogState extends FogSettings {
   setLightFalloff: (falloff: number) => void;
   setVolumetricEnabled: (enabled: boolean) => void;
   setEffectQuality: (quality: EffectQuality) => void;
+  setDimZoneOpacity: (opacity: number) => void;
   setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
 }
 
@@ -78,6 +80,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
     lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
     volumetricEnabled: false,
     effectQuality: 'balanced' as EffectQuality,
+    dimZoneOpacity: 0.4, // 40% fog in dim zone
   },
   
   // Actions - sync happens automatically via syncPatch middleware
@@ -134,6 +137,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
         lightFalloff: 0.5,
         volumetricEnabled: false,
         effectQuality: 'balanced' as EffectQuality,
+        dimZoneOpacity: 0.4,
       },
     });
   },
@@ -173,6 +177,12 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
   setEffectQuality: (quality) => {
     set((state) => ({
       effectSettings: { ...state.effectSettings, effectQuality: quality },
+    }));
+  },
+  setDimZoneOpacity: (opacity) => {
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+    set((state) => ({
+      effectSettings: { ...state.effectSettings, dimZoneOpacity: clampedOpacity },
     }));
   },
   setEffectSettings: (settings) => {

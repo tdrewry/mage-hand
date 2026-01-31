@@ -39,6 +39,7 @@ export function FogControlCardContent() {
     setLightFalloff,
     setVolumetricEnabled,
     setEffectQuality,
+    setDimZoneOpacity,
     clearExploredAreas,
     resetFog,
   } = useFogStore();
@@ -356,6 +357,30 @@ export function FogControlCardContent() {
                   <span>No lights enabled — this only affects light sources</span>
                 </div>
               )}
+            </div>
+
+            {/* Dim Zone Darkness */}
+            <div className="space-y-2 pl-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="dim-zone-opacity" className="text-xs font-medium flex items-center gap-2">
+                  <Circle className="h-3 w-3 opacity-50" />
+                  Dim Zone Darkness
+                </Label>
+                <span className="text-xs font-medium">{Math.round(effectSettings.dimZoneOpacity * 100)}%</span>
+              </div>
+              <Slider
+                id="dim-zone-opacity"
+                min={0}
+                max={100}
+                step={5}
+                value={[effectSettings.dimZoneOpacity * 100]}
+                onValueChange={([value]) => setDimZoneOpacity(value / 100)}
+                disabled={!enabled}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                How dark the outer edge of vision appears
+              </p>
             </div>
 
             {/* Volumetric Fog Toggle */}

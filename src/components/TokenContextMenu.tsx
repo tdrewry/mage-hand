@@ -388,6 +388,7 @@ export const TokenContextMenu = ({
     }
     
     targetTokens.forEach(token => {
+      // Update legacy fields for backward compatibility
       useSessionStore.setState((state) => ({
         tokens: state.tokens.map((t) =>
           t.id === token.id
@@ -399,6 +400,15 @@ export const TokenContextMenu = ({
             : t
         ),
       }));
+      
+      // CRITICAL: Also sync to illuminationSources so renderer sees the change
+      if (range !== undefined) {
+        updateTokenIllumination(token.id, { 
+          range,
+          dimIntensity: useGradientsValue ? 0.4 : 0.0,
+          softEdge: useGradientsValue,
+        });
+      }
     });
     
     setShowVisionRangeModal(false);

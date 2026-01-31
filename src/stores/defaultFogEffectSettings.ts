@@ -10,4 +10,5 @@ export const DEFAULT_FOG_EFFECT_SETTINGS: FogEffectSettings = {
   lightFalloff: 0.5,
   volumetricEnabled: false,
   effectQuality: 'balanced' as EffectQuality,
+  dimZoneOpacity: 0.4,
 };
