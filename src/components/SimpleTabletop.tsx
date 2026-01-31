@@ -5626,7 +5626,8 @@ export const SimpleTabletop = () => {
   };
 
   const handleCanvasUpdate = () => {
-    // Canvas automatically redraws when tokens change
+    // Force immediate redraw for illumination/visibility changes
+    redrawCanvas();
   };
 
   const addTokenToCanvas = async (
