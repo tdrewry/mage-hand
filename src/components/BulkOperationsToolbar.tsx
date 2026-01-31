@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +14,11 @@ import { Label } from '@/components/ui/label';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
-import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { canAssignTokenRoles } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
-import type { IlluminationSource } from '@/types/illumination';
+import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '@/lib/illuminationPresets';
 
 interface BulkOperationsToolbarProps {
   selectedTokenIds: string[];
@@ -35,7 +34,6 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   const { tokens, currentPlayerId, players, removeToken, updateTokenIllumination } = useSessionStore();
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
-  const { profiles } = useVisionProfileStore();
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
@@ -102,47 +100,19 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
     toast.success(`Vision ${enabled ? 'enabled' : 'disabled'} for ${selectedTokens.length} token(s)`);
   };
   
-  const handleApplyVisionProfile = (profileId: string) => {
-    const profile = profiles.find(p => p.id === profileId);
-    if (!profile) return;
+  const handleApplyIlluminationPreset = (presetKey: PresetKey) => {
+    const presets = getSelectablePresets();
+    const presetEntry = presets.find(p => p.key === presetKey);
+    if (!presetEntry) return;
     
-    // Convert legacy vision profile to illumination format
-    const illuminationSettings: Partial<IlluminationSource> = {
-      range: profile.visionRange,
-      brightZone: 0.5,
-      brightIntensity: 1.0,
-      dimIntensity: profile.useGradients ? 0.4 : 0.0, // Gradients = dim zone visible
-      color: profile.color,
-      colorEnabled: false,
-      colorIntensity: 0.15,
-      softEdge: profile.useGradients,
-      softEdgeRadius: 8,
-      animation: 'none' as const,
-      animationSpeed: 1.0,
-      animationIntensity: 0.3,
-    };
+    const illuminationSettings = presetToIlluminationSource(presetEntry.preset);
     
     selectedTokens.forEach(token => {
-      // Update legacy fields for backward compatibility
-      useSessionStore.setState((state) => ({
-        tokens: state.tokens.map((t) =>
-          t.id === token.id
-            ? {
-                ...t,
-                visionProfileId: profile.id,
-                visionRange: profile.visionRange,
-                useGradients: profile.useGradients,
-              }
-            : t
-        ),
-      }));
-      
-      // CRITICAL: Also update illuminationSources so renderer sees the change
       updateTokenIllumination(token.id, illuminationSettings);
     });
     
     onUpdateCanvas?.();
-    toast.success(`Applied ${profile.name} to ${selectedTokens.length} token(s)`);
+    toast.success(`Applied ${presetEntry.preset.icon} ${presetEntry.preset.name} to ${selectedTokens.length} token(s)`);
   };
   
   const handleDeleteConfirm = () => {
@@ -259,39 +229,35 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                <Scan className="h-3 w-3 mr-1" />
-                Vision
+                <Sparkles className="h-3 w-3 mr-1" />
+                Light
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 bg-popover" style={{ zIndex: Z_INDEX.DROPDOWNS.MENU + 100 }}>
               <DropdownMenuItem onClick={() => setShowIlluminationModal(true)}>
                 <Lightbulb className="h-4 w-4 mr-2" />
-                Illumination Settings
+                Custom Settings...
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {getSelectablePresets().map(({ key, preset }) => (
+                <DropdownMenuItem 
+                  key={key}
+                  onClick={() => handleApplyIlluminationPreset(key)}
+                >
+                  <span className="mr-2 text-base">{preset.icon}</span>
+                  <span className="flex-1">{preset.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{preset.description.split(' ')[0]}</span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleToggleVision(true)}>
+                <Eye className="h-4 w-4 mr-2" />
                 Enable Vision
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleVision(false)}>
+                <EyeOff className="h-4 w-4 mr-2" />
                 Disable Vision
               </DropdownMenuItem>
-              {profiles.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  {profiles.map((profile) => (
-                    <DropdownMenuItem 
-                      key={profile.id}
-                      onClick={() => handleApplyVisionProfile(profile.id)}
-                    >
-                      <div 
-                        className="mr-2 h-3 w-3 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: profile.color }}
-                      />
-                      <span className="flex-1">{profile.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
           
