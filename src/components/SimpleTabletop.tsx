@@ -405,12 +405,14 @@ export const SimpleTabletop = () => {
       {
         position: { x: number; y: number };
         visionPath: any; // paper.js Path
+        illuminationRange?: number; // Track range to detect changes
       }
     >
   >(new Map());
 
-  // Track previous token positions to detect changes
+  // Track previous token positions and illumination ranges to detect changes
   const prevTokenPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const prevTokenIlluminationRef = useRef<Map<string, { range?: number; settingsHash?: string }>>(new Map());
 
   // Performance optimization: Cache for token drawing to reduce redundant renders
   const tokenDrawCache = useRef<Map<string, { lastDrawn: number; data: any }>>(new Map());
@@ -905,16 +907,50 @@ export const SimpleTabletop = () => {
           // Only consider tokens with vision enabled
           const tokensWithVision = tokensForVision.filter((t) => t.hasVision !== false);
           const movedTokens: typeof tokens = [];
+          const illuminationChangedTokens: typeof tokens = [];
           const currentTokenIds = new Set(tokensWithVision.map((t) => t.id));
 
-          // Track tokens whose vision state changed
+          // Track tokens whose vision state or illumination range changed
           let visionStateChanged = false;
+          let illuminationSettingsChanged = false;
 
           tokensWithVision.forEach((token) => {
             const prevPos = prevTokenPositionsRef.current.get(token.id);
             if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
               movedTokens.push(token);
             }
+            
+            // Check if illumination range changed (requires visibility polygon recomputation)
+            const prevIllum = prevTokenIlluminationRef.current.get(token.id);
+            const currentRange = token.illuminationSources?.[0]?.range ?? token.visionRange ?? fogVisionRange;
+            if (prevIllum?.range !== currentRange) {
+              // Range changed - need to recompute visibility polygon
+              if (!movedTokens.includes(token)) {
+                illuminationChangedTokens.push(token);
+              }
+            }
+            
+            // Check if other illumination settings changed (doesn't require polygon recomputation)
+            // Create a simple hash of relevant settings for comparison
+            const settingsHash = token.illuminationSources?.[0] 
+              ? JSON.stringify({
+                  brightZone: token.illuminationSources[0].brightZone,
+                  brightIntensity: token.illuminationSources[0].brightIntensity,
+                  dimIntensity: token.illuminationSources[0].dimIntensity,
+                  color: token.illuminationSources[0].color,
+                  colorEnabled: token.illuminationSources[0].colorEnabled,
+                  animation: token.illuminationSources[0].animation,
+                })
+              : '';
+            if (prevIllum?.settingsHash !== settingsHash) {
+              illuminationSettingsChanged = true;
+            }
+            
+            // Update tracking for next comparison
+            prevTokenIlluminationRef.current.set(token.id, {
+              range: currentRange,
+              settingsHash,
+            });
           });
 
           // Remove cached visibility for tokens that no longer exist OR lost vision
@@ -925,23 +961,28 @@ export const SimpleTabletop = () => {
               if (cached?.visionPath?.remove) cached.visionPath.remove();
               tokenVisibilityCacheRef.current.delete(id);
               prevTokenPositionsRef.current.delete(id);
+              prevTokenIlluminationRef.current.delete(id);
               visionStateChanged = true; // Vision was disabled for this token
             }
           });
 
-          // If no tokens moved and vision state didn't change, skip computation
-          // Unless we're in play mode and don't have fog masks yet (initial render)
+          // Determine what needs to be recomputed
+          const tokensNeedingVisibilityRecompute = [...movedTokens, ...illuminationChangedTokens];
+          
+          // If no tokens need visibility recomputation AND illumination settings didn't change,
+          // skip computation. Unless we're in play mode and don't have fog masks yet (initial render)
           if (
-            movedTokens.length === 0 &&
+            tokensNeedingVisibilityRecompute.length === 0 &&
             !visionStateChanged &&
+            !illuminationSettingsChanged &&
             tokenVisibilityCacheRef.current.size === tokensWithVision.length &&
             fogMasksRef.current !== null
           ) {
             return;
           }
 
-          // Compute visibility only for moved tokens
-          for (const token of movedTokens) {
+          // Compute visibility only for tokens that moved or had illumination range changes
+          for (const token of tokensNeedingVisibilityRecompute) {
             // Find token's region to get grid size
             const tokenRegion = regions.find(
               (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height,
@@ -965,10 +1006,11 @@ export const SimpleTabletop = () => {
               visionRangePixels,
             );
 
-            // Cache the new vision path
+            // Cache the new vision path with illumination range for change detection
             tokenVisibilityCacheRef.current.set(token.id, {
               position: { x: token.x, y: token.y },
               visionPath: tokenVision,
+              illuminationRange: visionRangePixels,
             });
 
             // Update previous position
