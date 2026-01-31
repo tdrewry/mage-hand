@@ -251,7 +251,7 @@ Verify all vision/illumination paths call refresh:
 | `BulkOperationsToolbar.handleApplyVisionProfile()` | ✅ | Yes (already) |
 | `BulkOperationsToolbar.handleToggleVision()` | ✅ | Yes (already) |
 
-The issue is that legacy fields are set but illumination isn't updated, so even though refresh is called, nothing visually changes.
+**FIXED:** The fog computation useEffect now detects illumination range changes (not just position changes) and triggers visibility polygon recomputation. Also detects non-range illumination setting changes (color, animation, etc.) to update the visibility data for rendering without needing to recompute polygons.
 
 ---
 
