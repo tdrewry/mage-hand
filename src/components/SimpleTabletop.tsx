@@ -2212,31 +2212,62 @@ export const SimpleTabletop = () => {
       // Only render fog on main canvas if post-processing is disabled
       // When post-processing is enabled, PixiJS layer renders the blurred fog
       if (!usePostProcessing) {
-        // First render base fog layers
-        ctx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
-        ctx.fill(fogMasksRef.current.unexploredMask);
-
-        ctx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
-        ctx.fill(fogMasksRef.current.exploredOnlyMask);
-
-        // Canvas 2D fallback: Use simple solid fills for all visibility areas
-        // (Gradient effects are only available in PixiJS post-processing mode)
-        if (tokenVisibilityDataRef.current.length > 0 || dragPreviewVisibilityRef.current) {
-          ctx.save();
-          ctx.globalCompositeOperation = "destination-out";
-
-          tokenVisibilityDataRef.current.forEach(({ visibilityPath }) => {
-            ctx.fillStyle = "rgba(255, 255, 255, 1)";
-            ctx.fill(visibilityPath);
-          });
+        // IMPORTANT: Render fog to an offscreen canvas first, then composite onto main canvas.
+        // This prevents destination-out from cutting through the floor textures beneath fog.
+        // Without this, destination-out would make holes through the ENTIRE canvas (including regions).
+        
+        // Create or reuse offscreen fog canvas
+        let fogOffscreenCanvas = (window as any).__fogOffscreenCanvas as HTMLCanvasElement | undefined;
+        if (!fogOffscreenCanvas || fogOffscreenCanvas.width !== canvas.width || fogOffscreenCanvas.height !== canvas.height) {
+          fogOffscreenCanvas = document.createElement('canvas');
+          fogOffscreenCanvas.width = canvas.width;
+          fogOffscreenCanvas.height = canvas.height;
+          (window as any).__fogOffscreenCanvas = fogOffscreenCanvas;
+        }
+        
+        const fogCtx = fogOffscreenCanvas.getContext('2d');
+        if (fogCtx) {
+          // Clear the offscreen fog canvas
+          fogCtx.clearRect(0, 0, fogOffscreenCanvas.width, fogOffscreenCanvas.height);
           
-          // Composite real-time drag preview visibility (when feature enabled)
-          if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current) {
-            ctx.fillStyle = "rgba(255, 255, 255, 1)";
-            ctx.fill(dragPreviewVisibilityRef.current);
-          }
+          // Apply the same transform as main canvas
+          fogCtx.save();
+          fogCtx.translate(transform.x, transform.y);
+          fogCtx.scale(transform.zoom, transform.zoom);
+          
+          // Render base fog layers to offscreen canvas
+          fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+          fogCtx.fill(fogMasksRef.current.unexploredMask);
 
-          ctx.globalCompositeOperation = "source-over";
+          fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+          fogCtx.fill(fogMasksRef.current.exploredOnlyMask);
+
+          // Cut out visibility areas from fog using destination-out
+          // This only affects the fog canvas, not the main canvas with regions
+          if (tokenVisibilityDataRef.current.length > 0 || dragPreviewVisibilityRef.current) {
+            fogCtx.globalCompositeOperation = "destination-out";
+
+            tokenVisibilityDataRef.current.forEach(({ visibilityPath }) => {
+              fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
+              fogCtx.fill(visibilityPath);
+            });
+            
+            // Composite real-time drag preview visibility (when feature enabled)
+            if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current) {
+              fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
+              fogCtx.fill(dragPreviewVisibilityRef.current);
+            }
+
+            fogCtx.globalCompositeOperation = "source-over";
+          }
+          
+          fogCtx.restore();
+          
+          // Now composite the fog canvas onto the main canvas
+          // The main canvas still has regions/textures intact; we're just overlaying fog with transparent holes
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to draw fog canvas at screen coordinates
+          ctx.drawImage(fogOffscreenCanvas, 0, 0);
           ctx.restore();
         }
       } else {
