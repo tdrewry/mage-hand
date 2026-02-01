@@ -1,258 +1,271 @@
 
-# Token Appearance Variants - IMPLEMENTED ✓
+
+# Token Movement Path Styling with Footprints
 
 ## Overview
-Tokens now support multiple saved "appearance variants" - combinations of image + size that can be quickly switched between. This supports use cases like:
-- **Wild Shape**: Druid changes between humanoid form and various animal forms
-- **Mounted/Unmounted**: Character on horseback vs on foot
-- **Polymorphed**: Original form vs transformed creature
-- **Rage/Combat Mode**: Visual indicator of combat state with different image
+This plan adds customizable movement path visualization for tokens, including a **footprint trail** option that draws actual footprints (bare feet, boot prints, paw prints, etc.) along the drag path. A new **Style** tab in the Edit Token modal consolidates visual styling controls.
 
-## Current State Analysis
+## Key Features
+1. **Footprint Path Style**: Draw alternating left/right footprints along the movement path
+2. **Multiple Footprint Types**: Bare feet, boots, paws, hooves, claws
+3. **New Style Tab**: Consolidate token color and path styling in one place
+4. **Live Preview**: Small canvas showing the selected path style
 
-The Token interface currently stores:
-- `imageUrl`: The current image data (in-memory, not persisted)
-- `imageHash`: Hash for texture sync to other clients
-- `gridWidth` / `gridHeight`: Current token footprint
+---
 
-The Appearance tab in the Edit Token modal allows:
-- Changing the current image
-- Selecting size presets (Tiny, Small/Medium, Large, Huge, Gargantuan)
-- Custom size input
+## Visual Reference
 
-**Missing**: No way to save and quickly switch between appearance configurations.
+The footprint trail will alternate left and right prints along the curved path, similar to this pattern:
 
-## Proposed Data Model
+```text
+Movement Direction →
 
-### New Interface: AppearanceVariant
-
-```typescript
-export interface AppearanceVariant {
-  id: string;              // Unique identifier
-  name: string;            // User-friendly name (e.g., "Bear Form", "Mounted")
-  imageHash?: string;      // Hash reference to stored texture
-  gridWidth: number;       // Footprint width in grid units
-  gridHeight: number;      // Footprint height in grid units
-  isDefault?: boolean;     // Mark one variant as the default/original
-}
+    🦶        🦶        🦶
+  🦶        🦶        🦶
+    🦶        🦶        🦶
+  🦶        🦶        🦶
 ```
 
-### Token Interface Extension
+Each footprint is:
+- Rotated to face the direction of movement
+- Offset left/right to simulate a walking gait
+- Faded from start (transparent) to end (opaque)
 
-```typescript
-export interface Token {
-  // ... existing fields ...
+---
+
+## Data Model
+
+### New Token Properties
+
+```text
+Token
+├── color: string              (existing - moves to Style tab)
+├── pathStyle: 'dashed' | 'solid' | 'footprint' | 'none'
+├── pathColor: string          (defaults to token.color or white)
+├── pathWeight: number         (1-5, affects line thickness or footprint size)
+├── pathOpacity: number        (0.3-1.0, default 0.7)
+└── footprintType: 'barefoot' | 'boot' | 'paw' | 'hoof' | 'claw'
+```
+
+### Footprint Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| barefoot | Human/humanoid bare feet | Default for most characters |
+| boot | Boot/shoe prints | Armored characters, adventurers |
+| paw | Animal paw prints (4 toes + pad) | Wolves, cats, bears, Wild Shape |
+| hoof | Hoofprints | Horses, centaurs, mounted tokens |
+| claw | Bird/dinosaur talons | Dragons, aarakocra, raptors |
+
+---
+
+## UI Design: New Style Tab
+
+The Edit Token modal gets a 4th tab between Label and Appearance:
+
+```text
+[Label] [Style] [Appearance] [Details]
+```
+
+### Style Tab Layout
+
+```text
+┌─────────────────────────────────────────┐
+│  TOKEN COLOR                            │
+│  ┌─────┐                                │
+│  │ ▓▓▓ │  #FF6B6B  [color picker]       │
+│  └─────┘                                │
+│  ┌──┬──┬──┬──┬──┬──┬──┬──┐             │
+│  │██│██│██│██│██│██│██│██│ Quick Colors │
+│  └──┴──┴──┴──┴──┴──┴──┴──┘             │
+├─────────────────────────────────────────┤
+│  MOVEMENT PATH                          │
+│                                         │
+│  Style: ┌──────────────────────────┐    │
+│         │ Footprint             ▾  │    │
+│         └──────────────────────────┘    │
+│                                         │
+│  Footprint Type: (only if footprint)    │
+│  ┌───────┐ ┌───────┐ ┌───────┐         │
+│  │  🦶   │ │  👢   │ │  🐾   │         │
+│  │Barefoot│ │ Boot  │ │  Paw  │         │
+│  └───────┘ └───────┘ └───────┘         │
+│  ┌───────┐ ┌───────┐                    │
+│  │  🐴   │ │  🦅   │                    │
+│  │ Hoof  │ │ Claw  │                    │
+│  └───────┘ └───────┘                    │
+│                                         │
+│  Path Color: [picker] ☑ Use token color │
+│  Size:    ═══○═══════  3                │
+│  Opacity: ═══════○═══  0.7              │
+├─────────────────────────────────────────┤
+│  PREVIEW                                │
+│  ┌─────────────────────────────────────┐│
+│  │  🦶    🦶    🦶    🦶    →          ││
+│  │    🦶    🦶    🦶                   ││
+│  └─────────────────────────────────────┘│
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Footprint Rendering System
+
+### SVG Path Data for Each Footprint Type
+
+Instead of using images, we'll use Canvas 2D path drawing for crisp rendering at any scale:
+
+**Barefoot**: Oval heel + ball + 5 toe circles
+```text
+Heel (ellipse at bottom)
+Ball (larger ellipse at top)
+Toes: 5 small circles in an arc
+```
+
+**Boot**: Rectangular sole with heel
+```text
+Rounded rectangle for sole
+Smaller rectangle for heel indent
+```
+
+**Paw**: Central pad + 4 toe pads
+```text
+Heart-shaped central pad
+4 oval toe pads above
+Optional: small claw marks
+```
+
+**Hoof**: U-shape with split
+```text
+U-shaped outline
+Vertical line for cleft
+```
+
+**Claw**: 3 forward toes with talons
+```text
+3 elongated toe shapes
+Pointed tips for claws
+Smaller rear toe
+```
+
+### Rendering Algorithm
+
+```text
+function drawFootprintPath(ctx, dragPath, token):
+  1. Calculate total path length
+  2. Determine stride length based on token size
+     stride = token.gridWidth * gridSize * 0.4
   
-  // Appearance variants - saved configurations of image + size
-  appearanceVariants?: AppearanceVariant[];
-  activeVariantId?: string;  // Which variant is currently active
-}
+  3. For each stride interval:
+     a. Calculate position on path using interpolation
+     b. Calculate direction (angle to next point)
+     c. Determine left/right foot (alternating)
+     d. Apply gait offset (left foot slightly left, right slightly right)
+     e. Calculate opacity (gradient from 0.3 to pathOpacity)
+     f. Draw footprint:
+        - Translate to position
+        - Rotate to face movement direction
+        - Mirror for left/right foot
+        - Scale based on pathWeight
+        - Draw footprint shape using Canvas paths
 ```
 
-### How It Works
+---
 
-1. **Saving a Variant**: User configures image + size in Appearance tab, clicks "Save as Variant", enters a name → stored in `appearanceVariants` array
-2. **Switching Variants**: User selects from a dropdown or grid of saved variants → `activeVariantId` updates, and `imageHash`/`imageUrl`/`gridWidth`/`gridHeight` are updated to match
-3. **Default Variant**: First variant or one marked `isDefault` represents the "base" appearance
-4. **Sync**: Variants sync via JSON Patch (only `imageHash` for images, not full data)
+## File Changes
+
+### Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/lib/footprintShapes.ts` | Canvas path functions for each footprint type |
+| `src/components/TokenPathPreviewCanvas.tsx` | Preview canvas for Style tab |
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/stores/sessionStore.ts` | Add `pathStyle`, `pathColor`, `pathWeight`, `pathOpacity`, `footprintType` to Token interface |
+| `src/components/TokenContextMenu.tsx` | Add Style tab with color picker (moved) and path controls |
+| `src/components/SimpleTabletop.tsx` | Update `drawDragPath()` to use token path settings and render footprints |
+| `src/lib/commands/tokenCommands.ts` | Add undo/redo support for style property changes |
 
 ---
 
 ## Technical Implementation
 
-### 1. Extend Token Interface
-**File:** `src/stores/sessionStore.ts`
-
-Add new types and fields:
+### 1. Footprint Shape Library (`src/lib/footprintShapes.ts`)
 
 ```typescript
-// New interface for appearance presets
-export interface AppearanceVariant {
-  id: string;
-  name: string;
-  imageHash?: string;      // Hash reference (imageUrl loaded from IndexedDB)
-  gridWidth: number;
-  gridHeight: number;
-  isDefault?: boolean;
-}
+export type FootprintType = 'barefoot' | 'boot' | 'paw' | 'hoof' | 'claw';
 
-export interface Token {
-  // ... existing fields ...
+export function drawFootprint(
+  ctx: CanvasRenderingContext2D,
+  type: FootprintType,
+  x: number,
+  y: number,
+  size: number,
+  rotation: number,
+  isLeftFoot: boolean,
+  color: string,
+  opacity: number
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  if (isLeftFoot) ctx.scale(-1, 1); // Mirror for left foot
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = color;
   
-  // Appearance variants system
-  appearanceVariants?: AppearanceVariant[];
-  activeVariantId?: string;
-}
-```
-
-### 2. Add Store Methods
-**File:** `src/stores/sessionStore.ts`
-
-```typescript
-// Add a new appearance variant to a token
-addAppearanceVariant: (tokenId: string, variant: AppearanceVariant) => void;
-
-// Remove an appearance variant from a token
-removeAppearanceVariant: (tokenId: string, variantId: string) => void;
-
-// Update an existing variant
-updateAppearanceVariant: (tokenId: string, variantId: string, updates: Partial<AppearanceVariant>) => void;
-
-// Switch to a different variant (applies its settings to the token)
-setActiveVariant: (tokenId: string, variantId: string) => void;
-```
-
-### 3. Update TokenContextMenu Appearance Tab
-**File:** `src/components/TokenContextMenu.tsx`
-
-Restructure the Appearance tab to include:
-
-```text
-+------------------------------------------+
-|           Appearance Tab                  |
-+------------------------------------------+
-| Current Appearance                        |
-| ┌────────────────────────────────────────┐|
-| │ [Image Preview]    Size: 2×2 Large     │|
-| │ [Change Image] [Clear]                  │|
-| │                                         │|
-| │ Size: [Tiny] [Med] [Lrg] [Huge] [Garg] │|
-| │ Custom: [___] × [___]                   │|
-| └────────────────────────────────────────┘|
-|                                           |
-| Saved Variants                            |
-| ┌────────────────────────────────────────┐|
-| │ [+] Save Current as Variant            │|
-| │                                         │|
-| │ ┌──────┐ ┌──────┐ ┌──────┐            │|
-| │ │ Bear │ │Hawk  │ │Wolf  │            │|
-| │ │ 2×2  │ │ 0.5  │ │ 1×1  │            │|
-| │ │[Use] │ │[Use] │ │[Use] │            │|
-| │ │ [×]  │ │ [×]  │ │ [×]  │            │|
-| │ └──────┘ └──────┘ └──────┘            │|
-| └────────────────────────────────────────┘|
-+------------------------------------------+
-```
-
-**UI Elements:**
-- **Current Appearance Section**: Same as now - image preview, change/clear buttons, size presets
-- **Save as Variant Button**: Saves current image + size as a named variant
-- **Variant Grid**: Shows saved variants with thumbnail preview, name, size indicator
-- **Use Button**: Switches to that variant
-- **Delete Button (×)**: Removes the variant
-
-### 4. Variant Selection Flow
-
-When user clicks "Use" on a variant:
-
-```typescript
-const handleUseVariant = async (variant: AppearanceVariant) => {
-  // 1. Set the variant as active
-  setActiveVariant(tokenId, variant.id);
-  
-  // 2. Load the image from IndexedDB using imageHash
-  if (variant.imageHash) {
-    const imageUrl = await loadTokenTexture(variant.imageHash);
-    setImageUrlValue(imageUrl);
+  switch (type) {
+    case 'barefoot':
+      drawBarefootPrint(ctx, size);
+      break;
+    case 'boot':
+      drawBootPrint(ctx, size);
+      break;
+    // ... etc
   }
   
-  // 3. Update size values
-  setGridWidthValue(variant.gridWidth);
-  setGridHeightValue(variant.gridHeight);
-  
-  // 4. Apply to token immediately
-  updateTokenSize(tokenId, variant.gridWidth, variant.gridHeight);
-  if (variant.imageHash) {
-    updateTokenImage(tokenId, imageUrl, variant.imageHash);
-  }
-};
+  ctx.restore();
+}
 ```
 
-### 5. Save Variant Flow
+### 2. Path Rendering in SimpleTabletop
 
-```typescript
-const handleSaveVariant = async () => {
-  // Create variant from current settings
-  const variant: AppearanceVariant = {
-    id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    name: variantNameInput,  // User-provided name
-    imageHash: currentToken.imageHash,
-    gridWidth: gridWidthValue,
-    gridHeight: gridHeightValue,
-    isDefault: (currentToken.appearanceVariants?.length ?? 0) === 0, // First one is default
-  };
-  
-  addAppearanceVariant(tokenId, variant);
-};
-```
+The `drawDragPath` function will check `token.pathStyle`:
 
----
+- **'none'**: Skip path rendering entirely
+- **'solid'/'dashed'**: Draw high-contrast line (existing + enhanced)
+- **'footprint'**: Call new `drawFootprintPath()` function
 
-## Files to Modify
+### 3. Token Property Defaults
 
-| File | Changes |
-|------|---------|
-| `src/stores/sessionStore.ts` | Add `AppearanceVariant` interface, extend `Token` with `appearanceVariants` and `activeVariantId`, add CRUD methods |
-| `src/components/TokenContextMenu.tsx` | Restructure Appearance tab with variant management UI |
-| `src/lib/commands/tokenCommands.ts` | (Optional) Add undo/redo commands for variant operations |
-
----
-
-## UI/UX Details
-
-### Saving a New Variant
-1. User configures image and size in the Appearance tab
-2. Clicks "Save as Variant" button
-3. Small inline form appears or dialog asking for variant name
-4. User enters name (e.g., "Bear Form") and confirms
-5. Variant appears in the grid below
-
-### Variant Card Design
-```text
-┌─────────────────────┐
-│     ┌───────┐       │
-│     │ [img] │       │  ← Circular thumbnail
-│     └───────┘       │
-│     Bear Form       │  ← Variant name
-│     2×2 (Large)     │  ← Size description
-│                     │
-│  [Apply]   [Edit]   │  ← Action buttons
-│     [Delete]        │
-└─────────────────────┘
-```
-
-### Active Variant Indicator
-- The currently active variant has a ring/border highlight
-- When token is using a variant, show variant name somewhere visible
-
-### Multi-Selection Handling
-- When multiple tokens selected, variants section shows message: "Manage variants for individual tokens"
-- Variant management disabled for multi-select to avoid complexity
-
----
-
-## Sync Considerations
-
-1. **Variants array syncs normally**: Small metadata, safe for JSON Patch
-2. **imageHash references sync**: Actual texture data is handled by texture sync system
-3. **No imageUrl in variants**: Only store hash, resolve URL from IndexedDB on client
-4. **Persisted to localStorage**: Variants excluded from imageUrl issue (only hashes stored)
+Tokens without explicit path settings use these defaults:
+- `pathStyle: 'dashed'`
+- `pathColor: undefined` (uses token.color)
+- `pathWeight: 3`
+- `pathOpacity: 0.7`
+- `footprintType: 'barefoot'`
 
 ---
 
 ## Edge Cases
 
-1. **Deleted texture**: If a variant references a hash that no longer exists in IndexedDB, show placeholder and option to re-upload
-2. **Variant without image**: Allow variants that only change size (color token at different sizes)
-3. **Default variant deletion**: Prompt user to select new default if deleting the default variant
-4. **Duplicate names**: Allow (variants identified by ID), but warn user
-5. **Maximum variants**: Soft limit of ~10 variants per token to keep UI manageable
+1. **Very short paths**: Don't draw footprints if path is shorter than 1 stride
+2. **Sharp turns**: Rotate footprints to follow the curve smoothly
+3. **Large tokens**: Scale footprint size with token size, cap at reasonable maximum
+4. **Multi-select**: Style changes apply to all selected tokens
+5. **Sync**: Path style properties sync via JSON Patch (small data, no images)
 
 ---
 
-## Future Enhancements
+## Summary
 
-1. **Variant Hotkeys**: Assign keyboard shortcuts to variants for quick switching
-2. **Conditional Variants**: Auto-switch based on HP, combat status, etc.
-3. **Shared Variant Templates**: Save variant configurations to apply to other tokens
-4. **Animation between variants**: Smooth transition when switching forms
+This enhancement adds expressive movement visualization with actual footprint icons that:
+- Follow the curved drag path naturally
+- Alternate left/right like real walking
+- Support multiple creature types (humanoid, beast, mount)
+- Remain crisp at any zoom level (Canvas 2D drawing, not images)
+- Consolidate all token styling in one convenient tab
+
