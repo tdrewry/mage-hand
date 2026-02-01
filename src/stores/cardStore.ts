@@ -225,7 +225,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     fullCardDraggable: true,
   },
   [CardType.STYLES]: {
-    title: 'Styles',
+    title: 'Map',
     defaultPosition: { x: 320, y: 80 },
     defaultSize: { width: 400, height: 600 },
     minSize: { width: 350, height: 500 },

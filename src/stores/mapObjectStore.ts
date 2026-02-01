@@ -45,6 +45,7 @@ interface MapObjectStore {
   // Door-specific operations
   toggleDoor: (id: string) => void;
   setDoorState: (id: string, isOpen: boolean) => void;
+  closeAllDoors: () => void;
   
   // Get vision-blocking objects (for fog calculation)
   getVisionBlockingObjects: () => MapObject[];
@@ -363,6 +364,21 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
             ...obj,
             isOpen,
             blocksVision: !isOpen,
+          };
+        }
+        return obj;
+      }),
+    }));
+  },
+
+  closeAllDoors: () => {
+    set((state) => ({
+      mapObjects: state.mapObjects.map((obj) => {
+        if (obj.category === 'door') {
+          return {
+            ...obj,
+            isOpen: false,
+            blocksVision: true,
           };
         }
         return obj;
