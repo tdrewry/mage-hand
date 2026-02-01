@@ -2813,9 +2813,7 @@ export const SimpleTabletop = () => {
       }
     }
 
-    // Draw direction arrow at current position
-    drawDirectionArrow(ctx, dragStartPos, { x: token.x, y: token.y }, pathColor);
-
+    // Note: No direction arrow needed - path renders under the token so arrow would be hidden
     ctx.restore();
   };
 
