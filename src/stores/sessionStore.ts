@@ -19,6 +19,16 @@ export interface EntityRef {
   projectionType?: string;   // 'stat-block' | 'character' | 'creature' | etc.
 }
 
+// Appearance variant for saved image + size configurations (Wild Shape, Mounted, etc.)
+export interface AppearanceVariant {
+  id: string;              // Unique identifier
+  name: string;            // User-friendly name (e.g., "Bear Form", "Mounted")
+  imageHash?: string;      // Hash reference to stored texture (imageUrl loaded from IndexedDB)
+  gridWidth: number;       // Footprint width in grid units
+  gridHeight: number;      // Footprint height in grid units
+  isDefault?: boolean;     // Mark one variant as the default/original
+}
+
 export interface Token {
   id: string;
   name: string;
@@ -47,6 +57,10 @@ export interface Token {
   // Token-instance data (separate from linked entity)
   notes?: string;              // GM notes for this token instance
   quickReferenceUrl?: string;  // Bridge field for external links
+
+  // Appearance variants - saved configurations of image + size (e.g., Wild Shape, Mounted)
+  appearanceVariants?: AppearanceVariant[];
+  activeVariantId?: string;  // Which variant is currently active
 
   // @deprecated Legacy fields - kept for migration, will be removed in future
   hasVision?: boolean;
@@ -200,6 +214,35 @@ export interface SessionState {
    * @param entityRef The entity reference object.
    */
   updateTokenEntityRef: (tokenId: string, entityRef: EntityRef | undefined) => void;
+
+  /**
+   * Adds an appearance variant to a token.
+   * @param tokenId The ID of the token.
+   * @param variant The appearance variant to add.
+   */
+  addAppearanceVariant: (tokenId: string, variant: AppearanceVariant) => void;
+
+  /**
+   * Removes an appearance variant from a token.
+   * @param tokenId The ID of the token.
+   * @param variantId The ID of the variant to remove.
+   */
+  removeAppearanceVariant: (tokenId: string, variantId: string) => void;
+
+  /**
+   * Updates an existing appearance variant.
+   * @param tokenId The ID of the token.
+   * @param variantId The ID of the variant to update.
+   * @param updates Partial updates to apply.
+   */
+  updateAppearanceVariant: (tokenId: string, variantId: string, updates: Partial<AppearanceVariant>) => void;
+
+  /**
+   * Sets the active appearance variant (applies its image/size to the token).
+   * @param tokenId The ID of the token.
+   * @param variantId The ID of the variant to activate.
+   */
+  setActiveVariant: (tokenId: string, variantId: string) => void;
 
   /**
    * Removes a token from the session.
@@ -457,6 +500,82 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, entityRef } : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  addAppearanceVariant: (tokenId, variant) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId 
+          ? { 
+              ...token, 
+              appearanceVariants: [...(token.appearanceVariants || []), variant],
+              // If this is the first variant, also set it as active
+              activeVariantId: token.appearanceVariants?.length ? token.activeVariantId : variant.id,
+            } 
+          : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  removeAppearanceVariant: (tokenId, variantId) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) => {
+        if (token.id !== tokenId) return token;
+        
+        const updatedVariants = (token.appearanceVariants || []).filter(v => v.id !== variantId);
+        // If we removed the active variant, clear the activeVariantId
+        const newActiveId = token.activeVariantId === variantId ? undefined : token.activeVariantId;
+        
+        return {
+          ...token,
+          appearanceVariants: updatedVariants,
+          activeVariantId: newActiveId,
+        };
+      }),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateAppearanceVariant: (tokenId, variantId, updates) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId
+          ? {
+              ...token,
+              appearanceVariants: (token.appearanceVariants || []).map(v =>
+                v.id === variantId ? { ...v, ...updates } : v
+              ),
+            }
+          : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  setActiveVariant: (tokenId, variantId) => {
+    const token = get().tokens.find(t => t.id === tokenId);
+    if (!token) return;
+
+    const variant = token.appearanceVariants?.find(v => v.id === variantId);
+    if (!variant) return;
+
+    // Apply the variant's settings to the token
+    set((state) => ({
+      tokens: state.tokens.map((t) =>
+        t.id === tokenId
+          ? {
+              ...t,
+              activeVariantId: variantId,
+              gridWidth: variant.gridWidth,
+              gridHeight: variant.gridHeight,
+              // Note: imageUrl is not stored in variant - caller must load from IndexedDB and call updateTokenImage
+              imageHash: variant.imageHash,
+            }
+          : t
       ),
     }));
     // Sync happens automatically via syncPatch middleware
