@@ -59,6 +59,20 @@ export const useTokenInteraction = () => {
     const currentPlayer = players.find(p => p.id === currentPlayerId);
     if (!currentPlayer) return;
 
+    // Check if movement is globally locked (but allow in Edit mode)
+    const movementLocked = useSessionStore.getState().movementLocked;
+    if (movementLocked) {
+      // Import dungeonStore to check rendering mode
+      const { useDungeonStore } = require('@/stores/dungeonStore');
+      const renderingMode = useDungeonStore.getState().renderingMode;
+      
+      // Only block movement in Play mode
+      if (renderingMode === 'play') {
+        toast.error('Token movement is locked');
+        return;
+      }
+    }
+
     // Check if player can control this token
     if (!canControlToken(token, currentPlayer, roles)) {
       const role = roles.find(r => r.id === token.roleId);

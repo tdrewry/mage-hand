@@ -540,7 +540,14 @@ const persistOptions: PersistOptions<SessionState, Partial<SessionState>> = {
     tokenVisibility: state.tokenVisibility,
     labelVisibility: state.labelVisibility,
     viewportTransforms: state.viewportTransforms,
+    // Explicitly exclude movementLocked - always start unlocked
   }),
+  onRehydrateStorage: () => (state) => {
+    // Ensure movementLocked is always false on app start
+    if (state) {
+      state.movementLocked = false;
+    }
+  },
 };
 
 export const useSessionStore = create<SessionState>()(
