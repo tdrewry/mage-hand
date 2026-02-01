@@ -97,7 +97,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     } else {
       registerCard({
         type: CardType.STYLES,
-        title: 'Styles',
+        title: 'Map',
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 400, height: 600 },
         minSize: { width: 350, height: 500 },
@@ -289,7 +289,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
           <ToolbarButton
             icon={Settings2}
-            label="Styles"
+            label="Map"
             onClick={handleToggleStylesCard}
             isActive={stylesCard?.isVisible}
             variant="ghost"
@@ -392,7 +392,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         <>
           <ToolbarButton
             icon={Palette}
-            label="Styles"
+            label="Map"
             onClick={handleToggleStylesCard}
             isActive={stylesCard?.isVisible}
             variant="ghost"

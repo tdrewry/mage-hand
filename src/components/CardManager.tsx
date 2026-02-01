@@ -126,7 +126,7 @@ function getCardTitle(type: CardType): string {
     [CardType.WATABOU_IMPORT]: 'Watabou Import',
     [CardType.BACKGROUND_GRID]: 'Background & Grid',
     [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
-    [CardType.STYLES]: 'Styles',
+    [CardType.STYLES]: 'Map',
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
     [CardType.ROLE_MANAGER]: 'Role Manager',
     [CardType.HISTORY]: 'History',
