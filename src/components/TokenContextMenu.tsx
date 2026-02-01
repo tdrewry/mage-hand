@@ -37,7 +37,7 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
-import { saveTokenTexture, loadTokenTexture } from '@/lib/tokenTextureStorage';
+import { saveTokenTexture, loadTextureByHash } from '@/lib/tokenTextureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 import { hashImageData } from '@/lib/tokenTextureStorage';
 
@@ -188,7 +188,7 @@ export const TokenContextMenu = ({
         for (const variant of token.appearanceVariants) {
           if (variant.imageHash) {
             try {
-              const url = await loadTokenTexture(variant.imageHash);
+              const url = await loadTextureByHash(variant.imageHash);
               if (url) urls[variant.id] = url;
             } catch (e) {
               console.warn('Failed to load variant image:', variant.imageHash);
@@ -301,7 +301,7 @@ export const TokenContextMenu = ({
       } else {
         try {
           console.log('Loading variant texture from IndexedDB:', variant.imageHash);
-          const url = await loadTokenTexture(variant.imageHash);
+          const url = await loadTextureByHash(variant.imageHash);
           if (url) {
             console.log('Loaded variant texture successfully');
             setImageUrlValue(url);
