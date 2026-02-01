@@ -16,8 +16,12 @@ function renderDoorShape(
 ) {
   const { width, height, isOpen, fillColor, strokeColor } = mapObject;
   
+  // Door dimensions: width is the doorway span, height is door thickness
+  const doorLength = width;
+  const doorThickness = height;
+  const openDoorLength = doorLength * 0.5; // Half length when open
+  
   if (isOpen) {
-    // Draw open door - thin line at the edge to indicate doorway
     ctx.save();
     
     // Draw doorway opening (dashed line where door was)
@@ -25,52 +29,51 @@ function renderDoorShape(
     ctx.strokeStyle = '#9ca3af';
     ctx.lineWidth = 2 / zoom;
     ctx.beginPath();
-    ctx.moveTo(-width / 2, 0);
-    ctx.lineTo(width / 2, 0);
+    ctx.moveTo(-doorLength / 2, 0);
+    ctx.lineTo(doorLength / 2, 0);
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Draw door panel swung open (small rectangle at edge)
+    // Draw door panel swung open at 90 degrees from pivot point (left edge)
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1 / zoom;
     
-    // Draw hinges and swung door
+    // Draw hinge at pivot point
     ctx.beginPath();
-    ctx.arc(-width / 2, 0, 3 / zoom, 0, Math.PI * 2);
+    ctx.arc(-doorLength / 2, 0, 3 / zoom, 0, Math.PI * 2);
     ctx.fill();
     
-    // Swung door panel (rotated 90 degrees from closed position)
+    // Swung door panel: pivots from left edge, rotates 90 degrees, half length
     ctx.save();
-    ctx.translate(-width / 2, 0);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillRect(0, -height / 2, width * 0.7, height);
-    ctx.strokeRect(0, -height / 2, width * 0.7, height);
+    ctx.translate(-doorLength / 2, 0);
+    ctx.rotate(-Math.PI / 2); // Rotate 90 degrees counter-clockwise
+    // Draw the open door panel extending from the pivot
+    ctx.fillRect(0, -doorThickness / 2, openDoorLength, doorThickness);
+    ctx.strokeRect(0, -doorThickness / 2, openDoorLength, doorThickness);
     ctx.restore();
     
     ctx.restore();
   } else {
     // Draw closed door - solid rectangle blocking the doorway
-    ctx.fillRect(-width / 2, -height / 2, width, height);
-    ctx.strokeRect(-width / 2, -height / 2, width, height);
+    ctx.fillRect(-doorLength / 2, -doorThickness / 2, doorLength, doorThickness);
+    ctx.strokeRect(-doorLength / 2, -doorThickness / 2, doorLength, doorThickness);
     
     // Draw door handle/detail
     ctx.beginPath();
-    ctx.arc(width / 4, 0, 2 / zoom, 0, Math.PI * 2);
+    ctx.arc(doorLength / 4, 0, 2 / zoom, 0, Math.PI * 2);
     ctx.fillStyle = strokeColor;
     ctx.fill();
   }
   
   // DM view: always show interactive indicator
   if (isDMView) {
-    // Draw a small icon indicator showing the door is interactive
     const indicatorSize = 8 / zoom;
-    const indicatorY = -height / 2 - indicatorSize - 4 / zoom;
+    const indicatorY = -doorThickness / 2 - indicatorSize - 4 / zoom;
     
     ctx.globalAlpha = 0.9;
-    ctx.fillStyle = isOpen ? '#22c55e' : '#f59e0b'; // Green for open, amber for closed
+    ctx.fillStyle = isOpen ? '#22c55e' : '#f59e0b';
     
-    // Draw small door icon
     ctx.beginPath();
     ctx.roundRect(
       -indicatorSize / 2, 
@@ -81,7 +84,6 @@ function renderDoorShape(
     );
     ctx.fill();
     
-    // Draw lock/unlock symbol inside
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${6 / zoom}px Arial`;
     ctx.textAlign = 'center';
