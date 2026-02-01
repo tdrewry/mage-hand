@@ -1,0 +1,159 @@
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { useRegionStore } from '@/stores/regionStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { Canvas as FabricCanvas } from 'fabric';
+import { toast } from 'sonner';
+
+interface ClearDataDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fabricCanvas?: FabricCanvas | null;
+}
+
+export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
+  open,
+  onOpenChange,
+  fabricCanvas,
+}) => {
+  const [shouldClearTokens, setShouldClearTokens] = useState(false);
+  const [shouldClearRegions, setShouldClearRegions] = useState(false);
+  const [shouldClearMapObjects, setShouldClearMapObjects] = useState(false);
+  const [shouldClearMarkers, setShouldClearMarkers] = useState(false);
+
+  const { clearRegions } = useRegionStore();
+  const { clearAllTokens } = useSessionStore();
+  const { clearTerrainFeatures, clearAnnotations } = useDungeonStore();
+  const { clearMapObjects } = useMapObjectStore();
+
+  const handleClear = () => {
+    const cleared: string[] = [];
+
+    if (shouldClearTokens) {
+      if (fabricCanvas) {
+        const objects = fabricCanvas.getObjects();
+        objects.forEach((obj: any) => {
+          if (obj.tokenId || obj.isTokenLabel) {
+            fabricCanvas.remove(obj);
+          }
+        });
+        fabricCanvas.renderAll();
+      }
+      clearAllTokens();
+      cleared.push('tokens');
+    }
+
+    if (shouldClearRegions) {
+      clearRegions();
+      cleared.push('regions');
+    }
+
+    if (shouldClearMapObjects) {
+      clearMapObjects();
+      clearTerrainFeatures();
+      cleared.push('map objects');
+    }
+
+    if (shouldClearMarkers) {
+      clearAnnotations();
+      cleared.push('markers');
+    }
+
+    if (cleared.length > 0) {
+      toast.success(`Cleared: ${cleared.join(', ')}`);
+    }
+
+    // Reset checkboxes and close
+    setShouldClearTokens(false);
+    setShouldClearRegions(false);
+    setShouldClearMapObjects(false);
+    setShouldClearMarkers(false);
+    onOpenChange(false);
+  };
+
+  const hasSelection = shouldClearTokens || shouldClearRegions || shouldClearMapObjects || shouldClearMarkers;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[360px]">
+        <DialogHeader>
+          <DialogTitle>Clear Data</DialogTitle>
+          <DialogDescription>
+            Select what you want to clear from the canvas.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="clear-tokens"
+              checked={shouldClearTokens}
+              onCheckedChange={(checked) => setShouldClearTokens(checked === true)}
+            />
+            <Label htmlFor="clear-tokens" className="cursor-pointer">
+              Tokens
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="clear-regions"
+              checked={shouldClearRegions}
+              onCheckedChange={(checked) => setShouldClearRegions(checked === true)}
+            />
+            <Label htmlFor="clear-regions" className="cursor-pointer">
+              Regions
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="clear-map-objects"
+              checked={shouldClearMapObjects}
+              onCheckedChange={(checked) => setShouldClearMapObjects(checked === true)}
+            />
+            <Label htmlFor="clear-map-objects" className="cursor-pointer">
+              Map Objects & Terrain Features
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="clear-markers"
+              checked={shouldClearMarkers}
+              onCheckedChange={(checked) => setShouldClearMarkers(checked === true)}
+            />
+            <Label htmlFor="clear-markers" className="cursor-pointer">
+              Markers
+            </Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleClear}
+            disabled={!hasSelection}
+          >
+            Clear Selected
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

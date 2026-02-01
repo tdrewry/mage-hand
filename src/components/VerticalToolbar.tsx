@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   MapPlus,
   Square,
@@ -8,14 +8,12 @@ import {
   Settings2,
   Eye,
   EyeOff,
-  CircleMinus,
   FileDown,
   Layers,
   CirclePlus,
   Palette,
   CloudFog,
   Swords,
-  Grid2x2X,
   Grid3X3,
   Undo,
   Redo,
@@ -25,19 +23,16 @@ import {
   Maximize,
   Trash2,
 } from 'lucide-react';
-import { useRegionStore } from '@/stores/regionStore';
-import { useSessionStore } from '@/stores/sessionStore';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
-import { useDungeonStore } from '@/stores/dungeonStore';
-import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { ClearDataDialog } from '@/components/modals/ClearDataDialog';
 
 interface VerticalToolbarProps {
   mode: 'edit' | 'play';
@@ -76,14 +71,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   onToggleRegions,
   onFitToView,
 }) => {
-  const { clearRegions } = useRegionStore();
-  const { clearAllTokens } = useSessionStore();
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, startCombat, endCombat } = useInitiativeStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
   const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
-  const { clearTerrainFeatures } = useDungeonStore();
-  const { clearMapObjects } = useMapObjectStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -215,31 +208,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     }
   };
 
-  const handleClearTokens = () => {
-    if (fabricCanvas) {
-      const objects = fabricCanvas.getObjects();
-      objects.forEach((obj: any) => {
-        if (obj.tokenId || obj.isTokenLabel) {
-          fabricCanvas.remove(obj);
-        }
-      });
-      fabricCanvas.renderAll();
-    }
-    clearAllTokens();
-    toast.success('All tokens cleared!');
-  };
-
-  const handleClearRegions = () => {
-    clearRegions();
-    toast.success('All regions cleared!');
-  };
-
-  const handleClearMapObjects = () => {
-    clearMapObjects();
-    clearTerrainFeatures();
-    toast.success('All map objects cleared!');
-  };
-
   const handleCombatToggle = () => {
     if (isInCombat) {
       endCombat();
@@ -349,27 +317,9 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
-            icon={CircleMinus}
-            label="Clear Tokens"
-            onClick={handleClearTokens}
-            variant="ghost"
-            size="xs"
-            className="text-orange-600 hover:bg-orange-600/10"
-          />
-
-          <ToolbarButton
-            icon={Grid2x2X}
-            label="Clear Regions"
-            onClick={handleClearRegions}
-            variant="ghost"
-            size="xs"
-            className="text-orange-600 hover:bg-orange-600/10"
-          />
-
-          <ToolbarButton
             icon={Trash2}
-            label="Clear Map Objects"
-            onClick={handleClearMapObjects}
+            label="Clear Data"
+            onClick={() => setShowClearDialog(true)}
             variant="ghost"
             size="xs"
             className="text-orange-600 hover:bg-orange-600/10"
@@ -539,6 +489,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             onClick={onFitToView || (() => {})}
             variant="ghost"
             size="xs"
+          />
+
+          <ClearDataDialog
+            open={showClearDialog}
+            onOpenChange={setShowClearDialog}
+            fabricCanvas={fabricCanvas}
           />
         </>
       )}
