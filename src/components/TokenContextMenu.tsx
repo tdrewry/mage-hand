@@ -18,11 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
 import { useSessionStore, type LabelPosition } from '../stores/sessionStore';
@@ -46,6 +48,15 @@ interface TokenContextMenuProps {
   onUpdateCanvas?: () => void;
 }
 
+// Size presets based on D&D creature sizes
+const SIZE_PRESETS = [
+  { name: 'Tiny', gridWidth: 0.5, gridHeight: 0.5 },
+  { name: 'Small/Medium', gridWidth: 1, gridHeight: 1 },
+  { name: 'Large', gridWidth: 2, gridHeight: 2 },
+  { name: 'Huge', gridWidth: 3, gridHeight: 3 },
+  { name: 'Gargantuan', gridWidth: 4, gridHeight: 4 },
+] as const;
+
 export const TokenContextMenu = ({ 
   children, 
   tokenId, 
@@ -60,6 +71,8 @@ export const TokenContextMenu = ({
     updateTokenLabelPosition,
     updateTokenLabelStyle,
     updateTokenImage,
+    updateTokenSize,
+    updateTokenDetails,
     updateTokenVision,
     updateTokenVisionRange,
     updateTokenIllumination,
@@ -79,12 +92,21 @@ export const TokenContextMenu = ({
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [showVisionRangeModal, setShowVisionRangeModal] = useState(false);
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
+  
+  // Edit modal state
+  const [activeTab, setActiveTab] = useState<'label' | 'appearance' | 'details'>('label');
   const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
   const [imageUrlValue, setImageUrlValue] = useState('');
   const [labelColorValue, setLabelColorValue] = useState('#FFFFFF');
   const [labelBackgroundValue, setLabelBackgroundValue] = useState('rgba(30, 30, 30, 0.75)');
+  const [gridWidthValue, setGridWidthValue] = useState(1);
+  const [gridHeightValue, setGridHeightValue] = useState(1);
+  const [notesValue, setNotesValue] = useState('');
+  const [quickReferenceUrlValue, setQuickReferenceUrlValue] = useState('');
+  
+  // Other modal state
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [initiativeValue, setInitiativeValue] = useState('');
   const [visionRangeValue, setVisionRangeValue] = useState('');
@@ -131,22 +153,46 @@ export const TokenContextMenu = ({
       return;
     }
     
+    // Reset to first tab
+    setActiveTab('label');
+    
     if (targetTokens.length === 1) {
-      setNameValue(targetTokens[0].name || '');
-      setLabelValue(targetTokens[0].label || '');
-      setLabelPositionValue(targetTokens[0].labelPosition || 'below');
-      setLabelColorValue(targetTokens[0].labelColor || '#FFFFFF');
-      setLabelBackgroundValue(targetTokens[0].labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
-      setImageUrlValue(targetTokens[0].imageUrl || '');
+      const token = targetTokens[0];
+      // Label tab fields
+      setNameValue(token.name || '');
+      setLabelValue(token.label || '');
+      setLabelPositionValue(token.labelPosition || 'below');
+      setLabelColorValue(token.labelColor || '#FFFFFF');
+      setLabelBackgroundValue(token.labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
+      // Appearance tab fields
+      setImageUrlValue(token.imageUrl || '');
+      setGridWidthValue(token.gridWidth || 1);
+      setGridHeightValue(token.gridHeight || 1);
+      // Details tab fields
+      setNotesValue(token.notes || '');
+      setQuickReferenceUrlValue(token.quickReferenceUrl || '');
     } else {
+      // Multi-selection: blank fields for batch update
       setNameValue('');
       setLabelValue('');
       setLabelPositionValue('below');
       setLabelColorValue('#FFFFFF');
       setLabelBackgroundValue('rgba(30, 30, 30, 0.75)');
       setImageUrlValue('');
+      // For size, show "Mixed" if different, otherwise use common value
+      const allSameSizeW = targetTokens.every(t => t.gridWidth === targetTokens[0].gridWidth);
+      const allSameSizeH = targetTokens.every(t => t.gridHeight === targetTokens[0].gridHeight);
+      setGridWidthValue(allSameSizeW ? targetTokens[0].gridWidth || 1 : 1);
+      setGridHeightValue(allSameSizeH ? targetTokens[0].gridHeight || 1 : 1);
+      setNotesValue('');
+      setQuickReferenceUrlValue('');
     }
     setShowTokenEditModal(true);
+  };
+
+  // Check if current size matches a preset
+  const getCurrentSizePreset = () => {
+    return SIZE_PRESETS.find(p => p.gridWidth === gridWidthValue && p.gridHeight === gridHeightValue);
   };
 
   const handleImageImportConfirm = (result: ImageImportResult) => {
@@ -194,8 +240,8 @@ export const TokenContextMenu = ({
     let maxTokenHeight = 0;
     targetTokens.forEach(token => {
       // Token size in pixels (gridWidth * gridSize approximation - use 50px per grid unit as reasonable default)
-      const tokenPixelWidth = token.gridWidth * 50;
-      const tokenPixelHeight = token.gridHeight * 50;
+      const tokenPixelWidth = (gridWidthValue || token.gridWidth) * 50;
+      const tokenPixelHeight = (gridHeightValue || token.gridHeight) * 50;
       maxTokenWidth = Math.max(maxTokenWidth, tokenPixelWidth);
       maxTokenHeight = Math.max(maxTokenHeight, tokenPixelHeight);
     });
@@ -204,6 +250,7 @@ export const TokenContextMenu = ({
     maxTokenHeight = Math.max(maxTokenHeight, 128);
     
     for (const token of targetTokens) {
+      // Label tab updates
       if (nameValue) {
         updateTokenName(token.id, nameValue);
       }
@@ -213,7 +260,12 @@ export const TokenContextMenu = ({
       updateTokenLabelPosition(token.id, labelPositionValue);
       updateTokenLabelStyle(token.id, labelColorValue, labelBackgroundValue);
       
-      // Apply image with texture sync
+      // Appearance tab updates - size
+      if (gridWidthValue !== token.gridWidth || gridHeightValue !== token.gridHeight) {
+        updateTokenSize(token.id, gridWidthValue, gridHeightValue);
+      }
+      
+      // Appearance tab updates - image
       if (imageUrlValue) {
         try {
           // Save to IndexedDB and get hash
@@ -228,9 +280,26 @@ export const TokenContextMenu = ({
           // Still update the local image
           updateTokenImage(token.id, imageUrlValue);
         }
-      } else {
-        // Clear image
+      } else if (token.imageUrl && !imageUrlValue) {
+        // Clear image only if there was an image and now it's cleared
         updateTokenImage(token.id, '', undefined);
+      }
+      
+      // Details tab updates
+      const hasDetailsChanged = 
+        (notesValue && notesValue !== token.notes) || 
+        (quickReferenceUrlValue && quickReferenceUrlValue !== token.quickReferenceUrl) ||
+        (isMultiSelection && (notesValue || quickReferenceUrlValue));
+      
+      if (hasDetailsChanged || notesValue !== '' || quickReferenceUrlValue !== '') {
+        // For single token: update if changed; for multi: update if value provided
+        if (!isMultiSelection || notesValue || quickReferenceUrlValue) {
+          updateTokenDetails(
+            token.id, 
+            notesValue || token.notes, 
+            quickReferenceUrlValue || token.quickReferenceUrl
+          );
+        }
       }
     }
     
@@ -522,7 +591,7 @@ export const TokenContextMenu = ({
 
       {/* Token Edit Modal */}
       <Dialog open={showTokenEditModal} onOpenChange={setShowTokenEditModal}>
-        <DialogContent>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               Edit Token{isMultiSelection ? 's' : ''}
@@ -530,122 +599,260 @@ export const TokenContextMenu = ({
             <DialogDescription>
               {isMultiSelection 
                 ? `Edit properties for ${targetTokens.length} tokens`
-                : 'Edit token name, label, and display settings'
+                : 'Manage token label, appearance, and details'
               }
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="token-name">Token Name</Label>
-              <Input
-                id="token-name"
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                placeholder={isMultiSelection ? 'Enter name for all tokens' : 'Enter token name'}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Internal identifier for the token</p>
-            </div>
-            <div>
-              <Label htmlFor="token-label">Display Label</Label>
-              <Input
-                id="token-label"
-                value={labelValue}
-                onChange={(e) => setLabelValue(e.target.value)}
-                placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter display label'}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Text displayed on/near the token</p>
-            </div>
-            <div>
-              <Label>Label Position</Label>
-              <div className="flex gap-2 mt-2">
-                {(['above', 'center', 'below'] as LabelPosition[]).map((pos) => (
-                  <Button
-                    key={pos}
-                    variant={labelPositionValue === pos ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setLabelPositionValue(pos)}
-                    className="flex-1 capitalize"
-                  >
-                    {pos}
-                  </Button>
-                ))}
-              </div>
-            </div>
+          
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="label">Label</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+            </TabsList>
             
-            {/* Label Style Presets */}
-            <div>
-              <Label>Label Style</Label>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {labelStylePresets.map((preset) => (
-                  <button
-                    key={preset.name}
-                    className={`px-2 py-1.5 rounded text-xs font-medium transition-all ${
-                      labelColorValue === preset.labelColor && labelBackgroundValue === preset.bgColor
-                        ? 'ring-2 ring-primary ring-offset-1'
-                        : 'hover:opacity-80'
-                    }`}
-                    style={{
-                      backgroundColor: preset.bgColor,
-                      color: preset.labelColor,
-                    }}
-                    onClick={() => {
-                      setLabelColorValue(preset.labelColor);
-                      setLabelBackgroundValue(preset.bgColor);
-                    }}
-                  >
-                    {preset.name}
-                  </button>
-                ))}
+            {/* Label Tab */}
+            <TabsContent value="label" className="flex-1 overflow-y-auto space-y-4 mt-4">
+              <div>
+                <Label htmlFor="token-name">Token Name</Label>
+                <Input
+                  id="token-name"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  placeholder={isMultiSelection ? 'Enter name for all tokens' : 'Enter token name'}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Internal identifier for the token</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Choose a label style preset</p>
-            </div>
-            
-            {/* Token Image Section */}
-            <div>
-              <Label>Token Image</Label>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={openImageImport}
-                >
-                  <Upload className="mr-1 h-3 w-3" />
-                  {imageUrlValue ? 'Change Image' : 'Add Image'}
-                </Button>
-                {imageUrlValue && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearImage}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
+              <div>
+                <Label htmlFor="token-label">Display Label</Label>
+                <Input
+                  id="token-label"
+                  value={labelValue}
+                  onChange={(e) => setLabelValue(e.target.value)}
+                  placeholder={isMultiSelection ? 'Enter label for all tokens' : 'Enter display label'}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Text displayed on/near the token</p>
+              </div>
+              <div>
+                <Label>Label Position</Label>
+                <div className="flex gap-2 mt-2">
+                  {(['above', 'center', 'below'] as LabelPosition[]).map((pos) => (
+                    <Button
+                      key={pos}
+                      variant={labelPositionValue === pos ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setLabelPositionValue(pos)}
+                      className="flex-1 capitalize"
+                    >
+                      {pos}
+                    </Button>
+                  ))}
+                </div>
               </div>
               
-              {/* Image Preview */}
-              {imageUrlValue && (
-                <div className="mt-2">
-                  <div className="border rounded-lg p-2 bg-muted/50">
-                    <img 
-                      src={imageUrlValue} 
-                      alt="Token preview" 
-                      className="w-16 h-16 object-cover rounded-full mx-auto"
-                      onError={() => {
-                        toast.error('Failed to load image');
-                        setImageUrlValue('');
+              {/* Label Style Presets */}
+              <div>
+                <Label>Label Style</Label>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {labelStylePresets.map((preset) => (
+                    <button
+                      key={preset.name}
+                      className={`px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                        labelColorValue === preset.labelColor && labelBackgroundValue === preset.bgColor
+                          ? 'ring-2 ring-primary ring-offset-1'
+                          : 'hover:opacity-80'
+                      }`}
+                      style={{
+                        backgroundColor: preset.bgColor,
+                        color: preset.labelColor,
                       }}
-                    />
-                  </div>
+                      onClick={() => {
+                        setLabelColorValue(preset.labelColor);
+                        setLabelBackgroundValue(preset.bgColor);
+                      }}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">Choose a label style preset</p>
+              </div>
+            </TabsContent>
+            
+            {/* Appearance Tab */}
+            <TabsContent value="appearance" className="flex-1 overflow-y-auto space-y-4 mt-4">
+              {/* Token Image Section */}
+              <div>
+                <Label>Token Image</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={openImageImport}
+                  >
+                    <Upload className="mr-1 h-3 w-3" />
+                    {imageUrlValue ? 'Change Image' : 'Add Image'}
+                  </Button>
+                  {imageUrlValue && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearImage}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Image Preview */}
+                {imageUrlValue && (
+                  <div className="mt-2">
+                    <div className="border rounded-lg p-2 bg-muted/50">
+                      <img 
+                        src={imageUrlValue} 
+                        alt="Token preview" 
+                        className="w-16 h-16 object-cover rounded-full mx-auto"
+                        onError={() => {
+                          toast.error('Failed to load image');
+                          setImageUrlValue('');
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isMultiSelection ? 'Image will be applied to all selected tokens' : 'Optional image for the token'}
+                </p>
+              </div>
+              
+              {/* Token Size Section */}
+              <div>
+                <Label>Token Size</Label>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {SIZE_PRESETS.map((preset) => {
+                    const isSelected = gridWidthValue === preset.gridWidth && gridHeightValue === preset.gridHeight;
+                    return (
+                      <button
+                        key={preset.name}
+                        className={`px-2 py-2 rounded text-xs font-medium transition-all border ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-1'
+                            : 'border-border hover:border-primary/50 hover:bg-muted'
+                        }`}
+                        onClick={() => {
+                          setGridWidthValue(preset.gridWidth);
+                          setGridHeightValue(preset.gridHeight);
+                        }}
+                      >
+                        <div className="font-medium">{preset.name}</div>
+                        <div className="text-muted-foreground">{preset.gridWidth}×{preset.gridHeight}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Custom Size */}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Custom:</span>
+                  <Input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={gridWidthValue}
+                    onChange={(e) => setGridWidthValue(parseFloat(e.target.value) || 1)}
+                    className="w-16 h-8 text-center"
+                  />
+                  <span className="text-muted-foreground">×</span>
+                  <Input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={gridHeightValue}
+                    onChange={(e) => setGridHeightValue(parseFloat(e.target.value) || 1)}
+                    className="w-16 h-8 text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">grid units</span>
+                </div>
+                
+                {isMultiSelection && !getCurrentSizePreset() && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    Selected tokens have mixed sizes
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+            
+            {/* Details Tab */}
+            <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 mt-4">
+              {/* Entity Link Placeholder */}
+              <div className="p-3 rounded-lg bg-muted/50 border border-dashed border-muted-foreground/30">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Database className="h-4 w-4" />
+                  <span className="text-sm font-medium">Entity Linking</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Link to character sheets, creatures, and resources coming soon.
+                </p>
+              </div>
+              
+              {/* Quick Reference URL */}
+              <div>
+                <Label htmlFor="quick-ref-url" className="flex items-center gap-1">
+                  <Link2 className="h-3 w-3" />
+                  Quick Reference URL
+                </Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="quick-ref-url"
+                    value={quickReferenceUrlValue}
+                    onChange={(e) => setQuickReferenceUrlValue(e.target.value)}
+                    placeholder="https://dndbeyond.com/characters/..."
+                    className="flex-1"
+                  />
+                  {quickReferenceUrlValue && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => window.open(quickReferenceUrlValue, '_blank')}
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Link to an external character sheet, wiki, or reference
+                </p>
+              </div>
+              
+              {/* Token Notes */}
+              <div>
+                <Label htmlFor="token-notes">Token Notes</Label>
+                <Textarea
+                  id="token-notes"
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder={isMultiSelection 
+                    ? 'Notes will be applied to all selected tokens'
+                    : 'Add GM notes, stats, or other information...'
+                  }
+                  className="mt-2 min-h-[100px] resize-y"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Token-specific notes (not shared with linked entity data)
+                </p>
+              </div>
+              
+              {isMultiSelection && (
+                <p className="text-xs text-amber-500">
+                  ⚠ Entering values will override notes/URL for all {targetTokens.length} selected tokens
+                </p>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
-                {isMultiSelection ? 'Image will be applied to all selected tokens' : 'Optional image for the token'}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setShowTokenEditModal(false)}>
               Cancel
             </Button>

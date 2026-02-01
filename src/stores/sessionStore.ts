@@ -11,6 +11,14 @@ import type { IlluminationSource } from '@/types/illumination';
 
 export type LabelPosition = 'above' | 'center' | 'below';
 
+// ECS-ready entity reference structure
+export interface EntityRef {
+  type: 'none' | 'local' | 'remote';
+  entityId?: string;         // Pointer to entity in ECS store
+  source?: string;           // URL or storage key
+  projectionType?: string;   // 'stat-block' | 'character' | 'creature' | etc.
+}
+
 export interface Token {
   id: string;
   name: string;
@@ -32,6 +40,13 @@ export interface Token {
   
   // Unified illumination system - array of attached light/vision sources
   illuminationSources?: IlluminationSource[];
+
+  // ECS-ready entity reference (Phase 1: mostly unused, prepared for future)
+  entityRef?: EntityRef;
+  
+  // Token-instance data (separate from linked entity)
+  notes?: string;              // GM notes for this token instance
+  quickReferenceUrl?: string;  // Bridge field for external links
 
   // @deprecated Legacy fields - kept for migration, will be removed in future
   hasVision?: boolean;
@@ -162,6 +177,29 @@ export interface SessionState {
    * @param ownerId The ID of the role that owns the token.
    */
   setTokenOwner: (tokenId: string, ownerId: string) => void;
+
+  /**
+   * Updates the size of a specific token.
+   * @param tokenId The ID of the token.
+   * @param gridWidth The new width in grid units.
+   * @param gridHeight The new height in grid units.
+   */
+  updateTokenSize: (tokenId: string, gridWidth: number, gridHeight: number) => void;
+
+  /**
+   * Updates the details (notes, quickReferenceUrl) of a specific token.
+   * @param tokenId The ID of the token.
+   * @param notes The GM notes for this token instance.
+   * @param quickReferenceUrl The external reference URL.
+   */
+  updateTokenDetails: (tokenId: string, notes?: string, quickReferenceUrl?: string) => void;
+
+  /**
+   * Updates the entity reference for a specific token.
+   * @param tokenId The ID of the token.
+   * @param entityRef The entity reference object.
+   */
+  updateTokenEntityRef: (tokenId: string, entityRef: EntityRef | undefined) => void;
 
   /**
    * Removes a token from the session.
@@ -392,6 +430,33 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, ownerId } : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateTokenSize: (tokenId, gridWidth, gridHeight) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, gridWidth, gridHeight } : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateTokenDetails: (tokenId, notes, quickReferenceUrl) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, notes, quickReferenceUrl } : token
+      ),
+    }));
+    // Sync happens automatically via syncPatch middleware
+  },
+
+  updateTokenEntityRef: (tokenId, entityRef) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, entityRef } : token
       ),
     }));
     // Sync happens automatically via syncPatch middleware
