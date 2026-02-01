@@ -179,7 +179,7 @@ function renderDoorShape(
     ctx.fill();
   }
   
-  // DM view: show interactive toggle indicators on both ends of the door
+  // DM view: show interactive toggle indicators on all four sides of the door
   if (isDMView) {
     const indicatorSize = 6 / zoom;
     const indicatorOffset = 2 / zoom; // Gap from door edge
@@ -189,35 +189,35 @@ function renderDoorShape(
     ctx.strokeStyle = '#78350f'; // Dark amber border
     ctx.lineWidth = 1 / zoom;
     
+    // Helper to draw a single indicator
+    const drawIndicator = (ix: number, iy: number) => {
+      ctx.beginPath();
+      ctx.roundRect(
+        ix - indicatorSize / 2,
+        iy - indicatorSize / 2,
+        indicatorSize,
+        indicatorSize,
+        1.5 / zoom
+      );
+      ctx.fill();
+      ctx.stroke();
+    };
+    
     // Left end indicator (near pivot/hinge)
     const leftX = -doorLength / 2 - indicatorOffset - indicatorSize / 2;
-    const leftY = 0;
-    
-    ctx.beginPath();
-    ctx.roundRect(
-      leftX - indicatorSize / 2,
-      leftY - indicatorSize / 2,
-      indicatorSize,
-      indicatorSize,
-      1.5 / zoom
-    );
-    ctx.fill();
-    ctx.stroke();
+    drawIndicator(leftX, 0);
     
     // Right end indicator (far end of door)
     const rightX = doorLength / 2 + indicatorOffset + indicatorSize / 2;
-    const rightY = 0;
+    drawIndicator(rightX, 0);
     
-    ctx.beginPath();
-    ctx.roundRect(
-      rightX - indicatorSize / 2,
-      rightY - indicatorSize / 2,
-      indicatorSize,
-      indicatorSize,
-      1.5 / zoom
-    );
-    ctx.fill();
-    ctx.stroke();
+    // Front indicator (above door in local Y)
+    const frontY = -doorThickness / 2 - indicatorOffset - indicatorSize / 2;
+    drawIndicator(0, frontY);
+    
+    // Back indicator (below door in local Y)
+    const backY = doorThickness / 2 + indicatorOffset + indicatorSize / 2;
+    drawIndicator(0, backY);
   }
   
   ctx.restore(); // Restore state after door rendering (removes vertical door rotation)
@@ -463,38 +463,49 @@ export function isPointInMapObject(
     localY = newY;
   }
   
-  // For doors in DM view, also check if clicking on either toggle indicator
+  // For doors in DM view, also check if clicking on any of the four toggle indicators
   if (shape === 'door' && isDMView) {
     const indicatorSize = 6 / zoom;
     const indicatorOffset = 2 / zoom;
     const indicatorHitRadius = indicatorSize;
     
-    // Calculate door length (handle legacy vertical doors)
+    // Calculate door dimensions (handle legacy vertical doors)
     const isVerticalDoor = mapObject.rotation === 90 || 
       (mapObject.rotation === 0 && mapObject.doorDirection && 
        Math.abs(mapObject.doorDirection.x) > Math.abs(mapObject.doorDirection.y));
     const doorLength = (isVerticalDoor && mapObject.rotation === 0) 
       ? Math.max(width, height) 
       : width;
+    const doorThickness = (isVerticalDoor && mapObject.rotation === 0)
+      ? Math.min(width, height)
+      : height;
     
     // Left indicator position
     const leftX = -doorLength / 2 - indicatorOffset - indicatorSize / 2;
     // Right indicator position  
     const rightX = doorLength / 2 + indicatorOffset + indicatorSize / 2;
+    // Front indicator position
+    const frontY = -doorThickness / 2 - indicatorOffset - indicatorSize / 2;
+    // Back indicator position
+    const backY = doorThickness / 2 + indicatorOffset + indicatorSize / 2;
     
     // Check if click is on left indicator
-    if (
-      Math.abs(localX - leftX) <= indicatorHitRadius &&
-      Math.abs(localY) <= indicatorHitRadius
-    ) {
+    if (Math.abs(localX - leftX) <= indicatorHitRadius && Math.abs(localY) <= indicatorHitRadius) {
       return true;
     }
     
     // Check if click is on right indicator
-    if (
-      Math.abs(localX - rightX) <= indicatorHitRadius &&
-      Math.abs(localY) <= indicatorHitRadius
-    ) {
+    if (Math.abs(localX - rightX) <= indicatorHitRadius && Math.abs(localY) <= indicatorHitRadius) {
+      return true;
+    }
+    
+    // Check if click is on front indicator
+    if (Math.abs(localX) <= indicatorHitRadius && Math.abs(localY - frontY) <= indicatorHitRadius) {
+      return true;
+    }
+    
+    // Check if click is on back indicator
+    if (Math.abs(localX) <= indicatorHitRadius && Math.abs(localY - backY) <= indicatorHitRadius) {
       return true;
     }
   }
