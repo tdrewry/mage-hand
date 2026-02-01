@@ -287,6 +287,9 @@ export const SimpleTabletop = () => {
   
   // Combined visibility-blocking segments (walls + map objects)
   const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
+  
+  // Track previous map objects blocking state to detect changes (e.g., door toggle)
+  const prevMapObjectsBlockingRef = useRef<string>('');
 
   // Grid highlighting state for token movement (supports both hex and square grids)
   const [highlightedGrids, setHighlightedGrids] = useState<
@@ -986,8 +989,26 @@ export const SimpleTabletop = () => {
             }
           });
 
+          // Check if map object blocking state changed (e.g., door toggled)
+          // This creates a hash of all vision-blocking objects to detect changes
+          const mapObjectsBlockingHash = mapObjects
+            .filter(obj => obj.blocksVision || obj.category === 'door')
+            .map(obj => `${obj.id}:${obj.blocksVision}:${obj.isOpen}`)
+            .join('|');
+          const mapObjectsBlockingChanged = mapObjectsBlockingHash !== prevMapObjectsBlockingRef.current;
+          if (mapObjectsBlockingChanged) {
+            prevMapObjectsBlockingRef.current = mapObjectsBlockingHash;
+            // Clear all cached visibility polygons since blocking geometry changed
+            tokenVisibilityCacheRef.current.forEach((cached) => {
+              if (cached?.visionPath?.remove) cached.visionPath.remove();
+            });
+            tokenVisibilityCacheRef.current.clear();
+          }
+
           // Determine what needs to be recomputed
-          const tokensNeedingVisibilityRecompute = [...movedTokens, ...illuminationChangedTokens];
+          const tokensNeedingVisibilityRecompute = mapObjectsBlockingChanged 
+            ? tokensWithVision  // All tokens need recompute if blocking geometry changed
+            : [...movedTokens, ...illuminationChangedTokens];
           
           // If no tokens need visibility recomputation AND illumination settings didn't change,
           // skip computation. Unless we're in play mode and don't have fog masks yet (initial render)
@@ -995,6 +1016,7 @@ export const SimpleTabletop = () => {
             tokensNeedingVisibilityRecompute.length === 0 &&
             !visionStateChanged &&
             !illuminationSettingsChanged &&
+            !mapObjectsBlockingChanged &&
             tokenVisibilityCacheRef.current.size === tokensWithVision.length &&
             fogMasksRef.current !== null
           ) {
