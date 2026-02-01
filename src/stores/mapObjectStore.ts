@@ -1,7 +1,8 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
-import { MapObject, MapObjectCategory, MAP_OBJECT_PRESETS } from '@/types/mapObjectTypes';
+import { MapObject, MapObjectCategory, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
+import { DoorConnection, TerrainFeature } from '@/lib/dungeonTypes';
 
 interface MapObjectStore {
   mapObjects: MapObject[];
@@ -36,6 +37,17 @@ interface MapObjectStore {
     tiles: { x: number; y: number }[],
     terrainFeatureId?: string
   ) => string[];
+  
+  // Conversion from doors
+  convertDoorToMapObject: (door: DoorConnection) => string;
+  convertDoorsToMapObjects: (doors: DoorConnection[]) => string[];
+  
+  // Door-specific operations
+  toggleDoor: (id: string) => void;
+  setDoorState: (id: string, isOpen: boolean) => void;
+  
+  // Get vision-blocking objects (for fog calculation)
+  getVisionBlockingObjects: () => MapObject[];
 }
 
 const generateId = () => `map-object-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -171,6 +183,7 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       revealedByLight: preset.revealedByLight ?? true,
       selected: false,
       category,
+      isOpen: preset.isOpen,
     };
     
     set((state) => ({
@@ -218,6 +231,134 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
     }));
     
     return ids;
+  },
+
+  convertDoorToMapObject: (door) => {
+    const id = generateId();
+    const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
+    const preset = MAP_OBJECT_PRESETS.door;
+    
+    // Calculate rotation based on door direction
+    // Direction { x: 0, y: -1 } = facing up = 0 degrees
+    // Direction { x: 1, y: 0 } = facing right = 90 degrees
+    let rotation = 0;
+    if (door.direction) {
+      rotation = Math.atan2(door.direction.x, -door.direction.y) * (180 / Math.PI);
+    }
+    
+    const newMapObject: MapObject = {
+      id,
+      position: door.position,
+      width: preset.width || 50,
+      height: preset.height || 8,
+      rotation,
+      shape: 'door',
+      fillColor: doorStyle.fillColor,
+      strokeColor: doorStyle.strokeColor,
+      strokeWidth: preset.strokeWidth || 2,
+      opacity: preset.opacity ?? 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: true, // Closed doors block vision by default
+      revealedByLight: true,
+      selected: false,
+      category: 'door',
+      isOpen: false,
+      doorType: door.type,
+      doorDirection: door.direction,
+      label: doorStyle.label,
+    };
+    
+    set((state) => ({
+      mapObjects: [...state.mapObjects, newMapObject],
+    }));
+    
+    return id;
+  },
+
+  convertDoorsToMapObjects: (doors) => {
+    const ids: string[] = [];
+    const newMapObjects: MapObject[] = [];
+    
+    doors.forEach((door) => {
+      const id = generateId();
+      ids.push(id);
+      
+      const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
+      const preset = MAP_OBJECT_PRESETS.door;
+      
+      // Calculate rotation based on door direction
+      let rotation = 0;
+      if (door.direction) {
+        rotation = Math.atan2(door.direction.x, -door.direction.y) * (180 / Math.PI);
+      }
+      
+      newMapObjects.push({
+        id,
+        position: door.position,
+        width: preset.width || 50,
+        height: preset.height || 8,
+        rotation,
+        shape: 'door',
+        fillColor: doorStyle.fillColor,
+        strokeColor: doorStyle.strokeColor,
+        strokeWidth: preset.strokeWidth || 2,
+        opacity: preset.opacity ?? 1,
+        castsShadow: false,
+        blocksMovement: false,
+        blocksVision: true,
+        revealedByLight: true,
+        selected: false,
+        category: 'door',
+        isOpen: false,
+        doorType: door.type,
+        doorDirection: door.direction,
+        label: doorStyle.label,
+      });
+    });
+    
+    set((state) => ({
+      mapObjects: [...state.mapObjects, ...newMapObjects],
+    }));
+    
+    return ids;
+  },
+
+  toggleDoor: (id) => {
+    set((state) => ({
+      mapObjects: state.mapObjects.map((obj) => {
+        if (obj.id === id && obj.category === 'door') {
+          const newIsOpen = !obj.isOpen;
+          return {
+            ...obj,
+            isOpen: newIsOpen,
+            // When open, don't block vision; when closed, block vision
+            blocksVision: !newIsOpen,
+          };
+        }
+        return obj;
+      }),
+    }));
+  },
+
+  setDoorState: (id, isOpen) => {
+    set((state) => ({
+      mapObjects: state.mapObjects.map((obj) => {
+        if (obj.id === id && obj.category === 'door') {
+          return {
+            ...obj,
+            isOpen,
+            blocksVision: !isOpen,
+          };
+        }
+        return obj;
+      }),
+    }));
+  },
+
+  getVisionBlockingObjects: () => {
+    const { mapObjects } = get();
+    return mapObjects.filter((obj) => obj.blocksVision);
   },
 });
 

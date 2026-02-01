@@ -6,6 +6,57 @@ import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
+ * Render a door shape (rectangular with hinges indicator)
+ */
+function renderDoorShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number
+) {
+  const { width, height, isOpen } = mapObject;
+  
+  if (isOpen) {
+    // Draw open door - swung to the side (90 degrees)
+    // Door appears as a thin line at the edge with the door panel rotated
+    ctx.save();
+    
+    // Draw hinge point
+    ctx.beginPath();
+    ctx.arc(-width / 2, 0, 3 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw swung door panel
+    ctx.rotate(-Math.PI / 2); // Rotate 90 degrees
+    ctx.fillRect(-height / 2, -width / 2, height, width * 0.15);
+    ctx.strokeRect(-height / 2, -width / 2, height, width * 0.15);
+    
+    ctx.restore();
+    
+    // Draw doorway opening (dashed line)
+    ctx.save();
+    ctx.setLineDash([4 / zoom, 4 / zoom]);
+    ctx.strokeStyle = '#9ca3af';
+    ctx.lineWidth = 1 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(-width / 2, 0);
+    ctx.lineTo(width / 2, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  } else {
+    // Draw closed door - solid rectangle
+    ctx.fillRect(-width / 2, -height / 2, width, height);
+    ctx.strokeRect(-width / 2, -height / 2, width, height);
+    
+    // Draw door handle/detail
+    ctx.beginPath();
+    ctx.arc(width / 4, 0, 2 / zoom, 0, Math.PI * 2);
+    ctx.fillStyle = mapObject.strokeColor;
+    ctx.fill();
+  }
+}
+
+/**
  * Render a single map object to the canvas
  */
 export function renderMapObject(
@@ -33,34 +84,38 @@ export function renderMapObject(
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = strokeWidth / zoom;
   
-  ctx.beginPath();
-  
-  switch (shape) {
-    case 'circle':
-      const radius = Math.min(width, height) / 2;
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      break;
-      
-    case 'rectangle':
-      ctx.rect(-width / 2, -height / 2, width, height);
-      break;
-      
-    case 'custom':
-      if (mapObject.customPath && mapObject.customPath.length > 2) {
-        ctx.moveTo(mapObject.customPath[0].x, mapObject.customPath[0].y);
-        for (let i = 1; i < mapObject.customPath.length; i++) {
-          ctx.lineTo(mapObject.customPath[i].x, mapObject.customPath[i].y);
-        }
-        ctx.closePath();
-      } else {
-        // Fallback to rectangle
+  if (shape === 'door') {
+    renderDoorShape(ctx, mapObject, zoom);
+  } else {
+    ctx.beginPath();
+    
+    switch (shape) {
+      case 'circle':
+        const radius = Math.min(width, height) / 2;
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        break;
+        
+      case 'rectangle':
         ctx.rect(-width / 2, -height / 2, width, height);
-      }
-      break;
+        break;
+        
+      case 'custom':
+        if (mapObject.customPath && mapObject.customPath.length > 2) {
+          ctx.moveTo(mapObject.customPath[0].x, mapObject.customPath[0].y);
+          for (let i = 1; i < mapObject.customPath.length; i++) {
+            ctx.lineTo(mapObject.customPath[i].x, mapObject.customPath[i].y);
+          }
+          ctx.closePath();
+        } else {
+          // Fallback to rectangle
+          ctx.rect(-width / 2, -height / 2, width, height);
+        }
+        break;
+    }
+    
+    ctx.fill();
+    ctx.stroke();
   }
-  
-  ctx.fill();
-  ctx.stroke();
   
   // Draw selection indicator
   if (selected) {
@@ -86,6 +141,17 @@ export function renderMapObject(
     }
     
     ctx.setLineDash([]);
+  }
+  
+  // Draw open/closed indicator for doors
+  if (shape === 'door' && mapObject.isOpen !== undefined) {
+    ctx.globalAlpha = 0.8;
+    ctx.font = `${10 / zoom}px Arial`;
+    ctx.fillStyle = mapObject.isOpen ? '#22c55e' : '#ef4444';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Small indicator above the door
+    ctx.fillText(mapObject.isOpen ? '○' : '●', 0, -height / 2 - 8 / zoom);
   }
   
   ctx.restore();
@@ -122,12 +188,17 @@ export function getMapObjectShadowPath(
   lightAngle: number // degrees, 0 = top, 90 = right
 ): Path2D {
   const path = new Path2D();
-  const { position, width, height, shape } = mapObject;
+  const { position, width, height, shape, rotation } = mapObject;
   
   // Calculate shadow offset based on light direction
   const angleRad = (lightAngle * Math.PI) / 180;
   const offsetX = Math.sin(angleRad) * shadowDistance;
   const offsetY = -Math.cos(angleRad) * shadowDistance;
+  
+  // For doors, only cast shadow when closed
+  if (shape === 'door' && mapObject.isOpen) {
+    return path; // Return empty path for open doors
+  }
   
   switch (shape) {
     case 'circle':
@@ -142,13 +213,39 @@ export function getMapObjectShadowPath(
       break;
       
     case 'rectangle':
+    case 'door':
     default:
-      path.rect(
-        position.x - width / 2 + offsetX,
-        position.y - height / 2 + offsetY,
-        width,
-        height
-      );
+      // For rotated rectangles, we need to transform the corners
+      if (rotation) {
+        const rotRad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rotRad);
+        const sin = Math.sin(rotRad);
+        
+        const corners = [
+          { x: -width / 2, y: -height / 2 },
+          { x: width / 2, y: -height / 2 },
+          { x: width / 2, y: height / 2 },
+          { x: -width / 2, y: height / 2 },
+        ];
+        
+        const transformedCorners = corners.map((c) => ({
+          x: position.x + (c.x * cos - c.y * sin) + offsetX,
+          y: position.y + (c.x * sin + c.y * cos) + offsetY,
+        }));
+        
+        path.moveTo(transformedCorners[0].x, transformedCorners[0].y);
+        for (let i = 1; i < transformedCorners.length; i++) {
+          path.lineTo(transformedCorners[i].x, transformedCorners[i].y);
+        }
+        path.closePath();
+      } else {
+        path.rect(
+          position.x - width / 2 + offsetX,
+          position.y - height / 2 + offsetY,
+          width,
+          height
+        );
+      }
       break;
   }
   
@@ -204,18 +301,23 @@ export function isPointInMapObject(
     localY = newY;
   }
   
+  // For doors, use a larger hit area for easier selection
+  const hitWidth = shape === 'door' ? Math.max(width, 20) : width;
+  const hitHeight = shape === 'door' ? Math.max(height, 20) : height;
+  
   switch (shape) {
     case 'circle':
       const radius = Math.min(width, height) / 2;
       return localX * localX + localY * localY <= radius * radius;
       
     case 'rectangle':
+    case 'door':
     default:
       return (
-        localX >= -width / 2 &&
-        localX <= width / 2 &&
-        localY >= -height / 2 &&
-        localY <= height / 2
+        localX >= -hitWidth / 2 &&
+        localX <= hitWidth / 2 &&
+        localY >= -hitHeight / 2 &&
+        localY <= hitHeight / 2
       );
   }
 }
