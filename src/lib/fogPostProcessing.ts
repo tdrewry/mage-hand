@@ -281,11 +281,33 @@ export function applyFogPostProcessing(
   // - Bright zone (inner circle): fully clears fog
   // - Dim zone (outer ring): partially clears fog based on dimIntensity
   // - Overlapping sources: the brightest value wins (using intermediate canvas)
+  //
+  // IMPORTANT: The exploredOnlyMask excludes currently visible areas, so we must
+  // first FILL visibility areas with fog before using destination-out to cut through it.
   const animationTime = performance.now();
   
   if (illuminationData && illuminationData.sources.length > 0) {
-    // Use destination-out to cut illuminated areas from the fog
-    // We'll draw radial gradients that define bright center -> dim edge
+    // STEP 1: Fill all visibility areas with explored-level fog first
+    // This provides a base layer for the destination-out gradients to work against.
+    // Without this, visible areas have NO fog, so the gradient has nothing to remove.
+    for (const source of illuminationData.sources) {
+      if (!source.enabled || !source.visibilityPolygon) continue;
+      
+      const pos = source.position;
+      const rangePixels = source.range;
+      
+      // Fill visibility area with explored fog opacity
+      fogCtx.save();
+      fogCtx.clip(source.visibilityPolygon);
+      fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+      fogCtx.beginPath();
+      fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+      fogCtx.fill();
+      fogCtx.restore();
+    }
+    
+    // STEP 2: Use destination-out to cut illuminated areas from the fog
+    // We draw radial gradients that define bright center -> dim edge
     fogCtx.globalCompositeOperation = 'destination-out';
     
     for (const source of illuminationData.sources) {
