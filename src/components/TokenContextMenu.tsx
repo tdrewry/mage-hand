@@ -64,6 +64,11 @@ const SIZE_PRESETS = [
   { name: 'Large', gridWidth: 2, gridHeight: 2 },
   { name: 'Huge', gridWidth: 3, gridHeight: 3 },
   { name: 'Gargantuan', gridWidth: 4, gridHeight: 4 },
+  // Non-uniform presets for vehicles, serpents, etc.
+  { name: 'Long (2×1)', gridWidth: 2, gridHeight: 1 },
+  { name: 'Tall (1×2)', gridWidth: 1, gridHeight: 2 },
+  { name: 'Wide (3×1)', gridWidth: 3, gridHeight: 1 },
+  { name: 'Tall (1×3)', gridWidth: 1, gridHeight: 3 },
 ] as const;
 
 export const TokenContextMenu = ({ 
