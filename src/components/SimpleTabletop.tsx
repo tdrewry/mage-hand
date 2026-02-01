@@ -94,6 +94,7 @@ import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog 
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
+import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 
 import { Z_INDEX } from "../lib/zIndex";
 
@@ -2580,6 +2581,13 @@ export const SimpleTabletop = () => {
     // TODO: For grid movement, this will use grid-based pathfinding algorithms
 
     const gridSize = 40; // Grid unit size in pixels
+    
+    // Get token path styling settings (use defaults if not set)
+    const pathStyle = token.pathStyle || 'dashed';
+    const pathColor = token.pathColor || token.color || '#ffffff';
+    const pathWeight = token.pathWeight ?? 3;
+    const pathOpacity = token.pathOpacity ?? 0.7;
+    const footprintType = token.footprintType || 'barefoot';
 
     ctx.save();
 
@@ -2589,20 +2597,19 @@ export const SimpleTabletop = () => {
     const distancePixels = Math.sqrt(dx * dx + dy * dy);
     const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
 
-    // Draw path line
-    ctx.strokeStyle = token.color || "#ffffff";
-    ctx.lineWidth = 3 / transform.zoom;
-    ctx.globalAlpha = 0.6;
-
-    // Simple straight line for free movement
+    // Draw straight line indicator (always shown for distance reference)
+    ctx.strokeStyle = pathColor;
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.globalAlpha = 0.3;
+    ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
     ctx.beginPath();
     ctx.moveTo(dragStartPos.x, dragStartPos.y);
     ctx.lineTo(token.x, token.y);
     ctx.stroke();
+    ctx.setLineDash([]);
 
     // Draw distance text at midpoint of line
     if (distancePixels > 10) {
-      // Only show if line is long enough
       const midX = (dragStartPos.x + token.x) / 2;
       const midY = (dragStartPos.y + token.y) / 2;
 
@@ -2612,7 +2619,6 @@ export const SimpleTabletop = () => {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Add background to text for better readability
       const textMetrics = ctx.measureText(`${distanceGridUnits} units`);
       const textWidth = textMetrics.width;
       const textHeight = 14 / transform.zoom;
@@ -2629,35 +2635,50 @@ export const SimpleTabletop = () => {
       ctx.fillText(`${distanceGridUnits} units`, midX, midY);
     }
 
-    // Draw path points if we have a detailed path
-    if (dragPath.length > 1) {
-      ctx.fillStyle = token.color || "#ffffff";
-      ctx.globalAlpha = 0.4;
-
+    // Draw detailed movement path if we have path points and path style is not 'none'
+    if (dragPath.length > 1 && pathStyle !== 'none') {
       // Calculate total path distance
       let pathDistance = 0;
       for (let i = 1; i < dragPath.length; i++) {
-        const dx = dragPath[i].x - dragPath[i - 1].x;
-        const dy = dragPath[i].y - dragPath[i - 1].y;
-        pathDistance += Math.sqrt(dx * dx + dy * dy);
+        const pdx = dragPath[i].x - dragPath[i - 1].x;
+        const pdy = dragPath[i].y - dragPath[i - 1].y;
+        pathDistance += Math.sqrt(pdx * pdx + pdy * pdy);
       }
       const pathDistanceGridUnits = (pathDistance / gridSize).toFixed(2);
 
-      // Draw path points
-      dragPath.forEach((point, index) => {
-        if (index === 0 || index === dragPath.length - 1) return; // Skip start and end
-
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 2 / transform.zoom, 0, 2 * Math.PI);
-        ctx.fill();
-      });
+      // Draw movement path based on style
+      if (pathStyle === 'footprint') {
+        // Calculate footprint size based on token size and weight setting
+        const baseTokenSize = 40;
+        const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+        const footprintSize = tokenSize * 0.3 * (pathWeight / 3); // Scale with pathWeight
+        
+        drawFootprintPath(
+          ctx,
+          dragPath,
+          footprintType,
+          pathColor,
+          footprintSize,
+          pathOpacity,
+          transform.zoom
+        );
+      } else {
+        // Solid or dashed line
+        drawStyledLinePath(
+          ctx,
+          dragPath,
+          pathStyle as 'solid' | 'dashed',
+          pathColor,
+          pathWeight,
+          pathOpacity,
+          transform.zoom
+        );
+      }
 
       // Draw path distance text near the end of the path
       if (dragPath.length > 2 && pathDistance > 10) {
         const endPoint = dragPath[dragPath.length - 1];
-        const secondLastPoint = dragPath[dragPath.length - 2];
 
-        // Position text farther offset from the end point to avoid token overlap
         const offsetX = 40 / transform.zoom;
         const offsetY = -40 / transform.zoom;
         const textX = endPoint.x + offsetX;
@@ -2669,7 +2690,6 @@ export const SimpleTabletop = () => {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        // Add background to text for better readability
         const pathText = `Path: ${pathDistanceGridUnits}`;
         const textMetrics = ctx.measureText(pathText);
         const textWidth = textMetrics.width;
@@ -2683,13 +2703,13 @@ export const SimpleTabletop = () => {
           textHeight,
         );
 
-        ctx.fillStyle = token.color || "#ffffff";
+        ctx.fillStyle = pathColor;
         ctx.fillText(pathText, textX, textY);
       }
     }
 
     // Draw direction arrow at current position
-    drawDirectionArrow(ctx, dragStartPos, { x: token.x, y: token.y }, token.color || "#ffffff");
+    drawDirectionArrow(ctx, dragStartPos, { x: token.x, y: token.y }, pathColor);
 
     ctx.restore();
   };

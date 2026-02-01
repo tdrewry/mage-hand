@@ -24,10 +24,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark, Footprints } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
-import { useSessionStore, type LabelPosition, type AppearanceVariant } from '../stores/sessionStore';
+import { TokenPathPreviewCanvas } from './TokenPathPreviewCanvas';
+import { useSessionStore, type LabelPosition, type AppearanceVariant, type PathStyle, type FootprintType } from '../stores/sessionStore';
+import { FOOTPRINT_TYPES, PATH_STYLES } from '@/lib/footprintShapes';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from '@/components/ui/slider';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '../lib/illuminationPresets';
@@ -96,7 +106,7 @@ export const TokenContextMenu = ({
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
   
   // Edit modal state
-  const [activeTab, setActiveTab] = useState<'label' | 'appearance' | 'details'>('label');
+  const [activeTab, setActiveTab] = useState<'label' | 'style' | 'appearance' | 'details'>('label');
   const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
@@ -112,6 +122,15 @@ export const TokenContextMenu = ({
   const [showSaveVariantInput, setShowSaveVariantInput] = useState(false);
   const [variantNameInput, setVariantNameInput] = useState('');
   const [variantImageUrls, setVariantImageUrls] = useState<Record<string, string>>({});
+  
+  // Style tab state - path styling
+  const [pathStyleValue, setPathStyleValue] = useState<PathStyle>('dashed');
+  const [pathColorValue, setPathColorValue] = useState('#FFFFFF');
+  const [useTokenColorForPath, setUseTokenColorForPath] = useState(true);
+  const [pathWeightValue, setPathWeightValue] = useState(3);
+  const [pathOpacityValue, setPathOpacityValue] = useState(0.7);
+  const [footprintTypeValue, setFootprintTypeValue] = useState<FootprintType>('barefoot');
+  const [tokenColorValue, setTokenColorValue] = useState('#FF6B6B');
   
   // Other modal state
   const [colorValue, setColorValue] = useState('#FF6B6B');
@@ -180,6 +199,14 @@ export const TokenContextMenu = ({
       // Details tab fields
       setNotesValue(token.notes || '');
       setQuickReferenceUrlValue(token.quickReferenceUrl || '');
+      // Style tab fields
+      setTokenColorValue(token.color || '#FF6B6B');
+      setPathStyleValue(token.pathStyle || 'dashed');
+      setPathColorValue(token.pathColor || token.color || '#FFFFFF');
+      setUseTokenColorForPath(token.pathColor === undefined);
+      setPathWeightValue(token.pathWeight ?? 3);
+      setPathOpacityValue(token.pathOpacity ?? 0.7);
+      setFootprintTypeValue(token.footprintType || 'barefoot');
       
       // Load variant image URLs from IndexedDB
       if (token.appearanceVariants?.length) {
@@ -214,6 +241,14 @@ export const TokenContextMenu = ({
       setNotesValue('');
       setQuickReferenceUrlValue('');
       setVariantImageUrls({});
+      // Style tab - use defaults for multi-selection
+      setTokenColorValue('#FF6B6B');
+      setPathStyleValue('dashed');
+      setPathColorValue('#FFFFFF');
+      setUseTokenColorForPath(true);
+      setPathWeightValue(3);
+      setPathOpacityValue(0.7);
+      setFootprintTypeValue('barefoot');
     }
     setShowTokenEditModal(true);
   };
@@ -445,6 +480,23 @@ export const TokenContextMenu = ({
           );
         }
       }
+      
+      // Style tab updates - update token color and path styling directly
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map((t) =>
+          t.id === token.id
+            ? {
+                ...t,
+                color: tokenColorValue,
+                pathStyle: pathStyleValue,
+                pathColor: useTokenColorForPath ? undefined : pathColorValue,
+                pathWeight: pathWeightValue,
+                pathOpacity: pathOpacityValue,
+                footprintType: footprintTypeValue,
+              }
+            : t
+        ),
+      }));
     }
     
     setShowTokenEditModal(false);
@@ -809,8 +861,9 @@ export const TokenContextMenu = ({
           </DialogHeader>
           
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="label">Label</TabsTrigger>
+              <TabsTrigger value="style">Style</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
             </TabsList>
@@ -881,6 +934,177 @@ export const TokenContextMenu = ({
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Choose a label style preset</p>
               </div>
+            </TabsContent>
+            
+            {/* Style Tab */}
+            <TabsContent value="style" className="flex-1 overflow-y-auto space-y-4 mt-4">
+              {/* Token Color Section */}
+              <div>
+                <Label>Token Color</Label>
+                <div className="flex gap-2 items-center mt-2">
+                  <Input
+                    type="color"
+                    value={tokenColorValue}
+                    onChange={(e) => setTokenColorValue(e.target.value)}
+                    className="w-14 h-10 p-1"
+                  />
+                  <span className="text-sm text-muted-foreground font-mono">
+                    {tokenColorValue}
+                  </span>
+                </div>
+                <div className="grid grid-cols-8 gap-2 mt-2">
+                  {[
+                    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+                    '#FFEAA7', '#DDA0DD', '#F8C471', '#85C1E9',
+                    '#F1948A', '#82E0AA', '#BB8FCE', '#F7DC6F',
+                    '#85C1E9', '#98D8C8', '#F39C12', '#E74C3C'
+                  ].map(color => (
+                    <button
+                      key={color}
+                      className={`w-6 h-6 rounded border-2 transition-transform hover:scale-110 ${
+                        tokenColorValue === color ? 'border-ring ring-2 ring-ring ring-offset-1' : 'border-border'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setTokenColorValue(color)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="flex items-center gap-1 mb-3">
+                  <Footprints className="h-3.5 w-3.5" />
+                  Movement Path
+                </Label>
+                
+                {/* Path Style */}
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Style</Label>
+                    <Select
+                      value={pathStyleValue}
+                      onValueChange={(v) => setPathStyleValue(v as PathStyle)}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PATH_STYLES.map(({ style, label }) => (
+                          <SelectItem key={style} value={style}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Footprint Type - only show when pathStyle is 'footprint' */}
+                  {pathStyleValue === 'footprint' && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Footprint Type</Label>
+                      <div className="grid grid-cols-5 gap-2 mt-2">
+                        {FOOTPRINT_TYPES.map(({ type, label, icon }) => (
+                          <button
+                            key={type}
+                            className={`flex flex-col items-center p-2 rounded-lg border transition-all ${
+                              footprintTypeValue === type
+                                ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                            onClick={() => setFootprintTypeValue(type)}
+                          >
+                            <span className="text-xl">{icon}</span>
+                            <span className="text-[10px] mt-1">{label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Path Color */}
+                  {pathStyleValue !== 'none' && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Path Color</Label>
+                        <label className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={useTokenColorForPath}
+                            onChange={(e) => setUseTokenColorForPath(e.target.checked)}
+                            className="rounded"
+                          />
+                          Use token color
+                        </label>
+                      </div>
+                      {!useTokenColorForPath && (
+                        <div className="flex gap-2 items-center mt-2">
+                          <Input
+                            type="color"
+                            value={pathColorValue}
+                            onChange={(e) => setPathColorValue(e.target.value)}
+                            className="w-14 h-8 p-1"
+                          />
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {pathColorValue}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Path Weight/Size */}
+                  {pathStyleValue !== 'none' && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">
+                          {pathStyleValue === 'footprint' ? 'Footprint Size' : 'Line Weight'}
+                        </Label>
+                        <span className="text-xs font-mono">{pathWeightValue}</span>
+                      </div>
+                      <Slider
+                        value={[pathWeightValue]}
+                        onValueChange={(v) => setPathWeightValue(v[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="mt-2"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Path Opacity */}
+                  {pathStyleValue !== 'none' && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Opacity</Label>
+                        <span className="text-xs font-mono">{pathOpacityValue.toFixed(1)}</span>
+                      </div>
+                      <Slider
+                        value={[pathOpacityValue]}
+                        onValueChange={(v) => setPathOpacityValue(v[0])}
+                        min={0.3}
+                        max={1}
+                        step={0.1}
+                        className="mt-2"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Preview */}
+              {pathStyleValue !== 'none' && (
+                <div className="border-t pt-4">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Preview</Label>
+                  <TokenPathPreviewCanvas
+                    pathStyle={pathStyleValue}
+                    footprintType={footprintTypeValue}
+                    pathColor={useTokenColorForPath ? tokenColorValue : pathColorValue}
+                    pathWeight={pathWeightValue}
+                    pathOpacity={pathOpacityValue}
+                  />
+                </div>
+              )}
             </TabsContent>
             
             {/* Appearance Tab */}
