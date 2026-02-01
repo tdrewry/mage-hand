@@ -1,11 +1,99 @@
 // Wall geometry generation using negative space approach
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle } from './watabouStyles';
+import { MapObject } from '@/types/mapObjectTypes';
 import paper from 'paper';
 
 export interface LineSegment {
   start: { x: number; y: number };
   end: { x: number; y: number };
+}
+
+/**
+ * Convert vision-blocking MapObjects to line segments for visibility calculation
+ * Circle-shaped objects are approximated with 8-sided polygons
+ * Rectangle-shaped objects use their 4 edges
+ * @param mapObjects Array of MapObject entities
+ * @returns Array of LineSegment representing the blocking geometry
+ */
+export function mapObjectsToSegments(mapObjects: MapObject[]): LineSegment[] {
+  const segments: LineSegment[] = [];
+  
+  for (const obj of mapObjects) {
+    // Only include objects that block vision
+    if (!obj.blocksVision) continue;
+    
+    // For doors, only block vision if closed
+    if (obj.category === 'door' && obj.isOpen) continue;
+    
+    const { x, y } = obj.position;
+    const { width, height, rotation = 0, shape } = obj;
+    
+    if (shape === 'circle') {
+      // Approximate circle with 8-sided polygon
+      const radius = Math.min(width, height) / 2;
+      const numSides = 8;
+      const points: { x: number; y: number }[] = [];
+      
+      for (let i = 0; i < numSides; i++) {
+        const angle = (i / numSides) * Math.PI * 2;
+        points.push({
+          x: x + Math.cos(angle) * radius,
+          y: y + Math.sin(angle) * radius,
+        });
+      }
+      
+      // Create segments from points
+      for (let i = 0; i < points.length; i++) {
+        segments.push({
+          start: points[i],
+          end: points[(i + 1) % points.length],
+        });
+      }
+    } else if (shape === 'rectangle' || shape === 'door') {
+      // Rectangle/door: 4 corners relative to center position
+      let corners = [
+        { x: x - width / 2, y: y - height / 2 },
+        { x: x + width / 2, y: y - height / 2 },
+        { x: x + width / 2, y: y + height / 2 },
+        { x: x - width / 2, y: y + height / 2 },
+      ];
+      
+      // Apply rotation if present
+      if (rotation) {
+        const rad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        
+        corners = corners.map(corner => {
+          const dx = corner.x - x;
+          const dy = corner.y - y;
+          return {
+            x: x + dx * cos - dy * sin,
+            y: y + dx * sin + dy * cos,
+          };
+        });
+      }
+      
+      // Create segments from corners
+      for (let i = 0; i < corners.length; i++) {
+        segments.push({
+          start: corners[i],
+          end: corners[(i + 1) % corners.length],
+        });
+      }
+    } else if (shape === 'custom' && obj.customPath && obj.customPath.length > 2) {
+      // Custom path
+      for (let i = 0; i < obj.customPath.length; i++) {
+        segments.push({
+          start: obj.customPath[i],
+          end: obj.customPath[(i + 1) % obj.customPath.length],
+        });
+      }
+    }
+  }
+  
+  return segments;
 }
 
 export interface WallGeometry {

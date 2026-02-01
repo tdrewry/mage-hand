@@ -35,7 +35,7 @@ import {
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
 import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint } from "../lib/mapObjectRenderer";
-import { generateNegativeSpaceRegion } from "../lib/wallGeometry";
+import { generateNegativeSpaceRegion, mapObjectsToSegments } from "../lib/wallGeometry";
 import {
   applyHatchingPattern,
   applyStipplingPattern,
@@ -284,6 +284,9 @@ export const SimpleTabletop = () => {
 
   // Store wall geometry separately for fog computation
   const wallGeometryRef = useRef<any>(null);
+  
+  // Combined visibility-blocking segments (walls + map objects)
+  const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
 
   // Grid highlighting state for token movement (supports both hex and square grids)
   const [highlightedGrids, setHighlightedGrids] = useState<
@@ -907,11 +910,12 @@ export const SimpleTabletop = () => {
 
           // Filter tokens based on role permissions and hostility
           // This replaces simple ownership-based filtering with role-based logic
+          // Use combined segments (walls + vision-blocking map objects)
           const tokensForVision = getTokensForVisionCalculation(
             tokens,
             currentPlayer,
             roles,
-            wallGeometry.wallSegments,
+            combinedSegmentsRef.current,
           );
 
           // Only consider tokens with vision enabled
@@ -1009,9 +1013,10 @@ export const SimpleTabletop = () => {
             if (oldCached?.visionPath?.remove) oldCached.visionPath.remove();
 
             // Compute new visibility for this token
+            // Use combined segments (walls + vision-blocking map objects)
             const tokenVision = await computeTokenVisibilityPaper(
               [token],
-              wallGeometry.wallSegments,
+              combinedSegmentsRef.current,
               wallGeometry,
               visionRangePixels,
             );
@@ -1130,11 +1135,11 @@ export const SimpleTabletop = () => {
           // Add enabled light sources to fog revelation with two-zone gradients
           const enabledLights = lights.filter((l) => l.enabled);
           for (const light of enabledLights) {
-            // Compute visibility for this light source using walls
+            // Compute visibility for this light source using walls + map objects
             // Pass a mock token-like object with required properties
             const lightVision = await computeTokenVisibilityPaper(
               [{ x: light.position.x, y: light.position.y, id: light.id, gridWidth: 1, gridHeight: 1 }],
-              wallGeometry.wallSegments,
+              combinedSegmentsRef.current,
               wallGeometry,
               light.radius,
             );
@@ -1187,6 +1192,7 @@ export const SimpleTabletop = () => {
     setSerializedExploredAreas,
     renderingMode,
     regions,
+    mapObjects, // Re-compute fog when map objects change (they may block vision)
     transform.x,
     transform.y,
     transform.zoom,
@@ -1890,6 +1896,10 @@ export const SimpleTabletop = () => {
       wallGeometryRef.current = wallGeometry; // Update ref for fog computation
       cachedCanvas = wallDecorationCacheRef.current.canvas;
       cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
+      
+      // Update combined segments (walls + vision-blocking map objects) - even with cached walls
+      const mapObjectSegments = mapObjectsToSegments(mapObjects);
+      combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments];
     } else {
       // Generate new decorations and cache them
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
@@ -1953,6 +1963,10 @@ export const SimpleTabletop = () => {
 
         // Store in separate ref for fog computation
         wallGeometryRef.current = wallGeometry;
+        
+        // Update combined segments (walls + vision-blocking map objects)
+        const mapObjectSegments = mapObjectsToSegments(mapObjects);
+        combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments];
       }
     }
 
@@ -1983,8 +1997,9 @@ export const SimpleTabletop = () => {
     }
 
     // NEW: Render shadows using visibility polygon system
+    // Use combined segments (walls + vision-blocking map objects)
     if (isPlayMode && lights.length > 0 && wallGeometry) {
-      const illumination = computeIllumination(lights, wallGeometry.wallSegments, wallGeometry);
+      const illumination = computeIllumination(lights, combinedSegmentsRef.current, wallGeometry);
       renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
 
@@ -5110,17 +5125,17 @@ export const SimpleTabletop = () => {
             // Store the position for rendering (post-processing path needs this) - use state to trigger re-render
             setDragPreviewPosition({ x: tokenCenterX, y: tokenCenterY, range: tokenVisionRange });
             
-            // Get wall segments, default to empty array if not available
-            const wallSegments = wallGeometryRef.current?.wallSegments ?? [];
-            console.log('[DRAG VISION] Computing visibility at:', { tokenCenterX, tokenCenterY, tokenVisionRange, wallSegmentsCount: wallSegments.length });
+            // Get combined segments (walls + vision-blocking map objects)
+            const combinedSegments = combinedSegmentsRef.current;
+            console.log('[DRAG VISION] Computing visibility at:', { tokenCenterX, tokenCenterY, tokenVisionRange, segmentsCount: combinedSegments.length });
             
             // Always use circular fallback for now to verify rendering works
             // TODO: Re-enable wall-based visibility once basic rendering is confirmed
-            if (wallSegments.length > 0) {
+            if (combinedSegments.length > 0) {
               try {
                 const visibility = computeVisibilityFromSegments(
                   { x: tokenCenterX, y: tokenCenterY },
-                  wallSegments,
+                  combinedSegments,
                   tokenVisionRange
                 );
                 console.log('[DRAG VISION] Visibility computed, polygon points:', visibility.polygon?.length, 'boundingBox:', visibility.boundingBox);
