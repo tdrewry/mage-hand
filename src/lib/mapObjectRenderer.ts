@@ -7,6 +7,14 @@ import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
  * Render a door shape (rectangular with open/closed visual state)
+ * All coordinates are in local space - the parent transform handles position and rotation.
+ * This means the door will render correctly at any angle, not just grid-aligned.
+ * 
+ * Local coordinate system:
+ * - X axis runs along the doorway (width = door span)
+ * - Y axis is perpendicular (height = door thickness)
+ * - Origin is at door center
+ * - Pivot point is at local left edge (-width/2, 0)
  */
 function renderDoorShape(
   ctx: CanvasRenderingContext2D,
@@ -16,10 +24,17 @@ function renderDoorShape(
 ) {
   const { width, height, isOpen, fillColor, strokeColor } = mapObject;
   
-  // Door dimensions: width is the doorway span, height is door thickness
+  // Door dimensions in local space:
+  // - doorLength: span of the doorway (along local X)
+  // - doorThickness: thickness of the door panel (along local Y)
   const doorLength = width;
   const doorThickness = height;
   const openDoorLength = doorLength * 0.5; // Half length when open
+  
+  // Pivot is always at the left edge in local coordinates (-doorLength/2, 0)
+  // After parent rotation, this becomes the correct world-space hinge position
+  const pivotX = -doorLength / 2;
+  const pivotY = 0;
   
   if (isOpen) {
     ctx.save();
@@ -34,21 +49,21 @@ function renderDoorShape(
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Draw door panel swung open at 90 degrees from pivot point (left edge)
+    // Draw door panel swung open at 90 degrees from pivot point
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1 / zoom;
     
-    // Draw hinge at pivot point
+    // Draw hinge indicator at pivot point
     ctx.beginPath();
-    ctx.arc(-doorLength / 2, 0, 3 / zoom, 0, Math.PI * 2);
+    ctx.arc(pivotX, pivotY, 3 / zoom, 0, Math.PI * 2);
     ctx.fill();
     
-    // Swung door panel: pivots from left edge, rotates 90 degrees, half length
+    // Swung door panel: rotates 90° counter-clockwise from pivot, half length
+    // The -90° rotation (in local space) means the door swings "into" the positive Y direction
     ctx.save();
-    ctx.translate(-doorLength / 2, 0);
-    ctx.rotate(-Math.PI / 2); // Rotate 90 degrees counter-clockwise
-    // Draw the open door panel extending from the pivot
+    ctx.translate(pivotX, pivotY);
+    ctx.rotate(-Math.PI / 2); // 90° counter-clockwise in local space
     ctx.fillRect(0, -doorThickness / 2, openDoorLength, doorThickness);
     ctx.strokeRect(0, -doorThickness / 2, openDoorLength, doorThickness);
     ctx.restore();
@@ -59,16 +74,17 @@ function renderDoorShape(
     ctx.fillRect(-doorLength / 2, -doorThickness / 2, doorLength, doorThickness);
     ctx.strokeRect(-doorLength / 2, -doorThickness / 2, doorLength, doorThickness);
     
-    // Draw door handle/detail
+    // Draw door handle/detail (offset toward the non-pivot end)
     ctx.beginPath();
     ctx.arc(doorLength / 4, 0, 2 / zoom, 0, Math.PI * 2);
     ctx.fillStyle = strokeColor;
     ctx.fill();
   }
   
-  // DM view: always show interactive indicator
+  // DM view: show interactive indicator above the door
   if (isDMView) {
     const indicatorSize = 8 / zoom;
+    // Position indicator above the door in local Y (which may be any world direction after rotation)
     const indicatorY = -doorThickness / 2 - indicatorSize - 4 / zoom;
     
     ctx.globalAlpha = 0.9;
