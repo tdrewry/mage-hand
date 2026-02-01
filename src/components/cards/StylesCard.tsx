@@ -35,7 +35,7 @@ export const StylesCardContent: React.FC = () => {
   
   const {
     enabled: hatchingEnabled,
-    options: hatchingOptions,
+    hatchingOptions,
     setEnabled: setHatchingEnabled,
     setOptions: setHatchingOptions,
     applyPreset: applyHatchingPreset,

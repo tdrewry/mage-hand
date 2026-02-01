@@ -79,6 +79,7 @@ import { useUndoableActions } from "../hooks/useUndoableActions";
 import { useTextureLoader } from "../hooks/useTextureLoader";
 import { TextureDownloadProgress } from "./TextureDownloadProgress";
 import { texturePatternCache } from "../lib/texturePatternCache";
+import { animatedTextureManager } from "../lib/animatedTextureManager";
 import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -1679,9 +1680,20 @@ export const SimpleTabletop = () => {
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
   // Helper to get or load a cached image (must be defined before redrawCanvas)
-  const getCachedImage = (url: string): HTMLImageElement | null => {
+  // For animated GIFs, returns the current frame's ImageBitmap
+  const getCachedImage = (url: string): HTMLImageElement | ImageBitmap | null => {
     if (!url) return null;
     
+    // Check for animated texture first - returns current frame if animated
+    const animatedFrame = animatedTextureManager.getCurrentFrame(url);
+    if (animatedFrame) return animatedFrame;
+    
+    // If it might be animated but not loaded yet, preload it
+    if (animatedTextureManager.mightBeAnimated(url)) {
+      animatedTextureManager.preload(url);
+    }
+    
+    // Fall back to static image cache
     let img = imageCache.current.get(url);
     
     if (!img) {
@@ -3288,44 +3300,72 @@ export const SimpleTabletop = () => {
     }
   };
   // Function to draw region background image (optimized with pattern caching)
+  // Supports animated GIFs via animatedTextureManager
   const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     if (!region.backgroundImage) return;
 
-    let img = imageCache.current.get(region.backgroundImage);
-
-    if (!img) {
-      // Create and cache new image
-      img = new Image();
-      img.crossOrigin = "anonymous";
-      imageCache.current.set(region.backgroundImage, img);
-
-      // Only set up onload for new images
-      img.onload = () => {
-        // Invalidate any cached patterns for this image since it just loaded
-        texturePatternCache.invalidateImage(region.backgroundImage!);
-        // Trigger re-render when image loads
-        setImageLoadCounter(c => c + 1);
-      };
+    // Check for animated texture first
+    const animatedFrame = animatedTextureManager.getCurrentFrame(region.backgroundImage);
+    const isAnimated = animatedFrame !== null;
+    
+    // For animated textures, use the current frame directly
+    // For static textures, use the image cache
+    let img: HTMLImageElement | ImageBitmap | null = null;
+    let imgWidth: number;
+    let imgHeight: number;
+    
+    if (isAnimated) {
+      img = animatedFrame;
+      imgWidth = animatedFrame.width;
+      imgHeight = animatedFrame.height;
+    } else {
+      // Check if this might be animated but not loaded yet
+      if (animatedTextureManager.mightBeAnimated(region.backgroundImage)) {
+        animatedTextureManager.preload(region.backgroundImage);
+      }
       
-      img.onerror = () => {
-        console.warn('Failed to load region background image:', region.backgroundImage?.substring(0, 50));
-      };
+      let staticImg = imageCache.current.get(region.backgroundImage);
 
-      img.src = region.backgroundImage;
+      if (!staticImg) {
+        // Create and cache new image
+        staticImg = new Image();
+        staticImg.crossOrigin = "anonymous";
+        imageCache.current.set(region.backgroundImage, staticImg);
+
+        // Only set up onload for new images
+        staticImg.onload = () => {
+          // Invalidate any cached patterns for this image since it just loaded
+          texturePatternCache.invalidateImage(region.backgroundImage!);
+          // Trigger re-render when image loads
+          setImageLoadCounter(c => c + 1);
+        };
+        
+        staticImg.onerror = () => {
+          console.warn('Failed to load region background image:', region.backgroundImage?.substring(0, 50));
+        };
+
+        staticImg.src = region.backgroundImage;
+        
+        // Draw placeholder while loading (blue = loading)
+        ctx.fillStyle = "rgba(100, 100, 200, 0.5)";
+        ctx.fillRect(region.x, region.y, region.width, region.height);
+        return;
+      }
+
+      // Only draw if image is fully loaded with valid dimensions
+      if (!staticImg.complete || staticImg.naturalWidth === 0 || staticImg.naturalHeight === 0) {
+        // Draw placeholder while loading (green = waiting for dimensions)
+        ctx.fillStyle = "rgba(100, 200, 100, 0.5)";
+        ctx.fillRect(region.x, region.y, region.width, region.height);
+        return;
+      }
       
-      // Draw placeholder while loading (blue = loading)
-      ctx.fillStyle = "rgba(100, 100, 200, 0.5)";
-      ctx.fillRect(region.x, region.y, region.width, region.height);
-      return;
+      img = staticImg;
+      imgWidth = staticImg.naturalWidth;
+      imgHeight = staticImg.naturalHeight;
     }
 
-    // Only draw if image is fully loaded with valid dimensions
-    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-      // Draw placeholder while loading (green = waiting for dimensions)
-      ctx.fillStyle = "rgba(100, 200, 100, 0.5)";
-      ctx.fillRect(region.x, region.y, region.width, region.height);
-      return;
-    }
+    if (!img) return;
 
     // Calculate bounds - for path regions use bounding box from pathPoints
     let x = region.x;
@@ -3348,17 +3388,30 @@ export const SimpleTabletop = () => {
     const repeat = region.backgroundRepeat || "repeat";
 
     // Calculate scaled image dimensions
-    const scaledWidth = Math.max(1, img.naturalWidth * scale);
-    const scaledHeight = Math.max(1, img.naturalHeight * scale);
+    const scaledWidth = Math.max(1, imgWidth * scale);
+    const scaledHeight = Math.max(1, imgHeight * scale);
 
     if (repeat === "no-repeat") {
       // For no-repeat, draw the scaled image once at the offset position
       ctx.drawImage(img, x + offsetX, y + offsetY, scaledWidth, scaledHeight);
+    } else if (isAnimated) {
+      // For animated textures, we can't use CanvasPattern (it captures only one frame)
+      // Instead, manually tile the current frame using drawImage
+      const startX = x + offsetX - scaledWidth;
+      const startY = y + offsetY - scaledHeight;
+      const endX = x + width + scaledWidth;
+      const endY = y + height + scaledHeight;
+      
+      for (let tileY = startY; tileY < endY; tileY += scaledHeight) {
+        for (let tileX = startX; tileX < endX; tileX += scaledWidth) {
+          ctx.drawImage(img, tileX, tileY, scaledWidth, scaledHeight);
+        }
+      }
     } else {
-      // Use cached pattern for repeat modes (major performance optimization)
+      // Use cached pattern for static textures in repeat modes (major performance optimization)
       const pattern = texturePatternCache.getPattern(
         ctx,
-        img,
+        img as HTMLImageElement,
         region.backgroundImage,
         scale,
         repeat
@@ -4193,9 +4246,16 @@ export const SimpleTabletop = () => {
     const hasAnimatedIllumination = tokens.some((token) => 
       token.illuminationSources?.some((source) => source.animation && source.animation !== 'none')
     );
+    
+    // Check if there are any animated textures (GIFs) on tokens or regions
+    const hasAnimatedTextures = tokens.some((token) => 
+      token.imageUrl && animatedTextureManager.isAnimated(token.imageUrl)
+    ) || regions.some((region) => 
+      region.backgroundImage && animatedTextureManager.isAnimated(region.backgroundImage)
+    );
 
     // Only run animation loop if there's something to animate
-    if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination) return;
+    if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination && !hasAnimatedTextures) return;
 
     // Set up throttled animation loop (limit to ~30 FPS)
     let animationId: number;
@@ -4220,7 +4280,8 @@ export const SimpleTabletop = () => {
     };
     // Include transform in dependencies so animation loop recreates with fresh transform values
     // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
-  }, [tokens, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
+    // Include regions for animated region textures
+  }, [tokens, regions, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
