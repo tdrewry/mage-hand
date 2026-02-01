@@ -9,19 +9,33 @@ import { DysonHatchingOptions, DEFAULT_HATCHING_OPTIONS, HATCHING_PRESETS } from
 export interface HatchingStore {
   // Enable/disable hatching
   enabled: boolean;
+  /**
+   * Enables or disables hatching.
+   * @param enabled True to enable hatching, false to disable.
+   */
   setEnabled: (enabled: boolean) => void;
 
-  // Hatching options
-  options: Required<DysonHatchingOptions>;
+  /**
+   * Sets the hatching options.
+   * @param options Partial hatching options to merge with current options.
+   */
   setOptions: (options: Partial<DysonHatchingOptions>) => void;
 
-  // Apply a preset
+  /**
+   * Applies a hatching preset by name.
+   * @param presetName The name of the preset to apply.
+   */
   applyPreset: (presetName: string) => void;
 
-  // Get preset names
+  /**
+   * Gets the names of all available hatching presets.
+   * @returns An array of preset names.
+   */
   getPresetNames: () => string[];
 
-  // Reset to defaults
+  /**
+   * Resets hatching options to their default values.
+   */
   resetToDefaults: () => void;
 }
 

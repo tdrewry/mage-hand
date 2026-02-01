@@ -11,6 +11,10 @@ import { ConnectionIndicator } from "./components/ConnectionIndicator";
 
 const queryClient = new QueryClient();
 
+/**
+ * Main application component that sets up providers, routing, and global hooks.
+ * @returns The rendered application.
+ */
 const App = () => {
   // Set dark mode by default for gaming
   React.useEffect(() => {

@@ -33,27 +33,112 @@ export interface FogSettings {
 
 interface FogState extends FogSettings {
   // Actions
+  /**
+   * Enables or disables the fog of war system.
+   * @param enabled True to enable, false to disable.
+   */
   setEnabled: (enabled: boolean) => void;
+
+  /**
+   * Sets whether the entire map should be revealed (DM mode).
+   * @param revealAll True to reveal all, false to use standard fog rules.
+   */
   setRevealAll: (revealAll: boolean) => void;
+
+  /**
+   * Sets the default vision range for tokens.
+   * @param range The vision range in grid units.
+   */
   setVisionRange: (range: number) => void;
+
+  /**
+   * Sets the opacity of the fog in unexplored areas.
+   * @param opacity Opacity value between 0 and 1.
+   */
   setFogOpacity: (opacity: number) => void;
+
+  /**
+   * Sets the opacity of the fog in explored but currently not visible areas.
+   * @param opacity Opacity value between 0 and 1.
+   */
   setExploredOpacity: (opacity: number) => void;
+
+  /**
+   * Sets whether previously explored areas should be shown as dimmed.
+   * @param show True to show explored areas, false to keep them hidden.
+   */
   setShowExploredAreas: (show: boolean) => void;
+
+  /**
+   * Sets the serialized explored areas geometry data.
+   * @param data The serialized geometry string.
+   */
   setSerializedExploredAreas: (data: string) => void;
+
+  /**
+   * Clears all explored areas, resetting them to unexplored.
+   */
   clearExploredAreas: () => void;
+
+  /**
+   * Resets the entire fog system to its default state.
+   */
   resetFog: () => void;
   
   // Real-time vision during drag actions
+  /**
+   * Sets whether vision should be updated in real-time during token dragging.
+   * @param enabled True to enable real-time updates, false to update only after drag.
+   */
   setRealtimeVisionDuringDrag: (enabled: boolean) => void;
+
+  /**
+   * Sets the throttle interval for real-time vision updates.
+   * @param ms The interval in milliseconds.
+   */
   setRealtimeVisionThrottleMs: (ms: number) => void;
   
   // Post-processing effect actions
+  /**
+   * Enables or disables PixiJS post-processing for fog effects.
+   * @param enabled True to enable, false to disable.
+   */
   setPostProcessingEnabled: (enabled: boolean) => void;
+
+  /**
+   * Sets the blur radius for the fog edge.
+   * @param blur The blur radius in pixels (0-20).
+   */
   setEdgeBlur: (blur: number) => void;
+
+  /**
+   * Sets the light falloff percentage.
+   * @param falloff The percentage of light radius where the bright zone ends (0-1).
+   */
   setLightFalloff: (falloff: number) => void;
+
+  /**
+   * Enables or disables volumetric fog effects.
+   * @param enabled True to enable, false to disable.
+   */
   setVolumetricEnabled: (enabled: boolean) => void;
+
+  /**
+   * Sets the quality level for fog effects.
+   * @param quality The quality setting ('performance', 'balanced', or 'cinematic').
+   */
   setEffectQuality: (quality: EffectQuality) => void;
+
+  /**
+   * Sets the opacity of the dim zone in the fog effect.
+   * @param opacity Opacity value between 0 and 1.
+   */
   setDimZoneOpacity: (opacity: number) => void;
+
+  /**
+   * Updates multiple fog effect settings at once.
+   * @param settings Partial fog effect settings to apply.
+   */
   setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
 }
 

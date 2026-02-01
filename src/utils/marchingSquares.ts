@@ -10,6 +10,11 @@ export interface Point {
 /**
  * Group connected tiles into separate regions
  */
+/**
+ * Groups adjacent tiles into connected components.
+ * @param tiles Array of points representing occupied tiles.
+ * @returns An array of arrays, where each inner array contains points of a connected component.
+ */
 export function groupConnectedTiles(tiles: Point[]): Point[][] {
   const groups: Point[][] = [];
   const visited = new Set<string>();
@@ -61,7 +66,10 @@ export function groupConnectedTiles(tiles: Point[]): Point[][] {
 }
 
 /**
- * Generate a contour path from a group of tiles using marching squares
+ * Generates a contour for a group of tiles using the Marching Squares algorithm.
+ * @param tiles Array of points representing tiles in a connected component.
+ * @param gridSize The size of each grid cell (default: 50).
+ * @returns An array of points defining the contour of the tiles.
  */
 export function generateContour(tiles: Point[], gridSize: number = 50): Point[] {
   if (tiles.length === 0) return [];
@@ -140,7 +148,10 @@ export function generateContour(tiles: Point[], gridSize: number = 50): Point[] 
 }
 
 /**
- * Simplified contour generation using tile edges
+ * Generates a simple contour by finding the outline edges of a set of tiles.
+ * @param tiles Array of points representing occupied tiles.
+ * @param gridSize The size of each grid cell.
+ * @returns An array of points defining the simplified contour.
  */
 export function generateSimpleContour(tiles: Point[], gridSize: number = 50): Point[] {
   if (tiles.length === 0) return [];

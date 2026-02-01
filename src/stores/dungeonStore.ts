@@ -20,46 +20,185 @@ interface DungeonStore {
   // Wall geometry caching
   cachedWallGeometry: WallGeometry | null;
   wallGeometryCacheKey: string | null;
+
+  /**
+   * Sets the cached wall geometry and its cache key.
+   * @param geometry The wall geometry to cache, or null.
+   * @param cacheKey The key associated with the cached geometry.
+   */
   setCachedWallGeometry: (geometry: WallGeometry | null, cacheKey: string | null) => void;
   
   // Rendering mode
+  /**
+   * Sets the current rendering mode.
+   * @param mode The rendering mode ('edit' or 'play').
+   */
   setRenderingMode: (mode: 'edit' | 'play') => void;
+
+  /**
+   * Sets the Watabou style configuration for the dungeon.
+   * @param style The Watabou style to apply.
+   */
   setWatabouStyle: (style: WatabouStyle) => void;
+
+  /**
+   * Sets the edge style for dungeon walls.
+   * @param style The wall edge style.
+   */
   setWallEdgeStyle: (style: 'stone' | 'wood' | 'metal' | 'simple') => void;
+
+  /**
+   * Sets the thickness of dungeon walls.
+   * @param thickness The wall thickness.
+   */
   setWallThickness: (thickness: number) => void;
+
+  /**
+   * Sets the texture scaling factor for dungeon surfaces.
+   * @param scale The texture scale.
+   */
   setTextureScale: (scale: number) => void;
+
+  /**
+   * Sets the light direction for shadow rendering.
+   * @param angle The angle in degrees.
+   */
   setLightDirection: (angle: number) => void;
+
+  /**
+   * Sets the distance shadows extend from walls.
+   * @param distance The shadow distance in pixels.
+   */
   setShadowDistance: (distance: number) => void;
   
   // Light source operations
+  /**
+   * Adds a new light source to the dungeon.
+   * @param source The light source data to add.
+   */
   addLightSource: (source: Omit<LightSource, 'id'>) => void;
+
+  /**
+   * Updates an existing light source.
+   * @param id The ID of the light source to update.
+   * @param updates The updates to apply.
+   */
   updateLightSource: (id: string, updates: Partial<LightSource>) => void;
+
+  /**
+   * Removes a light source from the dungeon.
+   * @param id The ID of the light source to remove.
+   */
   removeLightSource: (id: string) => void;
+
+  /**
+   * Clears all light sources from the dungeon.
+   */
   clearLightSources: () => void;
+
+  /**
+   * Replaces the entire light sources array.
+   * @param sources The new array of light sources.
+   */
   setLightSources: (sources: LightSource[]) => void;
   
   // Door operations
+  /**
+   * Adds a new door connection to the dungeon.
+   * @param door The door data to add.
+   */
   addDoor: (door: Omit<DoorConnection, 'id'>) => void;
+
+  /**
+   * Updates an existing door.
+   * @param id The ID of the door to update.
+   * @param updates The updates to apply.
+   */
   updateDoor: (id: string, updates: Partial<DoorConnection>) => void;
+
+  /**
+   * Removes a door from the dungeon.
+   * @param id The ID of the door to remove.
+   */
   removeDoor: (id: string) => void;
+
+  /**
+   * Clears all doors from the dungeon.
+   */
   clearDoors: () => void;
+
+  /**
+   * Replaces the entire doors array.
+   * @param doors The new array of doors.
+   */
   setDoors: (doors: DoorConnection[]) => void;
   
   // Annotation operations
+  /**
+   * Adds a new annotation to the dungeon.
+   * @param annotation The annotation data to add.
+   */
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
+
+  /**
+   * Updates an existing annotation.
+   * @param id The ID of the annotation to update.
+   * @param updates The updates to apply.
+   */
   updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
+
+  /**
+   * Removes an annotation from the dungeon.
+   * @param id The ID of the annotation to remove.
+   */
   removeAnnotation: (id: string) => void;
+
+  /**
+   * Clears all annotations from the dungeon.
+   */
   clearAnnotations: () => void;
+
+  /**
+   * Replaces the entire annotations array.
+   * @param annotations The new array of annotations.
+   */
   setAnnotations: (annotations: Annotation[]) => void;
   
   // Terrain operations
+  /**
+   * Adds a new terrain feature to the dungeon.
+   * @param feature The terrain feature data to add.
+   */
   addTerrainFeature: (feature: Omit<TerrainFeature, 'id'>) => void;
+
+  /**
+   * Updates an existing terrain feature.
+   * @param id The ID of the terrain feature to update.
+   * @param updates The updates to apply.
+   */
   updateTerrainFeature: (id: string, updates: Partial<TerrainFeature>) => void;
+
+  /**
+   * Removes a terrain feature from the dungeon.
+   * @param id The ID of the terrain feature to remove.
+   */
   removeTerrainFeature: (id: string) => void;
+
+  /**
+   * Clears all terrain features from the dungeon.
+   */
   clearTerrainFeatures: () => void;
+
+  /**
+   * Replaces the entire terrain features array.
+   * @param features The new array of terrain features.
+   */
   setTerrainFeatures: (features: TerrainFeature[]) => void;
   
   // Clear all dungeon data
+  /**
+   * Clears all data related to the dungeon (doors, annotations, terrain, light sources).
+   */
   clearAll: () => void;
 }
 

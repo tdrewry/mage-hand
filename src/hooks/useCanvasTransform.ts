@@ -8,6 +8,12 @@ export interface Transform {
   zoom: number;
 }
 
+/**
+ * Custom hook for managing canvas transformations including panning and zooming.
+ * Supports screen-to-world and world-to-screen coordinate conversions.
+ * @param initialZoom The initial zoom level for the canvas.
+ * @returns An object containing the current transform and methods to manipulate it.
+ */
 export const useCanvasTransform = (initialZoom = 1) => {
   // Get current map ID for per-map viewport persistence
   const selectedMapId = useMapStore((state) => state.selectedMapId);

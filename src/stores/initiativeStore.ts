@@ -18,18 +18,80 @@ interface InitiativeState {
   restrictMovement: boolean;
   
   // Actions
+  /**
+   * Starts a combat encounter, sorting the initiative order by value.
+   */
   startCombat: () => void;
+
+  /**
+   * Ends the current combat encounter and resets initiative state.
+   */
   endCombat: () => void;
+
+  /**
+   * Sets the entire initiative order.
+   * @param order The new initiative order.
+   */
   setInitiativeOrder: (order: InitiativeEntry[]) => void;
+
+  /**
+   * Adds a token to the initiative order or updates its initiative if already present.
+   * @param tokenId The ID of the token.
+   * @param initiative The initiative value.
+   */
   addToInitiative: (tokenId: string, initiative: number) => void;
+
+  /**
+   * Removes a token from the initiative order.
+   * @param tokenId The ID of the token to remove.
+   */
   removeFromInitiative: (tokenId: string) => void;
+
+  /**
+   * Reorders an entry in the initiative list.
+   * @param fromIndex The original index.
+   * @param toIndex The new index.
+   */
   reorderInitiative: (fromIndex: number, toIndex: number) => void;
+
+  /**
+   * Advances the combat to the next turn.
+   */
   nextTurn: () => void;
+
+  /**
+   * Moves the combat back to the previous turn.
+   */
   previousTurn: () => void;
+
+  /**
+   * Sets the current turn to a specific index in the initiative order.
+   * @param index The index of the turn to set.
+   */
   setCurrentTurn: (index: number) => void;
+
+  /**
+   * Updates the initiative value for a specific token.
+   * @param tokenId The ID of the token.
+   * @param newInitiative The new initiative value.
+   */
   updateInitiative: (tokenId: string, newInitiative: number) => void;
+
+  /**
+   * Sets whether the initiative tracker is visible.
+   * @param visible True to show the tracker, false to hide it.
+   */
   setTrackerVisible: (visible: boolean) => void;
+
+  /**
+   * Sets whether movement is restricted based on initiative.
+   * @param restrict True to restrict movement, false otherwise.
+   */
   setRestrictMovement: (restrict: boolean) => void;
+
+  /**
+   * Resets the current combat round, clearing "has gone" flags.
+   */
   resetRound: () => void;
 }
 

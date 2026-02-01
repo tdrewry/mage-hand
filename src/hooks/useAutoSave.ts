@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { autoSaveManager, AutoSaveSettings } from '@/lib/autoSaveManager';
 
+/**
+ * Custom hook for managing auto-save functionality.
+ * Provides settings, status, and actions for auto-saving session data.
+ * @returns An object with auto-save state and management methods.
+ */
 export function useAutoSave() {
   const [settings, setSettings] = useState<AutoSaveSettings>(
     autoSaveManager.getSettings()

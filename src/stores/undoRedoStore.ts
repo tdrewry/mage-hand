@@ -16,11 +16,36 @@ interface UndoRedoState {
   redoHistory: Command[];
   
   // Actions
+  /**
+   * Performs an undo operation.
+   */
   undo: () => void;
+
+  /**
+   * Performs a redo operation.
+   */
   redo: () => void;
+
+  /**
+   * Clears the undo and redo history.
+   */
   clear: () => void;
+
+  /**
+   * Updates the store state from the undo/redo manager.
+   */
   updateState: () => void;
+
+  /**
+   * Undoes all commands up to the specified index in the history.
+   * @param index The index to undo to.
+   */
   undoToIndex: (index: number) => void;
+
+  /**
+   * Redoes all commands up to the specified index in the history.
+   * @param index The index to redo to.
+   */
   redoToIndex: (index: number) => void;
 }
 

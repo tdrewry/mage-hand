@@ -1,6 +1,14 @@
 // Token visibility utilities
 import { Token, TokenVisibility, LabelVisibility } from '../stores/sessionStore';
 
+/**
+ * Determines if a token should be visible based on global visibility rules and user role.
+ * @param token The token to check.
+ * @param tokenVisibility The global token visibility setting.
+ * @param currentPlayerId The ID of the current player.
+ * @param isDM True if the current player is a Dungeon Master.
+ * @returns True if the token should be shown, false otherwise.
+ */
 export const shouldShowToken = (
   token: Token,
   tokenVisibility: TokenVisibility,
@@ -19,6 +27,15 @@ export const shouldShowToken = (
   }
 };
 
+/**
+ * Determines if a token label should be visible based on label visibility rules and selection state.
+ * @param token The token whose label is being checked.
+ * @param labelVisibility The global label visibility setting.
+ * @param selectedTokenIds Array of currently selected token IDs.
+ * @param currentPlayerId The ID of the current player.
+ * @param isDM True if the current player is a Dungeon Master.
+ * @returns True if the label should be shown, false otherwise.
+ */
 export const shouldShowLabel = (
   token: Token,
   labelVisibility: LabelVisibility,

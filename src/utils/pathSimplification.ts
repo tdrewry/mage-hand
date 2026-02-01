@@ -36,10 +36,11 @@ function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): 
 }
 
 /**
- * Douglas-Peucker path simplification algorithm
- * @param points - Array of points to simplify
- * @param epsilon - Tolerance threshold (higher = more simplification)
- * @returns Simplified array of points
+ * Simplifies a path using the Douglas-Peucker algorithm.
+ * Reduces the number of points in a path while maintaining its general shape within a specified tolerance.
+ * @param points Array of points to simplify.
+ * @param epsilon Tolerance threshold; higher values result in more simplification.
+ * @returns A simplified array of points.
  */
 export function simplifyPath(points: Point[], epsilon: number = 2.0): Point[] {
   if (points.length <= 2) return points;

@@ -5,6 +5,11 @@ import { canControlToken, canSeeToken } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
 import type { Token } from '@/stores/sessionStore';
 
+/**
+ * Custom hook for handling token interactions such as selection, dragging, and movement.
+ * Manages local interaction state and updates the global session store.
+ * @returns An object containing token interaction state and methods.
+ */
 export const useTokenInteraction = () => {
   const { tokens, updateTokenPosition, currentPlayerId, players } = useSessionStore();
   const { roles } = useRoleStore();

@@ -13,8 +13,10 @@ export interface BezierControlPoint {
 }
 
 /**
- * Generate smooth Bezier control points for a path
- * Uses the Hobby algorithm for aesthetically pleasing curves
+ * Generates smooth Bezier control points for a path.
+ * Uses a simplified version of the Hobby algorithm for aesthetically pleasing curves.
+ * @param points An array of points defining the path.
+ * @returns An array of Bezier control points for each segment.
  */
 export function generateBezierControlPoints(points: Point[]): BezierControlPoint[] {
   if (points.length < 2) return [];
@@ -78,7 +80,13 @@ export function bezierPoint(p0: Point, cp1: Point, cp2: Point, p1: Point, t: num
 }
 
 /**
- * Generate interpolated points along a Bezier curve for rendering
+ * Generates an array of interpolated points along a Bezier curve for rendering.
+ * @param p0 Start point.
+ * @param cp1 First control point.
+ * @param cp2 Second control point.
+ * @param p1 End point.
+ * @param segments Number of segments to use for interpolation.
+ * @returns An array of points along the curve.
  */
 export function bezierCurvePoints(
   p0: Point, 
@@ -98,7 +106,10 @@ export function bezierCurvePoints(
 }
 
 /**
- * Get bounding box for points including Bezier control points
+ * Calculates the bounding box for a set of points including their Bezier control points.
+ * @param points An array of anchor points.
+ * @param controlPoints An array of Bezier control points.
+ * @returns An object representing the bounding box {x, y, width, height}.
  */
 export function getBezierBounds(
   points: Point[], 

@@ -8,6 +8,11 @@ import { useEffect } from 'react';
 import { useUndoRedoStore } from '@/stores/undoRedoStore';
 import { toast } from 'sonner';
 
+/**
+ * Custom hook for providing Undo/Redo functionality, including keyboard shortcuts.
+ * @param enabled Whether the keyboard shortcuts are enabled.
+ * @returns An object containing undo/redo actions and state.
+ */
 export const useUndoRedo = (enabled = true) => {
   const { undo, redo, canUndo, canRedo, undoDescription, redoDescription } = useUndoRedoStore();
 

@@ -6,33 +6,98 @@ interface CardStore {
   cards: CardState[];
   nextZIndex: number;
   
-  // Card registration
+  /**
+   * Registers a new UI card with the specified configuration.
+   * @param config The configuration for the new card.
+   * @returns The unique ID of the registered card.
+   */
   registerCard: (config: CardConfig) => string;
+
+  /**
+   * Unregisters a card by its ID.
+   * @param id The ID of the card to unregister.
+   */
   unregisterCard: (id: string) => void;
   
-  // Card visibility
+  /**
+   * Toggles the visibility of a card.
+   * @param id The ID of the card.
+   */
   toggleVisibility: (id: string) => void;
+
+  /**
+   * Sets the visibility of a card.
+   * @param id The ID of the card.
+   * @param isVisible True to show, false to hide.
+   */
   setVisibility: (id: string, isVisible: boolean) => void;
   
-  // Card minimize
+  /**
+   * Toggles the minimized state of a card.
+   * @param id The ID of the card.
+   */
   toggleMinimize: (id: string) => void;
+
+  /**
+   * Sets the minimized state of a card.
+   * @param id The ID of the card.
+   * @param isMinimized True to minimize, false to restore.
+   */
   setMinimize: (id: string, isMinimized: boolean) => void;
   
-  // Card position and size
+  /**
+   * Updates the position of a card.
+   * @param id The ID of the card.
+   * @param position The new position.
+   */
   updateCardPosition: (id: string, position: CardPosition) => void;
+
+  /**
+   * Updates the size of a card.
+   * @param id The ID of the card.
+   * @param size The new size.
+   */
   updateCardSize: (id: string, size: CardSize) => void;
   
-  // Z-index management
+  /**
+   * Brings a card to the front by increasing its Z-index.
+   * @param id The ID of the card.
+   */
   bringToFront: (id: string) => void;
   
-  // Layout persistence
+  /**
+   * Saves the current card layout to local storage.
+   */
   saveLayout: () => void;
+
+  /**
+   * Loads the card layout from local storage.
+   */
   loadLayout: () => void;
+
+  /**
+   * Resets the card layout to default values.
+   */
   resetLayout: () => void;
+
+  /**
+   * Removes all cards of the specified types.
+   * @param types The types of cards to remove.
+   */
   removeCardsByType: (types: CardType[]) => void;
   
-  // Utilities
+  /**
+   * Retrieves a card state by its ID.
+   * @param id The ID of the card.
+   * @returns The card state, or undefined if not found.
+   */
   getCard: (id: string) => CardState | undefined;
+
+  /**
+   * Retrieves the first card state of the specified type.
+   * @param type The type of the card.
+   * @returns The card state, or undefined if not found.
+   */
   getCardByType: (type: CardType) => CardState | undefined;
 }
 

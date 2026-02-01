@@ -72,30 +72,164 @@ export interface SessionState {
   movementLocked: boolean;
   // Per-map viewport transforms (mapId -> transform)
   viewportTransforms: Record<string, ViewportTransform>;
+  /**
+   * Adds a new token to the session.
+   * @param token The token to add.
+   */
   addToken: (token: Token) => void;
+
+  /**
+   * Replaces the entire tokens array.
+   * @param tokens The new array of tokens.
+   */
   setTokens: (tokens: Token[]) => void;
+
+  /**
+   * Updates the position of a specific token.
+   * @param tokenId The ID of the token.
+   * @param x The new x-coordinate.
+   * @param y The new y-coordinate.
+   */
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
+
+  /**
+   * Updates the label text of a specific token.
+   * @param tokenId The ID of the token.
+   * @param label The new label text.
+   */
   updateTokenLabel: (tokenId: string, label: string) => void;
+
+  /**
+   * Updates the name of a specific token.
+   * @param tokenId The ID of the token.
+   * @param name The new name.
+   */
   updateTokenName: (tokenId: string, name: string) => void;
+
+  /**
+   * Updates the label position for a specific token.
+   * @param tokenId The ID of the token.
+   * @param labelPosition The new label position ('above', 'center', or 'below').
+   */
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
+
+  /**
+   * Updates the label style for a specific token.
+   * @param tokenId The ID of the token.
+   * @param labelColor The new text color.
+   * @param labelBackgroundColor The new background color.
+   */
   updateTokenLabelStyle: (tokenId: string, labelColor?: string, labelBackgroundColor?: string) => void;
+
+  /**
+   * Updates the color of a specific token.
+   * @param tokenId The ID of the token.
+   * @param color The new color string.
+   */
   updateTokenColor: (tokenId: string, color: string) => void;
+
+  /**
+   * Updates the image and/or image hash for a specific token.
+   * @param tokenId The ID of the token.
+   * @param imageUrl The new image URL.
+   * @param imageHash The new image hash for synchronization.
+   */
   updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
+
+  /**
+   * Updates whether a token has vision.
+   * @param tokenId The ID of the token.
+   * @param hasVision True if it has vision, false otherwise.
+   */
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
+
+  /**
+   * Updates the vision range of a specific token.
+   * @param tokenId The ID of the token.
+   * @param visionRange The new vision range in grid units.
+   */
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
+
+  /**
+   * Updates the illumination source settings for a specific token.
+   * @param tokenId The ID of the token.
+   * @param illumination Partial illumination source settings to apply.
+   */
   updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
+
+  /**
+   * Sets the owner (role) of a specific token.
+   * @param tokenId The ID of the token.
+   * @param ownerId The ID of the role that owns the token.
+   */
   setTokenOwner: (tokenId: string, ownerId: string) => void;
+
+  /**
+   * Removes a token from the session.
+   * @param tokenId The ID of the token to remove.
+   */
   removeToken: (tokenId: string) => void;
+
+  /**
+   * Clears all tokens from the current session.
+   */
   clearAllTokens: () => void;
+
+  /**
+   * Sets the list of currently selected tokens.
+   * @param tokenIds Array of token IDs to select.
+   */
   setSelectedTokens: (tokenIds: string[]) => void;
+
+  /**
+   * Sets the global token visibility rule.
+   * @param visibility The visibility setting ('all', 'owned', or 'dm-only').
+   */
   setTokenVisibility: (visibility: TokenVisibility) => void;
+
+  /**
+   * Sets the global label visibility rule.
+   * @param visibility The visibility setting ('show', 'hide', or 'selected').
+   */
   setLabelVisibility: (visibility: LabelVisibility) => void;
+
+  /**
+   * Sets whether token movement is globally locked.
+   * @param locked True to lock movement, false to unlock.
+   */
   setMovementLocked: (locked: boolean) => void;
+
+  /**
+   * Adds a new player to the session.
+   * @param player The player to add.
+   */
   addPlayer: (player: Player) => void;
+
+  /**
+   * Sets the current player and their role.
+   * @param playerId The ID of the current player.
+   * @param role The role of the player ('dm' or 'player').
+   */
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
+
+  /**
+   * Initializes the session with the given ID.
+   * @param sessionId The session ID.
+   */
   initializeSession: (sessionId?: string) => void;
-  // Viewport transform methods
+
+  /**
+   * Sets the viewport transform (pan and zoom) for a specific map.
+   * @param mapId The ID of the map.
+   * @param transform The new viewport transform.
+   */
   setViewportTransform: (mapId: string, transform: ViewportTransform) => void;
+
+  /**
+   * Gets the viewport transform for a specific map.
+   * @param mapId The ID of the map.
+   * @returns The viewport transform for that map.
+   */
   getViewportTransform: (mapId: string) => ViewportTransform;
 }
 

@@ -38,20 +38,72 @@ interface MapStore {
   maps: GameMap[];
   selectedMapId: string | null;
   
-  // Map operations
+  /**
+   * Adds a new map to the store.
+   * @param map The map data to add.
+   */
   addMap: (map: CreateMapData) => void;
+
+  /**
+   * Updates an existing map.
+   * @param id The ID of the map to update.
+   * @param updates The updates to apply.
+   */
   updateMap: (id: string, updates: Partial<GameMap>) => void;
+
+  /**
+   * Removes a map from the store by its ID.
+   * @param id The ID of the map to remove.
+   */
   removeMap: (id: string) => void;
+
+  /**
+   * Sets the currently selected map.
+   * @param id The ID of the map to select, or null.
+   */
   setSelectedMap: (id: string | null) => void;
+
+  /**
+   * Reorders maps in the list.
+   * @param fromIndex The original index of the map.
+   * @param toIndex The new index of the map.
+   */
   reorderMaps: (fromIndex: number, toIndex: number) => void;
-  
-  // Region operations
+
+  /**
+   * Adds a new region to a specific map.
+   * @param mapId The ID of the map.
+   * @param region The region data to add.
+   */
   addRegion: (mapId: string, region: Omit<GridRegion, 'id'>) => void;
+
+  /**
+   * Updates an existing region on a specific map.
+   * @param mapId The ID of the map containing the region.
+   * @param regionId The ID of the region to update.
+   * @param updates The updates to apply.
+   */
   updateRegion: (mapId: string, regionId: string, updates: Partial<GridRegion>) => void;
+
+  /**
+   * Removes a region from a specific map.
+   * @param mapId The ID of the map containing the region.
+   * @param regionId The ID of the region to remove.
+   */
   removeRegion: (mapId: string, regionId: string) => void;
-  
-  // Utilities
+
+  /**
+   * Finds the active region at the given coordinates.
+   * @param x The x-coordinate.
+   * @param y The y-coordinate.
+   * @returns An object containing the map and region, or null if none found.
+   */
   getActiveRegionAt: (x: number, y: number) => { map: GameMap; region: GridRegion } | null;
+
+  /**
+   * Gets a list of all currently visible maps.
+   * @returns An array of visible GameMap objects.
+   */
   getVisibleMaps: () => GameMap[];
 }
 

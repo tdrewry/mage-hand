@@ -27,6 +27,11 @@ interface MapManagerProps {
   onClose: () => void;
 }
 
+/**
+ * Component for managing maps and grid regions.
+ * Allows creating, updating, reordering, and deleting maps and their regions.
+ * @param props Component props including onClose callback.
+ */
 export const MapManager: React.FC<MapManagerProps> = ({ onClose }) => {
   const {
     maps,

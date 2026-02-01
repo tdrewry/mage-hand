@@ -6,7 +6,10 @@ export interface Point {
 }
 
 /**
- * Check if a point is inside a polygon using ray casting algorithm
+ * Check if a point is inside a polygon using the ray casting algorithm.
+ * @param point The point to check.
+ * @param polygon An array of points defining the polygon vertices.
+ * @returns True if the point is inside the polygon, false otherwise.
  */
 export function isPointInPolygon(point: Point, polygon: Point[]): boolean {
   if (polygon.length < 3) return false;
@@ -29,7 +32,9 @@ export function isPointInPolygon(point: Point, polygon: Point[]): boolean {
 }
 
 /**
- * Calculate the bounding box of a polygon
+ * Calculates the bounding box of a polygon.
+ * @param points An array of points defining the polygon vertices.
+ * @returns An object representing the bounding box {x, y, width, height}.
  */
 export function getPolygonBounds(points: Point[]): { x: number; y: number; width: number; height: number } {
   if (points.length === 0) {
@@ -57,7 +62,11 @@ export function getPolygonBounds(points: Point[]): { x: number; y: number; width
 }
 
 /**
- * Get distance from a point to the nearest point on a line segment
+ * Calculates the shortest distance from a point to a line segment.
+ * @param point The point to check.
+ * @param lineStart The start point of the line segment.
+ * @param lineEnd The end point of the line segment.
+ * @returns The shortest distance from the point to the line segment.
  */
 export function distanceToLineSegment(point: Point, lineStart: Point, lineEnd: Point): number {
   const A = point.x - lineStart.x;
@@ -93,7 +102,11 @@ export function distanceToLineSegment(point: Point, lineStart: Point, lineEnd: P
 }
 
 /**
- * Check if a point is near a polygon edge (for selection)
+ * Checks if a point is within a certain tolerance of any edge of a polygon.
+ * @param point The point to check.
+ * @param polygon An array of points defining the polygon vertices.
+ * @param tolerance The distance tolerance for being considered "near" an edge.
+ * @returns True if the point is near an edge, false otherwise.
  */
 export function isPointNearPolygonEdge(point: Point, polygon: Point[], tolerance: number = 5): boolean {
   for (let i = 0; i < polygon.length; i++) {
@@ -107,7 +120,11 @@ export function isPointNearPolygonEdge(point: Point, polygon: Point[], tolerance
 }
 
 /**
- * Find the nearest vertex to a point
+ * Finds the index of the nearest vertex to a given point within a tolerance.
+ * @param point The point to check from.
+ * @param polygon An array of points defining the polygon vertices.
+ * @param tolerance The distance tolerance for being considered a match.
+ * @returns The index of the nearest vertex, or null if no vertex is within tolerance.
  */
 export function findNearestVertex(point: Point, polygon: Point[], tolerance: number = 8): number | null {
   let nearestIndex = -1;
