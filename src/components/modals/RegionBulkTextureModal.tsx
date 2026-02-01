@@ -43,6 +43,7 @@ export const RegionBulkTextureModal = ({
   
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const hasInitializedRef = useRef(false);
 
   const selectedRegions = regions.filter(r => selectedRegionIds.includes(r.id));
 
@@ -87,18 +88,17 @@ export const RegionBulkTextureModal = ({
     };
   }, [selectedRegions]);
 
-  // Reset preview pan/zoom ONLY when modal opens (not on other state changes)
+  // Reset state and initialize ONLY when modal opens (not on subsequent state changes)
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      
+      // Reset preview pan/zoom
       setPreviewZoom(1);
       setPreviewPanX(0);
       setPreviewPanY(0);
-    }
-  }, [open]);
-
-  // Initialize texture settings when modal opens (separate from pan/zoom)
-  useEffect(() => {
-    if (open) {
+      
+      // Initialize texture settings based on analysis
       if (textureAnalysis.hasTextures && textureAnalysis.allSame && textureAnalysis.commonTexture) {
         // All selected regions have the same texture - pre-populate
         setBackgroundUrl(textureAnalysis.commonTexture);
@@ -121,6 +121,9 @@ export const RegionBulkTextureModal = ({
         setWorldAligned(true);
         setHasMixedTextures(false);
       }
+    } else if (!open) {
+      // Reset the initialization flag when modal closes
+      hasInitializedRef.current = false;
     }
   }, [open, textureAnalysis]);
 
