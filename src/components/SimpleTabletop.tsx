@@ -4440,6 +4440,8 @@ export const SimpleTabletop = () => {
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
           toggleDoor(clickedMapObject.id);
+          // Clear light system visibility cache so illumination recalculates
+          notifyObstaclesChanged();
           // Force fog recalculation by triggering a redraw
           requestAnimationFrame(() => redrawCanvas());
         }
