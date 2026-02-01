@@ -204,13 +204,29 @@ function convertRect(
 
 /**
  * Convert Watabou door to DoorConnection
+ * 
+ * Door positions in Watabou are at cell corners. We need to offset them
+ * by half a grid cell in the direction perpendicular to the door facing
+ * so they appear centered on the wall between cells.
  */
 function convertDoor(door: WatabouJSON['doors'][0]): Omit<DoorConnection, 'id'> {
+  // Base position at grid corner
+  let x = door.x * GRID_SIZE;
+  let y = door.y * GRID_SIZE;
+  
+  // Offset to center of cell edge based on door direction
+  // Door direction points toward the room the door opens into
+  // We need to shift perpendicular to the door facing
+  if (Math.abs(door.dir.x) > Math.abs(door.dir.y)) {
+    // Door faces horizontally (left/right) - shift vertically to center
+    y += GRID_SIZE / 2;
+  } else {
+    // Door faces vertically (up/down) - shift horizontally to center
+    x += GRID_SIZE / 2;
+  }
+  
   return {
-    position: {
-      x: door.x * GRID_SIZE,
-      y: door.y * GRID_SIZE,
-    },
+    position: { x, y },
     direction: door.dir,
     type: door.type,
   };
@@ -270,16 +286,14 @@ function convertWater(waterTiles: { x: number; y: number }[]): Omit<TerrainFeatu
 }
 
 /**
- * Convert Watabou columns to TerrainFeature
+ * Convert Watabou columns to tiles array (for MapObject conversion)
+ * Note: Columns are now converted to MapObjects, not TerrainFeatures
  */
-function convertColumns(columnTiles: { x: number; y: number }[]): Omit<TerrainFeature, 'id'> {
-  return {
-    type: 'column',
-    tiles: columnTiles.map((tile) => ({
-      x: tile.x * GRID_SIZE,
-      y: tile.y * GRID_SIZE,
-    })),
-  };
+function convertColumnTiles(columnTiles: { x: number; y: number }[]): { x: number; y: number }[] {
+  return columnTiles.map((tile) => ({
+    x: tile.x * GRID_SIZE,
+    y: tile.y * GRID_SIZE,
+  }));
 }
 
 export interface ImportedDungeon {
@@ -296,8 +310,11 @@ export interface ImportedDungeon {
 
 /**
  * Import a Watabou dungeon JSON and convert to our format
+ * 
+ * Note: Columns are NOT added to terrainFeatures. They are returned separately
+ * as columnTiles so they can be converted to interactive MapObjects by the caller.
  */
-export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon {
+export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon & { columnTiles: { x: number; y: number }[] } {
   // First pass: detect connections
   const connections = detectRegionConnections(json.rects, json.doors);
   
@@ -308,21 +325,24 @@ export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon {
   const doors = json.doors.map(convertDoor);
   const annotations = json.notes.map(convertNote);
   
+  // Only water goes into terrainFeatures (rendered but non-interactive)
   const terrainFeatures: Omit<TerrainFeature, 'id'>[] = [];
   
   if (json.water && json.water.length > 0) {
     terrainFeatures.push(convertWater(json.water));
   }
   
-  if (json.columns && json.columns.length > 0) {
-    terrainFeatures.push(convertColumns(json.columns));
-  }
+  // Columns are returned separately for MapObject conversion
+  const columnTiles = json.columns && json.columns.length > 0
+    ? convertColumnTiles(json.columns)
+    : [];
   
   return {
     regions,
     doors,
     annotations,
     terrainFeatures,
+    columnTiles,
     metadata: {
       title: json.title,
       story: json.story,

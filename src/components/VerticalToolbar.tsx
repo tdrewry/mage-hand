@@ -381,6 +381,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="xs"
           />
+
+          <ClearDataDialog
+            open={showClearDialog}
+            onOpenChange={setShowClearDialog}
+            fabricCanvas={fabricCanvas}
+          />
         </>
       ) : (
         <>
