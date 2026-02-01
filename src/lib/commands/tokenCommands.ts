@@ -130,3 +130,81 @@ export class UpdateTokenCommand implements Command {
     }
   }
 }
+
+/**
+ * Command for updating token size
+ */
+export class UpdateTokenSizeCommand implements Command {
+  type = 'UPDATE_TOKEN_SIZE';
+  description: string;
+  private tokenId: string;
+  private previousSize: { gridWidth: number; gridHeight: number };
+  private newSize: { gridWidth: number; gridHeight: number };
+
+  constructor(
+    tokenId: string,
+    previousSize: { gridWidth: number; gridHeight: number },
+    newSize: { gridWidth: number; gridHeight: number },
+    tokenLabel?: string
+  ) {
+    this.tokenId = tokenId;
+    this.previousSize = previousSize;
+    this.newSize = newSize;
+    this.description = `Resize ${tokenLabel || 'token'} to ${newSize.gridWidth}x${newSize.gridHeight}`;
+  }
+
+  execute(): void {
+    useSessionStore.getState().updateTokenSize(
+      this.tokenId,
+      this.newSize.gridWidth,
+      this.newSize.gridHeight
+    );
+  }
+
+  undo(): void {
+    useSessionStore.getState().updateTokenSize(
+      this.tokenId,
+      this.previousSize.gridWidth,
+      this.previousSize.gridHeight
+    );
+  }
+}
+
+/**
+ * Command for updating token details (notes, quickReferenceUrl)
+ */
+export class UpdateTokenDetailsCommand implements Command {
+  type = 'UPDATE_TOKEN_DETAILS';
+  description: string;
+  private tokenId: string;
+  private previousDetails: { notes?: string; quickReferenceUrl?: string };
+  private newDetails: { notes?: string; quickReferenceUrl?: string };
+
+  constructor(
+    tokenId: string,
+    previousDetails: { notes?: string; quickReferenceUrl?: string },
+    newDetails: { notes?: string; quickReferenceUrl?: string },
+    tokenLabel?: string
+  ) {
+    this.tokenId = tokenId;
+    this.previousDetails = previousDetails;
+    this.newDetails = newDetails;
+    this.description = `Update ${tokenLabel || 'token'} details`;
+  }
+
+  execute(): void {
+    useSessionStore.getState().updateTokenDetails(
+      this.tokenId,
+      this.newDetails.notes,
+      this.newDetails.quickReferenceUrl
+    );
+  }
+
+  undo(): void {
+    useSessionStore.getState().updateTokenDetails(
+      this.tokenId,
+      this.previousDetails.notes,
+      this.previousDetails.quickReferenceUrl
+    );
+  }
+}
