@@ -6,53 +6,87 @@ import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
- * Render a door shape (rectangular with hinges indicator)
+ * Render a door shape (rectangular with open/closed visual state)
  */
 function renderDoorShape(
   ctx: CanvasRenderingContext2D,
   mapObject: MapObject,
-  zoom: number
+  zoom: number,
+  isDMView: boolean = false
 ) {
-  const { width, height, isOpen } = mapObject;
+  const { width, height, isOpen, fillColor, strokeColor } = mapObject;
   
   if (isOpen) {
-    // Draw open door - swung to the side (90 degrees)
-    // Door appears as a thin line at the edge with the door panel rotated
+    // Draw open door - thin line at the edge to indicate doorway
     ctx.save();
     
-    // Draw hinge point
-    ctx.beginPath();
-    ctx.arc(-width / 2, 0, 3 / zoom, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Draw swung door panel
-    ctx.rotate(-Math.PI / 2); // Rotate 90 degrees
-    ctx.fillRect(-height / 2, -width / 2, height, width * 0.15);
-    ctx.strokeRect(-height / 2, -width / 2, height, width * 0.15);
-    
-    ctx.restore();
-    
-    // Draw doorway opening (dashed line)
-    ctx.save();
+    // Draw doorway opening (dashed line where door was)
     ctx.setLineDash([4 / zoom, 4 / zoom]);
     ctx.strokeStyle = '#9ca3af';
-    ctx.lineWidth = 1 / zoom;
+    ctx.lineWidth = 2 / zoom;
     ctx.beginPath();
     ctx.moveTo(-width / 2, 0);
     ctx.lineTo(width / 2, 0);
     ctx.stroke();
     ctx.setLineDash([]);
+    
+    // Draw door panel swung open (small rectangle at edge)
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1 / zoom;
+    
+    // Draw hinges and swung door
+    ctx.beginPath();
+    ctx.arc(-width / 2, 0, 3 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Swung door panel (rotated 90 degrees from closed position)
+    ctx.save();
+    ctx.translate(-width / 2, 0);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillRect(0, -height / 2, width * 0.7, height);
+    ctx.strokeRect(0, -height / 2, width * 0.7, height);
+    ctx.restore();
+    
     ctx.restore();
   } else {
-    // Draw closed door - solid rectangle
+    // Draw closed door - solid rectangle blocking the doorway
     ctx.fillRect(-width / 2, -height / 2, width, height);
     ctx.strokeRect(-width / 2, -height / 2, width, height);
     
     // Draw door handle/detail
     ctx.beginPath();
     ctx.arc(width / 4, 0, 2 / zoom, 0, Math.PI * 2);
-    ctx.fillStyle = mapObject.strokeColor;
+    ctx.fillStyle = strokeColor;
     ctx.fill();
+  }
+  
+  // DM view: always show interactive indicator
+  if (isDMView) {
+    // Draw a small icon indicator showing the door is interactive
+    const indicatorSize = 8 / zoom;
+    const indicatorY = -height / 2 - indicatorSize - 4 / zoom;
+    
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = isOpen ? '#22c55e' : '#f59e0b'; // Green for open, amber for closed
+    
+    // Draw small door icon
+    ctx.beginPath();
+    ctx.roundRect(
+      -indicatorSize / 2, 
+      indicatorY - indicatorSize / 2, 
+      indicatorSize, 
+      indicatorSize, 
+      2 / zoom
+    );
+    ctx.fill();
+    
+    // Draw lock/unlock symbol inside
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${6 / zoom}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isOpen ? '○' : '●', 0, indicatorY);
   }
 }
 
@@ -64,7 +98,8 @@ export function renderMapObject(
   mapObject: MapObject,
   zoom: number,
   selected: boolean = false,
-  style: WatabouStyle = DEFAULT_STYLE
+  style: WatabouStyle = DEFAULT_STYLE,
+  isDMView: boolean = false
 ) {
   const { position, width, height, shape, fillColor, strokeColor, strokeWidth, opacity, rotation } = mapObject;
   
@@ -85,7 +120,7 @@ export function renderMapObject(
   ctx.lineWidth = strokeWidth / zoom;
   
   if (shape === 'door') {
-    renderDoorShape(ctx, mapObject, zoom);
+    renderDoorShape(ctx, mapObject, zoom, isDMView);
   } else {
     ctx.beginPath();
     
@@ -143,17 +178,6 @@ export function renderMapObject(
     ctx.setLineDash([]);
   }
   
-  // Draw open/closed indicator for doors
-  if (shape === 'door' && mapObject.isOpen !== undefined) {
-    ctx.globalAlpha = 0.8;
-    ctx.font = `${10 / zoom}px Arial`;
-    ctx.fillStyle = mapObject.isOpen ? '#22c55e' : '#ef4444';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // Small indicator above the door
-    ctx.fillText(mapObject.isOpen ? '○' : '●', 0, -height / 2 - 8 / zoom);
-  }
-  
   ctx.restore();
 }
 
@@ -165,7 +189,8 @@ export function renderMapObjects(
   mapObjects: MapObject[],
   zoom: number,
   selectedIds: string[] = [],
-  style: WatabouStyle = DEFAULT_STYLE
+  style: WatabouStyle = DEFAULT_STYLE,
+  isDMView: boolean = false
 ) {
   // Sort so selected objects render on top
   const sortedObjects = [...mapObjects].sort((a, b) => {
@@ -175,7 +200,7 @@ export function renderMapObjects(
   });
   
   sortedObjects.forEach((obj) => {
-    renderMapObject(ctx, obj, zoom, selectedIds.includes(obj.id), style);
+    renderMapObject(ctx, obj, zoom, selectedIds.includes(obj.id), style, isDMView);
   });
 }
 
