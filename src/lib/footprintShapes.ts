@@ -100,55 +100,49 @@ function drawBarefootPrint(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * Draw a boot print - rounded rectangle sole with heel
+ * Draw a boot print - separate heel block and foot/sole with tread pattern
+ * Pattern: [] [ ==]  (heel separate from main sole)
  */
 function drawBootPrint(ctx: CanvasRenderingContext2D, size: number): void {
   const scale = size / 30;
 
-  // Main sole shape
-  ctx.beginPath();
-  
-  // Draw rounded rectangle for boot sole
-  const soleWidth = 10 * scale;
-  const soleHeight = 22 * scale;
-  const radius = 3 * scale;
-  
-  ctx.moveTo(-soleWidth / 2 + radius, -soleHeight / 2);
-  ctx.lineTo(soleWidth / 2 - radius, -soleHeight / 2);
-  ctx.quadraticCurveTo(soleWidth / 2, -soleHeight / 2, soleWidth / 2, -soleHeight / 2 + radius);
-  ctx.lineTo(soleWidth / 2, soleHeight / 2 - radius);
-  ctx.quadraticCurveTo(soleWidth / 2, soleHeight / 2, soleWidth / 2 - radius, soleHeight / 2);
-  ctx.lineTo(-soleWidth / 2 + radius, soleHeight / 2);
-  ctx.quadraticCurveTo(-soleWidth / 2, soleHeight / 2, -soleWidth / 2, soleHeight / 2 - radius);
-  ctx.lineTo(-soleWidth / 2, -soleHeight / 2 + radius);
-  ctx.quadraticCurveTo(-soleWidth / 2, -soleHeight / 2, -soleWidth / 2 + radius, -soleHeight / 2);
-  ctx.closePath();
-  ctx.fill();
-
-  // Heel indent (darker)
-  ctx.globalAlpha = ctx.globalAlpha * 0.3;
+  // Heel block (separate square at bottom)
   ctx.beginPath();
   ctx.roundRect(
     -4 * scale,
     6 * scale,
     8 * scale,
-    6 * scale,
+    7 * scale,
+    1.5 * scale
+  );
+  ctx.fill();
+
+  // Main foot/sole (larger rectangle above heel, with gap)
+  ctx.beginPath();
+  ctx.roundRect(
+    -5 * scale,
+    -12 * scale,
+    10 * scale,
+    15 * scale,
     2 * scale
   );
   ctx.fill();
 
-  // Toe grip pattern
+  // Tread pattern on sole (horizontal lines)
+  const currentAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = currentAlpha * 0.3;
   ctx.beginPath();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     ctx.roundRect(
       -3.5 * scale,
-      (-8 - i * 3) * scale,
+      (-10 + i * 3.5) * scale,
       7 * scale,
       2 * scale,
-      1 * scale
+      0.5 * scale
     );
   }
   ctx.fill();
+  ctx.globalAlpha = currentAlpha;
 }
 
 /**
@@ -203,36 +197,48 @@ function drawPawPrint(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * Draw a hoof print - U-shape with cleft
+ * Draw a hoof print - sideways U-shape with open side facing away from movement
+ * Since footprints are rotated to face movement direction, "away" means toward the bottom (positive Y)
  */
 function drawHoofPrint(ctx: CanvasRenderingContext2D, size: number): void {
   const scale = size / 30;
 
-  // U-shaped hoof outline
+  // Sideways U-shape (horseshoe) - open side facing down (away from movement)
   ctx.beginPath();
-  ctx.moveTo(-7 * scale, -10 * scale);
-  ctx.lineTo(-7 * scale, 2 * scale);
+  
+  // Start at top-left, go around the U shape
+  // The U opens downward (toward positive Y, which is "behind" the movement)
+  ctx.moveTo(-7 * scale, 8 * scale);  // Bottom left
+  ctx.lineTo(-7 * scale, -4 * scale); // Up the left side
   ctx.bezierCurveTo(
-    -7 * scale, 10 * scale,
-    0, 12 * scale,
-    0, 12 * scale
+    -7 * scale, -12 * scale,  // Control point
+    0, -14 * scale,           // Top of curve
+    0, -14 * scale            // Top center
   );
   ctx.bezierCurveTo(
-    0, 12 * scale,
-    7 * scale, 10 * scale,
-    7 * scale, 2 * scale
+    0, -14 * scale,           // Top center
+    7 * scale, -12 * scale,   // Control point
+    7 * scale, -4 * scale     // Down the right side
   );
-  ctx.lineTo(7 * scale, -10 * scale);
+  ctx.lineTo(7 * scale, 8 * scale);   // Bottom right
+  
+  // Inner curve of the U (creates the horseshoe gap)
+  ctx.lineTo(4 * scale, 8 * scale);   // Step in on right
+  ctx.lineTo(4 * scale, -2 * scale);  // Up inner right
+  ctx.bezierCurveTo(
+    4 * scale, -8 * scale,
+    0, -10 * scale,
+    0, -10 * scale
+  );
+  ctx.bezierCurveTo(
+    0, -10 * scale,
+    -4 * scale, -8 * scale,
+    -4 * scale, -2 * scale
+  );
+  ctx.lineTo(-4 * scale, 8 * scale);  // Down inner left
   ctx.closePath();
+  
   ctx.fill();
-
-  // Cleft (vertical line dividing the hoof)
-  ctx.globalAlpha = ctx.globalAlpha * 0.3;
-  ctx.beginPath();
-  ctx.moveTo(0, -8 * scale);
-  ctx.lineTo(0, 8 * scale);
-  ctx.lineWidth = 2 * scale;
-  ctx.stroke();
 }
 
 /**
