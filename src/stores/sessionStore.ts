@@ -29,6 +29,10 @@ export interface AppearanceVariant {
   isDefault?: boolean;     // Mark one variant as the default/original
 }
 
+// Path styling types
+export type PathStyle = 'dashed' | 'solid' | 'footprint' | 'none';
+export type FootprintType = 'barefoot' | 'boot' | 'paw' | 'hoof' | 'claw';
+
 export interface Token {
   id: string;
   name: string;
@@ -45,6 +49,13 @@ export interface Token {
   roleId: string;     // Role this token belongs to
   isHidden: boolean;  // Whether token is hidden (only visible to privileged roles)
   color?: string;     // Token color (for default tokens)
+  
+  // Movement path styling
+  pathStyle?: PathStyle;        // How to render movement path (default: 'dashed')
+  pathColor?: string;           // Path color (defaults to token.color or white)
+  pathWeight?: number;          // Path line thickness or footprint size (1-5, default: 3)
+  pathOpacity?: number;         // Path opacity (0.3-1.0, default: 0.7)
+  footprintType?: FootprintType; // Type of footprint when pathStyle is 'footprint' (default: 'barefoot')
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
   
