@@ -260,6 +260,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.MAP_OBJECTS]: {
+    title: 'Map Objects',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 350, height: 550 },
+    minSize: { width: 300, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

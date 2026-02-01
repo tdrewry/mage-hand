@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -64,6 +64,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
   const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
   const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
+  const mapObjectsCard = cards.find((c) => c.type === CardType.MAP_OBJECTS);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -142,6 +143,23 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 600, height: 700 },
         minSize: { width: 500, height: 600 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleMapObjects = () => {
+    if (mapObjectsCard) {
+      setVisibility(mapObjectsCard.id, !mapObjectsCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.MAP_OBJECTS,
+        title: 'Map Objects',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 350, height: 550 },
+        minSize: { width: 300, height: 400 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -441,6 +459,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Shield className="h-4 w-4 mr-2" />
           Role Manager
+        </Button>
+
+        <Button 
+          variant={mapObjectsCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleMapObjects}
+          className="w-full"
+        >
+          <Box className="h-4 w-4 mr-2" />
+          Map Objects
         </Button>
 
         <Button 
