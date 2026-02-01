@@ -2780,14 +2780,14 @@ export const SimpleTabletop = () => {
         );
       }
 
-      // Draw path distance text near the end of the path
+      // Draw path distance text near the origin (start) so it's always visible
       if (dragPath.length > 2 && pathDistance > 10) {
-        const endPoint = dragPath[dragPath.length - 1];
+        const originPoint = dragPath[0];
 
         const offsetX = 40 / transform.zoom;
         const offsetY = -40 / transform.zoom;
-        const textX = endPoint.x + offsetX;
-        const textY = endPoint.y + offsetY;
+        const textX = originPoint.x + offsetX;
+        const textY = originPoint.y + offsetY;
 
         ctx.fillStyle = "#ffffff";
         ctx.globalAlpha = 0.9;
