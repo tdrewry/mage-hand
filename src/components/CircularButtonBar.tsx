@@ -7,7 +7,7 @@ import {
   Footprints,
 } from 'lucide-react';
 import { useCardStore } from '@/stores/cardStore';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useInitiativeStore } from '@/stores/initiativeStore';
 import { CardType } from '@/types/cardTypes';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 
@@ -24,8 +24,9 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   const setVisibility = useCardStore((state) => state.setVisibility);
   const registerCard = useCardStore((state) => state.registerCard);
   
-  const movementLocked = useSessionStore((state) => state.movementLocked);
-  const setMovementLocked = useSessionStore((state) => state.setMovementLocked);
+  // Use initiativeStore's restrictMovement as the master movement lock
+  const movementLocked = useInitiativeStore((state) => state.restrictMovement);
+  const setMovementLocked = useInitiativeStore((state) => state.setRestrictMovement);
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
