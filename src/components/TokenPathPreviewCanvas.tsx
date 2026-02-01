@@ -12,6 +12,7 @@ interface TokenPathPreviewCanvasProps {
   pathColor: string;
   pathWeight: number;
   pathOpacity: number;
+  pathGaitWidth?: number;
 }
 
 export const TokenPathPreviewCanvas: React.FC<TokenPathPreviewCanvasProps> = ({
@@ -20,6 +21,7 @@ export const TokenPathPreviewCanvas: React.FC<TokenPathPreviewCanvasProps> = ({
   pathColor,
   pathWeight,
   pathOpacity,
+  pathGaitWidth = 0.6,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -73,6 +75,7 @@ export const TokenPathPreviewCanvas: React.FC<TokenPathPreviewCanvasProps> = ({
         pathColor,
         previewSize,
         pathOpacity,
+        pathGaitWidth,
         1 // zoom = 1 for preview
       );
     } else {
@@ -106,7 +109,7 @@ export const TokenPathPreviewCanvas: React.FC<TokenPathPreviewCanvasProps> = ({
     ctx.fill();
     ctx.restore();
 
-  }, [pathStyle, footprintType, pathColor, pathWeight, pathOpacity]);
+  }, [pathStyle, footprintType, pathColor, pathWeight, pathOpacity, pathGaitWidth]);
 
   return (
     <canvas

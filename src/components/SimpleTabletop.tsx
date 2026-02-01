@@ -2587,6 +2587,7 @@ export const SimpleTabletop = () => {
     const pathColor = token.pathColor || token.color || '#ffffff';
     const pathWeight = token.pathWeight ?? 3;
     const pathOpacity = token.pathOpacity ?? 0.7;
+    const pathGaitWidth = token.pathGaitWidth ?? 0.6;
     const footprintType = token.footprintType || 'barefoot';
 
     ctx.save();
@@ -2660,6 +2661,7 @@ export const SimpleTabletop = () => {
           pathColor,
           footprintSize,
           pathOpacity,
+          pathGaitWidth,
           transform.zoom
         );
       } else {

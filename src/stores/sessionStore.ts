@@ -55,6 +55,7 @@ export interface Token {
   pathColor?: string;           // Path color (defaults to token.color or white)
   pathWeight?: number;          // Path line thickness or footprint size (1-5, default: 3)
   pathOpacity?: number;         // Path opacity (0.3-1.0, default: 0.7)
+  pathGaitWidth?: number;       // Side-to-side offset for footprints (0.2-1.0, default: 0.6)
   footprintType?: FootprintType; // Type of footprint when pathStyle is 'footprint' (default: 'barefoot')
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
