@@ -34,7 +34,7 @@ import {
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
-import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint } from "../lib/mapObjectRenderer";
+import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
 import { generateNegativeSpaceRegion, mapObjectsToSegments } from "../lib/wallGeometry";
 import {
   applyHatchingPattern,
@@ -4406,7 +4406,8 @@ export const SimpleTabletop = () => {
     // Include transform in dependencies so animation loop recreates with fresh transform values
     // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
     // Include regions for animated region textures
-  }, [tokens, regions, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
+    // Include mapObjects so door state changes are reflected immediately in animation frames
+  }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
 
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -4455,6 +4456,9 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
+          // Trigger visual animation before state change
+          const isOpening = !clickedMapObject.isOpen;
+          triggerDoorAnimation(clickedMapObject.id, isOpening);
           // The useEffect on mapObjects handles segment updates, cache clearing, and redraw
           toggleDoor(clickedMapObject.id);
         }

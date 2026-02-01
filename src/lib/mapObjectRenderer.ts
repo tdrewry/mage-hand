@@ -6,6 +6,46 @@ import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
+ * Door toggle animation state - tracks recently toggled doors for visual feedback
+ */
+interface DoorAnimationState {
+  startTime: number;
+  isOpening: boolean; // true = opening, false = closing
+}
+
+const doorAnimations = new Map<string, DoorAnimationState>();
+const DOOR_ANIMATION_DURATION = 300; // ms
+
+/**
+ * Trigger a door toggle animation
+ */
+export function triggerDoorAnimation(doorId: string, isOpening: boolean) {
+  doorAnimations.set(doorId, {
+    startTime: performance.now(),
+    isOpening,
+  });
+}
+
+/**
+ * Get animation progress for a door (0-1, or null if not animating)
+ */
+function getDoorAnimationProgress(doorId: string): { progress: number; isOpening: boolean } | null {
+  const animation = doorAnimations.get(doorId);
+  if (!animation) return null;
+  
+  const elapsed = performance.now() - animation.startTime;
+  if (elapsed >= DOOR_ANIMATION_DURATION) {
+    doorAnimations.delete(doorId);
+    return null;
+  }
+  
+  return {
+    progress: elapsed / DOOR_ANIMATION_DURATION,
+    isOpening: animation.isOpening,
+  };
+}
+
+/**
  * Render a door shape (rectangular with open/closed visual state)
  * All coordinates are in local space - the parent transform handles position and rotation.
  * This means the door will render correctly at any angle, not just grid-aligned.
@@ -22,7 +62,7 @@ function renderDoorShape(
   zoom: number,
   isDMView: boolean = false
 ) {
-  const { width, height, isOpen, fillColor, strokeColor } = mapObject;
+  const { id, width, height, isOpen, fillColor, strokeColor } = mapObject;
   
   // Door dimensions in local space:
   // - doorLength: span of the doorway (along local X)
@@ -36,7 +76,32 @@ function renderDoorShape(
   const pivotX = -doorLength / 2;
   const pivotY = 0;
   
-  if (isOpen) {
+  // Check for door toggle animation
+  const animation = getDoorAnimationProgress(id);
+  
+  // Calculate animated door swing angle (0 = closed, -90° = open)
+  let swingAngle = isOpen ? -Math.PI / 2 : 0;
+  let animatedDoorLength = isOpen ? openDoorLength : doorLength;
+  
+  if (animation) {
+    // Ease-out curve for smooth animation
+    const easeOut = 1 - Math.pow(1 - animation.progress, 3);
+    
+    if (animation.isOpening) {
+      // Animating from closed to open
+      swingAngle = -Math.PI / 2 * easeOut;
+      animatedDoorLength = doorLength - (doorLength - openDoorLength) * easeOut;
+    } else {
+      // Animating from open to closed
+      swingAngle = -Math.PI / 2 * (1 - easeOut);
+      animatedDoorLength = openDoorLength + (doorLength - openDoorLength) * easeOut;
+    }
+  }
+  
+  // Determine if we should draw as open or closed based on animation state
+  const drawAsOpen = animation ? animation.isOpening : isOpen;
+  
+  if (drawAsOpen || animation) {
     ctx.save();
     
     // Draw doorway opening (dashed line where door was)
@@ -49,7 +114,7 @@ function renderDoorShape(
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Draw door panel swung open at 90 degrees from pivot point
+    // Draw door panel with animated swing
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1 / zoom;
@@ -59,15 +124,24 @@ function renderDoorShape(
     ctx.arc(pivotX, pivotY, 3 / zoom, 0, Math.PI * 2);
     ctx.fill();
     
-    // Swung door panel: rotates 90° counter-clockwise from pivot, half length
-    // The -90° rotation (in local space) means the door swings "into" the positive Y direction
+    // Apply glow effect if animating
+    if (animation) {
+      const glowIntensity = Math.sin(animation.progress * Math.PI);
+      const glowColor = animation.isOpening ? '34, 197, 94' : '245, 158, 11';
+      ctx.shadowColor = `rgba(${glowColor}, ${glowIntensity * 0.6})`;
+      ctx.shadowBlur = (15 + glowIntensity * 10) / zoom;
+    }
+    
+    // Swung door panel with animated rotation
     ctx.save();
     ctx.translate(pivotX, pivotY);
-    ctx.rotate(-Math.PI / 2); // 90° counter-clockwise in local space
-    ctx.fillRect(0, -doorThickness / 2, openDoorLength, doorThickness);
-    ctx.strokeRect(0, -doorThickness / 2, openDoorLength, doorThickness);
+    ctx.rotate(swingAngle);
+    ctx.fillRect(0, -doorThickness / 2, animatedDoorLength, doorThickness);
+    ctx.strokeRect(0, -doorThickness / 2, animatedDoorLength, doorThickness);
     ctx.restore();
     
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
     ctx.restore();
   } else {
     // Draw closed door - solid rectangle blocking the doorway
