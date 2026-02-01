@@ -106,9 +106,9 @@ const STORAGE_KEY = 'vtt-card-layout';
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   [CardType.MENU]: {
     title: 'Menu',
-    defaultPosition: { x: 20, y: 20 },
-    defaultSize: { width: 320, height: 520 },
-    minSize: { width: 200, height: 300 },
+    defaultPosition: { x: 70, y: 20 }, // Offset to clear the left vertical toolbar
+    defaultSize: { width: 340, height: 520 },
+    minSize: { width: 280, height: 300 },
     isResizable: true,
     isClosable: false,
     defaultVisible: true,
