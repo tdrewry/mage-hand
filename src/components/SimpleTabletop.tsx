@@ -878,6 +878,11 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [serializedExploredAreas]);
 
+  // Redraw when map objects change (e.g., door toggle)
+  useEffect(() => {
+    redrawCanvas();
+  }, [mapObjects]);
+
   // Compute fog of war masks when tokens move or fog settings change
   // Skip during dragging to prevent stuttering
   useEffect(() => {
