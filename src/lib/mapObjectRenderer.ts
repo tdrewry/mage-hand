@@ -304,11 +304,15 @@ export function renderMapObjectShadows(
 
 /**
  * Hit test for a point against a map object
+ * @param isDMView - If true, includes the DM indicator area for doors
+ * @param zoom - Current zoom level (needed to calculate indicator hit area)
  */
 export function isPointInMapObject(
   x: number,
   y: number,
-  mapObject: MapObject
+  mapObject: MapObject,
+  isDMView: boolean = false,
+  zoom: number = 1
 ): boolean {
   const { position, width, height, shape, rotation } = mapObject;
   
@@ -324,6 +328,21 @@ export function isPointInMapObject(
     const newY = localX * sin + localY * cos;
     localX = newX;
     localY = newY;
+  }
+  
+  // For doors in DM view, also check if clicking on the indicator
+  if (shape === 'door' && isDMView) {
+    const indicatorSize = 8 / zoom;
+    const indicatorY = -height / 2 - indicatorSize - 4 / zoom;
+    const indicatorHitRadius = indicatorSize;
+    
+    // Check if click is on indicator
+    if (
+      Math.abs(localX) <= indicatorHitRadius &&
+      Math.abs(localY - indicatorY) <= indicatorHitRadius
+    ) {
+      return true;
+    }
   }
   
   // For doors, use a larger hit area for easier selection
@@ -349,15 +368,19 @@ export function isPointInMapObject(
 
 /**
  * Find map object at a given point
+ * @param isDMView - If true, includes the DM indicator area for doors
+ * @param zoom - Current zoom level (needed for indicator hit detection)
  */
 export function findMapObjectAtPoint(
   x: number,
   y: number,
-  mapObjects: MapObject[]
+  mapObjects: MapObject[],
+  isDMView: boolean = false,
+  zoom: number = 1
 ): MapObject | null {
   // Search in reverse order so top-most (selected) objects are found first
   for (let i = mapObjects.length - 1; i >= 0; i--) {
-    if (isPointInMapObject(x, y, mapObjects[i])) {
+    if (isPointInMapObject(x, y, mapObjects[i], isDMView, zoom)) {
       return mapObjects[i];
     }
   }

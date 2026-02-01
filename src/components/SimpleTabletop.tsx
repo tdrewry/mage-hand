@@ -4408,7 +4408,7 @@ export const SimpleTabletop = () => {
 
       // Check if we clicked on a token first (tokens are on top)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects);
+      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
       if (clickedToken) {
@@ -5507,7 +5507,7 @@ export const SimpleTabletop = () => {
         
         // Check if hovering over a door (DM in play mode)
         if (isDM && renderingMode === 'play') {
-          const hoveredMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects);
+          const hoveredMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, true, transform.zoom);
           if (hoveredMapObject?.category === 'door') {
             if (canvas) {
               canvas.style.cursor = "pointer";
