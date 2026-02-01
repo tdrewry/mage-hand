@@ -242,21 +242,26 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
     const id = generateId();
     const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
     
-    // Determine if horizontal or vertical based on direction
+    // Determine if vertical based on direction
     // Watabou door.direction indicates which way the door faces
-    const isHorizontal = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
+    // If door faces up/down (y dominant), it's a horizontal door (no rotation needed)
+    // If door faces left/right (x dominant), it's a vertical door (needs 90° rotation)
+    const isVertical = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
     
     // Door dimensions - match grid spacing (50px is GRID_SIZE)
+    // width = door span (length of doorway), height = door thickness
+    // These stay consistent; rotation handles orientation
     const doorLength = 40; // Slightly smaller than grid cell
     const doorThickness = 6;
     
     const newMapObject: MapObject = {
       id,
       position: door.position,
-      // Swap width/height based on orientation
-      width: isHorizontal ? doorThickness : doorLength,
-      height: isHorizontal ? doorLength : doorThickness,
-      rotation: 0, // No rotation needed - we handle orientation via width/height
+      // Always use consistent dimensions: width = span, height = thickness
+      width: doorLength,
+      height: doorThickness,
+      // Use rotation to orient the door: 0° = horizontal, 90° = vertical
+      rotation: isVertical ? 90 : 0,
       shape: 'door',
       fillColor: doorStyle.fillColor,
       strokeColor: doorStyle.strokeColor,
@@ -291,19 +296,23 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       
       const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
       
-      // Determine if horizontal or vertical based on direction
-      const isHorizontal = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
+      // Determine if vertical based on direction
+      // If door faces left/right (x dominant), it's a vertical door (needs 90° rotation)
+      const isVertical = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
       
       // Door dimensions - match grid spacing
+      // width = door span (length of doorway), height = door thickness
       const doorLength = 40;
       const doorThickness = 6;
       
       newMapObjects.push({
         id,
         position: door.position,
-        width: isHorizontal ? doorThickness : doorLength,
-        height: isHorizontal ? doorLength : doorThickness,
-        rotation: 0,
+        // Always use consistent dimensions: width = span, height = thickness
+        width: doorLength,
+        height: doorThickness,
+        // Use rotation to orient the door: 0° = horizontal, 90° = vertical
+        rotation: isVertical ? 90 : 0,
         shape: 'door',
         fillColor: doorStyle.fillColor,
         strokeColor: doorStyle.strokeColor,
