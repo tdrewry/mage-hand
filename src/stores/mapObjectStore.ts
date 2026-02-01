@@ -202,12 +202,17 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       const id = generateId();
       ids.push(id);
       
+      // Columns should be at grid intersection points (tile coordinates directly)
+      // Debris/other objects should be centered on the tile (+25 offset)
+      const isColumn = terrainType === 'column';
+      
       return {
         id,
         position: {
-          // Center the object on the tile
-          x: tile.x + 25,
-          y: tile.y + 25,
+          // Columns: at grid intersection (no offset)
+          // Others: center of tile (+25 offset for 50px grid)
+          x: isColumn ? tile.x : tile.x + 25,
+          y: isColumn ? tile.y : tile.y + 25,
         },
         width: preset.width || 16,
         height: preset.height || 16,
@@ -216,7 +221,7 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
         strokeColor: preset.strokeColor || '#52525b',
         strokeWidth: preset.strokeWidth || 2,
         opacity: preset.opacity ?? 1,
-        castsShadow: preset.castsShadow ?? true,
+        castsShadow: preset.castsShadow ?? false,
         blocksMovement: preset.blocksMovement ?? true,
         blocksVision: preset.blocksVision ?? true,
         revealedByLight: preset.revealedByLight ?? true,
