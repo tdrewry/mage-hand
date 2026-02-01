@@ -1,11 +1,11 @@
 import React from 'react';
 import { Lock } from 'lucide-react';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useInitiativeStore } from '@/stores/initiativeStore';
 import { Badge } from './ui/badge';
 import { Z_INDEX } from '@/lib/zIndex';
 
 export const MovementLockIndicator: React.FC = () => {
-  const movementLocked = useSessionStore((state) => state.movementLocked);
+  const movementLocked = useInitiativeStore((state) => state.restrictMovement);
 
   if (!movementLocked) return null;
 
