@@ -323,15 +323,19 @@ export function drawFootprintPath(
     const pos = getPositionOnPath(path, distanceTraveled);
     if (!pos) break;
 
-    // Calculate direction at this point
+    // Calculate direction of movement at this point
     const nextPos = getPositionOnPath(path, distanceTraveled + stride * 0.1);
-    let angle = 0;
+    let direction = 0;
     if (nextPos) {
-      angle = Math.atan2(nextPos.y - pos.y, nextPos.x - pos.x) + Math.PI / 2; // Rotate to face direction
+      direction = Math.atan2(nextPos.y - pos.y, nextPos.x - pos.x);
     }
+    
+    // Footprint rotation: rotate 90 degrees so footprint faces movement direction
+    const footprintAngle = direction + Math.PI / 2;
 
-    // Apply gait offset perpendicular to direction
-    const perpAngle = angle - Math.PI / 2;
+    // Apply gait offset PERPENDICULAR to direction of movement (90 degrees offset)
+    // This creates the left/right alternating pattern
+    const perpAngle = direction + Math.PI / 2;
     const offsetX = Math.cos(perpAngle) * gaitOffset * (isLeftFoot ? -1 : 1);
     const offsetY = Math.sin(perpAngle) * gaitOffset * (isLeftFoot ? -1 : 1);
 
@@ -346,7 +350,7 @@ export function drawFootprintPath(
       pos.x + offsetX,
       pos.y + offsetY,
       adjustedSize,
-      angle,
+      footprintAngle,
       isLeftFoot,
       color,
       footOpacity
