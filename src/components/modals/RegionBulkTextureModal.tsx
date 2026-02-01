@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { useRegionStore, type CanvasRegion } from '@/stores/regionStore';
 import { ImageImportModal, ImageImportResult } from './ImageImportModal';
 import { toast } from 'sonner';
-import { Image, Trash2, Upload, Grid } from 'lucide-react';
+import { Image, Trash2, Upload, Grid, AlertTriangle } from 'lucide-react';
 import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 
@@ -32,9 +32,66 @@ export const RegionBulkTextureModal = ({
   const [worldAligned, setWorldAligned] = useState(true); // Default to world-aligned for continuous textures
   const [showImageImport, setShowImageImport] = useState(false);
   const [previewImage, setPreviewImage] = useState<HTMLImageElement | null>(null);
+  const [hasMixedTextures, setHasMixedTextures] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const selectedRegions = regions.filter(r => selectedRegionIds.includes(r.id));
+
+  // Analyze selected regions for common texture settings
+  const textureAnalysis = useMemo(() => {
+    if (selectedRegions.length === 0) {
+      return { commonTexture: null, commonScale: 1, allSame: true, hasTextures: false };
+    }
+
+    const texturedRegions = selectedRegions.filter(r => r.backgroundImage);
+    if (texturedRegions.length === 0) {
+      return { commonTexture: null, commonScale: 1, allSame: true, hasTextures: false };
+    }
+
+    const firstTexture = texturedRegions[0].backgroundImage;
+    const firstScale = texturedRegions[0].backgroundScale || 1;
+    const firstHash = texturedRegions[0].textureHash;
+
+    // Check if all textured regions have the same texture (comparing by hash if available, otherwise URL)
+    const allSame = texturedRegions.every(r => {
+      const sameTexture = firstHash 
+        ? r.textureHash === firstHash 
+        : r.backgroundImage === firstTexture;
+      const sameScale = (r.backgroundScale || 1) === firstScale;
+      return sameTexture && sameScale;
+    });
+
+    return {
+      commonTexture: firstTexture,
+      commonScale: firstScale,
+      allSame,
+      hasTextures: true
+    };
+  }, [selectedRegions]);
+
+  // Initialize state when modal opens
+  useEffect(() => {
+    if (open) {
+      if (textureAnalysis.hasTextures && textureAnalysis.allSame && textureAnalysis.commonTexture) {
+        // All selected regions have the same texture - pre-populate
+        setBackgroundUrl(textureAnalysis.commonTexture);
+        setBackgroundScale(textureAnalysis.commonScale);
+        setHasMixedTextures(false);
+      } else if (textureAnalysis.hasTextures && !textureAnalysis.allSame) {
+        // Mixed textures - show warning, start fresh
+        setBackgroundUrl('');
+        setBackgroundScale(1);
+        setHasMixedTextures(true);
+      } else {
+        // No textures - start fresh
+        setBackgroundUrl('');
+        setBackgroundScale(1);
+        setHasMixedTextures(false);
+      }
+      setBackgroundRepeat('repeat');
+      setWorldAligned(true);
+    }
+  }, [open, textureAnalysis]);
 
   // Load preview image when URL changes
   useEffect(() => {
@@ -280,6 +337,19 @@ export const RegionBulkTextureModal = ({
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Mixed textures warning */}
+            {hasMixedTextures && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">Mixed Textures Detected</p>
+                  <p className="text-muted-foreground">
+                    Selected regions have different textures. Applying a new texture will override all existing textures.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Image Selection */}
             <div className="space-y-2">
               <Label>Background Texture</Label>
@@ -405,6 +475,7 @@ export const RegionBulkTextureModal = ({
         shape={{ type: 'rectangle', width: 200, height: 200 }}
         title="Select Texture Image"
         description="Choose an image to use as a repeating texture across selected regions."
+        initialImageUrl={backgroundUrl}
         initialScale={backgroundScale}
       />
     </>
