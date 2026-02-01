@@ -1,110 +1,78 @@
 
+# Consolidate Fog Control Settings with Illumination Settings
 
-# Fix: Dim Illumination Zones Not Rendering
+## Problem
 
-## Problem Analysis
+The global fog control panel (when GPU post-processing is enabled) has settings that duplicate per-token illumination settings:
 
-The dim illumination zones are not rendering because of a fundamental issue in the fog rendering pipeline:
+| Global Setting | Per-Token Setting | Relationship |
+|---|---|---|
+| Light Inner Zone | Bright Zone | Same concept - % of range that's fully bright |
+| Dim Zone Darkness | Dim Intensity | Same concept - fog opacity in dim zone |
 
-### Current Flow (Broken)
-1. Fog masks are computed excluding the visible area entirely
-2. `unexploredMask` = Canvas minus Explored areas
-3. `exploredOnlyMask` = Explored minus Visible areas
-4. **Visible area receives NO fog at all**
-5. `destination-out` gradient tries to cut fog that was never drawn
-6. Result: The entire visible area appears at full brightness
-
-### Expected Flow (Correct)
-1. Draw fog to the entire visible area first
-2. Then use `destination-out` with gradients to create bright center and dim outer ring
-3. The gradient alpha controls how much fog is removed at each distance from the light source
-
----
+This creates confusion about which setting applies and when.
 
 ## Solution
 
-Modify `fogPostProcessing.ts` to first fill the visibility areas with fog at the appropriate opacity, THEN apply the `destination-out` gradient to cut through it proportionally.
+Simplify the global fog settings to only show **true global defaults** and make the relationship clearer:
 
-### File: `src/lib/fogPostProcessing.ts`
+### Option A: Remove Overlapping Global Settings (Recommended)
 
-**Change the rendering order in `applyFogPostProcessing`:**
+Remove `Light Inner Zone` and `Dim Zone Darkness` from the global fog panel since these are really per-source settings. The global values only serve as defaults when tokens don't specify their own.
 
-1. Draw `unexploredMask` with `fogOpacity` (unchanged)
-2. Draw `exploredOnlyMask` with `exploredOpacity` (unchanged)
-3. **NEW: Draw visibility polygons with `exploredOpacity`** (so visible areas start with fog)
-4. Apply `destination-out` gradients to create bright/dim zones
+**Changes to FogControlCard:**
+- Remove the "Light Inner Zone" slider (lines 333-360)
+- Remove the "Dim Zone Darkness" slider (lines 362-384)
+- Keep the global settings in the store as defaults but don't expose them as editable
+- Add a brief note: "Configure light zones in Token Illumination settings"
 
-```
-Before:
-  [unexplored: dark fog] [explored-only: lighter fog] [visible: NO FOG]
-  
-After:  
-  [unexplored: dark fog] [explored-only: lighter fog] [visible: gradient from bright to dim]
-```
+### Option B: Keep Globals as "Default for New Tokens"
 
-### Code Changes
+Rename the global settings to make their role clear:
 
-In `applyFogPostProcessing()`, after drawing the fog masks and before applying `destination-out` gradients:
+| Current Name | New Name |
+|---|---|
+| Light Inner Zone | Default Bright Zone (for new tokens) |
+| Dim Zone Darkness | Default Dim Intensity (for new tokens) |
 
-```javascript
-// First fill ALL visibility areas with explored opacity fog
-// This provides a base for the destination-out gradients to work against
-if (illuminationData && illuminationData.sources.length > 0) {
-  for (const source of illuminationData.sources) {
-    if (!source.enabled || !source.visibilityPolygon) continue;
-    
-    // Draw fog in visibility area - this will be partially cleared by gradient
-    fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
-    fogCtx.save();
-    fogCtx.clip(source.visibilityPolygon);
-    fogCtx.beginPath();
-    const pos = source.position;
-    const rangePixels = source.range;
-    fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
-    fogCtx.fill();
-    fogCtx.restore();
-  }
-}
-```
-
-Then the existing `destination-out` gradient code will properly cut through this fog layer.
+Add helper text explaining these are defaults that individual tokens can override.
 
 ---
 
-## Technical Details
+## Recommended Approach: Option A
 
-### Why This Works
+The global settings add confusion without adding value. Users configuring individual tokens via the Illumination modal already have full control. Removing the duplicates simplifies the UI.
 
-The `destination-out` composite operation removes pixels from the destination (fog) based on the source's alpha:
-- Alpha 0.8 (brightIntensity) removes 80% of fog → Only 20% fog remains (bright zone)
-- Alpha 0.4 (dimIntensity) removes 40% of fog → 60% fog remains (dim zone)
+### Files to Modify
 
-For this to work, there must BE fog to remove. The current code skips drawing fog in visible areas entirely, so there's nothing for the gradient to cut through.
+| File | Change |
+|---|---|
+| `src/components/cards/FogControlCard.tsx` | Remove Light Inner Zone and Dim Zone Darkness sliders |
+| `src/stores/fogStore.ts` | Keep `lightFalloff` and `dimZoneOpacity` in effectSettings (used as defaults) but they become internal |
+| `src/types/illumination.ts` | Update `DEFAULT_ILLUMINATION` to use `0.5` for brightZone and `0.4` for dimIntensity (current defaults) |
 
-### Gradient Stops Explanation
+### UI After Changes
 
-With `brightZone = 0.1`, `brightIntensity = 0.8`, `dimIntensity = 0.4`:
+**Fog Control Panel (GPU Post-Processing section):**
+```
+[ ] GPU Post-Processing
+├── Effect Quality: Balanced
+├── Fog Edge Softness: 8px
+└── [ ] Volumetric Fog
+```
 
-| Radius % | Fog Removal | Remaining Fog |
-|----------|-------------|---------------|
-| 0-9%     | 80%         | 20% (bright)  |
-| 10%      | 60%         | 40% (transition) |
-| 20-100%  | 40%         | 60% (dim)     |
+**Token Illumination Modal (unchanged):**
+- Preset selector
+- Range
+- Bright Zone (always per-token control)
+- Bright/Dim Intensity
+- Color settings
+- Animation settings
 
 ---
 
-## Testing Checklist
+## Technical Notes
 
-1. Create a token with illumination settings:
-   - Range: 3 units
-   - Bright Zone: 10%
-   - Bright Intensity: 80%
-   - Dim Intensity: 40%
-   
-2. Verify the visible area shows:
-   - Very bright center (10% of radius)
-   - Dimmer outer ring (remaining 90% of radius)
-   - Clear transition between zones
-
-3. Test with different settings to ensure gradients work at various configurations
-
+- The global `lightFalloff` will still exist in the store and be used as the default `brightZone` for new illumination sources
+- The global `dimZoneOpacity` will still be used as a fallback when a source's `dimIntensity` is undefined (the rendering code in fogPostProcessing.ts already handles this at line 330-331)
+- No changes needed to the rendering pipeline itself
