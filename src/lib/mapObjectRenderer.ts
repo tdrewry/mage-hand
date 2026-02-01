@@ -179,30 +179,45 @@ function renderDoorShape(
     ctx.fill();
   }
   
-  // DM view: show interactive indicator above the door
+  // DM view: show interactive toggle indicators on both ends of the door
   if (isDMView) {
-    const indicatorSize = 8 / zoom;
-    // Position indicator above the door in local Y (which may be any world direction after rotation)
-    const indicatorY = -doorThickness / 2 - indicatorSize - 4 / zoom;
+    const indicatorSize = 6 / zoom;
+    const indicatorOffset = 2 / zoom; // Gap from door edge
     
     ctx.globalAlpha = 0.9;
-    ctx.fillStyle = isOpen ? '#22c55e' : '#f59e0b';
+    ctx.fillStyle = '#f59e0b'; // Always yellow/amber for visibility
+    ctx.strokeStyle = '#78350f'; // Dark amber border
+    ctx.lineWidth = 1 / zoom;
+    
+    // Left end indicator (near pivot/hinge)
+    const leftX = -doorLength / 2 - indicatorOffset - indicatorSize / 2;
+    const leftY = 0;
     
     ctx.beginPath();
     ctx.roundRect(
-      -indicatorSize / 2, 
-      indicatorY - indicatorSize / 2, 
-      indicatorSize, 
-      indicatorSize, 
-      2 / zoom
+      leftX - indicatorSize / 2,
+      leftY - indicatorSize / 2,
+      indicatorSize,
+      indicatorSize,
+      1.5 / zoom
     );
     ctx.fill();
+    ctx.stroke();
     
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${6 / zoom}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(isOpen ? '○' : '●', 0, indicatorY);
+    // Right end indicator (far end of door)
+    const rightX = doorLength / 2 + indicatorOffset + indicatorSize / 2;
+    const rightY = 0;
+    
+    ctx.beginPath();
+    ctx.roundRect(
+      rightX - indicatorSize / 2,
+      rightY - indicatorSize / 2,
+      indicatorSize,
+      indicatorSize,
+      1.5 / zoom
+    );
+    ctx.fill();
+    ctx.stroke();
   }
   
   ctx.restore(); // Restore state after door rendering (removes vertical door rotation)
@@ -448,16 +463,37 @@ export function isPointInMapObject(
     localY = newY;
   }
   
-  // For doors in DM view, also check if clicking on the indicator
+  // For doors in DM view, also check if clicking on either toggle indicator
   if (shape === 'door' && isDMView) {
-    const indicatorSize = 8 / zoom;
-    const indicatorY = -height / 2 - indicatorSize - 4 / zoom;
+    const indicatorSize = 6 / zoom;
+    const indicatorOffset = 2 / zoom;
     const indicatorHitRadius = indicatorSize;
     
-    // Check if click is on indicator
+    // Calculate door length (handle legacy vertical doors)
+    const isVerticalDoor = mapObject.rotation === 90 || 
+      (mapObject.rotation === 0 && mapObject.doorDirection && 
+       Math.abs(mapObject.doorDirection.x) > Math.abs(mapObject.doorDirection.y));
+    const doorLength = (isVerticalDoor && mapObject.rotation === 0) 
+      ? Math.max(width, height) 
+      : width;
+    
+    // Left indicator position
+    const leftX = -doorLength / 2 - indicatorOffset - indicatorSize / 2;
+    // Right indicator position  
+    const rightX = doorLength / 2 + indicatorOffset + indicatorSize / 2;
+    
+    // Check if click is on left indicator
     if (
-      Math.abs(localX) <= indicatorHitRadius &&
-      Math.abs(localY - indicatorY) <= indicatorHitRadius
+      Math.abs(localX - leftX) <= indicatorHitRadius &&
+      Math.abs(localY) <= indicatorHitRadius
+    ) {
+      return true;
+    }
+    
+    // Check if click is on right indicator
+    if (
+      Math.abs(localX - rightX) <= indicatorHitRadius &&
+      Math.abs(localY) <= indicatorHitRadius
     ) {
       return true;
     }
