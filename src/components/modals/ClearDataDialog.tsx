@@ -84,6 +84,14 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
   };
 
   const hasSelection = shouldClearTokens || shouldClearRegions || shouldClearMapObjects || shouldClearMarkers;
+  const allSelected = shouldClearTokens && shouldClearRegions && shouldClearMapObjects && shouldClearMarkers;
+
+  const handleSelectAll = (checked: boolean) => {
+    setShouldClearTokens(checked);
+    setShouldClearRegions(checked);
+    setShouldClearMapObjects(checked);
+    setShouldClearMarkers(checked);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,6 +104,17 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          <div className="flex items-center space-x-3 pb-2 border-b border-border">
+            <Checkbox
+              id="select-all"
+              checked={allSelected}
+              onCheckedChange={(checked) => handleSelectAll(checked === true)}
+            />
+            <Label htmlFor="select-all" className="cursor-pointer font-medium">
+              Select All
+            </Label>
+          </div>
+
           <div className="flex items-center space-x-3">
             <Checkbox
               id="clear-tokens"
