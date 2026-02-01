@@ -292,6 +292,7 @@ export function drawFootprintPath(
   color: string,
   size: number,
   opacity: number,
+  gaitWidth: number,
   zoom: number
 ): void {
   if (path.length < 2) return;
@@ -309,8 +310,8 @@ export function drawFootprintPath(
   const stride = adjustedSize * 1.5; // Distance between footprints (increased for better spacing)
   if (totalLength < stride) return;
 
-  // Gait offset (left/right foot offset from centerline) - increased for realistic walking gait
-  const gaitOffset = adjustedSize * 0.6;
+  // Gait offset (left/right foot offset from centerline) - uses gaitWidth parameter
+  const gaitOffset = adjustedSize * gaitWidth;
 
   // Walk along path and place footprints
   let distanceTraveled = stride * 0.5; // Start half-stride in

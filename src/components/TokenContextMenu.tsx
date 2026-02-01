@@ -129,6 +129,7 @@ export const TokenContextMenu = ({
   const [useTokenColorForPath, setUseTokenColorForPath] = useState(true);
   const [pathWeightValue, setPathWeightValue] = useState(3);
   const [pathOpacityValue, setPathOpacityValue] = useState(0.7);
+  const [pathGaitWidthValue, setPathGaitWidthValue] = useState(0.6);
   const [footprintTypeValue, setFootprintTypeValue] = useState<FootprintType>('barefoot');
   const [tokenColorValue, setTokenColorValue] = useState('#FF6B6B');
   
@@ -206,6 +207,7 @@ export const TokenContextMenu = ({
       setUseTokenColorForPath(token.pathColor === undefined);
       setPathWeightValue(token.pathWeight ?? 3);
       setPathOpacityValue(token.pathOpacity ?? 0.7);
+      setPathGaitWidthValue(token.pathGaitWidth ?? 0.6);
       setFootprintTypeValue(token.footprintType || 'barefoot');
       
       // Load variant image URLs from IndexedDB
@@ -248,6 +250,7 @@ export const TokenContextMenu = ({
       setUseTokenColorForPath(true);
       setPathWeightValue(3);
       setPathOpacityValue(0.7);
+      setPathGaitWidthValue(0.6);
       setFootprintTypeValue('barefoot');
     }
     setShowTokenEditModal(true);
@@ -492,6 +495,7 @@ export const TokenContextMenu = ({
                 pathColor: useTokenColorForPath ? undefined : pathColorValue,
                 pathWeight: pathWeightValue,
                 pathOpacity: pathOpacityValue,
+                pathGaitWidth: pathGaitWidthValue,
                 footprintType: footprintTypeValue,
               }
             : t
@@ -1089,6 +1093,25 @@ export const TokenContextMenu = ({
                       />
                     </div>
                   )}
+                  
+                  {/* Gait Width - only for footprints */}
+                  {pathStyleValue === 'footprint' && (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Gait Width</Label>
+                        <span className="text-xs font-mono">{pathGaitWidthValue.toFixed(1)}</span>
+                      </div>
+                      <Slider
+                        value={[pathGaitWidthValue]}
+                        onValueChange={(v) => setPathGaitWidthValue(v[0])}
+                        min={0.2}
+                        max={1.0}
+                        step={0.1}
+                        className="mt-2"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">Side-to-side offset between footprints</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -1102,6 +1125,7 @@ export const TokenContextMenu = ({
                     pathColor={useTokenColorForPath ? tokenColorValue : pathColorValue}
                     pathWeight={pathWeightValue}
                     pathOpacity={pathOpacityValue}
+                    pathGaitWidth={pathGaitWidthValue}
                   />
                 </div>
               )}
