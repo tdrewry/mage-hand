@@ -40,17 +40,23 @@ export const RegionBulkTextureModal = ({
   // Analyze selected regions for common texture settings
   const textureAnalysis = useMemo(() => {
     if (selectedRegions.length === 0) {
-      return { commonTexture: null, commonScale: 1, allSame: true, hasTextures: false };
+      return { commonTexture: null, commonScale: 1, commonRepeat: 'repeat' as const, commonWorldAligned: true, allSame: true, hasTextures: false };
     }
 
     const texturedRegions = selectedRegions.filter(r => r.backgroundImage);
     if (texturedRegions.length === 0) {
-      return { commonTexture: null, commonScale: 1, allSame: true, hasTextures: false };
+      return { commonTexture: null, commonScale: 1, commonRepeat: 'repeat' as const, commonWorldAligned: true, allSame: true, hasTextures: false };
     }
 
     const firstTexture = texturedRegions[0].backgroundImage;
     const firstScale = texturedRegions[0].backgroundScale || 1;
+    const firstRepeat = texturedRegions[0].backgroundRepeat || 'repeat';
     const firstHash = texturedRegions[0].textureHash;
+    
+    // Determine if world-aligned based on offset pattern
+    // World-aligned regions have offsets calculated from world origin
+    // We can infer this by checking if offsets are non-zero (world-aligned usually has calculated offsets)
+    const firstHasOffset = (texturedRegions[0].backgroundOffsetX !== 0 || texturedRegions[0].backgroundOffsetY !== 0);
 
     // Check if all textured regions have the same texture (comparing by hash if available, otherwise URL)
     const allSame = texturedRegions.every(r => {
@@ -58,12 +64,15 @@ export const RegionBulkTextureModal = ({
         ? r.textureHash === firstHash 
         : r.backgroundImage === firstTexture;
       const sameScale = (r.backgroundScale || 1) === firstScale;
-      return sameTexture && sameScale;
+      const sameRepeat = (r.backgroundRepeat || 'repeat') === firstRepeat;
+      return sameTexture && sameScale && sameRepeat;
     });
 
     return {
       commonTexture: firstTexture,
       commonScale: firstScale,
+      commonRepeat: firstRepeat as 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y',
+      commonWorldAligned: firstHasOffset, // Infer from offset presence
       allSame,
       hasTextures: true
     };
@@ -76,20 +85,24 @@ export const RegionBulkTextureModal = ({
         // All selected regions have the same texture - pre-populate
         setBackgroundUrl(textureAnalysis.commonTexture);
         setBackgroundScale(textureAnalysis.commonScale);
+        setBackgroundRepeat(textureAnalysis.commonRepeat);
+        setWorldAligned(textureAnalysis.commonWorldAligned);
         setHasMixedTextures(false);
       } else if (textureAnalysis.hasTextures && !textureAnalysis.allSame) {
         // Mixed textures - show warning, start fresh
         setBackgroundUrl('');
         setBackgroundScale(1);
+        setBackgroundRepeat('repeat');
+        setWorldAligned(true);
         setHasMixedTextures(true);
       } else {
         // No textures - start fresh
         setBackgroundUrl('');
         setBackgroundScale(1);
+        setBackgroundRepeat('repeat');
+        setWorldAligned(true);
         setHasMixedTextures(false);
       }
-      setBackgroundRepeat('repeat');
-      setWorldAligned(true);
     }
   }, [open, textureAnalysis]);
 
