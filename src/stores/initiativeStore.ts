@@ -102,7 +102,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
   roundNumber: 1,
   initiativeOrder: [],
   isTrackerVisible: true,
-  restrictMovement: true,
+  restrictMovement: false, // Default to unlocked - will be reset on app start anyway
   
   startCombat: () => {
     const order = get().initiativeOrder;
@@ -273,8 +273,14 @@ const persistOptions: PersistOptions<InitiativeState, Partial<InitiativeState>> 
     roundNumber: state.roundNumber,
     initiativeOrder: state.initiativeOrder,
     isTrackerVisible: state.isTrackerVisible,
-    restrictMovement: state.restrictMovement
-  })
+    // Exclude restrictMovement from persistence - always start unlocked
+  }),
+  onRehydrateStorage: () => (state) => {
+    // Ensure restrictMovement is always false on app start
+    if (state) {
+      state.restrictMovement = false;
+    }
+  }
 };
 
 export const useInitiativeStore = create<InitiativeState>()(
