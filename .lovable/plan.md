@@ -1,143 +1,110 @@
 
-# Toolbar Consolidation & Movement Lock Cleanup Plan
 
-## Executive Summary
+# Fix: Dim Illumination Zones Not Rendering
 
-The audit revealed redundant buttons and two parallel movement restriction systems causing user confusion. This plan consolidates the toolbars and clarifies the movement lock behavior.
+## Problem Analysis
 
----
+The dim illumination zones are not rendering because of a fundamental issue in the fog rendering pipeline:
 
-## Current State Analysis
+### Current Flow (Broken)
+1. Fog masks are computed excluding the visible area entirely
+2. `unexploredMask` = Canvas minus Explored areas
+3. `exploredOnlyMask` = Explored minus Visible areas
+4. **Visible area receives NO fog at all**
+5. `destination-out` gradient tries to cut fog that was never drawn
+6. Result: The entire visible area appears at full brightness
 
-### Movement Lock Systems
-
-| System | Store | Location | Purpose |
-|--------|-------|----------|---------|
-| `movementLocked` | sessionStore | Top bar (persistent) | Global lock (import/export) |
-| `restrictMovement` | initiativeStore | Play mode toolbar | Turn-based combat restriction |
-
-Both use the **Footprints** icon, creating confusion.
-
-### Redundant Buttons
-
-| Button | Top Bar (Persistent) | Play Mode Toolbar |
-|--------|---------------------|-------------------|
-| Roster | Yes | Yes (duplicate) |
-| Movement Lock | Yes (global) | Yes (combat-specific) |
+### Expected Flow (Correct)
+1. Draw fog to the entire visible area first
+2. Then use `destination-out` with gradients to create bright center and dim outer ring
+3. The gradient alpha controls how much fog is removed at each distance from the light source
 
 ---
 
-## Proposed Changes
+## Solution
 
-### 1. Remove Duplicate Roster Button from Play Mode
+Modify `fogPostProcessing.ts` to first fill the visibility areas with fog at the appropriate opacity, THEN apply the `destination-out` gradient to cut through it proportionally.
 
-The Roster button in the top bar is already persistent across modes. Remove it from the play mode left toolbar.
+### File: `src/lib/fogPostProcessing.ts`
 
-**File:** `src/components/VerticalToolbar.tsx`
-- Remove the Roster ToolbarButton (lines 457-464) from play mode section
+**Change the rendering order in `applyFogPostProcessing`:**
 
-### 2. Remove Redundant Combat Movement Restriction Button
+1. Draw `unexploredMask` with `fogOpacity` (unchanged)
+2. Draw `exploredOnlyMask` with `exploredOpacity` (unchanged)
+3. **NEW: Draw visibility polygons with `exploredOpacity`** (so visible areas start with fog)
+4. Apply `destination-out` gradients to create bright/dim zones
 
-The `restrictMovement` toggle in play mode is combat-specific, but it overlaps with the persistent movement lock. Since combat mode already has "turn restriction" semantics built into the combat system itself, we can simplify:
+```
+Before:
+  [unexplored: dark fog] [explored-only: lighter fog] [visible: NO FOG]
+  
+After:  
+  [unexplored: dark fog] [explored-only: lighter fog] [visible: gradient from bright to dim]
+```
 
-- **Keep** the top bar movement lock as the master "prevent any movement" toggle
-- **Remove** the play mode `restrictMovement` button from the toolbar
-- **Behavior change:** When combat is active, movement is automatically restricted to the active token (this is already the default behavior when `restrictMovement: true` in initiativeStore defaults)
+### Code Changes
 
-**File:** `src/components/VerticalToolbar.tsx`
-- Remove the Footprints (restrictMovement) button from play mode (lines 475-486)
+In `applyFogPostProcessing()`, after drawing the fog masks and before applying `destination-out` gradients:
 
-### 3. Update Top Bar Movement Lock Tooltip
+```javascript
+// First fill ALL visibility areas with explored opacity fog
+// This provides a base for the destination-out gradients to work against
+if (illuminationData && illuminationData.sources.length > 0) {
+  for (const source of illuminationData.sources) {
+    if (!source.enabled || !source.visibilityPolygon) continue;
+    
+    // Draw fog in visibility area - this will be partially cleared by gradient
+    fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+    fogCtx.save();
+    fogCtx.clip(source.visibilityPolygon);
+    fogCtx.beginPath();
+    const pos = source.position;
+    const rangePixels = source.range;
+    fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
+    fogCtx.fill();
+    fogCtx.restore();
+  }
+}
+```
 
-Improve clarity by updating the tooltip on the persistent movement lock.
-
-**File:** `src/components/CircularButtonBar.tsx`
-- Change label from `"Lock Movement"` / `"Unlock Movement"` to include context:
-  - `"Lock All Token Movement"` / `"Unlock Token Movement"`
-
-### 4. Keep MovementLockIndicator for Global Lock
-
-The red badge at the top already indicates when movement is globally locked. No changes needed.
+Then the existing `destination-out` gradient code will properly cut through this fog layer.
 
 ---
 
-## Files to Modify
+## Technical Details
 
-| File | Changes |
-|------|---------|
-| `src/components/VerticalToolbar.tsx` | Remove duplicate Roster button and restrictMovement button from play mode |
-| `src/components/CircularButtonBar.tsx` | Update movement lock button label for clarity |
+### Why This Works
 
----
+The `destination-out` composite operation removes pixels from the destination (fog) based on the source's alpha:
+- Alpha 0.8 (brightIntensity) removes 80% of fog → Only 20% fog remains (bright zone)
+- Alpha 0.4 (dimIntensity) removes 40% of fog → 60% fog remains (dim zone)
 
-## Final Toolbar Layout
+For this to work, there must BE fog to remove. The current code skips drawing fog in visible areas entirely, so there's nothing for the gradient to cut through.
 
-### Top Bar (Persistent - Both Modes)
-```
-[ Menu | Play | Edit | Roster | Lock Movement ]
-```
+### Gradient Stops Explanation
 
-### Left Toolbar - Edit Mode
-```
-[ Map Manager ]
-[ Tokens ]
-─────────────
-[ Add Region ]
-[ Draw Polygon ]
-[ Draw Freehand ]
-─────────────
-[ World Snap ]
-[ Styles ]
-[ Pause Animations ]
-[ Regions On/Off ]
-─────────────
-[ Clear Tokens ]
-[ Clear Regions ]
-[ Import Dungeon ]
-[ Manage Layers ]
-─────────────
-[ Undo ]
-[ Redo ]
-[ History ]
-─────────────
-[ Fit to View ]
-```
+With `brightZone = 0.1`, `brightIntensity = 0.8`, `dimIntensity = 0.4`:
 
-### Left Toolbar - Play Mode
-```
-[ Styles ]
-[ Pause Animations ]
-[ Fog of War ]
-[ Regions On/Off ]
-─────────────
-[ Start/End Combat ]
-[ Background & Grid ]
-[ Manage Layers ]
-─────────────
-[ Undo ]
-[ Redo ]
-[ History ]
-─────────────
-[ Fit to View ]
-```
-
----
-
-## Behavior Summary After Changes
-
-| Action | Result |
-|--------|--------|
-| Top bar Lock Movement toggled ON | No tokens can be moved (except in Edit mode) |
-| Combat started | Turn-based movement automatically enforced (only active token can move) |
-| Combat ended | Free movement restored (unless Lock Movement is ON) |
+| Radius % | Fog Removal | Remaining Fog |
+|----------|-------------|---------------|
+| 0-9%     | 80%         | 20% (bright)  |
+| 10%      | 60%         | 40% (transition) |
+| 20-100%  | 40%         | 60% (dim)     |
 
 ---
 
 ## Testing Checklist
 
-1. Toggle Lock Movement in top bar - verify tokens cannot be dragged in Play mode
-2. Switch to Edit mode while locked - verify tokens CAN still be moved (DM editing)
-3. Start combat - verify only the active token can be moved
-4. End combat - verify free movement is restored
-5. Verify Roster button only appears once in top bar
-6. Verify no duplicate movement buttons in play mode toolbar
+1. Create a token with illumination settings:
+   - Range: 3 units
+   - Bright Zone: 10%
+   - Bright Intensity: 80%
+   - Dim Intensity: 40%
+   
+2. Verify the visible area shows:
+   - Very bright center (10% of radius)
+   - Dimmer outer ring (remaining 90% of radius)
+   - Clear transition between zones
+
+3. Test with different settings to ensure gradients work at various configurations
+
