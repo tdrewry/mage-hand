@@ -882,7 +882,18 @@ export const SimpleTabletop = () => {
   }, [serializedExploredAreas]);
 
   // Redraw when map objects change (e.g., door toggle)
+  // Must also update combined segments and clear visibility cache
   useEffect(() => {
+    // Update combined segments with new map object state
+    if (wallGeometryRef.current) {
+      const mapObjectSegments = mapObjectsToSegments(mapObjects);
+      combinedSegmentsRef.current = [...wallGeometryRef.current.wallSegments, ...mapObjectSegments];
+    }
+    
+    // Clear visibility caches so fog recalculates with new segments
+    notifyObstaclesChanged();
+    tokenVisibilityCacheRef.current.clear();
+    
     redrawCanvas();
   }, [mapObjects]);
 
@@ -4439,11 +4450,8 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
+          // The useEffect on mapObjects handles segment updates, cache clearing, and redraw
           toggleDoor(clickedMapObject.id);
-          // Clear light system visibility cache so illumination recalculates
-          notifyObstaclesChanged();
-          // Force fog recalculation by triggering a redraw
-          requestAnimationFrame(() => redrawCanvas());
         }
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
