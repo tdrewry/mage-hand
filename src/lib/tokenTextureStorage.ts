@@ -260,6 +260,48 @@ export async function saveTextureByHash(hash: string, dataUrl: string): Promise<
 }
 
 /**
+ * Save a texture for an appearance variant (with proper refCount)
+ * Unlike saveTextureByHash, this increments refCount to protect from garbage collection
+ */
+export async function saveVariantTexture(hash: string, dataUrl: string): Promise<void> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TEXTURES_STORE], 'readwrite');
+      const store = transaction.objectStore(TEXTURES_STORE);
+
+      const getRequest = store.get(hash);
+      
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result as TextureEntry | undefined;
+        if (existing) {
+          // Increment refCount to protect this texture from cleanup
+          store.put({
+            ...existing,
+            refCount: existing.refCount + 1,
+          });
+        } else {
+          // New texture with refCount 1 (represents this variant's reference)
+          store.put({
+            hash,
+            dataUrl,
+            refCount: 1,
+            createdAt: Date.now(),
+          });
+        }
+        textureCache.set(hash, dataUrl);
+      };
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('Failed to save variant texture:', error);
+  }
+}
+
+/**
  * Remove texture reference for a token
  */
 export async function removeTokenTexture(tokenId: string): Promise<void> {

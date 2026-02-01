@@ -37,7 +37,7 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
-import { saveTokenTexture, loadTextureByHash, hashImageData, saveTextureByHash } from '@/lib/tokenTextureStorage';
+import { saveTokenTexture, loadTextureByHash, hashImageData, saveVariantTexture } from '@/lib/tokenTextureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 
 interface TokenContextMenuProps {
@@ -249,8 +249,8 @@ export const TokenContextMenu = ({
       try {
         // Generate hash for the image data
         imageHash = await hashImageData(imageUrlValue);
-        // Save texture directly by hash (no refCount management - keeps it independent)
-        await saveTextureByHash(imageHash, imageUrlValue);
+        // Save variant texture with proper refCount to prevent garbage collection
+        await saveVariantTexture(imageHash, imageUrlValue);
         // Also upload to server for multiplayer sync
         await uploadTexture(imageHash, imageUrlValue);
         console.log('Saved variant texture with hash:', imageHash);
