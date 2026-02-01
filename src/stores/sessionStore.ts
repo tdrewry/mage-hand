@@ -260,29 +260,12 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     if (!existingToken || 
         Math.abs(existingToken.x - x) > 2 || 
         Math.abs(existingToken.y - y) > 2) {
-      try {
-        set((state) => ({
-          tokens: state.tokens.map((token) =>
-            token.id === tokenId ? { ...token, x, y } : token
-          ),
-        }));
-        // Sync happens automatically via syncPatch middleware (throttled)
-      } catch (error) {
-        console.warn('Failed to update token position:', error);
-        // Clear old data if storage is full
-        if (error instanceof Error && error.message.includes('quota')) {
-          localStorage.clear();
-          set({ 
-            tokens: [], 
-            sessionId: state.sessionId, 
-            players: [], 
-            currentPlayerId: '', 
-            selectedTokenIds: [], 
-            tokenVisibility: 'all',
-            labelVisibility: 'show' 
-          });
-        }
-      }
+      set((state) => ({
+        tokens: state.tokens.map((token) =>
+          token.id === tokenId ? { ...token, x, y } : token
+        ),
+      }));
+      // Sync happens automatically via syncPatch middleware (throttled)
     }
   },
 
@@ -512,7 +495,12 @@ const withSyncPatch = syncPatch<SessionState>({
 const persistOptions: PersistOptions<SessionState, Partial<SessionState>> = {
   name: 'vtt-session-storage',
   partialize: (state) => ({
-    tokens: state.tokens,
+    // Exclude imageUrl from persistence to avoid localStorage quota issues
+    // The imageHash is still persisted, allowing textures to reload from IndexedDB
+    tokens: state.tokens.map(token => ({
+      ...token,
+      imageUrl: '', // Large base64 data excluded - will be reloaded via imageHash
+    })),
     sessionId: state.sessionId,
     players: state.players,
     currentPlayerId: state.currentPlayerId,
