@@ -391,11 +391,11 @@ export function renderTerrainFeatures(
       case 'water':
         renderWaterTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions, feature.fluidBoundary);
         break;
+      // NOTE: columns and debris are now converted to MapObjects during import
+      // and rendered by the MapObject system, so we skip them here
       case 'column':
-        renderColumnTiles(ctx, feature.tiles, zoom, regions);
-        break;
       case 'debris':
-        renderDebrisTiles(ctx, feature.tiles, zoom, dungeonMapMode, style, regions);
+        // Skip - now handled by MapObject system
         break;
       case 'trap':
         renderTrapTiles(ctx, feature.tiles, zoom, regions);
