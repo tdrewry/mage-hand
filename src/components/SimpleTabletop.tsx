@@ -2461,9 +2461,14 @@ export const SimpleTabletop = () => {
     // Draw visible tokens AFTER fog - but only if NOT using overlay canvas
     // When post-processing is enabled with fog, tokens are drawn to overlay canvas to appear above PixiJS
     if (!useOverlayForTokens) {
+      // Draw drag path BEFORE tokens so footprints appear below token art
+      if (isDraggingToken && draggedTokenId) {
+        drawDragPathOnly(ctx);
+      }
+      
       drawTokensToContext(ctx);
       
-      // Draw drag ghost and path on top of tokens (only for non-overlay mode)
+      // Draw drag ghost on top of tokens (only for non-overlay mode)
       if (isDraggingToken && draggedTokenId) {
         drawDragGhostAndPath(ctx);
       }
@@ -2500,10 +2505,15 @@ export const SimpleTabletop = () => {
             // Draw annotations first (below tokens)
             drawAnnotationsToContext(overlayCtx);
             
+            // Draw drag path BEFORE tokens so footprints appear below token art
+            if (isDraggingToken && draggedTokenId) {
+              drawDragPathOnly(overlayCtx);
+            }
+            
             // Draw tokens on top
             drawTokensToContext(overlayCtx);
             
-            // Draw drag ghost and path on overlay so it appears above fog
+            // Draw drag ghost on overlay so it appears above tokens
             if (isDraggingToken && draggedTokenId) {
               drawDragGhostAndPath(overlayCtx);
             }
@@ -2532,8 +2542,18 @@ export const SimpleTabletop = () => {
     const draggedToken = tokens.find((t) => t.id === draggedTokenId);
     if (!draggedToken) return;
 
-    // Draw ghost token at original position
+    // Draw ghost token at original position (on top of everything)
     drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
+    
+    // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
+  };
+
+  // Function to draw ONLY the drag path (called before tokens so path appears below token art)
+  const drawDragPathOnly = (ctx: CanvasRenderingContext2D) => {
+    if (!draggedTokenId) return;
+
+    const draggedToken = tokens.find((t) => t.id === draggedTokenId);
+    if (!draggedToken) return;
 
     // Draw drag path
     drawDragPath(ctx, draggedToken);
