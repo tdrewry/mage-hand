@@ -126,12 +126,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     }
   };
 
-  // Handle image load
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-    setImageLoaded(true);
-  };
+  // Image loading is now handled in the useEffect that manages the canvas
 
   // Reset to defaults
   const handleReset = () => {
@@ -176,8 +171,8 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   };
 
   // Draw preview with shape overlay
-  useEffect(() => {
-    if (!canvasRef.current || !imageUrl) return;
+  const drawCanvas = useCallback((img?: HTMLImageElement) => {
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -215,7 +210,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       }
     }
 
-    if (imageLoaded && imageSize.width > 0) {
+    if (img && imageSize.width > 0) {
       // Create shape clipping path
       ctx.save();
       ctx.beginPath();
@@ -238,27 +233,21 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       
       ctx.clip();
 
-      // Draw repeating texture pattern
-      const img = new Image();
-      img.src = imageUrl;
+      // Calculate scaled image size
+      const scaledW = imageSize.width * scale * 0.5; // Scale relative to preview
+      const scaledH = imageSize.height * scale * 0.5;
       
-      if (img.complete) {
-        // Calculate scaled image size
-        const scaledW = imageSize.width * scale * 0.5; // Scale relative to preview
-        const scaledH = imageSize.height * scale * 0.5;
-        
-        // Calculate pattern offset
-        const patternOffsetX = offsetX % scaledW;
-        const patternOffsetY = offsetY % scaledH;
-        
-        // Draw repeating pattern
-        const startX = shapeX + patternOffsetX - scaledW;
-        const startY = shapeY + patternOffsetY - scaledH;
-        
-        for (let y = startY; y < shapeY + shapeH + scaledH; y += scaledH) {
-          for (let x = startX; x < shapeX + shapeW + scaledW; x += scaledW) {
-            ctx.drawImage(img, x, y, scaledW, scaledH);
-          }
+      // Calculate pattern offset
+      const patternOffsetX = offsetX % scaledW;
+      const patternOffsetY = offsetY % scaledH;
+      
+      // Draw repeating pattern
+      const startX = shapeX + patternOffsetX - scaledW;
+      const startY = shapeY + patternOffsetY - scaledH;
+      
+      for (let py = startY; py < shapeY + shapeH + scaledH; py += scaledH) {
+        for (let px = startX; px < shapeX + shapeW + scaledW; px += scaledW) {
+          ctx.drawImage(img, px, py, scaledW, scaledH);
         }
       }
       
@@ -299,8 +288,54 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       ctx.fillRect(shapeX - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
       ctx.fillRect(shapeX + shapeW - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
     }
+  }, [shape, imageSize, scale, offsetX, offsetY]);
 
-  }, [imageUrl, imageLoaded, imageSize, scale, offsetX, offsetY, shape]);
+  // Store loaded image reference for redrawing
+  const loadedImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Load image and draw canvas when imageUrl changes or when parameters change
+  useEffect(() => {
+    if (!imageUrl) {
+      loadedImageRef.current = null;
+      drawCanvas();
+      return;
+    }
+
+    // If we already have a loaded image with the same URL, just redraw
+    if (loadedImageRef.current && loadedImageRef.current.src === imageUrl && imageLoaded) {
+      drawCanvas(loadedImageRef.current);
+      return;
+    }
+
+    // Load the image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      loadedImageRef.current = img;
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+      setImageLoaded(true);
+      drawCanvas(img);
+    };
+    img.onerror = () => {
+      loadedImageRef.current = null;
+      setImageLoaded(false);
+      drawCanvas();
+      // Show appropriate error message
+      if (imageUrl.startsWith('data:')) {
+        toast.error('Failed to load image data');
+      } else {
+        toast.error('Failed to load image - the server may block cross-origin requests. Try uploading the image file instead.');
+      }
+    };
+    img.src = imageUrl;
+  }, [imageUrl, drawCanvas, imageLoaded]);
+
+  // Redraw when parameters change and we have a loaded image
+  useEffect(() => {
+    if (loadedImageRef.current && imageLoaded) {
+      drawCanvas(loadedImageRef.current);
+    }
+  }, [scale, offsetX, offsetY, imageLoaded, drawCanvas]);
 
   const handleConfirm = () => {
     if (!imageUrl) {
@@ -396,25 +431,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
             />
             
-            {/* Hidden image for loading - crossOrigin required for canvas usage */}
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                alt="Loading"
-                className="hidden"
-                crossOrigin="anonymous"
-                onLoad={handleImageLoad}
-                onError={() => {
-                  // Check if it's a data URL (these shouldn't fail)
-                  if (imageUrl.startsWith('data:')) {
-                    toast.error('Failed to load image data');
-                  } else {
-                    toast.error('Failed to load image - the server may block cross-origin requests. Try uploading the image file instead.');
-                  }
-                  setImageLoaded(false);
-                }}
-              />
-            )}
+            {/* Image loading is handled in useEffect */}
 
             {/* Instructions overlay */}
             {!imageUrl && (
