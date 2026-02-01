@@ -65,24 +65,16 @@ export const WatabouImportCardContent = () => {
       }));
       setAnnotations(annotationsWithIds);
       
-      // Process terrain features - always convert to MapObjects
+      // Convert column tiles to interactive MapObjects
       let mapObjectCount = doorIds.length;
-      const waterFeatures: typeof imported.terrainFeatures = [];
+      if (imported.columnTiles.length > 0) {
+        const terrainId = `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const ids = convertTerrainFeatureToMapObjects('column', imported.columnTiles, terrainId);
+        mapObjectCount += ids.length;
+      }
       
-      imported.terrainFeatures.forEach((feature) => {
-        if (feature.type === 'column' || feature.type === 'debris') {
-          // Convert column/debris tiles to interactive MapObjects
-          const terrainId = `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const ids = convertTerrainFeatureToMapObjects(feature.type, feature.tiles, terrainId);
-          mapObjectCount += ids.length;
-        } else {
-          // Keep water as terrain features (not interactive)
-          waterFeatures.push(feature);
-        }
-      });
-      
-      // Import remaining terrain features (water only)
-      const featuresWithIds = waterFeatures.map((feature) => ({
+      // Import terrain features (water only - columns are now MapObjects)
+      const featuresWithIds = imported.terrainFeatures.map((feature) => ({
         ...feature,
         id: `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
