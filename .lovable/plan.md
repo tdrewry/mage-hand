@@ -1,81 +1,82 @@
 
-# Animated GIF Support for Canvas Rendering
 
-## Status: ✅ IMPLEMENTED
+# Fix: Animated GIF Token Loading Causes Session Reset
 
-## Problem Analysis
+## Problem Summary
 
-Currently, animated GIFs work in React components (InitiativeCard, TokenContextMenu) because:
-- CSS `background-image: url(...)` naturally animates GIFs
-- The browser handles GIF frame decoding automatically
+When loading an animated GIF as a token image, the application sometimes loses context and returns to a "welcome to the session" state. This happens because:
 
-However, on the canvas:
-- **Tokens**: Use `HTMLImageElement` via `getCachedImage()` which loads GIFs as static images
-- **Regions**: Use `CanvasPattern` via `TexturePatternCache` which also captures only the first frame
+1. Animated GIF base64 data URLs are very large (often several megabytes)
+2. The `sessionStore` persists the full `token.imageUrl` to localStorage
+3. localStorage has a ~5MB limit
+4. When exceeded, a `QuotaExceededError` is thrown
+5. The error handler in `updateTokenPosition` clears all localStorage, resetting the session
 
-Canvas `drawImage()` and `createPattern()` only capture the **current frame** at the moment they're called - they don't automatically animate.
+## Solution
 
-## Solution Implemented
-
-### New File: `src/lib/animatedTextureManager.ts`
-
-A singleton service that:
-1. **Detects animated images**: Checks for GIF magic bytes in data URLs
-2. **Decodes frames using WebCodecs ImageDecoder API**: Extracts all frames as ImageBitmaps
-3. **Tracks playback state**: Current frame index, timing based on elapsed time
-4. **Provides frame access**: `getCurrentFrame(url)` returns the right ImageBitmap for the current time
-5. **Memory efficient**: Limits max frames (100) and resolution (512px)
-
-### Changes to `src/components/SimpleTabletop.tsx`
-
-**Token rendering changes:**
-- `getCachedImage()` now checks `animatedTextureManager.getCurrentFrame()` first
-- Falls back to static image cache for non-animated images
-- Preloads GIFs when first encountered
-
-**Region rendering changes:**
-- `drawRegionBackground()` now handles animated textures specially
-- For animated GIFs: Uses tiled `drawImage()` calls instead of CanvasPattern
-- For static images: Continues using cached patterns for performance
-
-**Animation loop integration:**
-- Added `hasAnimatedTextures` check to animation loop conditions
-- Ensures continuous redraws when animated textures are present
-
-### Changes to `src/lib/texturePatternCache.ts`
-
-- Added `shouldBypassCache()` method to check if an image is animated
-- Animated textures bypass pattern caching (patterns don't animate)
+Exclude `imageUrl` from localStorage persistence in `sessionStore.ts`, following the same pattern used by `regionStore` for `backgroundImage`. The `imageHash` field is still persisted, which allows the texture to be reloaded from IndexedDB on next app start.
 
 ---
 
-## Browser Compatibility
+## Technical Details
 
-The `ImageDecoder` API is part of WebCodecs:
-- Chrome/Edge 94+ (2021) ✅
-- Safari 17+ (2023) ✅
-- Firefox: Not yet supported - falls back to static rendering
+### File: `src/stores/sessionStore.ts`
 
-Since the app already requires WebGL2 (GPU mandatory), this compatibility is acceptable.
+**Current persistence (problematic):**
+```typescript
+partialize: (state) => ({
+  tokens: state.tokens,  // Includes large imageUrl data!
+  ...
+}),
+```
+
+**Fixed persistence:**
+```typescript
+partialize: (state) => ({
+  tokens: state.tokens.map(token => ({
+    ...token,
+    imageUrl: '',  // Exclude from persistence to avoid quota issues
+  })),
+  ...
+}),
+```
+
+This ensures:
+- `imageHash` is still persisted (small string)
+- `useTextureLoader` hook will reload the image from IndexedDB on app start
+- localStorage stays within quota
+
+### Secondary Improvement: Safer Error Handling
+
+The current error handling in `updateTokenPosition` clears ALL localStorage when quota is exceeded, which is too aggressive. A better approach:
+- Only clear the problematic key if possible
+- Don't reset the entire in-memory session state
+- Log a warning instead of silently corrupting state
 
 ---
 
-## Performance Considerations
+## Changes Summary
 
-1. **Memory**: Each GIF stores frames as ImageBitmaps (capped at 100 frames, 512px max)
-2. **Decode cost**: Initial decode is async (brief delay before animation starts)
-3. **Draw cost**: Animated regions use per-frame tiled drawing instead of cached patterns
-4. **Animation loop**: Throttled to ~30 FPS to reduce CPU usage
+| File | Change |
+|------|--------|
+| `src/stores/sessionStore.ts` | Exclude `imageUrl` from persistence via `partialize`; improve quota error handling |
+
+---
+
+## Why This Fixes the Issue
+
+1. Animated GIF data (base64) no longer attempts to persist to localStorage
+2. The `imageHash` is still saved, so textures can be reloaded from IndexedDB
+3. No more `QuotaExceededError` when adding large token images
+4. Session state remains intact even with many/large token textures
 
 ---
 
 ## Testing Checklist
 
-- [ ] Import animated GIF as token image - verify animation plays on canvas
-- [ ] Import animated GIF as region background texture - verify animation plays
-- [ ] Test with multiple animated tokens simultaneously
-- [ ] Test performance with 5+ animated textures visible
-- [ ] Verify static PNG/JPEG images continue to work normally
-- [ ] Test pattern caching still works for static region textures
-- [ ] Test texture synchronization (multiplayer) with animated textures
+- [ ] Load an animated GIF as a token image
+- [ ] Verify the app doesn't reset to "welcome" state
+- [ ] Refresh the page and verify the token image is restored (via IndexedDB/imageHash)
+- [ ] Test with multiple animated GIF tokens
+- [ ] Verify static PNG/JPEG token images still work correctly
 
