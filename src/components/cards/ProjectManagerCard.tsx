@@ -357,7 +357,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     if (wasAutoSaveEnabled) {
       autoSave.toggleAutoSave();
     }
-    sessionStore.setMovementLocked(true);
+    initiativeStore.setRestrictMovement(true);
 
     try {
       const projectData = createCurrentProjectData();
@@ -367,7 +367,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       toast.error(`Failed to export project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       // Re-enable auto-save and unlock movement
-      sessionStore.setMovementLocked(false);
+      initiativeStore.setRestrictMovement(false);
       if (wasAutoSaveEnabled) {
         setTimeout(() => {
           autoSave.toggleAutoSave();
@@ -382,7 +382,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     if (wasAutoSaveEnabled) {
       autoSave.toggleAutoSave();
     }
-    sessionStore.setMovementLocked(true);
+    initiativeStore.setRestrictMovement(true);
 
     try {
       // Step 1: Clear existing tokens
@@ -652,7 +652,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       throw error;
     } finally {
       // Unlock movement and re-enable auto-save if it was enabled before
-      sessionStore.setMovementLocked(false);
+      initiativeStore.setRestrictMovement(false);
       if (wasAutoSaveEnabled) {
         setTimeout(() => {
           autoSave.toggleAutoSave();

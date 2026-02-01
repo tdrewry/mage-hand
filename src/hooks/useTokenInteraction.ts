@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { canControlToken, canSeeToken } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
@@ -60,7 +61,7 @@ export const useTokenInteraction = () => {
     if (!currentPlayer) return;
 
     // Check if movement is globally locked (but allow in Edit mode)
-    const movementLocked = useSessionStore.getState().movementLocked;
+    const movementLocked = useInitiativeStore.getState().restrictMovement;
     if (movementLocked) {
       // Import dungeonStore to check rendering mode
       const { useDungeonStore } = require('@/stores/dungeonStore');

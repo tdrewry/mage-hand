@@ -69,7 +69,6 @@ export interface SessionState {
   selectedTokenIds: string[];
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
-  movementLocked: boolean;
   // Per-map viewport transforms (mapId -> transform)
   viewportTransforms: Record<string, ViewportTransform>;
   /**
@@ -194,12 +193,6 @@ export interface SessionState {
   setLabelVisibility: (visibility: LabelVisibility) => void;
 
   /**
-   * Sets whether token movement is globally locked.
-   * @param locked True to lock movement, false to unlock.
-   */
-  setMovementLocked: (locked: boolean) => void;
-
-  /**
    * Adds a new player to the session.
    * @param player The player to add.
    */
@@ -242,7 +235,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   selectedTokenIds: [],
   tokenVisibility: 'all',
   labelVisibility: 'show',
-  movementLocked: false,
   viewportTransforms: {},
   
   addToken: (token) => {
@@ -257,19 +249,9 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   },
   
   updateTokenPosition: (tokenId, x, y) => {
-    // Check if movement is locked (but allow movement in Edit mode)
+    // Movement lock is now handled by initiativeStore.restrictMovement
+    // The actual blocking happens in the UI layer (SimpleTabletop/useTokenInteraction)
     const state = get();
-    if (state.movementLocked) {
-      // Import dungeonStore to check rendering mode
-      const { useDungeonStore } = require('@/stores/dungeonStore');
-      const renderingMode = useDungeonStore.getState().renderingMode;
-      
-      // Only block movement in Play mode
-      if (renderingMode === 'play') {
-        console.warn('Token movement is locked during import/export');
-        return;
-      }
-    }
     
     // Throttle position updates to prevent localStorage overflow
     const existingToken = state.tokens.find(t => t.id === tokenId);
@@ -455,9 +437,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   setLabelVisibility: (visibility) =>
     set({ labelVisibility: visibility }),
 
-  setMovementLocked: (locked) =>
-    set({ movementLocked: locked }),
-
   addPlayer: (player) =>
     set((state) => ({
       players: [...state.players.filter(p => p.id !== player.id), player],
@@ -540,14 +519,7 @@ const persistOptions: PersistOptions<SessionState, Partial<SessionState>> = {
     tokenVisibility: state.tokenVisibility,
     labelVisibility: state.labelVisibility,
     viewportTransforms: state.viewportTransforms,
-    // Explicitly exclude movementLocked - always start unlocked
   }),
-  onRehydrateStorage: () => (state) => {
-    // Ensure movementLocked is always false on app start
-    if (state) {
-      state.movementLocked = false;
-    }
-  },
 };
 
 export const useSessionStore = create<SessionState>()(
