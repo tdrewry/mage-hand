@@ -62,13 +62,30 @@ function renderDoorShape(
   zoom: number,
   isDMView: boolean = false
 ) {
-  const { id, width, height, isOpen, fillColor, strokeColor } = mapObject;
+  const { id, width, height, isOpen, fillColor, strokeColor, doorDirection, rotation } = mapObject;
   
-  // Door dimensions in local space:
-  // - doorLength: span of the doorway (along local X)
-  // - doorThickness: thickness of the door panel (along local Y)
-  const doorLength = width;
-  const doorThickness = height;
+  // Detect if this is a vertical door (legacy doors used swapped width/height, new doors use rotation)
+  // A vertical door either has rotation=90 OR has doorDirection.x dominant with no rotation
+  const isVerticalDoor = rotation === 90 || 
+    (rotation === 0 && doorDirection && Math.abs(doorDirection.x) > Math.abs(doorDirection.y));
+  
+  // For legacy vertical doors (rotation=0 but vertical via swapped dimensions), 
+  // the width/height are swapped. We need to use the larger dimension as doorLength.
+  // For new doors with rotation=90, width is already the door span.
+  let doorLength: number;
+  let doorThickness: number;
+  
+  if (isVerticalDoor && rotation === 0) {
+    // Legacy vertical door: width and height were swapped during import
+    // The larger dimension is the door span
+    doorLength = Math.max(width, height);
+    doorThickness = Math.min(width, height);
+  } else {
+    // Standard door (horizontal, or vertical with proper rotation)
+    doorLength = width;
+    doorThickness = height;
+  }
+  
   const openDoorLength = doorLength * 0.5; // Half length when open
   
   // Pivot is always at the left edge in local coordinates (-doorLength/2, 0)
@@ -96,6 +113,13 @@ function renderDoorShape(
       swingAngle = -Math.PI / 2 * (1 - easeOut);
       animatedDoorLength = openDoorLength + (doorLength - openDoorLength) * easeOut;
     }
+  }
+  
+  // For legacy vertical doors, we need to apply an additional 90° rotation
+  // to render them correctly since they don't have rotation in the transform
+  ctx.save(); // Save state before any door-specific rotation
+  if (isVerticalDoor && rotation === 0) {
+    ctx.rotate(Math.PI / 2); // Rotate 90° to make it vertical
   }
   
   // Determine if we should draw as open or closed based on animation state
@@ -180,6 +204,8 @@ function renderDoorShape(
     ctx.textBaseline = 'middle';
     ctx.fillText(isOpen ? '○' : '●', 0, indicatorY);
   }
+  
+  ctx.restore(); // Restore state after door rendering (removes vertical door rotation)
 }
 
 /**
