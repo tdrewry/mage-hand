@@ -17,6 +17,7 @@ export enum CardType {
   VISION_PROFILE_MANAGER = 'vision_profile_manager',
   ROLE_MANAGER = 'role_manager',
   HISTORY = 'history',
+  MAP_OBJECTS = 'map_objects',
 }
 
 export interface ToolsCardProps {

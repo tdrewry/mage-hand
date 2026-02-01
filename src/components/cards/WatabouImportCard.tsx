@@ -3,15 +3,18 @@ import { Upload, FileJson, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
 import { parseWatabouFile, importWatabouDungeon } from '@/lib/watabouImporter';
 import { useRegionStore } from '@/stores/regionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { toast } from 'sonner';
 
 export const WatabouImportCardContent = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [convertColumnsToObjects, setConvertColumnsToObjects] = useState(true);
   
   const addRegion = useRegionStore((state) => state.addRegion);
   const clearRegions = useRegionStore((state) => state.clearRegions);
@@ -20,6 +23,9 @@ export const WatabouImportCardContent = () => {
   const setAnnotations = useDungeonStore((state) => state.setAnnotations);
   const setTerrainFeatures = useDungeonStore((state) => state.setTerrainFeatures);
   const clearAll = useDungeonStore((state) => state.clearAll);
+  
+  const convertTerrainFeatureToMapObjects = useMapObjectStore((state) => state.convertTerrainFeatureToMapObjects);
+  const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
   const handleFileSelect = async (file: File) => {
     if (!file.name.endsWith('.json')) {
@@ -40,6 +46,7 @@ export const WatabouImportCardContent = () => {
       // Clear existing data
       clearRegions();
       clearAll();
+      clearMapObjects();
       
       // Import regions
       imported.regions.forEach((region) => {
@@ -60,15 +67,31 @@ export const WatabouImportCardContent = () => {
       }));
       setAnnotations(annotationsWithIds);
       
-      // Import terrain features
-      const featuresWithIds = imported.terrainFeatures.map((feature) => ({
+      // Process terrain features - convert columns to MapObjects if enabled
+      let mapObjectCount = 0;
+      const nonColumnFeatures: typeof imported.terrainFeatures = [];
+      
+      imported.terrainFeatures.forEach((feature) => {
+        if (feature.type === 'column' && convertColumnsToObjects) {
+          // Convert column tiles to interactive MapObjects
+          const terrainId = `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const ids = convertTerrainFeatureToMapObjects('column', feature.tiles, terrainId);
+          mapObjectCount += ids.length;
+        } else {
+          nonColumnFeatures.push(feature);
+        }
+      });
+      
+      // Import remaining terrain features (water, debris that weren't converted)
+      const featuresWithIds = nonColumnFeatures.map((feature) => ({
         ...feature,
         id: `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
       setTerrainFeatures(featuresWithIds);
       
+      const objectsNote = mapObjectCount > 0 ? `, ${mapObjectCount} map objects` : '';
       toast.success(`Imported dungeon: ${imported.metadata.title || 'Untitled'}`, {
-        description: `Loaded ${imported.regions.length} rooms, ${imported.doors.length} doors, ${imported.annotations.length} notes`,
+        description: `Loaded ${imported.regions.length} rooms, ${imported.doors.length} doors, ${imported.annotations.length} notes${objectsNote}`,
       });
     } catch (err) {
       console.error('Import error:', err);
@@ -153,6 +176,17 @@ export const WatabouImportCardContent = () => {
           className="hidden"
           onChange={handleFileInput}
           disabled={loading}
+        />
+      </div>
+
+      <div className="flex items-center justify-between py-2">
+        <Label htmlFor="convert-columns" className="text-xs cursor-pointer">
+          Convert columns to interactive objects
+        </Label>
+        <Switch
+          id="convert-columns"
+          checked={convertColumnsToObjects}
+          onCheckedChange={setConvertColumnsToObjects}
         />
       </div>
 

@@ -14,6 +14,7 @@ import { MenuCardContent } from '@/components/cards/MenuCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
+import { MapObjectPanelCardContent } from '@/components/cards/MapObjectPanelCard';
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
 import { useCardStore } from '@/stores/cardStore';
@@ -129,6 +130,7 @@ function getCardTitle(type: CardType): string {
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
     [CardType.ROLE_MANAGER]: 'Role Manager',
     [CardType.HISTORY]: 'History',
+    [CardType.MAP_OBJECTS]: 'Map Objects',
   };
   
   return titles[type] || type;
@@ -197,6 +199,8 @@ function renderCardContent(
       return <RoleManagerCard />;
     case CardType.HISTORY:
       return <HistoryCard />;
+    case CardType.MAP_OBJECTS:
+      return <MapObjectPanelCardContent />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:

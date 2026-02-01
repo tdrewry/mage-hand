@@ -25,6 +25,7 @@ import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
 import { useInitiativeStore } from "../stores/initiativeStore";
 import { useCardStore } from "../stores/cardStore";
+import { useMapObjectStore } from "../stores/mapObjectStore";
 import { CardType } from "@/types/cardTypes";
 import {
   renderDoors,
@@ -33,6 +34,7 @@ import {
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
+import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint } from "../lib/mapObjectRenderer";
 import { generateNegativeSpaceRegion } from "../lib/wallGeometry";
 import {
   applyHatchingPattern,
@@ -318,6 +320,12 @@ export const SimpleTabletop = () => {
     wallThickness,
     textureScale,
   } = useDungeonStore();
+
+  // Map objects store
+  const mapObjects = useMapObjectStore((state) => state.mapObjects);
+  const selectedMapObjectIds = useMapObjectStore((state) => state.selectedMapObjectIds);
+  const selectMapObject = useMapObjectStore((state) => state.selectMapObject);
+  const clearMapObjectSelection = useMapObjectStore((state) => state.clearSelection);
 
   // Light system store
   const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity } = useLightStore();
@@ -1984,6 +1992,23 @@ export const SimpleTabletop = () => {
     if (renderingMode === "edit") {
       renderDoors(ctx, doors, transform.zoom);
     }
+
+    // 5. Render map objects (columns, statues, etc.) - after walls so shadows work
+    // First render shadows from shadow-casting objects
+    const { lightDirection, shadowDistance } = useDungeonStore.getState();
+    const shadowCastingObjects = mapObjects.filter(obj => obj.castsShadow);
+    if (shadowCastingObjects.length > 0) {
+      renderMapObjectShadows(
+        ctx,
+        shadowCastingObjects,
+        shadowDistance,
+        lightDirection,
+        'rgba(0, 0, 0, 0.25)'
+      );
+    }
+    
+    // Then render the map objects themselves
+    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle);
 
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
@@ -4341,6 +4366,7 @@ export const SimpleTabletop = () => {
 
       // Check if we clicked on a token first (tokens are on top)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
       if (clickedToken) {
@@ -4353,6 +4379,22 @@ export const SimpleTabletop = () => {
         } else {
           // Normal click: select only this token
           setSelectedTokenIds([clickedToken.id]);
+        }
+        // Clear map object selection when selecting token
+        clearMapObjectSelection();
+      } else if (clickedMapObject) {
+        // Map object selection logic (in edit mode)
+        if (renderingMode === "edit") {
+          if (e.ctrlKey || e.metaKey) {
+            // Ctrl+click: toggle selection
+            selectMapObject(clickedMapObject.id, true);
+          } else {
+            // Normal click: select only this object
+            selectMapObject(clickedMapObject.id, false);
+          }
+          setSelectedTokenIds([]);
+          clearSelection();
+          setSelectedRegionIds([]);
         }
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
@@ -4380,6 +4422,7 @@ export const SimpleTabletop = () => {
             setSelectedRegionIds([clickedRegion.id]);
           }
           setSelectedTokenIds([]); // Deselect tokens when selecting region
+          clearMapObjectSelection(); // Deselect map objects when selecting region
         }
         // In play mode, clicking regions does nothing
       } else {
@@ -4396,11 +4439,13 @@ export const SimpleTabletop = () => {
           selectedRegionIds.forEach(id => deselectRegion(id));
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
+          clearMapObjectSelection();
         } else {
           // Play mode: just deselect
           setSelectedTokenIds([]);
           clearSelection();
           setSelectedRegionIds([]);
+          clearMapObjectSelection();
         }
       }
     }
