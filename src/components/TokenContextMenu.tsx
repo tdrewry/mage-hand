@@ -591,6 +591,39 @@ export const TokenContextMenu = ({
     toast.success(`${newHiddenState ? 'Hidden' : 'Shown'} ${targetTokens.length} token(s)`);
   };
 
+  // Quick variant switch from context menu (single token only)
+  const handleQuickVariantSwitch = async (variant: AppearanceVariant) => {
+    if (!currentToken) return;
+    if (!canControl) {
+      toast.error("You don't have permission to modify this token");
+      return;
+    }
+
+    // Apply the variant to the token
+    setActiveVariant(currentToken.id, variant.id);
+    updateTokenSize(currentToken.id, variant.gridWidth, variant.gridHeight);
+
+    // Load and apply the image
+    if (variant.imageHash) {
+      try {
+        const url = await loadTextureByHash(variant.imageHash);
+        if (url) {
+          updateTokenImage(currentToken.id, url, variant.imageHash);
+        } else {
+          toast.error(`Texture for "${variant.name}" not found`);
+        }
+      } catch (e) {
+        console.error('Failed to load variant image:', e);
+        toast.error(`Failed to load texture for "${variant.name}"`);
+      }
+    } else {
+      updateTokenImage(currentToken.id, '', undefined);
+    }
+
+    onUpdateCanvas?.();
+    toast.success(`Switched to "${variant.name}"`);
+  };
+
   const applyVisionRange = () => {
     // Apply custom settings
     const range = visionRangeValue === '' ? undefined : parseFloat(visionRangeValue);
@@ -646,6 +679,33 @@ export const TokenContextMenu = ({
             <span>Change Color{isMultiSelection ? 's' : ''}</span>
             {!canControl && <span className="ml-auto text-xs text-muted-foreground">No permission</span>}
           </ContextMenuItem>
+          {/* Quick Variant Switcher - only show for single token with variants */}
+          {currentToken && currentToken.appearanceVariants && currentToken.appearanceVariants.length > 0 && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger disabled={!canControl}>
+                <Bookmark className="mr-2 h-4 w-4" />
+                <span>Switch Variant</span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
+                {currentToken.appearanceVariants.map((variant) => {
+                  const isActive = currentToken.activeVariantId === variant.id;
+                  return (
+                    <ContextMenuItem 
+                      key={variant.id}
+                      onClick={() => handleQuickVariantSwitch(variant)}
+                      disabled={isActive}
+                    >
+                      {isActive && <span className="mr-2">✓</span>}
+                      <span className="flex-1">{variant.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {variant.gridWidth}×{variant.gridHeight}
+                      </span>
+                    </ContextMenuItem>
+                  );
+                })}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
           <ContextMenuSeparator />
           <ContextMenuCheckboxItem
             checked={hasVisionEnabled}
