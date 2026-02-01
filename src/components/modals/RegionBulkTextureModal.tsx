@@ -87,7 +87,16 @@ export const RegionBulkTextureModal = ({
     };
   }, [selectedRegions]);
 
-  // Initialize state when modal opens
+  // Reset preview pan/zoom ONLY when modal opens (not on other state changes)
+  useEffect(() => {
+    if (open) {
+      setPreviewZoom(1);
+      setPreviewPanX(0);
+      setPreviewPanY(0);
+    }
+  }, [open]);
+
+  // Initialize texture settings when modal opens (separate from pan/zoom)
   useEffect(() => {
     if (open) {
       if (textureAnalysis.hasTextures && textureAnalysis.allSame && textureAnalysis.commonTexture) {
@@ -112,10 +121,6 @@ export const RegionBulkTextureModal = ({
         setWorldAligned(true);
         setHasMixedTextures(false);
       }
-      // Reset preview pan/zoom when modal opens
-      setPreviewZoom(1);
-      setPreviewPanX(0);
-      setPreviewPanY(0);
     }
   }, [open, textureAnalysis]);
 
