@@ -329,6 +329,7 @@ export const SimpleTabletop = () => {
   const selectedMapObjectIds = useMapObjectStore((state) => state.selectedMapObjectIds);
   const selectMapObject = useMapObjectStore((state) => state.selectMapObject);
   const clearMapObjectSelection = useMapObjectStore((state) => state.clearSelection);
+  const toggleDoor = useMapObjectStore((state) => state.toggleDoor);
 
   // Light system store
   const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity } = useLightStore();
@@ -2021,7 +2022,8 @@ export const SimpleTabletop = () => {
     }
     
     // Then render the map objects themselves
-    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle);
+    // Pass isDM for DM-specific UI (door toggle indicators)
+    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM);
 
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
@@ -4396,7 +4398,7 @@ export const SimpleTabletop = () => {
         // Clear map object selection when selecting token
         clearMapObjectSelection();
       } else if (clickedMapObject) {
-        // Map object selection logic (in edit mode)
+        // Map object selection logic
         if (renderingMode === "edit") {
           if (e.ctrlKey || e.metaKey) {
             // Ctrl+click: toggle selection
@@ -4408,6 +4410,11 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([]);
           clearSelection();
           setSelectedRegionIds([]);
+        } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
+          // DM can toggle doors in play mode
+          toggleDoor(clickedMapObject.id);
+          // Force fog recalculation by triggering a redraw
+          requestAnimationFrame(() => redrawCanvas());
         }
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
@@ -5468,7 +5475,18 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
-        if (canvas) {
+        
+        // Check if hovering over a door (DM in play mode)
+        if (isDM && renderingMode === 'play') {
+          const hoveredMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects);
+          if (hoveredMapObject?.category === 'door') {
+            if (canvas) {
+              canvas.style.cursor = "pointer";
+            }
+          } else if (canvas) {
+            canvas.style.cursor = "default";
+          }
+        } else if (canvas) {
           canvas.style.cursor = "default";
         }
       }
