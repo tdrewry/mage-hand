@@ -61,7 +61,12 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     <Tooltip>
       <TooltipTrigger asChild>
         <button
-          onClick={onClick}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick();
+          }}
           disabled={disabled}
           className={cn(
             'rounded-full flex items-center justify-center transition-all border-2',
