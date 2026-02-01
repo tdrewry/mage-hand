@@ -941,7 +941,7 @@ export const TokenContextMenu = ({
             </TabsContent>
             
             {/* Style Tab */}
-            <TabsContent value="style" className="flex-1 overflow-y-auto space-y-4 mt-4">
+            <TabsContent value="style" className="flex-1 overflow-y-auto space-y-4 mt-4 pr-3">
               {/* Token Color Section */}
               <div>
                 <Label>Token Color</Label>
