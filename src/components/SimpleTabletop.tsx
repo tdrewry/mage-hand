@@ -2221,8 +2221,12 @@ export const SimpleTabletop = () => {
     // Helper to draw a single token to a specific context
     const drawTokenToContext = (targetCtx: CanvasRenderingContext2D, token: any, isInFog: boolean = false) => {
       const baseTokenSize = 40;
-      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
-      const radius = tokenSize / 2;
+      const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
+      const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
+      const radiusX = tokenWidth / 2;
+      const radiusY = tokenHeight / 2;
+      // For label positioning, use the larger radius
+      const maxRadius = Math.max(radiusX, radiusY);
       const isSelected = selectedTokenIds.includes(token.id);
       const isHovered = hoveredTokenId === token.id;
 
@@ -2248,7 +2252,7 @@ export const SimpleTabletop = () => {
         targetCtx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulseIntensity * 0.4})`;
         targetCtx.lineWidth = (5 + pulseIntensity * 2) / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius + 5, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX + 5, radiusY + 5, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
         targetCtx.restore();
       }
@@ -2259,12 +2263,12 @@ export const SimpleTabletop = () => {
         targetCtx.strokeStyle = "rgba(255, 215, 0, 0.6)";
         targetCtx.lineWidth = 6 / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius + 6, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX + 6, radiusY + 6, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
         targetCtx.strokeStyle = "rgba(255, 215, 0, 0.8)";
         targetCtx.lineWidth = 3 / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius + 3, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX + 3, radiusY + 3, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
         targetCtx.restore();
       }
@@ -2275,7 +2279,7 @@ export const SimpleTabletop = () => {
         targetCtx.strokeStyle = "rgba(34, 197, 94, 0.6)";
         targetCtx.lineWidth = 4 / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius + 4, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX + 4, radiusY + 4, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
         targetCtx.restore();
       }
@@ -2287,7 +2291,7 @@ export const SimpleTabletop = () => {
         targetCtx.strokeStyle = "#fbbf24";
         targetCtx.lineWidth = 3 / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius + 3 / transform.zoom, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX + 3 / transform.zoom, radiusY + 3 / transform.zoom, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
         targetCtx.shadowBlur = 0;
       }
@@ -2296,28 +2300,27 @@ export const SimpleTabletop = () => {
       const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
       
       if (tokenImg) {
-        // Draw circular clipped image
+        // Draw elliptical clipped image
         targetCtx.save();
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         targetCtx.clip();
         
-        // Draw image centered and scaled to fit
-        const size = radius * 2;
-        targetCtx.drawImage(tokenImg, token.x - radius, token.y - radius, size, size);
+        // Draw image centered and scaled to fit the ellipse bounds
+        targetCtx.drawImage(tokenImg, token.x - radiusX, token.y - radiusY, tokenWidth, tokenHeight);
         targetCtx.restore();
         
         // Draw border on top
         targetCtx.strokeStyle = roleBorderColor;
         targetCtx.lineWidth = 3 / transform.zoom;
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         targetCtx.stroke();
       } else {
         // Fallback to color fill
         targetCtx.fillStyle = token.color || "#ffffff";
         targetCtx.beginPath();
-        targetCtx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
+        targetCtx.ellipse(token.x, token.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         targetCtx.fill();
 
         // Draw role border
@@ -2336,7 +2339,7 @@ export const SimpleTabletop = () => {
           token.x,
           token.y,
           labelPos,
-          radius,
+          maxRadius,
           transform.zoom,
           token.labelColor,
           token.labelBackgroundColor

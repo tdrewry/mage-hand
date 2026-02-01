@@ -39,13 +39,14 @@ export const useTokenInteraction = () => {
       
       const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
       const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
-      const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
+      const radiusX = tokenWidth / 2;
+      const radiusY = tokenHeight / 2;
       
-      const distance = Math.sqrt(
-        Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2)
-      );
+      // Point-in-ellipse test: (x/a)² + (y/b)² <= 1
+      const normalizedX = (worldX - token.x) / radiusX;
+      const normalizedY = (worldY - token.y) / radiusY;
       
-      if (distance <= maxRadius) {
+      if (normalizedX * normalizedX + normalizedY * normalizedY <= 1) {
         return token;
       }
     }
