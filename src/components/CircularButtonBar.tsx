@@ -100,7 +100,7 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
       <ToolbarButton
         icon={Footprints}
-        label={movementLocked ? 'Unlock Movement' : 'Lock Movement'}
+        label={movementLocked ? 'Unlock Token Movement' : 'Lock All Token Movement'}
         onClick={() => setMovementLocked(!movementLocked)}
         variant={movementLocked ? 'destructive' : 'ghost'}
         size="xs"

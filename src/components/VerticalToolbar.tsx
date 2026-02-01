@@ -15,8 +15,6 @@ import {
   Palette,
   CloudFog,
   Swords,
-  Footprints,
-  Users,
   Grid2x2X,
   Grid3X3,
   Undo,
@@ -78,7 +76,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
   const { enabled: fogEnabled } = useFogStore();
-  const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
+  const { isInCombat, startCombat, endCombat } = useInitiativeStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
   const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
   
@@ -455,32 +453,10 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
-            icon={Users}
-            label={`${rosterCard?.isVisible ? 'Hide' : 'Show'} Roster`}
-            onClick={handleToggleRosterCard}
-            isActive={rosterCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
             icon={Swords}
             label={`${isInCombat ? 'End' : 'Start'} Combat`}
             onClick={handleCombatToggle}
             isActive={isInCombat}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={Footprints}
-            label={
-              isInCombat 
-                ? (restrictMovement ? 'Active Token Only' : 'All Tokens') 
-                : (restrictMovement ? 'GM Only' : 'Free Movement')
-            }
-            onClick={() => setRestrictMovement(!restrictMovement)}
-            isActive={restrictMovement}
             variant="ghost"
             size="xs"
           />
