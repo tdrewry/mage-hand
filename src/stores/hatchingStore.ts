@@ -9,6 +9,8 @@ import { DysonHatchingOptions, DEFAULT_HATCHING_OPTIONS, HATCHING_PRESETS } from
 export interface HatchingStore {
   // Enable/disable hatching
   enabled: boolean;
+  // Hatching options
+  hatchingOptions: DysonHatchingOptions;
   /**
    * Enables or disables hatching.
    * @param enabled True to enable hatching, false to disable.
@@ -43,20 +45,20 @@ export const useHatchingStore = create<HatchingStore>()(
   persist(
     (set, get) => ({
       enabled: false,
-      options: { ...DEFAULT_HATCHING_OPTIONS },
+      hatchingOptions: { ...DEFAULT_HATCHING_OPTIONS },
 
       setEnabled: (enabled) => set({ enabled }),
 
       setOptions: (newOptions) =>
         set((state) => ({
-          options: { ...state.options, ...newOptions },
+          hatchingOptions: { ...state.hatchingOptions, ...newOptions },
         })),
 
       applyPreset: (presetName) => {
         const preset = HATCHING_PRESETS[presetName];
         if (preset) {
           set((state) => ({
-            options: { ...state.options, ...preset },
+            hatchingOptions: { ...state.hatchingOptions, ...preset },
           }));
         }
       },
@@ -65,12 +67,12 @@ export const useHatchingStore = create<HatchingStore>()(
 
       resetToDefaults: () =>
         set({
-          options: { ...DEFAULT_HATCHING_OPTIONS },
+          hatchingOptions: { ...DEFAULT_HATCHING_OPTIONS },
         }),
     }),
     {
       name: 'hatching-store',
-      version: 4, // Bump version for skipDepth option
+      version: 5, // Bump version for options -> hatchingOptions rename
     }
   )
 );

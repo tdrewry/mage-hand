@@ -5,6 +5,8 @@
  * This is critical for performance when many textured regions are displayed.
  */
 
+import { animatedTextureManager } from './animatedTextureManager';
+
 export interface CachedPattern {
   pattern: CanvasPattern;
   patternCanvas: HTMLCanvasElement;
@@ -204,6 +206,14 @@ export class TexturePatternCache {
   resetStats(): void {
     this.hitCount = 0;
     this.missCount = 0;
+  }
+
+  /**
+   * Check if an image URL should bypass pattern caching (e.g., animated GIFs)
+   * Animated textures need fresh draws each frame, so pattern caching is counterproductive.
+   */
+  shouldBypassCache(imageUrl: string): boolean {
+    return animatedTextureManager.isAnimated(imageUrl);
   }
 }
 

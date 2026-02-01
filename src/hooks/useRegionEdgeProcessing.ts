@@ -34,7 +34,7 @@ export function useRegionEdgeProcessing({
   const [isReady, setIsReady] = useState(false);
   const initializingRef = useRef(false);
 
-  const { options: hatchingOptions, enabled: hatchingEnabled } = useHatchingStore();
+  const { hatchingOptions, enabled: hatchingEnabled } = useHatchingStore();
 
   // Initialize/cleanup based on enabled state
   useEffect(() => {
