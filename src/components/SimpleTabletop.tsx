@@ -893,8 +893,13 @@ export const SimpleTabletop = () => {
     // Clear visibility caches so fog recalculates with new segments
     notifyObstaclesChanged();
     tokenVisibilityCacheRef.current.clear();
+    clearVisibilityCache(); // Also clear the global visibility cache
     
-    redrawCanvas();
+    // Use requestAnimationFrame to ensure redraw happens after React's state update cycle
+    // This prevents stale closures from causing out-of-sync renders
+    requestAnimationFrame(() => {
+      redrawCanvas();
+    });
   }, [mapObjects]);
 
   // Compute fog of war masks when tokens move or fog settings change
