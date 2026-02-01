@@ -241,15 +241,18 @@ export const TokenContextMenu = ({
       return;
     }
 
-    // Get the current imageHash - either from current state or from the token
-    let imageHash = currentToken.imageHash;
+    let imageHash: string | undefined;
     
-    // If we have a new image that's not yet saved, save it first
-    if (imageUrlValue && imageUrlValue !== currentToken.imageUrl) {
+    // If we have an image, always save it to get/confirm the hash
+    // (Don't rely on currentToken.imageHash as it may be stale or undefined)
+    if (imageUrlValue) {
       try {
         imageHash = await saveTokenTexture(currentToken.id, imageUrlValue);
+        console.log('Saved variant texture with hash:', imageHash);
       } catch (e) {
         console.error('Failed to save variant image:', e);
+        // Fall back to current token's hash if save fails
+        imageHash = currentToken.imageHash;
       }
     }
 
@@ -271,44 +274,54 @@ export const TokenContextMenu = ({
 
     setShowSaveVariantInput(false);
     setVariantNameInput('');
-    toast.success(`Saved variant "${variant.name}"`);
+    toast.success(`Saved variant "${variant.name}" ${imageHash ? `(texture: ${imageHash.slice(0, 8)}...)` : '(no image)'}`);
   };
 
   // Handle using/applying a variant
   const handleUseVariant = async (variant: AppearanceVariant) => {
     if (!currentToken) return;
 
-    // Apply the variant to the token
+    console.log('Applying variant:', variant.name, 'imageHash:', variant.imageHash);
+
+    // Update size values first (these always work)
+    setGridWidthValue(variant.gridWidth);
+    setGridHeightValue(variant.gridHeight);
+    updateTokenSize(currentToken.id, variant.gridWidth, variant.gridHeight);
+
+    // Apply the variant to the token (sets activeVariantId, size, and imageHash)
     setActiveVariant(currentToken.id, variant.id);
 
-    // Load the image from cache or IndexedDB
+    // Load and apply the image from cache or IndexedDB
     if (variant.imageHash) {
       const cachedUrl = variantImageUrls[variant.id];
       if (cachedUrl) {
+        console.log('Using cached image URL for variant');
         setImageUrlValue(cachedUrl);
         updateTokenImage(currentToken.id, cachedUrl, variant.imageHash);
       } else {
         try {
+          console.log('Loading variant texture from IndexedDB:', variant.imageHash);
           const url = await loadTokenTexture(variant.imageHash);
           if (url) {
+            console.log('Loaded variant texture successfully');
             setImageUrlValue(url);
             setVariantImageUrls(prev => ({ ...prev, [variant.id]: url }));
             updateTokenImage(currentToken.id, url, variant.imageHash);
+          } else {
+            console.warn('Variant texture not found in IndexedDB:', variant.imageHash);
+            toast.error(`Texture for "${variant.name}" not found. Please re-upload the image.`);
           }
         } catch (e) {
-          console.warn('Failed to load variant image:', e);
+          console.error('Failed to load variant image:', e);
+          toast.error(`Failed to load texture for "${variant.name}"`);
         }
       }
     } else {
       // Variant without image - just clear the image
+      console.log('Variant has no image, clearing token image');
       setImageUrlValue('');
       updateTokenImage(currentToken.id, '', undefined);
     }
-
-    // Update size values
-    setGridWidthValue(variant.gridWidth);
-    setGridHeightValue(variant.gridHeight);
-    updateTokenSize(currentToken.id, variant.gridWidth, variant.gridHeight);
 
     onUpdateCanvas?.();
     toast.success(`Applied variant "${variant.name}"`);
