@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { useRegionStore, type CanvasRegion } from '@/stores/regionStore';
 import { ImageImportModal, ImageImportResult } from './ImageImportModal';
 import { toast } from 'sonner';
-import { Image, Trash2, Upload, Grid, AlertTriangle } from 'lucide-react';
+import { Image, Trash2, Upload, Grid, AlertTriangle, Move, RotateCcw } from 'lucide-react';
 import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 
@@ -33,7 +33,16 @@ export const RegionBulkTextureModal = ({
   const [showImageImport, setShowImageImport] = useState(false);
   const [previewImage, setPreviewImage] = useState<HTMLImageElement | null>(null);
   const [hasMixedTextures, setHasMixedTextures] = useState(false);
+  
+  // Preview pan/zoom state
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewPanX, setPreviewPanX] = useState(0);
+  const [previewPanY, setPreviewPanY] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const selectedRegions = regions.filter(r => selectedRegionIds.includes(r.id));
 
@@ -103,6 +112,10 @@ export const RegionBulkTextureModal = ({
         setWorldAligned(true);
         setHasMixedTextures(false);
       }
+      // Reset preview pan/zoom when modal opens
+      setPreviewZoom(1);
+      setPreviewPanX(0);
+      setPreviewPanY(0);
     }
   }, [open, textureAnalysis]);
 
@@ -119,6 +132,48 @@ export const RegionBulkTextureModal = ({
       setPreviewImage(null);
     }
   }, [backgroundUrl]);
+
+  // Preview pan handlers
+  const handlePreviewMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - previewPanX, y: e.clientY - previewPanY });
+  }, [previewPanX, previewPanY]);
+
+  const handlePreviewMouseMove = useCallback((e: MouseEvent) => {
+    if (!isPanning) return;
+    setPreviewPanX(e.clientX - panStart.x);
+    setPreviewPanY(e.clientY - panStart.y);
+  }, [isPanning, panStart]);
+
+  const handlePreviewMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Attach global mouse listeners for panning
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener('mousemove', handlePreviewMouseMove);
+      window.addEventListener('mouseup', handlePreviewMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handlePreviewMouseMove);
+        window.removeEventListener('mouseup', handlePreviewMouseUp);
+      };
+    }
+  }, [isPanning, handlePreviewMouseMove, handlePreviewMouseUp]);
+
+  // Preview zoom handler
+  const handlePreviewWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setPreviewZoom(prev => Math.max(0.25, Math.min(4, prev + delta)));
+  }, []);
+
+  // Reset preview view
+  const resetPreviewView = useCallback(() => {
+    setPreviewZoom(1);
+    setPreviewPanX(0);
+    setPreviewPanY(0);
+  }, []);
 
   // Draw preview
   useEffect(() => {
@@ -150,20 +205,30 @@ export const RegionBulkTextureModal = ({
     const boundsHeight = maxY - minY;
     const padding = 20;
 
-    // Calculate scale to fit in preview
-    const previewScale = Math.min(
+    // Calculate base scale to fit in preview (before user zoom)
+    const baseScale = Math.min(
       (canvas.width - padding * 2) / boundsWidth,
       (canvas.height - padding * 2) / boundsHeight
     );
+    
+    // Apply user zoom
+    const finalScale = baseScale * previewZoom;
 
     // Clear canvas
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = 'hsl(var(--muted))';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    ctx.translate(padding, padding);
-    ctx.scale(previewScale, previewScale);
-    ctx.translate(-minX, -minY);
+    
+    // Apply pan and zoom transforms
+    // Center the view, then apply user pan offset
+    const centerX = canvas.width / 2 + previewPanX;
+    const centerY = canvas.height / 2 + previewPanY;
+    const boundsCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    
+    ctx.translate(centerX, centerY);
+    ctx.scale(finalScale, finalScale);
+    ctx.translate(-boundsCenter.x, -boundsCenter.y);
 
     // Draw each region with texture preview
     selectedRegions.forEach(region => {
@@ -217,15 +282,15 @@ export const RegionBulkTextureModal = ({
       }
 
       // Draw region outline
-      ctx.strokeStyle = '#4f46e5';
-      ctx.lineWidth = 2 / previewScale;
+      ctx.strokeStyle = 'hsl(var(--primary))';
+      ctx.lineWidth = 2 / finalScale;
       ctx.stroke();
 
       ctx.restore();
     });
 
     ctx.restore();
-  }, [previewImage, selectedRegions, backgroundScale, backgroundRepeat, worldAligned]);
+  }, [previewImage, selectedRegions, backgroundScale, backgroundRepeat, worldAligned, previewZoom, previewPanX, previewPanY]);
 
   const handleImageImportConfirm = (result: ImageImportResult) => {
     setBackgroundUrl(result.imageUrl);
@@ -409,13 +474,40 @@ export const RegionBulkTextureModal = ({
             {/* Preview Canvas */}
             {backgroundUrl && selectedRegions.length > 0 && (
               <div className="space-y-2">
-                <Label>Preview</Label>
-                <canvas 
-                  ref={previewCanvasRef}
-                  width={400}
-                  height={200}
-                  className="w-full rounded-lg border border-border bg-background"
-                />
+                <div className="flex items-center justify-between">
+                  <Label>Preview</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {(previewZoom * 100).toFixed(0)}%
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2"
+                      onClick={resetPreviewView}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+                <div
+                  ref={previewContainerRef}
+                  className="relative rounded-lg border border-border bg-muted overflow-hidden cursor-grab active:cursor-grabbing"
+                  onMouseDown={handlePreviewMouseDown}
+                  onWheel={handlePreviewWheel}
+                >
+                  <canvas 
+                    ref={previewCanvasRef}
+                    width={400}
+                    height={200}
+                    className="w-full"
+                  />
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-1 text-xs text-white/70 bg-black/50 rounded px-2 py-1">
+                    <Move className="h-3 w-3" />
+                    Drag to pan • Scroll to zoom
+                  </div>
+                </div>
               </div>
             )}
 
