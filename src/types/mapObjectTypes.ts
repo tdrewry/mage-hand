@@ -1,9 +1,9 @@
 /**
  * MapObject type definitions for interactive static map features
- * (columns, statues, furniture, etc.)
+ * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door';
 
 export interface MapObject {
   id: string;
@@ -34,6 +34,11 @@ export interface MapObject {
   blocksVision: boolean;
   revealedByLight: boolean; // Interior revealed when lit (like tokens)
   
+  // Door-specific properties
+  isOpen?: boolean; // For doors: true = open (doesn't block light), false = closed (blocks light)
+  doorType?: number; // Watabou door type (0-9)
+  doorDirection?: { x: number; y: number }; // Direction the door faces
+  
   // Selection state
   selected: boolean;
   
@@ -53,6 +58,7 @@ export type MapObjectCategory =
   | 'trap'
   | 'decoration'
   | 'obstacle'
+  | 'door'
   | 'custom';
 
 export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
@@ -63,6 +69,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   trap: 'Trap',
   decoration: 'Decoration',
   obstacle: 'Obstacle',
+  door: 'Door',
   custom: 'Custom',
 };
 
@@ -158,6 +165,20 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     blocksVision: true,
     revealedByLight: true,
   },
+  door: {
+    shape: 'door',
+    width: 50, // Width of doorway
+    height: 8, // Thickness of door
+    fillColor: '#8b4513', // Saddle brown for wood
+    strokeColor: '#5d2e0c',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false, // Doors don't block movement by default
+    blocksVision: true, // Closed doors block vision
+    revealedByLight: true,
+    isOpen: false,
+  },
   custom: {
     shape: 'rectangle',
     width: 30,
@@ -171,4 +192,18 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     blocksVision: false,
     revealedByLight: true,
   },
+};
+
+// Door type visual styles (from Watabou)
+export const DOOR_TYPE_STYLES: Record<number, { fillColor: string; strokeColor: string; label: string }> = {
+  0: { fillColor: '#8b4513', strokeColor: '#5d2e0c', label: 'Normal' },
+  1: { fillColor: '#a0522d', strokeColor: '#6b3810', label: 'Double' },
+  2: { fillColor: '#4a5568', strokeColor: '#2d3748', label: 'Secret' },
+  3: { fillColor: '#718096', strokeColor: '#4a5568', label: 'Portcullis' },
+  4: { fillColor: '#8b4513', strokeColor: '#c9a227', label: 'Locked' }, // Gold stroke for locked
+  5: { fillColor: '#991b1b', strokeColor: '#7f1d1d', label: 'Trapped' },
+  6: { fillColor: '#78716c', strokeColor: '#57534e', label: 'Archway' },
+  7: { fillColor: '#6b7280', strokeColor: '#4b5563', label: 'Bars' },
+  8: { fillColor: '#7c3aed', strokeColor: '#5b21b6', label: 'Curtain' },
+  9: { fillColor: '#374151', strokeColor: '#1f2937', label: 'Hidden' },
 };

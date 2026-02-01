@@ -1988,10 +1988,8 @@ export const SimpleTabletop = () => {
       renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
 
-    // 4. Then render doors - ABOVE walls (only in edit mode for now)
-    if (renderingMode === "edit") {
-      renderDoors(ctx, doors, transform.zoom);
-    }
+    // 4. Doors are now rendered as MapObjects, so old door rendering is deprecated
+    // Legacy door data from dungeonStore is still imported but converted to MapObjects
 
     // 5. Render map objects (columns, statues, etc.) - after walls so shadows work
     // First render shadows from shadow-casting objects

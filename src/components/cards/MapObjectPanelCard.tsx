@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, Square, Move, Trash2, Eye, EyeOff, SunMedium, Moon } from 'lucide-react';
+import { Circle, Square, Move, Trash2, Eye, EyeOff, SunMedium, Moon, DoorOpen, DoorClosed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS, MAP_OBJECT_PRESETS } from '@/types/mapObjectTypes';
+import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
 
 export const MapObjectPanelCardContent = () => {
   const mapObjects = useMapObjectStore((state) => state.mapObjects);
@@ -21,9 +21,11 @@ export const MapObjectPanelCardContent = () => {
   const clearSelection = useMapObjectStore((state) => state.clearSelection);
   const createFromPreset = useMapObjectStore((state) => state.createFromPreset);
   const selectMapObject = useMapObjectStore((state) => state.selectMapObject);
+  const toggleDoor = useMapObjectStore((state) => state.toggleDoor);
   
   const selectedObjects = mapObjects.filter((obj) => selectedMapObjectIds.includes(obj.id));
   const singleSelected = selectedObjects.length === 1 ? selectedObjects[0] : null;
+  const isDoor = singleSelected?.category === 'door';
   
   // Local state for bulk property editing
   const [bulkCastsShadow, setBulkCastsShadow] = useState(false);
@@ -48,23 +50,40 @@ export const MapObjectPanelCardContent = () => {
     selectMapObject(id);
   };
   
+  const getObjectIcon = (obj: MapObject) => {
+    if (obj.category === 'door') {
+      return obj.isOpen ? (
+        <DoorOpen className="w-3 h-3 mr-2 text-green-500" />
+      ) : (
+        <DoorClosed className="w-3 h-3 mr-2 text-red-500" />
+      );
+    }
+    if (obj.shape === 'circle') {
+      return <Circle className="w-3 h-3 mr-2" style={{ color: obj.fillColor }} />;
+    }
+    return <Square className="w-3 h-3 mr-2" style={{ color: obj.fillColor }} />;
+  };
+  
   return (
     <div className="p-4 space-y-4">
       {/* Quick create presets */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Quick Create</Label>
         <div className="grid grid-cols-4 gap-1">
-          {(Object.keys(MAP_OBJECT_CATEGORY_LABELS) as MapObjectCategory[]).slice(0, 4).map((category) => (
-            <Button
-              key={category}
-              variant="outline"
-              size="sm"
-              className="text-xs h-8"
-              onClick={() => handleCreatePreset(category)}
-            >
-              {MAP_OBJECT_CATEGORY_LABELS[category]}
-            </Button>
-          ))}
+          {(Object.keys(MAP_OBJECT_CATEGORY_LABELS) as MapObjectCategory[])
+            .filter((cat) => cat !== 'door') // Can't manually create doors
+            .slice(0, 4)
+            .map((category) => (
+              <Button
+                key={category}
+                variant="outline"
+                size="sm"
+                className="text-xs h-8"
+                onClick={() => handleCreatePreset(category)}
+              >
+                {MAP_OBJECT_CATEGORY_LABELS[category]}
+              </Button>
+            ))}
         </div>
       </div>
       
@@ -75,7 +94,10 @@ export const MapObjectPanelCardContent = () => {
         {selectedObjects.length === 0 ? (
           <p className="text-muted-foreground">No map objects selected</p>
         ) : selectedObjects.length === 1 ? (
-          <p>Editing: <span className="font-medium">{singleSelected?.label || MAP_OBJECT_CATEGORY_LABELS[singleSelected?.category || 'custom']}</span></p>
+          <p>Editing: <span className="font-medium">
+            {singleSelected?.label || MAP_OBJECT_CATEGORY_LABELS[singleSelected?.category || 'custom']}
+            {isDoor && singleSelected?.doorType !== undefined && ` (${DOOR_TYPE_STYLES[singleSelected.doorType]?.label || 'Unknown'})`}
+          </span></p>
         ) : (
           <p>Editing <span className="font-medium">{selectedObjects.length}</span> objects</p>
         )}
@@ -84,8 +106,41 @@ export const MapObjectPanelCardContent = () => {
       {/* Properties panel */}
       {selectedObjects.length > 0 && (
         <div className="space-y-4">
+          {/* Door-specific controls */}
+          {isDoor && singleSelected && (
+            <>
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  {singleSelected.isOpen ? (
+                    <DoorOpen className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <DoorClosed className="w-5 h-5 text-red-500" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {singleSelected.isOpen ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleDoor(singleSelected.id)}
+                >
+                  {singleSelected.isOpen ? 'Close Door' : 'Open Door'}
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                {singleSelected.isOpen 
+                  ? 'Open doors allow light and vision to pass through.' 
+                  : 'Closed doors block light and vision.'}
+              </p>
+              
+              <Separator />
+            </>
+          )}
+          
           {/* Single object properties */}
-          {singleSelected && (
+          {singleSelected && !isDoor && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="obj-label" className="text-xs">Label</Label>
@@ -167,92 +222,94 @@ export const MapObjectPanelCardContent = () => {
                   step={5}
                 />
               </div>
+              
+              <Separator />
             </>
           )}
           
-          <Separator />
-          
-          {/* Behavior flags (work for both single and multi-select) */}
-          <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground">Behavior</Label>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="casts-shadow" className="text-xs flex items-center gap-2 cursor-pointer">
-                <Moon className="w-3 h-3" />
-                Casts Shadow
-              </Label>
-              <Switch
-                id="casts-shadow"
-                checked={singleSelected?.castsShadow ?? bulkCastsShadow}
-                onCheckedChange={(checked) => {
-                  if (singleSelected) {
-                    updateMapObject(singleSelected.id, { castsShadow: checked });
-                  } else {
-                    setBulkCastsShadow(checked);
-                    handleBulkUpdate({ castsShadow: checked });
-                  }
-                }}
-              />
+          {/* Behavior flags (work for both single and multi-select, but not shown for doors) */}
+          {!isDoor && (
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground">Behavior</Label>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="casts-shadow" className="text-xs flex items-center gap-2 cursor-pointer">
+                  <Moon className="w-3 h-3" />
+                  Casts Shadow
+                </Label>
+                <Switch
+                  id="casts-shadow"
+                  checked={singleSelected?.castsShadow ?? bulkCastsShadow}
+                  onCheckedChange={(checked) => {
+                    if (singleSelected) {
+                      updateMapObject(singleSelected.id, { castsShadow: checked });
+                    } else {
+                      setBulkCastsShadow(checked);
+                      handleBulkUpdate({ castsShadow: checked });
+                    }
+                  }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="blocks-movement" className="text-xs flex items-center gap-2 cursor-pointer">
+                  <Move className="w-3 h-3" />
+                  Blocks Movement
+                </Label>
+                <Switch
+                  id="blocks-movement"
+                  checked={singleSelected?.blocksMovement ?? bulkBlocksMovement}
+                  onCheckedChange={(checked) => {
+                    if (singleSelected) {
+                      updateMapObject(singleSelected.id, { blocksMovement: checked });
+                    } else {
+                      setBulkBlocksMovement(checked);
+                      handleBulkUpdate({ blocksMovement: checked });
+                    }
+                  }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="blocks-vision" className="text-xs flex items-center gap-2 cursor-pointer">
+                  <EyeOff className="w-3 h-3" />
+                  Blocks Vision
+                </Label>
+                <Switch
+                  id="blocks-vision"
+                  checked={singleSelected?.blocksVision ?? bulkBlocksVision}
+                  onCheckedChange={(checked) => {
+                    if (singleSelected) {
+                      updateMapObject(singleSelected.id, { blocksVision: checked });
+                    } else {
+                      setBulkBlocksVision(checked);
+                      handleBulkUpdate({ blocksVision: checked });
+                    }
+                  }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="revealed-by-light" className="text-xs flex items-center gap-2 cursor-pointer">
+                  <SunMedium className="w-3 h-3" />
+                  Revealed by Light
+                </Label>
+                <Switch
+                  id="revealed-by-light"
+                  checked={singleSelected?.revealedByLight ?? true}
+                  onCheckedChange={(checked) => {
+                    if (singleSelected) {
+                      updateMapObject(singleSelected.id, { revealedByLight: checked });
+                    } else {
+                      handleBulkUpdate({ revealedByLight: checked });
+                    }
+                  }}
+                />
+              </div>
+              
+              <Separator />
             </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="blocks-movement" className="text-xs flex items-center gap-2 cursor-pointer">
-                <Move className="w-3 h-3" />
-                Blocks Movement
-              </Label>
-              <Switch
-                id="blocks-movement"
-                checked={singleSelected?.blocksMovement ?? bulkBlocksMovement}
-                onCheckedChange={(checked) => {
-                  if (singleSelected) {
-                    updateMapObject(singleSelected.id, { blocksMovement: checked });
-                  } else {
-                    setBulkBlocksMovement(checked);
-                    handleBulkUpdate({ blocksMovement: checked });
-                  }
-                }}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="blocks-vision" className="text-xs flex items-center gap-2 cursor-pointer">
-                <EyeOff className="w-3 h-3" />
-                Blocks Vision
-              </Label>
-              <Switch
-                id="blocks-vision"
-                checked={singleSelected?.blocksVision ?? bulkBlocksVision}
-                onCheckedChange={(checked) => {
-                  if (singleSelected) {
-                    updateMapObject(singleSelected.id, { blocksVision: checked });
-                  } else {
-                    setBulkBlocksVision(checked);
-                    handleBulkUpdate({ blocksVision: checked });
-                  }
-                }}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="revealed-by-light" className="text-xs flex items-center gap-2 cursor-pointer">
-                <SunMedium className="w-3 h-3" />
-                Revealed by Light
-              </Label>
-              <Switch
-                id="revealed-by-light"
-                checked={singleSelected?.revealedByLight ?? true}
-                onCheckedChange={(checked) => {
-                  if (singleSelected) {
-                    updateMapObject(singleSelected.id, { revealedByLight: checked });
-                  } else {
-                    handleBulkUpdate({ revealedByLight: checked });
-                  }
-                }}
-              />
-            </div>
-          </div>
-          
-          <Separator />
+          )}
           
           {/* Actions */}
           <div className="flex gap-2">
@@ -294,12 +351,13 @@ export const MapObjectPanelCardContent = () => {
                   className="w-full justify-start h-7 text-xs"
                   onClick={() => selectMapObject(obj.id)}
                 >
-                  {obj.shape === 'circle' ? (
-                    <Circle className="w-3 h-3 mr-2" style={{ color: obj.fillColor }} />
-                  ) : (
-                    <Square className="w-3 h-3 mr-2" style={{ color: obj.fillColor }} />
-                  )}
+                  {getObjectIcon(obj)}
                   {obj.label || MAP_OBJECT_CATEGORY_LABELS[obj.category]}
+                  {obj.category === 'door' && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      {obj.isOpen ? 'open' : 'closed'}
+                    </span>
+                  )}
                 </Button>
               ))
             )}

@@ -3,7 +3,6 @@ import { Upload, FileJson, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
 import { parseWatabouFile, importWatabouDungeon } from '@/lib/watabouImporter';
 import { useRegionStore } from '@/stores/regionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -14,17 +13,16 @@ export const WatabouImportCardContent = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [convertColumnsToObjects, setConvertColumnsToObjects] = useState(true);
   
   const addRegion = useRegionStore((state) => state.addRegion);
   const clearRegions = useRegionStore((state) => state.clearRegions);
   
-  const setDoors = useDungeonStore((state) => state.setDoors);
   const setAnnotations = useDungeonStore((state) => state.setAnnotations);
   const setTerrainFeatures = useDungeonStore((state) => state.setTerrainFeatures);
   const clearAll = useDungeonStore((state) => state.clearAll);
   
   const convertTerrainFeatureToMapObjects = useMapObjectStore((state) => state.convertTerrainFeatureToMapObjects);
+  const convertDoorsToMapObjects = useMapObjectStore((state) => state.convertDoorsToMapObjects);
   const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
   const handleFileSelect = async (file: File) => {
@@ -53,12 +51,12 @@ export const WatabouImportCardContent = () => {
         addRegion(region);
       });
       
-      // Import doors
+      // Convert doors to interactive MapObjects (add IDs first)
       const doorsWithIds = imported.doors.map((door) => ({
         ...door,
         id: `door-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
-      setDoors(doorsWithIds);
+      const doorIds = convertDoorsToMapObjects(doorsWithIds);
       
       // Import annotations
       const annotationsWithIds = imported.annotations.map((annotation) => ({
@@ -67,31 +65,31 @@ export const WatabouImportCardContent = () => {
       }));
       setAnnotations(annotationsWithIds);
       
-      // Process terrain features - convert columns to MapObjects if enabled
-      let mapObjectCount = 0;
-      const nonColumnFeatures: typeof imported.terrainFeatures = [];
+      // Process terrain features - always convert to MapObjects
+      let mapObjectCount = doorIds.length;
+      const waterFeatures: typeof imported.terrainFeatures = [];
       
       imported.terrainFeatures.forEach((feature) => {
-        if (feature.type === 'column' && convertColumnsToObjects) {
-          // Convert column tiles to interactive MapObjects
+        if (feature.type === 'column' || feature.type === 'debris') {
+          // Convert column/debris tiles to interactive MapObjects
           const terrainId = `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const ids = convertTerrainFeatureToMapObjects('column', feature.tiles, terrainId);
+          const ids = convertTerrainFeatureToMapObjects(feature.type, feature.tiles, terrainId);
           mapObjectCount += ids.length;
         } else {
-          nonColumnFeatures.push(feature);
+          // Keep water as terrain features (not interactive)
+          waterFeatures.push(feature);
         }
       });
       
-      // Import remaining terrain features (water, debris that weren't converted)
-      const featuresWithIds = nonColumnFeatures.map((feature) => ({
+      // Import remaining terrain features (water only)
+      const featuresWithIds = waterFeatures.map((feature) => ({
         ...feature,
         id: `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
       setTerrainFeatures(featuresWithIds);
       
-      const objectsNote = mapObjectCount > 0 ? `, ${mapObjectCount} map objects` : '';
       toast.success(`Imported dungeon: ${imported.metadata.title || 'Untitled'}`, {
-        description: `Loaded ${imported.regions.length} rooms, ${imported.doors.length} doors, ${imported.annotations.length} notes${objectsNote}`,
+        description: `Loaded ${imported.regions.length} rooms, ${mapObjectCount} objects (${doorIds.length} doors), ${imported.annotations.length} notes`,
       });
     } catch (err) {
       console.error('Import error:', err);
@@ -179,15 +177,14 @@ export const WatabouImportCardContent = () => {
         />
       </div>
 
-      <div className="flex items-center justify-between py-2">
-        <Label htmlFor="convert-columns" className="text-xs cursor-pointer">
-          Convert columns to interactive objects
-        </Label>
-        <Switch
-          id="convert-columns"
-          checked={convertColumnsToObjects}
-          onCheckedChange={setConvertColumnsToObjects}
-        />
+      <div className="text-xs text-muted-foreground space-y-2">
+        <p className="font-medium">Import converts:</p>
+        <ul className="list-disc list-inside space-y-1 ml-2">
+          <li>Rooms → Regions</li>
+          <li>Doors → Interactive doors (open/close)</li>
+          <li>Columns & debris → Map objects</li>
+          <li>Water → Terrain features</li>
+        </ul>
       </div>
 
       <div className="text-xs text-muted-foreground space-y-1">
