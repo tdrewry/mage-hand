@@ -23,6 +23,7 @@ import {
   Pause,
   Play,
   Maximize,
+  Trash2,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -30,6 +31,8 @@ import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
@@ -79,6 +82,8 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const { isInCombat, startCombat, endCombat } = useInitiativeStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
   const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
+  const { clearTerrainFeatures } = useDungeonStore();
+  const { clearMapObjects } = useMapObjectStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -229,6 +234,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     toast.success('All regions cleared!');
   };
 
+  const handleClearMapObjects = () => {
+    clearMapObjects();
+    clearTerrainFeatures();
+    toast.success('All map objects cleared!');
+  };
+
   const handleCombatToggle = () => {
     if (isInCombat) {
       endCombat();
@@ -350,6 +361,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             icon={Grid2x2X}
             label="Clear Regions"
             onClick={handleClearRegions}
+            variant="ghost"
+            size="xs"
+            className="text-orange-600 hover:bg-orange-600/10"
+          />
+
+          <ToolbarButton
+            icon={Trash2}
+            label="Clear Map Objects"
+            onClick={handleClearMapObjects}
             variant="ghost"
             size="xs"
             className="text-orange-600 hover:bg-orange-600/10"
