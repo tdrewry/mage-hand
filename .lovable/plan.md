@@ -1,8 +1,8 @@
 
-# Token Appearance Variants Implementation Plan
+# Token Appearance Variants - IMPLEMENTED ✓
 
 ## Overview
-Add the ability for tokens to have multiple saved "appearance variants" - combinations of image + size that can be quickly switched between. This supports use cases like:
+Tokens now support multiple saved "appearance variants" - combinations of image + size that can be quickly switched between. This supports use cases like:
 - **Wild Shape**: Druid changes between humanoid form and various animal forms
 - **Mounted/Unmounted**: Character on horseback vs on foot
 - **Polymorphed**: Original form vs transformed creature

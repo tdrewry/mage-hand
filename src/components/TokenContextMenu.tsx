@@ -24,10 +24,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
-import { useSessionStore, type LabelPosition } from '../stores/sessionStore';
+import { useSessionStore, type LabelPosition, type AppearanceVariant } from '../stores/sessionStore';
 import { useRoleStore } from '../stores/roleStore';
 import { useInitiativeStore } from '../stores/initiativeStore';
 import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '../lib/illuminationPresets';
@@ -37,7 +37,7 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
-import { saveTokenTexture } from '@/lib/tokenTextureStorage';
+import { saveTokenTexture, loadTokenTexture } from '@/lib/tokenTextureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 import { hashImageData } from '@/lib/tokenTextureStorage';
 
@@ -78,6 +78,9 @@ export const TokenContextMenu = ({
     updateTokenIllumination,
     removeToken,
     setTokenOwner,
+    addAppearanceVariant,
+    removeAppearanceVariant,
+    setActiveVariant,
     currentPlayerId,
     players
   } = useSessionStore();
@@ -105,6 +108,11 @@ export const TokenContextMenu = ({
   const [gridHeightValue, setGridHeightValue] = useState(1);
   const [notesValue, setNotesValue] = useState('');
   const [quickReferenceUrlValue, setQuickReferenceUrlValue] = useState('');
+  
+  // Appearance variant state
+  const [showSaveVariantInput, setShowSaveVariantInput] = useState(false);
+  const [variantNameInput, setVariantNameInput] = useState('');
+  const [variantImageUrls, setVariantImageUrls] = useState<Record<string, string>>({});
   
   // Other modal state
   const [colorValue, setColorValue] = useState('#FF6B6B');
@@ -147,14 +155,16 @@ export const TokenContextMenu = ({
   const hasVisionEnabled = targetTokens.every(t => t.hasVision !== false);
   const isHidden = targetTokens.every(t => t.isHidden);
 
-  const handleEditTokenClick = () => {
+  const handleEditTokenClick = async () => {
     if (!canControl) {
       toast.error("You don't have permission to edit these tokens");
       return;
     }
     
-    // Reset to first tab
+    // Reset to first tab and clear variant UI state
     setActiveTab('label');
+    setShowSaveVariantInput(false);
+    setVariantNameInput('');
     
     if (targetTokens.length === 1) {
       const token = targetTokens[0];
@@ -171,6 +181,24 @@ export const TokenContextMenu = ({
       // Details tab fields
       setNotesValue(token.notes || '');
       setQuickReferenceUrlValue(token.quickReferenceUrl || '');
+      
+      // Load variant image URLs from IndexedDB
+      if (token.appearanceVariants?.length) {
+        const urls: Record<string, string> = {};
+        for (const variant of token.appearanceVariants) {
+          if (variant.imageHash) {
+            try {
+              const url = await loadTokenTexture(variant.imageHash);
+              if (url) urls[variant.id] = url;
+            } catch (e) {
+              console.warn('Failed to load variant image:', variant.imageHash);
+            }
+          }
+        }
+        setVariantImageUrls(urls);
+      } else {
+        setVariantImageUrls({});
+      }
     } else {
       // Multi-selection: blank fields for batch update
       setNameValue('');
@@ -186,6 +214,7 @@ export const TokenContextMenu = ({
       setGridHeightValue(allSameSizeH ? targetTokens[0].gridHeight || 1 : 1);
       setNotesValue('');
       setQuickReferenceUrlValue('');
+      setVariantImageUrls({});
     }
     setShowTokenEditModal(true);
   };
@@ -193,6 +222,103 @@ export const TokenContextMenu = ({
   // Check if current size matches a preset
   const getCurrentSizePreset = () => {
     return SIZE_PRESETS.find(p => p.gridWidth === gridWidthValue && p.gridHeight === gridHeightValue);
+  };
+
+  // Get size description for display
+  const getSizeDescription = (width: number, height: number) => {
+    const preset = SIZE_PRESETS.find(p => p.gridWidth === width && p.gridHeight === height);
+    if (preset) return `${width}×${height} (${preset.name})`;
+    return `${width}×${height}`;
+  };
+
+  // Get current token for variant operations (single selection only)
+  const currentToken = targetTokens.length === 1 ? targetTokens[0] : null;
+
+  // Handle saving current appearance as a variant
+  const handleSaveVariant = async () => {
+    if (!currentToken || !variantNameInput.trim()) {
+      toast.error('Please enter a name for the variant');
+      return;
+    }
+
+    // Get the current imageHash - either from current state or from the token
+    let imageHash = currentToken.imageHash;
+    
+    // If we have a new image that's not yet saved, save it first
+    if (imageUrlValue && imageUrlValue !== currentToken.imageUrl) {
+      try {
+        imageHash = await saveTokenTexture(currentToken.id, imageUrlValue);
+      } catch (e) {
+        console.error('Failed to save variant image:', e);
+      }
+    }
+
+    const variant: AppearanceVariant = {
+      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: variantNameInput.trim(),
+      imageHash,
+      gridWidth: gridWidthValue,
+      gridHeight: gridHeightValue,
+      isDefault: (currentToken.appearanceVariants?.length ?? 0) === 0,
+    };
+
+    addAppearanceVariant(currentToken.id, variant);
+    
+    // Update local image URLs cache
+    if (imageHash && imageUrlValue) {
+      setVariantImageUrls(prev => ({ ...prev, [variant.id]: imageUrlValue }));
+    }
+
+    setShowSaveVariantInput(false);
+    setVariantNameInput('');
+    toast.success(`Saved variant "${variant.name}"`);
+  };
+
+  // Handle using/applying a variant
+  const handleUseVariant = async (variant: AppearanceVariant) => {
+    if (!currentToken) return;
+
+    // Apply the variant to the token
+    setActiveVariant(currentToken.id, variant.id);
+
+    // Load the image from cache or IndexedDB
+    if (variant.imageHash) {
+      const cachedUrl = variantImageUrls[variant.id];
+      if (cachedUrl) {
+        setImageUrlValue(cachedUrl);
+        updateTokenImage(currentToken.id, cachedUrl, variant.imageHash);
+      } else {
+        try {
+          const url = await loadTokenTexture(variant.imageHash);
+          if (url) {
+            setImageUrlValue(url);
+            setVariantImageUrls(prev => ({ ...prev, [variant.id]: url }));
+            updateTokenImage(currentToken.id, url, variant.imageHash);
+          }
+        } catch (e) {
+          console.warn('Failed to load variant image:', e);
+        }
+      }
+    } else {
+      // Variant without image - just clear the image
+      setImageUrlValue('');
+      updateTokenImage(currentToken.id, '', undefined);
+    }
+
+    // Update size values
+    setGridWidthValue(variant.gridWidth);
+    setGridHeightValue(variant.gridHeight);
+    updateTokenSize(currentToken.id, variant.gridWidth, variant.gridHeight);
+
+    onUpdateCanvas?.();
+    toast.success(`Applied variant "${variant.name}"`);
+  };
+
+  // Handle deleting a variant
+  const handleDeleteVariant = (variantId: string, variantName: string) => {
+    if (!currentToken) return;
+    removeAppearanceVariant(currentToken.id, variantId);
+    toast.success(`Deleted variant "${variantName}"`);
   };
 
   const handleImageImportConfirm = (result: ImageImportResult) => {
@@ -780,6 +906,150 @@ export const TokenContextMenu = ({
                     Selected tokens have mixed sizes
                   </p>
                 )}
+              </div>
+              
+              {/* Saved Variants Section */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="flex items-center gap-1">
+                    <Bookmark className="h-3 w-3" />
+                    Saved Variants
+                  </Label>
+                  {!isMultiSelection && !showSaveVariantInput && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSaveVariantInput(true)}
+                      className="h-7 text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Save Current
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Save Variant Input */}
+                {showSaveVariantInput && !isMultiSelection && (
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      value={variantNameInput}
+                      onChange={(e) => setVariantNameInput(e.target.value)}
+                      placeholder="Variant name (e.g., Bear Form)"
+                      className="flex-1 h-8"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveVariant();
+                        if (e.key === 'Escape') {
+                          setShowSaveVariantInput(false);
+                          setVariantNameInput('');
+                        }
+                      }}
+                    />
+                    <Button size="sm" onClick={handleSaveVariant} className="h-8">
+                      <Save className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setShowSaveVariantInput(false);
+                        setVariantNameInput('');
+                      }}
+                      className="h-8"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Multi-selection message */}
+                {isMultiSelection && (
+                  <p className="text-xs text-muted-foreground">
+                    Manage variants for individual tokens
+                  </p>
+                )}
+                
+                {/* Variant Grid */}
+                {!isMultiSelection && currentToken && (
+                  <>
+                    {currentToken.appearanceVariants && currentToken.appearanceVariants.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {currentToken.appearanceVariants.map((variant) => {
+                          const isActive = currentToken.activeVariantId === variant.id;
+                          const variantImageUrl = variantImageUrls[variant.id];
+                          
+                          return (
+                            <div
+                              key={variant.id}
+                              className={`relative p-2 rounded-lg border transition-all ${
+                                isActive
+                                  ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                                  : 'border-border hover:border-primary/50'
+                              }`}
+                            >
+                              {/* Variant Preview */}
+                              <div className="flex items-center gap-2">
+                                {variantImageUrl ? (
+                                  <img
+                                    src={variantImageUrl}
+                                    alt={variant.name}
+                                    className="w-10 h-10 rounded-full object-cover border border-border"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border">
+                                    <Bookmark className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-xs truncate">{variant.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {getSizeDescription(variant.gridWidth, variant.gridHeight)}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Actions */}
+                              <div className="flex gap-1 mt-2">
+                                <Button
+                                  variant={isActive ? 'secondary' : 'outline'}
+                                  size="sm"
+                                  className="flex-1 h-6 text-xs"
+                                  onClick={() => handleUseVariant(variant)}
+                                  disabled={isActive}
+                                >
+                                  {isActive ? 'Active' : 'Use'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteVariant(variant.id, variant.name)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              
+                              {/* Default badge */}
+                              {variant.isDefault && (
+                                <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                                  Default
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-3">
+                        No variants saved. Click "Save Current" to save the current appearance.
+                      </p>
+                    )}
+                  </>
+                )}
+                
+                <p className="text-xs text-muted-foreground mt-2">
+                  Save image + size combos for forms like Wild Shape or mounted/unmounted
+                </p>
               </div>
             </TabsContent>
             

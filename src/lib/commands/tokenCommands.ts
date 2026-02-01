@@ -3,7 +3,7 @@
  */
 
 import { Command } from '../undoRedoManager';
-import { useSessionStore, Token } from '@/stores/sessionStore';
+import { useSessionStore, Token, AppearanceVariant } from '@/stores/sessionStore';
 
 /**
  * Command for adding a token
@@ -206,5 +206,109 @@ export class UpdateTokenDetailsCommand implements Command {
       this.previousDetails.notes,
       this.previousDetails.quickReferenceUrl
     );
+  }
+}
+
+/**
+ * Command for adding an appearance variant
+ */
+export class AddAppearanceVariantCommand implements Command {
+  type = 'ADD_APPEARANCE_VARIANT';
+  description: string;
+  private tokenId: string;
+  private variant: AppearanceVariant;
+
+  constructor(tokenId: string, variant: AppearanceVariant, tokenLabel?: string) {
+    this.tokenId = tokenId;
+    this.variant = variant;
+    this.description = `Add variant "${variant.name}" to ${tokenLabel || 'token'}`;
+  }
+
+  execute(): void {
+    useSessionStore.getState().addAppearanceVariant(this.tokenId, this.variant);
+  }
+
+  undo(): void {
+    useSessionStore.getState().removeAppearanceVariant(this.tokenId, this.variant.id);
+  }
+}
+
+/**
+ * Command for removing an appearance variant
+ */
+export class RemoveAppearanceVariantCommand implements Command {
+  type = 'REMOVE_APPEARANCE_VARIANT';
+  description: string;
+  private tokenId: string;
+  private variant: AppearanceVariant;
+
+  constructor(tokenId: string, variant: AppearanceVariant, tokenLabel?: string) {
+    this.tokenId = tokenId;
+    this.variant = variant;
+    this.description = `Remove variant "${variant.name}" from ${tokenLabel || 'token'}`;
+  }
+
+  execute(): void {
+    useSessionStore.getState().removeAppearanceVariant(this.tokenId, this.variant.id);
+  }
+
+  undo(): void {
+    useSessionStore.getState().addAppearanceVariant(this.tokenId, this.variant);
+  }
+}
+
+/**
+ * Command for setting active variant
+ */
+export class SetActiveVariantCommand implements Command {
+  type = 'SET_ACTIVE_VARIANT';
+  description: string;
+  private tokenId: string;
+  private previousVariantId: string | undefined;
+  private previousState: { gridWidth: number; gridHeight: number; imageHash?: string };
+  private newVariantId: string;
+
+  constructor(
+    tokenId: string,
+    previousVariantId: string | undefined,
+    previousState: { gridWidth: number; gridHeight: number; imageHash?: string },
+    newVariantId: string,
+    variantName: string,
+    tokenLabel?: string
+  ) {
+    this.tokenId = tokenId;
+    this.previousVariantId = previousVariantId;
+    this.previousState = previousState;
+    this.newVariantId = newVariantId;
+    this.description = `Switch ${tokenLabel || 'token'} to "${variantName}"`;
+  }
+
+  execute(): void {
+    useSessionStore.getState().setActiveVariant(this.tokenId, this.newVariantId);
+  }
+
+  undo(): void {
+    // Restore previous state
+    if (this.previousVariantId) {
+      useSessionStore.getState().setActiveVariant(this.tokenId, this.previousVariantId);
+    } else {
+      // Restore manual state without a variant
+      const token = useSessionStore.getState().tokens.find(t => t.id === this.tokenId);
+      if (token) {
+        useSessionStore.setState(state => ({
+          tokens: state.tokens.map(t => 
+            t.id === this.tokenId 
+              ? { 
+                  ...t, 
+                  activeVariantId: undefined,
+                  gridWidth: this.previousState.gridWidth,
+                  gridHeight: this.previousState.gridHeight,
+                  imageHash: this.previousState.imageHash,
+                }
+              : t
+          )
+        }));
+      }
+    }
   }
 }
