@@ -5,7 +5,7 @@
 import type { FogEffectSettings, EffectQuality } from './fogStore';
 
 export const DEFAULT_FOG_EFFECT_SETTINGS: FogEffectSettings = {
-  postProcessingEnabled: false,
+  postProcessingEnabled: true,
   edgeBlur: 8,
   lightFalloff: 0.5,
   volumetricEnabled: false,

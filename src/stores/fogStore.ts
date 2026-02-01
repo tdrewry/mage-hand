@@ -160,7 +160,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
   
   // Post-processing effect settings
   effectSettings: {
-    postProcessingEnabled: false,
+    postProcessingEnabled: true, // Enabled by default with fog
     edgeBlur: 8,
     lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
     volumetricEnabled: false,
@@ -217,7 +217,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
       realtimeVisionDuringDrag: false,
       realtimeVisionThrottleMs: 32,
       effectSettings: {
-        postProcessingEnabled: false,
+        postProcessingEnabled: true,
         edgeBlur: 8,
         lightFalloff: 0.5,
         volumetricEnabled: false,
