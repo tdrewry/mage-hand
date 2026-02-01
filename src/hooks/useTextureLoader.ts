@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { 
   loadRegionTextures, 
   saveRegionTexture, 
@@ -27,22 +28,29 @@ import {
 /**
  * Hook to manage texture loading from IndexedDB and multiplayer sync
  * Handles initial load and syncing textures when regions/tokens change
+ * 
+ * OPTIMIZATION: Downloads are deduplicated by hash - if multiple regions
+ * share the same texture, we only download once and apply to all.
  */
 export function useTextureLoader() {
   const regions = useRegionStore(state => state.regions);
   const updateRegion = useRegionStore(state => state.updateRegion);
   const tokens = useSessionStore(state => state.tokens);
   const updateTokenImage = useSessionStore(state => state.updateTokenImage);
+  const connectedUsers = useMultiplayerStore(state => state.connectedUsers);
+  const isConnected = useMultiplayerStore(state => state.isConnected);
   
   const loadedRegionsRef = useRef<Set<string>>(new Set());
   const loadedTokensRef = useRef<Set<string>>(new Set());
   const pendingLoadsRef = useRef<Set<string>>(new Set());
+  const pendingHashDownloadsRef = useRef<Set<string>>(new Set()); // Track unique hash downloads
   const initialLoadDoneRef = useRef(false);
 
   // Load textures for regions on mount and when new regions appear
   useEffect(() => {
     const regionsNeedingLocalTextures: string[] = [];
-    const regionsNeedingRemoteTextures: { id: string; hash: string }[] = [];
+    // Map of hash -> array of region IDs that need this texture
+    const hashToRegionIds = new Map<string, string[]>();
 
     regions.forEach(region => {
       if (loadedRegionsRef.current.has(region.id)) return;
@@ -54,7 +62,10 @@ export function useTextureLoader() {
       }
 
       if (region.textureHash) {
-        regionsNeedingRemoteTextures.push({ id: region.id, hash: region.textureHash });
+        // Group regions by their texture hash for deduplication
+        const existing = hashToRegionIds.get(region.textureHash) || [];
+        existing.push(region.id);
+        hashToRegionIds.set(region.textureHash, existing);
       } else {
         regionsNeedingLocalTextures.push(region.id);
       }
@@ -83,18 +94,29 @@ export function useTextureLoader() {
       });
     }
 
-    // Load remote textures (from multiplayer sync)
-    if (regionsNeedingRemoteTextures.length > 0) {
-      regionsNeedingRemoteTextures.forEach(({ id, hash }) => {
-        pendingLoadsRef.current.add(`region:${id}`);
-        notifyTextureDownloadStart(hash);
+    // Load remote textures (from multiplayer sync) - DEDUPLICATED BY HASH
+    if (hashToRegionIds.size > 0) {
+      // Mark all regions as pending
+      hashToRegionIds.forEach((regionIds, hash) => {
+        regionIds.forEach(id => pendingLoadsRef.current.add(`region:${id}`));
       });
 
-      regionsNeedingRemoteTextures.forEach(async ({ id, hash }) => {
+      // Process each unique hash only once
+      hashToRegionIds.forEach(async (regionIds, hash) => {
+        // Skip if we're already downloading this hash
+        if (pendingHashDownloadsRef.current.has(hash)) {
+          return;
+        }
+        
+        pendingHashDownloadsRef.current.add(hash);
+        notifyTextureDownloadStart(hash);
+
         try {
+          // Try local cache first (IndexedDB)
           let dataUrl = await loadRegionTextureByHash(hash);
           
-          if (!dataUrl) {
+          // Only request from server if we're connected to multiplayer
+          if (!dataUrl && isConnected) {
             dataUrl = await requestTextureFromServer(hash);
             
             if (dataUrl) {
@@ -103,30 +125,37 @@ export function useTextureLoader() {
           }
 
           if (dataUrl) {
-            updateRegion(id, { backgroundImage: dataUrl });
+            // Apply the same texture to ALL regions that need it
+            regionIds.forEach(id => {
+              updateRegion(id, { backgroundImage: dataUrl });
+            });
             cacheTexture(hash, dataUrl);
             notifyTextureDownloadComplete(hash);
           } else {
             notifyTextureDownloadError(hash);
           }
         } catch (error) {
-          console.error(`Failed to load remote texture for region ${id}:`, error);
+          console.error(`Failed to load remote texture ${hash} for ${regionIds.length} regions:`, error);
           notifyTextureDownloadError(hash);
         } finally {
-          pendingLoadsRef.current.delete(`region:${id}`);
-          loadedRegionsRef.current.add(id);
+          pendingHashDownloadsRef.current.delete(hash);
+          regionIds.forEach(id => {
+            pendingLoadsRef.current.delete(`region:${id}`);
+            loadedRegionsRef.current.add(id);
+          });
         }
       });
     }
 
-    if (regionsNeedingLocalTextures.length === 0 && regionsNeedingRemoteTextures.length === 0) {
+    if (regionsNeedingLocalTextures.length === 0 && hashToRegionIds.size === 0) {
       initialLoadDoneRef.current = true;
     }
-  }, [regions, updateRegion]);
+  }, [regions, updateRegion, isConnected]);
 
-  // Load textures for tokens
+  // Load textures for tokens - DEDUPLICATED BY HASH
   useEffect(() => {
-    const tokensNeedingRemoteTextures: { id: string; hash: string }[] = [];
+    // Map of hash -> array of token IDs that need this texture
+    const hashToTokenIds = new Map<string, string[]>();
 
     tokens.forEach(token => {
       if (loadedTokensRef.current.has(token.id)) return;
@@ -140,24 +169,35 @@ export function useTextureLoader() {
 
       // Token has a hash from sync but no imageUrl
       if (token.imageHash) {
-        tokensNeedingRemoteTextures.push({ id: token.id, hash: token.imageHash });
+        const existing = hashToTokenIds.get(token.imageHash) || [];
+        existing.push(token.id);
+        hashToTokenIds.set(token.imageHash, existing);
       }
     });
 
-    // Load remote token textures
-    if (tokensNeedingRemoteTextures.length > 0) {
-      tokensNeedingRemoteTextures.forEach(({ id, hash }) => {
-        pendingLoadsRef.current.add(`token:${id}`);
-        notifyTextureDownloadStart(hash);
+    // Load remote token textures - one download per unique hash
+    if (hashToTokenIds.size > 0) {
+      // Mark all tokens as pending
+      hashToTokenIds.forEach((tokenIds, hash) => {
+        tokenIds.forEach(id => pendingLoadsRef.current.add(`token:${id}`));
       });
 
-      tokensNeedingRemoteTextures.forEach(async ({ id, hash }) => {
+      // Process each unique hash only once
+      hashToTokenIds.forEach(async (tokenIds, hash) => {
+        // Skip if we're already downloading this hash
+        if (pendingHashDownloadsRef.current.has(hash)) {
+          return;
+        }
+        
+        pendingHashDownloadsRef.current.add(hash);
+        notifyTextureDownloadStart(hash);
+
         try {
           // Try local cache first
           let dataUrl = await loadTokenTextureByHash(hash);
           
-          if (!dataUrl) {
-            // Request from server
+          // Only request from server if we're connected to multiplayer
+          if (!dataUrl && isConnected) {
             dataUrl = await requestTextureFromServer(hash);
             
             if (dataUrl) {
@@ -166,22 +206,28 @@ export function useTextureLoader() {
           }
 
           if (dataUrl) {
-            updateTokenImage(id, dataUrl, hash);
+            // Apply the same texture to ALL tokens that need it
+            tokenIds.forEach(id => {
+              updateTokenImage(id, dataUrl!, hash);
+            });
             cacheTexture(hash, dataUrl);
             notifyTextureDownloadComplete(hash);
           } else {
             notifyTextureDownloadError(hash);
           }
         } catch (error) {
-          console.error(`Failed to load remote texture for token ${id}:`, error);
+          console.error(`Failed to load remote texture ${hash} for ${tokenIds.length} tokens:`, error);
           notifyTextureDownloadError(hash);
         } finally {
-          pendingLoadsRef.current.delete(`token:${id}`);
-          loadedTokensRef.current.add(id);
+          pendingHashDownloadsRef.current.delete(hash);
+          tokenIds.forEach(id => {
+            pendingLoadsRef.current.delete(`token:${id}`);
+            loadedTokensRef.current.add(id);
+          });
         }
       });
     }
-  }, [tokens, updateTokenImage]);
+  }, [tokens, updateTokenImage, isConnected]);
 
   // Save region texture to IndexedDB and upload to server for sync
   const saveRegionTextureAndSync = useCallback(async (regionId: string, dataUrl: string): Promise<string> => {

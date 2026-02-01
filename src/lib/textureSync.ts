@@ -31,7 +31,8 @@ export async function uploadTexture(
 ): Promise<void> {
   const socket = patchTransport.getSocket();
   if (!socket) {
-    console.warn('[TextureSync] No socket connection, skipping upload');
+    // No socket connection - just cache locally, skip server upload
+    localTextureCache.set(hash, dataUrl);
     return;
   }
 
