@@ -236,27 +236,27 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
   convertDoorToMapObject: (door) => {
     const id = generateId();
     const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
-    const preset = MAP_OBJECT_PRESETS.door;
     
-    // Calculate rotation based on door direction
-    // Direction { x: 0, y: -1 } = facing up = 0 degrees
-    // Direction { x: 1, y: 0 } = facing right = 90 degrees
-    let rotation = 0;
-    if (door.direction) {
-      rotation = Math.atan2(door.direction.x, -door.direction.y) * (180 / Math.PI);
-    }
+    // Determine if horizontal or vertical based on direction
+    // Watabou door.direction indicates which way the door faces
+    const isHorizontal = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
+    
+    // Door dimensions - match grid spacing (50px is GRID_SIZE)
+    const doorLength = 40; // Slightly smaller than grid cell
+    const doorThickness = 6;
     
     const newMapObject: MapObject = {
       id,
       position: door.position,
-      width: preset.width || 50,
-      height: preset.height || 8,
-      rotation,
+      // Swap width/height based on orientation
+      width: isHorizontal ? doorThickness : doorLength,
+      height: isHorizontal ? doorLength : doorThickness,
+      rotation: 0, // No rotation needed - we handle orientation via width/height
       shape: 'door',
       fillColor: doorStyle.fillColor,
       strokeColor: doorStyle.strokeColor,
-      strokeWidth: preset.strokeWidth || 2,
-      opacity: preset.opacity ?? 1,
+      strokeWidth: 2,
+      opacity: 1,
       castsShadow: false,
       blocksMovement: false,
       blocksVision: true, // Closed doors block vision by default
@@ -285,25 +285,25 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       ids.push(id);
       
       const doorStyle = DOOR_TYPE_STYLES[door.type] || DOOR_TYPE_STYLES[0];
-      const preset = MAP_OBJECT_PRESETS.door;
       
-      // Calculate rotation based on door direction
-      let rotation = 0;
-      if (door.direction) {
-        rotation = Math.atan2(door.direction.x, -door.direction.y) * (180 / Math.PI);
-      }
+      // Determine if horizontal or vertical based on direction
+      const isHorizontal = door.direction ? Math.abs(door.direction.x) > Math.abs(door.direction.y) : false;
+      
+      // Door dimensions - match grid spacing
+      const doorLength = 40;
+      const doorThickness = 6;
       
       newMapObjects.push({
         id,
         position: door.position,
-        width: preset.width || 50,
-        height: preset.height || 8,
-        rotation,
+        width: isHorizontal ? doorThickness : doorLength,
+        height: isHorizontal ? doorLength : doorThickness,
+        rotation: 0,
         shape: 'door',
         fillColor: doorStyle.fillColor,
         strokeColor: doorStyle.strokeColor,
-        strokeWidth: preset.strokeWidth || 2,
-        opacity: preset.opacity ?? 1,
+        strokeWidth: 2,
+        opacity: 1,
         castsShadow: false,
         blocksMovement: false,
         blocksVision: true,
