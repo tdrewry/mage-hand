@@ -82,6 +82,57 @@ export function mapObjectsToSegments(mapObjects: MapObject[]): LineSegment[] {
           end: corners[(i + 1) % corners.length],
         });
       }
+      
+      // For doors, add extension lines from short edges to prevent light leakage
+      // These extend perpendicular to the door direction (outward from short edge midpoints)
+      if (shape === 'door' && obj.doorDirection) {
+        const extensionLength = 30; // Extend 30px to reach walls (half grid cell + margin)
+        
+        // doorDirection indicates which way the door faces (perpendicular to door length)
+        // We need to extend along the door direction (outward from short edges)
+        const dir = obj.doorDirection;
+        const dirLen = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        const normDir = dirLen > 0 ? { x: dir.x / dirLen, y: dir.y / dirLen } : { x: 1, y: 0 };
+        
+        // Determine which edges are "short" based on door orientation
+        // If doorDirection is more horizontal, the door is vertical (short edges are top/bottom)
+        // If doorDirection is more vertical, the door is horizontal (short edges are left/right)
+        const isHorizontalDoor = Math.abs(normDir.x) > Math.abs(normDir.y);
+        
+        if (isHorizontalDoor) {
+          // Door is horizontal (lying flat), short edges are left/right (corners 0-3 and 1-2)
+          // Extension goes along X axis (left and right from door ends)
+          const leftMid = { x: (corners[0].x + corners[3].x) / 2, y: (corners[0].y + corners[3].y) / 2 };
+          const rightMid = { x: (corners[1].x + corners[2].x) / 2, y: (corners[1].y + corners[2].y) / 2 };
+          
+          // Extend left
+          segments.push({
+            start: leftMid,
+            end: { x: leftMid.x - extensionLength, y: leftMid.y }
+          });
+          // Extend right
+          segments.push({
+            start: rightMid,
+            end: { x: rightMid.x + extensionLength, y: rightMid.y }
+          });
+        } else {
+          // Door is vertical (standing), short edges are top/bottom (corners 0-1 and 2-3)
+          // Extension goes along Y axis (up and down from door ends)
+          const topMid = { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 };
+          const bottomMid = { x: (corners[2].x + corners[3].x) / 2, y: (corners[2].y + corners[3].y) / 2 };
+          
+          // Extend up
+          segments.push({
+            start: topMid,
+            end: { x: topMid.x, y: topMid.y - extensionLength }
+          });
+          // Extend down
+          segments.push({
+            start: bottomMid,
+            end: { x: bottomMid.x, y: bottomMid.y + extensionLength }
+          });
+        }
+      }
     } else if (shape === 'custom' && obj.customPath && obj.customPath.length > 2) {
       // Custom path
       for (let i = 0; i < obj.customPath.length; i++) {
