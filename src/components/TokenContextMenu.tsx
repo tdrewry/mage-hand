@@ -37,9 +37,8 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
-import { saveTokenTexture, loadTextureByHash } from '@/lib/tokenTextureStorage';
+import { saveTokenTexture, loadTextureByHash, hashImageData, saveTextureByHash } from '@/lib/tokenTextureStorage';
 import { uploadTexture } from '@/lib/textureSync';
-import { hashImageData } from '@/lib/tokenTextureStorage';
 
 interface TokenContextMenuProps {
   children: React.ReactNode;
@@ -243,11 +242,17 @@ export const TokenContextMenu = ({
 
     let imageHash: string | undefined;
     
-    // If we have an image, always save it to get/confirm the hash
-    // (Don't rely on currentToken.imageHash as it may be stale or undefined)
+    // For variants, we need to save textures independently of the token's main mapping.
+    // Using saveTokenTexture would manage refCounts tied to the token mapping and could
+    // delete the previous texture when saving a new one. Instead, we hash and save directly.
     if (imageUrlValue) {
       try {
-        imageHash = await saveTokenTexture(currentToken.id, imageUrlValue);
+        // Generate hash for the image data
+        imageHash = await hashImageData(imageUrlValue);
+        // Save texture directly by hash (no refCount management - keeps it independent)
+        await saveTextureByHash(imageHash, imageUrlValue);
+        // Also upload to server for multiplayer sync
+        await uploadTexture(imageHash, imageUrlValue);
         console.log('Saved variant texture with hash:', imageHash);
       } catch (e) {
         console.error('Failed to save variant image:', e);
