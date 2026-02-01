@@ -82,7 +82,7 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     strokeColor: '#52525b',
     strokeWidth: 2,
     opacity: 1,
-    castsShadow: true,
+    castsShadow: false, // Columns don't cast visual shadows (matches original terrain rendering)
     blocksMovement: true,
     blocksVision: true,
     revealedByLight: true,
