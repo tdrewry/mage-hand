@@ -171,6 +171,9 @@ export const useTokenInteraction = () => {
     // Only enforce collisions in Play mode
     const shouldEnforceCollisions = renderingMode === 'play';
 
+    // Debug: Show what mode we're in
+    console.log('[Collision Debug] Mode:', renderingMode, 'Enforce:', { enforceMovementBlocking, enforceRegionBounds });
+
     if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
       const baseTokenSize = 40;
       const tokenRadius = ((token.gridWidth || 1) * baseTokenSize) / 2;
@@ -178,6 +181,10 @@ export const useTokenInteraction = () => {
       const mapObjects = useMapObjectStore.getState().mapObjects;
       const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
       const regions = enforceRegionBounds ? useRegionStore.getState().regions : [];
+
+      // Debug: Show what we're checking against
+      console.log('[Collision Debug] Blocking objects:', blockingObjects.length, 'Regions:', regions.length);
+      console.log('[Collision Debug] Path:', dragStartPos, '->', { x: token.x, y: token.y });
 
       // Check if path from start to current position crosses any blocker
       const collisionResult = checkMovementCollision(
@@ -189,15 +196,26 @@ export const useTokenInteraction = () => {
         { enforceMovementBlocking, enforceRegionBounds }
       );
 
-      // If blocked, snap back to original position immediately
+      // Debug: Show collision result
+      console.log('[Collision Debug] Result:', collisionResult);
+
+      // If blocked, show toast and snap back
       if (collisionResult.blocked) {
         let blockReason = '';
         if (collisionResult.collidedWith) {
           const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
-          blockReason = blockingObj?.category === 'door' ? 'Blocked by closed door' : 'Blocked by obstacle';
+          blockReason = blockingObj?.category === 'door' 
+            ? `Blocked by closed door (${blockingObj.id.slice(0,6)})` 
+            : `Blocked by ${blockingObj?.category || 'obstacle'} (${collisionResult.collidedWith.slice(0,6)})`;
         } else {
-          blockReason = 'Cannot leave region boundary';
+          blockReason = 'Movement blocked: left region boundary';
         }
+
+        // Show debug toast with details
+        toast.error(blockReason, { 
+          duration: 2000,
+          description: `From (${Math.round(dragStartPos.x)}, ${Math.round(dragStartPos.y)}) to (${Math.round(token.x)}, ${Math.round(token.y)})`
+        });
 
         // Restore to original positions
         if (groupedTokens.length > 0) {
@@ -207,8 +225,9 @@ export const useTokenInteraction = () => {
         } else {
           updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
         }
-
-        toast.warning(blockReason, { duration: 1500 });
+      } else {
+        // Debug: Movement was valid
+        toast.success('Movement valid', { duration: 1000 });
       }
     }
 
