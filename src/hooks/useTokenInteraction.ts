@@ -158,9 +158,11 @@ export const useTokenInteraction = () => {
       // Get regions for boundary constraint
       const regions = enforceRegionBounds ? useRegionStore.getState().regions : [];
 
-      // Check for collisions
+      // CRITICAL: Use dragStartPos (original position) for collision check, not token.x/y
+      // This ensures the entire path from original position is checked, preventing
+      // the token from "jumping through" obstacles when the drag moves past them
       const collisionResult = checkMovementCollision(
-        { x: token.x, y: token.y },
+        dragStartPos,  // Always check from original drag start position
         { x: desiredX, y: desiredY },
         tokenRadius,
         blockingObjects,
