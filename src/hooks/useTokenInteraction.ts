@@ -123,6 +123,9 @@ export const useTokenInteraction = () => {
     }
   }, [tokens, selectedTokenIds, currentPlayerId, players, roles]);
 
+  // Track if we've shown a block notification recently to avoid spam
+  const [lastBlockNotification, setLastBlockNotification] = useState<number>(0);
+  
   const updateTokenDrag = useCallback((worldX: number, worldY: number) => {
     if (!isDraggingToken || !draggedTokenId) return;
 
@@ -140,6 +143,8 @@ export const useTokenInteraction = () => {
     
     let finalX = desiredX;
     let finalY = desiredY;
+    let wasBlocked = false;
+    let blockReason = '';
 
     if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
       // Calculate token radius for collision
@@ -165,6 +170,27 @@ export const useTokenInteraction = () => {
 
       finalX = collisionResult.validPosition.x;
       finalY = collisionResult.validPosition.y;
+      
+      // Check if movement was actually blocked (position changed from desired)
+      const positionChanged = Math.abs(finalX - desiredX) > 1 || Math.abs(finalY - desiredY) > 1;
+      if (collisionResult.blocked && positionChanged) {
+        wasBlocked = true;
+        if (collisionResult.collidedWith) {
+          const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
+          blockReason = blockingObj?.category === 'door' ? 'Blocked by closed door' : 'Blocked by obstacle';
+        } else {
+          blockReason = 'Cannot leave region boundary';
+        }
+      }
+    }
+
+    // Show notification when blocked (throttled to avoid spam)
+    if (wasBlocked) {
+      const now = Date.now();
+      if (now - lastBlockNotification > 1500) {
+        toast.warning(blockReason, { duration: 1000 });
+        setLastBlockNotification(now);
+      }
     }
 
     setDragPath(prev => [...prev, { x: finalX, y: finalY }]);
@@ -180,7 +206,7 @@ export const useTokenInteraction = () => {
     } else {
       updateTokenPosition(draggedTokenId, finalX, finalY);
     }
-  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens]);
+  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens, lastBlockNotification]);
 
   const endTokenDrag = useCallback(() => {
     setIsDraggingToken(false);
