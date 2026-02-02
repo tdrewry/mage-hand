@@ -18,6 +18,7 @@ import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
+import { MapObjectContextMenu } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { useMapStore } from "../stores/mapStore";
@@ -333,6 +334,7 @@ export const SimpleTabletop = () => {
   const selectMapObject = useMapObjectStore((state) => state.selectMapObject);
   const clearMapObjectSelection = useMapObjectStore((state) => state.clearSelection);
   const toggleDoor = useMapObjectStore((state) => state.toggleDoor);
+  const updateMapObject = useMapObjectStore((state) => state.updateMapObject);
 
   // Light system store
   const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity } = useLightStore();
@@ -494,6 +496,18 @@ export const SimpleTabletop = () => {
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
   const [initialRegionState, setInitialRegionState] = useState<Partial<CanvasRegion> | null>(null);
   const [transformingRegionId, setTransformingRegionId] = useState<string | null>(null);
+  
+  // MapObject dragging state (for edit mode)
+  const [isDraggingMapObject, setIsDraggingMapObject] = useState(false);
+  const [draggedMapObjectId, setDraggedMapObjectId] = useState<string | null>(null);
+  const [mapObjectDragOffset, setMapObjectDragOffset] = useState({ x: 0, y: 0 });
+  
+  // MapObject context menu state
+  const [mapObjectContextMenu, setMapObjectContextMenu] = useState<{
+    x: number;
+    y: number;
+    mapObjectId: string;
+  } | null>(null);
 
   const {
     sessionId,
@@ -554,7 +568,7 @@ export const SimpleTabletop = () => {
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
-    if (isDraggingToken || isDraggingRegion || isPanning) {
+    if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject) {
       const handleGlobalMouseUp = () => {
         // Reset all drag states
         if (isDraggingToken) {
@@ -574,6 +588,11 @@ export const SimpleTabletop = () => {
           setDraggedRegionId(null);
           setDragPreview(null);
         }
+        if (isDraggingMapObject) {
+          setIsDraggingMapObject(false);
+          setDraggedMapObjectId(null);
+          setMapObjectDragOffset({ x: 0, y: 0 });
+        }
         if (isPanning) {
           setIsPanning(false);
         }
@@ -588,7 +607,24 @@ export const SimpleTabletop = () => {
         window.removeEventListener("mouseup", handleGlobalMouseUp);
       };
     }
-  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion]);
+  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject]);
+
+  // Close MapObject context menu when clicking outside
+  useEffect(() => {
+    if (!mapObjectContextMenu) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      // Small delay to allow the context menu to process the click first
+      setTimeout(() => {
+        setMapObjectContextMenu(null);
+      }, 100);
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [mapObjectContextMenu]);
 
   // Update highlights whenever tokens or regions change (but not during drag - handled separately)
   useEffect(() => {
@@ -4518,7 +4554,7 @@ export const SimpleTabletop = () => {
     }
   };
 
-  // Handle right-click context menu for tokens and regions
+  // Handle right-click context menu for tokens, regions, and map objects
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
 
@@ -4534,6 +4570,7 @@ export const SimpleTabletop = () => {
 
     // Check if we right-clicked on a token first (tokens are on top)
     const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+    const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
     const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
     // In play mode with fog enabled, check visibility before showing context menus
@@ -4570,6 +4607,17 @@ export const SimpleTabletop = () => {
         },
       });
       window.dispatchEvent(event);
+    } else if (clickedMapObject && renderingMode === "edit") {
+      // Show map object context menu in edit mode
+      // Select the map object if not already selected
+      if (!selectedMapObjectIds.includes(clickedMapObject.id)) {
+        selectMapObject(clickedMapObject.id, false);
+      }
+      setMapObjectContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        mapObjectId: clickedMapObject.id,
+      });
     } else if (clickedRegion) {
       // Show region context menu
       showRegionContextMenu(e.clientX, e.clientY, clickedRegion);
@@ -4885,8 +4933,9 @@ export const SimpleTabletop = () => {
       }
 
 
-      // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then regions)
+      // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then map objects, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
       if (clickedToken) {
@@ -4929,6 +4978,14 @@ export const SimpleTabletop = () => {
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
         }
+      } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit") {
+        // Start dragging a selected MapObject in edit mode
+        setIsDraggingMapObject(true);
+        setDraggedMapObjectId(clickedMapObject.id);
+        setMapObjectDragOffset({
+          x: worldPos.x - clickedMapObject.position.x,
+          y: worldPos.y - clickedMapObject.position.y,
+        });
       } else if (clickedRegion && clickedRegion.selected && renderingMode === "edit") {
         // Only allow region manipulation in edit mode
         // Check if we're clicking on a rotation handle first
@@ -5221,6 +5278,19 @@ export const SimpleTabletop = () => {
 
       // Force immediate redraw for smooth dragging feedback
       redrawCanvas();
+    } else if (isDraggingMapObject && draggedMapObjectId) {
+      // MapObject dragging in edit mode
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const newX = worldPos.x - mapObjectDragOffset.x;
+      const newY = worldPos.y - mapObjectDragOffset.y;
+
+      // Update map object position
+      updateMapObject(draggedMapObjectId, {
+        position: { x: newX, y: newY },
+      });
+
+      // Force immediate redraw for smooth dragging feedback
+      requestAnimationFrame(() => redrawCanvas());
     } else if (isDraggingRegion && draggedRegionId) {
       // Region dragging - move tokens in real-time for smooth preview
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -5745,6 +5815,18 @@ export const SimpleTabletop = () => {
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
 
+      // Handle MapObject drag completion
+      if (isDraggingMapObject && draggedMapObjectId) {
+        // Just reset the drag state - position was already updated during drag
+        setIsDraggingMapObject(false);
+        setDraggedMapObjectId(null);
+        setMapObjectDragOffset({ x: 0, y: 0 });
+        
+        // Notify visibility system that obstacles have changed
+        notifyObstaclesChanged();
+        toast.success("Map object moved");
+      }
+
       // Apply final positions for region drag preview (visual only; undo handled below)
       if (dragPreview && draggedRegionId) {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
@@ -6191,6 +6273,46 @@ export const SimpleTabletop = () => {
             </div>
           );
         })()}
+
+      {/* MapObject Context Menu */}
+      {mapObjectContextMenu && (
+        <MapObjectContextMenu
+          mapObjectId={mapObjectContextMenu.mapObjectId}
+          onUpdateCanvas={() => {
+            redrawCanvas();
+            setMapObjectContextMenu(null);
+          }}
+        >
+          <div
+            id="map-object-context-trigger"
+            ref={(el) => {
+              // Trigger context menu on the element when it mounts
+              if (el) {
+                setTimeout(() => {
+                  const event = new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: mapObjectContextMenu.x,
+                    clientY: mapObjectContextMenu.y,
+                    button: 2,
+                  });
+                  el.dispatchEvent(event);
+                }, 0);
+              }
+            }}
+            style={{
+              position: 'fixed',
+              left: `${mapObjectContextMenu.x}px`,
+              top: `${mapObjectContextMenu.y}px`,
+              width: '1px',
+              height: '1px',
+              pointerEvents: 'none',
+              zIndex: -1,
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        </MapObjectContextMenu>
+      )}
 
       {/* Map Manager Modal */}
       {showMapManager && <MapManager onClose={() => setShowMapManager(false)} />}
