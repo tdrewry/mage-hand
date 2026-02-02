@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
-  ContextMenuCheckboxItem,
-} from '@/components/ui/context-menu';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -30,22 +27,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, EyeOff, Move, DoorOpen, DoorClosed } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed } from 'lucide-react';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
+import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
 import { toast } from 'sonner';
 
-interface MapObjectContextMenuProps {
-  children: React.ReactNode;
+interface MapObjectContextMenuWrapperProps {
   mapObjectId: string;
+  position: { x: number; y: number };
+  onClose: () => void;
   onUpdateCanvas?: () => void;
 }
 
-export const MapObjectContextMenu = ({
-  children,
+export const MapObjectContextMenuWrapper = ({
   mapObjectId,
+  position,
+  onClose,
   onUpdateCanvas,
-}: MapObjectContextMenuProps) => {
+}: MapObjectContextMenuWrapperProps) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const hasOpenedRef = useRef(false);
+  
   const {
     mapObjects,
     selectedMapObjectIds,
@@ -84,6 +86,14 @@ export const MapObjectContextMenu = ({
   const targetObjects = getTargetObjects();
   const isMultiSelection = targetObjects.length > 1;
   const currentObject = mapObjects.find(obj => obj.id === mapObjectId);
+
+  // Handle open state change - close calls parent onClose
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open && !showEditModal && !showDeleteModal) {
+      onClose();
+    }
+  };
 
   const handleEditClick = () => {
     if (targetObjects.length === 1) {
@@ -173,22 +183,43 @@ export const MapObjectContextMenu = ({
     }
   };
 
+  const handleDialogClose = (open: boolean, setter: (v: boolean) => void) => {
+    setter(open);
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
     <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          {children}
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-56">
+      <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
+        <DropdownMenuTrigger asChild>
+          <div
+            style={{
+              position: 'fixed',
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              width: '1px',
+              height: '1px',
+              pointerEvents: 'none',
+            }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent 
+          className="w-56" 
+          align="start"
+          side="bottom"
+          sideOffset={0}
+        >
           {/* Edit option */}
-          <ContextMenuItem onClick={handleEditClick}>
+          <DropdownMenuItem onClick={handleEditClick}>
             <Edit3 className="mr-2 h-4 w-4" />
             Edit {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
-          </ContextMenuItem>
+          </DropdownMenuItem>
 
           {/* Door-specific toggle */}
           {currentObject?.category === 'door' && !isMultiSelection && (
-            <ContextMenuItem onClick={handleToggleDoor}>
+            <DropdownMenuItem onClick={handleToggleDoor}>
               {currentObject.isOpen ? (
                 <>
                   <DoorClosed className="mr-2 h-4 w-4" />
@@ -200,13 +231,13 @@ export const MapObjectContextMenu = ({
                   Open Door
                 </>
               )}
-            </ContextMenuItem>
+            </DropdownMenuItem>
           )}
 
-          <ContextMenuSeparator />
+          <DropdownMenuSeparator />
 
           {/* Quick toggles */}
-          <ContextMenuCheckboxItem
+          <DropdownMenuCheckboxItem
             checked={targetObjects.every(obj => obj.blocksVision)}
             onCheckedChange={(checked) => {
               targetObjects.forEach(obj => {
@@ -217,9 +248,9 @@ export const MapObjectContextMenu = ({
           >
             <Eye className="mr-2 h-4 w-4" />
             Blocks Vision
-          </ContextMenuCheckboxItem>
+          </DropdownMenuCheckboxItem>
 
-          <ContextMenuCheckboxItem
+          <DropdownMenuCheckboxItem
             checked={targetObjects.every(obj => obj.castsShadow)}
             onCheckedChange={(checked) => {
               targetObjects.forEach(obj => {
@@ -229,9 +260,9 @@ export const MapObjectContextMenu = ({
             }}
           >
             Casts Shadow
-          </ContextMenuCheckboxItem>
+          </DropdownMenuCheckboxItem>
 
-          <ContextMenuCheckboxItem
+          <DropdownMenuCheckboxItem
             checked={targetObjects.every(obj => obj.revealedByLight)}
             onCheckedChange={(checked) => {
               targetObjects.forEach(obj => {
@@ -241,23 +272,23 @@ export const MapObjectContextMenu = ({
             }}
           >
             Revealed by Light
-          </ContextMenuCheckboxItem>
+          </DropdownMenuCheckboxItem>
 
-          <ContextMenuSeparator />
+          <DropdownMenuSeparator />
 
           {/* Delete option */}
-          <ContextMenuItem
+          <DropdownMenuItem
             onClick={handleDeleteClick}
             className="text-destructive focus:text-destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Edit Modal */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+      <Dialog open={showEditModal} onOpenChange={(open) => handleDialogClose(open, setShowEditModal)}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -443,7 +474,7 @@ export const MapObjectContextMenu = ({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+            <Button variant="outline" onClick={() => handleDialogClose(false, setShowEditModal)}>
               Cancel
             </Button>
             <Button onClick={applyEdit}>
@@ -454,7 +485,7 @@ export const MapObjectContextMenu = ({
       </Dialog>
 
       {/* Delete Confirmation Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+      <Dialog open={showDeleteModal} onOpenChange={(open) => handleDialogClose(open, setShowDeleteModal)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete {isMultiSelection ? 'Objects' : 'Object'}</DialogTitle>
@@ -465,7 +496,7 @@ export const MapObjectContextMenu = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+            <Button variant="outline" onClick={() => handleDialogClose(false, setShowDeleteModal)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
