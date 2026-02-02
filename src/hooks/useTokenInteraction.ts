@@ -148,7 +148,11 @@ export const useTokenInteraction = () => {
   }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens]);
 
   const endTokenDrag = useCallback(() => {
+    console.log('[Collision Debug] endTokenDrag called, draggedTokenId:', draggedTokenId);
+    toast.info('Drag ended', { duration: 500 });
+    
     if (!draggedTokenId) {
+      console.log('[Collision Debug] No draggedTokenId, early exit');
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragPath([]);
