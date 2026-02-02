@@ -6306,8 +6306,7 @@ export const SimpleTabletop = () => {
               top: `${mapObjectContextMenu.y}px`,
               width: '1px',
               height: '1px',
-              pointerEvents: 'none',
-              zIndex: -1,
+              zIndex: 9999,
             }}
             onContextMenu={(e) => e.preventDefault()}
           />
