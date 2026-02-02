@@ -98,6 +98,7 @@ import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
+import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
 
 import { Z_INDEX } from "../lib/zIndex";
 
@@ -571,7 +572,61 @@ export const SimpleTabletop = () => {
     if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject) {
       const handleGlobalMouseUp = () => {
         // Reset all drag states
-        if (isDraggingToken) {
+        if (isDraggingToken && draggedTokenId) {
+          // Check for collision before finalizing the move
+          const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
+          const shouldEnforceCollisions = renderingMode === 'play';
+          
+          console.log('[Collision Debug] Token drag ended', { enforceMovementBlocking, enforceRegionBounds, renderingMode });
+          
+          if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
+            const draggedToken = tokens.find(t => t.id === draggedTokenId);
+            if (draggedToken) {
+              const baseTokenSize = 40;
+              const tokenRadius = ((draggedToken.gridWidth || 1) * baseTokenSize) / 2;
+              
+              const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
+              const checkRegions = enforceRegionBounds ? regions : [];
+              
+              console.log('[Collision Debug] Checking path', dragStartPos, '->', { x: draggedToken.x, y: draggedToken.y });
+              console.log('[Collision Debug] Blocking objects:', blockingObjects.length);
+              
+              const collisionResult = checkMovementCollision(
+                dragStartPos,
+                { x: draggedToken.x, y: draggedToken.y },
+                tokenRadius,
+                blockingObjects,
+                checkRegions,
+                { enforceMovementBlocking, enforceRegionBounds }
+              );
+              
+              console.log('[Collision Debug] Result:', collisionResult);
+              
+              if (collisionResult.blocked) {
+                // Show toast with details
+                let blockReason = '';
+                if (collisionResult.collidedWith) {
+                  const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
+                  blockReason = blockingObj?.category === 'door' 
+                    ? `Blocked by closed door` 
+                    : `Blocked by ${blockingObj?.category || 'obstacle'}`;
+                } else {
+                  blockReason = 'Left region boundary';
+                }
+                
+                toast.error(blockReason, { 
+                  duration: 2000,
+                  description: `Movement from (${Math.round(dragStartPos.x)}, ${Math.round(dragStartPos.y)}) invalid`
+                });
+                
+                // Snap back to original position
+                updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
+              } else {
+                toast.success('Movement valid', { duration: 800 });
+              }
+            }
+          }
+          
           setIsDraggingToken(false);
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
@@ -580,6 +635,17 @@ export const SimpleTabletop = () => {
           setGroupedTokens([]);
           setTempTokenPositions(undefined);
           // Clear real-time vision preview
+          dragPreviewVisibilityRef.current = null;
+          setDragPreviewPosition(null);
+        } else if (isDraggingToken) {
+          // Token drag without draggedTokenId - just reset state
+          setIsDraggingToken(false);
+          setDraggedTokenId(null);
+          setDragOffset({ x: 0, y: 0 });
+          setDragStartPos({ x: 0, y: 0 });
+          setDragPath([]);
+          setGroupedTokens([]);
+          setTempTokenPositions(undefined);
           dragPreviewVisibilityRef.current = null;
           setDragPreviewPosition(null);
         }
