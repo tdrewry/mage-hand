@@ -1,239 +1,215 @@
 
-
-# Plan: Enhanced Watabou-Style Terrain Rendering
+# Plan: Token Movement Blocking System
 
 ## Overview
 
-This plan improves the rendering of Watabou terrain features to match the authentic One Page Dungeon aesthetic, based on your clarifications:
+Implement a collision detection system that prevents tokens from being dragged through movement-blocking MapObjects (columns, closed doors) and optionally constrains tokens to remain within region boundaries.
 
-1. **Water**: Shore ripple lines that follow the water boundary curve (not horizontal waves)
-2. **Debris**: Unfilled squares and small circles (not stippling/crosshatching)
-3. **Stairs**: New MapObject type for parallel lines indicating direction
+## Current State Analysis
 
-## Analysis of Current State
+| Component | Current Behavior |
+|-----------|-----------------|
+| **`blocksMovement` on MapObjects** | Property exists but is **not enforced** - it's a placeholder |
+| **Token dragging** | `useTokenInteraction.ts` directly updates position without collision checks |
+| **Regions** | `regionStore.ts` defines playable areas but no movement constraint |
+| **Collision detection** | `lineSegmentsIntersect()` exists in `visionPermissions.ts` for LoS |
 
-| Feature | Current | Target |
-|---------|---------|--------|
-| **Water** | Horizontal sine waves across the area | Concentric ripple lines following the shore boundary |
-| **Debris** | Stippled dots pattern | Unfilled squares (with diagonal lines) and small circles |
-| **Columns** | Already correct | No changes needed |
-| **Doors** | Already correct | No changes needed |
-| **Stairs** | Not implemented | MapObjects with parallel lines |
+## Proposed Architecture
+
+### Core Concept: Path-Based Collision Detection
+
+When a token is dragged from position A to position B, we check if the movement path intersects any blocking geometry:
+
+```text
+Token at A ─────────────────> Target B
+                    │
+                ┌───┼───┐
+                │ COLUMN│  <- If path intersects, 
+                │   ●   │     stop token at nearest
+                └───────┘     valid position before collision
+```
+
+### Two Collision Modes
+
+1. **MapObject Blocking**: Tokens cannot pass through objects with `blocksMovement: true`
+2. **Region Constraint**: Tokens are constrained to stay within regions (optional toggle)
 
 ---
 
-## Technical Changes
+## Technical Implementation
 
-### 1. Enhanced Water Rendering with Shore Ripples
+### 1. New Collision Utility Module
 
-**File: `src/lib/dungeonRenderer.ts`**
+**File: `src/lib/movementCollision.ts`**
 
-Replace the current horizontal wave pattern with concentric ripple lines that follow the water boundary:
-
-```text
-Current rendering:
-+------------------+
-|   ~~~~~~~~~~~~   |  <- horizontal sine waves
-|   ~~~~~~~~~~~~   |
-|   ~~~~~~~~~~~~   |
-+------------------+
-
-Target rendering:
-+------------------+
-|     /~~~~\       |  <- lines follow the
-|    /      \      |     shore boundary
-|   |        |     |     getting smaller toward
-|    \      /      |     the center
-|     \____/       |
-+------------------+
-```
-
-**Implementation approach:**
-- Use the `fluidBoundary` path (already computed via marching squares)
-- Create offset/inset versions of the boundary path at decreasing distances
-- Draw each inset path as a ripple line
-- Clip all rendering to the containing region
+Create a dedicated module for movement collision detection:
 
 ```typescript
-function renderWaterTiles(
-  ctx: CanvasRenderingContext2D,
-  tiles: { x: number; y: number }[],
-  zoom: number,
-  dungeonMapMode: boolean,
-  style: WatabouStyle,
+// Core types
+interface CollisionResult {
+  blocked: boolean;
+  validPosition: { x: number; y: number };  // Furthest valid position
+  collidedWith?: string;  // ID of blocking object
+}
+
+// Main collision check function
+export function checkMovementCollision(
+  startPos: { x: number; y: number },
+  endPos: { x: number; y: number },
+  tokenRadius: number,
+  blockingObjects: MapObject[],
   regions: CanvasRegion[],
-  fluidBoundary?: { x: number; y: number }[]
-) {
-  if (dungeonMapMode && fluidBoundary && fluidBoundary.length > 2) {
-    // Fill with water color
-    ctx.fillStyle = style.colorWater;
-    // ... fill the boundary path
-    
-    // Draw shore ripples - concentric lines following boundary
-    const rippleSpacing = 8; // pixels between ripple lines
-    const maxRipples = 5;
-    
-    for (let i = 1; i <= maxRipples; i++) {
-      const insetPath = computeInsetPath(fluidBoundary, rippleSpacing * i);
-      if (insetPath.length < 3) break; // Stop if inset collapses
-      
-      ctx.beginPath();
-      ctx.moveTo(insetPath[0].x, insetPath[0].y);
-      for (const point of insetPath) {
-        ctx.lineTo(point.x, point.y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = style.colorInk;
-      ctx.globalAlpha = 0.3 - (i * 0.04); // Fade toward center
-      ctx.stroke();
-    }
+  options: {
+    enforceRegionBounds: boolean;
   }
+): CollisionResult;
+
+// Helper: Get movement-blocking geometry from MapObjects
+export function getBlockingSegments(mapObjects: MapObject[]): LineSegment[];
+
+// Helper: Check if movement line intersects circle (for columns)
+export function lineIntersectsCircle(
+  lineStart: Point,
+  lineEnd: Point,
+  circleCenter: Point,
+  radius: number
+): { intersects: boolean; nearestPoint?: Point };
+
+// Helper: Check if movement line intersects rotated rectangle
+export function lineIntersectsRectangle(
+  lineStart: Point,
+  lineEnd: Point,
+  rect: { x: number; y: number; width: number; height: number; rotation?: number }
+): { intersects: boolean; nearestPoint?: Point };
+
+// Helper: Find the furthest valid position along movement path
+export function findValidPositionAlongPath(
+  start: Point,
+  end: Point,
+  blockingGeometry: LineSegment[],
+  tokenRadius: number
+): Point;
+```
+
+### 2. Movement Collision Integration
+
+**File: `src/hooks/useTokenInteraction.ts`**
+
+Modify `updateTokenDrag()` to check collisions before updating position:
+
+```typescript
+// In updateTokenDrag callback:
+const updateTokenDrag = useCallback((worldX: number, worldY: number) => {
+  if (!isDraggingToken || !draggedTokenId) return;
+
+  const token = tokens.find(t => t.id === draggedTokenId);
+  if (!token) return;
+
+  const desiredX = worldX - dragOffset.x;
+  const desiredY = worldY - dragOffset.y;
+
+  // Get blocking objects and regions
+  const blockingObjects = mapObjects.filter(obj => obj.blocksMovement);
+  const regions = useRegionStore.getState().regions;
+  
+  // Calculate token radius for collision
+  const tokenRadius = ((token.gridWidth || 1) * 40) / 2;
+
+  // Check for collisions
+  const collisionResult = checkMovementCollision(
+    { x: token.x, y: token.y },
+    { x: desiredX, y: desiredY },
+    tokenRadius,
+    blockingObjects,
+    regions,
+    { enforceRegionBounds }
+  );
+
+  // Use valid position (may be same as desired if no collision)
+  const finalX = collisionResult.validPosition.x;
+  const finalY = collisionResult.validPosition.y;
+
+  // Optional: Show feedback when blocked
+  if (collisionResult.blocked && collisionResult.collidedWith) {
+    // Could trigger visual feedback here
+  }
+
+  setDragPath(prev => [...prev, { x: finalX, y: finalY }]);
+  updateTokenPosition(draggedTokenId, finalX, finalY);
+}, [...]);
+```
+
+### 3. Global Movement Blocking Toggle
+
+**File: `src/stores/dungeonStore.ts`**
+
+Add a global toggle for movement blocking (only active in Play mode):
+
+```typescript
+interface DungeonStore {
+  // ... existing fields
+  enforceMovementBlocking: boolean;
+  enforceRegionBounds: boolean;
+  
+  setEnforceMovementBlocking: (enforce: boolean) => void;
+  setEnforceRegionBounds: (enforce: boolean) => void;
 }
 ```
 
-### 2. Authentic Debris Rendering
+### 4. UI Controls
 
-**File: `src/lib/dungeonRenderer.ts`**
+**File: `src/components/cards/ToolsCard.tsx`** (or similar controls location)
 
-Update `renderDebrisTiles()` to draw unfilled squares and circles instead of stippling:
+Add toggles to the DM controls:
+
+```tsx
+<div className="space-y-2">
+  <Label>Movement Constraints</Label>
+  <div className="flex items-center justify-between">
+    <span className="text-sm">Block through obstacles</span>
+    <Switch 
+      checked={enforceMovementBlocking}
+      onCheckedChange={setEnforceMovementBlocking}
+    />
+  </div>
+  <div className="flex items-center justify-between">
+    <span className="text-sm">Constrain to regions</span>
+    <Switch 
+      checked={enforceRegionBounds}
+      onCheckedChange={setEnforceRegionBounds}
+    />
+  </div>
+</div>
+```
+
+---
+
+## Collision Detection Algorithm
+
+### For Circle-Shaped Objects (Columns)
 
 ```text
-Current rendering:
-+------------------+
-|   · ··  ·  ·· ·  |  <- stippled dots
-|   ·  · ··   · ·  |
-+------------------+
-
-Target rendering:
-+------------------+
-|   □  ○  □        |  <- unfilled squares with
-|      ○     □     |     diagonal lines + circles
-|   □     ○    □   |
-+------------------+
+1. Calculate movement vector from start to end
+2. Find closest point on movement line to circle center
+3. If distance < (tokenRadius + columnRadius), collision detected
+4. Find intersection point and calculate safe stop position
 ```
 
-**Implementation:**
-```typescript
-function renderDebrisTiles(
-  ctx: CanvasRenderingContext2D,
-  tiles: { x: number; y: number }[],
-  zoom: number,
-  dungeonMapMode: boolean,
-  style: WatabouStyle,
-  regions: CanvasRegion[]
-) {
-  if (dungeonMapMode) {
-    tiles.forEach((tile) => {
-      ctx.strokeStyle = style.colorInk;
-      ctx.lineWidth = style.strokeThin / zoom;
-      
-      // Use seeded random for consistent rendering
-      const seed = tile.x * 1000 + tile.y;
-      const rand = seededRandom(seed);
-      
-      // Place 2-4 debris items per tile
-      const itemCount = 2 + Math.floor(rand() * 3);
-      
-      for (let i = 0; i < itemCount; i++) {
-        const x = tile.x + 8 + rand() * 34;
-        const y = tile.y + 8 + rand() * 34;
-        const size = 4 + rand() * 6;
-        
-        if (rand() > 0.5) {
-          // Square with optional diagonal lines
-          ctx.strokeRect(x - size/2, y - size/2, size, size);
-          if (rand() > 0.5) {
-            // Add diagonal line
-            ctx.beginPath();
-            ctx.moveTo(x - size/2, y - size/2);
-            ctx.lineTo(x + size/2, y + size/2);
-            ctx.stroke();
-          }
-        } else {
-          // Small circle
-          ctx.beginPath();
-          ctx.arc(x, y, size / 2, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-    });
-  }
-}
+### For Rectangle-Shaped Objects (Doors, Furniture)
+
+```text
+1. Convert rectangle to 4 line segments (respecting rotation)
+2. Check if movement line intersects any segment
+3. Find first intersection point along movement path
+4. Calculate safe stop position (back off by tokenRadius)
 ```
 
-### 3. Stairs as MapObjects
+### For Region Boundary Constraint
 
-Since the Watabou JSON doesn't include stairs in the standard export, we'll add stairs as a manual MapObject category that users can place.
-
-**File: `src/types/mapObjectTypes.ts`**
-
-Add a new `'stairs'` category and shape:
-
-```typescript
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs';
-
-export type MapObjectCategory = 
-  | 'column'
-  | 'statue'
-  | 'furniture'
-  | 'debris'
-  | 'trap'
-  | 'decoration'
-  | 'obstacle'
-  | 'door'
-  | 'stairs'  // NEW
-  | 'custom';
-
-// Add to MAP_OBJECT_PRESETS
-stairs: {
-  shape: 'stairs',
-  width: 50,  // One grid cell wide
-  height: 100, // Two grid cells long
-  fillColor: 'transparent',
-  strokeColor: '#2C241D', // Ink color
-  strokeWidth: 1.5,
-  opacity: 1,
-  castsShadow: false,
-  blocksMovement: false,
-  blocksVision: false,
-  revealedByLight: true,
-},
-
-// Add to MAP_OBJECT_CATEGORY_LABELS
-stairs: 'Stairs',
-```
-
-**File: `src/lib/mapObjectRenderer.ts`** (or wherever MapObjects are rendered)
-
-Add rendering logic for stairs:
-
-```typescript
-function renderStairsMapObject(
-  ctx: CanvasRenderingContext2D,
-  obj: MapObject,
-  zoom: number
-) {
-  ctx.save();
-  ctx.translate(obj.position.x, obj.position.y);
-  if (obj.rotation) {
-    ctx.rotate((obj.rotation * Math.PI) / 180);
-  }
-  
-  // Draw parallel lines across the stair width
-  const numLines = Math.floor(obj.height / 8); // ~6px spacing
-  ctx.strokeStyle = obj.strokeColor;
-  ctx.lineWidth = obj.strokeWidth / zoom;
-  
-  for (let i = 0; i < numLines; i++) {
-    const y = -obj.height/2 + (i + 0.5) * (obj.height / numLines);
-    ctx.beginPath();
-    ctx.moveTo(-obj.width/2, y);
-    ctx.lineTo(obj.width/2, y);
-    ctx.stroke();
-  }
-  
-  ctx.restore();
-}
+```text
+1. Check if end position is inside any region
+2. If not, find intersection with region boundary
+3. Clamp position to stay within region
 ```
 
 ---
@@ -242,50 +218,66 @@ function renderStairsMapObject(
 
 | File | Changes |
 |------|---------|
-| `src/lib/dungeonRenderer.ts` | Update `renderWaterTiles()` with shore ripple algorithm; update `renderDebrisTiles()` with squares/circles |
-| `src/types/mapObjectTypes.ts` | Add `'stairs'` to shape and category types; add stairs preset |
-| `src/lib/mapObjectRenderer.ts` | Add stairs rendering logic (parallel lines) |
+| `src/lib/movementCollision.ts` | **NEW** - Core collision detection utilities |
+| `src/hooks/useTokenInteraction.ts` | Integrate collision checks in `updateTokenDrag()` |
+| `src/stores/dungeonStore.ts` | Add `enforceMovementBlocking` and `enforceRegionBounds` toggles |
+| `src/components/cards/ToolsCard.tsx` | Add UI toggles for movement blocking |
+| `src/components/MapObjectContextMenu.tsx` | Remove "Blocks Movement" toggle if it clutters UI, or keep for per-object control |
 
 ---
 
-## Visual Reference
+## Behavior Specification
 
-Based on the Watabou original:
+### When Movement Blocking is Enabled
 
-```text
-WATER (shore ripples):
-    ___________
-   /           \
-  /   _______   \    <- concentric lines
- |   /       \   |      following the
- |  |         |  |      water boundary
- |   \_______/   |
-  \             /
-   \___________/
+1. **Columns** (`blocksMovement: true`, shape: circle)
+   - Token cannot pass through the column's radius
+   - Token stops at the edge if attempting to cross
 
-DEBRIS (room 9 style):
-  □     ○
-    □      ○
-  ○    □
-     □   ○      <- unfilled geometric shapes
-                   squares may have diagonal
+2. **Closed Doors** (`blocksMovement: false` by default, but can be enabled)
+   - Door's `blocksMovement` can be linked to `isOpen` state
+   - Closed door blocks, open door allows passage
 
-STAIRS (new MapObject):
-  ─────────────
-  ─────────────    <- parallel horizontal lines
-  ─────────────       (rotation determines direction)
-  ─────────────
-```
+3. **Furniture/Obstacles** (`blocksMovement: true`)
+   - Token cannot overlap with the object's bounding box
+
+### When Region Bounds Enforcement is Enabled
+
+1. Token cannot be dragged outside of any region boundary
+2. Token "slides" along region edges rather than escaping
+3. Path-based regions use polygon containment check
+
+### Edit Mode vs Play Mode
+
+- **Edit Mode**: Movement blocking is **bypassed** (DM can freely arrange tokens)
+- **Play Mode**: Movement blocking is **enforced** when toggles are enabled
 
 ---
 
-## Implementation Notes
+## Visual Feedback (Optional Enhancement)
 
-1. **Seeded Random**: For debris, use a seeded random based on tile position so patterns are consistent across re-renders
+When a token is blocked during drag:
 
-2. **Path Inset Algorithm**: For water ripples, implement a simple polygon inset by moving each point toward the centroid, or use a proper polygon offset algorithm
+1. Brief red flash on the blocking object
+2. Token "snaps back" to last valid position smoothly
+3. Optional toast notification for first-time blocking
 
-3. **Stairs Rotation**: Stairs use the existing `rotation` property to orient in any direction (0° = horizontal stairs, 90° = vertical stairs)
+---
 
-4. **No Changes to Doors/Columns**: These are working correctly per your feedback
+## Performance Considerations
 
+1. **Caching**: Cache blocking geometry when MapObjects don't change
+2. **Spatial partitioning**: For maps with many objects, use grid-based lookup
+3. **Early exit**: Skip collision check if movement distance is zero
+
+---
+
+## Edge Cases
+
+| Scenario | Handling |
+|----------|----------|
+| Token starts inside blocking object | Allow movement outward, block re-entry |
+| Multiple blocking objects in path | Stop at first collision |
+| Token larger than gap between objects | Block if token radius exceeds gap |
+| Region with hole (path-based) | Treat hole as blocking boundary |
+| Rotated rectangles | Apply rotation transform before intersection test |
