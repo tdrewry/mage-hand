@@ -123,56 +123,74 @@ export const useTokenInteraction = () => {
     }
   }, [tokens, selectedTokenIds, currentPlayerId, players, roles]);
 
-  // Track if we've shown a block notification recently to avoid spam
-  const [lastBlockNotification, setLastBlockNotification] = useState<number>(0);
-  
   const updateTokenDrag = useCallback((worldX: number, worldY: number) => {
     if (!isDraggingToken || !draggedTokenId) return;
 
     const token = tokens.find(t => t.id === draggedTokenId);
     if (!token) return;
 
-    const desiredX = worldX - dragOffset.x;
-    const desiredY = worldY - dragOffset.y;
+    const newX = worldX - dragOffset.x;
+    const newY = worldY - dragOffset.y;
+
+    setDragPath(prev => [...prev, { x: newX, y: newY }]);
+
+    // Update grouped tokens if any
+    if (groupedTokens.length > 0) {
+      const dragDeltaX = newX - dragStartPos.x;
+      const dragDeltaY = newY - dragStartPos.y;
+
+      groupedTokens.forEach(({ tokenId, startX, startY }) => {
+        updateTokenPosition(tokenId, startX + dragDeltaX, startY + dragDeltaY);
+      });
+    } else {
+      updateTokenPosition(draggedTokenId, newX, newY);
+    }
+  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens]);
+
+  const endTokenDrag = useCallback(() => {
+    if (!draggedTokenId) {
+      setIsDraggingToken(false);
+      setDraggedTokenId(null);
+      setDragPath([]);
+      setGroupedTokens([]);
+      return;
+    }
+
+    const token = tokens.find(t => t.id === draggedTokenId);
+    if (!token) {
+      setIsDraggingToken(false);
+      setDraggedTokenId(null);
+      setDragPath([]);
+      setGroupedTokens([]);
+      return;
+    }
 
     // Get movement blocking settings from dungeonStore
     const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
     
     // Only enforce collisions in Play mode
     const shouldEnforceCollisions = renderingMode === 'play';
-    
-    let finalX = desiredX;
-    let finalY = desiredY;
 
     if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
-      // Calculate token radius for collision
       const baseTokenSize = 40;
       const tokenRadius = ((token.gridWidth || 1) * baseTokenSize) / 2;
 
-      // Get blocking objects
       const mapObjects = useMapObjectStore.getState().mapObjects;
       const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
-      
-      // Get regions for boundary constraint
       const regions = enforceRegionBounds ? useRegionStore.getState().regions : [];
 
-      // Check for collisions from original drag start position
+      // Check if path from start to current position crosses any blocker
       const collisionResult = checkMovementCollision(
         dragStartPos,
-        { x: desiredX, y: desiredY },
+        { x: token.x, y: token.y },
         tokenRadius,
         blockingObjects,
         regions,
         { enforceMovementBlocking, enforceRegionBounds }
       );
 
-      finalX = collisionResult.validPosition.x;
-      finalY = collisionResult.validPosition.y;
-      
-      // Check if movement was blocked (position differs significantly from desired)
-      const positionChanged = Math.abs(finalX - desiredX) > 1 || Math.abs(finalY - desiredY) > 1;
-      if (collisionResult.blocked && positionChanged) {
-        // Force end the drag - token stops at last valid position
+      // If blocked, snap back to original position immediately
+      if (collisionResult.blocked) {
         let blockReason = '';
         if (collisionResult.collidedWith) {
           const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
@@ -180,55 +198,25 @@ export const useTokenInteraction = () => {
         } else {
           blockReason = 'Cannot leave region boundary';
         }
-        
-        // Update token to the valid position before ending drag
+
+        // Restore to original positions
         if (groupedTokens.length > 0) {
-          const dragDeltaX = finalX - dragStartPos.x;
-          const dragDeltaY = finalY - dragStartPos.y;
           groupedTokens.forEach(({ tokenId, startX, startY }) => {
-            updateTokenPosition(tokenId, startX + dragDeltaX, startY + dragDeltaY);
+            updateTokenPosition(tokenId, startX, startY);
           });
         } else {
-          updateTokenPosition(draggedTokenId, finalX, finalY);
+          updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
         }
-        
-        // Show notification (throttled)
-        const now = Date.now();
-        if (now - lastBlockNotification > 1500) {
-          toast.warning(blockReason, { duration: 1000 });
-          setLastBlockNotification(now);
-        }
-        
-        // Force end the drag operation
-        setIsDraggingToken(false);
-        setDraggedTokenId(null);
-        setDragPath([]);
-        setGroupedTokens([]);
-        return;
+
+        toast.warning(blockReason, { duration: 1500 });
       }
     }
 
-    setDragPath(prev => [...prev, { x: finalX, y: finalY }]);
-
-    // Update grouped tokens if any
-    if (groupedTokens.length > 0) {
-      const dragDeltaX = finalX - dragStartPos.x;
-      const dragDeltaY = finalY - dragStartPos.y;
-
-      groupedTokens.forEach(({ tokenId, startX, startY }) => {
-        updateTokenPosition(tokenId, startX + dragDeltaX, startY + dragDeltaY);
-      });
-    } else {
-      updateTokenPosition(draggedTokenId, finalX, finalY);
-    }
-  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens, lastBlockNotification]);
-
-  const endTokenDrag = useCallback(() => {
     setIsDraggingToken(false);
     setDraggedTokenId(null);
     setDragPath([]);
     setGroupedTokens([]);
-  }, []);
+  }, [draggedTokenId, dragStartPos, groupedTokens, tokens, updateTokenPosition]);
 
   const selectToken = useCallback((tokenId: string, isMultiSelect: boolean) => {
     const token = tokens.find(t => t.id === tokenId);
