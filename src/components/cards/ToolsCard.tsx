@@ -26,6 +26,8 @@ import {
   Lock,
   LockOpen,
   Users,
+  ShieldX,
+  Fence,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -80,6 +82,7 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
   const { clearAllTokens } = useSessionStore();
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
+  const { enforceMovementBlocking, enforceRegionBounds, setEnforceMovementBlocking, setEnforceRegionBounds } = useDungeonStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -518,6 +521,38 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
                     : (restrictMovement ? 'GM Only' : 'Free Movement')
                   }
                 </p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={enforceMovementBlocking ? "default" : "ghost"}
+                  size="icon"
+                  onClick={() => setEnforceMovementBlocking(!enforceMovementBlocking)}
+                  className="w-10 h-10"
+                >
+                  <ShieldX className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Obstacle Collision {enforceMovementBlocking ? 'On' : 'Off'}</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={enforceRegionBounds ? "default" : "ghost"}
+                  size="icon"
+                  onClick={() => setEnforceRegionBounds(!enforceRegionBounds)}
+                  className="w-10 h-10"
+                >
+                  <Fence className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Region Bounds {enforceRegionBounds ? 'On' : 'Off'}</p>
               </TooltipContent>
             </Tooltip>
 

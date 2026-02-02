@@ -17,6 +17,10 @@ interface DungeonStore {
   lightDirection: number; // Angle in degrees (0 = top, 90 = right, 180 = bottom, 270 = left)
   shadowDistance: number; // Distance shadows extend from walls in pixels
   
+  // Movement blocking settings
+  enforceMovementBlocking: boolean; // Prevent tokens from passing through obstacles
+  enforceRegionBounds: boolean; // Constrain tokens to stay within regions
+  
   // Wall geometry caching
   cachedWallGeometry: WallGeometry | null;
   wallGeometryCacheKey: string | null;
@@ -27,6 +31,19 @@ interface DungeonStore {
    * @param cacheKey The key associated with the cached geometry.
    */
   setCachedWallGeometry: (geometry: WallGeometry | null, cacheKey: string | null) => void;
+  
+  // Movement blocking setters
+  /**
+   * Sets whether movement blocking through obstacles is enforced.
+   * @param enforce Whether to enforce movement blocking.
+   */
+  setEnforceMovementBlocking: (enforce: boolean) => void;
+  
+  /**
+   * Sets whether tokens are constrained to region boundaries.
+   * @param enforce Whether to enforce region bounds.
+   */
+  setEnforceRegionBounds: (enforce: boolean) => void;
   
   // Rendering mode
   /**
@@ -216,6 +233,8 @@ export const useDungeonStore = create<DungeonStore>()(
     textureScale: 1,
     lightDirection: 315, // Default: top-left (45 degrees from top)
     shadowDistance: 30, // Default: 30px shadow distance
+    enforceMovementBlocking: false, // Default: disabled
+    enforceRegionBounds: false, // Default: disabled
     cachedWallGeometry: null,
     wallGeometryCacheKey: null,
       
@@ -226,6 +245,8 @@ export const useDungeonStore = create<DungeonStore>()(
       setTextureScale: (scale) => set({ textureScale: scale }),
       setLightDirection: (angle) => set({ lightDirection: angle }),
       setShadowDistance: (distance) => set({ shadowDistance: distance }),
+      setEnforceMovementBlocking: (enforce) => set({ enforceMovementBlocking: enforce }),
+      setEnforceRegionBounds: (enforce) => set({ enforceRegionBounds: enforce }),
       setCachedWallGeometry: (geometry, cacheKey) => set({
         cachedWallGeometry: geometry, 
         wallGeometryCacheKey: cacheKey 
