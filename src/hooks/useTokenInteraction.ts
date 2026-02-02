@@ -143,8 +143,6 @@ export const useTokenInteraction = () => {
     
     let finalX = desiredX;
     let finalY = desiredY;
-    let wasBlocked = false;
-    let blockReason = '';
 
     if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
       // Calculate token radius for collision
@@ -158,11 +156,9 @@ export const useTokenInteraction = () => {
       // Get regions for boundary constraint
       const regions = enforceRegionBounds ? useRegionStore.getState().regions : [];
 
-      // CRITICAL: Use dragStartPos (original position) for collision check, not token.x/y
-      // This ensures the entire path from original position is checked, preventing
-      // the token from "jumping through" obstacles when the drag moves past them
+      // Check for collisions from original drag start position
       const collisionResult = checkMovementCollision(
-        dragStartPos,  // Always check from original drag start position
+        dragStartPos,
         { x: desiredX, y: desiredY },
         tokenRadius,
         blockingObjects,
@@ -173,25 +169,42 @@ export const useTokenInteraction = () => {
       finalX = collisionResult.validPosition.x;
       finalY = collisionResult.validPosition.y;
       
-      // Check if movement was actually blocked (position changed from desired)
+      // Check if movement was blocked (position differs significantly from desired)
       const positionChanged = Math.abs(finalX - desiredX) > 1 || Math.abs(finalY - desiredY) > 1;
       if (collisionResult.blocked && positionChanged) {
-        wasBlocked = true;
+        // Force end the drag - token stops at last valid position
+        let blockReason = '';
         if (collisionResult.collidedWith) {
           const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
           blockReason = blockingObj?.category === 'door' ? 'Blocked by closed door' : 'Blocked by obstacle';
         } else {
           blockReason = 'Cannot leave region boundary';
         }
-      }
-    }
-
-    // Show notification when blocked (throttled to avoid spam)
-    if (wasBlocked) {
-      const now = Date.now();
-      if (now - lastBlockNotification > 1500) {
-        toast.warning(blockReason, { duration: 1000 });
-        setLastBlockNotification(now);
+        
+        // Update token to the valid position before ending drag
+        if (groupedTokens.length > 0) {
+          const dragDeltaX = finalX - dragStartPos.x;
+          const dragDeltaY = finalY - dragStartPos.y;
+          groupedTokens.forEach(({ tokenId, startX, startY }) => {
+            updateTokenPosition(tokenId, startX + dragDeltaX, startY + dragDeltaY);
+          });
+        } else {
+          updateTokenPosition(draggedTokenId, finalX, finalY);
+        }
+        
+        // Show notification (throttled)
+        const now = Date.now();
+        if (now - lastBlockNotification > 1500) {
+          toast.warning(blockReason, { duration: 1000 });
+          setLastBlockNotification(now);
+        }
+        
+        // Force end the drag operation
+        setIsDraggingToken(false);
+        setDraggedTokenId(null);
+        setDragPath([]);
+        setGroupedTokens([]);
+        return;
       }
     }
 
