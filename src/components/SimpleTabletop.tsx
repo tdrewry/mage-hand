@@ -18,7 +18,7 @@ import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
-import { MapObjectContextMenu } from "./MapObjectContextMenu";
+import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { useMapStore } from "../stores/mapStore";
@@ -609,22 +609,8 @@ export const SimpleTabletop = () => {
     }
   }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject]);
 
-  // Close MapObject context menu when clicking outside
-  useEffect(() => {
-    if (!mapObjectContextMenu) return;
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      // Small delay to allow the context menu to process the click first
-      setTimeout(() => {
-        setMapObjectContextMenu(null);
-      }, 100);
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [mapObjectContextMenu]);
+  // MapObject context menu is handled by Radix ContextMenu component
+  // No need for manual click-outside handling - Radix handles it
 
   // Update highlights whenever tokens or regions change (but not during drag - handled separately)
   useEffect(() => {
@@ -6276,41 +6262,15 @@ export const SimpleTabletop = () => {
 
       {/* MapObject Context Menu */}
       {mapObjectContextMenu && (
-        <MapObjectContextMenu
+        <MapObjectContextMenuWrapper
           mapObjectId={mapObjectContextMenu.mapObjectId}
+          position={{ x: mapObjectContextMenu.x, y: mapObjectContextMenu.y }}
+          onClose={() => setMapObjectContextMenu(null)}
           onUpdateCanvas={() => {
             redrawCanvas();
             setMapObjectContextMenu(null);
           }}
-        >
-          <div
-            id="map-object-context-trigger"
-            ref={(el) => {
-              // Trigger context menu on the element when it mounts
-              if (el) {
-                setTimeout(() => {
-                  const event = new MouseEvent('contextmenu', {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: mapObjectContextMenu.x,
-                    clientY: mapObjectContextMenu.y,
-                    button: 2,
-                  });
-                  el.dispatchEvent(event);
-                }, 0);
-              }
-            }}
-            style={{
-              position: 'fixed',
-              left: `${mapObjectContextMenu.x}px`,
-              top: `${mapObjectContextMenu.y}px`,
-              width: '1px',
-              height: '1px',
-              zIndex: 9999,
-            }}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-        </MapObjectContextMenu>
+        />
       )}
 
       {/* Map Manager Modal */}
