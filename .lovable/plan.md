@@ -1,132 +1,291 @@
 
-# Plan: Support Non-Uniform Token Dimensions
+
+# Plan: Enhanced Watabou-Style Terrain Rendering
 
 ## Overview
-Enable tokens to render with their actual gridWidth and gridHeight proportions instead of always being circular. This will support rectangular tokens (e.g., 2×1 wagons, 1×3 snakes) while maintaining circular rendering for uniform dimensions.
 
-## Key Concepts
+This plan improves the rendering of Watabou terrain features to match the authentic One Page Dungeon aesthetic, based on your clarifications:
 
-### Token Shape Logic
-Tokens will be rendered based on a new concept of "token shape":
-- **Circular**: When `gridWidth === gridHeight` (current default behavior)
-- **Elliptical**: When `gridWidth !== gridHeight` (new behavior for non-uniform dimensions)
+1. **Water**: Shore ripple lines that follow the water boundary curve (not horizontal waves)
+2. **Debris**: Unfilled squares and small circles (not stippling/crosshatching)
+3. **Stairs**: New MapObject type for parallel lines indicating direction
 
-For decorated tokens (with images), the image will be clipped to an ellipse or rounded rectangle matching the token's proportions.
+## Analysis of Current State
 
-For undecorated tokens (color fill only), a filled ellipse or rounded rectangle will be drawn.
+| Feature | Current | Target |
+|---------|---------|--------|
+| **Water** | Horizontal sine waves across the area | Concentric ripple lines following the shore boundary |
+| **Debris** | Stippled dots pattern | Unfilled squares (with diagonal lines) and small circles |
+| **Columns** | Already correct | No changes needed |
+| **Doors** | Already correct | No changes needed |
+| **Stairs** | Not implemented | MapObjects with parallel lines |
 
 ---
 
 ## Technical Changes
 
-### 1. Update Token Rendering in SimpleTabletop.tsx
+### 1. Enhanced Water Rendering with Shore Ripples
 
-**Current behavior (line ~2224):**
-```typescript
-const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
-const radius = tokenSize / 2;
+**File: `src/lib/dungeonRenderer.ts`**
+
+Replace the current horizontal wave pattern with concentric ripple lines that follow the water boundary:
+
+```text
+Current rendering:
++------------------+
+|   ~~~~~~~~~~~~   |  <- horizontal sine waves
+|   ~~~~~~~~~~~~   |
+|   ~~~~~~~~~~~~   |
++------------------+
+
+Target rendering:
++------------------+
+|     /~~~~\       |  <- lines follow the
+|    /      \      |     shore boundary
+|   |        |     |     getting smaller toward
+|    \      /      |     the center
+|     \____/       |
++------------------+
 ```
 
-**New behavior:**
-```typescript
-const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
-const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
-const isUniform = tokenWidth === tokenHeight;
-const radiusX = tokenWidth / 2;
-const radiusY = tokenHeight / 2;
-```
-
-Replace all `arc(x, y, radius, ...)` calls with `ellipse(x, y, radiusX, radiusY, ...)` for:
-- Main token fill/image clipping
-- Selection highlight
-- Hover glow
-- Combat highlight
-- Hostile pulse indicator
-
-### 2. Update Hit Detection in useTokenInteraction.ts
-
-**Current behavior:**
-```typescript
-const maxRadius = Math.max(tokenWidth, tokenHeight) / 2;
-const distance = Math.sqrt(Math.pow(worldX - token.x, 2) + Math.pow(worldY - token.y, 2));
-if (distance <= maxRadius) { return token; }
-```
-
-**New behavior (ellipse hit test):**
-```typescript
-const radiusX = tokenWidth / 2;
-const radiusY = tokenHeight / 2;
-// Point-in-ellipse test: (x/a)² + (y/b)² <= 1
-const normalizedX = (worldX - token.x) / radiusX;
-const normalizedY = (worldY - token.y) / radiusY;
-if (normalizedX * normalizedX + normalizedY * normalizedY <= 1) { return token; }
-```
-
-### 3. Update Image Import Shape Configuration
-
-When opening the ImageImportModal for token images, pass the shape config based on token dimensions:
+**Implementation approach:**
+- Use the `fluidBoundary` path (already computed via marching squares)
+- Create offset/inset versions of the boundary path at decreasing distances
+- Draw each inset path as a ripple line
+- Clip all rendering to the containing region
 
 ```typescript
-const shapeConfig: ShapeConfig = {
-  type: gridWidthValue === gridHeightValue ? 'circle' : 'rectangle', // or 'ellipse' if we add that
-  width: gridWidthValue * baseSize,
-  height: gridHeightValue * baseSize
-};
+function renderWaterTiles(
+  ctx: CanvasRenderingContext2D,
+  tiles: { x: number; y: number }[],
+  zoom: number,
+  dungeonMapMode: boolean,
+  style: WatabouStyle,
+  regions: CanvasRegion[],
+  fluidBoundary?: { x: number; y: number }[]
+) {
+  if (dungeonMapMode && fluidBoundary && fluidBoundary.length > 2) {
+    // Fill with water color
+    ctx.fillStyle = style.colorWater;
+    // ... fill the boundary path
+    
+    // Draw shore ripples - concentric lines following boundary
+    const rippleSpacing = 8; // pixels between ripple lines
+    const maxRipples = 5;
+    
+    for (let i = 1; i <= maxRipples; i++) {
+      const insetPath = computeInsetPath(fluidBoundary, rippleSpacing * i);
+      if (insetPath.length < 3) break; // Stop if inset collapses
+      
+      ctx.beginPath();
+      ctx.moveTo(insetPath[0].x, insetPath[0].y);
+      for (const point of insetPath) {
+        ctx.lineTo(point.x, point.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = style.colorInk;
+      ctx.globalAlpha = 0.3 - (i * 0.04); // Fade toward center
+      ctx.stroke();
+    }
+  }
+}
 ```
 
-### 4. Add Non-Uniform Size Presets (Optional Enhancement)
+### 2. Authentic Debris Rendering
 
-Extend `SIZE_PRESETS` in TokenContextMenu.tsx to include common non-uniform sizes:
+**File: `src/lib/dungeonRenderer.ts`**
+
+Update `renderDebrisTiles()` to draw unfilled squares and circles instead of stippling:
+
+```text
+Current rendering:
++------------------+
+|   · ··  ·  ·· ·  |  <- stippled dots
+|   ·  · ··   · ·  |
++------------------+
+
+Target rendering:
++------------------+
+|   □  ○  □        |  <- unfilled squares with
+|      ○     □     |     diagonal lines + circles
+|   □     ○    □   |
++------------------+
+```
+
+**Implementation:**
+```typescript
+function renderDebrisTiles(
+  ctx: CanvasRenderingContext2D,
+  tiles: { x: number; y: number }[],
+  zoom: number,
+  dungeonMapMode: boolean,
+  style: WatabouStyle,
+  regions: CanvasRegion[]
+) {
+  if (dungeonMapMode) {
+    tiles.forEach((tile) => {
+      ctx.strokeStyle = style.colorInk;
+      ctx.lineWidth = style.strokeThin / zoom;
+      
+      // Use seeded random for consistent rendering
+      const seed = tile.x * 1000 + tile.y;
+      const rand = seededRandom(seed);
+      
+      // Place 2-4 debris items per tile
+      const itemCount = 2 + Math.floor(rand() * 3);
+      
+      for (let i = 0; i < itemCount; i++) {
+        const x = tile.x + 8 + rand() * 34;
+        const y = tile.y + 8 + rand() * 34;
+        const size = 4 + rand() * 6;
+        
+        if (rand() > 0.5) {
+          // Square with optional diagonal lines
+          ctx.strokeRect(x - size/2, y - size/2, size, size);
+          if (rand() > 0.5) {
+            // Add diagonal line
+            ctx.beginPath();
+            ctx.moveTo(x - size/2, y - size/2);
+            ctx.lineTo(x + size/2, y + size/2);
+            ctx.stroke();
+          }
+        } else {
+          // Small circle
+          ctx.beginPath();
+          ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    });
+  }
+}
+```
+
+### 3. Stairs as MapObjects
+
+Since the Watabou JSON doesn't include stairs in the standard export, we'll add stairs as a manual MapObject category that users can place.
+
+**File: `src/types/mapObjectTypes.ts`**
+
+Add a new `'stairs'` category and shape:
 
 ```typescript
-const SIZE_PRESETS = [
-  { name: 'Tiny', gridWidth: 0.5, gridHeight: 0.5 },
-  { name: 'Small/Medium', gridWidth: 1, gridHeight: 1 },
-  { name: 'Large', gridWidth: 2, gridHeight: 2 },
-  { name: 'Huge', gridWidth: 3, gridHeight: 3 },
-  { name: 'Gargantuan', gridWidth: 4, gridHeight: 4 },
-  // Non-uniform presets
-  { name: 'Long (2×1)', gridWidth: 2, gridHeight: 1 },
-  { name: 'Tall (1×2)', gridWidth: 1, gridHeight: 2 },
-  { name: 'Wide (3×1)', gridWidth: 3, gridHeight: 1 },
-] as const;
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs';
+
+export type MapObjectCategory = 
+  | 'column'
+  | 'statue'
+  | 'furniture'
+  | 'debris'
+  | 'trap'
+  | 'decoration'
+  | 'obstacle'
+  | 'door'
+  | 'stairs'  // NEW
+  | 'custom';
+
+// Add to MAP_OBJECT_PRESETS
+stairs: {
+  shape: 'stairs',
+  width: 50,  // One grid cell wide
+  height: 100, // Two grid cells long
+  fillColor: 'transparent',
+  strokeColor: '#2C241D', // Ink color
+  strokeWidth: 1.5,
+  opacity: 1,
+  castsShadow: false,
+  blocksMovement: false,
+  blocksVision: false,
+  revealedByLight: true,
+},
+
+// Add to MAP_OBJECT_CATEGORY_LABELS
+stairs: 'Stairs',
 ```
 
-### 5. Update Token Visibility/LoS Calculations
+**File: `src/lib/mapObjectRenderer.ts`** (or wherever MapObjects are rendered)
 
-In SimpleTabletop.tsx, update any visibility checks that use token radius to account for elliptical tokens. The center point remains the reference for LoS calculations.
+Add rendering logic for stairs:
 
-### 6. Update Hex Grid Token Patterns
-
-The hex occupancy calculations (lines ~1380-1495) for different creature sizes should continue to work as-is since they already handle `gridWidth` and `gridHeight` independently.
+```typescript
+function renderStairsMapObject(
+  ctx: CanvasRenderingContext2D,
+  obj: MapObject,
+  zoom: number
+) {
+  ctx.save();
+  ctx.translate(obj.position.x, obj.position.y);
+  if (obj.rotation) {
+    ctx.rotate((obj.rotation * Math.PI) / 180);
+  }
+  
+  // Draw parallel lines across the stair width
+  const numLines = Math.floor(obj.height / 8); // ~6px spacing
+  ctx.strokeStyle = obj.strokeColor;
+  ctx.lineWidth = obj.strokeWidth / zoom;
+  
+  for (let i = 0; i < numLines; i++) {
+    const y = -obj.height/2 + (i + 0.5) * (obj.height / numLines);
+    ctx.beginPath();
+    ctx.moveTo(-obj.width/2, y);
+    ctx.lineTo(obj.width/2, y);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+```
 
 ---
 
-## Files to Modify
+## File Changes Summary
 
 | File | Changes |
 |------|---------|
-| `src/components/SimpleTabletop.tsx` | Update `drawTokenToContext()` to use ellipses for non-uniform tokens |
-| `src/hooks/useTokenInteraction.ts` | Update `getTokenAtPosition()` with ellipse hit detection |
-| `src/components/TokenContextMenu.tsx` | Optionally add non-uniform size presets, update image import shape |
-| `src/components/modals/ImageImportModal.tsx` | Potentially add ellipse shape support |
+| `src/lib/dungeonRenderer.ts` | Update `renderWaterTiles()` with shore ripple algorithm; update `renderDebrisTiles()` with squares/circles |
+| `src/types/mapObjectTypes.ts` | Add `'stairs'` to shape and category types; add stairs preset |
+| `src/lib/mapObjectRenderer.ts` | Add stairs rendering logic (parallel lines) |
 
 ---
 
-## Visual Behavior Summary
+## Visual Reference
 
-| Token Type | gridWidth = gridHeight | gridWidth ≠ gridHeight |
-|------------|------------------------|------------------------|
-| Undecorated (color) | Circle fill | Ellipse fill |
-| Decorated (image) | Circular clip | Elliptical clip |
-| Selection ring | Circle | Ellipse |
-| Combat highlight | Circle | Ellipse |
+Based on the Watabou original:
+
+```text
+WATER (shore ripples):
+    ___________
+   /           \
+  /   _______   \    <- concentric lines
+ |   /       \   |      following the
+ |  |         |  |      water boundary
+ |   \_______/   |
+  \             /
+   \___________/
+
+DEBRIS (room 9 style):
+  □     ○
+    □      ○
+  ○    □
+     □   ○      <- unfilled geometric shapes
+                   squares may have diagonal
+
+STAIRS (new MapObject):
+  ─────────────
+  ─────────────    <- parallel horizontal lines
+  ─────────────       (rotation determines direction)
+  ─────────────
+```
 
 ---
 
-## Considerations
+## Implementation Notes
 
-1. **Rotation**: This plan does not add rotation support. Tokens remain axis-aligned.
-2. **Backwards Compatibility**: All existing tokens with uniform dimensions will render identically.
-3. **Image Aspect Ratio**: The image import modal already handles positioning/scaling within arbitrary shapes.
-4. **Performance**: `ellipse()` has the same performance characteristics as `arc()` in canvas 2D.
+1. **Seeded Random**: For debris, use a seeded random based on tile position so patterns are consistent across re-renders
+
+2. **Path Inset Algorithm**: For water ripples, implement a simple polygon inset by moving each point toward the centroid, or use a proper polygon offset algorithm
+
+3. **Stairs Rotation**: Stairs use the existing `rotation` property to orient in any direction (0° = horizontal stairs, 90° = vertical stairs)
+
+4. **No Changes to Doors/Columns**: These are working correctly per your feedback
+
