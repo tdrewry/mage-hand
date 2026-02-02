@@ -224,6 +224,35 @@ function renderDoorShape(
 }
 
 /**
+ * Render stairs as parallel lines indicating direction
+ * Rotation determines the orientation of the stairs
+ */
+function renderStairsShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number
+) {
+  const { width, height, strokeColor, strokeWidth } = mapObject;
+  
+  // Calculate number of lines based on height (stair length)
+  // Use ~8px spacing for a balanced look
+  const lineSpacing = 8;
+  const numLines = Math.max(2, Math.floor(height / lineSpacing));
+  
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth / zoom;
+  
+  // Draw parallel lines across the stair width
+  for (let i = 0; i < numLines; i++) {
+    const y = -height / 2 + (i + 0.5) * (height / numLines);
+    ctx.beginPath();
+    ctx.moveTo(-width / 2, y);
+    ctx.lineTo(width / 2, y);
+    ctx.stroke();
+  }
+}
+
+/**
  * Render a single map object to the canvas
  */
 export function renderMapObject(
@@ -254,6 +283,8 @@ export function renderMapObject(
   
   if (shape === 'door') {
     renderDoorShape(ctx, mapObject, zoom, isDMView);
+  } else if (shape === 'stairs') {
+    renderStairsShape(ctx, mapObject, zoom);
   } else {
     ctx.beginPath();
     

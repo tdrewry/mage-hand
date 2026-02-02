@@ -406,6 +406,46 @@ export function renderTerrainFeatures(
   });
 }
 
+/**
+ * Compute an inset path by moving each point toward the centroid
+ * This creates concentric ripple lines that follow the water boundary
+ */
+function computeInsetPath(
+  boundary: { x: number; y: number }[],
+  insetDistance: number
+): { x: number; y: number }[] {
+  if (boundary.length < 3) return [];
+  
+  // Calculate centroid
+  const centroid = {
+    x: boundary.reduce((sum, p) => sum + p.x, 0) / boundary.length,
+    y: boundary.reduce((sum, p) => sum + p.y, 0) / boundary.length,
+  };
+  
+  // Move each point toward centroid by insetDistance
+  const insetPath: { x: number; y: number }[] = [];
+  
+  for (const point of boundary) {
+    const dx = centroid.x - point.x;
+    const dy = centroid.y - point.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist <= insetDistance) {
+      // Point would collapse past centroid, skip it
+      continue;
+    }
+    
+    // Normalize and move toward centroid
+    const ratio = insetDistance / dist;
+    insetPath.push({
+      x: point.x + dx * ratio,
+      y: point.y + dy * ratio,
+    });
+  }
+  
+  return insetPath;
+}
+
 function renderWaterTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
@@ -415,17 +455,9 @@ function renderWaterTiles(
   regions: CanvasRegion[] = [],
   fluidBoundary?: { x: number; y: number }[]
 ) {
-  // If we have a fluid boundary, render as organic shape
+  // If we have a fluid boundary, render as organic shape with shore ripples
   if (dungeonMapMode && fluidBoundary && fluidBoundary.length > 2) {
     ctx.save();
-    
-    // Create path from fluid boundary
-    ctx.beginPath();
-    ctx.moveTo(fluidBoundary[0].x, fluidBoundary[0].y);
-    for (let i = 1; i < fluidBoundary.length; i++) {
-      ctx.lineTo(fluidBoundary[i].x, fluidBoundary[i].y);
-    }
-    ctx.closePath();
     
     // Find region containing water for clipping
     const containingRegion = regions.find(region => {
@@ -441,31 +473,36 @@ function renderWaterTiles(
       clipToRegion(ctx, containingRegion);
     }
     
-    // Fill with water color
+    // Create path from fluid boundary and fill with water color
+    ctx.beginPath();
+    ctx.moveTo(fluidBoundary[0].x, fluidBoundary[0].y);
+    for (let i = 1; i < fluidBoundary.length; i++) {
+      ctx.lineTo(fluidBoundary[i].x, fluidBoundary[i].y);
+    }
+    ctx.closePath();
     ctx.fillStyle = style.colorWater;
     ctx.fill();
     
-    // Add wavy pattern across the fluid area
+    // Draw shore ripples - concentric lines following boundary
+    const rippleSpacing = 10; // pixels between ripple lines
+    const maxRipples = 6;
+    
     ctx.strokeStyle = style.colorInk;
     ctx.lineWidth = style.strokeThin / zoom;
-    ctx.globalAlpha = 0.4;
     
-    // Get bounds of fluid boundary
-    const minX = Math.min(...fluidBoundary.map(p => p.x));
-    const maxX = Math.max(...fluidBoundary.map(p => p.x));
-    const minY = Math.min(...fluidBoundary.map(p => p.y));
-    const maxY = Math.max(...fluidBoundary.map(p => p.y));
-    
-    // Draw wavy lines across the area
-    const numWaves = Math.ceil((maxY - minY) / 20);
-    for (let i = 0; i < numWaves; i++) {
+    for (let i = 1; i <= maxRipples; i++) {
+      const insetPath = computeInsetPath(fluidBoundary, rippleSpacing * i);
+      if (insetPath.length < 3) break; // Stop if inset collapses
+      
       ctx.beginPath();
-      const y = minY + (i + 1) * ((maxY - minY) / (numWaves + 1));
-      ctx.moveTo(minX, y);
-      for (let x = 0; x <= maxX - minX; x += 8) {
-        const wave = Math.sin((x / (maxX - minX)) * Math.PI * 6) * 2;
-        ctx.lineTo(minX + x, y + wave);
+      ctx.moveTo(insetPath[0].x, insetPath[0].y);
+      for (let j = 1; j < insetPath.length; j++) {
+        ctx.lineTo(insetPath[j].x, insetPath[j].y);
       }
+      ctx.closePath();
+      
+      // Fade toward center
+      ctx.globalAlpha = 0.35 - (i * 0.05);
       ctx.stroke();
     }
     
@@ -588,6 +625,17 @@ function renderColumnTiles(
   });
 }
 
+/**
+ * Seeded random number generator for consistent debris rendering
+ */
+function seededRandom(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff;
+    return state / 0x7fffffff;
+  };
+}
+
 function renderDebrisTiles(
   ctx: CanvasRenderingContext2D,
   tiles: { x: number; y: number }[],
@@ -610,15 +658,42 @@ function renderDebrisTiles(
         clipToRegion(ctx, containingRegion);
       }
       
-      // Dungeon map style - dense stippled pattern
-      ctx.fillStyle = style.colorInk;
-      ctx.globalAlpha = 0.15;
-      for (let i = 0; i < 40; i++) {
-        const x = tile.x + Math.random() * 50;
-        const y = tile.y + Math.random() * 50;
-        const size = 0.5 + Math.random() * 1.5;
-        ctx.fillRect(x, y, size / zoom, size / zoom);
+      // Dungeon map style - unfilled squares and small circles (Watabou authentic style)
+      ctx.strokeStyle = style.colorInk;
+      ctx.lineWidth = style.strokeThin / zoom;
+      ctx.globalAlpha = 0.6;
+      
+      // Use seeded random for consistent rendering across redraws
+      const seed = Math.floor(tile.x * 1000 + tile.y);
+      const rand = seededRandom(seed);
+      
+      // Place 2-4 debris items per tile
+      const itemCount = 2 + Math.floor(rand() * 3);
+      
+      for (let i = 0; i < itemCount; i++) {
+        const x = tile.x + 8 + rand() * 34;
+        const y = tile.y + 8 + rand() * 34;
+        const size = 4 + rand() * 6;
+        
+        if (rand() > 0.5) {
+          // Unfilled square
+          ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+          
+          // Optionally add diagonal line inside the square
+          if (rand() > 0.5) {
+            ctx.beginPath();
+            ctx.moveTo(x - size / 2, y - size / 2);
+            ctx.lineTo(x + size / 2, y + size / 2);
+            ctx.stroke();
+          }
+        } else {
+          // Small unfilled circle
+          ctx.beginPath();
+          ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
+      
       ctx.globalAlpha = 1.0;
       
       if (containingRegion) {
@@ -627,10 +702,15 @@ function renderDebrisTiles(
     } else {
       // VTT style - gray shapes
       ctx.fillStyle = 'rgba(120, 113, 108, 0.5)';
+      
+      // Use seeded random for consistency
+      const seed = Math.floor(tile.x * 1000 + tile.y);
+      const rand = seededRandom(seed);
+      
       for (let i = 0; i < 3; i++) {
-        const x = tile.x + Math.random() * 50;
-        const y = tile.y + Math.random() * 50;
-        const size = 5 + Math.random() * 5;
+        const x = tile.x + rand() * 50;
+        const y = tile.y + rand() * 50;
+        const size = 5 + rand() * 5;
         ctx.fillRect(x, y, size, size);
       }
     }
