@@ -3,7 +3,7 @@
  * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs';
 
 export interface MapObject {
   id: string;
@@ -59,6 +59,7 @@ export type MapObjectCategory =
   | 'decoration'
   | 'obstacle'
   | 'door'
+  | 'stairs'
   | 'custom';
 
 export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
@@ -70,6 +71,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   decoration: 'Decoration',
   obstacle: 'Obstacle',
   door: 'Door',
+  stairs: 'Stairs',
   custom: 'Custom',
 };
 
@@ -178,6 +180,19 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     blocksVision: true, // Closed doors block vision
     revealedByLight: true,
     isOpen: false,
+  },
+  stairs: {
+    shape: 'stairs',
+    width: 50, // One grid cell wide
+    height: 100, // Two grid cells long
+    fillColor: 'transparent',
+    strokeColor: '#2C241D', // Ink color
+    strokeWidth: 1.5,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: true,
   },
   custom: {
     shape: 'rectangle',
