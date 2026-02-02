@@ -2,7 +2,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useRegionStore } from '@/stores/regionStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
 import { canControlToken, canSeeToken } from '@/lib/rolePermissions';
+import { checkMovementCollision, getBlockingObjects } from '@/lib/movementCollision';
 import { toast } from 'sonner';
 import type { Token } from '@/stores/sessionStore';
 
@@ -122,23 +126,61 @@ export const useTokenInteraction = () => {
   const updateTokenDrag = useCallback((worldX: number, worldY: number) => {
     if (!isDraggingToken || !draggedTokenId) return;
 
-    const newX = worldX - dragOffset.x;
-    const newY = worldY - dragOffset.y;
+    const token = tokens.find(t => t.id === draggedTokenId);
+    if (!token) return;
 
-    setDragPath(prev => [...prev, { x: newX, y: newY }]);
+    const desiredX = worldX - dragOffset.x;
+    const desiredY = worldY - dragOffset.y;
+
+    // Get movement blocking settings from dungeonStore
+    const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
+    
+    // Only enforce collisions in Play mode
+    const shouldEnforceCollisions = renderingMode === 'play';
+    
+    let finalX = desiredX;
+    let finalY = desiredY;
+
+    if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
+      // Calculate token radius for collision
+      const baseTokenSize = 40;
+      const tokenRadius = ((token.gridWidth || 1) * baseTokenSize) / 2;
+
+      // Get blocking objects
+      const mapObjects = useMapObjectStore.getState().mapObjects;
+      const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
+      
+      // Get regions for boundary constraint
+      const regions = enforceRegionBounds ? useRegionStore.getState().regions : [];
+
+      // Check for collisions
+      const collisionResult = checkMovementCollision(
+        { x: token.x, y: token.y },
+        { x: desiredX, y: desiredY },
+        tokenRadius,
+        blockingObjects,
+        regions,
+        { enforceMovementBlocking, enforceRegionBounds }
+      );
+
+      finalX = collisionResult.validPosition.x;
+      finalY = collisionResult.validPosition.y;
+    }
+
+    setDragPath(prev => [...prev, { x: finalX, y: finalY }]);
 
     // Update grouped tokens if any
     if (groupedTokens.length > 0) {
-      const dragDeltaX = newX - dragStartPos.x;
-      const dragDeltaY = newY - dragStartPos.y;
+      const dragDeltaX = finalX - dragStartPos.x;
+      const dragDeltaY = finalY - dragStartPos.y;
 
       groupedTokens.forEach(({ tokenId, startX, startY }) => {
         updateTokenPosition(tokenId, startX + dragDeltaX, startY + dragDeltaY);
       });
     } else {
-      updateTokenPosition(draggedTokenId, newX, newY);
+      updateTokenPosition(draggedTokenId, finalX, finalY);
     }
-  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition]);
+  }, [isDraggingToken, draggedTokenId, dragOffset, dragStartPos, groupedTokens, updateTokenPosition, tokens]);
 
   const endTokenDrag = useCallback(() => {
     setIsDraggingToken(false);
