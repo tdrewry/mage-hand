@@ -37,6 +37,7 @@ import {
   type DndBeyondCharacter,
   type MonsterSize
 } from '@/types/creatureTypes';
+import type { IlluminationSource } from '@/types/illumination';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -159,6 +160,121 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
   const [importProgress, setImportProgress] = useState<string>('');
   const [creatingToken, setCreatingToken] = useState<string | null>(null);
 
+  // Parse vision senses from monster data to create illumination sources
+  const parseMonsterSenses = (monster: Monster5eTools): IlluminationSource[] => {
+    const sources: IlluminationSource[] = [];
+    
+    if (!monster.senses || monster.senses.length === 0) {
+      return sources;
+    }
+    
+    for (const sense of monster.senses) {
+      const senseLower = sense.toLowerCase();
+      
+      // Parse darkvision (e.g., "darkvision 60 ft." or "darkvision 120 ft.")
+      const darkvisionMatch = senseLower.match(/darkvision\s+(\d+)\s*ft/);
+      if (darkvisionMatch) {
+        const range = parseInt(darkvisionMatch[1], 10) / 5; // Convert feet to grid units
+        sources.push({
+          id: `illum-darkvision-${Date.now()}`,
+          name: 'Darkvision',
+          enabled: true,
+          position: { x: 0, y: 0 }, // Will be updated by token position
+          range,
+          brightZone: 0.0, // Darkvision sees in dim light
+          brightIntensity: 0.0,
+          dimIntensity: 0.7,
+          color: '#90EE90',
+          colorEnabled: true,
+          colorIntensity: 0.1,
+          softEdge: true,
+          softEdgeRadius: 4,
+          animation: 'none',
+          animationSpeed: 1.0,
+          animationIntensity: 0.0,
+        });
+        continue;
+      }
+      
+      // Parse blindsight (e.g., "blindsight 30 ft.")
+      const blindsightMatch = senseLower.match(/blindsight\s+(\d+)\s*ft/);
+      if (blindsightMatch) {
+        const range = parseInt(blindsightMatch[1], 10) / 5;
+        sources.push({
+          id: `illum-blindsight-${Date.now()}`,
+          name: 'Blindsight',
+          enabled: true,
+          position: { x: 0, y: 0 },
+          range,
+          brightZone: 1.0, // Blindsight is full "bright" perception
+          brightIntensity: 1.0,
+          dimIntensity: 0.0,
+          color: '#ADD8E6',
+          colorEnabled: true,
+          colorIntensity: 0.15,
+          softEdge: true,
+          softEdgeRadius: 2,
+          animation: 'none',
+          animationSpeed: 1.0,
+          animationIntensity: 0.0,
+        });
+        continue;
+      }
+      
+      // Parse truesight (e.g., "truesight 120 ft.")
+      const truesightMatch = senseLower.match(/truesight\s+(\d+)\s*ft/);
+      if (truesightMatch) {
+        const range = parseInt(truesightMatch[1], 10) / 5;
+        sources.push({
+          id: `illum-truesight-${Date.now()}`,
+          name: 'Truesight',
+          enabled: true,
+          position: { x: 0, y: 0 },
+          range,
+          brightZone: 1.0,
+          brightIntensity: 1.0,
+          dimIntensity: 0.0,
+          color: '#FFD700',
+          colorEnabled: true,
+          colorIntensity: 0.2,
+          softEdge: true,
+          softEdgeRadius: 6,
+          animation: 'glow',
+          animationSpeed: 0.5,
+          animationIntensity: 0.2,
+        });
+        continue;
+      }
+      
+      // Parse tremorsense (e.g., "tremorsense 60 ft.")
+      const tremorsenseMatch = senseLower.match(/tremorsense\s+(\d+)\s*ft/);
+      if (tremorsenseMatch) {
+        const range = parseInt(tremorsenseMatch[1], 10) / 5;
+        sources.push({
+          id: `illum-tremorsense-${Date.now()}`,
+          name: 'Tremorsense',
+          enabled: true,
+          position: { x: 0, y: 0 },
+          range,
+          brightZone: 0.8,
+          brightIntensity: 0.8,
+          dimIntensity: 0.4,
+          color: '#8B4513',
+          colorEnabled: true,
+          colorIntensity: 0.15,
+          softEdge: true,
+          softEdgeRadius: 4,
+          animation: 'pulse',
+          animationSpeed: 0.3,
+          animationIntensity: 0.15,
+        });
+        continue;
+      }
+    }
+    
+    return sources;
+  };
+
   // Create token from monster
   const handleCreateMonsterToken = async (monster: Monster5eTools) => {
     setCreatingToken(monster.id);
@@ -168,18 +284,19 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const center = getViewportCenter();
       
-      // Try to fetch token art if available
+      // Try to fetch token art if available - only use if it's a valid loadable URL
       let imageUrl = '';
       const artUrl = monster.tokenUrl || monster.fluffImages?.[0]?.url;
       
-      if (artUrl) {
+      // Only attempt to load if it looks like a full URL (not a 5e.tools reference)
+      if (artUrl && (artUrl.startsWith('http://') || artUrl.startsWith('https://') || artUrl.startsWith('data:'))) {
         try {
-          // Try to load the image to verify it's accessible
           const img = new Image();
           img.crossOrigin = 'anonymous';
           await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error('Failed to load image'));
+            const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+            img.onload = () => { clearTimeout(timeout); resolve(); };
+            img.onerror = () => { clearTimeout(timeout); reject(new Error('Failed to load image')); };
             img.src = artUrl;
           });
           imageUrl = artUrl;
@@ -187,6 +304,9 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
           console.warn(`Could not load token art for ${monster.name}, using default`);
         }
       }
+      
+      // Parse creature senses for vision/illumination
+      const illuminationSources = parseMonsterSenses(monster);
       
       const newToken = {
         id: tokenId,
@@ -205,10 +325,17 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
           entityId: monster.id,
           projectionType: 'monster',
         },
+        // Only add illumination sources if the creature has special senses
+        ...(illuminationSources.length > 0 ? { illuminationSources } : {}),
       };
       
       addToken(newToken);
-      toast.success(`Created ${monster.name} token (${MONSTER_SIZE_NAMES[monster.size]}, ${gridSize}×${gridSize})`);
+      
+      // Build success message with senses info
+      const sensesInfo = illuminationSources.length > 0 
+        ? ` with ${illuminationSources.map(s => s.name).join(', ')}`
+        : '';
+      toast.success(`Created ${monster.name} token (${MONSTER_SIZE_NAMES[monster.size]}, ${gridSize}×${gridSize})${sensesInfo}`);
     } catch (error) {
       console.error('Failed to create token:', error);
       toast.error('Failed to create token');
