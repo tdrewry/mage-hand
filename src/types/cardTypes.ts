@@ -18,6 +18,9 @@ export enum CardType {
   ROLE_MANAGER = 'role_manager',
   HISTORY = 'history',
   MAP_OBJECTS = 'map_objects',
+  CHARACTER_SHEET = 'character_sheet',
+  MONSTER_STAT_BLOCK = 'monster_stat_block',
+  CREATURE_LIBRARY = 'creature_library',
 }
 
 export interface ToolsCardProps {
