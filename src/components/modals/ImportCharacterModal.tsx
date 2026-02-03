@@ -5,7 +5,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,11 +13,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, FileJson, PenLine, Sparkles } from 'lucide-react';
+import { Upload, FileJson, PenLine, Sparkles, Download, FileCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { parseDndBeyondExport } from '@/lib/dndBeyondParser';
 import { getAbilityModifier, formatModifier, type DndBeyondCharacter } from '@/types/creatureTypes';
+import { 
+  generateBlankTemplate, 
+  generateFilledTemplate, 
+  downloadJson, 
+  downloadSchema 
+} from '@/lib/characterTemplateGenerator';
 
 interface ImportCharacterModalProps {
   open: boolean;
@@ -294,11 +299,11 @@ export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModa
           {/* JSON Import Tab */}
           <TabsContent value="json" className="flex-1 flex flex-col gap-3 min-h-0">
             <div className="text-xs text-muted-foreground">
-              Export your character from D&D Beyond (Character Sheet → Options → Export JSON), 
-              then paste or upload the file here.
+              Import a character using our JSON format. Download a blank template or the schema to get started.
             </div>
             
-            <div className="flex gap-2">
+            {/* Download buttons */}
+            <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -307,6 +312,24 @@ export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModa
               >
                 <Upload className="h-3.5 w-3.5" />
                 Upload File
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => downloadJson(generateBlankTemplate(), 'character-template.json')}
+                className="gap-1.5"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Blank Template
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={downloadSchema}
+                className="gap-1.5"
+              >
+                <FileCode className="h-3.5 w-3.5" />
+                JSON Schema
               </Button>
               <input
                 ref={fileInputRef}
@@ -318,7 +341,7 @@ export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModa
             </div>
 
             <Textarea
-              placeholder="Paste D&D Beyond character JSON here..."
+              placeholder="Paste character JSON here..."
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}
               className="flex-1 min-h-[180px] font-mono text-xs resize-none"
@@ -463,28 +486,50 @@ export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModa
           </TabsContent>
 
           {/* Template Tab */}
-          <TabsContent value="template" className="flex-1 min-h-0">
-            <ScrollArea className="h-full">
+          <TabsContent value="template" className="flex-1 min-h-0 flex flex-col gap-2">
+            <div className="text-xs text-muted-foreground">
+              Click to add directly, or use the download button to get a pre-filled JSON template.
+            </div>
+            <ScrollArea className="flex-1">
               <div className="space-y-2 pr-2">
                 {QUICK_TEMPLATES.map((template) => (
-                  <button
+                  <div
                     key={template.name}
-                    onClick={() => handleTemplateSelect(template)}
-                    className="w-full p-3 rounded-md border border-border bg-card hover:bg-accent transition-colors text-left"
+                    className="w-full p-3 rounded-md border border-border bg-card hover:bg-accent/50 transition-colors text-left flex justify-between items-start gap-2"
                   >
-                    <div className="font-medium text-sm">{template.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {template.race} {template.className} {template.level}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {template.description}
-                    </div>
-                    <div className="flex gap-2 mt-2 text-[10px] text-muted-foreground font-mono">
-                      {['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map((stat, i) => (
-                        <span key={stat}>{stat} {template.abilities[i]}</span>
-                      ))}
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => handleTemplateSelect(template)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="font-medium text-sm">{template.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {template.race} {template.className} {template.level}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {template.description}
+                      </div>
+                      <div className="flex gap-2 mt-2 text-[10px] text-muted-foreground font-mono">
+                        {['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map((stat, i) => (
+                          <span key={stat}>{stat} {template.abilities[i]}</span>
+                        ))}
+                      </div>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const templateType = template.className.toLowerCase() as 'fighter' | 'wizard' | 'rogue' | 'cleric';
+                        const filledTemplate = generateFilledTemplate(templateType);
+                        downloadJson(filledTemplate, `${template.className.toLowerCase()}-template.json`);
+                        toast.success(`Downloaded ${template.className} template`);
+                      }}
+                      title="Download as JSON template"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             </ScrollArea>

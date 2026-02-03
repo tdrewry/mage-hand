@@ -1,0 +1,408 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vtt.lovable.app/schemas/character-import-schema.json",
+  "title": "VTT Character Import Schema",
+  "description": "JSON schema for importing player characters into the VTT application",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "level",
+    "classes",
+    "race",
+    "abilities",
+    "armorClass",
+    "hitPoints",
+    "speed",
+    "initiative",
+    "proficiencyBonus",
+    "skills",
+    "savingThrows",
+    "proficiencies",
+    "passivePerception",
+    "features",
+    "actions",
+    "conditions",
+    "sourceUrl",
+    "lastUpdated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the character. Use format like 'custom-{timestamp}' or 'dndb-{ddbId}'",
+      "examples": ["custom-1706961234567", "dndb-14304463"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Character's display name",
+      "minLength": 1,
+      "maxLength": 100,
+      "examples": ["Thorin Ironfist", "Elara Moonwhisper"]
+    },
+    "portraitUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL to character portrait image",
+      "examples": ["https://example.com/portraits/thorin.png"]
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "description": "Total character level (sum of all class levels)"
+    },
+    "classes": {
+      "type": "array",
+      "description": "Array of class/level combinations",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "level"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Class name",
+            "examples": ["Fighter", "Wizard", "Cleric", "Rogue"]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Levels in this class"
+          }
+        }
+      }
+    },
+    "race": {
+      "type": "string",
+      "description": "Character's race/species",
+      "examples": ["Human", "High Elf", "Mountain Dwarf", "Lightfoot Halfling"]
+    },
+    "background": {
+      "type": "string",
+      "description": "Optional character background",
+      "examples": ["Soldier", "Sage", "Criminal", "Noble"]
+    },
+    "abilities": {
+      "type": "object",
+      "description": "Six ability scores with calculated modifiers",
+      "required": ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+      "properties": {
+        "strength": { "$ref": "#/definitions/abilityScore" },
+        "dexterity": { "$ref": "#/definitions/abilityScore" },
+        "constitution": { "$ref": "#/definitions/abilityScore" },
+        "intelligence": { "$ref": "#/definitions/abilityScore" },
+        "wisdom": { "$ref": "#/definitions/abilityScore" },
+        "charisma": { "$ref": "#/definitions/abilityScore" }
+      }
+    },
+    "armorClass": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 40,
+      "description": "Armor Class value"
+    },
+    "hitPoints": {
+      "type": "object",
+      "required": ["current", "max", "temp"],
+      "properties": {
+        "current": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current hit points"
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum hit points"
+        },
+        "temp": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Temporary hit points"
+        }
+      }
+    },
+    "speed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Base walking speed in feet"
+    },
+    "initiative": {
+      "type": "integer",
+      "description": "Initiative modifier (typically DEX modifier)"
+    },
+    "proficiencyBonus": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 6,
+      "description": "Proficiency bonus based on level"
+    },
+    "skills": {
+      "type": "array",
+      "description": "Array of skill proficiencies and modifiers",
+      "items": {
+        "type": "object",
+        "required": ["name", "modifier", "proficient"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "Acrobatics", "Animal Handling", "Arcana", "Athletics",
+              "Deception", "History", "Insight", "Intimidation",
+              "Investigation", "Medicine", "Nature", "Perception",
+              "Performance", "Persuasion", "Religion", "Sleight of Hand",
+              "Stealth", "Survival"
+            ]
+          },
+          "modifier": {
+            "type": "integer",
+            "description": "Total skill modifier"
+          },
+          "proficient": {
+            "type": "boolean",
+            "description": "Whether proficient in this skill"
+          },
+          "expertise": {
+            "type": "boolean",
+            "description": "Whether has expertise (double proficiency)"
+          }
+        }
+      }
+    },
+    "savingThrows": {
+      "type": "array",
+      "description": "Saving throw modifiers for each ability",
+      "items": {
+        "type": "object",
+        "required": ["ability", "modifier", "proficient"],
+        "properties": {
+          "ability": {
+            "type": "string",
+            "enum": ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+          },
+          "modifier": {
+            "type": "integer",
+            "description": "Total saving throw modifier"
+          },
+          "proficient": {
+            "type": "boolean",
+            "description": "Whether proficient in this save"
+          }
+        }
+      }
+    },
+    "proficiencies": {
+      "type": "object",
+      "required": ["armor", "weapons", "tools", "languages"],
+      "properties": {
+        "armor": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Armor proficiencies",
+          "examples": [["Light", "Medium", "Heavy", "Shields"]]
+        },
+        "weapons": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Weapon proficiencies",
+          "examples": [["Simple", "Martial"]]
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tool proficiencies",
+          "examples": [["Thieves' Tools", "Smith's Tools"]]
+        },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Known languages",
+          "examples": [["Common", "Elvish", "Dwarvish"]]
+        }
+      }
+    },
+    "passivePerception": {
+      "type": "integer",
+      "description": "Passive Perception score (10 + Perception modifier)"
+    },
+    "passiveInvestigation": {
+      "type": "integer",
+      "description": "Optional Passive Investigation score"
+    },
+    "passiveInsight": {
+      "type": "integer",
+      "description": "Optional Passive Insight score"
+    },
+    "features": {
+      "type": "array",
+      "description": "Class features, racial traits, and other abilities",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "source"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Feature name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Feature description"
+          },
+          "source": {
+            "type": "string",
+            "description": "Where this feature comes from",
+            "examples": ["Fighter 1", "Human Racial", "Soldier Background"]
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Attacks and other combat actions",
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Action name"
+          },
+          "attackBonus": {
+            "type": "integer",
+            "description": "Attack roll bonus (if applicable)"
+          },
+          "damage": {
+            "type": "string",
+            "description": "Damage dice expression",
+            "examples": ["1d8+4", "2d6+3"]
+          },
+          "damageType": {
+            "type": "string",
+            "description": "Damage type",
+            "examples": ["slashing", "piercing", "bludgeoning", "fire"]
+          },
+          "range": {
+            "type": "string",
+            "description": "Attack range",
+            "examples": ["5 ft.", "30/120 ft."]
+          },
+          "description": {
+            "type": "string",
+            "description": "Full action description"
+          }
+        }
+      }
+    },
+    "spells": {
+      "type": "object",
+      "description": "Optional spellcasting information",
+      "properties": {
+        "spellcastingAbility": {
+          "type": "string",
+          "enum": ["Intelligence", "Wisdom", "Charisma"],
+          "description": "Primary spellcasting ability"
+        },
+        "spellSaveDC": {
+          "type": "integer",
+          "description": "Spell save DC"
+        },
+        "spellAttackBonus": {
+          "type": "integer",
+          "description": "Spell attack modifier"
+        },
+        "cantrips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "spellsByLevel": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["level", "slots", "slotsUsed", "spells"],
+            "properties": {
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "slots": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "slotsUsed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "spells": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "prepared"],
+                  "properties": {
+                    "name": { "type": "string" },
+                    "prepared": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Active conditions (poisoned, stunned, etc.)"
+    },
+    "equipment": {
+      "type": "array",
+      "description": "Optional equipment list",
+      "items": {
+        "type": "object",
+        "required": ["name", "quantity"],
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1 },
+          "equipped": { "type": "boolean" }
+        }
+      }
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "Source URL or identifier (use 'manual://custom' for hand-created)",
+      "examples": ["https://www.dndbeyond.com/characters/12345", "manual://custom"]
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    }
+  },
+  "definitions": {
+    "abilityScore": {
+      "type": "object",
+      "required": ["score", "modifier"],
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Ability score value"
+        },
+        "modifier": {
+          "type": "integer",
+          "minimum": -5,
+          "maximum": 10,
+          "description": "Calculated modifier: floor((score - 10) / 2)"
+        }
+      }
+    }
+  }
+}
