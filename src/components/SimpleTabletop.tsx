@@ -582,8 +582,9 @@ export const SimpleTabletop = () => {
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
             const draggedToken = tokens.find(t => t.id === draggedTokenId);
             if (draggedToken) {
-              const baseTokenSize = 40;
-              const tokenRadius = ((draggedToken.gridWidth || 1) * baseTokenSize) / 2;
+              // Use center point only (radius = 0) - allows tokens to pass through corridors
+              // as long as their center can fit, regardless of token visual size
+              const tokenRadius = 0;
               
               const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
               const checkRegions = enforceRegionBounds ? regions : [];
@@ -5816,8 +5817,9 @@ export const SimpleTabletop = () => {
           let movementBlocked = false;
           
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
-            const baseTokenSize = 40;
-            const tokenRadius = ((token.gridWidth || 1) * baseTokenSize) / 2;
+            // Use center point only (radius = 0) - allows tokens to pass through corridors
+            // as long as their center can fit, regardless of token visual size
+            const tokenRadius = 0;
             
             const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
             const checkRegions = enforceRegionBounds ? regions : [];
