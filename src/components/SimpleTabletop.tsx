@@ -5799,6 +5799,11 @@ export const SimpleTabletop = () => {
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
           const shouldEnforceCollisions = renderingMode === 'play';
           
+          // ALWAYS show this toast to confirm drag end is firing
+          toast.info(`Drag ended: obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds}, mode=${renderingMode}`, {
+            duration: 1500
+          });
+          
           console.log('[Collision Debug] handleMouseUp - Token drag ended', { 
             enforceMovementBlocking, enforceRegionBounds, renderingMode,
             from: dragStartPos, to: { x: token.x, y: token.y }
