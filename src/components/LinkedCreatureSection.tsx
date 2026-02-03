@@ -1,6 +1,9 @@
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Database, FileText, Unlink, Skull, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Database, FileText, Unlink, Skull, Users, Link2, Search, X } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { 
   MONSTER_SIZE_NAMES, 
@@ -15,17 +18,128 @@ interface LinkedCreatureSectionProps {
   token: Token | null;
   onViewStats: () => void;
   onUnlink?: () => void;
+  onLinkCreature?: (creatureId: string, creatureType: 'character' | 'monster') => void;
 }
 
-export function LinkedCreatureSection({ token, onViewStats, onUnlink }: LinkedCreatureSectionProps) {
-  const { getCreatureById, getCreatureType } = useCreatureStore();
+export function LinkedCreatureSection({ token, onViewStats, onUnlink, onLinkCreature }: LinkedCreatureSectionProps) {
+  const { getCreatureById, getCreatureType, searchMonsters, searchCharacters, monsters, characters } = useCreatureStore();
+  
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const linkedCreatureId = token?.entityRef?.entityId;
   const creature = linkedCreatureId ? getCreatureById(linkedCreatureId) : undefined;
   const creatureType = linkedCreatureId ? getCreatureType(linkedCreatureId) : undefined;
   
-  // No linked creature - show placeholder
+  // Search results
+  const searchResults = useMemo(() => {
+    const monsterResults = searchMonsters(searchQuery, { limit: 5 });
+    const characterResults = searchCharacters(searchQuery).slice(0, 5);
+    return { monsters: monsterResults, characters: characterResults };
+  }, [searchQuery, searchMonsters, searchCharacters]);
+  
+  const hasLibraryContent = monsters.length > 0 || characters.length > 0;
+  const hasSearchResults = searchResults.monsters.length > 0 || searchResults.characters.length > 0;
+  
+  const handleSelectCreature = (creatureId: string, type: 'character' | 'monster') => {
+    onLinkCreature?.(creatureId, type);
+    setShowSearch(false);
+    setSearchQuery('');
+  };
+  
+  const handleCancelSearch = () => {
+    setShowSearch(false);
+    setSearchQuery('');
+  };
+  
+  // No linked creature - show placeholder or search UI
   if (!creature || !creatureType) {
+    // Show search UI when toggled
+    if (showSearch) {
+      return (
+        <div className="p-3 rounded-lg bg-muted/50 border border-muted-foreground/30">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search creatures..."
+              className="flex-1 h-8"
+              autoFocus
+            />
+            <Button variant="ghost" size="sm" onClick={handleCancelSearch}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {!hasLibraryContent ? (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No creatures in library. Import from Creature Library first.
+            </p>
+          ) : !hasSearchResults && searchQuery.length > 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No creatures match "{searchQuery}"
+            </p>
+          ) : (
+            <ScrollArea className="max-h-48">
+              <div className="space-y-1">
+                {/* Monsters Section */}
+                {searchResults.monsters.length > 0 && (
+                  <>
+                    <p className="text-xs text-muted-foreground font-medium px-1 pt-1">Monsters</p>
+                    {searchResults.monsters.map((monster) => {
+                      const monsterType = typeof monster.type === 'object' ? monster.type.type : monster.type;
+                      return (
+                        <button
+                          key={monster.id}
+                          className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-accent/50 text-left transition-colors"
+                          onClick={() => handleSelectCreature(monster.id, 'monster')}
+                        >
+                          <Skull className="h-4 w-4 text-destructive shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium truncate block">{monster.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              CR {monster.cr}, {MONSTER_SIZE_NAMES[monster.size]} {monsterType}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+                
+                {/* Characters Section */}
+                {searchResults.characters.length > 0 && (
+                  <>
+                    <p className="text-xs text-muted-foreground font-medium px-1 pt-2">Characters</p>
+                    {searchResults.characters.map((character) => {
+                      const classString = character.classes.map(c => `${c.name} ${c.level}`).join(' / ');
+                      return (
+                        <button
+                          key={character.id}
+                          className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-accent/50 text-left transition-colors"
+                          onClick={() => handleSelectCreature(character.id, 'character')}
+                        >
+                          <Users className="h-4 w-4 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium truncate block">{character.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Lvl {character.level} {character.race} {classString}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      );
+    }
+    
+    // Show placeholder with "Link to Creature" button
     return (
       <div className="p-3 rounded-lg bg-muted/50 border border-dashed border-muted-foreground/30">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -35,6 +149,17 @@ export function LinkedCreatureSection({ token, onViewStats, onUnlink }: LinkedCr
         <p className="text-xs text-muted-foreground mt-1">
           Create tokens from the Creature Library to automatically link creature data.
         </p>
+        {onLinkCreature && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-3 w-full"
+            onClick={() => setShowSearch(true)}
+          >
+            <Link2 className="h-3 w-3 mr-1" />
+            Link to Creature
+          </Button>
+        )}
       </div>
     );
   }
