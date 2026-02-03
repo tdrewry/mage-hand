@@ -24,7 +24,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark, Footprints, FileText } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText } from 'lucide-react';
+import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
 import { TokenPathPreviewCanvas } from './TokenPathPreviewCanvas';
@@ -1436,16 +1437,11 @@ export const TokenContextMenu = ({
             
             {/* Details Tab */}
             <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 mt-4">
-              {/* Entity Link Placeholder */}
-              <div className="p-3 rounded-lg bg-muted/50 border border-dashed border-muted-foreground/30">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Database className="h-4 w-4" />
-                  <span className="text-sm font-medium">Entity Linking</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Link to character sheets, creatures, and resources coming soon.
-                </p>
-              </div>
+              {/* Linked Creature Section */}
+              <LinkedCreatureSection 
+                token={currentToken}
+                onViewStats={handleViewStats}
+              />
               
               {/* Quick Reference URL */}
               <div>
