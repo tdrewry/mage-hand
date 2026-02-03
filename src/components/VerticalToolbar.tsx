@@ -22,9 +22,12 @@ import {
   Play,
   Maximize,
   Trash2,
+  ShieldX,
+  Fence,
 } from 'lucide-react';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { CardType } from '@/types/cardTypes';
@@ -75,6 +78,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   
   const { enabled: fogEnabled } = useFogStore();
   const { isInCombat, startCombat, endCombat } = useInitiativeStore();
+  const { enforceMovementBlocking, enforceRegionBounds, setEnforceMovementBlocking, setEnforceRegionBounds } = useDungeonStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
   const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
   
@@ -422,6 +426,26 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label={`Regions ${showRegions ? 'On' : 'Off'}`}
             onClick={onToggleRegions}
             isActive={showRegions}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarSeparator orientation="horizontal" />
+
+          <ToolbarButton
+            icon={ShieldX}
+            label={`Obstacle Collision ${enforceMovementBlocking ? 'On' : 'Off'}`}
+            onClick={() => setEnforceMovementBlocking(!enforceMovementBlocking)}
+            isActive={enforceMovementBlocking}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Fence}
+            label={`Region Bounds ${enforceRegionBounds ? 'On' : 'Off'}`}
+            onClick={() => setEnforceRegionBounds(!enforceRegionBounds)}
+            isActive={enforceRegionBounds}
             variant="ghost"
             size="xs"
           />
