@@ -1,134 +1,151 @@
 
-# Phase 5: Token-Creature Linking Implementation ✅ COMPLETE
+# D&D Beyond Character Import (Client-Side)
 
 ## Overview
 
-Phase 5 completes the token-creature integration by enabling users to:
-1. **Link existing tokens** to creatures from the library
-2. **Unlink tokens** from their linked creature data
+Since external scraping services are not available, this implementation provides a **client-side character import system** with multiple import methods:
 
-This allows tokens placed manually (not from the Creature Library) to be connected to creature data after the fact.
+1. **D&D Beyond JSON Export** - Users can export their character JSON directly from D&D Beyond
+2. **Manual Character Entry** - Form-based entry for character stats
+3. **Quick Character Template** - Pre-filled templates for common builds
 
 ---
 
-## Components to Modify
+## Architecture
 
-### 1. LinkedCreatureSection.tsx
-
-**Current State**: Already displays linked creature quick stats, has an `onUnlink` prop that is not being passed.
-
-**Changes**:
-- Add a "Link Creature" UI when no creature is linked
-- Include a search input with dropdown results showing both characters and monsters
-- Clicking a creature links it to the token
-
-**New UI Flow**:
 ```text
-+--------------------------------------------------+
-| No Linked Creature                               |
-| Create tokens from the Creature Library to...    |
-|                                                  |
-| [🔗 Link to Creature]                            |
-+--------------------------------------------------+
-
-When clicked, expands to:
-+--------------------------------------------------+
-| 🔍 [Search creatures...]              [Cancel]   |
-|--------------------------------------------------|
-| Monsters:                                        |
-|   🦴 Goblin (CR 1/4, Small humanoid)            |
-|   🦴 Orc (CR 1/2, Medium humanoid)              |
-| Characters:                                      |
-|   👤 Tordek (Lvl 5 Dwarf Fighter)               |
-+--------------------------------------------------+
++-----------------------------------+
+|     ImportCharacterModal.tsx      |
+|-----------------------------------|
+| [Tabs]                            |
+|   > JSON Import                   |
+|   > Manual Entry                  |
+|   > Quick Template                |
+|-----------------------------------|
+| JSON Import:                      |
+|   [Paste JSON or upload file]     |
+|   [Import Character]              |
+|-----------------------------------|
+| Manual Entry:                     |
+|   Name: [___________]             |
+|   Race: [___________]             |
+|   Class: [Select ▾] Level: [__]   |
+|   ...ability scores...            |
+|   [Create Character]              |
++-----------------------------------+
 ```
-
-### 2. TokenContextMenu.tsx
-
-**Current State**: Renders `LinkedCreatureSection` without passing `onUnlink`.
-
-**Changes**:
-- Pass `onUnlink` handler to `LinkedCreatureSection`
-- Pass `onLinkCreature` handler for linking functionality
-- Wire up `updateTokenEntityRef` from sessionStore
 
 ---
 
-## Technical Implementation
+## Implementation Details
 
-### LinkedCreatureSection Props Update
+### 1. New Component: ImportCharacterModal
 
-```typescript
-interface LinkedCreatureSectionProps {
-  token: Token | null;
-  onViewStats: () => void;
-  onUnlink?: () => void;
-  onLinkCreature?: (creatureId: string, creatureType: 'character' | 'monster') => void;
-}
-```
+**Location**: `src/components/modals/ImportCharacterModal.tsx`
 
-### Link Creature Search UI
+**Features**:
+- **JSON Import Tab**: 
+  - Textarea for pasting D&D Beyond character JSON
+  - File upload button for `.json` files
+  - Parses the D&D Beyond character builder export format
+  - Maps fields to our `DndBeyondCharacter` type
 
-The search UI will:
-1. Use a local state to toggle between "placeholder" and "search" modes
-2. Query `searchMonsters` and `searchCharacters` with the input value
-3. Display combined results (max 5-8 items) with type indicators
-4. On selection, call `onLinkCreature` with the creature ID and type
+- **Manual Entry Tab**:
+  - Form fields for: Name, Race, Class(es), Level, Background
+  - Six ability score inputs with auto-calculated modifiers
+  - AC, HP, Speed, Initiative fields
+  - Proficiency bonus auto-calculated from level
 
-### Unlink Handler in TokenContextMenu
+- **Quick Template Tab** (optional enhancement):
+  - Pre-built common character templates (Fighter, Wizard, Rogue, Cleric)
+  - One-click import with default stats for quick placeholder tokens
 
-```typescript
-const handleUnlinkCreature = () => {
-  if (!currentToken) return;
-  updateTokenEntityRef(currentToken.id, undefined);
-  toast.success('Creature unlinked from token');
-};
-```
+### 2. D&D Beyond JSON Parser
 
-### Link Handler in TokenContextMenu
+**Location**: `src/lib/dndBeyondParser.ts` (extend existing)
 
-```typescript
-const handleLinkCreature = (creatureId: string, creatureType: 'character' | 'monster') => {
-  if (!currentToken) return;
-  updateTokenEntityRef(currentToken.id, {
-    type: 'local',
-    entityId: creatureId,
-    projectionType: creatureType === 'monster' ? 'stat-block' : 'character',
-  });
-  toast.success(`Token linked to ${creatureType}`);
-};
-```
+**New Function**: `parseDndBeyondExport(json: object): DndBeyondCharacter`
+
+D&D Beyond's character export JSON has a specific structure:
+- `name`, `race.fullName`, `classes[].definition.name` with levels
+- `stats[].value` for ability scores (array of 6, ordered STR→CHA)
+- `baseHitPoints`, `bonusHitPoints` for HP calculation
+- `overrideArmorClass` or calculated from equipment
+
+### 3. Wire Up to Creature Library Card
+
+Update `handleImportCharacter` in `CreatureLibraryCard.tsx` to open the new modal.
 
 ---
 
 ## File Changes Summary
 
-| File | Changes |
-|------|---------|
-| `src/components/LinkedCreatureSection.tsx` | Add "Link Creature" search UI with character/monster results |
-| `src/components/TokenContextMenu.tsx` | Wire up `onUnlink` and `onLinkCreature` handlers |
-| `.lovable/plan.md` | Mark Phase 5 as complete |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/modals/ImportCharacterModal.tsx` | Create | New modal with JSON import + manual entry tabs |
+| `src/lib/dndBeyondParser.ts` | Extend | Add `parseDndBeyondExport()` for official JSON format |
+| `src/components/cards/CreatureLibraryCard.tsx` | Modify | Wire up modal open, add state management |
 
 ---
 
 ## User Experience
 
-### Linking a Token to a Creature
-1. Right-click a token → Edit Token
-2. Go to "Details" tab
-3. Click "Link to Creature" button
-4. Type to search creatures in the library
-5. Click a result to link it
-6. Token now shows creature quick stats
+### Importing via D&D Beyond JSON Export
 
-### Unlinking a Token
-1. Right-click a linked token → Edit Token
-2. Go to "Details" tab
-3. Click the "Unlink" button (chain-break icon)
-4. Creature data is removed, token remains unchanged visually
+1. On D&D Beyond, go to your character sheet
+2. Click the "Export" button (found in character options)
+3. Save the `.json` file
+4. In the VTT, open Creature Library → Characters tab
+5. Click "Import from D&D Beyond"
+6. Either paste the JSON or upload the file
+7. Click "Import Character"
+8. Character appears in the library with full stats
 
-### Edge Cases Handled
-- **Empty library**: Show message "No creatures in library. Import from Creature Library first."
-- **Multi-selection**: Link/unlink disabled for multi-selection (too complex for batch operations)
-- **Already linked**: Shows current creature with unlink option
+### Creating a Manual Character
 
+1. Open Creature Library → Characters tab
+2. Click "Import from D&D Beyond"
+3. Switch to "Manual Entry" tab
+4. Fill in character name, race, class, level
+5. Enter ability scores (modifiers auto-calculate)
+6. Add AC, HP, Speed
+7. Click "Create Character"
+8. Character is added to the library
+
+---
+
+## Technical Notes
+
+### D&D Beyond Export JSON Structure
+
+The official D&D Beyond character JSON export includes:
+```json
+{
+  "id": 12345678,
+  "name": "Tordek Stonehammer",
+  "race": { "fullName": "Hill Dwarf", ... },
+  "classes": [
+    { "definition": { "name": "Fighter" }, "level": 5 }
+  ],
+  "stats": [
+    { "id": 1, "value": 16 },  // STR
+    { "id": 2, "value": 14 },  // DEX
+    ...
+  ],
+  "baseHitPoints": 44,
+  "decorations": { "avatarUrl": "https://..." }
+}
+```
+
+### Validation
+
+- Character name is required
+- At least one class with level ≥ 1
+- Ability scores between 1-30
+- AC, HP, Speed must be positive numbers
+
+### Edge Cases
+
+- **Invalid JSON**: Show error toast, don't close modal
+- **Missing fields**: Fill with sensible defaults (level 1, 10 for abilities)
+- **Duplicate character**: Update existing if same D&D Beyond ID
