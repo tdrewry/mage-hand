@@ -170,19 +170,19 @@ interface Monster5eTools {
 - Option 1: Ship with basic SRD monsters
 - Option 2: Allow user to paste/import 5e.tools JSON export
 
-### Phase 3: UI Cards - IN PROGRESS
+### Phase 3: UI Cards - COMPLETE
 
 **New Card Types:**
-- ✅ `CardType.CHARACTER_SHEET` - Displays character data (placeholder)
-- ✅ `CardType.MONSTER_STAT_BLOCK` - Displays monster stat block (placeholder)
+- ✅ `CardType.CHARACTER_SHEET` - Displays character data (COMPLETE)
+- ✅ `CardType.MONSTER_STAT_BLOCK` - Displays monster stat block (COMPLETE)
 - ✅ `CardType.CREATURE_LIBRARY` - Browse/search creatures, create tokens (COMPLETE)
 
 **Card Components:**
 
 ```text
 src/components/cards/
-  CharacterSheetCard.tsx      - Full character sheet display (TODO)
-  MonsterStatBlockCard.tsx    - Traditional stat block format (TODO)
+  CharacterSheetCard.tsx      - Full character sheet display (COMPLETE)
+  MonsterStatBlockCard.tsx    - Traditional stat block format (COMPLETE)
   CreatureLibraryCard.tsx     - Browse/import creatures (COMPLETE)
 ```
 
