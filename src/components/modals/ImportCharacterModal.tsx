@@ -518,12 +518,12 @@ export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModa
           </TabsContent>
 
           {/* Template Tab */}
-          <TabsContent value="template" className="flex-1 min-h-0 flex flex-col gap-2">
-            <div className="text-xs text-muted-foreground">
+          <TabsContent value="template" className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+            <div className="text-xs text-muted-foreground shrink-0">
               Click to add directly, or use the download button to get a pre-filled JSON template.
             </div>
-            <ScrollArea className="flex-1">
-              <div className="space-y-2 pr-2">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-2 pr-3">
                 {QUICK_TEMPLATES.map((template) => (
                   <div
                     key={template.name}
