@@ -269,6 +269,33 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.CHARACTER_SHEET]: {
+    title: 'Character Sheet',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 400, height: 600 },
+    minSize: { width: 350, height: 500 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
+  [CardType.MONSTER_STAT_BLOCK]: {
+    title: 'Monster Stat Block',
+    defaultPosition: { x: 360, y: 80 },
+    defaultSize: { width: 420, height: 650 },
+    minSize: { width: 380, height: 500 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
+  [CardType.CREATURE_LIBRARY]: {
+    title: 'Creature Library',
+    defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+    defaultSize: { width: 600, height: 700 },
+    minSize: { width: 500, height: 550 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

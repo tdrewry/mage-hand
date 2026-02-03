@@ -131,6 +131,9 @@ function getCardTitle(type: CardType): string {
     [CardType.ROLE_MANAGER]: 'Role Manager',
     [CardType.HISTORY]: 'History',
     [CardType.MAP_OBJECTS]: 'Map Objects',
+    [CardType.CHARACTER_SHEET]: 'Character Sheet',
+    [CardType.MONSTER_STAT_BLOCK]: 'Monster Stat Block',
+    [CardType.CREATURE_LIBRARY]: 'Creature Library',
   };
   
   return titles[type] || type;
@@ -201,6 +204,12 @@ function renderCardContent(
       return <HistoryCard />;
     case CardType.MAP_OBJECTS:
       return <MapObjectPanelCardContent />;
+    case CardType.CHARACTER_SHEET:
+      return <div className="text-muted-foreground text-sm p-2">Character sheet content - Coming soon</div>;
+    case CardType.MONSTER_STAT_BLOCK:
+      return <div className="text-muted-foreground text-sm p-2">Monster stat block content - Coming soon</div>;
+    case CardType.CREATURE_LIBRARY:
+      return <div className="text-muted-foreground text-sm p-2">Creature library content - Coming soon</div>;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
