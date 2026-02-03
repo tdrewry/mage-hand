@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
+import { useMapStore } from '@/stores/mapStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { 
@@ -126,8 +127,24 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     setBestiaryLoading,
   } = useCreatureStore();
 
-  const { addToken } = useSessionStore();
+  const { addToken, getViewportTransform } = useSessionStore();
+  const { selectedMapId } = useMapStore();
   const { registerCard } = useCardStore();
+  
+  // Helper to calculate the center of the current viewport in world coordinates
+  const getViewportCenter = () => {
+    const transform = selectedMapId ? getViewportTransform(selectedMapId) : { x: 0, y: 0, zoom: 1 };
+    // Assume a standard canvas size - the center in screen coords is approximately (width/2, height/2)
+    // We need to convert screen center to world coordinates
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    
+    // World coordinates: worldX = (screenX - panX) / zoom
+    const worldX = (screenCenterX - transform.x) / transform.zoom;
+    const worldY = (screenCenterY - transform.y) / transform.zoom;
+    
+    return { x: worldX, y: worldY };
+  };
 
   const [activeTab, setActiveTab] = useState<'characters' | 'monsters'>('monsters');
   const [searchQuery, setSearchQuery] = useState('');
@@ -149,6 +166,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     try {
       const gridSize = MONSTER_SIZE_GRID[monster.size] || 1;
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const center = getViewportCenter();
       
       // Try to fetch token art if available
       let imageUrl = '';
@@ -174,8 +192,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         id: tokenId,
         name: monster.name,
         imageUrl,
-        x: 200 + Math.random() * 100,
-        y: 200 + Math.random() * 100,
+        x: center.x,
+        y: center.y,
         gridWidth: gridSize,
         gridHeight: gridSize,
         label: monster.name,
@@ -205,6 +223,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     
     try {
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const center = getViewportCenter();
       
       // Try to load portrait
       let imageUrl = '';
@@ -227,8 +246,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         id: tokenId,
         name: character.name,
         imageUrl,
-        x: 200 + Math.random() * 100,
-        y: 200 + Math.random() * 100,
+        x: center.x,
+        y: center.y,
         gridWidth: 1, // Characters are typically Medium
         gridHeight: 1,
         label: character.name,
