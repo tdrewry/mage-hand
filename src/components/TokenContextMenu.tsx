@@ -296,10 +296,13 @@ export const TokenContextMenu = ({
       ? CardType.MONSTER_STAT_BLOCK 
       : CardType.CHARACTER_SHEET;
     
+    // Use correct metadata key based on creature type
+    const metadataKey = linkedCreatureType === 'monster' ? 'monsterId' : 'characterId';
+    
     // Check if a card of this type already exists with this creature
     const existingCard = cards.find(c => 
       c.type === cardType && 
-      c.metadata?.monsterId === linkedCreatureId
+      c.metadata?.[metadataKey] === linkedCreatureId
     );
     
     if (existingCard) {
@@ -307,7 +310,7 @@ export const TokenContextMenu = ({
       setVisibility(existingCard.id, true);
       bringToFront(existingCard.id);
     } else {
-      // Register a new card with the creature ID
+      // Register a new card with the creature ID using correct metadata key
       const cardId = registerCard({
         type: cardType,
         title: linkedCreatureType === 'monster' ? 'Monster Stat Block' : 'Character Sheet',
@@ -317,7 +320,7 @@ export const TokenContextMenu = ({
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
-        metadata: { monsterId: linkedCreatureId },
+        metadata: { [metadataKey]: linkedCreatureId },
       });
       bringToFront(cardId);
     }
