@@ -83,6 +83,38 @@ const QUICK_TEMPLATES: Array<{
     abilities: [14, 10, 16, 10, 16, 10],
     description: 'A divine healer and frontline support',
   },
+  {
+    name: 'Human Monk',
+    race: 'Human',
+    className: 'Monk',
+    level: 1,
+    abilities: [12, 16, 14, 10, 16, 8],
+    description: 'A martial artist harnessing ki energy',
+  },
+  {
+    name: 'Half-Elf Bard',
+    race: 'Half-Elf',
+    className: 'Bard',
+    level: 1,
+    abilities: [8, 14, 14, 12, 10, 16],
+    description: 'A charismatic performer and support caster',
+  },
+  {
+    name: 'Draconic Sorcerer',
+    race: 'Human',
+    className: 'Sorcerer',
+    level: 1,
+    abilities: [8, 14, 14, 10, 12, 16],
+    description: 'An innate spellcaster with draconic power',
+  },
+  {
+    name: 'Wood Elf Druid',
+    race: 'Wood Elf',
+    className: 'Druid',
+    level: 1,
+    abilities: [10, 14, 14, 12, 16, 10],
+    description: 'A nature-wielding shapeshifter',
+  },
 ];
 
 export function ImportCharacterModal({ open, onOpenChange }: ImportCharacterModalProps) {

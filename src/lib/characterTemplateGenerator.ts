@@ -75,7 +75,7 @@ export function generateBlankTemplate(): DndBeyondCharacter {
  * Generate a pre-filled template based on a quick template selection
  */
 export function generateFilledTemplate(
-  templateType: 'fighter' | 'wizard' | 'rogue' | 'cleric' | 'barbarian' | 'paladin' | 'ranger' | 'warlock'
+  templateType: 'fighter' | 'wizard' | 'rogue' | 'cleric' | 'barbarian' | 'paladin' | 'ranger' | 'warlock' | 'monk' | 'bard' | 'sorcerer' | 'druid'
 ): DndBeyondCharacter {
   const timestamp = new Date().toISOString();
   const baseTemplate = generateBlankTemplate();
@@ -462,6 +462,224 @@ export function generateFilledTemplate(
         { ability: "Intelligence", modifier: 1, proficient: false },
         { ability: "Wisdom", modifier: 2, proficient: true },
         { ability: "Charisma", modifier: 5, proficient: true },
+      ],
+    },
+    monk: {
+      name: "Human Monk",
+      race: "Human",
+      classes: [{ name: "Monk", level: 1 }],
+      level: 1,
+      abilities: {
+        strength: { score: 12, modifier: 1 },
+        dexterity: { score: 16, modifier: 3 },
+        constitution: { score: 14, modifier: 2 },
+        intelligence: { score: 10, modifier: 0 },
+        wisdom: { score: 16, modifier: 3 },
+        charisma: { score: 8, modifier: -1 },
+      },
+      armorClass: 16,
+      hitPoints: { current: 10, max: 10, temp: 0 },
+      speed: 30,
+      initiative: 3,
+      proficiencies: {
+        armor: [],
+        weapons: ["Simple", "Shortswords"],
+        tools: ["Artisan's Tools or Musical Instrument"],
+        languages: ["Common"],
+      },
+      features: [
+        { name: "Unarmored Defense", description: "AC = 10 + DEX + WIS when not wearing armor", source: "Monk 1" },
+        { name: "Martial Arts", description: "Use DEX for unarmed/monk weapons, bonus action unarmed strike", source: "Monk 1" },
+      ],
+      actions: [
+        { name: "Unarmed Strike", attackBonus: 5, damage: "1d4+3", damageType: "bludgeoning", range: "5 ft.", description: "Martial arts die" },
+        { name: "Quarterstaff", attackBonus: 5, damage: "1d6+3", damageType: "bludgeoning", range: "5 ft.", description: "Versatile (1d8)" },
+      ],
+      savingThrows: [
+        { ability: "Strength", modifier: 3, proficient: true },
+        { ability: "Dexterity", modifier: 5, proficient: true },
+        { ability: "Constitution", modifier: 2, proficient: false },
+        { ability: "Intelligence", modifier: 0, proficient: false },
+        { ability: "Wisdom", modifier: 3, proficient: false },
+        { ability: "Charisma", modifier: -1, proficient: false },
+      ],
+    },
+    bard: {
+      name: "Half-Elf Bard",
+      race: "Half-Elf",
+      classes: [{ name: "Bard", level: 1 }],
+      level: 1,
+      abilities: {
+        strength: { score: 8, modifier: -1 },
+        dexterity: { score: 14, modifier: 2 },
+        constitution: { score: 14, modifier: 2 },
+        intelligence: { score: 12, modifier: 1 },
+        wisdom: { score: 10, modifier: 0 },
+        charisma: { score: 16, modifier: 3 },
+      },
+      armorClass: 13,
+      hitPoints: { current: 10, max: 10, temp: 0 },
+      speed: 30,
+      initiative: 2,
+      proficiencies: {
+        armor: ["Light"],
+        weapons: ["Simple", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"],
+        tools: ["Lute", "Flute", "Lyre"],
+        languages: ["Common", "Elvish", "Sylvan"],
+      },
+      features: [
+        { name: "Bardic Inspiration", description: "Grant 1d6 to ally's roll (CHA mod/long rest)", source: "Bard 1" },
+        { name: "Spellcasting", description: "Charisma-based arcane spellcasting", source: "Bard 1" },
+        { name: "Fey Ancestry", description: "Advantage vs. charm, can't be put to sleep", source: "Half-Elf Racial" },
+      ],
+      actions: [
+        { name: "Rapier", attackBonus: 4, damage: "1d8+2", damageType: "piercing", range: "5 ft.", description: "Finesse" },
+        { name: "Vicious Mockery", attackBonus: 0, damage: "1d4", damageType: "psychic", range: "60 ft.", description: "WIS save cantrip" },
+      ],
+      spells: {
+        spellcastingAbility: "Charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        cantrips: [{ name: "Vicious Mockery" }, { name: "Minor Illusion" }],
+        spellsByLevel: [
+          {
+            level: 1,
+            slots: 2,
+            slotsUsed: 0,
+            spells: [
+              { name: "Healing Word", prepared: true },
+              { name: "Faerie Fire", prepared: true },
+              { name: "Dissonant Whispers", prepared: true },
+              { name: "Charm Person", prepared: true },
+            ],
+          },
+        ],
+      },
+      savingThrows: [
+        { ability: "Strength", modifier: -1, proficient: false },
+        { ability: "Dexterity", modifier: 4, proficient: true },
+        { ability: "Constitution", modifier: 2, proficient: false },
+        { ability: "Intelligence", modifier: 1, proficient: false },
+        { ability: "Wisdom", modifier: 0, proficient: false },
+        { ability: "Charisma", modifier: 5, proficient: true },
+      ],
+    },
+    sorcerer: {
+      name: "Draconic Sorcerer",
+      race: "Human",
+      classes: [{ name: "Sorcerer", level: 1 }],
+      level: 1,
+      abilities: {
+        strength: { score: 8, modifier: -1 },
+        dexterity: { score: 14, modifier: 2 },
+        constitution: { score: 14, modifier: 2 },
+        intelligence: { score: 10, modifier: 0 },
+        wisdom: { score: 12, modifier: 1 },
+        charisma: { score: 16, modifier: 3 },
+      },
+      armorClass: 13,
+      hitPoints: { current: 8, max: 8, temp: 0 },
+      speed: 30,
+      initiative: 2,
+      proficiencies: {
+        armor: [],
+        weapons: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"],
+        tools: [],
+        languages: ["Common", "Draconic"],
+      },
+      features: [
+        { name: "Sorcerous Origin", description: "Draconic Bloodline grants dragon ancestry benefits", source: "Sorcerer 1" },
+        { name: "Draconic Resilience", description: "+1 HP/level, AC 13 + DEX when unarmored", source: "Draconic Bloodline" },
+        { name: "Spellcasting", description: "Charisma-based innate spellcasting", source: "Sorcerer 1" },
+      ],
+      actions: [
+        { name: "Dagger", attackBonus: 4, damage: "1d4+2", damageType: "piercing", range: "20/60 ft.", description: "Finesse, light, thrown" },
+        { name: "Fire Bolt", attackBonus: 5, damage: "1d10", damageType: "fire", range: "120 ft.", description: "Cantrip spell attack" },
+      ],
+      spells: {
+        spellcastingAbility: "Charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        cantrips: [{ name: "Fire Bolt" }, { name: "Light" }, { name: "Prestidigitation" }, { name: "Mage Hand" }],
+        spellsByLevel: [
+          {
+            level: 1,
+            slots: 2,
+            slotsUsed: 0,
+            spells: [
+              { name: "Burning Hands", prepared: true },
+              { name: "Shield", prepared: true },
+            ],
+          },
+        ],
+      },
+      savingThrows: [
+        { ability: "Strength", modifier: -1, proficient: false },
+        { ability: "Dexterity", modifier: 2, proficient: false },
+        { ability: "Constitution", modifier: 4, proficient: true },
+        { ability: "Intelligence", modifier: 0, proficient: false },
+        { ability: "Wisdom", modifier: 1, proficient: false },
+        { ability: "Charisma", modifier: 5, proficient: true },
+      ],
+    },
+    druid: {
+      name: "Wood Elf Druid",
+      race: "Wood Elf",
+      classes: [{ name: "Druid", level: 1 }],
+      level: 1,
+      abilities: {
+        strength: { score: 10, modifier: 0 },
+        dexterity: { score: 14, modifier: 2 },
+        constitution: { score: 14, modifier: 2 },
+        intelligence: { score: 12, modifier: 1 },
+        wisdom: { score: 16, modifier: 3 },
+        charisma: { score: 10, modifier: 0 },
+      },
+      armorClass: 14,
+      hitPoints: { current: 10, max: 10, temp: 0 },
+      speed: 35,
+      initiative: 2,
+      proficiencies: {
+        armor: ["Light (non-metal)", "Medium (non-metal)", "Shields (non-metal)"],
+        weapons: ["Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs", "Scimitars", "Sickles", "Slings", "Spears"],
+        tools: ["Herbalism Kit"],
+        languages: ["Common", "Elvish", "Druidic"],
+      },
+      features: [
+        { name: "Druidic", description: "Secret language known only to druids", source: "Druid 1" },
+        { name: "Spellcasting", description: "Wisdom-based nature spellcasting", source: "Druid 1" },
+        { name: "Mask of the Wild", description: "Hide in natural phenomena", source: "Wood Elf Racial" },
+      ],
+      actions: [
+        { name: "Scimitar", attackBonus: 4, damage: "1d6+2", damageType: "slashing", range: "5 ft.", description: "Finesse, light" },
+        { name: "Produce Flame", attackBonus: 5, damage: "1d8", damageType: "fire", range: "30 ft.", description: "Cantrip spell attack" },
+      ],
+      spells: {
+        spellcastingAbility: "Wisdom",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        cantrips: [{ name: "Produce Flame" }, { name: "Druidcraft" }],
+        spellsByLevel: [
+          {
+            level: 1,
+            slots: 2,
+            slotsUsed: 0,
+            spells: [
+              { name: "Entangle", prepared: true },
+              { name: "Cure Wounds", prepared: true },
+              { name: "Thunderwave", prepared: true },
+              { name: "Faerie Fire", prepared: false },
+            ],
+          },
+        ],
+      },
+      savingThrows: [
+        { ability: "Strength", modifier: 0, proficient: false },
+        { ability: "Dexterity", modifier: 2, proficient: false },
+        { ability: "Constitution", modifier: 2, proficient: false },
+        { ability: "Intelligence", modifier: 3, proficient: true },
+        { ability: "Wisdom", modifier: 5, proficient: true },
+        { ability: "Charisma", modifier: 0, proficient: false },
       ],
     },
   };
