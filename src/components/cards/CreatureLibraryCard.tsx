@@ -66,6 +66,15 @@ const MONSTER_TYPES = [
 
 const SIZE_OPTIONS: MonsterSize[] = ['T', 'S', 'M', 'L', 'H', 'G'];
 
+// Color palette for tokens without images
+const TOKEN_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+  '#F8C471', '#82E0AA', '#F1948A', '#F39C12', '#E74C3C'
+];
+
+const getRandomTokenColor = () => TOKEN_COLORS[Math.floor(Math.random() * TOKEN_COLORS.length)];
+
 const CR_OPTIONS = [
   { label: '0', value: 0 },
   { label: '1/8', value: 0.125 },
@@ -308,6 +317,9 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       // Parse creature senses for vision/illumination
       const illuminationSources = parseMonsterSenses(monster);
       
+      // Use random color if no image is available
+      const tokenColor = imageUrl ? undefined : getRandomTokenColor();
+      
       const newToken = {
         id: tokenId,
         name: monster.name,
@@ -320,6 +332,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         labelPosition: 'below' as LabelPosition,
         roleId: 'dungeon-master', // Monsters default to DM control
         isHidden: false,
+        color: tokenColor,
         entityRef: {
           type: 'local' as const,
           entityId: monster.id,
@@ -369,6 +382,9 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         }
       }
       
+      // Use random color if no image is available
+      const tokenColor = imageUrl ? undefined : getRandomTokenColor();
+      
       const newToken = {
         id: tokenId,
         name: character.name,
@@ -381,6 +397,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         labelPosition: 'below' as LabelPosition,
         roleId: 'player', // Characters default to player control
         isHidden: false,
+        color: tokenColor,
         entityRef: {
           type: 'local' as const,
           entityId: character.id,
