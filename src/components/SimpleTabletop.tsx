@@ -5795,58 +5795,119 @@ export const SimpleTabletop = () => {
       if (isDraggingToken && draggedTokenId && !tokensMovedByRegion.includes(draggedTokenId)) {
         const token = tokens.find((t) => t.id === draggedTokenId);
         if (token) {
-          // Find local region at token position (our local regions in SimpleTabletop)
-          const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
-
-          // Priority 1: Local region snapping (if region exists and has snapping enabled)
-          if (localRegion && localRegion.gridSnapping && localRegion.gridType !== "free") {
-            // Convert local region to map region format for snapping
-            let regionPoints: Array<{ x: number; y: number }>;
-
-            if (localRegion.regionType === "path" && localRegion.pathPoints) {
-              regionPoints = localRegion.pathPoints;
-            } else {
-              // Rectangle region
-              regionPoints = [
-                { x: localRegion.x, y: localRegion.y },
-                { x: localRegion.x + localRegion.width, y: localRegion.y },
-                { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
-                { x: localRegion.x, y: localRegion.y + localRegion.height },
-              ];
-            }
-
-            const regionForSnap = {
-              map: {} as any, // Not used in snapping logic
-              region: {
-                gridType: localRegion.gridType,
-                gridSize: localRegion.gridSize * localRegion.gridScale,
-                points: regionPoints,
-              } as any,
-            };
-            const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
-            updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
-          }
-          // Priority 2: World space snapping (only if not in a region and world snapping is enabled)
-          else if (isGridSnappingEnabled && !localRegion) {
-            // World space uses the background grid (40 unit grid)
-            const worldGridSize = 40;
-            const snappedX = Math.round(token.x / worldGridSize) * worldGridSize;
-            const snappedY = Math.round(token.y / worldGridSize) * worldGridSize;
-            updateTokenPosition(draggedTokenId, snappedX, snappedY);
-          }
-          // No snapping applied if:
-          // - Token is in a region but region snapping is disabled
-          // - Token is in world space but world snapping is disabled
-          // - Token is in a 'free' grid region
+          // === COLLISION CHECK FIRST ===
+          const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
+          const shouldEnforceCollisions = renderingMode === 'play';
           
-          // Create undo command for token movement
-          if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
-            moveTokenUndoable(
-              draggedTokenId,
-              { x: initialTokenState.x, y: initialTokenState.y },
+          console.log('[Collision Debug] handleMouseUp - Token drag ended', { 
+            enforceMovementBlocking, enforceRegionBounds, renderingMode,
+            from: dragStartPos, to: { x: token.x, y: token.y }
+          });
+          
+          let movementBlocked = false;
+          
+          if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
+            const baseTokenSize = 40;
+            const tokenRadius = ((token.gridWidth || 1) * baseTokenSize) / 2;
+            
+            const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
+            const checkRegions = enforceRegionBounds ? regions : [];
+            
+            console.log('[Collision Debug] Checking collision', {
+              tokenRadius,
+              blockingObjects: blockingObjects.length,
+              checkRegions: checkRegions.length
+            });
+            
+            const collisionResult = checkMovementCollision(
+              dragStartPos,
               { x: token.x, y: token.y },
-              token.label || token.name
+              tokenRadius,
+              blockingObjects,
+              checkRegions,
+              { enforceMovementBlocking, enforceRegionBounds }
             );
+            
+            console.log('[Collision Debug] Result:', collisionResult);
+            
+            if (collisionResult.blocked) {
+              movementBlocked = true;
+              
+              let blockReason = '';
+              if (collisionResult.collidedWith) {
+                const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
+                blockReason = blockingObj?.category === 'door' 
+                  ? `Blocked by closed door` 
+                  : `Blocked by ${blockingObj?.category || 'obstacle'}`;
+              } else {
+                blockReason = 'Cannot leave region boundary';
+              }
+              
+              toast.error(blockReason, { 
+                duration: 2000,
+                description: `Token snapped back to start`
+              });
+              
+              // Snap back to original position
+              updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
+            }
+          }
+          
+          // Only proceed with snapping if movement wasn't blocked
+          if (!movementBlocked) {
+            // Find local region at token position (our local regions in SimpleTabletop)
+            const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
+
+            // Priority 1: Local region snapping (if region exists and has snapping enabled)
+            if (localRegion && localRegion.gridSnapping && localRegion.gridType !== "free") {
+              // Convert local region to map region format for snapping
+              let regionPoints: Array<{ x: number; y: number }>;
+
+              if (localRegion.regionType === "path" && localRegion.pathPoints) {
+                regionPoints = localRegion.pathPoints;
+              } else {
+                // Rectangle region
+                regionPoints = [
+                  { x: localRegion.x, y: localRegion.y },
+                  { x: localRegion.x + localRegion.width, y: localRegion.y },
+                  { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+                  { x: localRegion.x, y: localRegion.y + localRegion.height },
+                ];
+              }
+
+              const regionForSnap = {
+                map: {} as any, // Not used in snapping logic
+                region: {
+                  gridType: localRegion.gridType,
+                  gridSize: localRegion.gridSize * localRegion.gridScale,
+                  points: regionPoints,
+                } as any,
+              };
+              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
+              updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+            }
+            // Priority 2: World space snapping (only if not in a region and world snapping is enabled)
+            else if (isGridSnappingEnabled && !localRegion) {
+              // World space uses the background grid (40 unit grid)
+              const worldGridSize = 40;
+              const snappedX = Math.round(token.x / worldGridSize) * worldGridSize;
+              const snappedY = Math.round(token.y / worldGridSize) * worldGridSize;
+              updateTokenPosition(draggedTokenId, snappedX, snappedY);
+            }
+            // No snapping applied if:
+            // - Token is in a region but region snapping is disabled
+            // - Token is in world space but world snapping is disabled
+            // - Token is in a 'free' grid region
+            
+            // Create undo command for token movement (only if not blocked)
+            if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
+              moveTokenUndoable(
+                draggedTokenId,
+                { x: initialTokenState.x, y: initialTokenState.y },
+                { x: token.x, y: token.y },
+                token.label || token.name
+              );
+            }
           }
         }
       }
