@@ -60,12 +60,18 @@ export function checkMovementCollision(
     }
   }
 
-  // Check region bounds if enabled
+  // Check region bounds if enabled - ONE-WAY enforcement:
+  // - Tokens INSIDE a region cannot leave (blocked)
+  // - Tokens OUTSIDE regions can enter freely (useful for DM bringing monsters into play)
   if (options.enforceRegionBounds && regions.length > 0) {
-    const regionResult = constrainToRegions(validPosition, tokenRadius, regions);
-    if (regionResult.constrained) {
+    const regionResult = checkRegionBoundsOneWay(startPos, validPosition, tokenRadius, regions);
+    if (regionResult.blocked) {
       blocked = true;
-      validPosition = regionResult.position;
+      validPosition = regionResult.validPosition;
+      // Set a marker indicating this was a region bounds violation
+      if (!collidedWith) {
+        collidedWith = 'region_bounds';
+      }
     }
   }
 
@@ -252,8 +258,52 @@ export function lineIntersectsRectangle(
 }
 
 /**
- * Constrain a position to stay within any region.
+ * ONE-WAY region bounds check:
+ * - If token STARTS inside a region and ENDS outside, BLOCK the move
+ * - If token STARTS outside regions, ALLOW movement (can enter regions freely)
+ * 
+ * This enables DMs to bring monsters into play from outside regions.
+ */
+function checkRegionBoundsOneWay(
+  startPos: Point,
+  endPos: Point,
+  tokenRadius: number,
+  regions: CanvasRegion[]
+): { blocked: boolean; validPosition: Point } {
+  // First, check if the token started inside ANY region
+  let startedInsideRegion: CanvasRegion | null = null;
+  
+  for (const region of regions) {
+    if (isPointInRegion(startPos, region, tokenRadius)) {
+      startedInsideRegion = region;
+      break;
+    }
+  }
+  
+  // If token started OUTSIDE all regions, allow free movement (can enter regions)
+  if (!startedInsideRegion) {
+    console.log('[Collision Debug] Token started outside regions - movement allowed');
+    return { blocked: false, validPosition: endPos };
+  }
+  
+  // Token started INSIDE a region - check if it's still inside ANY region
+  for (const region of regions) {
+    if (isPointInRegion(endPos, region, tokenRadius)) {
+      // Still inside a region (same or different), allow movement
+      console.log('[Collision Debug] Token moved within/between regions - allowed');
+      return { blocked: false, validPosition: endPos };
+    }
+  }
+  
+  // Token started inside but ended outside all regions - BLOCK
+  console.log('[Collision Debug] Token tried to leave region bounds - BLOCKED');
+  return { blocked: true, validPosition: startPos };
+}
+
+/**
+ * Legacy: Constrain a position to stay within any region.
  * For path-based regions, uses point-in-polygon test.
+ * @deprecated Use checkRegionBoundsOneWay for one-way enforcement
  */
 function constrainToRegions(
   position: Point,
