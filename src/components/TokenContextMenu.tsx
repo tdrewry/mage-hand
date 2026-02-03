@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark, Footprints } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Database, Save, Bookmark, Footprints, FileText } from 'lucide-react';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
 import { TokenPathPreviewCanvas } from './TokenPathPreviewCanvas';
@@ -49,6 +49,9 @@ import {
 import { toast } from 'sonner';
 import { saveTokenTexture, loadTextureByHash, hashImageData, saveVariantTexture } from '@/lib/tokenTextureStorage';
 import { uploadTexture } from '@/lib/textureSync';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
+import { useCreatureStore } from '@/stores/creatureStore';
 
 interface TokenContextMenuProps {
   children: React.ReactNode;
@@ -101,6 +104,8 @@ export const TokenContextMenu = ({
   
   const { roles } = useRoleStore();
   const { addToInitiative } = useInitiativeStore();
+  const { registerCard, setVisibility, bringToFront, cards } = useCardStore();
+  const { getCreatureType } = useCreatureStore();
   
   const [showTokenEditModal, setShowTokenEditModal] = useState(false);
   const [showImageImportModal, setShowImageImportModal] = useState(false);
@@ -276,7 +281,45 @@ export const TokenContextMenu = ({
   // Get current token for variant operations (single selection only)
   const currentToken = targetTokens.length === 1 ? targetTokens[0] : null;
 
-  // Handle saving current appearance as a variant
+  // Check if single token has a linked creature
+  const linkedCreatureId = !isMultiSelection && currentToken?.entityRef?.entityId;
+  const linkedCreatureType = linkedCreatureId ? getCreatureType(linkedCreatureId) : undefined;
+  const hasLinkedCreature = !!linkedCreatureType;
+
+  // Handle opening the linked creature's stat block or character sheet
+  const handleViewStats = () => {
+    if (!linkedCreatureId || !linkedCreatureType) return;
+    
+    const cardType = linkedCreatureType === 'monster' 
+      ? CardType.MONSTER_STAT_BLOCK 
+      : CardType.CHARACTER_SHEET;
+    
+    // Check if a card of this type already exists with this creature
+    const existingCard = cards.find(c => 
+      c.type === cardType && 
+      c.metadata?.monsterId === linkedCreatureId
+    );
+    
+    if (existingCard) {
+      // Show and bring existing card to front
+      setVisibility(existingCard.id, true);
+      bringToFront(existingCard.id);
+    } else {
+      // Register a new card with the creature ID
+      const cardId = registerCard({
+        type: cardType,
+        title: linkedCreatureType === 'monster' ? 'Monster Stat Block' : 'Character Sheet',
+        defaultPosition: { x: 360, y: 80 },
+        defaultSize: { width: 420, height: 650 },
+        minSize: { width: 380, height: 500 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+        metadata: { monsterId: linkedCreatureId },
+      });
+      bringToFront(cardId);
+    }
+  };
   const handleSaveVariant = async () => {
     if (!currentToken || !variantNameInput.trim()) {
       toast.error('Please enter a name for the variant');
@@ -766,6 +809,13 @@ export const TokenContextMenu = ({
                 })}
               </ContextMenuSubContent>
             </ContextMenuSub>
+          )}
+          {/* View Stats - only show for single token with linked creature */}
+          {hasLinkedCreature && (
+            <ContextMenuItem onClick={handleViewStats}>
+              <FileText className="mr-2 h-4 w-4" />
+              <span>View {linkedCreatureType === 'monster' ? 'Stat Block' : 'Character Sheet'}</span>
+            </ContextMenuItem>
           )}
           <ContextMenuSeparator />
           <ContextMenuCheckboxItem
