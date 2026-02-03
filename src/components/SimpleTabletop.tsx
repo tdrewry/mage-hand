@@ -605,18 +605,22 @@ export const SimpleTabletop = () => {
               if (collisionResult.blocked) {
                 // Show toast with details
                 let blockReason = '';
-                if (collisionResult.collidedWith) {
+                let blockDetails = '';
+                if (collisionResult.collidedWith && collisionResult.collidedWith !== 'region_bounds') {
                   const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
+                  const objName = blockingObj?.label || blockingObj?.category || 'obstacle';
                   blockReason = blockingObj?.category === 'door' 
                     ? `Blocked by closed door` 
-                    : `Blocked by ${blockingObj?.category || 'obstacle'}`;
+                    : `Blocked by ${objName}`;
+                  blockDetails = `Object: ${blockingObj?.category}${blockingObj?.label ? ` "${blockingObj.label}"` : ''} (ID: ${collisionResult.collidedWith?.slice(0, 8)}...)`;
                 } else {
                   blockReason = 'Left region boundary';
+                  blockDetails = `Token tried to exit all regions (obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds})`;
                 }
                 
                 toast.error(blockReason, { 
-                  duration: 2000,
-                  description: `Movement from (${Math.round(dragStartPos.x)}, ${Math.round(dragStartPos.y)}) invalid`
+                  duration: 3000,
+                  description: blockDetails
                 });
                 
                 // Snap back to original position
@@ -5839,18 +5843,22 @@ export const SimpleTabletop = () => {
               movementBlocked = true;
               
               let blockReason = '';
-              if (collisionResult.collidedWith) {
+              let blockDetails = '';
+              if (collisionResult.collidedWith && collisionResult.collidedWith !== 'region_bounds') {
                 const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
+                const objName = blockingObj?.label || blockingObj?.category || 'obstacle';
                 blockReason = blockingObj?.category === 'door' 
                   ? `Blocked by closed door` 
-                  : `Blocked by ${blockingObj?.category || 'obstacle'}`;
+                  : `Blocked by ${objName}`;
+                blockDetails = `Object: ${blockingObj?.category}${blockingObj?.label ? ` "${blockingObj.label}"` : ''} (ID: ${collisionResult.collidedWith?.slice(0, 8)}...)`;
               } else {
                 blockReason = 'Cannot leave region boundary';
+                blockDetails = `Token tried to exit all regions (obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds})`;
               }
               
               toast.error(blockReason, { 
-                duration: 2000,
-                description: `Token snapped back to start`
+                duration: 3000,
+                description: blockDetails
               });
               
               // Snap back to original position
