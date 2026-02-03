@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Search, 
   Plus, 
@@ -17,7 +17,9 @@ import {
   ExternalLink,
   UserPlus,
   FileJson,
-  Eye
+  Eye,
+  Download,
+  Globe
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useCardStore } from '@/stores/cardStore';
@@ -33,6 +35,14 @@ import {
   type MonsterSize
 } from '@/types/creatureTypes';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface CreatureLibraryCardContentProps {
   cardId: string;
@@ -68,6 +78,34 @@ const CR_OPTIONS = [
   { label: '30', value: 30 },
 ];
 
+// 5e.tools bestiary source files
+const BESTIARY_SOURCES = [
+  { id: 'mm', name: 'Monster Manual', file: 'bestiary-mm.json' },
+  { id: 'vgm', name: "Volo's Guide to Monsters", file: 'bestiary-vgm.json' },
+  { id: 'mtf', name: "Mordenkainen's Tome of Foes", file: 'bestiary-mtf.json' },
+  { id: 'mpmm', name: "Mordenkainen Presents: Monsters of the Multiverse", file: 'bestiary-mpmm.json' },
+  { id: 'tce', name: "Tasha's Cauldron of Everything", file: 'bestiary-tce.json' },
+  { id: 'xge', name: "Xanathar's Guide to Everything", file: 'bestiary-xge.json' },
+  { id: 'ftd', name: "Fizban's Treasury of Dragons", file: 'bestiary-ftd.json' },
+  { id: 'cos', name: 'Curse of Strahd', file: 'bestiary-cos.json' },
+  { id: 'hotdq', name: 'Hoard of the Dragon Queen', file: 'bestiary-hotdq.json' },
+  { id: 'lmop', name: 'Lost Mine of Phandelver', file: 'bestiary-lmop.json' },
+  { id: 'oota', name: 'Out of the Abyss', file: 'bestiary-oota.json' },
+  { id: 'pota', name: 'Princes of the Apocalypse', file: 'bestiary-pota.json' },
+  { id: 'rot', name: 'Rise of Tiamat', file: 'bestiary-rot.json' },
+  { id: 'skt', name: 'Storm King\'s Thunder', file: 'bestiary-skt.json' },
+  { id: 'toa', name: 'Tomb of Annihilation', file: 'bestiary-toa.json' },
+  { id: 'wdh', name: 'Waterdeep: Dragon Heist', file: 'bestiary-wdh.json' },
+  { id: 'wdmm', name: 'Waterdeep: Dungeon of the Mad Mage', file: 'bestiary-wdmm.json' },
+  { id: 'bgdia', name: "Baldur's Gate: Descent into Avernus", file: 'bestiary-bgdia.json' },
+  { id: 'idrotf', name: 'Icewind Dale: Rime of the Frostmaiden', file: 'bestiary-idrotf.json' },
+  { id: 'cm', name: 'Candlekeep Mysteries', file: 'bestiary-cm.json' },
+  { id: 'wbtw', name: 'The Wild Beyond the Witchlight', file: 'bestiary-wbtw.json' },
+  { id: 'coa', name: 'Chains of Asmodeus', file: 'bestiary-coa.json' },
+  { id: 'phb', name: "Player's Handbook", file: 'bestiary-phb.json' },
+  { id: 'dmg', name: "Dungeon Master's Guide", file: 'bestiary-dmg.json' },
+];
+
 export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardContentProps) {
   const { 
     characters, 
@@ -78,6 +116,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     removeMonster,
     addMonsters,
     bestiaryLoading,
+    setBestiaryLoading,
   } = useCreatureStore();
 
   const { registerCard } = useCardStore();
@@ -88,6 +127,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [crMinFilter, setCrMinFilter] = useState<string>('any');
   const [crMaxFilter, setCrMaxFilter] = useState<string>('any');
+  
+  // 5e.tools import dialog state
+  const [showSourceDialog, setShowSourceDialog] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(['mm']));
+  const [importProgress, setImportProgress] = useState<string>('');
 
   // Filter results
   const filteredCharacters = useMemo(() => {
@@ -143,6 +187,81 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       }
     };
     input.click();
+  };
+
+  const handleFetchFromWeb = async () => {
+    if (selectedSources.size === 0) {
+      toast.error('Please select at least one source');
+      return;
+    }
+
+    setShowSourceDialog(false);
+    setBestiaryLoading(true);
+    
+    const sourcesToFetch = BESTIARY_SOURCES.filter(s => selectedSources.has(s.id));
+    let totalImported = 0;
+    let failedSources: string[] = [];
+
+    for (const source of sourcesToFetch) {
+      setImportProgress(`Fetching ${source.name}...`);
+      
+      try {
+        // 5e.tools hosts data at this URL pattern
+        const url = `https://5e.tools/data/bestiary/${source.file}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const monsterArray = data.monster || [];
+        
+        if (monsterArray.length > 0) {
+          const monstersWithIds = monsterArray.map((m: Monster5eTools, index: number) => ({
+            ...m,
+            id: m.id || `${m.name?.toLowerCase().replace(/\s+/g, '-') || 'monster'}-${m.source || source.id}-${index}`,
+          }));
+          
+          addMonsters(monstersWithIds);
+          totalImported += monstersWithIds.length;
+        }
+      } catch (error) {
+        console.error(`Failed to fetch ${source.name}:`, error);
+        failedSources.push(source.name);
+      }
+    }
+
+    setImportProgress('');
+    setBestiaryLoading(false);
+
+    if (totalImported > 0) {
+      toast.success(`Imported ${totalImported} monsters from ${sourcesToFetch.length - failedSources.length} sources`);
+    }
+    
+    if (failedSources.length > 0) {
+      toast.warning(`Failed to fetch: ${failedSources.join(', ')}. Try importing JSON manually.`);
+    }
+  };
+
+  const toggleSource = (sourceId: string) => {
+    setSelectedSources(prev => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
+      } else {
+        next.add(sourceId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllSources = () => {
+    setSelectedSources(new Set(BESTIARY_SOURCES.map(s => s.id)));
+  };
+
+  const clearSourceSelection = () => {
+    setSelectedSources(new Set());
   };
 
   const handleOpenCharacterSheet = (character: DndBeyondCharacter) => {
@@ -247,21 +366,32 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 
         {/* Monsters Tab */}
         <TabsContent value="monsters" className="flex-1 flex flex-col gap-3 mt-3">
-          {/* Import Button */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleImportBestiary}
-            disabled={bestiaryLoading}
-            className="w-full"
-          >
-            {bestiaryLoading ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
+          {/* Import Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowSourceDialog(true)}
+              disabled={bestiaryLoading}
+            >
+              {bestiaryLoading ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Globe className="h-4 w-4 mr-2" />
+              )}
+              {bestiaryLoading ? (importProgress || 'Loading...') : 'Fetch from 5e.tools'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleImportBestiary}
+              disabled={bestiaryLoading}
+            >
               <FileJson className="h-4 w-4 mr-2" />
-            )}
-            {bestiaryLoading ? 'Loading...' : 'Import 5e.tools JSON'}
-          </Button>
+              Import JSON
+            </Button>
+          </div>
 
           {/* Filters */}
           <div className="grid grid-cols-2 gap-2">
@@ -355,6 +485,63 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      {/* 5e.tools Source Selection Dialog */}
+      <Dialog open={showSourceDialog} onOpenChange={setShowSourceDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Fetch from 5e.tools
+            </DialogTitle>
+            <DialogDescription>
+              Select which source books to import monsters from. Data is fetched directly from 5e.tools.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex gap-2 mb-2">
+            <Button variant="outline" size="sm" onClick={selectAllSources}>
+              Select All
+            </Button>
+            <Button variant="outline" size="sm" onClick={clearSourceSelection}>
+              Clear All
+            </Button>
+            <Badge variant="secondary" className="ml-auto">
+              {selectedSources.size} selected
+            </Badge>
+          </div>
+
+          <ScrollArea className="flex-1 min-h-0 max-h-[300px] border rounded-md p-3">
+            <div className="space-y-2">
+              {BESTIARY_SOURCES.map((source) => (
+                <label
+                  key={source.id}
+                  className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedSources.has(source.id)}
+                    onCheckedChange={() => toggleSource(source.id)}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{source.name}</p>
+                    <p className="text-xs text-muted-foreground uppercase">{source.id}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowSourceDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFetchFromWeb} disabled={selectedSources.size === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              Fetch {selectedSources.size} Source{selectedSources.size !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
