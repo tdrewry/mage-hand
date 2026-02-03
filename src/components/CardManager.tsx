@@ -18,6 +18,7 @@ import { MapObjectPanelCardContent } from '@/components/cards/MapObjectPanelCard
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
+import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -212,11 +213,7 @@ function renderCardContent(
         </div>
       );
     case CardType.MONSTER_STAT_BLOCK:
-      return (
-        <div className="text-muted-foreground text-sm p-2">
-          Monster stat block for: {(metadata?.monsterId as string) || 'Unknown'}
-        </div>
-      );
+      return <MonsterStatBlockCardContent monsterId={(metadata?.monsterId as string) || ''} />;
     case CardType.CREATURE_LIBRARY:
       return <CreatureLibraryCardContent cardId={cardId} />;
     case CardType.GROUP_MANAGER:
