@@ -239,32 +239,29 @@ src/components/cards/
 +---------------------------------------+
 ```
 
-### Phase 4: Token Creation Integration
+### Phase 4: Token Creation Integration ✅ COMPLETE
 
 **Enhanced Token Creation Flow:**
 
-1. **From Character Sheet Card:**
-   - "Create Token" button extracts portrait URL
-   - Creates token with:
-     - `imageUrl`: Character portrait
-     - `name`: Character name
-     - `label`: Character name
-     - `entityRef`: `{ type: 'local', entityId: characterId, projectionType: 'character' }`
-   - Size defaults to Medium (1x1)
+1. **From Creature Library (Monster):** ✅
+   - "Create Token" button creates token with correct size based on monster size
+   - Token includes `entityRef: { type: 'local', entityId: monsterId, projectionType: 'monster' }`
+   - Automatically parses monster senses (darkvision, blindsight, truesight, tremorsense) into illumination sources
+   - Uses random color from palette if no valid image URL available
 
-2. **From Monster Stat Block Card:**
-   - "Create Token" button uses token/portrait image
-   - Creates token with:
-     - `imageUrl`: Monster token art
-     - `name`: Monster name  
-     - `label`: Monster name
-     - `gridWidth/gridHeight`: Based on size (T=0.5, S/M=1, L=2, H=3, G=4)
-     - `entityRef`: `{ type: 'local', entityId: monsterId, projectionType: 'stat-block' }`
+2. **From Creature Library (Character):** ✅
+   - "Create Token" button creates Medium (1x1) token
+   - Token includes `entityRef: { type: 'local', entityId: characterId, projectionType: 'character' }`
+   - Uses random color from palette if no portrait URL available
 
-3. **Creature Library Panel:**
-   - Searchable list of all characters and monsters
-   - Drag-and-drop or click to create token
-   - Preview panel shows quick stats
+3. **Token Context Menu Integration:** ✅
+   - "View Stat Block" / "View Character Sheet" option appears when token has linked creature
+   - Opens or focuses the corresponding creature card
+
+4. **Token Edit Modal - Details Tab:** ✅
+   - Shows linked creature quick stats (AC, HP, abilities) inline
+   - "View Stat Block" / "View Character Sheet" button to open full card
+   - Placeholder shown when no creature is linked
 
 ### Phase 5: Token-Creature Linking
 
