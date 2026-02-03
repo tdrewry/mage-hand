@@ -416,10 +416,10 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     }
   };
 
-  // Filter results
+  // Filter results - include characters/monsters arrays in deps to refresh on import
   const filteredCharacters = useMemo(() => {
     return searchCharacters(searchQuery);
-  }, [searchQuery, searchCharacters]);
+  }, [searchQuery, searchCharacters, characters]);
 
   const filteredMonsters = useMemo(() => {
     return searchMonsters(searchQuery, {
@@ -428,7 +428,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       crMin: crMinFilter !== 'any' ? parseFloat(crMinFilter) : undefined,
       crMax: crMaxFilter !== 'any' ? parseFloat(crMaxFilter) : undefined,
     });
-  }, [searchQuery, sizeFilter, typeFilter, crMinFilter, crMaxFilter, searchMonsters]);
+  }, [searchQuery, sizeFilter, typeFilter, crMinFilter, crMaxFilter, searchMonsters, monsters]);
 
   // Character import modal state
   const [showImportModal, setShowImportModal] = useState(false);
