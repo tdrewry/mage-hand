@@ -60,15 +60,20 @@ export const useCreatureStore = create<CreatureStore>()(
       
       addCharacter: (char) => {
         set((state) => {
-          // Check for duplicate by ID or sourceUrl
+          // Check for duplicate by ID only, or by sourceUrl if it's a real URL (not manual/template)
+          const isRealSourceUrl = char.sourceUrl && 
+            !char.sourceUrl.startsWith('manual://') && 
+            char.sourceUrl.trim() !== '';
+          
           const exists = state.characters.some(
-            (c) => c.id === char.id || c.sourceUrl === char.sourceUrl
+            (c) => c.id === char.id || (isRealSourceUrl && c.sourceUrl === char.sourceUrl)
           );
+          
           if (exists) {
             // Update existing character
             return {
               characters: state.characters.map((c) =>
-                c.id === char.id || c.sourceUrl === char.sourceUrl
+                c.id === char.id || (isRealSourceUrl && c.sourceUrl === char.sourceUrl)
                   ? { ...c, ...char, lastUpdated: new Date().toISOString() }
                   : c
               ),
