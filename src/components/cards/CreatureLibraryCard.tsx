@@ -19,9 +19,11 @@ import {
   FileJson,
   Eye,
   Download,
-  Globe
+  Globe,
+  Target
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { 
@@ -43,6 +45,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface CreatureLibraryCardContentProps {
   cardId: string;
@@ -119,6 +126,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     setBestiaryLoading,
   } = useCreatureStore();
 
+  const { addToken } = useSessionStore();
   const { registerCard } = useCardStore();
 
   const [activeTab, setActiveTab] = useState<'characters' | 'monsters'>('monsters');
@@ -132,6 +140,117 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
   const [showSourceDialog, setShowSourceDialog] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(['mm']));
   const [importProgress, setImportProgress] = useState<string>('');
+  const [creatingToken, setCreatingToken] = useState<string | null>(null);
+
+  // Create token from monster
+  const handleCreateMonsterToken = async (monster: Monster5eTools) => {
+    setCreatingToken(monster.id);
+    
+    try {
+      const gridSize = MONSTER_SIZE_GRID[monster.size] || 1;
+      const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Try to fetch token art if available
+      let imageUrl = '';
+      const artUrl = monster.tokenUrl || monster.fluffImages?.[0]?.url;
+      
+      if (artUrl) {
+        try {
+          // Try to load the image to verify it's accessible
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = artUrl;
+          });
+          imageUrl = artUrl;
+        } catch {
+          console.warn(`Could not load token art for ${monster.name}, using default`);
+        }
+      }
+      
+      const newToken = {
+        id: tokenId,
+        name: monster.name,
+        imageUrl,
+        x: 200 + Math.random() * 100,
+        y: 200 + Math.random() * 100,
+        gridWidth: gridSize,
+        gridHeight: gridSize,
+        label: monster.name,
+        labelPosition: 'below' as LabelPosition,
+        roleId: 'dungeon-master', // Monsters default to DM control
+        isHidden: false,
+        entityRef: {
+          type: 'local' as const,
+          entityId: monster.id,
+          projectionType: 'monster',
+        },
+      };
+      
+      addToken(newToken);
+      toast.success(`Created ${monster.name} token (${MONSTER_SIZE_NAMES[monster.size]}, ${gridSize}×${gridSize})`);
+    } catch (error) {
+      console.error('Failed to create token:', error);
+      toast.error('Failed to create token');
+    } finally {
+      setCreatingToken(null);
+    }
+  };
+
+  // Create token from character
+  const handleCreateCharacterToken = async (character: DndBeyondCharacter) => {
+    setCreatingToken(character.id);
+    
+    try {
+      const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Try to load portrait
+      let imageUrl = '';
+      if (character.portraitUrl) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = character.portraitUrl!;
+          });
+          imageUrl = character.portraitUrl;
+        } catch {
+          console.warn(`Could not load portrait for ${character.name}`);
+        }
+      }
+      
+      const newToken = {
+        id: tokenId,
+        name: character.name,
+        imageUrl,
+        x: 200 + Math.random() * 100,
+        y: 200 + Math.random() * 100,
+        gridWidth: 1, // Characters are typically Medium
+        gridHeight: 1,
+        label: character.name,
+        labelPosition: 'below' as LabelPosition,
+        roleId: 'player', // Characters default to player control
+        isHidden: false,
+        entityRef: {
+          type: 'local' as const,
+          entityId: character.id,
+          projectionType: 'character',
+        },
+      };
+      
+      addToken(newToken);
+      toast.success(`Created ${character.name} token`);
+    } catch (error) {
+      console.error('Failed to create token:', error);
+      toast.error('Failed to create token');
+    } finally {
+      setCreatingToken(null);
+    }
+  };
 
   // Filter results
   const filteredCharacters = useMemo(() => {
@@ -367,6 +486,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
                     key={char.id}
                     character={char}
                     onView={() => handleOpenCharacterSheet(char)}
+                    onCreateToken={() => handleCreateCharacterToken(char)}
+                    isCreating={creatingToken === char.id}
                     onRemove={() => {
                       removeCharacter(char.id);
                       toast.success(`Removed ${char.name}`);
@@ -481,6 +602,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
                     key={monster.id}
                     monster={monster}
                     onView={() => handleOpenMonsterStatBlock(monster)}
+                    onCreateToken={() => handleCreateMonsterToken(monster)}
+                    isCreating={creatingToken === monster.id}
                     onRemove={() => {
                       removeMonster(monster.id);
                       toast.success(`Removed ${monster.name}`);
@@ -564,10 +687,12 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 interface CharacterListItemProps {
   character: DndBeyondCharacter;
   onView: () => void;
+  onCreateToken: () => void;
+  isCreating: boolean;
   onRemove: () => void;
 }
 
-function CharacterListItem({ character, onView, onRemove }: CharacterListItemProps) {
+function CharacterListItem({ character, onView, onCreateToken, isCreating, onRemove }: CharacterListItemProps) {
   const classString = character.classes.map((c) => `${c.name} ${c.level}`).join(' / ');
   
   return (
@@ -605,6 +730,24 @@ function CharacterListItem({ character, onView, onRemove }: CharacterListItemPro
 
       {/* Actions */}
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7" 
+              onClick={onCreateToken}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Target className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Create Token</TooltipContent>
+        </Tooltip>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onView}>
           <Eye className="h-3.5 w-3.5" />
         </Button>
@@ -625,14 +768,17 @@ function CharacterListItem({ character, onView, onRemove }: CharacterListItemPro
 interface MonsterListItemProps {
   monster: Monster5eTools;
   onView: () => void;
+  onCreateToken: () => void;
+  isCreating: boolean;
   onRemove: () => void;
   getMonsterTypeString: (m: Monster5eTools) => string;
   formatCR: (cr: string | number) => string;
 }
 
-function MonsterListItem({ monster, onView, onRemove, getMonsterTypeString, formatCR }: MonsterListItemProps) {
+function MonsterListItem({ monster, onView, onCreateToken, isCreating, onRemove, getMonsterTypeString, formatCR }: MonsterListItemProps) {
   const monsterType = getMonsterTypeString(monster);
   const sizeName = MONSTER_SIZE_NAMES[monster.size] || monster.size;
+  const gridSize = MONSTER_SIZE_GRID[monster.size] || 1;
   
   return (
     <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
@@ -669,6 +815,24 @@ function MonsterListItem({ monster, onView, onRemove, getMonsterTypeString, form
 
       {/* Actions */}
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7" 
+              onClick={onCreateToken}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Target className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Create Token ({gridSize}×{gridSize})</TooltipContent>
+        </Tooltip>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onView}>
           <Eye className="h-3.5 w-3.5" />
         </Button>
