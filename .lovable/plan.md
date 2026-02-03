@@ -1,92 +1,401 @@
 
+# D&D Beyond Character Sheets & 5e.tools Monster Bestiary Integration
 
-# Token Movement Collision Debugging Plan
+## Overview
 
-## Investigation Findings
+This plan implements a comprehensive creature/character data system that enables:
 
-### Root Cause Identified
-The collision detection code IS executing correctly. The console logs show:
+1. **Character Sheet Cards** - Display D&D Beyond character data in draggable UI cards
+2. **Monster Stat Block Cards** - Display 5e.tools monster data in stat block format
+3. **Enhanced Token Creation Panel** - Create tokens from imported characters/monsters with auto-populated portraits
+
+---
+
+## Architecture
+
+```text
++------------------+     +------------------+     +------------------+
+|  Data Sources    |     |   Data Stores    |     |   UI Components  |
++------------------+     +------------------+     +------------------+
+|                  |     |                  |     |                  |
+| D&D Beyond URLs  |---->| creatureStore.ts |---->| CharacterCard    |
+| (Firecrawl)      |     | - characters[]   |     | MonsterCard      |
+|                  |     | - monsters[]     |     | CreaturePanel    |
+| 5e.tools Data    |---->| - bestiary[]     |     | (Token Creation) |
+| (Static JSON)    |     |                  |     |                  |
++------------------+     +------------------+     +------------------+
+        |                        |                        |
+        v                        v                        v
++------------------+     +------------------+     +------------------+
+| Token Creation   |<----|  Token.entityRef |<----| Token Edit Modal |
+| with Portrait    |     |  Links token to  |     | Shows linked     |
+|                  |     |  creature data   |     | creature data    |
++------------------+     +------------------+     +------------------+
 ```
-handleMouseUp - Token drag ended {
-  "enforceMovementBlocking": false,
-  "enforceRegionBounds": false,
-  ...
+
+---
+
+## Data Types
+
+### Character Data (D&D Beyond)
+
+```typescript
+interface DndBeyondCharacter {
+  id: string;
+  name: string;
+  portraitUrl?: string;
+  level: number;
+  classes: Array<{ name: string; level: number }>;
+  race: string;
+  
+  // Ability Scores
+  abilities: {
+    strength: { score: number; modifier: number };
+    dexterity: { score: number; modifier: number };
+    constitution: { score: number; modifier: number };
+    intelligence: { score: number; modifier: number };
+    wisdom: { score: number; modifier: number };
+    charisma: { score: number; modifier: number };
+  };
+  
+  // Combat Stats
+  armorClass: number;
+  hitPoints: { current: number; max: number; temp: number };
+  speed: number;
+  initiative: number;
+  proficiencyBonus: number;
+  
+  // Skills & Proficiencies
+  skills: Array<{ name: string; modifier: number; proficient: boolean }>;
+  savingThrows: Array<{ ability: string; modifier: number; proficient: boolean }>;
+  proficiencies: {
+    armor: string[];
+    weapons: string[];
+    tools: string[];
+    languages: string[];
+  };
+  
+  // Features & Actions
+  features: Array<{ name: string; description: string; source: string }>;
+  actions: Array<{ name: string; attackBonus?: number; damage?: string; description: string }>;
+  spells?: Array<{ name: string; level: number; prepared: boolean }>;
+  
+  // Conditions
+  conditions: string[];
+  
+  // Source tracking
+  sourceUrl: string;
+  lastUpdated: Date;
 }
 ```
 
-**Both collision enforcement toggles are disabled**, so the collision check block is skipped entirely. The code at line 5809 requires:
+### Monster Data (5e.tools Format)
+
 ```typescript
-if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds))
+interface Monster5eTools {
+  id: string;
+  name: string;
+  source: string;  // Book source (e.g., "MM", "VGM")
+  
+  // Classification
+  size: 'T' | 'S' | 'M' | 'L' | 'H' | 'G';  // Tiny to Gargantuan
+  type: string;  // "dragon", "humanoid", etc.
+  alignment: string;
+  
+  // Combat Stats
+  ac: Array<{ ac: number; from?: string[] }>;
+  hp: { average: number; formula: string };
+  speed: { walk?: number; fly?: number; swim?: number; climb?: number; burrow?: number };
+  
+  // Ability Scores
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+  
+  // Challenge
+  cr: string | number;  // Can be "1/4", "1/2", etc.
+  
+  // Defenses
+  senses: string[];
+  passive: number;  // Passive Perception
+  languages: string[];
+  immune?: string[];  // Damage immunities
+  resist?: string[];  // Damage resistances
+  vulnerable?: string[];
+  conditionImmune?: string[];
+  
+  // Actions & Traits
+  trait?: Array<{ name: string; entries: string[] }>;
+  action?: Array<{ name: string; entries: string[] }>;
+  legendary?: Array<{ name: string; entries: string[] }>;
+  reaction?: Array<{ name: string; entries: string[] }>;
+  
+  // Images
+  tokenUrl?: string;
+  fluffImages?: Array<{ url: string }>;
+}
 ```
-
-Since both values are `false`, no toasts appear.
-
-### How Movement Path Drawing Works
-1. **Path starts**: When token drag begins, `setDragPath([{ x: token.x, y: token.y }])` initializes the path
-2. **Path grows**: During `handleMouseMove`, points are added every 10 world units
-3. **Path renders**: `drawDragPathOnly()` checks `isDraggingToken && draggedTokenId` before drawing
-4. **Path ends**: When drag ends, `setIsDraggingToken(false)` and `setDragPath([])` clear everything
-
-### Unused Code Identified
-| File | Status | Action |
-|------|--------|--------|
-| `src/hooks/useTokenInteraction.ts` | **Completely unused** - never imported anywhere | Should be deleted |
-
-This hook duplicates all the token interaction logic that already exists in `SimpleTabletop.tsx`:
-- Its own `isDraggingToken`, `dragPath`, `dragStartPos` state
-- Its own collision detection in `endTokenDrag()`
-- Its own global mouseup listener
 
 ---
 
-## Proposed Changes
+## Implementation Phases
 
-### Task 1: Add Always-Visible Debug Toast
-Add a simple toast that fires every time a drag ends, regardless of collision settings. This will confirm the event handler is being reached.
+### Phase 1: Core Data Infrastructure
 
-**File**: `src/components/SimpleTabletop.tsx`
+**New Files:**
+- `src/types/creatureTypes.ts` - Type definitions for characters and monsters
+- `src/stores/creatureStore.ts` - Zustand store for creature data management
+- `src/lib/dndBeyondParser.ts` - Parse scraped D&D Beyond HTML to character data
+- `src/lib/monsterDataLoader.ts` - Load and manage 5e.tools monster data
 
-**Change**: In `handleMouseUp` (around line 5795), add a toast BEFORE any conditional checks:
+**creatureStore.ts Structure:**
 ```typescript
-if (isDraggingToken && draggedTokenId && !tokensMovedByRegion.includes(draggedTokenId)) {
-  const token = tokens.find((t) => t.id === draggedTokenId);
-  if (token) {
-    // ALWAYS show this toast to confirm drag end is firing
-    toast.info(`Drag ended: obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds}`, {
-      duration: 1500
-    });
-    // ... rest of collision logic
+interface CreatureStore {
+  // Characters from D&D Beyond
+  characters: DndBeyondCharacter[];
+  addCharacter: (char: DndBeyondCharacter) => void;
+  updateCharacter: (id: string, updates: Partial<DndBeyondCharacter>) => void;
+  removeCharacter: (id: string) => void;
+  
+  // Monsters from 5e.tools
+  monsters: Monster5eTools[];
+  loadBestiary: () => Promise<void>;
+  searchMonsters: (query: string) => Monster5eTools[];
+  
+  // Get creature by ID (for token linking)
+  getCreatureById: (id: string) => DndBeyondCharacter | Monster5eTools | undefined;
+}
 ```
 
-### Task 2: Delete Unused Hook
-Remove the unused `useTokenInteraction.ts` file to prevent confusion.
+### Phase 2: Data Import Systems
 
-**File to delete**: `src/hooks/useTokenInteraction.ts`
+**D&D Beyond Import (via Firecrawl):**
+- Create Supabase Edge Function `supabase/functions/scrape-dndbeyond/index.ts`
+- Accepts character URL, scrapes page, returns structured data
+- Extracts: portrait URL, stats, skills, features, actions, spells
 
----
+**5e.tools Data Loading:**
+- Bundle a curated SRD-compliant bestiary JSON (avoid copyright issues)
+- Provide UI to load external 5e.tools JSON exports
+- Store in IndexedDB for offline access
+- Option 1: Ship with basic SRD monsters
+- Option 2: Allow user to paste/import 5e.tools JSON export
 
-## Technical Details
+### Phase 3: UI Cards
 
-### Movement Path State Flow
+**New Card Types:**
+- `CardType.CHARACTER_SHEET` - Displays character data
+- `CardType.MONSTER_STAT_BLOCK` - Displays monster stat block
+- `CardType.CREATURE_LIBRARY` - Browse/search creatures, create tokens
+
+**Card Components:**
+
 ```text
-Token Mousedown             Token Mousemove              Token Mouseup
-      │                           │                            │
-      ▼                           ▼                            ▼
-setIsDraggingToken(true)    setDragPath([...prev,       setIsDraggingToken(false)
-setDragPath([startPos])       {x: newX, y: newY}])      setDragPath([])
-setDragStartPos(pos)                                    Collision check runs
+src/components/cards/
+  CharacterSheetCard.tsx      - Full character sheet display
+  MonsterStatBlockCard.tsx    - Traditional stat block format
+  CreatureLibraryCard.tsx     - Browse/import creatures
 ```
 
-### Why Two Mouseup Handlers Exist
-1. **Global listener** (lines 571-676): Catches mouseups outside the canvas
-2. **Canvas handler** (lines 5795-5920): Handles normal canvas mouseups
+**CharacterSheetCard Layout:**
+```
++---------------------------------------+
+| [Portrait] Character Name    Lvl X    |
+|           Race | Class(es)            |
++---------------------------------------+
+| STR  DEX  CON  INT  WIS  CHA         |
+| +2   +3   +1   +0   +2   -1          |
++---------------------------------------+
+| AC: 16  |  HP: 45/52  |  Init: +3    |
+| Speed: 30ft  |  Prof: +2             |
++---------------------------------------+
+| [Skills Tab] [Features Tab] [Spells] |
+|                                       |
+| Acrobatics: +5                        |
+| Arcana: +7*                          |
+| ...                                   |
++---------------------------------------+
+| [Create Token]  [Refresh]  [Remove]  |
++---------------------------------------+
+```
 
-Both contain collision detection code, but only the canvas handler logs are appearing in console.
+**MonsterStatBlockCard Layout:**
+```
++---------------------------------------+
+| [Token Art]  ADULT RED DRAGON        |
+|              Huge dragon, CE          |
++---------------------------------------+
+| AC 19 (natural armor)                 |
+| HP 256 (19d12 + 133)                  |
+| Speed 40ft, climb 40ft, fly 80ft      |
++---------------------------------------+
+| STR  DEX  CON  INT  WIS  CHA         |
+| 27   10   25   16   13   21          |
++---------------------------------------+
+| Saving Throws DEX +6, CON +13...      |
+| Skills Perception +13, Stealth +6     |
+| Damage Immunities fire                |
+| Senses blindsight 60ft...             |
+| Languages Common, Draconic            |
+| CR 17 (18,000 XP)                     |
++---------------------------------------+
+| TRAITS                                |
+| Legendary Resistance (3/Day). ...     |
++---------------------------------------+
+| ACTIONS                               |
+| Multiattack. The dragon can use...    |
+| Bite. +14 to hit, reach 10ft...       |
++---------------------------------------+
+| [Create Token]                        |
++---------------------------------------+
+```
 
-### Collision Toggle Location
-The toggles are controlled by:
-- `useDungeonStore.enforceMovementBlocking` 
-- `useDungeonStore.enforceRegionBounds`
+### Phase 4: Token Creation Integration
 
-These default to `false` (line 236-237 of dungeonStore.ts) and must be enabled via the toolbar.
+**Enhanced Token Creation Flow:**
+
+1. **From Character Sheet Card:**
+   - "Create Token" button extracts portrait URL
+   - Creates token with:
+     - `imageUrl`: Character portrait
+     - `name`: Character name
+     - `label`: Character name
+     - `entityRef`: `{ type: 'local', entityId: characterId, projectionType: 'character' }`
+   - Size defaults to Medium (1x1)
+
+2. **From Monster Stat Block Card:**
+   - "Create Token" button uses token/portrait image
+   - Creates token with:
+     - `imageUrl`: Monster token art
+     - `name`: Monster name  
+     - `label`: Monster name
+     - `gridWidth/gridHeight`: Based on size (T=0.5, S/M=1, L=2, H=3, G=4)
+     - `entityRef`: `{ type: 'local', entityId: monsterId, projectionType: 'stat-block' }`
+
+3. **Creature Library Panel:**
+   - Searchable list of all characters and monsters
+   - Drag-and-drop or click to create token
+   - Preview panel shows quick stats
+
+### Phase 5: Token-Creature Linking
+
+**Token Details Tab Enhancement:**
+
+The existing "Details" tab in Edit Token modal gains:
+- "Linked Creature" section showing linked character/monster
+- Quick stats summary inline
+- "View Full Sheet" button opens the full card
+- "Unlink" button to disconnect
+
+**entityRef Usage:**
+```typescript
+// Existing Token.entityRef structure:
+entityRef: {
+  type: 'local',           // Local data store
+  entityId: 'char-123',    // ID in creatureStore
+  projectionType: 'character' | 'stat-block'
+}
+```
+
+---
+
+## File Changes Summary
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `src/types/creatureTypes.ts` | TypeScript interfaces for characters/monsters |
+| `src/stores/creatureStore.ts` | Zustand store for creature data |
+| `src/lib/dndBeyondParser.ts` | Parse D&D Beyond page content |
+| `src/lib/monsterDataLoader.ts` | Load/search 5e.tools data |
+| `src/components/cards/CharacterSheetCard.tsx` | Character sheet UI |
+| `src/components/cards/MonsterStatBlockCard.tsx` | Monster stat block UI |
+| `src/components/cards/CreatureLibraryCard.tsx` | Creature browser/search |
+| `src/components/modals/ImportCharacterModal.tsx` | D&D Beyond URL import |
+| `src/components/modals/ImportBestiaryModal.tsx` | 5e.tools JSON import |
+| `supabase/functions/scrape-dndbeyond/index.ts` | Edge function for scraping |
+| `public/data/srd-bestiary.json` | SRD-compliant monster data |
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `src/types/cardTypes.ts` | Add `CHARACTER_SHEET`, `MONSTER_STAT_BLOCK`, `CREATURE_LIBRARY` |
+| `src/stores/cardStore.ts` | Add default configs for new card types |
+| `src/components/CardManager.tsx` | Register new card content renderers |
+| `src/components/cards/MenuCard.tsx` | Add "Creature Library" button |
+| `src/components/TokenContextMenu.tsx` | Show linked creature info in Details tab |
+
+---
+
+## Technical Considerations
+
+### Data Storage Strategy
+
+- **Characters**: Stored in `creatureStore` (Zustand with localStorage persistence)
+- **Monsters**: Loaded into memory from JSON, optionally cached in IndexedDB
+- **Token Images**: Saved via existing `tokenTextureStorage.ts` system
+
+### 5e.tools Data Loading Options
+
+1. **Bundled SRD Data**: Ship basic SRD monsters (~300 creatures, legal)
+2. **User Import**: Allow paste/upload of 5e.tools JSON export
+3. **Direct Fetch**: User provides their own 5e.tools data file URL
+
+Recommendation: Start with bundled SRD + user import for full bestiary.
+
+### D&D Beyond Scraping Considerations
+
+- Requires Firecrawl connector for web scraping
+- Falls back to manual data entry if scraping fails
+- Respects rate limits and caching (1 request per character per hour)
+- Character must be set to "Public" on D&D Beyond
+
+### Image Handling
+
+- Portrait/token images downloaded and stored in IndexedDB
+- Uses existing texture storage system (`tokenTextureStorage.ts`)
+- Hash-based deduplication prevents duplicates
+- Synced to other clients via existing `textureSync.ts`
+
+---
+
+## User Workflow
+
+### Importing a D&D Beyond Character
+
+1. User clicks "Creature Library" in Menu Card
+2. Clicks "Import Character" button
+3. Pastes D&D Beyond character URL
+4. System scrapes page, extracts data, downloads portrait
+5. Character appears in library and as a new Character Sheet Card
+6. User can "Create Token" to place on map
+
+### Adding Monsters from 5e.tools
+
+1. User clicks "Import Bestiary" in Creature Library
+2. Option A: Search bundled SRD monsters
+3. Option B: Paste 5e.tools bestiary JSON export
+4. Monsters appear in searchable library
+5. Click monster to open Stat Block Card
+6. "Create Token" spawns token with correct size
+
+### Linking Token to Creature
+
+1. Right-click token -> Edit Token
+2. Details tab shows "Link Creature" section
+3. Search/select from library
+4. Token now displays quick stats, opens full sheet on demand
+
+---
+
+## Dependencies
+
+- **Firecrawl Connector**: Required for D&D Beyond scraping
+- **Existing Infrastructure**: Uses current card system, token storage, image handling
+- **No New npm Packages**: Leverages existing UI components
 
