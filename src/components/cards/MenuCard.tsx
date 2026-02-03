@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -65,6 +65,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
   const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
   const mapObjectsCard = cards.find((c) => c.type === CardType.MAP_OBJECTS);
+  const creatureLibraryCard = cards.find((c) => c.type === CardType.CREATURE_LIBRARY);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -160,6 +161,23 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         defaultPosition: { x: 320, y: 80 },
         defaultSize: { width: 350, height: 550 },
         minSize: { width: 300, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleToggleCreatureLibrary = () => {
+    if (creatureLibraryCard) {
+      setVisibility(creatureLibraryCard.id, !creatureLibraryCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.CREATURE_LIBRARY,
+        title: 'Creature Library',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+        defaultSize: { width: 600, height: 700 },
+        minSize: { width: 500, height: 550 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -479,6 +497,16 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <HardDrive className="h-4 w-4 mr-2" />
           Storage Manager
+        </Button>
+
+        <Button 
+          variant={creatureLibraryCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleToggleCreatureLibrary}
+          className="w-full"
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Creature Library
         </Button>
       </div>
 

@@ -17,10 +17,11 @@ import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfil
 import { MapObjectPanelCardContent } from '@/components/cards/MapObjectPanelCard';
 import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
+import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
-import { CardType } from '@/types/cardTypes';
+import { CardType, CardState } from '@/types/cardTypes';
 
 interface CardManagerProps {
   children?: React.ReactNode;
@@ -83,8 +84,7 @@ export function CardManager({
       {/* Render all registered cards */}
       {cards.map((card) => {
         const content = renderCardContent(
-          card.id, 
-          card.type, 
+          card,
           handleAddToken, 
           sessionId,
           activeRegionId,
@@ -141,14 +141,15 @@ function getCardTitle(type: CardType): string {
 
 // Helper function to render card-specific content
 function renderCardContent(
-  cardId: string, 
-  type: CardType, 
+  card: CardState, 
   addToken: (imageUrl: string, x?: number, y?: number, gridWidth?: number, gridHeight?: number, color?: string) => void,
   sessionId?: string,
   activeRegionId?: string | null,
   onToggleSnapping?: (id: string) => void,
   onToggleGridVisibility?: (id: string) => void
 ): React.ReactNode {
+  const { id: cardId, type, metadata } = card;
+  
   switch (type) {
     case CardType.MENU:
       return <MenuCardContent sessionId={sessionId} />;
@@ -205,11 +206,19 @@ function renderCardContent(
     case CardType.MAP_OBJECTS:
       return <MapObjectPanelCardContent />;
     case CardType.CHARACTER_SHEET:
-      return <div className="text-muted-foreground text-sm p-2">Character sheet content - Coming soon</div>;
+      return (
+        <div className="text-muted-foreground text-sm p-2">
+          Character sheet for: {(metadata?.characterId as string) || 'Unknown'}
+        </div>
+      );
     case CardType.MONSTER_STAT_BLOCK:
-      return <div className="text-muted-foreground text-sm p-2">Monster stat block content - Coming soon</div>;
+      return (
+        <div className="text-muted-foreground text-sm p-2">
+          Monster stat block for: {(metadata?.monsterId as string) || 'Unknown'}
+        </div>
+      );
     case CardType.CREATURE_LIBRARY:
-      return <div className="text-muted-foreground text-sm p-2">Creature library content - Coming soon</div>;
+      return <CreatureLibraryCardContent cardId={cardId} />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
