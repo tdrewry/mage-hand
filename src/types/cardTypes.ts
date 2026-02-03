@@ -64,6 +64,7 @@ export interface CardConfig {
   defaultVisible?: boolean;
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CardState {
@@ -76,4 +77,5 @@ export interface CardState {
   zIndex: number;
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
+  metadata?: Record<string, unknown>;
 }

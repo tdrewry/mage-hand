@@ -319,6 +319,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
           zIndex: state.nextZIndex,
           hideHeader: config.hideHeader ?? defaultConfig.hideHeader,
           fullCardDraggable: config.fullCardDraggable ?? defaultConfig.fullCardDraggable,
+          metadata: config.metadata,
         },
       ],
       nextZIndex: state.nextZIndex + 1,
