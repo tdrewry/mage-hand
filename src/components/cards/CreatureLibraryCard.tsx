@@ -200,14 +200,14 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     
     const sourcesToFetch = BESTIARY_SOURCES.filter(s => selectedSources.has(s.id));
     let totalImported = 0;
-    let failedSources: string[] = [];
+    let failedSources: { name: string; url: string }[] = [];
 
     for (const source of sourcesToFetch) {
       setImportProgress(`Fetching ${source.name}...`);
+      const url = `https://5e.tools/data/bestiary/${source.file}`;
       
       try {
         // 5e.tools hosts data at this URL pattern
-        const url = `https://5e.tools/data/bestiary/${source.file}`;
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -228,7 +228,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         }
       } catch (error) {
         console.error(`Failed to fetch ${source.name}:`, error);
-        failedSources.push(source.name);
+        failedSources.push({ name: source.name, url });
       }
     }
 
@@ -239,8 +239,22 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       toast.success(`Imported ${totalImported} monsters from ${sourcesToFetch.length - failedSources.length} sources`);
     }
     
+    // If fetch failed (likely CORS), offer to open URLs for manual download
     if (failedSources.length > 0) {
-      toast.warning(`Failed to fetch: ${failedSources.join(', ')}. Try importing JSON manually.`);
+      toast.error(
+        `CORS blocked ${failedSources.length} source(s). Opening in new tabs for manual download...`,
+        { duration: 5000 }
+      );
+      
+      // Open each failed URL in a new tab so user can save the JSON
+      for (const failed of failedSources) {
+        window.open(failed.url, '_blank');
+      }
+      
+      toast.info(
+        'Save the JSON files, then use "Import JSON" to load them.',
+        { duration: 8000 }
+      );
     }
   };
 
