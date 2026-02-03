@@ -94,6 +94,7 @@ export const TokenContextMenu = ({
     updateTokenVision,
     updateTokenVisionRange,
     updateTokenIllumination,
+    updateTokenEntityRef,
     removeToken,
     setTokenOwner,
     addAppearanceVariant,
@@ -321,6 +322,25 @@ export const TokenContextMenu = ({
       bringToFront(cardId);
     }
   };
+
+  // Handle unlinking a creature from the token
+  const handleUnlinkCreature = () => {
+    if (!currentToken) return;
+    updateTokenEntityRef(currentToken.id, undefined);
+    toast.success('Creature unlinked from token');
+  };
+
+  // Handle linking a creature to the token
+  const handleLinkCreature = (creatureId: string, creatureType: 'character' | 'monster') => {
+    if (!currentToken) return;
+    updateTokenEntityRef(currentToken.id, {
+      type: 'local',
+      entityId: creatureId,
+      projectionType: creatureType === 'monster' ? 'stat-block' : 'character',
+    });
+    toast.success(`Token linked to ${creatureType}`);
+  };
+
   const handleSaveVariant = async () => {
     if (!currentToken || !variantNameInput.trim()) {
       toast.error('Please enter a name for the variant');
@@ -1441,6 +1461,8 @@ export const TokenContextMenu = ({
               <LinkedCreatureSection 
                 token={currentToken}
                 onViewStats={handleViewStats}
+                onUnlink={handleUnlinkCreature}
+                onLinkCreature={handleLinkCreature}
               />
               
               {/* Quick Reference URL */}
