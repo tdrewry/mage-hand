@@ -399,3 +399,307 @@ export function extractCharacterId(url: string): string | null {
   const match = url.match(/characters\/(\d+)/);
   return match ? match[1] : null;
 }
+
+// ============================================================================
+// D&D Beyond Official JSON Export Parser
+// ============================================================================
+
+interface DndBeyondExportResult {
+  success: boolean;
+  character?: DndBeyondCharacter;
+  error?: string;
+}
+
+/**
+ * Parse the official D&D Beyond character export JSON format.
+ * This handles the JSON structure from the "Export Character" feature.
+ */
+export function parseDndBeyondExport(data: unknown): DndBeyondExportResult {
+  try {
+    if (!data || typeof data !== 'object') {
+      return { success: false, error: 'Invalid data format' };
+    }
+
+    const json = data as Record<string, unknown>;
+    
+    // Extract character ID
+    const rawId = json.id ?? json.characterId ?? Date.now();
+    const characterId = `dndb-${rawId}`;
+    
+    // Extract name (required)
+    const name = (json.name as string)?.trim();
+    if (!name) {
+      return { success: false, error: 'Character name is missing' };
+    }
+
+    // Extract race
+    const raceData = json.race as Record<string, unknown> | undefined;
+    const race = (raceData?.fullName as string) || 
+                 (raceData?.baseName as string) || 
+                 (json.species as Record<string, unknown>)?.fullName as string ||
+                 'Unknown';
+
+    // Extract classes
+    const classesRaw = json.classes as Array<Record<string, unknown>> || [];
+    const classes = classesRaw.map((cls) => {
+      const definition = cls.definition as Record<string, unknown> | undefined;
+      return {
+        name: (definition?.name as string) || (cls.name as string) || 'Unknown',
+        level: (cls.level as number) || 1,
+      };
+    });
+    
+    if (classes.length === 0) {
+      classes.push({ name: 'Unknown', level: 1 });
+    }
+
+    const totalLevel = classes.reduce((sum, c) => sum + c.level, 0);
+
+    // Extract ability scores
+    // D&D Beyond format: stats is an array with id (1-6) and value
+    const statsRaw = json.stats as Array<{ id?: number; value?: number }> || [];
+    const bonusStatsRaw = json.bonusStats as Array<{ id?: number; value?: number }> || [];
+    const overrideStatsRaw = json.overrideStats as Array<{ id?: number; value?: number | null }> || [];
+    
+    // Racial bonuses
+    const racialBonuses = extractRacialBonuses(json);
+    
+    const getStatValue = (statId: number): number => {
+      // Check for override first
+      const override = overrideStatsRaw.find(s => s.id === statId);
+      if (override?.value !== null && override?.value !== undefined) {
+        return override.value;
+      }
+      
+      // Base stat + bonuses
+      const base = statsRaw.find(s => s.id === statId)?.value || 10;
+      const bonus = bonusStatsRaw.find(s => s.id === statId)?.value || 0;
+      const racial = racialBonuses[statId] || 0;
+      
+      return base + bonus + racial;
+    };
+
+    const abilities = {
+      strength: { score: getStatValue(1), modifier: getAbilityModifier(getStatValue(1)) },
+      dexterity: { score: getStatValue(2), modifier: getAbilityModifier(getStatValue(2)) },
+      constitution: { score: getStatValue(3), modifier: getAbilityModifier(getStatValue(3)) },
+      intelligence: { score: getStatValue(4), modifier: getAbilityModifier(getStatValue(4)) },
+      wisdom: { score: getStatValue(5), modifier: getAbilityModifier(getStatValue(5)) },
+      charisma: { score: getStatValue(6), modifier: getAbilityModifier(getStatValue(6)) },
+    };
+
+    // Calculate HP
+    const baseHitPoints = (json.baseHitPoints as number) || 0;
+    const bonusHitPoints = (json.bonusHitPoints as number) || 0;
+    const temporaryHitPoints = (json.temporaryHitPoints as number) || 0;
+    const removedHitPoints = (json.removedHitPoints as number) || 0;
+    const overrideHitPoints = json.overrideHitPoints as number | null;
+    
+    const constitutionBonus = abilities.constitution.modifier * totalLevel;
+    const maxHP = overrideHitPoints ?? (baseHitPoints + bonusHitPoints + constitutionBonus);
+    const currentHP = Math.max(0, maxHP - removedHitPoints);
+
+    // Calculate AC
+    let armorClass = 10 + abilities.dexterity.modifier;
+    if (json.overrideArmorClass !== null && json.overrideArmorClass !== undefined) {
+      armorClass = json.overrideArmorClass as number;
+    }
+    // Check for armor in inventory for better AC calculation could be added here
+
+    // Speed
+    const speedData = json.race as Record<string, unknown> | undefined;
+    const weightSpeeds = speedData?.weightSpeeds as Record<string, Record<string, number>> | undefined;
+    const walkingSpeed = (weightSpeeds?.normal?.walk as number) || 
+                         (json.baseWalkingSpeed as number) || 30;
+
+    // Proficiency bonus
+    const proficiencyBonus = Math.ceil(totalLevel / 4) + 1;
+
+    // Initiative
+    const initiative = abilities.dexterity.modifier;
+
+    // Portrait URL
+    const decorations = json.decorations as Record<string, unknown> | undefined;
+    const portraitUrl = (decorations?.avatarUrl as string) || 
+                        (decorations?.frameAvatarUrl as string) ||
+                        (json.avatarUrl as string);
+
+    // Background
+    const backgroundData = json.background as Record<string, unknown> | undefined;
+    const background = (backgroundData?.definition as Record<string, unknown>)?.name as string ||
+                       (backgroundData?.name as string);
+
+    // Build the character object
+    const character: DndBeyondCharacter = {
+      id: characterId,
+      name,
+      portraitUrl,
+      level: totalLevel,
+      classes,
+      race,
+      background,
+      abilities,
+      armorClass,
+      hitPoints: {
+        current: currentHP,
+        max: maxHP,
+        temp: temporaryHitPoints,
+      },
+      speed: walkingSpeed,
+      initiative,
+      proficiencyBonus,
+      skills: extractSkills(json, abilities, proficiencyBonus),
+      savingThrows: extractSavingThrows(json, abilities, proficiencyBonus),
+      proficiencies: extractProficiencies(json),
+      passivePerception: 10 + abilities.wisdom.modifier,
+      features: extractFeatures(json),
+      actions: extractActions(json),
+      conditions: [],
+      sourceUrl: '',
+      lastUpdated: new Date().toISOString(),
+    };
+
+    return { success: true, character };
+  } catch (error) {
+    console.error('Failed to parse D&D Beyond export:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown parsing error',
+    };
+  }
+}
+
+// Helper to extract racial ability bonuses
+function extractRacialBonuses(json: Record<string, unknown>): Record<number, number> {
+  const bonuses: Record<number, number> = {};
+  
+  const modifiers = json.modifiers as Record<string, Array<Record<string, unknown>>> | undefined;
+  if (!modifiers) return bonuses;
+  
+  const raceModifiers = modifiers.race || [];
+  for (const mod of raceModifiers) {
+    if (mod.type === 'bonus' && mod.subType?.toString().includes('-score')) {
+      const statId = mod.statId as number;
+      const value = mod.value as number || 0;
+      if (statId) {
+        bonuses[statId] = (bonuses[statId] || 0) + value;
+      }
+    }
+  }
+  
+  return bonuses;
+}
+
+// Helper to extract skills
+function extractSkills(
+  json: Record<string, unknown>,
+  abilities: DndBeyondCharacter['abilities'],
+  profBonus: number
+): DndBeyondCharacter['skills'] {
+  const skillAbilityMap: Record<string, keyof typeof abilities> = {
+    'Acrobatics': 'dexterity',
+    'Animal Handling': 'wisdom',
+    'Arcana': 'intelligence',
+    'Athletics': 'strength',
+    'Deception': 'charisma',
+    'History': 'intelligence',
+    'Insight': 'wisdom',
+    'Intimidation': 'charisma',
+    'Investigation': 'intelligence',
+    'Medicine': 'wisdom',
+    'Nature': 'intelligence',
+    'Perception': 'wisdom',
+    'Performance': 'charisma',
+    'Persuasion': 'charisma',
+    'Religion': 'intelligence',
+    'Sleight of Hand': 'dexterity',
+    'Stealth': 'dexterity',
+    'Survival': 'wisdom',
+  };
+
+  return Object.entries(skillAbilityMap).map(([skillName, ability]) => {
+    const baseMod = abilities[ability].modifier;
+    // Would need to check proficiencies in modifiers for accurate proficiency detection
+    return {
+      name: skillName,
+      modifier: baseMod,
+      proficient: false,
+    };
+  });
+}
+
+// Helper to extract saving throws
+function extractSavingThrows(
+  json: Record<string, unknown>,
+  abilities: DndBeyondCharacter['abilities'],
+  profBonus: number
+): DndBeyondCharacter['savingThrows'] {
+  const abilityNames: Array<{ name: string; key: keyof typeof abilities }> = [
+    { name: 'Strength', key: 'strength' },
+    { name: 'Dexterity', key: 'dexterity' },
+    { name: 'Constitution', key: 'constitution' },
+    { name: 'Intelligence', key: 'intelligence' },
+    { name: 'Wisdom', key: 'wisdom' },
+    { name: 'Charisma', key: 'charisma' },
+  ];
+
+  return abilityNames.map(({ name, key }) => ({
+    ability: name,
+    modifier: abilities[key].modifier,
+    proficient: false, // Would need class data for accurate detection
+  }));
+}
+
+// Helper to extract proficiencies
+function extractProficiencies(json: Record<string, unknown>): DndBeyondCharacter['proficiencies'] {
+  // Basic extraction - could be expanded with modifiers parsing
+  return {
+    armor: [],
+    weapons: [],
+    tools: [],
+    languages: ['Common'],
+  };
+}
+
+// Helper to extract features
+function extractFeatures(json: Record<string, unknown>): DndBeyondCharacter['features'] {
+  const features: DndBeyondCharacter['features'] = [];
+  
+  // Extract from class features
+  const classesData = json.classes as Array<Record<string, unknown>> || [];
+  for (const cls of classesData) {
+    const classFeatures = cls.classFeatures as Array<Record<string, unknown>> || [];
+    for (const feature of classFeatures) {
+      const definition = feature.definition as Record<string, unknown> | undefined;
+      if (definition?.name) {
+        features.push({
+          name: definition.name as string,
+          description: (definition.description as string) || '',
+          source: (cls.definition as Record<string, unknown>)?.name as string || 'Class',
+        });
+      }
+    }
+  }
+
+  return features.slice(0, 20); // Limit to avoid huge lists
+}
+
+// Helper to extract actions
+function extractActions(json: Record<string, unknown>): DndBeyondCharacter['actions'] {
+  const actions: DndBeyondCharacter['actions'] = [];
+  
+  // Extract from actions/attacks
+  const actionsData = json.actions as Record<string, Array<Record<string, unknown>>> | undefined;
+  if (actionsData?.class) {
+    for (const action of actionsData.class) {
+      if (action.name) {
+        actions.push({
+          name: action.name as string,
+          description: (action.snippet as string) || '',
+        });
+      }
+    }
+  }
+
+  return actions;
+}

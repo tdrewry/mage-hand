@@ -52,6 +52,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ImportCharacterModal } from '@/components/modals/ImportCharacterModal';
 
 interface CreatureLibraryCardContentProps {
   cardId: string;
@@ -429,9 +430,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     });
   }, [searchQuery, sizeFilter, typeFilter, crMinFilter, crMaxFilter, searchMonsters]);
 
+  // Character import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+
   const handleImportCharacter = () => {
-    // TODO: Open ImportCharacterModal
-    toast.info('Character import coming soon! Will use D&D Beyond URL scraping.');
+    setShowImportModal(true);
   };
 
   const handleImportBestiary = () => {
@@ -842,6 +845,12 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Character Modal */}
+      <ImportCharacterModal 
+        open={showImportModal} 
+        onOpenChange={setShowImportModal} 
+      />
     </div>
   );
 }
