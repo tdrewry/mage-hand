@@ -6138,7 +6138,7 @@ export const SimpleTabletop = () => {
       });
     },
     onTap: (x, y, rect) => {
-      // Handle tap as a click - mainly for selection/deselection
+      // Handle tap as a click - mainly for selection/deselection and door toggle
       const mouseX = x - rect.left;
       const mouseY = y - rect.top;
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -6148,6 +6148,25 @@ export const SimpleTabletop = () => {
       if (clickedToken) {
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
+        }
+        return;
+      }
+
+      // Check for map object tap (including doors)
+      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
+      if (clickedMapObject) {
+        if (renderingMode === "edit") {
+          // In edit mode, select the map object
+          selectMapObject(clickedMapObject.id, false);
+          setSelectedTokenIds([]);
+          clearSelection();
+          setSelectedRegionIds([]);
+        } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
+          // DM can toggle doors in play mode
+          const isOpening = !clickedMapObject.isOpen;
+          triggerDoorAnimation(clickedMapObject.id, isOpening);
+          toggleDoor(clickedMapObject.id);
+          toast.success(isOpening ? "Door opened" : "Door closed", { duration: 1500 });
         }
         return;
       }
@@ -6168,6 +6187,7 @@ export const SimpleTabletop = () => {
       setSelectedTokenIds([]);
       selectedRegionIds.forEach(id => deselectRegion(id));
       setSelectedRegionIds([]);
+      clearMapObjectSelection();
       redrawCanvas();
     },
     onDragStart: (x, y, rect) => {
