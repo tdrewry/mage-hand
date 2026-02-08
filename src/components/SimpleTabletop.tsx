@@ -99,6 +99,7 @@ import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
+import { useTouchEvents } from "../hooks/useTouchEvents";
 
 import { Z_INDEX } from "../lib/zIndex";
 
@@ -6097,6 +6098,400 @@ export const SimpleTabletop = () => {
     handleCanvasContextMenu(e);
   };
 
+  // Touch event handlers using the useTouchEvents hook
+  const touchHandlers = useTouchEvents({
+    onPanStart: (x, y) => {
+      setIsPanning(true);
+      setLastPanPoint({ x, y });
+    },
+    onPanMove: (x, y, deltaX, deltaY) => {
+      if (isPanning) {
+        setTransform(prev => ({
+          ...prev,
+          x: prev.x + deltaX,
+          y: prev.y + deltaY,
+        }));
+      }
+    },
+    onPanEnd: () => {
+      setIsPanning(false);
+    },
+    onZoom: (zoomDelta, centerX, centerY) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = centerX - rect.left;
+      const mouseY = centerY - rect.top;
+
+      const zoomFactor = zoomDelta > 0 ? 1 + Math.abs(zoomDelta) * 0.5 : 1 / (1 + Math.abs(zoomDelta) * 0.5);
+      const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
+
+      const zoomRatio = newZoom / transform.zoom;
+      const newX = mouseX - (mouseX - transform.x) * zoomRatio;
+      const newY = mouseY - (mouseY - transform.y) * zoomRatio;
+
+      setTransform({
+        x: newX,
+        y: newY,
+        zoom: newZoom,
+      });
+    },
+    onTap: (x, y, rect) => {
+      // Handle tap as a click - mainly for selection/deselection
+      const mouseX = x - rect.left;
+      const mouseY = y - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      // Check for token tap
+      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      if (clickedToken) {
+        if (!selectedTokenIds.includes(clickedToken.id)) {
+          setSelectedTokenIds([clickedToken.id]);
+        }
+        return;
+      }
+
+      // Check for region tap
+      const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+      if (clickedRegion) {
+        if (!clickedRegion.selected) {
+          // Clear other selections and select this one
+          selectedRegionIds.forEach(id => deselectRegion(id));
+          selectRegion(clickedRegion.id);
+          setSelectedRegionIds([clickedRegion.id]);
+        }
+        return;
+      }
+
+      // Tap on empty space - deselect everything
+      setSelectedTokenIds([]);
+      selectedRegionIds.forEach(id => deselectRegion(id));
+      setSelectedRegionIds([]);
+      redrawCanvas();
+    },
+    onDragStart: (x, y, rect) => {
+      const mouseX = x - rect.left;
+      const mouseY = y - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      // Check for token
+      const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      if (clickedToken) {
+        // Check movement restrictions
+        if (restrictMovement) {
+          if (isInCombat) {
+            const currentEntry = initiativeOrder[currentTurnIndex];
+            if (currentEntry?.tokenId !== clickedToken.id) {
+              toast.error("Can only move the active token during their turn");
+              return false;
+            }
+          } else {
+            toast.error("Token movement is locked. Unlock to move tokens.");
+            return false;
+          }
+        }
+
+        setIsDraggingToken(true);
+        setDraggedTokenId(clickedToken.id);
+        setDragOffset({
+          x: worldPos.x - clickedToken.x,
+          y: worldPos.y - clickedToken.y,
+        });
+        setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
+        setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+        
+        if (currentVisibilityRef.current) {
+          stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+        }
+        
+        setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
+
+        if (!selectedTokenIds.includes(clickedToken.id)) {
+          setSelectedTokenIds([clickedToken.id]);
+        }
+        return true;
+      }
+
+      // Check for region drag (edit mode only)
+      if (renderingMode === "edit") {
+        const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
+        if (clickedRegion && clickedRegion.selected) {
+          setIsDraggingRegion(true);
+          setDraggedRegionId(clickedRegion.id);
+          
+          if (currentVisibilityRef.current) {
+            stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+          }
+          
+          setInitialRegionState(captureRegionTransformState(clickedRegion));
+          setTransformingRegionId(clickedRegion.id);
+
+          setRegionDragOffset({
+            x: worldPos.x - clickedRegion.x,
+            y: worldPos.y - clickedRegion.y,
+          });
+
+          const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
+          tokens.forEach((token) => {
+            if (isPointInRegion(token.x, token.y, clickedRegion)) {
+              tokensInRegion.push({
+                tokenId: token.id,
+                startX: token.x,
+                startY: token.y,
+              });
+            }
+          });
+          setGroupedTokens(tokensInRegion);
+          return true;
+        }
+      }
+
+      return false; // Nothing to drag, will pan instead
+    },
+    onDragMove: (x, y, rect) => {
+      const mouseX = x - rect.left;
+      const mouseY = y - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      if (isDraggingToken && draggedTokenId) {
+        const token = tokens.find(t => t.id === draggedTokenId);
+        if (!token) return;
+
+        const newX = worldPos.x - dragOffset.x;
+        const newY = worldPos.y - dragOffset.y;
+
+        // Update drag path
+        setDragPath(prev => [...prev, { x: newX, y: newY }]);
+
+        // Update token position
+        updateTokenPosition(draggedTokenId, newX, newY);
+        updateAllTokenHighlights();
+        requestAnimationFrame(() => redrawCanvas());
+      } else if (isDraggingRegion && draggedRegionId) {
+        const region = regions.find(r => r.id === draggedRegionId);
+        if (!region) return;
+
+        const newX = worldPos.x - regionDragOffset.x;
+        const newY = worldPos.y - regionDragOffset.y;
+        const dx = newX - region.x;
+        const dy = newY - region.y;
+
+        if (region.regionType === "path" && region.pathPoints) {
+          const newPathPoints = region.pathPoints.map(p => ({
+            x: p.x + dx,
+            y: p.y + dy,
+          }));
+          const newBezierPoints = region.bezierControlPoints?.map(bp => ({
+            cp1: { x: bp.cp1.x + dx, y: bp.cp1.y + dy },
+            cp2: { x: bp.cp2.x + dx, y: bp.cp2.y + dy },
+          }));
+          
+          setDragPreview({
+            regionId: draggedRegionId,
+            pathPoints: newPathPoints,
+            bezierControlPoints: newBezierPoints,
+            x: newX,
+            y: newY,
+            width: region.width,
+            height: region.height,
+          });
+        } else {
+          setDragPreview({
+            regionId: draggedRegionId,
+            x: newX,
+            y: newY,
+            width: region.width,
+            height: region.height,
+          });
+        }
+
+        // Move grouped tokens
+        if (groupedTokens.length > 0) {
+          const positions: { [id: string]: { x: number; y: number } } = {};
+          groupedTokens.forEach(({ tokenId, startX, startY }) => {
+            positions[tokenId] = { x: startX + dx, y: startY + dy };
+          });
+          setTempTokenPositions(positions);
+        }
+
+        requestAnimationFrame(() => redrawCanvas());
+      }
+    },
+    onDragEnd: (x, y, rect) => {
+      const mouseX = x - rect.left;
+      const mouseY = y - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      // Token drag end - reuse existing logic from handleMouseUp
+      if (isDraggingToken && draggedTokenId) {
+        const token = tokens.find(t => t.id === draggedTokenId);
+        if (token) {
+          // Check collision using correct store state
+          const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
+          const shouldEnforceCollisions = renderingMode === 'play';
+          
+          let movementBlocked = false;
+          
+          if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
+            const tokenRadius = 0;
+            const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
+            const checkRegions = enforceRegionBounds ? regions : [];
+            
+            const collisionResult = checkMovementCollision(
+              dragStartPos,
+              { x: token.x, y: token.y },
+              tokenRadius,
+              blockingObjects,
+              checkRegions,
+              { enforceMovementBlocking, enforceRegionBounds }
+            );
+            
+            if (collisionResult.blocked) {
+              movementBlocked = true;
+              const blockReason = collisionResult.collidedWith === 'region_bounds' 
+                ? 'Cannot leave region boundary' 
+                : 'Movement blocked by obstacle';
+              toast.error(blockReason);
+              updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
+            }
+          }
+          
+          // Only apply snapping if movement wasn't blocked
+          if (!movementBlocked) {
+            // Find local region at token position
+            const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
+            
+            // Priority 1: Local region snapping
+            if (localRegion && localRegion.gridSnapping && localRegion.gridType !== "free") {
+              let regionPoints: Array<{ x: number; y: number }>;
+              if (localRegion.regionType === "path" && localRegion.pathPoints) {
+                regionPoints = localRegion.pathPoints;
+              } else {
+                regionPoints = [
+                  { x: localRegion.x, y: localRegion.y },
+                  { x: localRegion.x + localRegion.width, y: localRegion.y },
+                  { x: localRegion.x + localRegion.width, y: localRegion.y + localRegion.height },
+                  { x: localRegion.x, y: localRegion.y + localRegion.height },
+                ];
+              }
+              const regionForSnap = {
+                map: {} as any,
+                region: {
+                  gridType: localRegion.gridType,
+                  gridSize: localRegion.gridSize * localRegion.gridScale,
+                  points: regionPoints,
+                } as any,
+              };
+              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
+              updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+            }
+            // Priority 2: World space snapping
+            else if (isGridSnappingEnabled && !localRegion) {
+              const worldGridSize = 40;
+              const snappedX = Math.round(token.x / worldGridSize) * worldGridSize;
+              const snappedY = Math.round(token.y / worldGridSize) * worldGridSize;
+              updateTokenPosition(draggedTokenId, snappedX, snappedY);
+            }
+
+            if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
+              moveTokenUndoable(
+                draggedTokenId,
+                { x: initialTokenState.x, y: initialTokenState.y },
+                { x: token.x, y: token.y },
+                token.label || token.name
+              );
+            }
+          }
+        }
+
+        setIsDraggingToken(false);
+        setDraggedTokenId(null);
+        setDragOffset({ x: 0, y: 0 });
+        setDragStartPos({ x: 0, y: 0 });
+        setDragPath([]);
+        setInitialTokenState(null);
+        
+        if (stableVisibilityRef.current) {
+          stableVisibilityRef.current.remove();
+          stableVisibilityRef.current = null;
+        }
+
+        updateAllTokenHighlights();
+      }
+
+      // Region drag end
+      if (isDraggingRegion && draggedRegionId) {
+        if (dragPreview) {
+          const draggedRegion = regions.find(r => r.id === draggedRegionId);
+          if (draggedRegion) {
+            let finalState: Partial<CanvasRegion>;
+            
+            if (draggedRegion.regionType === "path" && dragPreview.pathPoints) {
+              const finalBounds = dragPreview.bezierControlPoints
+                ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
+                : getPolygonBounds(dragPreview.pathPoints);
+
+              finalState = {
+                x: finalBounds.x,
+                y: finalBounds.y,
+                width: finalBounds.width,
+                height: finalBounds.height,
+                pathPoints: dragPreview.pathPoints,
+                bezierControlPoints: dragPreview.bezierControlPoints,
+                rotation: draggedRegion.rotation,
+              };
+              
+              updateRegion(draggedRegionId, finalState);
+            } else {
+              finalState = {
+                x: dragPreview.x,
+                y: dragPreview.y,
+                width: dragPreview.width,
+                height: dragPreview.height,
+                rotation: draggedRegion.rotation,
+              };
+              
+              updateRegion(draggedRegionId, finalState);
+            }
+          }
+        }
+
+        if (tempTokenPositions) {
+          Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
+            updateTokenPosition(tokenId, position.x, position.y);
+          });
+        }
+
+        if (initialRegionState && transformingRegionId) {
+          const currentRegion = regions.find(r => r.id === transformingRegionId);
+          if (currentRegion) {
+            const currentState = captureRegionTransformState(currentRegion);
+            if (hasTransformChanged(initialRegionState, currentState)) {
+              transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+            }
+          }
+          setInitialRegionState(null);
+          setTransformingRegionId(null);
+        }
+
+        setIsDraggingRegion(false);
+        setDraggedRegionId(null);
+        setRegionDragOffset({ x: 0, y: 0 });
+        setDragPreview(null);
+        setGroupedTokens([]);
+        setTempTokenPositions(undefined);
+        
+        if (stableVisibilityRef.current) {
+          stableVisibilityRef.current.remove();
+          stableVisibilityRef.current = null;
+        }
+
+        redrawCanvas();
+      }
+    },
+  });
+
   // Token manipulation functions for FloatingMenu
   const handleTokenColorChange = (tokenId: string, color: string) => {
     updateTokenColor(tokenId, color);
@@ -6234,7 +6629,7 @@ export const SimpleTabletop = () => {
       <div ref={canvasContainerRef} className="flex-1 relative overflow-hidden">
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full touch-none"
           style={{
             background: "hsl(var(--canvas-background))",
             cursor: isPanning
@@ -6251,6 +6646,10 @@ export const SimpleTabletop = () => {
           onDoubleClick={() => pathDrawingMode === "drawing" && pathDrawingType === "polygon" && finishPathDrawing()}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
+          onTouchStart={touchHandlers.handleTouchStart}
+          onTouchMove={touchHandlers.handleTouchMove}
+          onTouchEnd={touchHandlers.handleTouchEnd}
+          onTouchCancel={touchHandlers.handleTouchCancel}
         />
         {/* Overlay canvas for UI elements above fog post-processing */}
         <canvas
