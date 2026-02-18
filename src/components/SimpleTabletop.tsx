@@ -1039,6 +1039,8 @@ export const SimpleTabletop = () => {
 
           // Only consider tokens with vision enabled
           const tokensWithVision = tokensForVision.filter((t) => t.hasVision !== false);
+          
+          console.log(`[Fog] Vision tokens: ${tokensWithVision.length}/${tokens.length}, cache: ${tokenVisibilityCacheRef.current.size}, visData: ${tokenVisibilityDataRef.current.length}`);
           const movedTokens: typeof tokens = [];
           const illuminationChangedTokens: typeof tokens = [];
           const currentTokenIds = new Set(tokensWithVision.map((t) => t.id));
@@ -1120,20 +1122,42 @@ export const SimpleTabletop = () => {
             ? tokensWithVision  // All tokens need recompute if blocking geometry changed
             : [...movedTokens, ...illuminationChangedTokens];
           
+          // Check if token visibility data ref is stale (wrong count vs cache)
+          const visDataStale = tokenVisibilityDataRef.current.length !== 
+            (tokenVisibilityCacheRef.current.size + lights.filter(l => l.enabled).length);
+
           // If no tokens need visibility recomputation AND illumination settings didn't change,
-          // skip computation. Unless we're in play mode and don't have fog masks yet (initial render)
-          if (
+          // skip the expensive Paper.js visibility polygon computation.
+          // BUT still rebuild tokenVisibilityDataRef if it's stale (wrong source count).
+          const canSkipPolygonComputation = (
             tokensNeedingVisibilityRecompute.length === 0 &&
             !visionStateChanged &&
             !illuminationSettingsChanged &&
             !mapObjectsBlockingChanged &&
             tokenVisibilityCacheRef.current.size === tokensWithVision.length &&
-            fogMasksRef.current !== null
-          ) {
+            fogMasksRef.current !== null &&
+            !visDataStale
+          );
+
+          if (canSkipPolygonComputation) {
+            console.log(`[Fog] Early-exit: all ${tokenVisibilityCacheRef.current.size} cached, visData=${tokenVisibilityDataRef.current.length}`);
             return;
           }
 
+          // If polygons are all cached but vis data is stale, skip recomputation
+          // but still rebuild the vis data and masks below
+          const skipPolygonRecomputation = (
+            tokensNeedingVisibilityRecompute.length === 0 &&
+            !visionStateChanged &&
+            !mapObjectsBlockingChanged &&
+            tokenVisibilityCacheRef.current.size === tokensWithVision.length
+          );
+          
+          console.log(`[Fog] Computing: recompute=${tokensNeedingVisibilityRecompute.length}, visionChanged=${visionStateChanged}, illuminChanged=${illuminationSettingsChanged}, visDataStale=${visDataStale}, skipPolygons=${skipPolygonRecomputation}`);
+
           // Compute visibility only for tokens that moved or had illumination range changes
+          // Skip if all polygons are already cached and only vis data needs rebuilding
+          if (!skipPolygonRecomputation) {
           for (const token of tokensNeedingVisibilityRecompute) {
             // Find token's region to get grid size
             const tokenRegion = regions.find(
@@ -1169,6 +1193,7 @@ export const SimpleTabletop = () => {
             // Update previous position
             prevTokenPositionsRef.current.set(token.id, { x: token.x, y: token.y });
           }
+          } // end skipPolygonRecomputation check
 
           // Merge all cached token visions
           let combinedVisibility: any = null;
@@ -1299,6 +1324,7 @@ export const SimpleTabletop = () => {
             }
           }
 
+          console.log(`[Fog] Built visData: ${tokenVisData.length} sources (${tokenVisData.filter(t => !t.isLightSource).length} tokens, ${tokenVisData.filter(t => t.isLightSource).length} lights)`);
           tokenVisibilityDataRef.current = tokenVisData;
 
           // Clean up
