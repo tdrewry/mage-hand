@@ -1336,6 +1336,9 @@ export const SimpleTabletop = () => {
     transform.zoom,
     effectSettings.lightFalloff,
     exploredOpacity,
+    players, // Re-compute when player data changes (role assignments affect vision)
+    currentPlayerId, // Re-compute when active player changes
+    roles, // Re-compute when roles change (permissions affect which tokens get vision)
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
