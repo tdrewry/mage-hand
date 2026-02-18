@@ -438,8 +438,11 @@ export const SimpleTabletop = () => {
   // Performance optimization: Cache for token drawing to reduce redundant renders
   const tokenDrawCache = useRef<Map<string, { lastDrawn: number; data: any }>>(new Map());
 
-  // Track if fog needs recomputation
+   // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
+  
+  // Track previous dragging state to detect drag-end transitions
+  const wasDraggingTokenRef = useRef(false);
   
   // Counter to force re-render when images load
   const [imageLoadCounter, setImageLoadCounter] = useState(0);
@@ -1006,7 +1009,20 @@ export const SimpleTabletop = () => {
 
     // Skip fog computation while dragging tokens to prevent stuttering
     if (isDraggingToken) {
+      wasDraggingTokenRef.current = true;
       return;
+    }
+    
+    // When drag just ended, clear all caches to force full recomputation
+    // Paper.js cached paths can become stale after drag operations
+    if (wasDraggingTokenRef.current) {
+      wasDraggingTokenRef.current = false;
+      tokenVisibilityCacheRef.current.forEach((cached) => {
+        if (cached?.visionPath?.remove) cached.visionPath.remove();
+      });
+      tokenVisibilityCacheRef.current.clear();
+      prevTokenPositionsRef.current.clear();
+      console.log('[Fog] Drag ended — cleared all visibility caches for full recomputation');
     }
 
     // Force fog computation when switching to play mode
