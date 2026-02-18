@@ -40,24 +40,13 @@ export async function computeTokenVisibilityPaper(
     return new paper.Path() as any;
   }
 
-  // Filter out tokens that are inside walls (shouldn't cast light)
-  let validTokens = tokens;
-  if (wallGeometry) {
-    // Create a temporary canvas context to test if tokens are in walls
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    if (tempCtx) {
-      validTokens = tokens.filter(token => {
-        // Check if token center is inside wall geometry (negative space)
-        const isInWall = tempCtx.isPointInPath(wallGeometry.wallPath, token.x, token.y, 'evenodd');
-        return !isInWall; // Only include tokens NOT in walls
-      });
-    }
-  }
-
-  if (validTokens.length === 0) {
-    return new paper.Path() as any;
-  }
+  // Note: We no longer filter tokens by wallGeometry.wallPath.
+  // The old check used isPointInPath(wallPath, ..., 'evenodd') which treated
+  // ALL tokens outside region boundaries as "inside walls" — this incorrectly
+  // removed lighting for tokens in open space. The visibility polygon computation
+  // (computeVisibilityFromSegments) already handles wall occlusion properly
+  // by using wall segments as obstacles, so the filter was redundant.
+  const validTokens = tokens;
 
   // Compute visibility for each token and merge using paper.js union
   let combinedVisibility: any = null;
