@@ -63,6 +63,7 @@ import { useFogStore } from '../../stores/fogStore';
 import { useLightStore } from '../../stores/lightStore';
 import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
+import { useMapObjectStore } from '../../stores/mapObjectStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useSessionTemplates } from '../../hooks/useSessionTemplates';
 import { useSessionHistory } from '../../hooks/useSessionHistory';
@@ -117,6 +118,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const lightStore = useLightStore();
   const cardStore = useCardStore();
   const dungeonStore = useDungeonStore();
+  const mapObjectStore = useMapObjectStore();
 
   // Load saved projects when component mounts
   useEffect(() => {
@@ -317,6 +319,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       lightDirection: dungeonStore.lightDirection,
       shadowDistance: dungeonStore.shadowDistance,
     },
+    mapObjects: mapObjectStore.mapObjects,
   });
 
   const handleSaveToStorage = async () => {
@@ -633,6 +636,20 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         if (projectData.dungeonData.shadowDistance !== undefined) {
           dungeonStore.setShadowDistance(projectData.dungeonData.shadowDistance);
         }
+      }
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (cancelRequested) throw new Error('Import cancelled by user');
+      
+      // Step 16: Apply map objects (doors, columns, stairs, etc.)
+      if (projectData.mapObjects && projectData.mapObjects.length > 0) {
+        setLoadingProgress('Clearing map objects...');
+        mapObjectStore.clearMapObjects();
+        await processInChunks(
+          projectData.mapObjects,
+          10,
+          (obj) => mapObjectStore.addMapObject(obj),
+          (processed, total) => setLoadingProgress(`Loading map objects (${processed}/${total})...`)
+        );
       }
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
