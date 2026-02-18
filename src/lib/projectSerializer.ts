@@ -19,6 +19,7 @@ import { FogSettings } from '../stores/fogStore';
 import { Role } from '../stores/roleStore';
 import { VisionProfile } from '../stores/visionProfileStore';
 import { CardState } from '../types/cardTypes';
+import { MapObject } from '../types/mapObjectTypes';
 import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
 import { getAllTokenMappings, importTokenTextures } from './tokenTextureStorage';
 
@@ -81,6 +82,7 @@ export interface ProjectData {
   lights?: LightSource[];
   cardStates?: CardState[];
   dungeonData?: any; // Optional dungeon data
+  mapObjects?: MapObject[]; // Interactive map features (doors, columns, etc.)
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }
