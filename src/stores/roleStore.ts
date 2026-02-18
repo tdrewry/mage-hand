@@ -123,13 +123,19 @@ export const useRoleStore = create<RoleState>()(
       roles: [],
       
       addRole: (role) => {
+        const existing = get().roles;
+        // Reject if a role with the same id or name already exists
+        if (existing.some(r => r.id === role.id || r.name === role.name)) {
+          console.warn(`[Role] Role already exists (id: ${role.id}, name: ${role.name}), skipping add`);
+          return;
+        }
+        
         set((state) => ({
           roles: [...state.roles, role],
         }));
         
         // Sync to multiplayer
         if (syncManager.isConnected()) {
-          // TODO: Implement role sync
           console.log('[Role] Role added, sync not yet implemented', role);
         }
       },
@@ -214,7 +220,18 @@ export const useRoleStore = create<RoleState>()(
       initializeDefaultRoles: () => {
         const state = get();
         if (state.roles.length === 0) {
-          set({ roles: DEFAULT_ROLES });
+          set({ roles: [...DEFAULT_ROLES] });
+        } else {
+          // Deduplicate on initialize
+          const seen = new Set<string>();
+          const uniqueRoles = state.roles.filter((role) => {
+            if (seen.has(role.id)) return false;
+            seen.add(role.id);
+            return true;
+          });
+          if (uniqueRoles.length !== state.roles.length) {
+            set({ roles: uniqueRoles });
+          }
         }
       },
     }),
