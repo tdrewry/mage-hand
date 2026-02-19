@@ -18,6 +18,7 @@ import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
+import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
@@ -6949,36 +6950,65 @@ export const SimpleTabletop = () => {
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel />
 
-      {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
-      <BulkOperationsToolbar
-        selectedTokenIds={selectedTokenIds}
-        onClearSelection={() => setSelectedTokenIds([])}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
+      {/* Unified Selection Toolbar - Shows when multiple entity types are selected */}
+      {(() => {
+        const multiTypeCount = [
+          selectedTokenIds.length > 0,
+          selectedRegionIds.length > 0,
+          selectedMapObjectIds.length > 0,
+          selectedLightIds.length > 0,
+        ].filter(Boolean).length;
+        const isMultiType = multiTypeCount >= 2;
 
-      {/* Region Control Bar - Shows when region(s) are selected */}
-      <RegionControlBar
-        selectedRegionIds={selectedRegionIds}
-        onClearSelection={() => {
-          selectedRegionIds.forEach(id => deselectRegion(id));
-          setSelectedRegionIds([]);
-          redrawCanvas();
-        }}
-        onUpdateCanvas={handleCanvasUpdate}
-        onSelectAll={() => {
-          // Select all regions
-          regions.forEach(region => selectRegion(region.id));
-          setSelectedRegionIds(regions.map(r => r.id));
-          redrawCanvas();
-        }}
-      />
+        return isMultiType ? (
+          <UnifiedSelectionToolbar
+            selectedTokenIds={selectedTokenIds}
+            selectedRegionIds={selectedRegionIds}
+            selectedMapObjectIds={selectedMapObjectIds}
+            selectedLightIds={selectedLightIds}
+            onClearAll={() => {
+              setSelectedTokenIds([]);
+              selectedRegionIds.forEach(id => deselectRegion(id));
+              setSelectedRegionIds([]);
+              clearMapObjectSelection();
+              clearLightSelection();
+              redrawCanvas();
+            }}
+          />
+        ) : (
+          <>
+            {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
+            <BulkOperationsToolbar
+              selectedTokenIds={selectedTokenIds}
+              onClearSelection={() => setSelectedTokenIds([])}
+              onUpdateCanvas={handleCanvasUpdate}
+            />
 
-      {/* Map Object Control Bar - Shows when map object(s) are selected */}
-      <MapObjectControlBar
-        pointEditMode={wallPointEditMode}
-        onTogglePointEditMode={() => setWallPointEditMode(prev => !prev)}
-        onUpdateCanvas={handleCanvasUpdate}
-      />
+            {/* Region Control Bar - Shows when region(s) are selected */}
+            <RegionControlBar
+              selectedRegionIds={selectedRegionIds}
+              onClearSelection={() => {
+                selectedRegionIds.forEach(id => deselectRegion(id));
+                setSelectedRegionIds([]);
+                redrawCanvas();
+              }}
+              onUpdateCanvas={handleCanvasUpdate}
+              onSelectAll={() => {
+                regions.forEach(region => selectRegion(region.id));
+                setSelectedRegionIds(regions.map(r => r.id));
+                redrawCanvas();
+              }}
+            />
+
+            {/* Map Object Control Bar - Shows when map object(s) are selected */}
+            <MapObjectControlBar
+              pointEditMode={wallPointEditMode}
+              onTogglePointEditMode={() => setWallPointEditMode(prev => !prev)}
+              onUpdateCanvas={handleCanvasUpdate}
+            />
+          </>
+        );
+      })()}
 
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
