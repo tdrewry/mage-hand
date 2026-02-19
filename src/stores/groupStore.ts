@@ -89,6 +89,16 @@ export const useGroupStore = create<GroupStore>()(
           return { groups: next };
         });
 
+        // Propagate the group's initial locked state (false) to all members
+        // so children that were individually locked get unlocked to match the group
+        members.forEach(({ id, type }) => {
+          if (type === 'region') {
+            useRegionStore.getState().updateRegion(id, { locked: newGroup.locked });
+          } else if (type === 'mapObject') {
+            useMapObjectStore.getState().updateMapObject(id, { locked: newGroup.locked });
+          }
+        });
+
         return newGroup;
       },
 
