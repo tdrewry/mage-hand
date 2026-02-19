@@ -4190,6 +4190,8 @@ export const SimpleTabletop = () => {
    */
   const computeGroupAABB = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
     const liveMapObjects = useMapObjectStore.getState().mapObjects;
+    // Read regions from BOTH the live Zustand store AND the React closure to handle
+    // cases where store rehydration or dragPreview lag causes mismatches.
     const liveRegions    = useRegionStore.getState().regions;
     const liveLights     = useLightStore.getState().lights;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -4197,7 +4199,6 @@ export const SimpleTabletop = () => {
       if (x < minX) minX = x; if (y < minY) minY = y;
       if (x > maxX) maxX = x; if (y > maxY) maxY = y;
     };
-    // Rotate a point around a pivot and expand bounds
     const expandRotated = (cx: number, cy: number, px: number, py: number, angleDeg: number) => {
       if (!angleDeg) { expand(px, py); return; }
       const rad = (angleDeg * Math.PI) / 180;
@@ -4206,6 +4207,28 @@ export const SimpleTabletop = () => {
       const ry = cy + sin * (px - cx) + cos * (py - cy);
       expand(rx, ry);
     };
+
+    const expandRegion = (r: { x: number; y: number; width: number; height: number; rotation?: number; pathPoints?: { x: number; y: number }[] }, previewPathPts?: { x: number; y: number }[], previewX?: number, previewY?: number, previewW?: number, previewH?: number) => {
+      const rot = r.rotation || 0;
+      const rx = previewX ?? r.x;
+      const ry = previewY ?? r.y;
+      const rw = previewW ?? r.width;
+      const rh = previewH ?? r.height;
+      const pathPts = previewPathPts ?? r.pathPoints;
+      if (pathPts && pathPts.length > 0) {
+        const cx = pathPts.reduce((s, p) => s + p.x, 0) / pathPts.length;
+        const cy = pathPts.reduce((s, p) => s + p.y, 0) / pathPts.length;
+        for (const p of pathPts) expandRotated(cx, cy, p.x, p.y, rot);
+      } else {
+        const cx = rx + rw / 2;
+        const cy = ry + rh / 2;
+        expandRotated(cx, cy, rx,      ry,      rot);
+        expandRotated(cx, cy, rx + rw, ry,      rot);
+        expandRotated(cx, cy, rx,      ry + rh, rot);
+        expandRotated(cx, cy, rx + rw, ry + rh, rot);
+      }
+    };
+
     for (const m of group.members) {
       if (m.type === 'mapObject') {
         const o = liveMapObjects.find(x => x.id === m.id);
@@ -4213,40 +4236,18 @@ export const SimpleTabletop = () => {
           if (o.wallPoints && o.wallPoints.length > 0) {
             for (const p of o.wallPoints) expand(p.x, p.y);
           } else {
-            expand(o.position.x - o.width / 2, o.position.y - o.height / 2);
-            expand(o.position.x + o.width / 2, o.position.y + o.height / 2);
+            expand(o.position.x - (o.width || 0) / 2, o.position.y - (o.height || 0) / 2);
+            expand(o.position.x + (o.width || 0) / 2, o.position.y + (o.height || 0) / 2);
           }
         }
       } else if (m.type === 'region') {
-        // CRITICAL: If this region is the primary dragged region, use dragPreview for its
-        // live position (it's not committed to the store until mouseup). For all other
-        // regions (siblings), the store is updated live so liveRegions is accurate.
         const preview = dragPreview?.regionId === m.id ? dragPreview : null;
-        const r = liveRegions.find(x => x.id === m.id);
+        // Try live store first, then fall back to React closure `regions`
+        const r = liveRegions.find(x => x.id === m.id) ?? regions.find(x => x.id === m.id);
         if (r) {
-          const rot = r.rotation || 0;
-          // Use preview x/y/pathPoints if available, else fall back to store
-          const rx = preview?.x ?? r.x;
-          const ry = preview?.y ?? r.y;
-          const rw = preview?.width ?? r.width;
-          const rh = preview?.height ?? r.height;
-          const pathPts = preview?.pathPoints ?? r.pathPoints;
-          if (pathPts && pathPts.length > 0) {
-            // For path regions, rotate each path point around the path centroid
-            const cx = pathPts.reduce((s, p) => s + p.x, 0) / pathPts.length;
-            const cy = pathPts.reduce((s, p) => s + p.y, 0) / pathPts.length;
-            for (const p of pathPts) expandRotated(cx, cy, p.x, p.y, rot);
-          } else {
-            // For rectangle regions, rotate all 4 corners around the region center
-            const cx = rx + rw / 2;
-            const cy = ry + rh / 2;
-            expandRotated(cx, cy, rx,      ry,      rot);
-            expandRotated(cx, cy, rx + rw, ry,      rot);
-            expandRotated(cx, cy, rx,      ry + rh, rot);
-            expandRotated(cx, cy, rx + rw, ry + rh, rot);
-          }
+          expandRegion(r, preview?.pathPoints ?? undefined, preview?.x, preview?.y, preview?.width, preview?.height);
         } else {
-          console.warn('[computeGroupAABB] region member not found in store:', m.id);
+          console.warn('[computeGroupAABB] region member not found:', m.id, '| store size:', liveRegions.length);
         }
       } else if (m.type === 'light') {
         const l = liveLights.find(x => x.id === m.id);
