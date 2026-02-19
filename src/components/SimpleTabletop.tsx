@@ -570,7 +570,8 @@ export const SimpleTabletop = () => {
    * Returns true if group propagation occurred.
    */
   const propagateGroupSelection = useCallback((entityId: string, entityType: 'token' | 'region' | 'mapObject' | 'light') => {
-    const group = getGroupForEntity(entityId);
+    // Always read from store at call time to avoid stale closure after rehydration
+    const group = useGroupStore.getState().getGroupForEntity(entityId);
     if (!group) return false;
 
     // Collect IDs by type
@@ -603,7 +604,7 @@ export const SimpleTabletop = () => {
     }
 
     return true;
-  }, [getGroupForEntity, clearSelection, selectRegion, selectMultipleLights]);
+  }, [clearSelection, selectRegion, selectMultipleLights]);
 
   // Register MENU, TOOLS, and MAP cards on mount (only once)
   useEffect(() => {
