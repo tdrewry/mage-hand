@@ -1945,18 +1945,33 @@ export const SimpleTabletop = () => {
       // Rectangle region resize handles
       const handleSize = 20 / transform.zoom; // Increased hitbox size
       const { x, y, width, height } = region;
+      const rotation = region.rotation || 0;
+
+      // Un-rotate mouse position into region-local space so we can
+      // hit-test against axis-aligned handle positions
+      let localX = worldX;
+      let localY = worldY;
+      if (rotation !== 0) {
+        const cx = x + width / 2;
+        const cy = y + height / 2;
+        const rad = -(rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        localX = cos * (worldX - cx) - sin * (worldY - cy) + cx;
+        localY = sin * (worldX - cx) + cos * (worldY - cy) + cy;
+      }
 
       // Check corner handles
-      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - y) <= handleSize) return "nw";
-      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - y) <= handleSize) return "ne";
-      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return "sw";
-      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return "se";
+      if (Math.abs(localX - x) <= handleSize && Math.abs(localY - y) <= handleSize) return "nw";
+      if (Math.abs(localX - (x + width)) <= handleSize && Math.abs(localY - y) <= handleSize) return "ne";
+      if (Math.abs(localX - x) <= handleSize && Math.abs(localY - (y + height)) <= handleSize) return "sw";
+      if (Math.abs(localX - (x + width)) <= handleSize && Math.abs(localY - (y + height)) <= handleSize) return "se";
 
       // Check edge handles
-      if (Math.abs(worldX - (x + width / 2)) <= handleSize && Math.abs(worldY - y) <= handleSize) return "n";
-      if (Math.abs(worldX - (x + width)) <= handleSize && Math.abs(worldY - (y + height / 2)) <= handleSize) return "e";
-      if (Math.abs(worldX - (x + width / 2)) <= handleSize && Math.abs(worldY - (y + height)) <= handleSize) return "s";
-      if (Math.abs(worldX - x) <= handleSize && Math.abs(worldY - (y + height / 2)) <= handleSize) return "w";
+      if (Math.abs(localX - (x + width / 2)) <= handleSize && Math.abs(localY - y) <= handleSize) return "n";
+      if (Math.abs(localX - (x + width)) <= handleSize && Math.abs(localY - (y + height / 2)) <= handleSize) return "e";
+      if (Math.abs(localX - (x + width / 2)) <= handleSize && Math.abs(localY - (y + height)) <= handleSize) return "s";
+      if (Math.abs(localX - x) <= handleSize && Math.abs(localY - (y + height / 2)) <= handleSize) return "w";
 
       return null;
     }
@@ -3994,46 +4009,68 @@ export const SimpleTabletop = () => {
   const drawRegionHandles = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const handleSize = 12 / transform.zoom;
     const { x, y, width, height } = region;
+    const rotation = region.rotation || 0;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const rad = (rotation * Math.PI) / 180;
+
+    // Helper to rotate a point around region center
+    const rot = (px: number, py: number) => {
+      if (rotation === 0) return { x: px, y: py };
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      return {
+        x: cos * (px - cx) - sin * (py - cy) + cx,
+        y: sin * (px - cx) + cos * (py - cy) + cy,
+      };
+    };
 
     ctx.fillStyle = "#4f46e5";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 2 / transform.zoom;
 
-    // Draw resize handles at corners and edges
-    const handles = [
-      { x: x, y: y }, // top-left
-      { x: x + width / 2, y: y }, // top-center
-      { x: x + width, y: y }, // top-right
-      { x: x + width, y: y + height / 2 }, // right-center
-      { x: x + width, y: y + height }, // bottom-right
-      { x: x + width / 2, y: y + height }, // bottom-center
-      { x: x, y: y + height }, // bottom-left
-      { x: x, y: y + height / 2 }, // left-center
+    // Draw resize handles at corners and edges (rotated)
+    const rawHandles = [
+      { x: x, y: y },
+      { x: x + width / 2, y: y },
+      { x: x + width, y: y },
+      { x: x + width, y: y + height / 2 },
+      { x: x + width, y: y + height },
+      { x: x + width / 2, y: y + height },
+      { x: x, y: y + height },
+      { x: x, y: y + height / 2 },
     ];
 
-    handles.forEach((handle) => {
-      ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
-      ctx.strokeRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
+    rawHandles.forEach((handle) => {
+      const r = rot(handle.x, handle.y);
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.rotate(rad);
+      ctx.fillRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize);
+      ctx.strokeRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize);
+      ctx.restore();
     });
 
-    // Draw rotation handle - positioned above the region
+    // Draw rotation handle - positioned above the region, rotated with region
     const rotationHandleDistance = 30 / transform.zoom;
-    const rotationX = x + width / 2;
-    const rotationY = y - rotationHandleDistance;
+    const rawRotX = x + width / 2;
+    const rawRotY = y - rotationHandleDistance;
+    const rotHandle = rot(rawRotX, rawRotY);
 
-    // Draw connection line from region to rotation handle
+    // Draw connection line from region top-center to rotation handle (both rotated)
+    const topCenter = rot(x + width / 2, y);
     ctx.strokeStyle = "#4f46e5";
     ctx.lineWidth = 2 / transform.zoom;
     ctx.beginPath();
-    ctx.moveTo(x + width / 2, y);
-    ctx.lineTo(rotationX, rotationY);
+    ctx.moveTo(topCenter.x, topCenter.y);
+    ctx.lineTo(rotHandle.x, rotHandle.y);
     ctx.stroke();
 
     // Draw rotation handle (circular)
-    ctx.fillStyle = "#10b981"; // Different color for rotation handle
+    ctx.fillStyle = "#10b981";
     ctx.strokeStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(rotationX, rotationY, handleSize / 2, 0, Math.PI * 2);
+    ctx.arc(rotHandle.x, rotHandle.y, handleSize / 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   };
@@ -4054,10 +4091,20 @@ export const SimpleTabletop = () => {
 
   // Function to check if mouse is over rotation handle
   const isOverRotationHandle = (mouseX: number, mouseY: number, region: CanvasRegion) => {
-    const handleSize = 30 / transform.zoom; // Further increased hitbox size
+    const handleSize = 30 / transform.zoom;
     const rotationHandleDistance = 30 / transform.zoom;
-    const rotationX = region.x + region.width / 2;
-    const rotationY = region.y - rotationHandleDistance;
+    const rotation = region.rotation || 0;
+    const cx = region.x + region.width / 2;
+    const cy = region.y + region.height / 2;
+    const rad = (rotation * Math.PI) / 180;
+
+    // Rotate the raw handle position to match region orientation
+    const rawX = region.x + region.width / 2;
+    const rawY = region.y - rotationHandleDistance;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const rotationX = cos * (rawX - cx) - sin * (rawY - cy) + cx;
+    const rotationY = sin * (rawX - cx) + cos * (rawY - cy) + cy;
 
     const distance = Math.sqrt((mouseX - rotationX) ** 2 + (mouseY - rotationY) ** 2);
     return distance <= handleSize;
