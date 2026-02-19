@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRight, ChevronDown, Lock, CircleDot, Square, Lightbulb, Box, FolderOpen, Folder, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Lock, LockOpen, CircleDot, Square, Lightbulb, Box, FolderOpen, Folder, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,45 +28,94 @@ interface TreeEntity {
   x: number;
   y: number;
   zIndex?: number;
+  locked?: boolean;
 }
 
 function getEntityName(entity: TreeEntity): string {
   return entity.name || `${entity.type}-${entity.id.slice(-4)}`;
 }
 
-function EntityRow({ entity, depth = 0 }: { entity: TreeEntity; depth?: number }) {
+function EntityRow({
+  entity,
+  depth = 0,
+  onToggleLock,
+}: {
+  entity: TreeEntity;
+  depth?: number;
+  onToggleLock?: (entity: TreeEntity) => void;
+}) {
+  const canLock = entity.type === 'region' || entity.type === 'mapObject';
   return (
     <div
-      className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs"
+      className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs group"
       style={{ paddingLeft: `${8 + depth * 16}px` }}
     >
       {entityTypeIcon[entity.type] || <Box className="h-3.5 w-3.5" />}
       <span className="truncate flex-1 text-foreground">{getEntityName(entity)}</span>
-      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">
         {entity.type}
       </Badge>
+      {canLock ? (
+        <button
+          className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+          title={entity.locked ? 'Unlock entity' : 'Lock entity'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLock?.(entity);
+          }}
+        >
+          {entity.locked
+            ? <Lock className="h-3 w-3 text-primary" />
+            : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
+        </button>
+      ) : (
+        <span className="h-3 w-3 ml-0.5 shrink-0" />
+      )}
     </div>
   );
 }
 
-function GroupNode({ group, entities, onDelete }: { group: EntityGroup; entities: TreeEntity[]; onDelete: (groupId: string) => void }) {
+function GroupNode({
+  group,
+  entities,
+  onDelete,
+  onToggleLock,
+  onToggleEntityLock,
+}: {
+  group: EntityGroup;
+  entities: TreeEntity[];
+  onDelete: (groupId: string) => void;
+  onToggleLock: (group: EntityGroup) => void;
+  onToggleEntityLock: (entity: TreeEntity) => void;
+}) {
   const [open, setOpen] = React.useState(true);
-  const memberEntities = entities.filter(e => 
+  const memberEntities = entities.filter(e =>
     group.members.some(m => m.id === e.id && m.type === e.type)
   );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 group">
         <CollapsibleTrigger className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs flex-1 text-left">
           {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
           {open ? <FolderOpen className="h-3.5 w-3.5 text-primary" /> : <Folder className="h-3.5 w-3.5 text-primary" />}
           <span className="truncate flex-1 font-medium text-foreground">{group.name}</span>
-          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
             {memberEntities.length}
           </Badge>
-          {group.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
         </CollapsibleTrigger>
+        <button
+          className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
+          title={group.locked ? 'Unlock group' : 'Lock group'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLock(group);
+          }}
+        >
+          {group.locked
+            ? <Lock className="h-3 w-3 text-primary" />
+            : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
+        </button>
         <Button
           variant="ghost"
           size="icon"
@@ -82,7 +131,7 @@ function GroupNode({ group, entities, onDelete }: { group: EntityGroup; entities
       </div>
       <CollapsibleContent>
         {memberEntities.map(entity => (
-          <EntityRow key={`${entity.type}-${entity.id}`} entity={entity} depth={1} />
+          <EntityRow key={`${entity.type}-${entity.id}`} entity={entity} depth={1} onToggleLock={onToggleEntityLock} />
         ))}
       </CollapsibleContent>
     </Collapsible>
@@ -92,15 +141,33 @@ function GroupNode({ group, entities, onDelete }: { group: EntityGroup; entities
 export const MapTreeCardContent: React.FC = () => {
   const tokens = useSessionStore(s => s.tokens);
   const regions = useRegionStore(s => s.regions);
+  const updateRegion = useRegionStore(s => s.updateRegion);
   const mapObjects = useMapObjectStore(s => s.mapObjects);
+  const updateMapObject = useMapObjectStore(s => s.updateMapObject);
   const lights = useLightStore(s => s.lights);
   const groups = useGroupStore(s => s.groups);
   const removeGroup = useGroupStore(s => s.removeGroup);
+  const setGroupLocked = useGroupStore(s => s.setGroupLocked);
 
   const handleDeleteGroup = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     removeGroup(groupId);
     toast.success(`Group "${group?.name || 'Unknown'}" dissolved (members kept)`);
+  };
+
+  const handleToggleGroupLock = (group: EntityGroup) => {
+    const next = !group.locked;
+    setGroupLocked(group.id, next);
+    toast.success(`Group "${group.name}" ${next ? 'locked' : 'unlocked'}`);
+  };
+
+  const handleToggleEntityLock = (entity: TreeEntity) => {
+    const next = !entity.locked;
+    if (entity.type === 'region') {
+      updateRegion(entity.id, { locked: next });
+    } else if (entity.type === 'mapObject') {
+      updateMapObject(entity.id, { locked: next });
+    }
   };
 
   const allEntities = useMemo<TreeEntity[]>(() => {
@@ -113,12 +180,12 @@ export const MapTreeCardContent: React.FC = () => {
 
     regions.forEach(r => entities.push({
       id: r.id, name: r.id.slice(0, 8), type: 'region',
-      x: r.x, y: r.y, zIndex: 0,
+      x: r.x, y: r.y, zIndex: 0, locked: r.locked,
     }));
 
     mapObjects.forEach(o => entities.push({
       id: o.id, name: o.label || o.shape || '', type: 'mapObject',
-      x: o.position.x, y: o.position.y, zIndex: 0,
+      x: o.position.x, y: o.position.y, zIndex: 0, locked: o.locked,
     }));
 
     lights.forEach(l => entities.push({
@@ -151,7 +218,14 @@ export const MapTreeCardContent: React.FC = () => {
 
         {/* Groups */}
         {groups.map(group => (
-          <GroupNode key={group.id} group={group} entities={allEntities} onDelete={handleDeleteGroup} />
+          <GroupNode
+            key={group.id}
+            group={group}
+            entities={allEntities}
+            onDelete={handleDeleteGroup}
+            onToggleLock={handleToggleGroupLock}
+            onToggleEntityLock={handleToggleEntityLock}
+          />
         ))}
 
         {/* Ungrouped entities */}
@@ -161,7 +235,7 @@ export const MapTreeCardContent: React.FC = () => {
           </div>
         )}
         {ungroupedEntities.map(entity => (
-          <EntityRow key={`${entity.type}-${entity.id}`} entity={entity} />
+          <EntityRow key={`${entity.type}-${entity.id}`} entity={entity} onToggleLock={handleToggleEntityLock} />
         ))}
 
         {allEntities.length === 0 && (
