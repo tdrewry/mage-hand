@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Upload, FileJson, AlertCircle, Map } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, Map, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseWatabouFile, importWatabouDungeon } from '@/lib/watabouImporter';
 import { parseDD2VTTFile, importDD2VTTMap } from '@/lib/dd2vttImporter';
+import { parsePrefabFile, importPrefabToMap } from '@/lib/groupSerializer';
 import { useRegionStore } from '@/stores/regionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useLightStore } from '@/stores/lightStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useGroupStore } from '@/stores/groupStore';
 import { saveRegionTexture } from '@/lib/textureStorage';
 import { toast } from 'sonner';
 
@@ -36,11 +39,13 @@ export const WatabouImportCardContent = () => {
   const setGlobalAmbientLight = useLightStore((state) => state.setGlobalAmbientLight);
 
   const handleFileSelect = async (file: File) => {
-    const isDD2VTT = file.name.toLowerCase().endsWith('.dd2vtt');
-    const isJSON = file.name.toLowerCase().endsWith('.json');
+    const name = file.name.toLowerCase();
+    const isDD2VTT = name.endsWith('.dd2vtt');
+    const isPrefab = name.endsWith('.d20prefab');
+    const isJSON = name.endsWith('.json');
 
-    if (!isDD2VTT && !isJSON) {
-      setError('Please select a .json (Watabou) or .dd2vtt (Dungeondraft) file');
+    if (!isDD2VTT && !isJSON && !isPrefab) {
+      setError('Please select a .json (Watabou), .dd2vtt (Dungeondraft), or .d20prefab (Prefab) file');
       return;
     }
 
@@ -48,17 +53,52 @@ export const WatabouImportCardContent = () => {
     setError(null);
 
     try {
-      if (isDD2VTT) {
+      if (isPrefab) {
+        await handlePrefabImport(file);
+      } else if (isDD2VTT) {
         await handleDD2VTTImport(file);
       } else {
         await handleWatabouImport(file);
       }
     } catch (err) {
       console.error('Import error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to import map');
+      setError(err instanceof Error ? err.message : 'Failed to import');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrefabImport = async (file: File) => {
+    const text = await file.text();
+    const prefab = parsePrefabFile(text);
+    
+    // Place at center of current viewport
+    const placementX = window.innerWidth / 2;
+    const placementY = window.innerHeight / 2;
+    
+    const result = await importPrefabToMap(prefab, placementX, placementY);
+    
+    // Add entities to stores
+    const addToken = useSessionStore.getState().addToken;
+    result.tokens.forEach(t => addToken(t));
+    result.regions.forEach(r => addRegion(r));
+    result.mapObjects.forEach(o => addMapObject(o));
+    result.lights.forEach(l => addLight(l));
+    
+    // Add the reconstituted group
+    const addGroup = useGroupStore.getState().addGroup;
+    const geometries = [
+      ...result.tokens.map(t => ({ id: t.id, x: t.x, y: t.y, width: (t.gridWidth || 1) * 40, height: (t.gridHeight || 1) * 40 })),
+      ...result.regions.map(r => ({ id: r.id, x: r.x, y: r.y, width: r.width, height: r.height })),
+      ...result.mapObjects.map(o => ({ id: o.id, x: o.position.x, y: o.position.y, width: o.width || 40, height: o.height || 40 })),
+      ...result.lights.map(l => ({ id: l.id, x: l.position.x, y: l.position.y, width: 30, height: 30 })),
+    ];
+    addGroup(prefab.name, result.group.members, geometries);
+
+    const total = result.tokens.length + result.regions.length + result.mapObjects.length + result.lights.length;
+    toast.success(`Imported prefab "${prefab.name}"`, {
+      description: `${total} entities placed as a group`,
+    });
   };
 
   const handleWatabouImport = async (file: File) => {
@@ -223,10 +263,10 @@ export const WatabouImportCardContent = () => {
         <Map className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
         <div className="space-y-2">
           <p className="text-sm font-medium">
-            Drop your map file here
+            Drop your file here
           </p>
           <p className="text-xs text-muted-foreground">
-            Supports Watabou JSON and Dungeondraft dd2vtt
+            Supports Watabou JSON, Dungeondraft dd2vtt, and d20prefab
           </p>
         </div>
 
@@ -246,7 +286,7 @@ export const WatabouImportCardContent = () => {
         <input
           id="file-upload"
           type="file"
-          accept=".json,.dd2vtt"
+          accept=".json,.dd2vtt,.d20prefab"
           className="hidden"
           onChange={handleFileInput}
           disabled={loading}
@@ -258,6 +298,7 @@ export const WatabouImportCardContent = () => {
         <ul className="list-disc list-inside space-y-1 ml-2">
           <li><strong>.json</strong> — Watabou One-Page Dungeon</li>
           <li><strong>.dd2vtt</strong> — Dungeondraft Universal VTT</li>
+          <li><strong>.d20prefab</strong> — Group Prefab (rooms, encounters)</li>
         </ul>
       </div>
 

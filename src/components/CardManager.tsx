@@ -130,7 +130,7 @@ function getCardTitle(type: CardType): string {
     [CardType.GROUP_MANAGER]: 'Group Manager',
     [CardType.PROJECT_MANAGER]: 'Project Manager',
     [CardType.REGION_CONTROL]: 'Region Control',
-    [CardType.WATABOU_IMPORT]: 'Watabou Import',
+    [CardType.WATABOU_IMPORT]: 'Import',
     [CardType.BACKGROUND_GRID]: 'Background & Grid',
     [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
     [CardType.STYLES]: 'Map',
