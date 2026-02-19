@@ -7043,6 +7043,67 @@ export const SimpleTabletop = () => {
 
       // Handle MapObject rotation completion
       if (isRotatingMapObject && rotatingMapObjectId) {
+        // Build batch undo covering ALL group members (map objects + regions)
+        const snapshots = groupSiblingSnapshotsRef.current;
+        const currentMapObjects = useMapObjectStore.getState().mapObjects;
+        const currentRegions = useRegionStore.getState().regions;
+
+        type MapObjEntry = { id: string; before: Partial<import('@/types/mapObjectTypes').MapObject>; after: Partial<import('@/types/mapObjectTypes').MapObject> };
+        type RegionEntry = { id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> };
+        const mobjEntries: MapObjEntry[] = [];
+        const regionEntries: RegionEntry[] = [];
+
+        for (const [memberId, snap] of Object.entries(snapshots)) {
+          if (snap.type === 'mapObject') {
+            const afterObj = currentMapObjects.find(o => o.id === memberId);
+            if (!afterObj) continue;
+            const before: Partial<import('@/types/mapObjectTypes').MapObject> = {
+              position: { ...snap.position! },
+              rotation: snap.rotation,
+              ...(snap.wallPoints ? { wallPoints: snap.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+            };
+            const after: Partial<import('@/types/mapObjectTypes').MapObject> = {
+              position: { ...afterObj.position },
+              rotation: afterObj.rotation,
+              ...(afterObj.wallPoints ? { wallPoints: afterObj.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+            };
+            mobjEntries.push({ id: memberId, before, after });
+          } else if (snap.type === 'region') {
+            const afterRegion = currentRegions.find(r => r.id === memberId);
+            if (!afterRegion) continue;
+            const before: Partial<CanvasRegion> = {
+              x: snap.x, y: snap.y, width: snap.width, height: snap.height,
+              rotation: snap.regRotation,
+              ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
+            };
+            const after: Partial<CanvasRegion> = {
+              x: afterRegion.x, y: afterRegion.y, width: afterRegion.width, height: afterRegion.height,
+              rotation: afterRegion.rotation,
+              ...(afterRegion.pathPoints ? { pathPoints: afterRegion.pathPoints.map(p => ({ ...p })) } : {}),
+            };
+            regionEntries.push({ id: memberId, before, after });
+          }
+        }
+
+        if (mobjEntries.length > 0 || regionEntries.length > 0) {
+          undoRedoManager.push({
+            type: 'BATCH_GROUP_ROTATION',
+            description: 'Rotate group',
+            execute: () => {
+              const { updateMapObject: umo } = useMapObjectStore.getState();
+              const { updateRegion: ur } = useRegionStore.getState();
+              for (const e of mobjEntries) umo(e.id, e.after);
+              for (const e of regionEntries) ur(e.id, e.after);
+            },
+            undo: () => {
+              const { updateMapObject: umo } = useMapObjectStore.getState();
+              const { updateRegion: ur } = useRegionStore.getState();
+              for (const e of mobjEntries) umo(e.id, e.before);
+              for (const e of regionEntries) ur(e.id, e.before);
+            },
+          });
+        }
+
         setIsRotatingMapObject(false);
         setRotatingMapObjectId(null);
         notifyObstaclesChanged();
@@ -7114,40 +7175,65 @@ export const SimpleTabletop = () => {
 
     // Handle rotation completion
     if (isRotatingRegion && draggedRegionId) {
-      // Build a batch undo entry covering EVERY region member of the group.
+      // Build a batch undo entry covering ALL group members (regions + map objects).
       // groupSiblingSnapshotsRef holds the pre-rotation snapshots; current store
       // state is the post-rotation result (already applied during mousemove).
       const snapshots = groupSiblingSnapshotsRef.current;
       const currentRegions = useRegionStore.getState().regions;
-      const batchEntries: Array<{ id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> }> = [];
+      const currentMapObjects = useMapObjectStore.getState().mapObjects;
+
+      type MapObjEntry2 = { id: string; before: Partial<import('@/types/mapObjectTypes').MapObject>; after: Partial<import('@/types/mapObjectTypes').MapObject> };
+      const regionEntries2: Array<{ id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> }> = [];
+      const mobjEntries2: MapObjEntry2[] = [];
+
       for (const [memberId, snap] of Object.entries(snapshots)) {
-        if (snap.type !== 'region') continue;
-        const afterRegion = currentRegions.find(r => r.id === memberId);
-        if (!afterRegion) continue;
-        const before: Partial<CanvasRegion> = {
-          x: snap.x, y: snap.y, width: snap.width, height: snap.height,
-          rotation: snap.regRotation,
-          ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
-        };
-        const after: Partial<CanvasRegion> = {
-          x: afterRegion.x, y: afterRegion.y, width: afterRegion.width, height: afterRegion.height,
-          rotation: afterRegion.rotation,
-          ...(afterRegion.pathPoints ? { pathPoints: afterRegion.pathPoints.map(p => ({ ...p })) } : {}),
-        };
-        batchEntries.push({ id: memberId, before, after });
+        if (snap.type === 'region') {
+          const afterRegion = currentRegions.find(r => r.id === memberId);
+          if (!afterRegion) continue;
+          const before: Partial<CanvasRegion> = {
+            x: snap.x, y: snap.y, width: snap.width, height: snap.height,
+            rotation: snap.regRotation,
+            ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
+          };
+          const after: Partial<CanvasRegion> = {
+            x: afterRegion.x, y: afterRegion.y, width: afterRegion.width, height: afterRegion.height,
+            rotation: afterRegion.rotation,
+            ...(afterRegion.pathPoints ? { pathPoints: afterRegion.pathPoints.map(p => ({ ...p })) } : {}),
+          };
+          regionEntries2.push({ id: memberId, before, after });
+        } else if (snap.type === 'mapObject') {
+          const afterObj = currentMapObjects.find(o => o.id === memberId);
+          if (!afterObj) continue;
+          const before: Partial<import('@/types/mapObjectTypes').MapObject> = {
+            position: { ...snap.position! },
+            rotation: snap.rotation,
+            ...(snap.wallPoints ? { wallPoints: snap.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+          };
+          const after: Partial<import('@/types/mapObjectTypes').MapObject> = {
+            position: { ...afterObj.position },
+            rotation: afterObj.rotation,
+            ...(afterObj.wallPoints ? { wallPoints: afterObj.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+          };
+          mobjEntries2.push({ id: memberId, before, after });
+        }
       }
-      if (batchEntries.length > 0) {
+
+      if (regionEntries2.length > 0 || mobjEntries2.length > 0) {
         // State is already applied — push without re-executing so we only need undo/redo
         undoRedoManager.push({
-          type: 'BATCH_REGION_ROTATION',
+          type: 'BATCH_GROUP_ROTATION',
           description: 'Rotate group',
           execute: () => {
             const { updateRegion } = useRegionStore.getState();
-            for (const e of batchEntries) updateRegion(e.id, e.after);
+            const { updateMapObject: umo } = useMapObjectStore.getState();
+            for (const e of regionEntries2) updateRegion(e.id, e.after);
+            for (const e of mobjEntries2) umo(e.id, e.after);
           },
           undo: () => {
             const { updateRegion } = useRegionStore.getState();
-            for (const e of batchEntries) updateRegion(e.id, e.before);
+            const { updateMapObject: umo } = useMapObjectStore.getState();
+            for (const e of regionEntries2) updateRegion(e.id, e.before);
+            for (const e of mobjEntries2) umo(e.id, e.before);
           },
         });
         // Null out so the unified undo block below does NOT double-register the primary region
