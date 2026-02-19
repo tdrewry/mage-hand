@@ -3,7 +3,7 @@
  * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light';
 
 export interface MapObject {
   id: string;
@@ -46,6 +46,18 @@ export interface MapObject {
   label?: string;
   category: MapObjectCategory;
   
+  // Wall-specific properties (polyline shape)
+  wallPoints?: { x: number; y: number }[]; // Points defining the wall polyline
+  
+  // Light-specific properties (embedded light data)
+  lightColor?: string; // Hex color for the light
+  lightRadius?: number; // Maximum visibility distance in pixels
+  lightIntensity?: number; // 0-1, affects brightness
+  lightEnabled?: boolean; // Whether the light is currently active
+  
+  // Lock state
+  locked?: boolean; // Prevents all transformations when true
+  
   // For linking to imported terrain features
   terrainFeatureId?: string;
 }
@@ -60,6 +72,9 @@ export type MapObjectCategory =
   | 'obstacle'
   | 'door'
   | 'stairs'
+  | 'wall'
+  | 'imported-obstacle'
+  | 'light'
   | 'custom';
 
 export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
@@ -72,6 +87,9 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   obstacle: 'Obstacle',
   door: 'Door',
   stairs: 'Stairs',
+  wall: 'Wall',
+  'imported-obstacle': 'Imported Obstacle',
+  light: 'Light Source',
   custom: 'Custom',
 };
 
@@ -206,6 +224,45 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     blocksMovement: false,
     blocksVision: false,
     revealedByLight: true,
+  },
+  wall: {
+    shape: 'wall',
+    width: 0,
+    height: 0,
+    fillColor: 'transparent',
+    strokeColor: '#ef4444',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: true,
+    blocksVision: true,
+    revealedByLight: false,
+  },
+  'imported-obstacle': {
+    shape: 'wall',
+    width: 0,
+    height: 0,
+    fillColor: 'transparent',
+    strokeColor: '#f97316',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: true,
+    revealedByLight: false,
+  },
+  light: {
+    shape: 'light',
+    width: 20,
+    height: 20,
+    fillColor: '#fbbf24',
+    strokeColor: '#f59e0b',
+    strokeWidth: 1,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
   },
 };
 
