@@ -7,7 +7,9 @@ import {
   Eye, 
   Trash2,
   Edit3,
-  Waves
+  Waves,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { useRegionStore, CanvasRegion } from '@/stores/regionStore';
@@ -214,11 +216,21 @@ export const RegionControlsCardContent: React.FC<RegionControlsCardContentProps>
       </div>
 
       {/* Actions */}
-      <div className="pt-2 border-t">
+      <div className="pt-2 border-t space-y-2">
+        <Button
+          variant={region.locked ? "default" : "outline"}
+          size="sm"
+          onClick={() => updateRegion(region.id, { locked: !region.locked })}
+          className="w-full text-xs h-8"
+        >
+          {region.locked ? <Lock className="w-3 h-3 mr-1" /> : <Unlock className="w-3 h-3 mr-1" />}
+          {region.locked ? 'Unlock Region' : 'Lock Region'}
+        </Button>
         <Button
           variant="destructive"
           size="sm"
           onClick={handleDeleteRegion}
+          disabled={region.locked}
           className="w-full text-xs h-8"
         >
           <Trash2 className="w-3 h-3 mr-1" />
