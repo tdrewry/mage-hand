@@ -510,7 +510,16 @@ export const SimpleTabletop = () => {
   const [isDraggingMapObject, setIsDraggingMapObject] = useState(false);
   const [draggedMapObjectId, setDraggedMapObjectId] = useState<string | null>(null);
   const [mapObjectDragOffset, setMapObjectDragOffset] = useState({ x: 0, y: 0 });
-  
+
+  // MapObject active tool: 'drag' | 'rotate' | 'points'
+  const [mapObjectTool, setMapObjectTool] = useState<'drag' | 'rotate' | 'points'>('drag');
+
+  // MapObject rotation drag state
+  const [isRotatingMapObject, setIsRotatingMapObject] = useState(false);
+  const [rotatingMapObjectId, setRotatingMapObjectId] = useState<string | null>(null);
+  const [mapObjectRotationStartAngle, setMapObjectRotationStartAngle] = useState(0);
+  const [mapObjectRotationStartValue, setMapObjectRotationStartValue] = useState(0);
+
   // Wall vertex dragging state
   const [isDraggingVertex, setIsDraggingVertex] = useState(false);
   const [draggedVertexInfo, setDraggedVertexInfo] = useState<{ mapObjectId: string; vertexIndex: number } | null>(null);
@@ -521,6 +530,7 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     if (JSON.stringify(prevSelectedMapObjectIdsRef.current) !== JSON.stringify(selectedMapObjectIds)) {
       setWallPointEditMode(false);
+      setMapObjectTool('drag');
       prevSelectedMapObjectIdsRef.current = selectedMapObjectIds;
     }
   }, [selectedMapObjectIds]);
@@ -636,7 +646,7 @@ export const SimpleTabletop = () => {
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
-    if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex) {
+    if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex || isRotatingMapObject) {
       const handleGlobalMouseUp = () => {
         // Reset all drag states
         if (isDraggingToken && draggedTokenId) {
@@ -731,6 +741,10 @@ export const SimpleTabletop = () => {
           setDraggedMapObjectId(null);
           setMapObjectDragOffset({ x: 0, y: 0 });
         }
+        if (isRotatingMapObject) {
+          setIsRotatingMapObject(false);
+          setRotatingMapObjectId(null);
+        }
         if (isDraggingVertex) {
           setIsDraggingVertex(false);
           setDraggedVertexInfo(null);
@@ -749,7 +763,7 @@ export const SimpleTabletop = () => {
         window.removeEventListener("mouseup", handleGlobalMouseUp);
       };
     }
-  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject, isDraggingVertex]);
+  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject, isDraggingVertex, isRotatingMapObject]);
 
   // MapObject context menu is handled by Radix ContextMenu component
   // No need for manual click-outside handling - Radix handles it
@@ -2309,6 +2323,34 @@ export const SimpleTabletop = () => {
     // Then render the map objects themselves
     // Pass isDM for DM-specific UI (door toggle indicators)
     renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM);
+
+    // Draw map object rotation handle when in rotate tool mode
+    if (renderingMode === 'edit' && mapObjectTool === 'rotate' && selectedMapObjectIds.length === 1) {
+      const selObj = mapObjects.find(o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape !== 'wall');
+      if (selObj) {
+        const hSize = 10 / transform.zoom;
+        const dist = 30 / transform.zoom;
+        const rotation = selObj.rotation || 0;
+        const rad = (rotation * Math.PI) / 180;
+        const rawHandleX = selObj.position.x;
+        const rawHandleY = selObj.position.y - Math.max(selObj.height / 2, 20) - dist;
+        // Rotate handle position around object center
+        const dx = rawHandleX - selObj.position.x; const dy = rawHandleY - selObj.position.y;
+        const handleX = selObj.position.x + dx * Math.cos(rad) - dy * Math.sin(rad);
+        const handleY = selObj.position.y + dx * Math.sin(rad) + dy * Math.cos(rad);
+        const topCenterRaw = { x: selObj.position.x, y: selObj.position.y - Math.max(selObj.height / 2, 20) };
+        const tcDx = topCenterRaw.x - selObj.position.x; const tcDy = topCenterRaw.y - selObj.position.y;
+        const topCenterX = selObj.position.x + tcDx * Math.cos(rad) - tcDy * Math.sin(rad);
+        const topCenterY = selObj.position.y + tcDx * Math.sin(rad) + tcDy * Math.cos(rad);
+        ctx.save();
+        ctx.strokeStyle = '#4f46e5';
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.beginPath(); ctx.moveTo(topCenterX, topCenterY); ctx.lineTo(handleX, handleY); ctx.stroke();
+        ctx.fillStyle = '#10b981'; ctx.strokeStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(handleX, handleY, hSize, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
@@ -5296,13 +5338,39 @@ export const SimpleTabletop = () => {
           setIsDraggingVertex(true);
           setDraggedVertexInfo(vertexHit);
         } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
-          // Start dragging a selected MapObject in edit mode (only if not locked)
-          setIsDraggingMapObject(true);
-          setDraggedMapObjectId(clickedMapObject.id);
-          setMapObjectDragOffset({
-            x: worldPos.x - clickedMapObject.position.x,
-            y: worldPos.y - clickedMapObject.position.y,
-          });
+          if (mapObjectTool === 'rotate' && clickedMapObject.shape !== 'wall') {
+            // Check if clicking on the rotation handle
+            const rotation = clickedMapObject.rotation || 0;
+            const rad = (rotation * Math.PI) / 180;
+            const dist = 30 / transform.zoom;
+            const rawHandleY = clickedMapObject.position.y - Math.max(clickedMapObject.height / 2, 20) - dist;
+            const dx = clickedMapObject.position.x - clickedMapObject.position.x;
+            const dy = rawHandleY - clickedMapObject.position.y;
+            const handleX = clickedMapObject.position.x + dx * Math.cos(rad) - dy * Math.sin(rad);
+            const handleY = clickedMapObject.position.y + dx * Math.sin(rad) + dy * Math.cos(rad);
+            const distToHandle = Math.hypot(worldPos.x - handleX, worldPos.y - handleY);
+            const handleHitRadius = 20 / transform.zoom;
+            if (distToHandle <= handleHitRadius) {
+              // Start rotation
+              setIsRotatingMapObject(true);
+              setRotatingMapObjectId(clickedMapObject.id);
+              setMapObjectRotationStartAngle(calculateAngle(clickedMapObject.position.x, clickedMapObject.position.y, worldPos.x, worldPos.y));
+              setMapObjectRotationStartValue(clickedMapObject.rotation || 0);
+            } else {
+              // In rotate mode but not on handle: drag the object (move it)
+              setIsDraggingMapObject(true);
+              setDraggedMapObjectId(clickedMapObject.id);
+              setMapObjectDragOffset({ x: worldPos.x - clickedMapObject.position.x, y: worldPos.y - clickedMapObject.position.y });
+            }
+          } else if (mapObjectTool === 'drag' || mapObjectTool === 'points') {
+            // Start dragging a selected MapObject in edit mode
+            setIsDraggingMapObject(true);
+            setDraggedMapObjectId(clickedMapObject.id);
+            setMapObjectDragOffset({
+              x: worldPos.x - clickedMapObject.position.x,
+              y: worldPos.y - clickedMapObject.position.y,
+            });
+          }
         }
         // Only allow region manipulation in edit mode (and not locked)
         // Check if we're clicking on a rotation handle first
@@ -5619,16 +5687,85 @@ export const SimpleTabletop = () => {
         });
       }
       redrawCanvas();
+    } else if (isRotatingMapObject && rotatingMapObjectId) {
+      // MapObject rotation drag
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const obj = mapObjects.find(o => o.id === rotatingMapObjectId);
+      if (obj) {
+        const currentAngle = calculateAngle(obj.position.x, obj.position.y, worldPos.x, worldPos.y);
+        const rotationDelta = currentAngle - mapObjectRotationStartAngle;
+        const newRotation = mapObjectRotationStartValue + rotationDelta;
+        updateMapObject(rotatingMapObjectId, { rotation: newRotation });
+
+        // Propagate rotation to group siblings around group pivot
+        const group = useGroupStore.getState().getGroupForEntity(rotatingMapObjectId);
+        if (group) {
+          const pivotX = group.pivot.x;
+          const pivotY = group.pivot.y;
+          for (const member of group.members) {
+            if (member.id === rotatingMapObjectId) continue;
+            if (member.type === 'mapObject') {
+              const sibling = mapObjects.find(o => o.id === member.id);
+              if (sibling) {
+                const rad = (rotationDelta * Math.PI) / 180;
+                const cos = Math.cos(rad); const sin = Math.sin(rad);
+                const dx = sibling.position.x - pivotX; const dy = sibling.position.y - pivotY;
+                updateMapObject(member.id, {
+                  position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+                  rotation: (sibling.rotation || 0) + rotationDelta,
+                });
+              }
+            }
+          }
+        }
+      }
+      requestAnimationFrame(() => redrawCanvas());
     } else if (isDraggingMapObject && draggedMapObjectId) {
       // MapObject dragging in edit mode
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - mapObjectDragOffset.x;
       const newY = worldPos.y - mapObjectDragOffset.y;
 
-      // Update map object position
-      updateMapObject(draggedMapObjectId, {
-        position: { x: newX, y: newY },
-      });
+      const prevObj = mapObjects.find(o => o.id === draggedMapObjectId);
+      const deltaX = prevObj ? newX - prevObj.position.x : 0;
+      const deltaY = prevObj ? newY - prevObj.position.y : 0;
+
+      // Update primary map object position
+      updateMapObject(draggedMapObjectId, { position: { x: newX, y: newY } });
+
+      // Propagate drag delta to all group siblings
+      const group = useGroupStore.getState().getGroupForEntity(draggedMapObjectId);
+      if (group && prevObj) {
+        for (const member of group.members) {
+          if (member.id === draggedMapObjectId) continue;
+          if (member.type === 'mapObject') {
+            const sibling = mapObjects.find(o => o.id === member.id);
+            if (sibling) {
+              updateMapObject(member.id, {
+                position: { x: sibling.position.x + deltaX, y: sibling.position.y + deltaY },
+              });
+            }
+          } else if (member.type === 'token') {
+            updateTokenPosition(member.id, 0, 0); // done via tempPositions below
+          } else if (member.type === 'region') {
+            const sibRegion = regions.find(r => r.id === member.id);
+            if (sibRegion) updateRegion(member.id, { x: sibRegion.x + deltaX, y: sibRegion.y + deltaY });
+          } else if (member.type === 'light') {
+            const sibLight = useLightStore.getState().lights.find(l => l.id === member.id);
+            if (sibLight) useLightStore.getState().updateLight(member.id, { position: { x: sibLight.position.x + deltaX, y: sibLight.position.y + deltaY } });
+          }
+        }
+        // Propagate token siblings via temp positions
+        const tokenSiblingIds = group.members.filter(m => m.type === 'token').map(m => m.id);
+        if (tokenSiblingIds.length > 0) {
+          const newTempPositions: { [id: string]: { x: number; y: number } } = {};
+          tokenSiblingIds.forEach(id => {
+            const t = tokens.find(tok => tok.id === id);
+            if (t) newTempPositions[id] = { x: t.x + deltaX, y: t.y + deltaY };
+          });
+          setTempTokenPositions(prev => ({ ...prev, ...newTempPositions }));
+        }
+      }
 
       // Force immediate redraw for smooth dragging feedback
       requestAnimationFrame(() => redrawCanvas());
@@ -5652,6 +5789,28 @@ export const SimpleTabletop = () => {
           const newTokenY = groupedToken.startY + deltaY;
           newTempPositions[groupedToken.tokenId] = { x: newTokenX, y: newTokenY };
         });
+
+        // Propagate drag to group siblings (map objects + lights + other regions)
+        const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
+        if (group && (deltaX !== 0 || deltaY !== 0)) {
+          for (const member of group.members) {
+            if (member.id === draggedRegionId) continue;
+            if (member.type === 'mapObject') {
+              const sib = mapObjects.find(o => o.id === member.id);
+              if (sib) updateMapObject(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
+            } else if (member.type === 'token') {
+              const t = tokens.find(tok => tok.id === member.id);
+              if (t) newTempPositions[member.id] = { x: t.x + deltaX, y: t.y + deltaY };
+            } else if (member.type === 'region') {
+              const sib = regions.find(r => r.id === member.id);
+              if (sib) updateRegion(member.id, { x: sib.x + deltaX, y: sib.y + deltaY });
+            } else if (member.type === 'light') {
+              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
+              if (sib) useLightStore.getState().updateLight(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
+            }
+          }
+        }
+
         setTempTokenPositions(newTempPositions);
 
         if (draggedRegion.regionType === "path" && draggedRegion.pathPoints) {
@@ -5737,6 +5896,47 @@ export const SimpleTabletop = () => {
           const rotatedPos = rotatePoint(groupedToken.startX, groupedToken.startY, centerX, centerY, rotationDelta);
           newTempPositions[groupedToken.tokenId] = { x: rotatedPos.x, y: rotatedPos.y };
         });
+
+        // Propagate rotation to group siblings around the region center (acts as group pivot)
+        const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
+        if (group) {
+          const rad = (rotationDelta * Math.PI) / 180;
+          const cos = Math.cos(rad); const sin = Math.sin(rad);
+          for (const member of group.members) {
+            if (member.id === draggedRegionId) continue;
+            if (member.type === 'mapObject') {
+              const sib = mapObjects.find(o => o.id === member.id);
+              if (sib) {
+                const dx = sib.position.x - centerX; const dy = sib.position.y - centerY;
+                updateMapObject(member.id, {
+                  position: { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos },
+                  rotation: (sib.rotation || 0) + rotationDelta,
+                });
+              }
+            } else if (member.type === 'token') {
+              const t = tokens.find(tok => tok.id === member.id);
+              if (t) {
+                const dx = t.x - centerX; const dy = t.y - centerY;
+                newTempPositions[member.id] = { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos };
+              }
+            } else if (member.type === 'region') {
+              const sib = regions.find(r => r.id === member.id);
+              if (sib) {
+                const cx2 = sib.x + sib.width / 2; const cy2 = sib.y + sib.height / 2;
+                const dx = cx2 - centerX; const dy = cy2 - centerY;
+                const newCx = centerX + dx * cos - dy * sin; const newCy = centerY + dx * sin + dy * cos;
+                updateRegion(member.id, { x: newCx - sib.width / 2, y: newCy - sib.height / 2, rotation: (sib.rotation || 0) + rotationDelta });
+              }
+            } else if (member.type === 'light') {
+              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
+              if (sib) {
+                const dx = sib.position.x - centerX; const dy = sib.position.y - centerY;
+                useLightStore.getState().updateLight(member.id, { position: { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos } });
+              }
+            }
+          }
+        }
+
         setTempTokenPositions(newTempPositions);
       }
 
@@ -6303,6 +6503,13 @@ export const SimpleTabletop = () => {
         setDraggedVertexInfo(null);
         notifyObstaclesChanged();
         toast.success("Wall vertex moved");
+      }
+
+      // Handle MapObject rotation completion
+      if (isRotatingMapObject && rotatingMapObjectId) {
+        setIsRotatingMapObject(false);
+        setRotatingMapObjectId(null);
+        notifyObstaclesChanged();
       }
 
       // Handle MapObject drag completion
@@ -7111,7 +7318,12 @@ export const SimpleTabletop = () => {
             {/* Map Object Control Bar - Shows when map object(s) are selected */}
             <MapObjectControlBar
               pointEditMode={wallPointEditMode}
-              onTogglePointEditMode={() => setWallPointEditMode(prev => !prev)}
+              onTogglePointEditMode={() => {
+                setWallPointEditMode(prev => !prev);
+                setMapObjectTool('points');
+              }}
+              mapObjectTool={mapObjectTool}
+              onSetMapObjectTool={setMapObjectTool}
               onUpdateCanvas={handleCanvasUpdate}
             />
           </>
