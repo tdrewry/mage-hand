@@ -1,4 +1,4 @@
-import { DoorConnection, Annotation, DOOR_TYPE_LABELS } from './dungeonTypes';
+import { DoorConnection, DOOR_TYPE_LABELS } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 import { generateWallGeometry, applyWallHatching, generateFloorGeometry, FloorGeometry } from './wallGeometry';
@@ -338,39 +338,16 @@ export function renderDungeonMapDoors(
 
 /**
  * Render annotations on the canvas
+ * NOTE: Annotations are now first-class MapObjects (category: 'annotation').
+ * This function is kept as a no-op for any remaining callers; rendering is handled
+ * in SimpleTabletop via drawAnnotationsToContext() using the mapObjects store.
  */
 export function renderAnnotations(
-  ctx: CanvasRenderingContext2D,
-  annotations: Annotation[],
-  zoom: number
+  _ctx: CanvasRenderingContext2D,
+  _annotations: { id: string; reference: string; position: { x: number; y: number } }[],
+  _zoom: number
 ) {
-  annotations.forEach((annotation) => {
-    ctx.save();
-    
-    const { x, y } = annotation.position;
-    const radius = 12 / zoom;
-    const fontSize = 10 / zoom;
-    
-    // Draw circle background
-    ctx.fillStyle = '#3b82f6';
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Draw white border
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2 / zoom;
-    ctx.stroke();
-    
-    // Draw reference number
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(annotation.reference, x, y);
-    
-    ctx.restore();
-  });
+  // No-op — annotations are now MapObjects rendered directly in SimpleTabletop.
 }
 
 /**

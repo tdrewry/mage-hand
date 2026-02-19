@@ -8,13 +8,7 @@ export interface DoorConnection {
   regionIds?: string[]; // Regions connected by this door
 }
 
-export interface Annotation {
-  id: string;
-  text: string;
-  reference: string; // "1", "2", etc.
-  position: { x: number; y: number };
-  regionId?: string; // Optional association with a region
-}
+// Annotation type removed — annotations are now first-class MapObjects (category: 'annotation')
 
 export interface LightSource {
   id: string;

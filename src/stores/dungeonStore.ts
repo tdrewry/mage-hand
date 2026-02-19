@@ -1,12 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DoorConnection, Annotation, LightSource } from '@/lib/dungeonTypes';
+import { DoorConnection, LightSource } from '@/lib/dungeonTypes';
 import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
 import { WallGeometry, LineSegment } from '@/lib/wallGeometry';
 
 interface DungeonStore {
   doors: DoorConnection[];
-  annotations: Annotation[];
   lightSources: LightSource[];
   importedWallSegments: LineSegment[]; // Wall segments imported from dd2vtt or other external formats
   renderingMode: 'edit' | 'play';
@@ -150,39 +149,7 @@ interface DungeonStore {
    */
   setDoors: (doors: DoorConnection[]) => void;
   
-  // Annotation operations
-  /**
-   * Adds a new annotation to the dungeon.
-   * @param annotation The annotation data to add.
-   */
-  addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
-
-  /**
-   * Updates an existing annotation.
-   * @param id The ID of the annotation to update.
-   * @param updates The updates to apply.
-   */
-  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
-
-  /**
-   * Removes an annotation from the dungeon.
-   * @param id The ID of the annotation to remove.
-   */
-  removeAnnotation: (id: string) => void;
-
-  /**
-   * Clears all annotations from the dungeon.
-   */
-  clearAnnotations: () => void;
-
-  /**
-   * Replaces the entire annotations array.
-   * @param annotations The new array of annotations.
-   */
-  setAnnotations: (annotations: Annotation[]) => void;
-  
-  
-  // Terrain operations — REMOVED (water/trap are now MapObjects)
+  // Terrain operations — REMOVED (water/trap/annotations are now MapObjects)
   // Legacy stubs kept for zero-error migration; do nothing.
   addTerrainFeature: (_feature: any) => void;
   updateTerrainFeature: (_id: string, _updates: any) => void;
@@ -204,7 +171,7 @@ interface DungeonStore {
   
   // Clear all dungeon data
   /**
-   * Clears all data related to the dungeon (doors, annotations, terrain, light sources, imported walls).
+   * Clears all data related to the dungeon (doors, terrain, light sources, imported walls).
    */
   clearAll: () => void;
 }
@@ -213,7 +180,6 @@ export const useDungeonStore = create<DungeonStore>()(
   persist(
     (set) => ({
     doors: [],
-    annotations: [],
     lightSources: [],
     importedWallSegments: [],
     renderingMode: 'edit',
@@ -275,40 +241,7 @@ export const useDungeonStore = create<DungeonStore>()(
         set({ doors });
       },
       
-      // Annotation operations
-      addAnnotation: (annotationData) => {
-        const newAnnotation: Annotation = {
-          ...annotationData,
-          id: `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        };
-        set((state) => ({
-          annotations: [...state.annotations, newAnnotation],
-        }));
-      },
-      
-      updateAnnotation: (id, updates) => {
-        set((state) => ({
-          annotations: state.annotations.map((annotation) =>
-            annotation.id === id ? { ...annotation, ...updates } : annotation
-          ),
-        }));
-      },
-      
-      removeAnnotation: (id) => {
-        set((state) => ({
-          annotations: state.annotations.filter((annotation) => annotation.id !== id),
-        }));
-      },
-      
-      clearAnnotations: () => {
-        set({ annotations: [] });
-      },
-      
-      setAnnotations: (annotations) => {
-        set({ annotations });
-      },
-      
-      // Terrain operations — no-ops (water/trap are now MapObjects)
+      // Terrain operations — no-ops (water/trap/annotations are now MapObjects)
       addTerrainFeature: () => {},
       updateTerrainFeature: () => {},
       removeTerrainFeature: () => {},
@@ -361,7 +294,6 @@ export const useDungeonStore = create<DungeonStore>()(
       clearAll: () => {
         set({
           doors: [],
-          annotations: [],
           lightSources: [],
           importedWallSegments: [],
         });

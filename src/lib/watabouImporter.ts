@@ -1,6 +1,6 @@
 import { WatabouJSON } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
-import { DoorConnection, Annotation } from './dungeonTypes';
+import { DoorConnection } from './dungeonTypes';
 import { groupConnectedTiles, generateSimpleContour } from '@/utils/marchingSquares';
 import { simplifyPath, smoothPath } from '@/utils/pathSimplification';
 
@@ -233,9 +233,9 @@ function convertDoor(door: WatabouJSON['doors'][0]): Omit<DoorConnection, 'id'> 
 }
 
 /**
- * Convert Watabou note to Annotation
+ * Convert Watabou note to annotation MapObject data
  */
-function convertNote(note: WatabouJSON['notes'][0]): Omit<Annotation, 'id'> {
+function convertNote(note: WatabouJSON['notes'][0]): { text: string; reference: string; position: { x: number; y: number } } {
   return {
     text: note.text,
     reference: note.ref,
@@ -285,10 +285,17 @@ function convertColumnTiles(columnTiles: { x: number; y: number }[]): { x: numbe
   }));
 }
 
+export interface AnnotationMapObjectData {
+  text: string;
+  reference: string;
+  position: { x: number; y: number };
+}
+
 export interface ImportedDungeon {
   regions: Omit<CanvasRegion, 'id'>[];
   doors: Omit<DoorConnection, 'id'>[];
-  annotations: Omit<Annotation, 'id'>[];
+  /** Annotation data — each becomes an 'annotation' MapObject via convertAnnotationToMapObject */
+  annotationData: AnnotationMapObjectData[];
   /** Water body data for convertWaterToMapObject (null if no water) */
   waterMapObjectData: { tiles: { x: number; y: number }[]; fluidBoundary?: { x: number; y: number }[] } | null;
   /** Trap tiles — each becomes an individual MapObject via convertTrapToMapObject */
@@ -316,7 +323,7 @@ export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon & { col
     convertRect(rect, index, json.rects, connections)
   );
   const doors = json.doors.map(convertDoor);
-  const annotations = json.notes.map(convertNote);
+  const annotationData = json.notes.map(convertNote);
 
   // Water → raw data for MapObject conversion by the caller
   const waterMapObjectData = (json.water && json.water.length > 0)
@@ -324,8 +331,6 @@ export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon & { col
     : null;
 
   // Traps → individual tile coords for MapObject conversion by the caller
-  // (Watabou JSON doesn't have a dedicated trap array; traps come from TerrainFeature.type === 'trap'
-  //  which was previously injected externally. For now we expose an empty array as the hook point.)
   const trapTiles: { x: number; y: number }[] = [];
 
   // Columns are returned separately for MapObject conversion
@@ -336,7 +341,7 @@ export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon & { col
   return {
     regions,
     doors,
-    annotations,
+    annotationData,
     waterMapObjectData,
     trapTiles,
     columnTiles,

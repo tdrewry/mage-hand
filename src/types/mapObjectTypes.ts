@@ -3,7 +3,7 @@
  * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light' | 'annotation';
 
 export interface MapObject {
   id: string;
@@ -61,6 +61,10 @@ export interface MapObject {
   
   // For linking to imported terrain features
   terrainFeatureId?: string;
+
+  // Annotation-specific properties (category: 'annotation')
+  annotationText?: string;     // Full descriptive text shown in popup
+  annotationReference?: string; // Short label drawn on the circle badge (e.g. "1", "A")
 }
 
 export type MapObjectCategory = 
@@ -70,6 +74,7 @@ export type MapObjectCategory =
   | 'debris'
   | 'trap'
   | 'water'
+  | 'annotation'
   | 'decoration'
   | 'obstacle'
   | 'door'
@@ -86,6 +91,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   debris: 'Debris',
   trap: 'Trap',
   water: 'Water',
+  annotation: 'Annotation Marker',
   decoration: 'Decoration',
   obstacle: 'Obstacle',
   door: 'Door',
@@ -274,6 +280,19 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     fillColor: '#fbbf24',
     strokeColor: '#f59e0b',
     strokeWidth: 1,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
+  },
+  annotation: {
+    shape: 'annotation',
+    width: 24,
+    height: 24,
+    fillColor: '#3b82f6',
+    strokeColor: '#ffffff',
+    strokeWidth: 2,
     opacity: 1,
     castsShadow: false,
     blocksMovement: false,

@@ -46,6 +46,9 @@ interface MapObjectStore {
     fluidBoundary?: { x: number; y: number }[]
   ) => string;
   convertTrapToMapObject: (tile: { x: number; y: number }) => string;
+
+  // Conversion from annotations
+  convertAnnotationToMapObject: (annotation: { id?: string; text: string; reference: string; position: { x: number; y: number } }) => string;
   
   // Conversion from doors
   convertDoorToMapObject: (door: DoorConnection) => string;
@@ -358,6 +361,32 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       selected: false,
     };
 
+    set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
+    return id;
+  },
+
+  convertAnnotationToMapObject: (annotation) => {
+    const id = annotation.id || generateId();
+    const mapObj: MapObject = {
+      id,
+      position: { x: annotation.position.x, y: annotation.position.y },
+      width: 24,
+      height: 24,
+      shape: 'annotation',
+      category: 'annotation',
+      annotationText: annotation.text,
+      annotationReference: annotation.reference,
+      fillColor: '#3b82f6',
+      strokeColor: '#ffffff',
+      strokeWidth: 2,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: false,
+      revealedByLight: false,
+      selected: false,
+      label: annotation.reference,
+    };
     set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
     return id;
   },

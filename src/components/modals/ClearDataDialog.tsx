@@ -12,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useGroupStore } from '@/stores/groupStore';
 import { Canvas as FabricCanvas } from 'fabric';
@@ -37,7 +36,6 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
 
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
-  const { clearAnnotations } = useDungeonStore();
   const { clearMapObjects } = useMapObjectStore();
   const { clearAllGroups } = useGroupStore();
 
@@ -69,7 +67,10 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
     }
 
     if (shouldClearMarkers) {
-      clearAnnotations();
+      // Annotations are now MapObjects with category 'annotation' — cleared alongside map objects
+      // If only markers are being cleared (not all map objects), we filter-remove them
+      const { mapObjects, removeMapObject } = useMapObjectStore.getState();
+      mapObjects.filter(o => o.category === 'annotation').forEach(o => removeMapObject(o.id));
       cleared.push('markers');
     }
 
