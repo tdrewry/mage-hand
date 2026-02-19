@@ -69,6 +69,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
     addGroup, 
     removeGroup, 
     updateGroup,
+    setGroupLocked,
     selectGroup,
     deselectGroup,
     clearGroupSelection,
@@ -157,7 +158,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
   };
 
   const handleToggleGroupLock = (group: EntityGroup) => {
-    updateGroup(group.id, { locked: !group.locked });
+    setGroupLocked(group.id, !group.locked);
     toast.success(`Group "${group.name}" ${group.locked ? 'unlocked' : 'locked'}`);
   };
 

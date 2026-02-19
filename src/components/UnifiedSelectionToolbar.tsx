@@ -37,6 +37,7 @@ export const UnifiedSelectionToolbar: React.FC<UnifiedSelectionToolbarProps> = (
   const selectedGroupIds = useGroupStore((s) => s.selectedGroupIds);
   const removeGroup = useGroupStore((s) => s.removeGroup);
   const updateGroup = useGroupStore((s) => s.updateGroup);
+  const setGroupLocked = useGroupStore((s) => s.setGroupLocked);
   const clearGroupSelection = useGroupStore((s) => s.clearGroupSelection);
   const getGroupForEntity = useGroupStore((s) => s.getGroupForEntity);
 
@@ -134,7 +135,7 @@ export const UnifiedSelectionToolbar: React.FC<UnifiedSelectionToolbarProps> = (
 
   const handleToggleLock = () => {
     if (!singleGroup) return;
-    updateGroup(singleGroup.id, { locked: !singleGroup.locked });
+    setGroupLocked(singleGroup.id, !singleGroup.locked);
     toast.success(singleGroup.locked ? 'Group unlocked' : 'Group locked');
   };
 
