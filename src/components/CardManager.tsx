@@ -20,10 +20,15 @@ import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
+import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { CardType, CardState } from '@/types/cardTypes';
+
+const LazyMapTreeCardContent = React.lazy(() =>
+  import('@/components/cards/MapTreeCard').then(m => ({ default: m.MapTreeCardContent }))
+);
 
 interface CardManagerProps {
   children?: React.ReactNode;
@@ -136,6 +141,7 @@ function getCardTitle(type: CardType): string {
     [CardType.CHARACTER_SHEET]: 'Character Sheet',
     [CardType.MONSTER_STAT_BLOCK]: 'Monster Stat Block',
     [CardType.CREATURE_LIBRARY]: 'Creature Library',
+    [CardType.MAP_TREE]: 'Map Tree',
   };
   
   return titles[type] || type;
@@ -213,6 +219,12 @@ function renderCardContent(
       return <MonsterStatBlockCardContent monsterId={(metadata?.monsterId as string) || ''} />;
     case CardType.CREATURE_LIBRARY:
       return <CreatureLibraryCardContent cardId={cardId} />;
+    case CardType.MAP_TREE:
+      return (
+        <Suspense fallback={<div className="p-4 text-xs text-muted-foreground">Loading…</div>}>
+          <LazyMapTreeCardContent />
+        </Suspense>
+      );
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -66,6 +66,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
   const mapObjectsCard = cards.find((c) => c.type === CardType.MAP_OBJECTS);
   const creatureLibraryCard = cards.find((c) => c.type === CardType.CREATURE_LIBRARY);
+  const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -507,6 +508,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <BookOpen className="h-4 w-4 mr-2" />
           Creature Library
+        </Button>
+
+        <Button 
+          variant={mapTreeCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (mapTreeCard) {
+              setVisibility(mapTreeCard.id, !mapTreeCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.MAP_TREE,
+                title: 'Map Tree',
+                defaultPosition: { x: 320, y: 80 },
+                defaultSize: { width: 320, height: 500 },
+                minSize: { width: 260, height: 300 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <GitBranch className="h-4 w-4 mr-2" />
+          Map Tree
         </Button>
       </div>
 
