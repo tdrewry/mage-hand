@@ -6381,10 +6381,6 @@ export const SimpleTabletop = () => {
         const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
         const rotationDelta = currentAngle - rotationStartAngle;
 
-        // Update the primary region's visual rotation (drawn around its own center by the renderer,
-        // but the visual angle is correct because rotationStartAngle was measured from the pivot)
-        setTempRegionRotation({ [draggedRegionId]: rotationDelta });
-
         setDragPreview({
           regionId: draggedRegionId,
           x: draggedRegion.x,
@@ -6409,7 +6405,6 @@ export const SimpleTabletop = () => {
           const rad = (rotationDelta * Math.PI) / 180;
           const cos = Math.cos(rad); const sin = Math.sin(rad);
           for (const member of group.members) {
-            if (member.id === draggedRegionId) continue; // primary region handled above via tempRegionRotation
             const snap = groupSiblingSnapshotsRef.current[member.id];
             if (!snap) continue;
             if (member.type === 'mapObject' && snap.type === 'mapObject') {
@@ -7117,16 +7112,8 @@ export const SimpleTabletop = () => {
 
     // Handle rotation completion
     if (isRotatingRegion && draggedRegionId) {
-      // Apply final rotation to region and tokens
-      if (tempRegionRotation[draggedRegionId]) {
-        const rotationDelta = tempRegionRotation[draggedRegionId];
-        const currentRegion = regions.find((r) => r.id === draggedRegionId);
-        const newRotation = (currentRegion?.rotation || 0) + rotationDelta;
-        
-        updateRegion(draggedRegionId, {
-          rotation: newRotation,
-        });
-      }
+      // Primary region is now committed live in the sibling loop during mousemove
+      // (same as all other group members). Nothing extra to commit here.
 
       // Clear rotation state
       setIsRotatingRegion(false);
