@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,6 +44,16 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   if (selectedRegions.length === 0) return null;
   
   const isSingleSelection = selectedRegions.length === 1;
+  const allLocked = selectedRegions.every(r => r.locked);
+  const someLocked = selectedRegions.some(r => r.locked);
+  
+  const handleToggleLock = () => {
+    const newLocked = !allLocked;
+    selectedRegions.forEach(region => {
+      updateRegion(region.id, { locked: newLocked });
+    });
+    toast.success(`${newLocked ? 'Locked' : 'Unlocked'} ${selectedRegions.length} region(s)`);
+  };
   
   const handleToggleGridSnap = (enabled: boolean) => {
     selectedRegions.forEach(region => {
@@ -153,6 +163,19 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
               max={500}
             />
           </div>
+          
+          <div className="h-4 w-px bg-border" />
+          
+          {/* Lock Toggle */}
+          <Button 
+            variant={allLocked ? "default" : "ghost"} 
+            size="sm" 
+            className="h-6 px-2 text-xs" 
+            onClick={handleToggleLock}
+          >
+            {allLocked ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+            {allLocked ? 'Locked' : 'Lock'}
+          </Button>
           
           <div className="h-4 w-px bg-border" />
           
