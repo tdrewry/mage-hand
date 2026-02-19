@@ -341,7 +341,7 @@ export const SimpleTabletop = () => {
   const updateMapObject = useMapObjectStore((state) => state.updateMapObject);
 
   // Light system store
-  const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity } = useLightStore();
+  const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity, selectedLightIds, selectMultipleLights, clearLightSelection } = useLightStore();
 
   // Light placement mode
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
@@ -497,7 +497,7 @@ export const SimpleTabletop = () => {
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
-  const [marqueeMode, setMarqueeMode] = useState<'regions' | 'tokens' | 'both'>('both');
+  const [marqueeMode, setMarqueeMode] = useState<'regions' | 'tokens' | 'both' | 'all'>('all');
   
   // Undo/Redo: Track initial states before transformations
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -4687,12 +4687,14 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
           clearMapObjectSelection();
+          clearLightSelection();
         } else {
           // Play mode: just deselect
           setSelectedTokenIds([]);
           clearSelection();
           setSelectedRegionIds([]);
           clearMapObjectSelection();
+          clearLightSelection();
         }
       }
     }
@@ -5872,6 +5874,8 @@ export const SimpleTabletop = () => {
       if (marqueeWidth > 5 && marqueeHeight > 5) {
         const selectedRegionIdsList: string[] = [];
         const selectedTokenIdsList: string[] = [];
+        const selectedMapObjectIdsList: string[] = [];
+        const selectedLightIdsList: string[] = [];
         
         // Select regions (in edit mode)
         if (renderingMode === 'edit') {
@@ -5928,12 +5932,74 @@ export const SimpleTabletop = () => {
           }
         });
         
+        // Select map objects (in edit mode)
+        if (renderingMode === 'edit') {
+          mapObjects.forEach(obj => {
+            let objMinX: number, objMinY: number, objMaxX: number, objMaxY: number;
+            
+            if (obj.shape === 'wall' && obj.wallPoints && obj.wallPoints.length > 0) {
+              // Wall polyline bounds
+              const xs = obj.wallPoints.map(p => p.x);
+              const ys = obj.wallPoints.map(p => p.y);
+              objMinX = Math.min(...xs);
+              objMinY = Math.min(...ys);
+              objMaxX = Math.max(...xs);
+              objMaxY = Math.max(...ys);
+            } else {
+              // Standard object bounds from position + dimensions
+              const halfW = obj.width / 2;
+              const halfH = obj.height / 2;
+              objMinX = obj.position.x - halfW;
+              objMinY = obj.position.y - halfH;
+              objMaxX = obj.position.x + halfW;
+              objMaxY = obj.position.y + halfH;
+            }
+            
+            const intersects = !(objMaxX < minX || objMinX > maxX || 
+                                objMaxY < minY || objMinY > maxY);
+            
+            if (intersects) {
+              selectedMapObjectIdsList.push(obj.id);
+            }
+          });
+        }
+        
+        // Select lights (in edit mode)
+        if (renderingMode === 'edit') {
+          lights.forEach(light => {
+            // Light is a point with a radius; use a small bounding box around the position
+            const lightSize = 15; // Visual size of light icon
+            const lMinX = light.position.x - lightSize;
+            const lMinY = light.position.y - lightSize;
+            const lMaxX = light.position.x + lightSize;
+            const lMaxY = light.position.y + lightSize;
+            
+            const intersects = !(lMaxX < minX || lMinX > maxX || 
+                                lMaxY < minY || lMinY > maxY);
+            
+            if (intersects) {
+              selectedLightIdsList.push(light.id);
+            }
+          });
+        }
+        
         // Update state based on what was selected
         if (selectedRegionIdsList.length > 0) {
           setSelectedRegionIds(selectedRegionIdsList);
         }
         if (selectedTokenIdsList.length > 0) {
           setSelectedTokenIds(selectedTokenIdsList);
+        }
+        if (selectedMapObjectIdsList.length > 0) {
+          selectMapObject(selectedMapObjectIdsList[0]); // Select first
+          if (selectedMapObjectIdsList.length > 1) {
+            // Use selectMultiple for all
+            const selectMultiple = useMapObjectStore.getState().selectMultiple;
+            selectMultiple(selectedMapObjectIdsList);
+          }
+        }
+        if (selectedLightIdsList.length > 0) {
+          selectMultipleLights(selectedLightIdsList);
         }
         
         // Show feedback
@@ -5944,8 +6010,14 @@ export const SimpleTabletop = () => {
         if (selectedTokenIdsList.length > 0) {
           parts.push(`${selectedTokenIdsList.length} token${selectedTokenIdsList.length !== 1 ? 's' : ''}`);
         }
+        if (selectedMapObjectIdsList.length > 0) {
+          parts.push(`${selectedMapObjectIdsList.length} object${selectedMapObjectIdsList.length !== 1 ? 's' : ''}`);
+        }
+        if (selectedLightIdsList.length > 0) {
+          parts.push(`${selectedLightIdsList.length} light${selectedLightIdsList.length !== 1 ? 's' : ''}`);
+        }
         if (parts.length > 0) {
-          toast.success(`Selected ${parts.join(' and ')}`);
+          toast.success(`Selected ${parts.join(', ')}`);
         }
       }
       

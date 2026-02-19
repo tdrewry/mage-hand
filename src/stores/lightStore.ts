@@ -17,6 +17,9 @@ interface LightState {
   globalAmbientLight: number; // 0-1, baseline illumination
   shadowIntensity: number; // 0-1, how dark shadows are
   
+  // Selection state
+  selectedLightIds: string[];
+  
   // Actions
   addLight: (light: Omit<LightSource, 'id'> & { id?: string }) => string;
   updateLight: (id: string, updates: Partial<LightSource>) => void;
@@ -26,6 +29,12 @@ interface LightState {
   setGlobalAmbientLight: (level: number) => void;
   setShadowIntensity: (intensity: number) => void;
   clearAllLights: () => void;
+  
+  // Selection actions
+  selectLight: (id: string, additive?: boolean) => void;
+  deselectLight: (id: string) => void;
+  clearLightSelection: () => void;
+  selectMultipleLights: (ids: string[]) => void;
 }
 
 let nextLightId = 1;
@@ -35,6 +44,7 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
   lights: [],
   globalAmbientLight: 0.2, // 20% ambient light by default
   shadowIntensity: 0.7, // Shadows are 70% opaque by default
+  selectedLightIds: [],
   
   addLight: (light) => {
     // Use provided ID if available (for synced lights), otherwise generate new
@@ -90,7 +100,31 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
   },
   
   clearAllLights: () => {
-    set({ lights: [] });
+    set({ lights: [], selectedLightIds: [] });
+  },
+  
+  selectLight: (id, additive = false) => {
+    set((state) => {
+      if (additive) {
+        if (state.selectedLightIds.includes(id)) return state;
+        return { selectedLightIds: [...state.selectedLightIds, id] };
+      }
+      return { selectedLightIds: [id] };
+    });
+  },
+  
+  deselectLight: (id) => {
+    set((state) => ({
+      selectedLightIds: state.selectedLightIds.filter((lid) => lid !== id),
+    }));
+  },
+  
+  clearLightSelection: () => {
+    set({ selectedLightIds: [] });
+  },
+  
+  selectMultipleLights: (ids) => {
+    set({ selectedLightIds: ids });
   },
 });
 
@@ -107,6 +141,7 @@ const persistOptions: PersistOptions<LightState, Partial<LightState>> = {
     lights: state.lights,
     globalAmbientLight: state.globalAmbientLight,
     shadowIntensity: state.shadowIntensity,
+    selectedLightIds: [],
   }),
 };
 
