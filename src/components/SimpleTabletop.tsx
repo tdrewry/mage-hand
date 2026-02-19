@@ -7111,7 +7111,63 @@ export const SimpleTabletop = () => {
 
       // Handle MapObject drag completion
       if (isDraggingMapObject && draggedMapObjectId) {
-        // Just reset the drag state - position was already updated during drag
+        // Build batch undo from snapshots captured at drag start vs current store state
+        const snapshots = groupSiblingSnapshotsRef.current;
+        const currentMapObjects = useMapObjectStore.getState().mapObjects;
+        const currentRegions2 = useRegionStore.getState().regions;
+
+        type MobjDragEntry = { id: string; before: Partial<import('@/types/mapObjectTypes').MapObject>; after: Partial<import('@/types/mapObjectTypes').MapObject> };
+        type RegDragEntry = { id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> };
+        const mobjDragEntries: MobjDragEntry[] = [];
+        const regDragEntries: RegDragEntry[] = [];
+
+        for (const [memberId, snap] of Object.entries(snapshots)) {
+          if (snap.type === 'mapObject') {
+            const afterObj = currentMapObjects.find(o => o.id === memberId);
+            if (!afterObj) continue;
+            const before: Partial<import('@/types/mapObjectTypes').MapObject> = {
+              position: { ...snap.position! },
+              ...(snap.wallPoints ? { wallPoints: snap.wallPoints.map(p => ({ ...p })), width: snap.width, height: snap.height } : {}),
+            };
+            const after: Partial<import('@/types/mapObjectTypes').MapObject> = {
+              position: { ...afterObj.position },
+              ...(afterObj.wallPoints ? { wallPoints: afterObj.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+            };
+            mobjDragEntries.push({ id: memberId, before, after });
+          } else if (snap.type === 'region') {
+            const afterReg = currentRegions2.find(r => r.id === memberId);
+            if (!afterReg) continue;
+            const before: Partial<CanvasRegion> = {
+              x: snap.x, y: snap.y,
+              ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
+            };
+            const after: Partial<CanvasRegion> = {
+              x: afterReg.x, y: afterReg.y,
+              ...(afterReg.pathPoints ? { pathPoints: afterReg.pathPoints.map(p => ({ ...p })) } : {}),
+            };
+            regDragEntries.push({ id: memberId, before, after });
+          }
+        }
+
+        if (mobjDragEntries.length > 0 || regDragEntries.length > 0) {
+          undoRedoManager.push({
+            type: 'BATCH_GROUP_DRAG',
+            description: 'Move map object',
+            execute: () => {
+              const { updateMapObject: umo } = useMapObjectStore.getState();
+              const { updateRegion: ur } = useRegionStore.getState();
+              for (const e of mobjDragEntries) umo(e.id, e.after);
+              for (const e of regDragEntries) ur(e.id, e.after);
+            },
+            undo: () => {
+              const { updateMapObject: umo } = useMapObjectStore.getState();
+              const { updateRegion: ur } = useRegionStore.getState();
+              for (const e of mobjDragEntries) umo(e.id, e.before);
+              for (const e of regDragEntries) ur(e.id, e.before);
+            },
+          });
+        }
+
         setIsDraggingMapObject(false);
         setDraggedMapObjectId(null);
         setMapObjectDragOffset({ x: 0, y: 0 });
@@ -7256,9 +7312,79 @@ export const SimpleTabletop = () => {
       if (currentRegion) {
         const currentState = captureRegionTransformState(currentRegion);
 
-        // Only register if something actually changed
         if (hasTransformChanged(initialRegionState, currentState)) {
-          transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+          // Check if there are group siblings that also moved
+          const snapshots = groupSiblingSnapshotsRef.current;
+          const siblingKeys = Object.keys(snapshots).filter(k => k !== transformingRegionId);
+          const hasSiblings = siblingKeys.length > 0;
+
+          if (hasSiblings) {
+            // Build a batch command covering the primary region + all group siblings
+            const currentMapObjects3 = useMapObjectStore.getState().mapObjects;
+            const currentRegions3 = useRegionStore.getState().regions;
+
+            type MobjBatchEntry = { id: string; before: Partial<import('@/types/mapObjectTypes').MapObject>; after: Partial<import('@/types/mapObjectTypes').MapObject> };
+            type RegBatchEntry = { id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> };
+            const mobjBatch: MobjBatchEntry[] = [];
+            const regBatch: RegBatchEntry[] = [];
+
+            // Primary region
+            regBatch.push({ id: transformingRegionId, before: initialRegionState, after: currentState });
+
+            // Siblings
+            for (const [memberId, snap] of Object.entries(snapshots)) {
+              if (memberId === transformingRegionId) continue;
+              if (snap.type === 'mapObject') {
+                const afterObj = currentMapObjects3.find(o => o.id === memberId);
+                if (!afterObj) continue;
+                mobjBatch.push({
+                  id: memberId,
+                  before: {
+                    position: { ...snap.position! },
+                    ...(snap.wallPoints ? { wallPoints: snap.wallPoints.map(p => ({ ...p })), width: snap.width, height: snap.height } : {}),
+                  },
+                  after: {
+                    position: { ...afterObj.position },
+                    ...(afterObj.wallPoints ? { wallPoints: afterObj.wallPoints.map(p => ({ ...p })), width: afterObj.width, height: afterObj.height } : {}),
+                  },
+                });
+              } else if (snap.type === 'region') {
+                const afterReg = currentRegions3.find(r => r.id === memberId);
+                if (!afterReg) continue;
+                regBatch.push({
+                  id: memberId,
+                  before: {
+                    x: snap.x, y: snap.y,
+                    ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
+                  },
+                  after: {
+                    x: afterReg.x, y: afterReg.y,
+                    ...(afterReg.pathPoints ? { pathPoints: afterReg.pathPoints.map(p => ({ ...p })) } : {}),
+                  },
+                });
+              }
+            }
+
+            undoRedoManager.push({
+              type: 'BATCH_GROUP_DRAG',
+              description: 'Move group',
+              execute: () => {
+                const { updateRegion: ur } = useRegionStore.getState();
+                const { updateMapObject: umo } = useMapObjectStore.getState();
+                for (const e of regBatch) ur(e.id, e.after);
+                for (const e of mobjBatch) umo(e.id, e.after);
+              },
+              undo: () => {
+                const { updateRegion: ur } = useRegionStore.getState();
+                const { updateMapObject: umo } = useMapObjectStore.getState();
+                for (const e of regBatch) ur(e.id, e.before);
+                for (const e of mobjBatch) umo(e.id, e.before);
+              },
+            });
+          } else {
+            // No group siblings — single region undo as before
+            transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
+          }
         }
       }
 
