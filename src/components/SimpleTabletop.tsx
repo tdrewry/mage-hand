@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { MapManager } from "./MapManager";
 import { TokenContextManager } from "./TokenContextManager";
 import { CardManager } from "./CardManager";
@@ -319,7 +320,18 @@ export const SimpleTabletop = () => {
     deselectRegion,
     clearSelection,
     getSelectedRegions,
-  } = useRegionStore();
+  } = useRegionStore(useShallow((s) => ({
+    regions: s.regions,
+    addRegion: s.addRegion,
+    updateRegion: s.updateRegion,
+    removeRegion: s.removeRegion,
+    clearRegions: s.clearRegions,
+    setRegions: s.setRegions,
+    selectRegion: s.selectRegion,
+    deselectRegion: s.deselectRegion,
+    clearSelection: s.clearSelection,
+    getSelectedRegions: s.getSelectedRegions,
+  })));
 
   // Dungeon features store
   const {
@@ -333,7 +345,18 @@ export const SimpleTabletop = () => {
     wallEdgeStyle,
     wallThickness,
     textureScale,
-  } = useDungeonStore();
+  } = useDungeonStore(useShallow((s) => ({
+    doors: s.doors,
+    annotations: s.annotations,
+    terrainFeatures: s.terrainFeatures,
+    importedWallSegments: s.importedWallSegments,
+    renderingMode: s.renderingMode,
+    setRenderingMode: s.setRenderingMode,
+    watabouStyle: s.watabouStyle,
+    wallEdgeStyle: s.wallEdgeStyle,
+    wallThickness: s.wallThickness,
+    textureScale: s.textureScale,
+  })));
 
   // Map objects store
   const mapObjects = useMapObjectStore((state) => state.mapObjects);
@@ -344,7 +367,11 @@ export const SimpleTabletop = () => {
   const updateMapObject = useMapObjectStore((state) => state.updateMapObject);
 
   // Light system store
-  const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity, selectedLightIds, selectMultipleLights, clearLightSelection } = useLightStore();
+  const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity, selectedLightIds, selectMultipleLights, clearLightSelection } = useLightStore(useShallow((s) => ({
+    lights: s.lights, addLight: s.addLight, updateLight: s.updateLight, removeLight: s.removeLight,
+    globalAmbientLight: s.globalAmbientLight, shadowIntensity: s.shadowIntensity,
+    selectedLightIds: s.selectedLightIds, selectMultipleLights: s.selectMultipleLights, clearLightSelection: s.clearLightSelection,
+  })));
 
   // Group store
   const getGroupForEntity = useGroupStore((s) => s.getGroupForEntity);
@@ -366,7 +393,20 @@ export const SimpleTabletop = () => {
     effectSettings,
     realtimeVisionDuringDrag,
     realtimeVisionThrottleMs,
-  } = useFogStore();
+  } = useFogStore(useShallow((s) => ({
+    enabled: s.enabled,
+    revealAll: s.revealAll,
+    visionRange: s.visionRange,
+    fogOpacity: s.fogOpacity,
+    exploredOpacity: s.exploredOpacity,
+    serializedExploredAreas: s.serializedExploredAreas,
+    setSerializedExploredAreas: s.setSerializedExploredAreas,
+    setEnabled: s.setEnabled,
+    setRevealAll: s.setRevealAll,
+    effectSettings: s.effectSettings,
+    realtimeVisionDuringDrag: s.realtimeVisionDuringDrag,
+    realtimeVisionThrottleMs: s.realtimeVisionThrottleMs,
+  })));
   
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady } = usePostProcessing({
@@ -546,18 +586,28 @@ export const SimpleTabletop = () => {
     removeToken,
     currentPlayerId,
     players,
-  } = useSessionStore();
+  } = useSessionStore(useShallow((s) => ({
+    sessionId: s.sessionId,
+    tokens: s.tokens,
+    addToken: s.addToken,
+    updateTokenPosition: s.updateTokenPosition,
+    updateTokenLabel: s.updateTokenLabel,
+    updateTokenColor: s.updateTokenColor,
+    removeToken: s.removeToken,
+    currentPlayerId: s.currentPlayerId,
+    players: s.players,
+  })));
 
   // Check if current user is a DM (bypasses fog visibility restrictions)
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
   
   // Get DM fog visibility preference
-  const { dmFogVisibility } = useUiModeStore();
+  const { dmFogVisibility } = useUiModeStore(useShallow((s) => ({ dmFogVisibility: s.dmFogVisibility })));
 
-  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore(useShallow((s) => ({ maps: s.maps, getVisibleMaps: s.getVisibleMaps, getActiveRegionAt: s.getActiveRegionAt })));
 
-  const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore();
+  const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore(useShallow((s) => ({ isInCombat: s.isInCombat, currentTurnIndex: s.currentTurnIndex, initiativeOrder: s.initiativeOrder, restrictMovement: s.restrictMovement })));
 
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);
@@ -6990,6 +7040,9 @@ export const SimpleTabletop = () => {
       toast.error("Failed to add token");
     }
   };
+
+
+
 
   return (
     <div className="w-full h-screen bg-surface flex flex-col relative">
