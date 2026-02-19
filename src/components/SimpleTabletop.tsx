@@ -455,6 +455,8 @@ export const SimpleTabletop = () => {
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
   const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
+  // Snapshot of the dragged region's start position — used to compute absolute delta (avoids compounding)
+  const regionDragStartRef = useRef<{ x: number; y: number } | null>(null);
   const [isResizingRegion, setIsResizingRegion] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
 
@@ -486,6 +488,21 @@ export const SimpleTabletop = () => {
 
   // Grouped dragging state - simpler approach without Paper.js
   const [groupedTokens, setGroupedTokens] = useState<{ tokenId: string; startX: number; startY: number }[]>([]);
+
+  // Snapshot of ALL group siblings captured at the start of a drag or rotation.
+  // Using a ref (not state) so reads during mousemove never go stale.
+  // We ALWAYS apply transforms relative to these snapshots, never to live store state,
+  // to prevent the compounding-delta bug where every frame re-rotates an already-rotated entity.
+  const groupSiblingSnapshotsRef = useRef<{
+    [memberId: string]: {
+      type: 'mapObject' | 'region' | 'light' | 'token';
+      position?: { x: number; y: number };
+      rotation?: number;
+      wallPoints?: { x: number; y: number }[];
+      x?: number; y?: number; regRotation?: number;
+      lightPos?: { x: number; y: number };
+    }
+  }>({});
 
   // Temporary token positions during region drag to avoid store updates
   const [tempTokenPositions, setTempTokenPositions] = useState<{ [tokenId: string]: { x: number; y: number } }>();
@@ -5219,6 +5236,29 @@ export const SimpleTabletop = () => {
             const centerY = selectedRegion.y + selectedRegion.height / 2;
             setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
 
+            // Snapshot all group siblings at rotation start
+            const rotGroup1 = useGroupStore.getState().getGroupForEntity(selectedRegion.id);
+            if (rotGroup1) {
+              const snap: typeof groupSiblingSnapshotsRef.current = {};
+              for (const m of rotGroup1.members) {
+                if (m.id === selectedRegion.id) continue;
+                if (m.type === 'mapObject') {
+                  const o = mapObjects.find(x => x.id === m.id);
+                  if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                } else if (m.type === 'region') {
+                  const r = regions.find(x => x.id === m.id);
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                } else if (m.type === 'light') {
+                  const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                  if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                } else if (m.type === 'token') {
+                  const t = tokens.find(x => x.id === m.id);
+                  if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                }
+              }
+              groupSiblingSnapshotsRef.current = snap;
+            }
+
             // Group tokens for rotation
             const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
             tokens.forEach((token) => {
@@ -5362,6 +5402,36 @@ export const SimpleTabletop = () => {
               x: worldPos.x - clickedMapObject.position.x,
               y: worldPos.y - clickedMapObject.position.y,
             });
+            // Snapshot group siblings so mousemove can use fixed-origin deltas.
+            // Also snapshot the PRIMARY dragged object under its own ID so we can compute
+            // absolute delta (newX - primarySnap.x) instead of incremental (newX - prevObj.position.x).
+            const mobjDragGroup = useGroupStore.getState().getGroupForEntity(clickedMapObject.id);
+            const snap: typeof groupSiblingSnapshotsRef.current = {};
+            // Always snapshot the primary
+            snap[clickedMapObject.id] = {
+              type: 'mapObject',
+              position: { ...clickedMapObject.position },
+              wallPoints: clickedMapObject.wallPoints ? clickedMapObject.wallPoints.map(p => ({ ...p })) : undefined,
+            };
+            if (mobjDragGroup) {
+              for (const m of mobjDragGroup.members) {
+                if (m.id === clickedMapObject.id) continue;
+                if (m.type === 'mapObject') {
+                  const o = mapObjects.find(x => x.id === m.id);
+                  if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                } else if (m.type === 'region') {
+                  const r = regions.find(x => x.id === m.id);
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
+                } else if (m.type === 'light') {
+                  const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                  if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                } else if (m.type === 'token') {
+                  const t = tokens.find(x => x.id === m.id);
+                  if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                }
+              }
+            }
+            groupSiblingSnapshotsRef.current = snap;
           }
         }
         // Only allow region manipulation in edit mode (and not locked)
@@ -5378,6 +5448,29 @@ export const SimpleTabletop = () => {
           const centerX = clickedRegion.x + clickedRegion.width / 2;
           const centerY = clickedRegion.y + clickedRegion.height / 2;
           setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+
+          // Snapshot all group siblings at rotation start (clickedRegion path)
+          const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+          if (rotGroup2) {
+            const snap: typeof groupSiblingSnapshotsRef.current = {};
+            for (const m of rotGroup2.members) {
+              if (m.id === clickedRegion.id) continue;
+              if (m.type === 'mapObject') {
+                const o = mapObjects.find(x => x.id === m.id);
+                if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+              } else if (m.type === 'region') {
+                const r = regions.find(x => x.id === m.id);
+                if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+              } else if (m.type === 'light') {
+                const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+              } else if (m.type === 'token') {
+                const t = tokens.find(x => x.id === m.id);
+                if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+              }
+            }
+            groupSiblingSnapshotsRef.current = snap;
+          }
 
           // Group tokens inside the region for rotation
           const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
@@ -5409,6 +5502,8 @@ export const SimpleTabletop = () => {
             // Start dragging the region - group tokens for smooth movement
             setIsDraggingRegion(true);
             setDraggedRegionId(clickedRegion.id);
+            // Snapshot the region's start position for absolute delta computation in mousemove
+            regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
             
             // Capture stable visibility snapshot at drag start to prevent flashing
             if (currentVisibilityRef.current) {
@@ -5431,6 +5526,30 @@ export const SimpleTabletop = () => {
                 x: worldPos.x - clickedRegion.x,
                 y: worldPos.y - clickedRegion.y,
               });
+            }
+
+            // Snapshot all group siblings at drag start so mousemove can apply
+            // deltas from the ORIGINAL positions, not from cumulative live state.
+            const dragGroup = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+            if (dragGroup) {
+              const snap: typeof groupSiblingSnapshotsRef.current = {};
+              for (const m of dragGroup.members) {
+                if (m.id === clickedRegion.id) continue;
+                if (m.type === 'mapObject') {
+                  const o = mapObjects.find(x => x.id === m.id);
+                  if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                } else if (m.type === 'region') {
+                  const r = regions.find(x => x.id === m.id);
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
+                } else if (m.type === 'light') {
+                  const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                  if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                } else if (m.type === 'token') {
+                  const t = tokens.find(x => x.id === m.id);
+                  if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                }
+              }
+              groupSiblingSnapshotsRef.current = snap;
             }
 
             // Group tokens inside the region for smooth dragging
@@ -5751,13 +5870,19 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - mapObjectDragOffset.x;
       const newY = worldPos.y - mapObjectDragOffset.y;
 
+      // Compute ABSOLUTE delta from snapshot origin (not from live store — avoids compounding)
+      const primarySnap = groupSiblingSnapshotsRef.current[draggedMapObjectId];
+      const primaryStartX = primarySnap?.position?.x ?? newX;
+      const primaryStartY = primarySnap?.position?.y ?? newY;
+      const absDeltaX = newX - primaryStartX;
+      const absDeltaY = newY - primaryStartY;
+
       const prevObj = mapObjects.find(o => o.id === draggedMapObjectId);
-      const deltaX = prevObj ? newX - prevObj.position.x : 0;
-      const deltaY = prevObj ? newY - prevObj.position.y : 0;
 
       // Update primary map object position (wall-aware: shift wallPoints, not just position)
-      if (prevObj && prevObj.shape === 'wall' && prevObj.wallPoints) {
-        const newWallPoints = prevObj.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+      if (prevObj && prevObj.shape === 'wall' && prevObj.wallPoints && primarySnap?.wallPoints) {
+        // Shift from snapshot wall points by absolute delta
+        const newWallPoints = primarySnap.wallPoints.map(p => ({ x: p.x + absDeltaX, y: p.y + absDeltaY }));
         const xs = newWallPoints.map(p => p.x);
         const ys = newWallPoints.map(p => p.y);
         const minX = Math.min(...xs); const maxX = Math.max(...xs);
@@ -5772,50 +5897,42 @@ export const SimpleTabletop = () => {
         updateMapObject(draggedMapObjectId, { position: { x: newX, y: newY } });
       }
 
-      // Propagate drag delta to all group siblings
+      // Propagate to all group siblings using snapshots (absolute delta, no compounding)
       const group = useGroupStore.getState().getGroupForEntity(draggedMapObjectId);
-      if (group && prevObj) {
+      if (group) {
         for (const member of group.members) {
           if (member.id === draggedMapObjectId) continue;
-          if (member.type === 'mapObject') {
-            const sibling = mapObjects.find(o => o.id === member.id);
-            if (sibling) {
-              if (sibling.shape === 'wall' && sibling.wallPoints) {
-                const newWallPoints = sibling.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
-                const xs = newWallPoints.map(p => p.x);
-                const ys = newWallPoints.map(p => p.y);
-                const minX = Math.min(...xs); const maxX = Math.max(...xs);
-                const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                updateMapObject(member.id, {
-                  wallPoints: newWallPoints,
-                  position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-                  width: Math.max(maxX - minX, 1),
-                  height: Math.max(maxY - minY, 1),
-                });
-              } else {
-                updateMapObject(member.id, {
-                  position: { x: sibling.position.x + deltaX, y: sibling.position.y + deltaY },
-                });
-              }
+          const snap = groupSiblingSnapshotsRef.current[member.id];
+          if (!snap) continue;
+          if (member.type === 'mapObject' && snap.type === 'mapObject') {
+            if (snap.wallPoints) {
+              const newWallPoints = snap.wallPoints.map(p => ({ x: p.x + absDeltaX, y: p.y + absDeltaY }));
+              const xs = newWallPoints.map(p => p.x);
+              const ys = newWallPoints.map(p => p.y);
+              const minX = Math.min(...xs); const maxX = Math.max(...xs);
+              const minY = Math.min(...ys); const maxY = Math.max(...ys);
+              updateMapObject(member.id, {
+                wallPoints: newWallPoints,
+                position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                width: Math.max(maxX - minX, 1),
+                height: Math.max(maxY - minY, 1),
+              });
+            } else if (snap.position) {
+              updateMapObject(member.id, { position: { x: snap.position.x + absDeltaX, y: snap.position.y + absDeltaY } });
             }
-          } else if (member.type === 'token') {
-            updateTokenPosition(member.id, 0, 0); // done via tempPositions below
-          } else if (member.type === 'region') {
-            const sibRegion = regions.find(r => r.id === member.id);
-            if (sibRegion) updateRegion(member.id, { x: sibRegion.x + deltaX, y: sibRegion.y + deltaY });
-          } else if (member.type === 'light') {
-            const sibLight = useLightStore.getState().lights.find(l => l.id === member.id);
-            if (sibLight) useLightStore.getState().updateLight(member.id, { position: { x: sibLight.position.x + deltaX, y: sibLight.position.y + deltaY } });
+          } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
+            updateRegion(member.id, { x: snap.x + absDeltaX, y: snap.y + absDeltaY });
+          } else if (member.type === 'light' && snap.lightPos) {
+            useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + absDeltaX, y: snap.lightPos.y + absDeltaY } });
           }
         }
-        // Propagate token siblings via temp positions
-        const tokenSiblingIds = group.members.filter(m => m.type === 'token').map(m => m.id);
-        if (tokenSiblingIds.length > 0) {
-          const newTempPositions: { [id: string]: { x: number; y: number } } = {};
-          tokenSiblingIds.forEach(id => {
-            const t = tokens.find(tok => tok.id === id);
-            if (t) newTempPositions[id] = { x: t.x + deltaX, y: t.y + deltaY };
-          });
+        // Token siblings via temp positions
+        const newTempPositions: { [id: string]: { x: number; y: number } } = {};
+        group.members.filter(m => m.type === 'token').forEach(m => {
+          const snap = groupSiblingSnapshotsRef.current[m.id];
+          if (snap?.position) newTempPositions[m.id] = { x: snap.position.x + absDeltaX, y: snap.position.y + absDeltaY };
+        });
+        if (Object.keys(newTempPositions).length > 0) {
           setTempTokenPositions(prev => ({ ...prev, ...newTempPositions }));
         }
       }
@@ -5831,9 +5948,13 @@ export const SimpleTabletop = () => {
       // Find the region being dragged
       const draggedRegion = regions.find((r) => r.id === draggedRegionId);
       if (draggedRegion) {
-        // Calculate movement delta from original region position
-        const deltaX = newX - draggedRegion.x;
-        const deltaY = newY - draggedRegion.y;
+        // Calculate movement delta from the SNAPSHOT start position (absolute, non-compounding).
+        // regionDragStartRef captures the region's x/y at mousedown, so deltaX/Y are always
+        // relative to the drag origin, not to the last-frame position.
+        const startX = regionDragStartRef.current?.x ?? draggedRegion.x;
+        const startY = regionDragStartRef.current?.y ?? draggedRegion.y;
+        const deltaX = newX - startX;
+        const deltaY = newY - startY;
 
         // Update temporary positions for preview (avoid store updates during drag)
         const newTempPositions: { [tokenId: string]: { x: number; y: number } } = {};
@@ -5844,38 +5965,37 @@ export const SimpleTabletop = () => {
         });
 
         // Propagate drag to group siblings (map objects + lights + other regions)
+        // IMPORTANT: Always use snapshots from groupSiblingSnapshotsRef to compute new positions.
+        // This prevents the compounding-delta bug where each frame adds deltaX/Y to the
+        // already-moved position from the previous frame.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group && (deltaX !== 0 || deltaY !== 0)) {
           for (const member of group.members) {
             if (member.id === draggedRegionId) continue;
-            if (member.type === 'mapObject') {
-              const sib = mapObjects.find(o => o.id === member.id);
-              if (sib) {
-                if (sib.shape === 'wall' && sib.wallPoints) {
-                  const newWallPoints = sib.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
-                  const xs = newWallPoints.map(p => p.x);
-                  const ys = newWallPoints.map(p => p.y);
-                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
-                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                  updateMapObject(member.id, {
-                    wallPoints: newWallPoints,
-                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-                    width: Math.max(maxX - minX, 1),
-                    height: Math.max(maxY - minY, 1),
-                  });
-                } else {
-                  updateMapObject(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
-                }
+            const snap = groupSiblingSnapshotsRef.current[member.id];
+            if (!snap) continue;
+            if (member.type === 'mapObject' && snap.type === 'mapObject') {
+              if (snap.wallPoints) {
+                const newWallPoints = snap.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                const xs = newWallPoints.map(p => p.x);
+                const ys = newWallPoints.map(p => p.y);
+                const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                updateMapObject(member.id, {
+                  wallPoints: newWallPoints,
+                  position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                  width: Math.max(maxX - minX, 1),
+                  height: Math.max(maxY - minY, 1),
+                });
+              } else if (snap.position) {
+                updateMapObject(member.id, { position: { x: snap.position.x + deltaX, y: snap.position.y + deltaY } });
               }
-            } else if (member.type === 'token') {
-              const t = tokens.find(tok => tok.id === member.id);
-              if (t) newTempPositions[member.id] = { x: t.x + deltaX, y: t.y + deltaY };
-            } else if (member.type === 'region') {
-              const sib = regions.find(r => r.id === member.id);
-              if (sib) updateRegion(member.id, { x: sib.x + deltaX, y: sib.y + deltaY });
-            } else if (member.type === 'light') {
-              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
-              if (sib) useLightStore.getState().updateLight(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
+            } else if (member.type === 'token' && snap.position) {
+              newTempPositions[member.id] = { x: snap.position.x + deltaX, y: snap.position.y + deltaY };
+            } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
+              updateRegion(member.id, { x: snap.x + deltaX, y: snap.y + deltaY });
+            } else if (member.type === 'light' && snap.lightPos) {
+              useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + deltaX, y: snap.lightPos.y + deltaY } });
             }
           }
         }
@@ -5967,6 +6087,9 @@ export const SimpleTabletop = () => {
         });
 
         // Propagate rotation to group siblings around the GROUP CENTROID (not just region center)
+        // IMPORTANT: Always read from groupSiblingSnapshotsRef (captured at rotation-start).
+        // rotationDelta is already relative to the start angle, so applying it to the SNAPSHOT
+        // positions each frame produces a correct, non-compounding rotation.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group) {
           // Use the group's stored pivot as the true rotation centroid
@@ -5976,54 +6099,48 @@ export const SimpleTabletop = () => {
           const cos = Math.cos(rad); const sin = Math.sin(rad);
           for (const member of group.members) {
             if (member.id === draggedRegionId) continue;
-            if (member.type === 'mapObject') {
-              const sib = mapObjects.find(o => o.id === member.id);
-              if (sib) {
-                if (sib.shape === 'wall' && sib.wallPoints) {
-                  // Rotate every wall vertex around the group pivot
-                  const newWallPoints = sib.wallPoints.map(p => {
-                    const dx = p.x - pivotX; const dy = p.y - pivotY;
-                    return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
-                  });
-                  const xs = newWallPoints.map(p => p.x);
-                  const ys = newWallPoints.map(p => p.y);
-                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
-                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                  updateMapObject(member.id, {
-                    wallPoints: newWallPoints,
-                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-                    width: Math.max(maxX - minX, 1),
-                    height: Math.max(maxY - minY, 1),
-                    rotation: (sib.rotation || 0) + rotationDelta,
-                  });
-                } else {
-                  const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
-                  updateMapObject(member.id, {
-                    position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
-                    rotation: (sib.rotation || 0) + rotationDelta,
-                  });
-                }
+            const snap = groupSiblingSnapshotsRef.current[member.id];
+            if (!snap) continue;
+            if (member.type === 'mapObject' && snap.type === 'mapObject') {
+              if (snap.wallPoints) {
+                // Rotate every SNAPSHOT wall vertex around the group pivot
+                const newWallPoints = snap.wallPoints.map(p => {
+                  const dx = p.x - pivotX; const dy = p.y - pivotY;
+                  return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+                });
+                const xs = newWallPoints.map(p => p.x);
+                const ys = newWallPoints.map(p => p.y);
+                const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                updateMapObject(member.id, {
+                  wallPoints: newWallPoints,
+                  position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                  width: Math.max(maxX - minX, 1),
+                  height: Math.max(maxY - minY, 1),
+                  rotation: (snap.rotation || 0) + rotationDelta,
+                });
+              } else if (snap.position) {
+                const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
+                updateMapObject(member.id, {
+                  position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+                  rotation: (snap.rotation || 0) + rotationDelta,
+                });
               }
-            } else if (member.type === 'token') {
-              const t = tokens.find(tok => tok.id === member.id);
-              if (t) {
-                const dx = t.x - pivotX; const dy = t.y - pivotY;
-                newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
-              }
-            } else if (member.type === 'region') {
-              const sib = regions.find(r => r.id === member.id);
-              if (sib) {
-                const cx2 = sib.x + sib.width / 2; const cy2 = sib.y + sib.height / 2;
+            } else if (member.type === 'token' && snap.position) {
+              const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
+              newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+            } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
+              // We need width/height of the region — look it up (read-only, no mutation risk)
+              const sibRegion = regions.find(r => r.id === member.id);
+              if (sibRegion) {
+                const cx2 = snap.x + sibRegion.width / 2; const cy2 = snap.y + sibRegion.height / 2;
                 const dx = cx2 - pivotX; const dy = cy2 - pivotY;
                 const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-                updateRegion(member.id, { x: newCx - sib.width / 2, y: newCy - sib.height / 2, rotation: (sib.rotation || 0) + rotationDelta });
+                updateRegion(member.id, { x: newCx - sibRegion.width / 2, y: newCy - sibRegion.height / 2, rotation: (snap.regRotation || 0) + rotationDelta });
               }
-            } else if (member.type === 'light') {
-              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
-              if (sib) {
-                const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
-                useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
-              }
+            } else if (member.type === 'light' && snap.lightPos) {
+              const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
+              useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
             }
           }
         }
