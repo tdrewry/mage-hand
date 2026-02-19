@@ -1,0 +1,238 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import {
+  Lock, Unlock, Trash2, Pencil, Move, EyeOff, Moon, SunMedium,
+  DoorOpen, DoorClosed, Lightbulb, LightbulbOff
+} from 'lucide-react';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { MapObject, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
+import { Z_INDEX } from '@/lib/zIndex';
+import { toast } from 'sonner';
+
+interface MapObjectControlBarProps {
+  pointEditMode: boolean;
+  onTogglePointEditMode: () => void;
+  onUpdateCanvas?: () => void;
+}
+
+export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
+  pointEditMode,
+  onTogglePointEditMode,
+  onUpdateCanvas,
+}) => {
+  const mapObjects = useMapObjectStore((state) => state.mapObjects);
+  const selectedMapObjectIds = useMapObjectStore((state) => state.selectedMapObjectIds);
+  const updateMapObject = useMapObjectStore((state) => state.updateMapObject);
+  const removeMultipleMapObjects = useMapObjectStore((state) => state.removeMultipleMapObjects);
+  const clearSelection = useMapObjectStore((state) => state.clearSelection);
+  const toggleDoor = useMapObjectStore((state) => state.toggleDoor);
+
+  const selectedObjects = mapObjects.filter((obj) => selectedMapObjectIds.includes(obj.id));
+  if (selectedObjects.length === 0) return null;
+
+  const singleSelected = selectedObjects.length === 1 ? selectedObjects[0] : null;
+  const allLocked = selectedObjects.every((o) => o.locked);
+  const isWall = singleSelected?.shape === 'wall';
+  const isDoor = singleSelected?.category === 'door';
+  const isLight = singleSelected?.category === 'light';
+
+  const handleToggleLock = () => {
+    const newLocked = !allLocked;
+    selectedObjects.forEach((obj) => {
+      updateMapObject(obj.id, { locked: newLocked });
+    });
+    onUpdateCanvas?.();
+    toast.success(`${newLocked ? 'Locked' : 'Unlocked'} ${selectedObjects.length} object(s)`);
+  };
+
+  const handleDelete = () => {
+    const unlocked = selectedObjects.filter((o) => !o.locked);
+    if (unlocked.length === 0) {
+      toast.error('Cannot delete locked objects');
+      return;
+    }
+    removeMultipleMapObjects(unlocked.map((o) => o.id));
+    onUpdateCanvas?.();
+    toast.success(`Deleted ${unlocked.length} object(s)`);
+  };
+
+  const handleToggleDoor = () => {
+    if (singleSelected && isDoor) {
+      toggleDoor(singleSelected.id);
+      onUpdateCanvas?.();
+    }
+  };
+
+  const handleLightToggle = (enabled: boolean) => {
+    if (singleSelected && isLight) {
+      updateMapObject(singleSelected.id, { lightEnabled: enabled });
+      onUpdateCanvas?.();
+    }
+  };
+
+  const categoryLabel = singleSelected
+    ? (singleSelected.label || MAP_OBJECT_CATEGORY_LABELS[singleSelected.category])
+    : `${selectedObjects.length} objects`;
+
+  return (
+    <div
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
+      style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
+    >
+      <div className="flex items-center gap-1">
+        {/* Label */}
+        <span className="text-xs font-medium text-foreground px-1.5 max-w-[120px] truncate">
+          {categoryLabel}
+        </span>
+
+        <div className="h-4 w-px bg-border" />
+
+        {/* Lock Toggle */}
+        <Button
+          variant={allLocked ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={handleToggleLock}
+        >
+          {allLocked ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+          {allLocked ? 'Locked' : 'Lock'}
+        </Button>
+
+        {/* Wall-specific: Point Edit Tool */}
+        {isWall && singleSelected && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <Button
+              variant={pointEditMode ? 'default' : 'ghost'}
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={onTogglePointEditMode}
+              disabled={!!singleSelected.locked}
+              title={singleSelected.locked ? 'Unlock wall to edit points' : 'Toggle point edit: click line to add, click vertex to remove'}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Points
+            </Button>
+            {pointEditMode && (
+              <span className="text-[10px] text-muted-foreground px-1">
+                Click line +point · Click vertex −point
+              </span>
+            )}
+          </>
+        )}
+
+        {/* Door-specific: Toggle open/close */}
+        {isDoor && singleSelected && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={handleToggleDoor}
+            >
+              {singleSelected.isOpen ? (
+                <DoorOpen className="h-3 w-3 mr-1 text-green-500" />
+              ) : (
+                <DoorClosed className="h-3 w-3 mr-1 text-red-500" />
+              )}
+              {singleSelected.isOpen ? 'Close' : 'Open'}
+            </Button>
+          </>
+        )}
+
+        {/* Light-specific: toggle + quick radius */}
+        {isLight && singleSelected && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => handleLightToggle(!singleSelected.lightEnabled)}
+            >
+              {singleSelected.lightEnabled !== false ? (
+                <Lightbulb className="h-3 w-3 mr-1 text-yellow-400" />
+              ) : (
+                <LightbulbOff className="h-3 w-3 mr-1 text-muted-foreground" />
+              )}
+              {singleSelected.lightEnabled !== false ? 'On' : 'Off'}
+            </Button>
+            <div className="flex items-center gap-1 px-1">
+              <span className="text-[10px] text-muted-foreground">R:</span>
+              <Input
+                type="number"
+                value={singleSelected.lightRadius ?? 200}
+                onChange={(e) => updateMapObject(singleSelected.id, { lightRadius: Number(e.target.value) })}
+                className="w-14 h-5 text-xs px-1"
+                min={10}
+                max={2000}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="h-4 w-px bg-border" />
+
+        {/* Behavior toggles (compact) */}
+        {singleSelected && !isDoor && (
+          <>
+            <Button
+              variant={singleSelected.blocksVision ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-6 w-6 p-0"
+              title={`Blocks Vision: ${singleSelected.blocksVision ? 'Yes' : 'No'}`}
+              onClick={() => updateMapObject(singleSelected.id, { blocksVision: !singleSelected.blocksVision })}
+            >
+              <EyeOff className="h-3 w-3" />
+            </Button>
+            <Button
+              variant={singleSelected.blocksMovement ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-6 w-6 p-0"
+              title={`Blocks Movement: ${singleSelected.blocksMovement ? 'Yes' : 'No'}`}
+              onClick={() => updateMapObject(singleSelected.id, { blocksMovement: !singleSelected.blocksMovement })}
+            >
+              <Move className="h-3 w-3" />
+            </Button>
+            <Button
+              variant={singleSelected.castsShadow ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-6 w-6 p-0"
+              title={`Casts Shadow: ${singleSelected.castsShadow ? 'Yes' : 'No'}`}
+              onClick={() => updateMapObject(singleSelected.id, { castsShadow: !singleSelected.castsShadow })}
+            >
+              <Moon className="h-3 w-3" />
+            </Button>
+            <div className="h-4 w-px bg-border" />
+          </>
+        )}
+
+        {/* Delete */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={handleDelete}
+        >
+          <Trash2 className="h-3 w-3 mr-1" />
+          Del
+        </Button>
+
+        {/* Clear Selection */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={() => clearSelection()}
+        >
+          ✕
+        </Button>
+      </div>
+    </div>
+  );
+};

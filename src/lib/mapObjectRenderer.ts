@@ -46,6 +46,43 @@ export function extractSegmentsFromWallMapObjects(
 }
 
 /**
+ * Find the nearest point on any wall segment for inserting a new vertex.
+ * Returns the mapObjectId, the segment index (insert after this index), and the projected point.
+ */
+export function findNearestWallSegmentPoint(
+  x: number,
+  y: number,
+  mapObjects: MapObject[],
+  zoom: number = 1
+): { mapObjectId: string; segmentIndex: number; point: { x: number; y: number } } | null {
+  const hitDistance = 10 / zoom;
+  let best: { mapObjectId: string; segmentIndex: number; point: { x: number; y: number }; dist: number } | null = null;
+
+  for (const obj of mapObjects) {
+    if (obj.shape !== 'wall' || !obj.wallPoints || obj.wallPoints.length < 2 || obj.locked || !obj.selected) continue;
+    
+    for (let i = 0; i < obj.wallPoints.length - 1; i++) {
+      const a = obj.wallPoints[i];
+      const b = obj.wallPoints[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) continue;
+      let t = ((x - a.x) * dx + (y - a.y) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const px = a.x + t * dx;
+      const py = a.y + t * dy;
+      const dist = Math.hypot(x - px, y - py);
+      if (dist <= hitDistance && (!best || dist < best.dist)) {
+        best = { mapObjectId: obj.id, segmentIndex: i, point: { x: px, y: py }, dist };
+      }
+    }
+  }
+
+  return best ? { mapObjectId: best.mapObjectId, segmentIndex: best.segmentIndex, point: best.point } : null;
+}
+
+/**
  * Find if a point is near a wall vertex (for drag handle interaction).
  * Returns { mapObjectId, vertexIndex } or null.
  */

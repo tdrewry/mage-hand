@@ -35,7 +35,8 @@ import {
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
-import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, findWallVertexAtPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
+import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, findWallVertexAtPoint, findNearestWallSegmentPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
+import { MapObjectControlBar } from "./MapObjectControlBar";
 import { generateNegativeSpaceRegion, mapObjectsToSegments } from "../lib/wallGeometry";
 import {
   applyHatchingPattern,
@@ -511,6 +512,16 @@ export const SimpleTabletop = () => {
   // Wall vertex dragging state
   const [isDraggingVertex, setIsDraggingVertex] = useState(false);
   const [draggedVertexInfo, setDraggedVertexInfo] = useState<{ mapObjectId: string; vertexIndex: number } | null>(null);
+  
+  // Wall point edit mode - reset when selection changes
+  const [wallPointEditMode, setWallPointEditMode] = useState(false);
+  const prevSelectedMapObjectIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (JSON.stringify(prevSelectedMapObjectIdsRef.current) !== JSON.stringify(selectedMapObjectIds)) {
+      setWallPointEditMode(false);
+      prevSelectedMapObjectIdsRef.current = selectedMapObjectIds;
+    }
+  }, [selectedMapObjectIds]);
   
   // MapObject context menu state
   const [mapObjectContextMenu, setMapObjectContextMenu] = useState<{
@@ -5128,6 +5139,46 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
+        // Wall point edit mode: add/remove vertices
+        if (wallPointEditMode && clickedMapObject.shape === 'wall' && clickedMapObject.wallPoints) {
+          const vertexHit = findWallVertexAtPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom);
+          if (vertexHit && vertexHit.mapObjectId === clickedMapObject.id) {
+            // Remove vertex (but keep at least 2 points)
+            if (clickedMapObject.wallPoints.length > 2) {
+              const newPoints = clickedMapObject.wallPoints.filter((_, i) => i !== vertexHit.vertexIndex);
+              const xs = newPoints.map(p => p.x);
+              const ys = newPoints.map(p => p.y);
+              updateMapObject(clickedMapObject.id, {
+                wallPoints: newPoints,
+                position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+                width: Math.max(...xs) - Math.min(...xs),
+                height: Math.max(...ys) - Math.min(...ys),
+              });
+              toast.success('Vertex removed');
+              redrawCanvas();
+            } else {
+              toast.error('Wall must have at least 2 points');
+            }
+          } else {
+            // Add vertex on nearest segment
+            const segHit = findNearestWallSegmentPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom);
+            if (segHit && segHit.mapObjectId === clickedMapObject.id) {
+              const newPoints = [...clickedMapObject.wallPoints];
+              newPoints.splice(segHit.segmentIndex + 1, 0, segHit.point);
+              const xs = newPoints.map(p => p.x);
+              const ys = newPoints.map(p => p.y);
+              updateMapObject(clickedMapObject.id, {
+                wallPoints: newPoints,
+                position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+                width: Math.max(...xs) - Math.min(...xs),
+                height: Math.max(...ys) - Math.min(...ys),
+              });
+              toast.success('Vertex added');
+              redrawCanvas();
+            }
+          }
+          return; // Don't start dragging in point edit mode
+        }
         // Check for wall vertex drag first (before general MapObject drag)
         const vertexHit = findWallVertexAtPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom);
         if (vertexHit && renderingMode === "edit") {
@@ -6848,6 +6899,13 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds(regions.map(r => r.id));
           redrawCanvas();
         }}
+      />
+
+      {/* Map Object Control Bar - Shows when map object(s) are selected */}
+      <MapObjectControlBar
+        pointEditMode={wallPointEditMode}
+        onTogglePointEditMode={() => setWallPointEditMode(prev => !prev)}
+        onUpdateCanvas={handleCanvasUpdate}
       />
 
 
