@@ -19,6 +19,7 @@ import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
+import { GroupControlBar } from "./GroupControlBar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
@@ -7135,6 +7136,8 @@ export const SimpleTabletop = () => {
         );
       })()}
 
+      {/* Group Control Bar - Shows when a grouped entity is selected */}
+      <GroupControlBar onUpdateCanvas={handleCanvasUpdate} />
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
