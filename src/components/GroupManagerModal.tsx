@@ -1,11 +1,11 @@
 /**
  * Group Manager Modal
  * 
- * Demonstrates the enhanced group transformation system
- * Allows users to create, manage, and transform token groups
+ * Universal group management for tokens, regions, map objects, and lights.
+ * Allows creating, managing, and transforming entity groups.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,23 +14,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
-import { Switch } from './ui/switch';
+import { Checkbox } from './ui/checkbox';
 import { toast } from 'sonner';
 import { 
   Users, 
   Plus, 
   Trash2, 
-  RotateCcw, 
-  Move, 
   Lock, 
   Unlock,
   Eye,
-  EyeOff
+  EyeOff,
+  CircleDot,
+  Square,
+  Layers,
+  Lightbulb,
 } from 'lucide-react';
 
 import { useGroupStore } from '../stores/groupStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { TokenGroup } from '../lib/groupTransforms';
+import { useRegionStore } from '../stores/regionStore';
+import { useMapObjectStore } from '../stores/mapObjectStore';
+import { useLightStore } from '../stores/lightStore';
+import { EntityGroup, GroupMember, EntityType, EntityGeometry } from '../lib/groupTransforms';
+
+const ENTITY_TYPE_ICON: Record<EntityType, React.ReactNode> = {
+  token: <CircleDot className="w-3 h-3" />,
+  region: <Square className="w-3 h-3" />,
+  mapObject: <Layers className="w-3 h-3" />,
+  light: <Lightbulb className="w-3 h-3" />,
+};
+
+const ENTITY_TYPE_LABEL: Record<EntityType, string> = {
+  token: 'Token',
+  region: 'Region',
+  mapObject: 'Map Object',
+  light: 'Light',
+};
 
 interface GroupManagerModalProps {
   open: boolean;
@@ -42,7 +61,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
   onOpenChange
 }) => {
   const [newGroupName, setNewGroupName] = useState('');
-  const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<GroupMember[]>([]);
 
   const { 
     groups, 
@@ -52,36 +71,79 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
     updateGroup,
     selectGroup,
     deselectGroup,
-    clearGroupSelection
+    clearGroupSelection,
+    isEntityInAnyGroup,
   } = useGroupStore();
 
-  const { tokens, selectedTokenIds: sessionSelectedTokenIds } = useSessionStore();
+  const { tokens } = useSessionStore();
+  const { regions } = useRegionStore();
+  const { mapObjects } = useMapObjectStore();
+  const { lights } = useLightStore();
+
+  // Entities not yet in any group
+  const availableEntities = useMemo(() => {
+    const available: { member: GroupMember; label: string }[] = [];
+    
+    tokens.forEach(t => {
+      if (!isEntityInAnyGroup(t.id)) {
+        available.push({ member: { id: t.id, type: 'token' }, label: t.label || t.name });
+      }
+    });
+    regions.forEach(r => {
+      if (!isEntityInAnyGroup(r.id)) {
+        available.push({ member: { id: r.id, type: 'region' }, label: `Region ${r.id.slice(-4)}` });
+      }
+    });
+    mapObjects.forEach(o => {
+      if (!isEntityInAnyGroup(o.id)) {
+        available.push({ member: { id: o.id, type: 'mapObject' }, label: o.label || o.category });
+      }
+    });
+    lights.forEach(l => {
+      if (!isEntityInAnyGroup(l.id)) {
+        available.push({ member: { id: l.id, type: 'light' }, label: l.label || `Light ${l.id.slice(-4)}` });
+      }
+    });
+    
+    return available;
+  }, [tokens, regions, mapObjects, lights, isEntityInAnyGroup, groups]);
+
+  const getGeometryForMember = (m: GroupMember): EntityGeometry => {
+    if (m.type === 'token') {
+      const t = tokens.find(x => x.id === m.id);
+      return t ? { id: t.id, x: t.x, y: t.y, width: t.gridWidth * 50, height: t.gridHeight * 50 } : { id: m.id, x: 0, y: 0, width: 50, height: 50 };
+    }
+    if (m.type === 'region') {
+      const r = regions.find(x => x.id === m.id);
+      return r ? { id: r.id, x: r.x, y: r.y, width: r.width, height: r.height } : { id: m.id, x: 0, y: 0, width: 100, height: 100 };
+    }
+    if (m.type === 'mapObject') {
+      const o = mapObjects.find(x => x.id === m.id);
+      return o ? { id: o.id, x: o.position.x, y: o.position.y, width: o.width, height: o.height } : { id: m.id, x: 0, y: 0, width: 50, height: 50 };
+    }
+    if (m.type === 'light') {
+      const l = lights.find(x => x.id === m.id);
+      return l ? { id: l.id, x: l.position.x - l.radius, y: l.position.y - l.radius, width: l.radius * 2, height: l.radius * 2 } : { id: m.id, x: 0, y: 0, width: 50, height: 50 };
+    }
+    return { id: m.id, x: 0, y: 0, width: 50, height: 50 };
+  };
 
   const handleCreateGroup = () => {
     if (!newGroupName.trim()) {
       toast.error('Please enter a group name');
       return;
     }
-
-    const tokensToGroup = selectedTokenIds.length > 0 
-      ? selectedTokenIds 
-      : sessionSelectedTokenIds;
-
-    if (tokensToGroup.length === 0) {
-      toast.error('Please select tokens to group');
-      return;
-    }
-
-    if (tokensToGroup.length === 1) {
-      toast.error('Groups must contain at least 2 tokens');
+    if (selectedMembers.length < 2) {
+      toast.error('Groups must contain at least 2 entities');
       return;
     }
 
     try {
-      const group = addGroup(newGroupName, tokensToGroup);
-      toast.success(`Group \"${group.name}\" created with ${tokensToGroup.length} tokens`);
+      const geometries = selectedMembers.map(getGeometryForMember);
+      const group = addGroup(newGroupName, selectedMembers, geometries);
+      toast.success(`Group "${group.name}" created with ${selectedMembers.length} members`);
       setNewGroupName('');
-      setSelectedTokenIds([]);
+      setSelectedMembers([]);
     } catch (error) {
       toast.error(`Failed to create group: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -90,40 +152,48 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
   const handleDeleteGroup = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (!group) return;
-
-    if (!confirm(`Delete group \"${group.name}\"? Tokens will remain but lose their group association.`)) {
-      return;
-    }
-
     removeGroup(groupId);
-    toast.success(`Group \"${group.name}\" deleted`);
+    toast.success(`Group "${group.name}" deleted`);
   };
 
-  const handleToggleGroupLock = (group: TokenGroup) => {
+  const handleToggleGroupLock = (group: EntityGroup) => {
     updateGroup(group.id, { locked: !group.locked });
-    toast.success(`Group \"${group.name}\" ${group.locked ? 'unlocked' : 'locked'}`);
+    toast.success(`Group "${group.name}" ${group.locked ? 'unlocked' : 'locked'}`);
   };
 
-  const handleToggleGroupVisibility = (group: TokenGroup) => {
+  const handleToggleGroupVisibility = (group: EntityGroup) => {
     updateGroup(group.id, { visible: !group.visible });
-    toast.success(`Group \"${group.name}\" ${group.visible ? 'hidden' : 'shown'}`);
+    toast.success(`Group "${group.name}" ${group.visible ? 'hidden' : 'shown'}`);
   };
 
-  const handleTokenSelectionChange = (tokenId: string, selected: boolean) => {
-    if (selected) {
-      setSelectedTokenIds(prev => [...prev, tokenId]);
-    } else {
-      setSelectedTokenIds(prev => prev.filter(id => id !== tokenId));
+  const toggleMemberSelection = (member: GroupMember) => {
+    setSelectedMembers(prev => {
+      const exists = prev.some(m => m.id === member.id);
+      return exists ? prev.filter(m => m.id !== member.id) : [...prev, member];
+    });
+  };
+
+  const getMemberLabel = (member: GroupMember): string => {
+    if (member.type === 'token') {
+      const t = tokens.find(x => x.id === member.id);
+      return t?.label || t?.name || member.id.slice(-6);
     }
+    if (member.type === 'region') return `Region ${member.id.slice(-4)}`;
+    if (member.type === 'mapObject') {
+      const o = mapObjects.find(x => x.id === member.id);
+      return o?.label || o?.category || member.id.slice(-6);
+    }
+    if (member.type === 'light') {
+      const l = lights.find(x => x.id === member.id);
+      return l?.label || `Light ${member.id.slice(-4)}`;
+    }
+    return member.id.slice(-6);
   };
 
-  const getTokensNotInGroups = () => {
-    const groupedTokenIds = new Set(groups.flatMap(g => g.tokenIds));
-    return tokens.filter(token => !groupedTokenIds.has(token.id));
-  };
-
-  const getTokensByIds = (tokenIds: string[]) => {
-    return tokens.filter(token => tokenIds.includes(token.id));
+  const getMemberCountsByType = (group: EntityGroup) => {
+    const counts: Partial<Record<EntityType, number>> = {};
+    group.members.forEach(m => { counts[m.type] = (counts[m.type] || 0) + 1; });
+    return counts;
   };
 
   return (
@@ -145,7 +215,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
                 Create New Group
               </CardTitle>
               <CardDescription>
-                Group selected tokens for easier management and transformation
+                Group tokens, regions, map objects, and lights together
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -155,38 +225,42 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
                   id="group-name"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="My Token Group"
+                  placeholder="Room Encounter, Trap Assembly..."
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Select Tokens to Group</Label>
-                <ScrollArea className="h-32 border rounded-md p-2">
-                  {getTokensNotInGroups().map(token => (
-                    <div key={token.id} className="flex items-center space-x-2 py-1">
-                      <input
-                        type="checkbox"
-                        id={`token-${token.id}`}
-                        checked={selectedTokenIds.includes(token.id)}
-                        onChange={(e) => handleTokenSelectionChange(token.id, e.target.checked)}
-                        className="rounded"
-                      />
-                      <label htmlFor={`token-${token.id}`} className="text-sm flex-1 cursor-pointer">
-                        {token.label || token.name}
-                      </label>
-                    </div>
-                  ))}
-                  {getTokensNotInGroups().length === 0 && (
+                <Label>Select Entities ({selectedMembers.length} selected)</Label>
+                <ScrollArea className="h-40 border rounded-md p-2">
+                  {availableEntities.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-2">
-                      All tokens are already grouped
+                      All entities are already grouped
                     </p>
+                  ) : (
+                    availableEntities.map(({ member, label }) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center space-x-2 py-1 cursor-pointer hover:bg-accent/50 rounded px-1"
+                        onClick={() => toggleMemberSelection(member)}
+                      >
+                        <Checkbox
+                          checked={selectedMembers.some(m => m.id === member.id)}
+                          onCheckedChange={() => toggleMemberSelection(member)}
+                        />
+                        <span className="text-muted-foreground">{ENTITY_TYPE_ICON[member.type]}</span>
+                        <span className="text-sm flex-1">{label}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {ENTITY_TYPE_LABEL[member.type]}
+                        </Badge>
+                      </div>
+                    ))
                   )}
                 </ScrollArea>
               </div>
 
               <Button 
                 onClick={handleCreateGroup}
-                disabled={!newGroupName.trim() || selectedTokenIds.length < 2}
+                disabled={!newGroupName.trim() || selectedMembers.length < 2}
                 className="w-full"
               >
                 Create Group
@@ -199,7 +273,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
             <CardHeader>
               <CardTitle>Existing Groups ({groups.length})</CardTitle>
               <CardDescription>
-                Manage your token groups and their properties
+                Manage your entity groups
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -213,8 +287,8 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {groups.map(group => {
-                      const groupTokens = getTokensByIds(group.tokenIds);
                       const isSelected = selectedGroupIds.includes(group.id);
+                      const counts = getMemberCountsByType(group);
 
                       return (
                         <Card 
@@ -229,68 +303,42 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-semibold">{group.name}</h4>
                                 <Badge variant="secondary" className="text-xs">
-                                  {group.tokenIds.length} tokens
+                                  {group.members.length} members
                                 </Badge>
-                                {group.locked && (
-                                  <Lock className="w-3 h-3 text-muted-foreground" />
-                                )}
-                                {!group.visible && (
-                                  <EyeOff className="w-3 h-3 text-muted-foreground" />
-                                )}
+                                {group.locked && <Lock className="w-3 h-3 text-muted-foreground" />}
+                                {!group.visible && <EyeOff className="w-3 h-3 text-muted-foreground" />}
                               </div>
 
-                              <div className="text-xs text-muted-foreground space-y-1">
-                                <p>Tokens: {groupTokens.map(t => t.label || t.name).join(', ')}</p>
-                                <div className="flex items-center gap-4">
-                                  <span>Position: ({Math.round(group.bounds.x)}, {Math.round(group.bounds.y)})</span>
-                                  <span>Size: {Math.round(group.bounds.width)}×{Math.round(group.bounds.height)}</span>
-                                </div>
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {Object.entries(counts).map(([type, count]) => (
+                                  <Badge key={type} variant="outline" className="text-xs gap-1">
+                                    {ENTITY_TYPE_ICON[type as EntityType]}
+                                    {count} {ENTITY_TYPE_LABEL[type as EntityType]}{count! > 1 ? 's' : ''}
+                                  </Badge>
+                                ))}
+                              </div>
+
+                              <div className="text-xs text-muted-foreground">
+                                {group.members.slice(0, 4).map(m => getMemberLabel(m)).join(', ')}
+                                {group.members.length > 4 && ` +${group.members.length - 4} more`}
                               </div>
                             </div>
                             
                             <div className="flex items-center gap-1 ml-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleGroupVisibility(group);
-                                }}
-                                title={group.visible ? 'Hide group' : 'Show group'}
-                              >
-                                {group.visible ? (
-                                  <Eye className="w-3 h-3" />
-                                ) : (
-                                  <EyeOff className="w-3 h-3" />
-                                )}
+                              <Button variant="ghost" size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleToggleGroupVisibility(group); }}
+                                title={group.visible ? 'Hide group' : 'Show group'}>
+                                {group.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                               </Button>
-                              
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleGroupLock(group);
-                                }}
-                                title={group.locked ? 'Unlock group' : 'Lock group'}
-                              >
-                                {group.locked ? (
-                                  <Lock className="w-3 h-3" />
-                                ) : (
-                                  <Unlock className="w-3 h-3" />
-                                )}
+                              <Button variant="ghost" size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleToggleGroupLock(group); }}
+                                title={group.locked ? 'Unlock group' : 'Lock group'}>
+                                {group.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                               </Button>
-                              
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteGroup(group.id);
-                                }}
+                              <Button variant="ghost" size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }}
                                 className="text-destructive hover:text-destructive"
-                                title="Delete group"
-                              >
+                                title="Delete group">
                                 <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
@@ -305,28 +353,13 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
               {selectedGroupIds.length > 0 && (
                 <>
                   <Separator className="my-3" />
-                  <div className="space-y-2">
+                  <div className="flex gap-2 items-center">
                     <p className="text-sm font-medium">
                       {selectedGroupIds.length} group(s) selected
                     </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={clearGroupSelection}
-                      >
-                        Clear Selection
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={true}
-                        title="Transform operations would be available in the main canvas"
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Transform
-                      </Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={clearGroupSelection}>
+                      Clear Selection
+                    </Button>
                   </div>
                 </>
               )}

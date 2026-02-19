@@ -476,12 +476,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       await processInChunks(
         groups,
         8,
-        (group) => {
-          const { name, tokenIds } = group;
-          const newGroup = groupStore.addGroup(name, tokenIds);
+        (group: any) => {
+          // Support both old tokenIds format and new members format
+          const members = group.members || (group.tokenIds || []).map((id: string) => ({ id, type: 'token' }));
+          const geometries = members.map((m: any) => ({ id: m.id, x: 0, y: 0, width: 50, height: 50 }));
+          const newGroup = groupStore.addGroup(group.name, members, geometries);
           groupStore.updateGroup(newGroup.id, {
             id: group.id,
-            transform: group.transform,
             pivot: group.pivot,
             bounds: group.bounds,
             locked: group.locked,
@@ -704,12 +705,12 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     (projectData.regions || []).forEach(region => regionStore.addRegion(region));
     
     groupStore.clearAllGroups();
-    (projectData.groups || []).forEach(group => {
-      const { name, tokenIds } = group;
-      const newGroup = groupStore.addGroup(name, tokenIds);
+    (projectData.groups || []).forEach((group: any) => {
+      const members = group.members || (group.tokenIds || []).map((id: string) => ({ id, type: 'token' }));
+      const geometries = members.map((m: any) => ({ id: m.id, x: 0, y: 0, width: 50, height: 50 }));
+      const newGroup = groupStore.addGroup(group.name, members, geometries);
       groupStore.updateGroup(newGroup.id, {
         id: group.id,
-        transform: group.transform,
         pivot: group.pivot,
         bounds: group.bounds,
         locked: group.locked,

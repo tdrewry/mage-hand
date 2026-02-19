@@ -1,42 +1,68 @@
 /**
- * Token Group Store
+ * Universal Group Store
  * 
- * Manages token groups for enhanced canvas operations
- * Integrates with the new group transformation system
+ * Manages entity groups (tokens, regions, map objects, lights)
+ * for unified selection, transformation, and prefab operations.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { TokenGroup, createTokenGroup, updateGroupBounds } from '../lib/groupTransforms';
-import { Token } from './sessionStore';
+import {
+  EntityGroup,
+  GroupMember,
+  EntityType,
+  EntityGeometry,
+  createEntityGroup,
+  recalculateGroupBounds,
+} from '../lib/groupTransforms';
+
+// ============= Entity Index =============
+// Derived lookup: entityId -> groupId, rebuilt on group changes
+
+let entityIndex: Map<string, string> = new Map();
+
+const rebuildEntityIndex = (groups: EntityGroup[]) => {
+  entityIndex = new Map();
+  for (const group of groups) {
+    for (const member of group.members) {
+      entityIndex.set(member.id, group.id);
+    }
+  }
+};
+
+// ============= Store Interface =============
 
 interface GroupStore {
-  groups: TokenGroup[];
-  
-  // Group operations
-  addGroup: (name: string, tokenIds: string[]) => TokenGroup;
+  groups: EntityGroup[];
+
+  // Group CRUD
+  addGroup: (name: string, members: GroupMember[], geometries: EntityGeometry[]) => EntityGroup;
   removeGroup: (groupId: string) => void;
-  updateGroup: (groupId: string, updates: Partial<TokenGroup>) => void;
-  
-  // Group membership
-  addTokenToGroup: (groupId: string, tokenId: string) => void;
-  removeTokenFromGroup: (groupId: string, tokenId: string) => void;
-  getTokenGroup: (tokenId: string) => TokenGroup | null;
-  
-  // Group selection
+  updateGroup: (groupId: string, updates: Partial<EntityGroup>) => void;
+  clearAllGroups: () => void;
+
+  // Member operations
+  addMembersToGroup: (groupId: string, members: GroupMember[]) => void;
+  removeMemberFromGroup: (groupId: string, entityId: string) => void;
+
+  // Lookups
+  getGroupForEntity: (entityId: string, entityType?: EntityType) => EntityGroup | null;
+  getMembersByType: (groupId: string, type: EntityType) => GroupMember[];
+  isEntityInAnyGroup: (entityId: string) => boolean;
+
+  // Bounds
+  recalculateBounds: (groupId: string, geometries: EntityGeometry[]) => void;
+
+  // Selection
   selectedGroupIds: string[];
   selectGroup: (groupId: string) => void;
   deselectGroup: (groupId: string) => void;
   clearGroupSelection: () => void;
   toggleGroupSelection: (groupId: string) => void;
-  
-  // Bulk operations
-  clearAllGroups: () => void;
-  updateGroupBounds: (groupId: string, tokens: Token[]) => void;
-  
-  // Utilities
-  getGroupsContainingToken: (tokenId: string) => TokenGroup[];
-  isTokenInAnyGroup: (tokenId: string) => boolean;
+
+  // Migration: old API compatibility
+  /** @deprecated Use addGroup with members array */
+  addGroupFromTokenIds?: (name: string, tokenIds: string[]) => EntityGroup;
 }
 
 export const useGroupStore = create<GroupStore>()(
@@ -45,97 +71,110 @@ export const useGroupStore = create<GroupStore>()(
       groups: [],
       selectedGroupIds: [],
 
-      addGroup: (name, tokenIds) => {
-        // Don't create empty groups
-        if (tokenIds.length === 0) {
-          throw new Error('Cannot create group without tokens');
+      addGroup: (name, members, geometries) => {
+        if (members.length === 0) {
+          throw new Error('Cannot create group without members');
         }
+        const newGroup = createEntityGroup(name, members, geometries);
 
-        // Create a dummy token array for bounds calculation
-        // In real usage, this would come from the session store
-        const dummyTokens: Token[] = tokenIds.map(id => ({
-          id,
-          name: 'Token',
-          imageUrl: '',
-          x: 0,
-          y: 0,
-          gridWidth: 1,
-          gridHeight: 1,
-          label: 'Token',
-          labelPosition: 'below',
-          color: '#ffffff',
-          roleId: 'player',
-          isHidden: false
-        }));
-
-        const newGroup = createTokenGroup(name, dummyTokens);
-        
-        set((state) => ({
-          groups: [...state.groups, newGroup]
-        }));
+        set((state) => {
+          const next = [...state.groups, newGroup];
+          rebuildEntityIndex(next);
+          return { groups: next };
+        });
 
         return newGroup;
       },
 
       removeGroup: (groupId) => {
-        set((state) => ({
-          groups: state.groups.filter(group => group.id !== groupId),
-          selectedGroupIds: state.selectedGroupIds.filter(id => id !== groupId)
-        }));
+        set((state) => {
+          const next = state.groups.filter(g => g.id !== groupId);
+          rebuildEntityIndex(next);
+          return {
+            groups: next,
+            selectedGroupIds: state.selectedGroupIds.filter(id => id !== groupId),
+          };
+        });
       },
 
       updateGroup: (groupId, updates) => {
-        set((state) => ({
-          groups: state.groups.map(group =>
-            group.id === groupId ? { ...group, ...updates } : group
-          )
-        }));
+        set((state) => {
+          const next = state.groups.map(g =>
+            g.id === groupId ? { ...g, ...updates } : g
+          );
+          // Rebuild index if members changed
+          if (updates.members) rebuildEntityIndex(next);
+          return { groups: next };
+        });
       },
 
-      addTokenToGroup: (groupId, tokenId) => {
-        set((state) => ({
-          groups: state.groups.map(group =>
-            group.id === groupId 
-              ? { ...group, tokenIds: [...group.tokenIds, tokenId] }
-              : group
-          )
-        }));
+      clearAllGroups: () => {
+        entityIndex = new Map();
+        set({ groups: [], selectedGroupIds: [] });
       },
 
-      removeTokenFromGroup: (groupId, tokenId) => {
-        set((state) => ({
-          groups: state.groups.map(group => {
-            if (group.id === groupId) {
-              const newTokenIds = group.tokenIds.filter(id => id !== tokenId);
-              return { ...group, tokenIds: newTokenIds };
-            }
-            return group;
-          }).filter(group => group.tokenIds.length > 0) // Remove empty groups
-        }));
+      addMembersToGroup: (groupId, newMembers) => {
+        set((state) => {
+          const next = state.groups.map(g => {
+            if (g.id !== groupId) return g;
+            const existingIds = new Set(g.members.map(m => m.id));
+            const toAdd = newMembers.filter(m => !existingIds.has(m.id));
+            return { ...g, members: [...g.members, ...toAdd] };
+          });
+          rebuildEntityIndex(next);
+          return { groups: next };
+        });
       },
 
-      getTokenGroup: (tokenId) => {
-        const { groups } = get();
-        return groups.find(group => group.tokenIds.includes(tokenId)) || null;
+      removeMemberFromGroup: (groupId, entityId) => {
+        set((state) => {
+          const next = state.groups
+            .map(g => {
+              if (g.id !== groupId) return g;
+              return { ...g, members: g.members.filter(m => m.id !== entityId) };
+            })
+            .filter(g => g.members.length > 0); // Remove empty groups
+          rebuildEntityIndex(next);
+          return { groups: next };
+        });
+      },
+
+      getGroupForEntity: (entityId) => {
+        const groupId = entityIndex.get(entityId);
+        if (!groupId) return null;
+        return get().groups.find(g => g.id === groupId) || null;
+      },
+
+      getMembersByType: (groupId, type) => {
+        const group = get().groups.find(g => g.id === groupId);
+        if (!group) return [];
+        return group.members.filter(m => m.type === type);
+      },
+
+      isEntityInAnyGroup: (entityId) => entityIndex.has(entityId),
+
+      recalculateBounds: (groupId, geometries) => {
+        const group = get().groups.find(g => g.id === groupId);
+        if (!group) return;
+        const updated = recalculateGroupBounds(group, geometries);
+        get().updateGroup(groupId, { bounds: updated.bounds, pivot: updated.pivot });
       },
 
       selectGroup: (groupId) => {
         set((state) => ({
-          selectedGroupIds: state.selectedGroupIds.includes(groupId) 
-            ? state.selectedGroupIds 
-            : [...state.selectedGroupIds, groupId]
+          selectedGroupIds: state.selectedGroupIds.includes(groupId)
+            ? state.selectedGroupIds
+            : [...state.selectedGroupIds, groupId],
         }));
       },
 
       deselectGroup: (groupId) => {
         set((state) => ({
-          selectedGroupIds: state.selectedGroupIds.filter(id => id !== groupId)
+          selectedGroupIds: state.selectedGroupIds.filter(id => id !== groupId),
         }));
       },
 
-      clearGroupSelection: () => {
-        set({ selectedGroupIds: [] });
-      },
+      clearGroupSelection: () => set({ selectedGroupIds: [] }),
 
       toggleGroupSelection: (groupId) => {
         const { selectedGroupIds } = get();
@@ -145,39 +184,37 @@ export const useGroupStore = create<GroupStore>()(
           get().selectGroup(groupId);
         }
       },
-
-      clearAllGroups: () => {
-        set({ 
-          groups: [],
-          selectedGroupIds: []
-        });
-      },
-
-      updateGroupBounds: (groupId, tokens) => {
-        const { groups } = get();
-        const group = groups.find(g => g.id === groupId);
-        
-        if (!group) return;
-
-        const groupTokens = tokens.filter(t => group.tokenIds.includes(t.id));
-        const updatedGroup = updateGroupBounds(group, groupTokens);
-        
-        get().updateGroup(groupId, updatedGroup);
-      },
-
-      getGroupsContainingToken: (tokenId) => {
-        const { groups } = get();
-        return groups.filter(group => group.tokenIds.includes(tokenId));
-      },
-
-      isTokenInAnyGroup: (tokenId) => {
-        const { groups } = get();
-        return groups.some(group => group.tokenIds.includes(tokenId));
-      }
     }),
     {
       name: 'token-groups-store',
-      version: 1,
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          // Migrate old TokenGroup[] (with tokenIds) to EntityGroup[] (with members)
+          const oldGroups = persistedState?.groups || [];
+          const migratedGroups = oldGroups.map((g: any) => {
+            if (g.members) return g; // Already migrated
+            // Convert tokenIds -> members
+            const tokenIds: string[] = g.tokenIds || [];
+            return {
+              ...g,
+              members: tokenIds.map((id: string) => ({ id, type: 'token' })),
+              // Remove old fields
+              tokenIds: undefined,
+              transform: undefined,
+            };
+          });
+          return { ...persistedState, groups: migratedGroups, selectedGroupIds: [] };
+        }
+        return persistedState as any;
+      },
+      
+
     }
   )
 );
+
+// Rebuild entity index on store hydration and changes
+useGroupStore.subscribe((state) => {
+  rebuildEntityIndex(state.groups);
+});
