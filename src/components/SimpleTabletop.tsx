@@ -3949,23 +3949,15 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw square grid within region
+  // NOTE: This is called from within an already-rotated canvas context (drawRectangleRegion),
+  // so NO additional rotation should be applied here.
   const drawSquareGrid = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
     const gridSize = region.gridSize;
 
     // Save context for local transformations
     ctx.save();
 
-    // Apply rotation if present (same as region rotation logic)
-    const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
-    if (effectiveRotation !== 0) {
-      const centerX = region.x + region.width / 2;
-      const centerY = region.y + region.height / 2;
-      const angle = (effectiveRotation * Math.PI) / 180;
-
-      ctx.translate(centerX, centerY);
-      ctx.rotate(angle);
-      ctx.translate(-centerX, -centerY);
-    }
+    // DO NOT apply rotation here - the caller (drawRectangleRegion) already has the context rotated.
 
     // Calculate grid lines in local region space (starting from region origin)
     const cols = Math.ceil(region.width / gridSize);
@@ -5697,23 +5689,56 @@ export const SimpleTabletop = () => {
         const newRotation = mapObjectRotationStartValue + rotationDelta;
         updateMapObject(rotatingMapObjectId, { rotation: newRotation });
 
-        // Propagate rotation to group siblings around group pivot
+        // Propagate rotation to group siblings around group pivot (centroid)
         const group = useGroupStore.getState().getGroupForEntity(rotatingMapObjectId);
         if (group) {
           const pivotX = group.pivot.x;
           const pivotY = group.pivot.y;
+          const rad = (rotationDelta * Math.PI) / 180;
+          const cos = Math.cos(rad); const sin = Math.sin(rad);
           for (const member of group.members) {
             if (member.id === rotatingMapObjectId) continue;
             if (member.type === 'mapObject') {
               const sibling = mapObjects.find(o => o.id === member.id);
               if (sibling) {
-                const rad = (rotationDelta * Math.PI) / 180;
-                const cos = Math.cos(rad); const sin = Math.sin(rad);
-                const dx = sibling.position.x - pivotX; const dy = sibling.position.y - pivotY;
-                updateMapObject(member.id, {
-                  position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
-                  rotation: (sibling.rotation || 0) + rotationDelta,
-                });
+                if (sibling.shape === 'wall' && sibling.wallPoints) {
+                  // Rotate every wall vertex around the group pivot
+                  const newWallPoints = sibling.wallPoints.map(p => {
+                    const dx = p.x - pivotX; const dy = p.y - pivotY;
+                    return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+                  });
+                  const xs = newWallPoints.map(p => p.x);
+                  const ys = newWallPoints.map(p => p.y);
+                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                  updateMapObject(member.id, {
+                    wallPoints: newWallPoints,
+                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                    width: Math.max(maxX - minX, 1),
+                    height: Math.max(maxY - minY, 1),
+                    rotation: (sibling.rotation || 0) + rotationDelta,
+                  });
+                } else {
+                  const dx = sibling.position.x - pivotX; const dy = sibling.position.y - pivotY;
+                  updateMapObject(member.id, {
+                    position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+                    rotation: (sibling.rotation || 0) + rotationDelta,
+                  });
+                }
+              }
+            } else if (member.type === 'region') {
+              const sib = regions.find(r => r.id === member.id);
+              if (sib) {
+                const cx2 = sib.x + sib.width / 2; const cy2 = sib.y + sib.height / 2;
+                const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+                const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+                updateRegion(member.id, { x: newCx - sib.width / 2, y: newCy - sib.height / 2, rotation: (sib.rotation || 0) + rotationDelta });
+              }
+            } else if (member.type === 'light') {
+              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
+              if (sib) {
+                const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
+                useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
               }
             }
           }
@@ -5941,9 +5966,12 @@ export const SimpleTabletop = () => {
           newTempPositions[groupedToken.tokenId] = { x: rotatedPos.x, y: rotatedPos.y };
         });
 
-        // Propagate rotation to group siblings around the region center (acts as group pivot)
+        // Propagate rotation to group siblings around the GROUP CENTROID (not just region center)
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group) {
+          // Use the group's stored pivot as the true rotation centroid
+          const pivotX = group.pivot.x;
+          const pivotY = group.pivot.y;
           const rad = (rotationDelta * Math.PI) / 180;
           const cos = Math.cos(rad); const sin = Math.sin(rad);
           for (const member of group.members) {
@@ -5951,31 +5979,50 @@ export const SimpleTabletop = () => {
             if (member.type === 'mapObject') {
               const sib = mapObjects.find(o => o.id === member.id);
               if (sib) {
-                const dx = sib.position.x - centerX; const dy = sib.position.y - centerY;
-                updateMapObject(member.id, {
-                  position: { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos },
-                  rotation: (sib.rotation || 0) + rotationDelta,
-                });
+                if (sib.shape === 'wall' && sib.wallPoints) {
+                  // Rotate every wall vertex around the group pivot
+                  const newWallPoints = sib.wallPoints.map(p => {
+                    const dx = p.x - pivotX; const dy = p.y - pivotY;
+                    return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+                  });
+                  const xs = newWallPoints.map(p => p.x);
+                  const ys = newWallPoints.map(p => p.y);
+                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                  updateMapObject(member.id, {
+                    wallPoints: newWallPoints,
+                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                    width: Math.max(maxX - minX, 1),
+                    height: Math.max(maxY - minY, 1),
+                    rotation: (sib.rotation || 0) + rotationDelta,
+                  });
+                } else {
+                  const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
+                  updateMapObject(member.id, {
+                    position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+                    rotation: (sib.rotation || 0) + rotationDelta,
+                  });
+                }
               }
             } else if (member.type === 'token') {
               const t = tokens.find(tok => tok.id === member.id);
               if (t) {
-                const dx = t.x - centerX; const dy = t.y - centerY;
-                newTempPositions[member.id] = { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos };
+                const dx = t.x - pivotX; const dy = t.y - pivotY;
+                newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
               }
             } else if (member.type === 'region') {
               const sib = regions.find(r => r.id === member.id);
               if (sib) {
                 const cx2 = sib.x + sib.width / 2; const cy2 = sib.y + sib.height / 2;
-                const dx = cx2 - centerX; const dy = cy2 - centerY;
-                const newCx = centerX + dx * cos - dy * sin; const newCy = centerY + dx * sin + dy * cos;
+                const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+                const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
                 updateRegion(member.id, { x: newCx - sib.width / 2, y: newCy - sib.height / 2, rotation: (sib.rotation || 0) + rotationDelta });
               }
             } else if (member.type === 'light') {
               const sib = useLightStore.getState().lights.find(l => l.id === member.id);
               if (sib) {
-                const dx = sib.position.x - centerX; const dy = sib.position.y - centerY;
-                useLightStore.getState().updateLight(member.id, { position: { x: centerX + dx * cos - dy * sin, y: centerY + dx * sin + dy * cos } });
+                const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
+                useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
               }
             }
           }
