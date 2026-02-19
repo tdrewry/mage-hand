@@ -2,7 +2,7 @@ import React, { Suspense, useState } from 'react';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
 
-const isLovableSandbox = window.location.hostname.includes('lovable.app');
+const isLovableSandbox = true;
 
 const LoadingScreen = () => (
   <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
