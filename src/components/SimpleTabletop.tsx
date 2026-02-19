@@ -5811,6 +5811,8 @@ export const SimpleTabletop = () => {
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               // Include primary so regionDragStartRef is always consistent
               snap[clickedRegion.id] = { type: 'region', x: clickedRegion.x, y: clickedRegion.y };
+              const groupRegionIdsForSnap = new Set<string>([clickedRegion.id]);
+
               for (const m of dragGroup2.members) {
                 if (m.id === clickedRegion.id) continue;
                 if (m.type === 'mapObject') {
@@ -5818,7 +5820,7 @@ export const SimpleTabletop = () => {
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                 } else if (m.type === 'region') {
                   const r = regions.find(x => x.id === m.id);
-                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
+                  if (r) { snap[m.id] = { type: 'region', x: r.x, y: r.y }; groupRegionIdsForSnap.add(m.id); }
                 } else if (m.type === 'light') {
                   const l = useLightStore.getState().lights.find(x => x.id === m.id);
                   if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5827,6 +5829,31 @@ export const SimpleTabletop = () => {
                   if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
                 }
               }
+
+              // Also snapshot annotations and terrain features associated with group regions
+              // so they move with the group during drag (they're not EntityGroup members).
+              const dungeonSnap = useDungeonStore.getState();
+              dungeonSnap.annotations.forEach(ann => {
+                if (ann.regionId && groupRegionIdsForSnap.has(ann.regionId)) {
+                  (snap as any)[`__ann_${ann.id}`] = { x: ann.position.x, y: ann.position.y };
+                }
+              });
+              dungeonSnap.terrainFeatures.forEach(tf => {
+                // Check if any tile overlaps a group region's bounds (heuristic: tile within 200px of any region center)
+                const shouldMove = dragGroup2.members.some(m => {
+                  if (m.type !== 'region') return false;
+                  const r = m.id === clickedRegion.id ? clickedRegion : regions.find(x => x.id === m.id);
+                  if (!r) return false;
+                  const cx = r.x + r.width / 2; const cy = r.y + r.height / 2;
+                  return tf.tiles.some(t => Math.abs(t.x - cx) < r.width && Math.abs(t.y - cy) < r.height);
+                });
+                if (shouldMove) {
+                  const tilesSnap = tf.tiles.map(t => ({ ...t })) as any;
+                  if (tf.fluidBoundary) tilesSnap._boundary = tf.fluidBoundary.map(t => ({ ...t }));
+                  (snap as any)[`__tf_${tf.id}`] = tilesSnap;
+                }
+              });
+
               groupSiblingSnapshotsRef.current = snap;
             }
 
@@ -6257,6 +6284,9 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
 
+      // Invalidate wall decoration cache every frame so ghost decorations don't trail the drag
+      wallDecorationCacheRef.current = null;
+
       // Find the region being dragged
       const draggedRegion = regions.find((r) => r.id === draggedRegionId);
       if (draggedRegion) {
@@ -6276,12 +6306,16 @@ export const SimpleTabletop = () => {
           newTempPositions[groupedToken.tokenId] = { x: newTokenX, y: newTokenY };
         });
 
-        // Propagate drag to group siblings (map objects + lights + other regions)
+        // Propagate drag to group siblings (map objects + lights + other regions + annotations + terrain)
         // IMPORTANT: Always use snapshots from groupSiblingSnapshotsRef to compute new positions.
         // This prevents the compounding-delta bug where each frame adds deltaX/Y to the
         // already-moved position from the previous frame.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group && (deltaX !== 0 || deltaY !== 0)) {
+          // Collect all region IDs in the group (including primary) for annotation/terrain propagation
+          const groupRegionIds = new Set<string>();
+          groupRegionIds.add(draggedRegionId);
+
           for (const member of group.members) {
             if (member.id === draggedRegionId) continue;
             const snap = groupSiblingSnapshotsRef.current[member.id];
@@ -6306,10 +6340,37 @@ export const SimpleTabletop = () => {
               newTempPositions[member.id] = { x: snap.position.x + deltaX, y: snap.position.y + deltaY };
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
               updateRegion(member.id, { x: snap.x + deltaX, y: snap.y + deltaY });
+              groupRegionIds.add(member.id);
             } else if (member.type === 'light' && snap.lightPos) {
               useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + deltaX, y: snap.lightPos.y + deltaY } });
             }
           }
+
+          // Propagate drag to annotations and terrain features associated with group regions.
+          // These live in dungeonStore and are not EntityGroup members, so we move them
+          // by applying the same delta to any item whose regionId matches a moved region.
+          const dungeonState = useDungeonStore.getState();
+          dungeonState.annotations.forEach(ann => {
+            if (ann.regionId && groupRegionIds.has(ann.regionId)) {
+              const snapKey = `__ann_${ann.id}`;
+              const snapPos = (groupSiblingSnapshotsRef.current as any)[snapKey];
+              if (snapPos) {
+                dungeonState.updateAnnotation(ann.id, { position: { x: snapPos.x + deltaX, y: snapPos.y + deltaY } });
+              }
+            }
+          });
+          dungeonState.terrainFeatures.forEach(tf => {
+            const snapKey = `__tf_${tf.id}`;
+            const snapTiles = (groupSiblingSnapshotsRef.current as any)[snapKey];
+            if (snapTiles) {
+              dungeonState.updateTerrainFeature(tf.id, {
+                tiles: snapTiles.map((t: {x:number;y:number}) => ({ x: t.x + deltaX, y: t.y + deltaY })),
+                ...(snapTiles._boundary ? {
+                  fluidBoundary: snapTiles._boundary.map((t: {x:number;y:number}) => ({ x: t.x + deltaX, y: t.y + deltaY }))
+                } : {}),
+              });
+            }
+          });
         }
 
         setTempTokenPositions(newTempPositions);
@@ -7413,6 +7474,12 @@ export const SimpleTabletop = () => {
         stableVisibilityRef.current.remove();
         stableVisibilityRef.current = null;
       }
+
+      // Recalculate lighting and fog after regions/groups move or rotate,
+      // since walls and vision-blocking geometry have shifted.
+      notifyObstaclesChanged();
+      tokenVisibilityCacheRef.current.clear();
+      clearVisibilityCache();
 
       // Redraw canvas to clear ghost token and path
       redrawCanvas();
