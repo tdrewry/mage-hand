@@ -21,8 +21,8 @@ export const WatabouImportCardContent = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [additive, setAdditive] = useState(false);
-  const [groupOnImport, setGroupOnImport] = useState(false);
+  const [additive, setAdditive] = useState(true);
+  const [groupOnImport, setGroupOnImport] = useState(true);
   const [groupName, setGroupName] = useState('');
 
   const addRegion = useRegionStore((state) => state.addRegion);
@@ -258,6 +258,44 @@ export const WatabouImportCardContent = () => {
         </Alert>
       )}
 
+      {/* Drop zone */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        <Map className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Drop your file here</p>
+          <p className="text-xs text-muted-foreground">
+            Supports Watabou JSON, Dungeondraft dd2vtt, and d20prefab
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4"
+          disabled={loading}
+          onClick={() => document.getElementById('file-upload')?.click()}
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          {loading ? 'Importing...' : 'Select File'}
+        </Button>
+
+        <input
+          id="file-upload"
+          type="file"
+          accept=".json,.dd2vtt,.d20prefab"
+          className="hidden"
+          onChange={handleFileInput}
+          disabled={loading}
+        />
+      </div>
+
       {/* Import options */}
       <div className="space-y-3 rounded-md border border-border p-3 bg-muted/30">
         <div className="flex items-center justify-between">
@@ -300,44 +338,6 @@ export const WatabouImportCardContent = () => {
             />
           )}
         </div>
-      </div>
-
-      {/* Drop zone */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        <Map className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Drop your file here</p>
-          <p className="text-xs text-muted-foreground">
-            Supports Watabou JSON, Dungeondraft dd2vtt, and d20prefab
-          </p>
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-4"
-          disabled={loading}
-          onClick={() => document.getElementById('file-upload')?.click()}
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {loading ? 'Importing...' : 'Select File'}
-        </Button>
-
-        <input
-          id="file-upload"
-          type="file"
-          accept=".json,.dd2vtt,.d20prefab"
-          className="hidden"
-          onChange={handleFileInput}
-          disabled={loading}
-        />
       </div>
 
       <div className="text-xs text-muted-foreground space-y-2">
