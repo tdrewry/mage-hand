@@ -6138,13 +6138,32 @@ export const SimpleTabletop = () => {
               });
             }
           } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-            // Use snapshot width/height — never read from stale React `regions` closure during mousemove
-            const snapW = snap.width ?? 0;
-            const snapH = snap.height ?? 0;
-            const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
-            const dx = cx2 - pivotX; const dy = cy2 - pivotY;
-            const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-            updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+            if (snap.pathPoints && snap.pathPoints.length > 0) {
+              // Path region: rotate every path point around the shared group pivot.
+              // The pathPoints ARE the geometry — x/y/width/height are just the bounding box.
+              const newPathPoints = snap.pathPoints.map(p => {
+                const dx = p.x - pivotX; const dy = p.y - pivotY;
+                return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+              });
+              const pxs = newPathPoints.map(p => p.x); const pys = newPathPoints.map(p => p.y);
+              const minPX = Math.min(...pxs); const maxPX = Math.max(...pxs);
+              const minPY = Math.min(...pys); const maxPY = Math.max(...pys);
+              updateRegion(member.id, {
+                pathPoints: newPathPoints,
+                x: minPX, y: minPY,
+                width: Math.max(maxPX - minPX, 1),
+                height: Math.max(maxPY - minPY, 1),
+                rotation: 0, // geometry baked into pathPoints — no separate angle needed
+              });
+            } else {
+              // Rect region: orbit bounding-box center around the shared pivot
+              const snapW = snap.width ?? 0;
+              const snapH = snap.height ?? 0;
+              const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
+              const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+              const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+              updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+            }
           } else if (member.type === 'light' && snap.lightPos) {
             const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
             useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
@@ -6155,6 +6174,7 @@ export const SimpleTabletop = () => {
       }
       requestAnimationFrame(() => redrawCanvas());
     } else if (isDraggingMapObject && draggedMapObjectId) {
+
       // MapObject dragging in edit mode
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - mapObjectDragOffset.x;
@@ -6422,13 +6442,33 @@ export const SimpleTabletop = () => {
               const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
               newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-              // Use snapshot width/height — never read from stale React `regions` closure during mousemove
-              const snapW = snap.width ?? 0;
-              const snapH = snap.height ?? 0;
-              const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
-              const dx = cx2 - pivotX; const dy = cy2 - pivotY;
-              const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-              updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+              if (snap.pathPoints && snap.pathPoints.length > 0) {
+                // Path region: rotate every path point around the shared group pivot.
+                // pathPoints ARE the geometry — x/y/width/height are just the bounding box.
+                const newPathPoints = snap.pathPoints.map(p => {
+                  const dx = p.x - pivotX; const dy = p.y - pivotY;
+                  return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+                });
+                const pxs = newPathPoints.map(p => p.x); const pys = newPathPoints.map(p => p.y);
+                const minPX = Math.min(...pxs); const maxPX = Math.max(...pxs);
+                const minPY = Math.min(...pys); const maxPY = Math.max(...pys);
+                updateRegion(member.id, {
+                  pathPoints: newPathPoints,
+                  x: minPX, y: minPY,
+                  width: Math.max(maxPX - minPX, 1),
+                  height: Math.max(maxPY - minPY, 1),
+                  rotation: 0,
+                });
+              } else {
+                // Rect region: orbit bounding-box center around shared pivot
+                const snapW = snap.width ?? 0;
+                const snapH = snap.height ?? 0;
+                const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
+                const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+                const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+                updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+              }
+
             } else if (member.type === 'light' && snap.lightPos) {
               const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
               useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
