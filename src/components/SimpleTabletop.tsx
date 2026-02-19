@@ -2375,13 +2375,25 @@ export const SimpleTabletop = () => {
       }
     }
 
-    // Draw the single shared group rotation handle for any selected grouped regions (edit mode only).
+    // Draw the single shared group rotation handle for any selected grouped entities (edit mode only).
     // Each group only gets one handle even if multiple members are selected.
+    // Check both regions AND map objects so the handle appears regardless of which member type was clicked first.
     if (renderingMode === 'edit') {
       const drawnGroupIds = new Set<string>();
       regions.forEach(region => {
         if (!region.selected) return;
         const grp = useGroupStore.getState().getGroupForEntity(region.id);
+        if (grp && !drawnGroupIds.has(grp.id)) {
+          drawnGroupIds.add(grp.id);
+          drawGroupRotationHandle(ctx, grp);
+        }
+      });
+      // Also check selected map objects — clicking a door/wall in a group selects it,
+      // and propagation selects sibling regions, but the region.selected flag may not be
+      // flushed yet; checking mapObjects ensures the handle always appears.
+      mapObjects.forEach(obj => {
+        if (!obj.selected) return;
+        const grp = useGroupStore.getState().getGroupForEntity(obj.id);
         if (grp && !drawnGroupIds.has(grp.id)) {
           drawnGroupIds.add(grp.id);
           drawGroupRotationHandle(ctx, grp);
@@ -5605,11 +5617,45 @@ export const SimpleTabletop = () => {
             const distToHandle = Math.hypot(worldPos.x - handleX, worldPos.y - handleY);
             const handleHitRadius = 20 / transform.zoom;
             if (distToHandle <= handleHitRadius) {
-              // Start rotation
+              // Start rotation — capture snapshots of ALL group siblings NOW so mousemove
+              // can apply absolute deltas (no compounding) from the snapshot positions.
               setIsRotatingMapObject(true);
               setRotatingMapObjectId(clickedMapObject.id);
-              setMapObjectRotationStartAngle(calculateAngle(clickedMapObject.position.x, clickedMapObject.position.y, worldPos.x, worldPos.y));
+              // Use group centroid as pivot if in a group, else object center
+              const mobjRotGroup = useGroupStore.getState().getGroupForEntity(clickedMapObject.id);
+              const rotPivot = mobjRotGroup
+                ? (() => { const b = computeGroupBounds(mobjRotGroup); return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : clickedMapObject.position; })()
+                : clickedMapObject.position;
+              groupRotationPivotRef.current = rotPivot;
+              setMapObjectRotationStartAngle(calculateAngle(rotPivot.x, rotPivot.y, worldPos.x, worldPos.y));
               setMapObjectRotationStartValue(clickedMapObject.rotation || 0);
+              // Snapshot all members
+              const mobjRotSnap: typeof groupSiblingSnapshotsRef.current = {};
+              mobjRotSnap[clickedMapObject.id] = {
+                type: 'mapObject',
+                position: { ...clickedMapObject.position },
+                rotation: clickedMapObject.rotation || 0,
+                wallPoints: clickedMapObject.wallPoints ? clickedMapObject.wallPoints.map(p => ({ ...p })) : undefined,
+              };
+              if (mobjRotGroup) {
+                for (const m of mobjRotGroup.members) {
+                  if (m.id === clickedMapObject.id) continue;
+                  if (m.type === 'mapObject') {
+                    const o = mapObjects.find(x => x.id === m.id);
+                    if (o) mobjRotSnap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                  } else if (m.type === 'region') {
+                    const r = regions.find(x => x.id === m.id);
+                    if (r) mobjRotSnap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                  } else if (m.type === 'light') {
+                    const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                    if (l) mobjRotSnap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                  } else if (m.type === 'token') {
+                    const t = tokens.find(x => x.id === m.id);
+                    if (t) mobjRotSnap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                  }
+                }
+              }
+              groupSiblingSnapshotsRef.current = mobjRotSnap;
             } else {
               // In rotate mode but not on handle: drag the object (move it)
               setIsDraggingMapObject(true);
@@ -5656,32 +5702,97 @@ export const SimpleTabletop = () => {
             groupSiblingSnapshotsRef.current = snap;
           }
         }
-        // Region manipulation in edit mode (only for selected or grouped regions, not locked)
-        // For grouped regions: start drag immediately on click (same UX as map objects).
-        // For ungrouped regions: require selection first (second-click-to-drag behaviour).
-        else if (clickedRegion && renderingMode === 'edit' && !clickedRegion.locked &&
-          (clickedRegion.selected || useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id))) {
-          // Check if we're clicking on a rotation handle first (ungrouped only — group handle handled in PRIORITY 2)
-          if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
-            setIsRotatingRegion(true);
+      } else if (clickedRegion && renderingMode === 'edit' && !clickedRegion.locked &&
+        (clickedRegion.selected || useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id))) {
+        // Region manipulation in edit mode.
+        // For grouped regions: start drag immediately (no prior selection required).
+        // For ungrouped regions: require prior selection.
+        // When dragging a grouped region, also propagate selection to all siblings.
+        const regionGroup = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+        if (regionGroup) {
+          // Ensure all group members are visually selected
+          propagateGroupSelection(clickedRegion.id, 'region');
+        }
+
+        // Check if we're clicking on a rotation handle first (ungrouped only — group handle handled in PRIORITY 2)
+        if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
+          setIsRotatingRegion(true);
+          setDraggedRegionId(clickedRegion.id);
+
+          setInitialRegionState(captureRegionTransformState(clickedRegion));
+          setTransformingRegionId(clickedRegion.id);
+
+          const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+          if (rotGroup2) {
+            const pivot = computeGroupCentroid(rotGroup2);
+            groupRotationPivotRef.current = pivot;
+            setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+            const snap: typeof groupSiblingSnapshotsRef.current = {};
+            for (const m of rotGroup2.members) {
+              if (m.type === 'mapObject') {
+                const o = mapObjects.find(x => x.id === m.id);
+                if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+              } else if (m.type === 'region') {
+                const r = regions.find(x => x.id === m.id);
+                if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+              } else if (m.type === 'light') {
+                const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+              } else if (m.type === 'token') {
+                const t = tokens.find(x => x.id === m.id);
+                if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+              }
+            }
+            groupSiblingSnapshotsRef.current = snap;
+          } else {
+            const centerX = clickedRegion.x + clickedRegion.width / 2;
+            const centerY = clickedRegion.y + clickedRegion.height / 2;
+            groupRotationPivotRef.current = null;
+            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+          }
+          const tokensInRegion2: { tokenId: string; startX: number; startY: number }[] = [];
+          tokens.forEach((token) => {
+            if (isPointInRegion(token.x, token.y, clickedRegion)) {
+              tokensInRegion2.push({ tokenId: token.id, startX: token.x, startY: token.y });
+            }
+          });
+          setGroupedTokens(tokensInRegion2);
+        } else {
+          // For ungrouped regions, check resize handles; for grouped, skip (no resize in group mode)
+          const inGroup = useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id);
+          const handle = !inGroup ? getResizeHandle(clickedRegion, worldPos.x, worldPos.y) : null;
+          if (handle) {
+            setIsResizingRegion(true);
+            setResizeHandle(handle);
             setDraggedRegionId(clickedRegion.id);
-            
             setInitialRegionState(captureRegionTransformState(clickedRegion));
             setTransformingRegionId(clickedRegion.id);
+          } else {
+            // Start dragging the region (for both grouped and ungrouped)
+            setIsDraggingRegion(true);
+            setDraggedRegionId(clickedRegion.id);
+            regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
+            if (currentVisibilityRef.current) {
+              stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+            }
+            setInitialRegionState(captureRegionTransformState(clickedRegion));
+            setTransformingRegionId(clickedRegion.id);
+            setRegionDragOffset({ x: worldPos.x - clickedRegion.x, y: worldPos.y - clickedRegion.y });
 
-            const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
-            if (rotGroup2) {
-              const pivot = computeGroupCentroid(rotGroup2);
-              groupRotationPivotRef.current = pivot;
-              setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+            // Snapshot ALL group siblings (and the primary itself) for absolute-delta drag
+            const dragGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+            if (dragGroup2) {
               const snap: typeof groupSiblingSnapshotsRef.current = {};
-              for (const m of rotGroup2.members) {
+              // Include primary so regionDragStartRef is always consistent
+              snap[clickedRegion.id] = { type: 'region', x: clickedRegion.x, y: clickedRegion.y };
+              for (const m of dragGroup2.members) {
+                if (m.id === clickedRegion.id) continue;
                 if (m.type === 'mapObject') {
                   const o = mapObjects.find(x => x.id === m.id);
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                 } else if (m.type === 'region') {
                   const r = regions.find(x => x.id === m.id);
-                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
                 } else if (m.type === 'light') {
                   const l = useLightStore.getState().lights.find(x => x.id === m.id);
                   if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5691,73 +5802,16 @@ export const SimpleTabletop = () => {
                 }
               }
               groupSiblingSnapshotsRef.current = snap;
-            } else {
-              const centerX = clickedRegion.x + clickedRegion.width / 2;
-              const centerY = clickedRegion.y + clickedRegion.height / 2;
-              groupRotationPivotRef.current = null;
-              setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
             }
-            const tokensInRegion2: { tokenId: string; startX: number; startY: number }[] = [];
+
+            const tokensInRegion3: { tokenId: string; startX: number; startY: number }[] = [];
             tokens.forEach((token) => {
               if (isPointInRegion(token.x, token.y, clickedRegion)) {
-                tokensInRegion2.push({ tokenId: token.id, startX: token.x, startY: token.y });
+                tokensInRegion3.push({ tokenId: token.id, startX: token.x, startY: token.y });
               }
             });
-            setGroupedTokens(tokensInRegion2);
-          } else {
-            // For ungrouped regions, check resize handles; for grouped, skip (no resize in group mode)
-            const inGroup = useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id);
-            const handle = !inGroup ? getResizeHandle(clickedRegion, worldPos.x, worldPos.y) : null;
-            if (handle) {
-              setIsResizingRegion(true);
-              setResizeHandle(handle);
-              setDraggedRegionId(clickedRegion.id);
-              setInitialRegionState(captureRegionTransformState(clickedRegion));
-              setTransformingRegionId(clickedRegion.id);
-            } else {
-              // Start dragging the region (for both grouped and ungrouped)
-              setIsDraggingRegion(true);
-              setDraggedRegionId(clickedRegion.id);
-              regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
-              if (currentVisibilityRef.current) {
-                stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
-              }
-              setInitialRegionState(captureRegionTransformState(clickedRegion));
-              setTransformingRegionId(clickedRegion.id);
-              setRegionDragOffset({ x: worldPos.x - clickedRegion.x, y: worldPos.y - clickedRegion.y });
-
-              // Snapshot all group siblings at drag start
-              const dragGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
-              if (dragGroup2) {
-                const snap: typeof groupSiblingSnapshotsRef.current = {};
-                for (const m of dragGroup2.members) {
-                  if (m.id === clickedRegion.id) continue;
-                  if (m.type === 'mapObject') {
-                    const o = mapObjects.find(x => x.id === m.id);
-                    if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
-                  } else if (m.type === 'region') {
-                    const r = regions.find(x => x.id === m.id);
-                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
-                  } else if (m.type === 'light') {
-                    const l = useLightStore.getState().lights.find(x => x.id === m.id);
-                    if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
-                  } else if (m.type === 'token') {
-                    const t = tokens.find(x => x.id === m.id);
-                    if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
-                  }
-                }
-                groupSiblingSnapshotsRef.current = snap;
-              }
-
-              const tokensInRegion3: { tokenId: string; startX: number; startY: number }[] = [];
-              tokens.forEach((token) => {
-                if (isPointInRegion(token.x, token.y, clickedRegion)) {
-                  tokensInRegion3.push({ tokenId: token.id, startX: token.x, startY: token.y });
-                }
-              });
-              setGroupedTokens(tokensInRegion3);
-              setTokensMovedByRegion(tokensInRegion3.map((t) => t.tokenId));
-            }
+            setGroupedTokens(tokensInRegion3);
+            setTokensMovedByRegion(tokensInRegion3.map((t) => t.tokenId));
           }
         }
       } else if (lightPlacementMode && renderingMode === "edit") {
@@ -5991,67 +6045,83 @@ export const SimpleTabletop = () => {
       }
       redrawCanvas();
     } else if (isRotatingMapObject && rotatingMapObjectId) {
-      // MapObject rotation drag
+      // MapObject rotation drag — uses SNAPSHOT positions to prevent compounding delta.
+      // Snapshots were captured at mousedown; rotationDelta is always relative to startAngle.
       const worldPos = screenToWorld(mouseX, mouseY);
-      const obj = mapObjects.find(o => o.id === rotatingMapObjectId);
-      if (obj) {
-        const currentAngle = calculateAngle(obj.position.x, obj.position.y, worldPos.x, worldPos.y);
-        const rotationDelta = currentAngle - mapObjectRotationStartAngle;
-        const newRotation = mapObjectRotationStartValue + rotationDelta;
-        updateMapObject(rotatingMapObjectId, { rotation: newRotation });
+      const pivot = groupRotationPivotRef.current ?? mapObjects.find(o => o.id === rotatingMapObjectId)?.position ?? { x: 0, y: 0 };
+      const pivotX = pivot.x;
+      const pivotY = pivot.y;
+      const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
+      const rotationDelta = currentAngle - mapObjectRotationStartAngle;
+      const rad = (rotationDelta * Math.PI) / 180;
+      const cos = Math.cos(rad); const sin = Math.sin(rad);
 
-        // Propagate rotation to group siblings around group pivot (centroid)
-        const group = useGroupStore.getState().getGroupForEntity(rotatingMapObjectId);
-        if (group) {
-          const pivotX = group.pivot.x;
-          const pivotY = group.pivot.y;
-          const rad = (rotationDelta * Math.PI) / 180;
-          const cos = Math.cos(rad); const sin = Math.sin(rad);
-          for (const member of group.members) {
-            if (member.id === rotatingMapObjectId) continue;
-            if (member.type === 'mapObject') {
-              const sibling = mapObjects.find(o => o.id === member.id);
-              if (sibling) {
-                if (sibling.shape === 'wall' && sibling.wallPoints) {
-                  // Rotate every wall vertex around the group pivot
-                  const newWallPoints = sibling.wallPoints.map(p => {
-                    const dx = p.x - pivotX; const dy = p.y - pivotY;
-                    return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
-                  });
-                  const xs = newWallPoints.map(p => p.x);
-                  const ys = newWallPoints.map(p => p.y);
-                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
-                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                  updateMapObject(member.id, {
-                    wallPoints: newWallPoints,
-                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-                    width: Math.max(maxX - minX, 1),
-                    height: Math.max(maxY - minY, 1),
-                    rotation: (sibling.rotation || 0) + rotationDelta,
-                  });
-                } else {
-                  const dx = sibling.position.x - pivotX; const dy = sibling.position.y - pivotY;
-                  updateMapObject(member.id, {
-                    position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
-                    rotation: (sibling.rotation || 0) + rotationDelta,
-                  });
-                }
-              }
-            } else if (member.type === 'region') {
-              const sib = regions.find(r => r.id === member.id);
-              if (sib) {
-                const cx2 = sib.x + sib.width / 2; const cy2 = sib.y + sib.height / 2;
-                const dx = cx2 - pivotX; const dy = cy2 - pivotY;
-                const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-                updateRegion(member.id, { x: newCx - sib.width / 2, y: newCy - sib.height / 2, rotation: (sib.rotation || 0) + rotationDelta });
-              }
-            } else if (member.type === 'light') {
-              const sib = useLightStore.getState().lights.find(l => l.id === member.id);
-              if (sib) {
-                const dx = sib.position.x - pivotX; const dy = sib.position.y - pivotY;
-                useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
-              }
+      // Update primary object from snapshot
+      const primarySnap = groupSiblingSnapshotsRef.current[rotatingMapObjectId];
+      if (primarySnap?.type === 'mapObject') {
+        if (primarySnap.wallPoints) {
+          const newWallPoints = primarySnap.wallPoints.map(p => {
+            const dx = p.x - pivotX; const dy = p.y - pivotY;
+            return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+          });
+          const xs = newWallPoints.map(p => p.x); const ys = newWallPoints.map(p => p.y);
+          updateMapObject(rotatingMapObjectId, {
+            wallPoints: newWallPoints,
+            position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+            width: Math.max(Math.max(...xs) - Math.min(...xs), 1),
+            height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
+            rotation: (primarySnap.rotation || 0) + rotationDelta,
+          });
+        } else if (primarySnap.position) {
+          const dx = primarySnap.position.x - pivotX; const dy = primarySnap.position.y - pivotY;
+          updateMapObject(rotatingMapObjectId, {
+            position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+            rotation: (primarySnap.rotation || 0) + rotationDelta,
+          });
+        }
+      }
+
+      // Propagate rotation to group siblings — ALL use snapshots, never live store positions
+      const group = useGroupStore.getState().getGroupForEntity(rotatingMapObjectId);
+      if (group) {
+        for (const member of group.members) {
+          if (member.id === rotatingMapObjectId) continue;
+          const snap = groupSiblingSnapshotsRef.current[member.id];
+          if (!snap) continue;
+          if (member.type === 'mapObject' && snap.type === 'mapObject') {
+            if (snap.wallPoints) {
+              const newWallPoints = snap.wallPoints.map(p => {
+                const dx = p.x - pivotX; const dy = p.y - pivotY;
+                return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+              });
+              const xs = newWallPoints.map(p => p.x); const ys = newWallPoints.map(p => p.y);
+              updateMapObject(member.id, {
+                wallPoints: newWallPoints,
+                position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+                width: Math.max(Math.max(...xs) - Math.min(...xs), 1),
+                height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
+                rotation: (snap.rotation || 0) + rotationDelta,
+              });
+            } else if (snap.position) {
+              const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
+              updateMapObject(member.id, {
+                position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
+                rotation: (snap.rotation || 0) + rotationDelta,
+              });
             }
+          } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
+            const sibRegion = regions.find(r => r.id === member.id);
+            if (sibRegion) {
+              const cx2 = snap.x + sibRegion.width / 2; const cy2 = snap.y + sibRegion.height / 2;
+              const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+              const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+              updateRegion(member.id, { x: newCx - sibRegion.width / 2, y: newCy - sibRegion.height / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+            }
+          } else if (member.type === 'light' && snap.lightPos) {
+            const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
+            useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
+          } else if (member.type === 'token' && snap.position) {
+            // tokens handled via tempPositions
           }
         }
       }
