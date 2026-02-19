@@ -37,7 +37,7 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
 
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
-  const { clearTerrainFeatures, clearAnnotations } = useDungeonStore();
+  const { clearAnnotations } = useDungeonStore();
   const { clearMapObjects } = useMapObjectStore();
   const { clearAllGroups } = useGroupStore();
 
@@ -65,7 +65,6 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
 
     if (shouldClearMapObjects) {
       clearMapObjects();
-      clearTerrainFeatures();
       cleared.push('map objects');
     }
 

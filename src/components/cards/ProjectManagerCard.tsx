@@ -311,7 +311,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     dungeonData: {
       doors: dungeonStore.doors,
       annotations: dungeonStore.annotations,
-      terrainFeatures: dungeonStore.terrainFeatures,
       importedWallSegments: dungeonStore.importedWallSegments,
       watabouStyle: dungeonStore.watabouStyle,
       wallEdgeStyle: dungeonStore.wallEdgeStyle,
@@ -617,9 +616,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         if (projectData.dungeonData.annotations) {
           dungeonStore.setAnnotations(projectData.dungeonData.annotations);
         }
-        if (projectData.dungeonData.terrainFeatures) {
-          dungeonStore.setTerrainFeatures(projectData.dungeonData.terrainFeatures);
-        }
         if (projectData.dungeonData.watabouStyle) {
           dungeonStore.setWatabouStyle(projectData.dungeonData.watabouStyle);
         }
@@ -742,7 +738,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       dungeonStore.clearAll();
       if (projectData.dungeonData.doors) dungeonStore.setDoors(projectData.dungeonData.doors);
       if (projectData.dungeonData.annotations) dungeonStore.setAnnotations(projectData.dungeonData.annotations);
-      if (projectData.dungeonData.terrainFeatures) dungeonStore.setTerrainFeatures(projectData.dungeonData.terrainFeatures);
       if (projectData.dungeonData.importedWallSegments) dungeonStore.setImportedWallSegments(projectData.dungeonData.importedWallSegments);
       if (projectData.dungeonData.watabouStyle) dungeonStore.setWatabouStyle(projectData.dungeonData.watabouStyle);
       if (projectData.dungeonData.wallEdgeStyle) dungeonStore.setWallEdgeStyle(projectData.dungeonData.wallEdgeStyle);

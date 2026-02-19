@@ -69,6 +69,7 @@ export type MapObjectCategory =
   | 'furniture'
   | 'debris'
   | 'trap'
+  | 'water'
   | 'decoration'
   | 'obstacle'
   | 'door'
@@ -84,6 +85,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   furniture: 'Furniture',
   debris: 'Debris',
   trap: 'Trap',
+  water: 'Water',
   decoration: 'Decoration',
   obstacle: 'Obstacle',
   door: 'Door',
@@ -148,17 +150,30 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     revealedByLight: true,
   },
   trap: {
-    shape: 'rectangle',
+    shape: 'custom',
     width: 50,
     height: 50,
-    fillColor: '#dc2626',
-    strokeColor: '#b91c1c',
+    fillColor: 'rgba(220, 38, 38, 0.2)',
+    strokeColor: '#dc2626',
     strokeWidth: 2,
-    opacity: 0.3,
+    opacity: 1,
     castsShadow: false,
     blocksMovement: false,
     blocksVision: false,
     revealedByLight: true,
+  },
+  water: {
+    shape: 'custom',
+    width: 100,
+    height: 100,
+    fillColor: 'rgba(59, 130, 246, 0.35)',
+    strokeColor: 'rgba(96, 165, 250, 0.6)',
+    strokeWidth: 1,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
   },
   decoration: {
     shape: 'circle',

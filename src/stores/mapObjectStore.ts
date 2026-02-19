@@ -2,7 +2,9 @@ import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
 import { MapObject, MapObjectCategory, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
-import { DoorConnection, TerrainFeature } from '@/lib/dungeonTypes';
+import { DoorConnection } from '@/lib/dungeonTypes';
+import { groupConnectedTiles, generateSimpleContour } from '@/utils/marchingSquares';
+import { simplifyPath, smoothPath } from '@/utils/pathSimplification';
 
 interface MapObjectStore {
   mapObjects: MapObject[];
@@ -31,12 +33,19 @@ interface MapObjectStore {
   // Factory method for creating from preset
   createFromPreset: (category: MapObjectCategory, position: { x: number; y: number }) => string;
   
-  // Conversion from terrain features
+  // Conversion from terrain features (legacy column/debris)
   convertTerrainFeatureToMapObjects: (
     terrainType: 'column' | 'debris',
     tiles: { x: number; y: number }[],
     terrainFeatureId?: string
   ) => string[];
+  
+  // Conversion from water/trap terrain data to MapObjects
+  convertWaterToMapObject: (
+    tiles: { x: number; y: number }[],
+    fluidBoundary?: { x: number; y: number }[]
+  ) => string;
+  convertTrapToMapObject: (tile: { x: number; y: number }) => string;
   
   // Conversion from doors
   convertDoorToMapObject: (door: DoorConnection) => string;
@@ -237,6 +246,120 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
     }));
     
     return ids;
+  },
+
+  convertWaterToMapObject: (tiles, fluidBoundary) => {
+    const GRID_SIZE = 50;
+    let boundary = fluidBoundary;
+
+    // If no fluid boundary, generate one from tiles using marching squares
+    if (!boundary || boundary.length < 3) {
+      if (tiles.length > 0) {
+        const groups = groupConnectedTiles(tiles);
+        if (groups.length > 0) {
+          const largest = groups.reduce((a, b) => a.length > b.length ? a : b);
+          let contour = generateSimpleContour(largest, GRID_SIZE);
+          if (contour.length > 0) {
+            contour = simplifyPath(contour, 3.0);
+            contour = smoothPath(contour, 3);
+            boundary = contour;
+          }
+        }
+      }
+    }
+
+    // Fallback: bounding rectangle from tiles
+    if (!boundary || boundary.length < 3) {
+      if (tiles.length === 0) {
+        boundary = [
+          { x: 0, y: 0 }, { x: GRID_SIZE, y: 0 },
+          { x: GRID_SIZE, y: GRID_SIZE }, { x: 0, y: GRID_SIZE },
+        ];
+      } else {
+        const xs = tiles.map(t => t.x);
+        const ys = tiles.map(t => t.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs) + GRID_SIZE;
+        const minY = Math.min(...ys), maxY = Math.max(...ys) + GRID_SIZE;
+        boundary = [
+          { x: minX, y: minY }, { x: maxX, y: minY },
+          { x: maxX, y: maxY }, { x: minX, y: maxY },
+        ];
+      }
+    }
+
+    // Compute centroid of boundary (used as position)
+    const centroidX = boundary.reduce((s, p) => s + p.x, 0) / boundary.length;
+    const centroidY = boundary.reduce((s, p) => s + p.y, 0) / boundary.length;
+
+    // Make customPath relative to centroid so ctx.translate(position) + draw works correctly
+    const relativePath = boundary.map(p => ({ x: p.x - centroidX, y: p.y - centroidY }));
+
+    // Bounding box
+    const xs = relativePath.map(p => p.x);
+    const ys = relativePath.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+
+    const id = generateId();
+    const mapObj: MapObject = {
+      id,
+      position: { x: centroidX, y: centroidY },
+      width: w,
+      height: h,
+      shape: 'custom',
+      category: 'water',
+      customPath: relativePath,
+      fillColor: 'rgba(59, 130, 246, 0.35)',
+      strokeColor: 'rgba(96, 165, 250, 0.6)',
+      strokeWidth: 1,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: false,
+      revealedByLight: false,
+      selected: false,
+    };
+
+    set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
+    return id;
+  },
+
+  convertTrapToMapObject: (tile) => {
+    const GRID_SIZE = 50;
+    // One MapObject per trap tile — simple square polygon
+    const cx = tile.x + GRID_SIZE / 2;
+    const cy = tile.y + GRID_SIZE / 2;
+    const half = GRID_SIZE / 2;
+
+    const relativePath = [
+      { x: -half, y: -half },
+      { x:  half, y: -half },
+      { x:  half, y:  half },
+      { x: -half, y:  half },
+    ];
+
+    const id = generateId();
+    const mapObj: MapObject = {
+      id,
+      position: { x: cx, y: cy },
+      width: GRID_SIZE,
+      height: GRID_SIZE,
+      shape: 'custom',
+      category: 'trap',
+      customPath: relativePath,
+      fillColor: 'rgba(220, 38, 38, 0.2)',
+      strokeColor: '#dc2626',
+      strokeWidth: 2,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: false,
+      revealedByLight: true,
+      selected: false,
+    };
+
+    set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
+    return id;
   },
 
   convertDoorToMapObject: (door) => {

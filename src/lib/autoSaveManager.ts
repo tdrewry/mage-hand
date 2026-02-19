@@ -171,7 +171,6 @@ export class AutoSaveManager {
         dungeonData: {
           doors: dungeonState.doors,
           annotations: dungeonState.annotations,
-          terrainFeatures: dungeonState.terrainFeatures,
           importedWallSegments: dungeonState.importedWallSegments,
           lightSources: dungeonState.lightSources,
           renderingMode: dungeonState.renderingMode,

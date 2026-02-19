@@ -4,6 +4,7 @@
 
 import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
+import { computeInsetPath } from '@/utils/pathUtils';
 
 /**
  * Calculate distance from a point to a line segment.
@@ -561,9 +562,43 @@ export function renderMapObject(
         }
         break;
     }
-    
+
     ctx.fill();
     ctx.stroke();
+
+    // Category-specific overlays drawn after base fill/stroke
+    if (mapObject.category === 'water' && mapObject.customPath && mapObject.customPath.length > 2) {
+      // Shore ripple lines — concentric inset strokes following the boundary
+      const rippleSpacing = 10;
+      const maxRipples = 6;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)';
+      ctx.lineWidth = 0.8 / zoom;
+      for (let i = 1; i <= maxRipples; i++) {
+        const inset = computeInsetPath(mapObject.customPath, rippleSpacing * i);
+        if (inset.length < 3) break;
+        ctx.beginPath();
+        ctx.moveTo(inset[0].x, inset[0].y);
+        for (let j = 1; j < inset.length; j++) ctx.lineTo(inset[j].x, inset[j].y);
+        ctx.closePath();
+        ctx.globalAlpha = opacity * (0.35 - i * 0.05);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (mapObject.category === 'trap') {
+      // Draw an × at the center of the object
+      const crossSize = Math.min(width, height) * 0.3;
+      ctx.save();
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 2 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(-crossSize, -crossSize);
+      ctx.lineTo(crossSize, crossSize);
+      ctx.moveTo(crossSize, -crossSize);
+      ctx.lineTo(-crossSize, crossSize);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
   
   // Draw selection indicator

@@ -32,7 +32,6 @@ import { CardType } from "@/types/cardTypes";
 import {
   renderDoors,
   renderAnnotations,
-  renderTerrainFeatures,
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
@@ -327,7 +326,6 @@ export const SimpleTabletop = () => {
   const {
     doors,
     annotations,
-    terrainFeatures,
     importedWallSegments,
     renderingMode,
     setRenderingMode,
@@ -2160,8 +2158,8 @@ export const SimpleTabletop = () => {
       }
     });
 
-    // 1. First render terrain features (water, debris, etc.) - BELOW walls
-    renderTerrainFeatures(ctx, terrainFeatures, transform.zoom, isPlayMode, watabouStyle, regions);
+    // Water/trap terrain is now rendered as MapObjects (shape: 'custom', category: 'water'|'trap')
+    // No explicit renderTerrainFeatures call needed — handled by the MapObject renderer below.
 
     // 2. First render floor regions - ABOVE terrain features
     // Skip region strokes since decorative walls will handle the edges
@@ -5871,21 +5869,7 @@ export const SimpleTabletop = () => {
                   (snap as any)[`__ann_${ann.id}`] = { x: ann.position.x, y: ann.position.y };
                 }
               });
-              dungeonSnap.terrainFeatures.forEach(tf => {
-                // Check if any tile overlaps a group region's bounds (heuristic: tile within 200px of any region center)
-                const shouldMove = dragGroup2.members.some(m => {
-                  if (m.type !== 'region') return false;
-                  const r = m.id === clickedRegion.id ? clickedRegion : regions.find(x => x.id === m.id);
-                  if (!r) return false;
-                  const cx = r.x + r.width / 2; const cy = r.y + r.height / 2;
-                  return tf.tiles.some(t => Math.abs(t.x - cx) < r.width && Math.abs(t.y - cy) < r.height);
-                });
-                if (shouldMove) {
-                  const tilesSnap = tf.tiles.map(t => ({ ...t })) as any;
-                  if (tf.fluidBoundary) tilesSnap._boundary = tf.fluidBoundary.map(t => ({ ...t }));
-                  (snap as any)[`__tf_${tf.id}`] = tilesSnap;
-                }
-              });
+              // Terrain features have been migrated to MapObjects; no special snapshot needed.
 
               groupSiblingSnapshotsRef.current = snap;
             }
@@ -6392,18 +6376,7 @@ export const SimpleTabletop = () => {
               }
             }
           });
-          dungeonState.terrainFeatures.forEach(tf => {
-            const snapKey = `__tf_${tf.id}`;
-            const snapTiles = (groupSiblingSnapshotsRef.current as any)[snapKey];
-            if (snapTiles) {
-              dungeonState.updateTerrainFeature(tf.id, {
-                tiles: snapTiles.map((t: {x:number;y:number}) => ({ x: t.x + deltaX, y: t.y + deltaY })),
-                ...(snapTiles._boundary ? {
-                  fluidBoundary: snapTiles._boundary.map((t: {x:number;y:number}) => ({ x: t.x + deltaX, y: t.y + deltaY }))
-                } : {}),
-              });
-            }
-          });
+          // Terrain features migrated to MapObjects — no special drag propagation needed.
         }
 
         setTempTokenPositions(newTempPositions);
