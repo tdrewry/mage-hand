@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DoorConnection, Annotation, TerrainFeature, LightSource } from '@/lib/dungeonTypes';
 import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
-import { WallGeometry } from '@/lib/wallGeometry';
+import { WallGeometry, LineSegment } from '@/lib/wallGeometry';
 
 interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
   terrainFeatures: TerrainFeature[];
   lightSources: LightSource[];
+  importedWallSegments: LineSegment[]; // Wall segments imported from dd2vtt or other external formats
   renderingMode: 'edit' | 'play';
   watabouStyle: WatabouStyle;
   wallEdgeStyle: 'stone' | 'wood' | 'metal' | 'simple';
@@ -212,9 +213,21 @@ interface DungeonStore {
    */
   setTerrainFeatures: (features: TerrainFeature[]) => void;
   
+  // Imported wall segments (from dd2vtt or other external formats)
+  /**
+   * Sets imported wall segments for vision/fog calculations.
+   * @param segments The wall segments from an external map format.
+   */
+  setImportedWallSegments: (segments: LineSegment[]) => void;
+
+  /**
+   * Clears imported wall segments.
+   */
+  clearImportedWallSegments: () => void;
+  
   // Clear all dungeon data
   /**
-   * Clears all data related to the dungeon (doors, annotations, terrain, light sources).
+   * Clears all data related to the dungeon (doors, annotations, terrain, light sources, imported walls).
    */
   clearAll: () => void;
 }
@@ -226,6 +239,7 @@ export const useDungeonStore = create<DungeonStore>()(
     annotations: [],
     terrainFeatures: [],
     lightSources: [],
+    importedWallSegments: [],
     renderingMode: 'edit',
     watabouStyle: DEFAULT_STYLE,
     wallEdgeStyle: 'stone',
@@ -384,6 +398,15 @@ export const useDungeonStore = create<DungeonStore>()(
         set({ lightSources: sources });
       },
       
+      // Imported wall segments
+      setImportedWallSegments: (segments) => {
+        set({ importedWallSegments: segments });
+      },
+      
+      clearImportedWallSegments: () => {
+        set({ importedWallSegments: [] });
+      },
+      
       // Clear all
       clearAll: () => {
         set({
@@ -391,6 +414,7 @@ export const useDungeonStore = create<DungeonStore>()(
           annotations: [],
           terrainFeatures: [],
           lightSources: [],
+          importedWallSegments: [],
         });
       },
     }),
