@@ -4804,10 +4804,17 @@ export const SimpleTabletop = () => {
       },
       { type: "separator" },
       {
+        label: region.locked ? "Unlock Region" : "Lock Region",
+        icon: region.locked ? "🔓" : "🔒",
+        action: () => updateRegion(region.id, { locked: !region.locked }),
+      },
+      { type: "separator" },
+      {
         label: "Delete Region",
         icon: "🗑️",
         action: () => deleteSelectedRegion(region.id),
         danger: true,
+        disabled: region.locked,
       },
     ] as const;
 
@@ -4819,12 +4826,16 @@ export const SimpleTabletop = () => {
         return;
       }
 
+      const isDisabled = "disabled" in item && item.disabled;
       const menuItem = document.createElement("div");
-      menuItem.className = `px-3 py-2 text-sm cursor-pointer hover:bg-accent rounded flex items-center gap-2 ${
+      menuItem.className = `px-3 py-2 text-sm rounded flex items-center gap-2 ${
+        isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-accent"
+      } ${
         "danger" in item && item.danger ? "text-destructive" : ""
       } ${"active" in item && item.active ? "bg-accent font-medium" : ""}`;
       menuItem.innerHTML = `<span>${"icon" in item ? item.icon : ""}</span> ${"label" in item ? item.label : ""}${"active" in item && item.active ? " ✓" : ""}`;
       menuItem.onclick = () => {
+        if (isDisabled) return;
         if ("action" in item) item.action();
         // Safe menu removal
         if (document.body.contains(menu)) {
