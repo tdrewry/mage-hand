@@ -20,6 +20,7 @@ import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
+import { MapTreeCardContent } from '@/components/cards/MapTreeCard';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -136,6 +137,7 @@ function getCardTitle(type: CardType): string {
     [CardType.CHARACTER_SHEET]: 'Character Sheet',
     [CardType.MONSTER_STAT_BLOCK]: 'Monster Stat Block',
     [CardType.CREATURE_LIBRARY]: 'Creature Library',
+    [CardType.MAP_TREE]: 'Map Tree',
   };
   
   return titles[type] || type;
@@ -213,6 +215,8 @@ function renderCardContent(
       return <MonsterStatBlockCardContent monsterId={(metadata?.monsterId as string) || ''} />;
     case CardType.CREATURE_LIBRARY:
       return <CreatureLibraryCardContent cardId={cardId} />;
+    case CardType.MAP_TREE:
+      return <MapTreeCardContent />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
