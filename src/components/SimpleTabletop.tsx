@@ -7306,9 +7306,11 @@ export const SimpleTabletop = () => {
 
     // Unified region transform undo registration
     // Handles move, scale, rotate - all region spatial changes
-    // MUST run AFTER all region updates have been applied above
+    // MUST run AFTER all region updates have been applied above.
+    // NOTE: Read from store directly (not closure) so we see the just-committed positions.
     if (initialRegionState && transformingRegionId) {
-      const currentRegion = regions.find((r) => r.id === transformingRegionId);
+      const liveRegions = useRegionStore.getState().regions;
+      const currentRegion = liveRegions.find((r) => r.id === transformingRegionId);
       if (currentRegion) {
         const currentState = captureRegionTransformState(currentRegion);
 
@@ -7321,7 +7323,6 @@ export const SimpleTabletop = () => {
           if (hasSiblings) {
             // Build a batch command covering the primary region + all group siblings
             const currentMapObjects3 = useMapObjectStore.getState().mapObjects;
-            const currentRegions3 = useRegionStore.getState().regions;
 
             type MobjBatchEntry = { id: string; before: Partial<import('@/types/mapObjectTypes').MapObject>; after: Partial<import('@/types/mapObjectTypes').MapObject> };
             type RegBatchEntry = { id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> };
@@ -7349,7 +7350,7 @@ export const SimpleTabletop = () => {
                   },
                 });
               } else if (snap.type === 'region') {
-                const afterReg = currentRegions3.find(r => r.id === memberId);
+                const afterReg = liveRegions.find(r => r.id === memberId);
                 if (!afterReg) continue;
                 regBatch.push({
                   id: memberId,
@@ -7833,9 +7834,10 @@ export const SimpleTabletop = () => {
         }
 
         if (initialRegionState && transformingRegionId) {
-          const currentRegion = regions.find(r => r.id === transformingRegionId);
-          if (currentRegion) {
-            const currentState = captureRegionTransformState(currentRegion);
+          // Read from store directly — closure `regions` is stale after updateRegion above
+          const liveRegion = useRegionStore.getState().regions.find(r => r.id === transformingRegionId);
+          if (liveRegion) {
+            const currentState = captureRegionTransformState(liveRegion);
             if (hasTransformChanged(initialRegionState, currentState)) {
               transformRegionUndoable(transformingRegionId, initialRegionState, currentState);
             }
