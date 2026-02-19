@@ -5012,6 +5012,10 @@ export const SimpleTabletop = () => {
       if (selectedRegionIds.length === 1 && renderingMode === "edit") {
         const selectedRegion = regions.find((r) => r.id === selectedRegionIds[0] && r.selected);
         if (selectedRegion) {
+          // Locked regions cannot be transformed
+          if (selectedRegion.locked) {
+            // Allow clicking but no transformations
+          } else {
           // Check for resize/anchor/bezier handles
           const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
           if (handle) {
@@ -5044,6 +5048,7 @@ export const SimpleTabletop = () => {
             setGroupedTokens(tokensInRegion);
             return;
           }
+          } // end locked check
         }
       }
 
@@ -5101,8 +5106,8 @@ export const SimpleTabletop = () => {
           x: worldPos.x - clickedMapObject.position.x,
           y: worldPos.y - clickedMapObject.position.y,
         });
-      } else if (clickedRegion && clickedRegion.selected && renderingMode === "edit") {
-        // Only allow region manipulation in edit mode
+      } else if (clickedRegion && clickedRegion.selected && renderingMode === "edit" && !clickedRegion.locked) {
+        // Only allow region manipulation in edit mode (and not locked)
         // Check if we're clicking on a rotation handle first
         if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
           setIsRotatingRegion(true);
@@ -6293,7 +6298,7 @@ export const SimpleTabletop = () => {
       // Check for region drag (edit mode only)
       if (renderingMode === "edit") {
         const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
-        if (clickedRegion && clickedRegion.selected) {
+        if (clickedRegion && clickedRegion.selected && !clickedRegion.locked) {
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
           
