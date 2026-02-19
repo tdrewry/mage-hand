@@ -81,6 +81,8 @@ import { usePostProcessing } from "../hooks/usePostProcessing";
 import { useRegionEdgeProcessing } from "../hooks/useRegionEdgeProcessing";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import { useUndoableActions } from "../hooks/useUndoableActions";
+import { undoRedoManager } from "../lib/undoRedoManager";
+import { BatchRegionRotationCommand } from "../lib/commands/regionCommands";
 import { useTextureLoader } from "../hooks/useTextureLoader";
 import { TextureDownloadProgress } from "./TextureDownloadProgress";
 import { texturePatternCache } from "../lib/texturePatternCache";
@@ -7112,8 +7114,46 @@ export const SimpleTabletop = () => {
 
     // Handle rotation completion
     if (isRotatingRegion && draggedRegionId) {
-      // Primary region is now committed live in the sibling loop during mousemove
-      // (same as all other group members). Nothing extra to commit here.
+      // Build a batch undo entry covering EVERY region member of the group.
+      // groupSiblingSnapshotsRef holds the pre-rotation snapshots; current store
+      // state is the post-rotation result (already applied during mousemove).
+      const snapshots = groupSiblingSnapshotsRef.current;
+      const currentRegions = useRegionStore.getState().regions;
+      const batchEntries: Array<{ id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> }> = [];
+      for (const [memberId, snap] of Object.entries(snapshots)) {
+        if (snap.type !== 'region') continue;
+        const afterRegion = currentRegions.find(r => r.id === memberId);
+        if (!afterRegion) continue;
+        const before: Partial<CanvasRegion> = {
+          x: snap.x, y: snap.y, width: snap.width, height: snap.height,
+          rotation: snap.regRotation,
+          ...(snap.pathPoints ? { pathPoints: snap.pathPoints.map(p => ({ ...p })) } : {}),
+        };
+        const after: Partial<CanvasRegion> = {
+          x: afterRegion.x, y: afterRegion.y, width: afterRegion.width, height: afterRegion.height,
+          rotation: afterRegion.rotation,
+          ...(afterRegion.pathPoints ? { pathPoints: afterRegion.pathPoints.map(p => ({ ...p })) } : {}),
+        };
+        batchEntries.push({ id: memberId, before, after });
+      }
+      if (batchEntries.length > 0) {
+        // State is already applied — push without re-executing so we only need undo/redo
+        undoRedoManager.push({
+          type: 'BATCH_REGION_ROTATION',
+          description: 'Rotate group',
+          execute: () => {
+            const { updateRegion } = useRegionStore.getState();
+            for (const e of batchEntries) updateRegion(e.id, e.after);
+          },
+          undo: () => {
+            const { updateRegion } = useRegionStore.getState();
+            for (const e of batchEntries) updateRegion(e.id, e.before);
+          },
+        });
+        // Null out so the unified undo block below does NOT double-register the primary region
+        setInitialRegionState(null);
+        setTransformingRegionId(null);
+      }
 
       // Clear rotation state
       setIsRotatingRegion(false);
