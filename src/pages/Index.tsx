@@ -13,12 +13,12 @@ const LoadingScreen = () => (
   </div>
 );
 
-const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
+const Index = () => {
   const [launched, setLaunched] = useState(!isLovableSandbox);
 
   if (!launched) {
     return (
-      <div ref={ref} className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
+      <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
         <div className="text-center space-y-6">
           <h1 className="text-3xl font-bold text-foreground">Tabletop Ready</h1>
           <p className="text-muted-foreground max-w-md mx-auto">
@@ -36,14 +36,10 @@ const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
   }
 
   return (
-    <div ref={ref}>
-      <Suspense fallback={<LoadingScreen />}>
-        <SimpleTabletop />
-      </Suspense>
-    </div>
+    <Suspense fallback={<LoadingScreen />}>
+      <SimpleTabletop />
+    </Suspense>
   );
-});
-
-Index.displayName = 'Index';
+};
 
 export default Index;
