@@ -31,7 +31,6 @@ import { useMapObjectStore } from "../stores/mapObjectStore";
 import { CardType } from "@/types/cardTypes";
 import {
   renderDoors,
-  renderAnnotations,
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
@@ -325,7 +324,6 @@ export const SimpleTabletop = () => {
   // Dungeon features store
   const {
     doors,
-    annotations,
     importedWallSegments,
     renderingMode,
     setRenderingMode,
@@ -2431,10 +2429,11 @@ export const SimpleTabletop = () => {
       ctx.restore();
     }
 
-    // Helper to draw annotations to a given context (with world-space transform applied)
+    // Helper to draw annotation MapObjects to a given context (with world-space transform applied)
     const drawAnnotationsToContext = (targetCtx: CanvasRenderingContext2D) => {
       const isPlayModeForAnnotations = renderingMode === 'play';
-      annotations.forEach((annotation) => {
+      const annotationObjs = mapObjects.filter(o => o.category === 'annotation');
+      annotationObjs.forEach((annotation) => {
         const { x, y } = annotation.position;
         
         // Check if annotation is in revealed area (for visibility and DM effects)
@@ -2494,7 +2493,7 @@ export const SimpleTabletop = () => {
         targetCtx.font = `bold ${fontSize}px Arial`;
         targetCtx.textAlign = "center";
         targetCtx.textBaseline = "middle";
-        targetCtx.fillText(annotation.reference, x, y);
+        targetCtx.fillText(annotation.annotationReference ?? annotation.label ?? '', x, y);
 
         targetCtx.restore();
       });
@@ -5406,16 +5405,15 @@ export const SimpleTabletop = () => {
         }
       }
 
-      // PRIORITY 1: Check for annotation clicks (markers)
-      // In play mode with fog, only allow clicking annotations in revealed areas
-      const clickedAnnotation = annotations.find((ann) => {
+      // PRIORITY 1: Check for annotation clicks (markers stored as MapObjects with category 'annotation')
+      const annotationObjs = mapObjects.filter(o => o.category === 'annotation');
+      const clickedAnnotation = annotationObjs.find((ann) => {
         const dx = worldPos.x - ann.position.x;
         const dy = worldPos.y - ann.position.y;
         const radius = 12;
         if (Math.sqrt(dx * dx + dy * dy) > radius) return false;
         
         // In play mode with fog enabled, check if annotation is in revealed area
-        // DM role can bypass based on dmFogVisibility setting
         if (renderingMode === 'play' && fogEnabled && !fogRevealAll) {
           const annotationPoint = { x: ann.position.x, y: ann.position.y };
           const isRevealed = isPointInRevealedArea(
@@ -5424,11 +5422,9 @@ export const SimpleTabletop = () => {
             currentVisibilityRef.current
           );
           if (!isRevealed) {
-            // Annotation is in fog - check DM visibility setting
             if (!isDM || dmFogVisibility === 'hidden') {
-              return false; // Not DM, or DM chose hidden mode
+              return false;
             }
-            // DM with 'semi-transparent' or 'full' mode can interact
           }
         }
         
@@ -5860,16 +5856,6 @@ export const SimpleTabletop = () => {
                   if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
                 }
               }
-
-              // Also snapshot annotations and terrain features associated with group regions
-              // so they move with the group during drag (they're not EntityGroup members).
-              const dungeonSnap = useDungeonStore.getState();
-              dungeonSnap.annotations.forEach(ann => {
-                if (ann.regionId && groupRegionIdsForSnap.has(ann.regionId)) {
-                  (snap as any)[`__ann_${ann.id}`] = { x: ann.position.x, y: ann.position.y };
-                }
-              });
-              // Terrain features have been migrated to MapObjects; no special snapshot needed.
 
               groupSiblingSnapshotsRef.current = snap;
             }
@@ -6362,21 +6348,7 @@ export const SimpleTabletop = () => {
               useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + deltaX, y: snap.lightPos.y + deltaY } });
             }
           }
-
-          // Propagate drag to annotations and terrain features associated with group regions.
-          // These live in dungeonStore and are not EntityGroup members, so we move them
-          // by applying the same delta to any item whose regionId matches a moved region.
-          const dungeonState = useDungeonStore.getState();
-          dungeonState.annotations.forEach(ann => {
-            if (ann.regionId && groupRegionIds.has(ann.regionId)) {
-              const snapKey = `__ann_${ann.id}`;
-              const snapPos = (groupSiblingSnapshotsRef.current as any)[snapKey];
-              if (snapPos) {
-                dungeonState.updateAnnotation(ann.id, { position: { x: snapPos.x + deltaX, y: snapPos.y + deltaY } });
-              }
-            }
-          });
-          // Terrain features migrated to MapObjects — no special drag propagation needed.
+          // Annotation MapObjects are now EntityGroup members — no special propagation needed.
         }
 
         setTempTokenPositions(newTempPositions);
@@ -8263,8 +8235,8 @@ export const SimpleTabletop = () => {
 
       {selectedAnnotationId &&
         (() => {
-          const annotation = annotations.find((a) => a.id === selectedAnnotationId);
-          if (!annotation || !annotation.text) return null;
+          const annotation = mapObjects.find((a) => a.id === selectedAnnotationId && a.category === 'annotation');
+          if (!annotation || !annotation.annotationText) return null;
 
           const screenX = annotation.position.x * transform.zoom + transform.x;
           const screenY = annotation.position.y * transform.zoom + transform.y;
@@ -8280,16 +8252,16 @@ export const SimpleTabletop = () => {
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                    {annotation.reference}
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+                    {annotation.annotationReference ?? annotation.label}
                   </div>
-                  <span className="text-sm font-semibold">Marker {annotation.reference}</span>
+                  <span className="text-sm font-semibold">Marker {annotation.annotationReference ?? annotation.label}</span>
                 </div>
                 <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setSelectedAnnotationId(null)}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">{annotation.text}</p>
+              <p className="text-sm text-muted-foreground">{annotation.annotationText}</p>
             </div>
           );
         })()}

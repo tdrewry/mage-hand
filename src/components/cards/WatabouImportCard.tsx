@@ -29,7 +29,6 @@ export const WatabouImportCardContent = () => {
   const updateRegion = useRegionStore((state) => state.updateRegion);
   const clearRegions = useRegionStore((state) => state.clearRegions);
 
-  const setAnnotations = useDungeonStore((state) => state.setAnnotations);
   const setImportedWallSegments = useDungeonStore((state) => state.setImportedWallSegments);
   const clearAll = useDungeonStore((state) => state.clearAll);
 
@@ -37,6 +36,7 @@ export const WatabouImportCardContent = () => {
   const convertDoorsToMapObjects = useMapObjectStore((state) => state.convertDoorsToMapObjects);
   const convertWaterToMapObject = useMapObjectStore((state) => state.convertWaterToMapObject);
   const convertTrapToMapObject = useMapObjectStore((state) => state.convertTrapToMapObject);
+  const convertAnnotationToMapObject = useMapObjectStore((state) => state.convertAnnotationToMapObject);
   const addMapObject = useMapObjectStore((state) => state.addMapObject);
   const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
@@ -141,8 +141,11 @@ export const WatabouImportCardContent = () => {
     const doorIds = convertDoorsToMapObjects(doorsWithIds);
     doorIds.forEach(id => addedEntityIds.push({ id, type: 'mapObject' }));
 
-    const annotationsWithIds = imported.annotations.map((annotation) => ({ ...annotation, id: makeId('annotation') }));
-    setAnnotations(annotationsWithIds);
+    // Annotations → first-class MapObjects (supports undo, rotation, group membership)
+    imported.annotationData.forEach(ann => {
+      const annId = convertAnnotationToMapObject(ann);
+      addedEntityIds.push({ id: annId, type: 'mapObject' });
+    });
 
     let mapObjectCount = doorIds.length;
     if (imported.columnTiles.length > 0) {
@@ -176,7 +179,7 @@ export const WatabouImportCardContent = () => {
     }
 
     toast.success(`Imported dungeon: ${imported.metadata.title || 'Untitled'}`, {
-      description: `Loaded ${imported.regions.length} rooms, ${mapObjectCount} objects (${doorIds.length} doors), ${imported.annotations.length} notes${resolvedGroupName ? ` → group "${resolvedGroupName}"` : ''}`,
+      description: `Loaded ${imported.regions.length} rooms, ${mapObjectCount} objects (${doorIds.length} doors), ${imported.annotationData.length} notes${resolvedGroupName ? ` → group "${resolvedGroupName}"` : ''}`,
     });
   };
 

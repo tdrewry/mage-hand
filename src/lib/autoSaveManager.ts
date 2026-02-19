@@ -170,7 +170,7 @@ export class AutoSaveManager {
         cardStates: cardState.cards,
         dungeonData: {
           doors: dungeonState.doors,
-          annotations: dungeonState.annotations,
+          // annotations are now MapObjects — serialized with mapObjects below
           importedWallSegments: dungeonState.importedWallSegments,
           lightSources: dungeonState.lightSources,
           renderingMode: dungeonState.renderingMode,
