@@ -9,7 +9,8 @@ import { useFogStore } from '@/stores/fogStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
-import { serializeProject, ProjectData } from './projectSerializer';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { serializeProject, deserializeProject, ProjectData } from './projectSerializer';
 
 const AUTO_SAVE_KEY = 'd20pro-autosave';
 const AUTO_SAVE_SETTINGS_KEY = 'd20pro-autosave-settings';
@@ -119,6 +120,7 @@ export class AutoSaveManager {
       const lightState = useLightStore.getState();
       const cardState = useCardStore.getState();
       const dungeonState = useDungeonStore.getState();
+      const mapObjectState = useMapObjectStore.getState();
 
       const projectData: ProjectData = {
         metadata: {
@@ -133,11 +135,7 @@ export class AutoSaveManager {
         maps: mapState.maps,
         regions: regionState.regions,
         groups: groupState.groups,
-        viewport: {
-          x: 0,
-          y: 0,
-          zoom: 1,
-        },
+        viewport: { x: 0, y: 0, zoom: 1 },
         settings: {
           gridSnappingEnabled: true,
           tokenVisibility: sessionState.tokenVisibility,
@@ -174,6 +172,7 @@ export class AutoSaveManager {
           doors: dungeonState.doors,
           annotations: dungeonState.annotations,
           terrainFeatures: dungeonState.terrainFeatures,
+          importedWallSegments: dungeonState.importedWallSegments,
           lightSources: dungeonState.lightSources,
           renderingMode: dungeonState.renderingMode,
           watabouStyle: dungeonState.watabouStyle,
@@ -183,11 +182,13 @@ export class AutoSaveManager {
           lightDirection: dungeonState.lightDirection,
           shadowDistance: dungeonState.shadowDistance,
         },
+        mapObjects: mapObjectState.mapObjects,
       };
 
       const serialized = serializeProject(projectData);
-      const serializedString = JSON.stringify(serialized);
-      localStorage.setItem(AUTO_SAVE_KEY, serializedString);
+      // Store only the inner ProjectData (not the SerializedProject wrapper) so that
+      // loadAutoSave() can return it directly as ProjectData without unwrapping.
+      localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(serialized.data));
       
       this.lastSaveTime = Date.now();
       localStorage.setItem(AUTO_SAVE_TIMESTAMP_KEY, this.lastSaveTime.toString());
@@ -265,7 +266,14 @@ export class AutoSaveManager {
     try {
       const saved = localStorage.getItem(AUTO_SAVE_KEY);
       if (!saved) return null;
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // New format: stores raw ProjectData directly.
+      // Old format (pre-0.2.9): stored a SerializedProject { version, data: ProjectData }.
+      // Handle both so existing autosaves don't break on upgrade.
+      if (parsed && parsed.version && parsed.data && parsed.data.tokens !== undefined) {
+        return parsed.data as ProjectData;
+      }
+      return parsed as ProjectData;
     } catch (error) {
       console.error('Failed to load auto-save:', error);
       return null;

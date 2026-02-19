@@ -645,10 +645,12 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
-      // Step 16: Apply map objects (doors, columns, stairs, etc.)
+      // Step 16: Apply map objects — always clear first so stale objects don't survive
+      setLoadingProgress('Clearing map objects...');
+      mapObjectStore.clearMapObjects();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (cancelRequested) throw new Error('Import cancelled by user');
       if (projectData.mapObjects && projectData.mapObjects.length > 0) {
-        setLoadingProgress('Clearing map objects...');
-        mapObjectStore.clearMapObjects();
         await processInChunks(
           projectData.mapObjects,
           10,
@@ -683,40 +685,74 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
-  // Helper to restore state without cancel checks
+  // Simplified full restore used by the cancel/rollback path — mirrors applyProjectData
+  // but without cancellation checks. Must stay in sync with applyProjectData steps.
   const applyProjectDataWithoutCancel = async (projectData: ProjectData) => {
-    // Simplified restore without cancel checks - just apply the data
+    // Tokens
     const existingTokens = [...sessionStore.tokens];
     existingTokens.forEach(token => sessionStore.removeToken(token.id));
     (projectData.tokens || []).forEach(token => sessionStore.addToken(token));
-    
     (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
     sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
     sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
-    
+
+    // Maps
     const existingMaps = [...mapStore.maps];
     existingMaps.forEach(map => mapStore.removeMap(map.id));
     (projectData.maps || []).forEach(map => {
       const { regions, ...mapData } = map;
       mapStore.addMap({ ...mapData, regions: [] });
     });
-    
+
+    // Regions
     regionStore.clearRegions();
     (projectData.regions || []).forEach(region => regionStore.addRegion(region));
-    
+
+    // Groups
     groupStore.clearAllGroups();
     (projectData.groups || []).forEach((group: any) => {
       const members = group.members || (group.tokenIds || []).map((id: string) => ({ id, type: 'token' }));
       groupStore.restoreGroup({
-        id: group.id,
-        name: group.name,
-        members,
+        id: group.id, name: group.name, members,
         pivot: group.pivot ?? { x: 0, y: 0 },
         bounds: group.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
-        locked: group.locked ?? false,
-        visible: group.visible ?? true,
+        locked: group.locked ?? false, visible: group.visible ?? true,
       });
     });
+
+    // Lights
+    if (projectData.lights) {
+      lightStore.clearAllLights();
+      (projectData.lights).forEach(light => lightStore.addLight(light));
+    }
+
+    // Fog
+    if (projectData.fogData) {
+      fogStore.setEnabled(projectData.fogData.enabled);
+      fogStore.setRevealAll(projectData.fogData.revealAll);
+      fogStore.setVisionRange(projectData.fogData.visionRange);
+      fogStore.setFogOpacity(projectData.fogData.fogOpacity);
+      fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
+      fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
+      fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
+    }
+
+    // Dungeon features
+    if (projectData.dungeonData) {
+      dungeonStore.clearAll();
+      if (projectData.dungeonData.doors) dungeonStore.setDoors(projectData.dungeonData.doors);
+      if (projectData.dungeonData.annotations) dungeonStore.setAnnotations(projectData.dungeonData.annotations);
+      if (projectData.dungeonData.terrainFeatures) dungeonStore.setTerrainFeatures(projectData.dungeonData.terrainFeatures);
+      if (projectData.dungeonData.importedWallSegments) dungeonStore.setImportedWallSegments(projectData.dungeonData.importedWallSegments);
+      if (projectData.dungeonData.watabouStyle) dungeonStore.setWatabouStyle(projectData.dungeonData.watabouStyle);
+      if (projectData.dungeonData.wallEdgeStyle) dungeonStore.setWallEdgeStyle(projectData.dungeonData.wallEdgeStyle);
+      if (projectData.dungeonData.wallThickness !== undefined) dungeonStore.setWallThickness(projectData.dungeonData.wallThickness);
+      if (projectData.dungeonData.textureScale !== undefined) dungeonStore.setTextureScale(projectData.dungeonData.textureScale);
+    }
+
+    // Map objects — always clear to avoid stale objects
+    mapObjectStore.clearMapObjects();
+    (projectData.mapObjects || []).forEach(obj => mapObjectStore.addMapObject(obj));
   };
 
   const handleLoadFromStorage = async (projectId: string) => {
