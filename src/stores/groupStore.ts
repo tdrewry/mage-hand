@@ -15,6 +15,8 @@ import {
   createEntityGroup,
   recalculateGroupBounds,
 } from '../lib/groupTransforms';
+import { useRegionStore } from './regionStore';
+import { useMapObjectStore } from './mapObjectStore';
 
 // ============= Entity Index =============
 // Derived lookup: entityId -> groupId, rebuilt on group changes
@@ -41,6 +43,8 @@ interface GroupStore {
   restoreGroup: (group: EntityGroup) => void;
   removeGroup: (groupId: string) => void;
   updateGroup: (groupId: string, updates: Partial<EntityGroup>) => void;
+  /** Lock or unlock a group and propagate the state to all member entities. */
+  setGroupLocked: (groupId: string, locked: boolean) => void;
   clearAllGroups: () => void;
 
   // Member operations
@@ -119,6 +123,24 @@ export const useGroupStore = create<GroupStore>()(
           // Always rebuild index — id or members may have changed
           rebuildEntityIndex(next);
           return { groups: next };
+        });
+      },
+
+      setGroupLocked: (groupId, locked) => {
+        const group = get().groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        // Update the group's own locked flag
+        get().updateGroup(groupId, { locked });
+
+        // Propagate lock state to member entities that support it
+        group.members.forEach(({ id, type }) => {
+          if (type === 'region') {
+            useRegionStore.getState().updateRegion(id, { locked });
+          } else if (type === 'mapObject') {
+            useMapObjectStore.getState().updateMapObject(id, { locked });
+          }
+          // tokens and lights do not have a locked field
         });
       },
 
