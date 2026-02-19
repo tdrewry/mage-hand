@@ -104,6 +104,7 @@ import { checkMovementCollision, getBlockingObjects } from "../lib/movementColli
 import { useTouchEvents } from "../hooks/useTouchEvents";
 
 import { Z_INDEX } from "../lib/zIndex";
+import { useGroupStore } from "../stores/groupStore";
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -343,6 +344,9 @@ export const SimpleTabletop = () => {
 
   // Light system store
   const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity, selectedLightIds, selectMultipleLights, clearLightSelection } = useLightStore();
+
+  // Group store
+  const getGroupForEntity = useGroupStore((s) => s.getGroupForEntity);
 
   // Light placement mode
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
@@ -4941,6 +4945,48 @@ export const SimpleTabletop = () => {
     toast.success("Region deleted");
   };
 
+  // ============= Group Selection Propagation =============
+  // When an entity is clicked, check if it belongs to a group and select all siblings
+  const propagateGroupSelection = useCallback((entityId: string, entityType: 'token' | 'region' | 'mapObject' | 'light') => {
+    const group = getGroupForEntity(entityId);
+    if (!group || group.locked) return;
+    
+    const tokenIds: string[] = [];
+    const regionIds: string[] = [];
+    const mapObjectIds: string[] = [];
+    const lightIds: string[] = [];
+    
+    for (const member of group.members) {
+      switch (member.type) {
+        case 'token': tokenIds.push(member.id); break;
+        case 'region': regionIds.push(member.id); break;
+        case 'mapObject': mapObjectIds.push(member.id); break;
+        case 'light': lightIds.push(member.id); break;
+      }
+    }
+    
+    if (tokenIds.length > 0) setSelectedTokenIds(tokenIds);
+    if (regionIds.length > 0) {
+      regionIds.forEach(id => selectRegion(id));
+      setSelectedRegionIds(regionIds);
+    }
+    if (mapObjectIds.length > 0) {
+      const selectMultiple = useMapObjectStore.getState().selectMultiple;
+      selectMultiple(mapObjectIds);
+    }
+    if (lightIds.length > 0) selectMultipleLights(lightIds);
+    
+    return group;
+  }, [getGroupForEntity, selectRegion, selectMultipleLights]);
+
+  // Ref to track group drag start positions for all siblings
+  const groupDragStartRef = useRef<{
+    groupId: string;
+    primaryStartX: number;
+    primaryStartY: number;
+    members: Array<{ id: string; type: string; startX: number; startY: number }>;
+  } | null>(null);
+
   // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -5137,9 +5183,32 @@ export const SimpleTabletop = () => {
         // Capture initial state for undo
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
-        // If token not selected, select it
+        // If token not selected, select it (and propagate group selection)
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
+        }
+        
+        // Group selection propagation: select all siblings
+        const group = propagateGroupSelection(clickedToken.id, 'token');
+        if (group) {
+          // Capture start positions for all group members for group dragging
+          const allTokens = useSessionStore.getState().tokens;
+          const allMapObjects = useMapObjectStore.getState().mapObjects;
+          const allRegions = useRegionStore.getState().regions;
+          const allLights = useLightStore.getState().lights;
+          const startMembers: Array<{ id: string; type: string; startX: number; startY: number }> = [];
+          for (const m of group.members) {
+            if (m.id === clickedToken.id) continue; // Primary drag target handled separately
+            switch (m.type) {
+              case 'token': { const t = allTokens.find(t => t.id === m.id); if (t) startMembers.push({ id: m.id, type: 'token', startX: t.x, startY: t.y }); break; }
+              case 'region': { const r = allRegions.find(r => r.id === m.id); if (r) startMembers.push({ id: m.id, type: 'region', startX: r.x, startY: r.y }); break; }
+              case 'mapObject': { const o = allMapObjects.find(o => o.id === m.id); if (o) startMembers.push({ id: m.id, type: 'mapObject', startX: o.position.x, startY: o.position.y }); break; }
+              case 'light': { const l = allLights.find(l => l.id === m.id); if (l) startMembers.push({ id: m.id, type: 'light', startX: l.position.x, startY: l.position.y }); break; }
+            }
+          }
+          groupDragStartRef.current = { groupId: group.id, primaryStartX: clickedToken.x, primaryStartY: clickedToken.y, members: startMembers };
+        } else {
+          groupDragStartRef.current = null;
         }
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
         // Wall point edit mode: add/remove vertices
@@ -5195,6 +5264,28 @@ export const SimpleTabletop = () => {
             x: worldPos.x - clickedMapObject.position.x,
             y: worldPos.y - clickedMapObject.position.y,
           });
+          
+          // Group selection propagation for map objects
+          const moGroup = propagateGroupSelection(clickedMapObject.id, 'mapObject');
+          if (moGroup) {
+            const allTokens = useSessionStore.getState().tokens;
+            const allMapObjects = useMapObjectStore.getState().mapObjects;
+            const allRegions = useRegionStore.getState().regions;
+            const allLights = useLightStore.getState().lights;
+            const startMembers: Array<{ id: string; type: string; startX: number; startY: number }> = [];
+            for (const m of moGroup.members) {
+              if (m.id === clickedMapObject.id) continue;
+              switch (m.type) {
+                case 'token': { const t = allTokens.find(t => t.id === m.id); if (t) startMembers.push({ id: m.id, type: 'token', startX: t.x, startY: t.y }); break; }
+                case 'region': { const r = allRegions.find(r => r.id === m.id); if (r) startMembers.push({ id: m.id, type: 'region', startX: r.x, startY: r.y }); break; }
+                case 'mapObject': { const o = allMapObjects.find(o => o.id === m.id); if (o) startMembers.push({ id: m.id, type: 'mapObject', startX: o.position.x, startY: o.position.y }); break; }
+                case 'light': { const l = allLights.find(l => l.id === m.id); if (l) startMembers.push({ id: m.id, type: 'light', startX: l.position.x, startY: l.position.y }); break; }
+              }
+            }
+            groupDragStartRef.current = { groupId: moGroup.id, primaryStartX: clickedMapObject.position.x, primaryStartY: clickedMapObject.position.y, members: startMembers };
+          } else {
+            groupDragStartRef.current = null;
+          }
         }
         // Only allow region manipulation in edit mode (and not locked)
         // Check if we're clicking on a rotation handle first
@@ -5395,6 +5486,22 @@ export const SimpleTabletop = () => {
 
       // Update token position in store
       updateTokenPosition(draggedTokenId, newX, newY);
+      
+      // Group dragging: move all sibling entities by the same delta
+      if (groupDragStartRef.current) {
+        const deltaX = newX - groupDragStartRef.current.primaryStartX;
+        const deltaY = newY - groupDragStartRef.current.primaryStartY;
+        for (const m of groupDragStartRef.current.members) {
+          const nx = m.startX + deltaX;
+          const ny = m.startY + deltaY;
+          switch (m.type) {
+            case 'token': updateTokenPosition(m.id, nx, ny); break;
+            case 'region': updateRegion(m.id, { x: nx, y: ny }); break;
+            case 'mapObject': updateMapObject(m.id, { position: { x: nx, y: ny } }); break;
+            case 'light': updateLight(m.id, { position: { x: nx, y: ny } }); break;
+          }
+        }
+      }
 
       // Real-time vision preview during drag (if enabled)
       console.log('[DRAG VISION] Checking conditions:', {
@@ -5521,6 +5628,22 @@ export const SimpleTabletop = () => {
       updateMapObject(draggedMapObjectId, {
         position: { x: newX, y: newY },
       });
+      
+      // Group dragging: move all sibling entities by the same delta
+      if (groupDragStartRef.current) {
+        const deltaX = newX - groupDragStartRef.current.primaryStartX;
+        const deltaY = newY - groupDragStartRef.current.primaryStartY;
+        for (const m of groupDragStartRef.current.members) {
+          const nx = m.startX + deltaX;
+          const ny = m.startY + deltaY;
+          switch (m.type) {
+            case 'token': updateTokenPosition(m.id, nx, ny); break;
+            case 'region': updateRegion(m.id, { x: nx, y: ny }); break;
+            case 'mapObject': updateMapObject(m.id, { position: { x: nx, y: ny } }); break;
+            case 'light': updateLight(m.id, { position: { x: nx, y: ny } }); break;
+          }
+        }
+      }
 
       // Force immediate redraw for smooth dragging feedback
       requestAnimationFrame(() => redrawCanvas());
@@ -6179,6 +6302,7 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
       setInitialTokenState(null);
+      groupDragStartRef.current = null;
       
       // Clear stable visibility snapshot after drag ends
       if (stableVisibilityRef.current) {
@@ -6203,6 +6327,7 @@ export const SimpleTabletop = () => {
         setIsDraggingMapObject(false);
         setDraggedMapObjectId(null);
         setMapObjectDragOffset({ x: 0, y: 0 });
+        groupDragStartRef.current = null;
         
         // Notify visibility system that obstacles have changed
         notifyObstaclesChanged();
