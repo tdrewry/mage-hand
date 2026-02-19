@@ -4168,44 +4168,58 @@ export const SimpleTabletop = () => {
   };
 
   /**
-   * Compute the true centroid for a group by building a fresh bounding box
-   * from every member's actual current position. This is used as the single
-   * shared pivot for all rotation operations so that all entities (regions,
-   * walls, lights, doors) orbit the exact same point.
+   * Single canonical AABB helper for groups.
+   * ALWAYS reads from live Zustand store state — never the React render closure —
+   * so the result is correct regardless of dragPreview or partial store updates.
+   * computeGroupCentroid and computeGroupBounds both delegate here.
    */
-  const computeGroupCentroid = (group: { members: { id: string; type: string }[] }): { x: number; y: number } => {
+  const computeGroupAABB = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
+    const liveMapObjects = useMapObjectStore.getState().mapObjects;
+    const liveRegions    = useRegionStore.getState().regions;
+    const liveLights     = useLightStore.getState().lights;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const expand = (x: number, y: number) => {
+      if (x < minX) minX = x; if (y < minY) minY = y;
+      if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+    };
     for (const m of group.members) {
       if (m.type === 'mapObject') {
-        const o = mapObjects.find(x => x.id === m.id);
+        const o = liveMapObjects.find(x => x.id === m.id);
         if (o) {
           if (o.wallPoints && o.wallPoints.length > 0) {
-            for (const p of o.wallPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+            for (const p of o.wallPoints) expand(p.x, p.y);
           } else {
-            minX = Math.min(minX, o.position.x); minY = Math.min(minY, o.position.y);
-            maxX = Math.max(maxX, o.position.x + o.width); maxY = Math.max(maxY, o.position.y + o.height);
+            expand(o.position.x - o.width / 2, o.position.y - o.height / 2);
+            expand(o.position.x + o.width / 2, o.position.y + o.height / 2);
           }
         }
       } else if (m.type === 'region') {
-        const r = regions.find(x => x.id === m.id);
+        const r = liveRegions.find(x => x.id === m.id);
         if (r) {
           if (r.pathPoints && r.pathPoints.length > 0) {
-            for (const p of r.pathPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+            for (const p of r.pathPoints) expand(p.x, p.y);
           } else {
-            minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
-            maxX = Math.max(maxX, r.x + r.width); maxY = Math.max(maxY, r.y + r.height);
+            expand(r.x, r.y);
+            expand(r.x + r.width, r.y + r.height);
           }
         }
       } else if (m.type === 'light') {
-        const l = useLightStore.getState().lights.find(x => x.id === m.id);
-        if (l) { minX = Math.min(minX, l.position.x); minY = Math.min(minY, l.position.y); maxX = Math.max(maxX, l.position.x); maxY = Math.max(maxY, l.position.y); }
+        const l = liveLights.find(x => x.id === m.id);
+        if (l) expand(l.position.x, l.position.y);
       } else if (m.type === 'token') {
         const t = tokens.find(x => x.id === m.id);
-        if (t) { minX = Math.min(minX, t.x); minY = Math.min(minY, t.y); maxX = Math.max(maxX, t.x); maxY = Math.max(maxY, t.y); }
+        if (t) expand(t.x, t.y);
       }
     }
-    if (!isFinite(minX)) return { x: 0, y: 0 };
-    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    if (!isFinite(minX)) return null;
+    return { minX, minY, maxX, maxY };
+  };
+
+  /** Centroid of the group combined AABB — single shared pivot for all rotation ops. */
+  const computeGroupCentroid = (group: { members: { id: string; type: string }[] }): { x: number; y: number } => {
+    const b = computeGroupAABB(group);
+    if (!b) return { x: 0, y: 0 };
+    return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   };
 
   // Helper function to rotate a point around a center
@@ -4218,46 +4232,9 @@ export const SimpleTabletop = () => {
   };
 
 
-  /**
-   * Compute the full bounding box (not just centroid) for a group from live member positions.
-   */
+  /** Delegates to computeGroupAABB — kept as alias so callers don't need updating. */
   const computeGroupBounds = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
-    // Always read from live store state (not React closure) so bounds reflect the
-    // latest positions regardless of whether store updates or dragPreview is active.
-    const liveMapObjects = useMapObjectStore.getState().mapObjects;
-    const liveRegions = useRegionStore.getState().regions;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const m of group.members) {
-      if (m.type === 'mapObject') {
-        const o = liveMapObjects.find(x => x.id === m.id);
-        if (o) {
-          if (o.wallPoints && o.wallPoints.length > 0) {
-            for (const p of o.wallPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
-          } else {
-            minX = Math.min(minX, o.position.x - o.width / 2); minY = Math.min(minY, o.position.y - o.height / 2);
-            maxX = Math.max(maxX, o.position.x + o.width / 2); maxY = Math.max(maxY, o.position.y + o.height / 2);
-          }
-        }
-      } else if (m.type === 'region') {
-        const r = liveRegions.find(x => x.id === m.id);
-        if (r) {
-          if (r.pathPoints && r.pathPoints.length > 0) {
-            for (const p of r.pathPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
-          } else {
-            minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
-            maxX = Math.max(maxX, r.x + r.width); maxY = Math.max(maxY, r.y + r.height);
-          }
-        }
-      } else if (m.type === 'light') {
-        const l = useLightStore.getState().lights.find(x => x.id === m.id);
-        if (l) { minX = Math.min(minX, l.position.x); minY = Math.min(minY, l.position.y); maxX = Math.max(maxX, l.position.x); maxY = Math.max(maxY, l.position.y); }
-      } else if (m.type === 'token') {
-        const t = tokens.find(x => x.id === m.id);
-        if (t) { minX = Math.min(minX, t.x); minY = Math.min(minY, t.y); maxX = Math.max(maxX, t.x); maxY = Math.max(maxY, t.y); }
-      }
-    }
-    if (!isFinite(minX)) return null;
-    return { minX, minY, maxX, maxY };
+    return computeGroupAABB(group);
   };
 
   /**
