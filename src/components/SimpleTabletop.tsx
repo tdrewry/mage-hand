@@ -322,6 +322,7 @@ export const SimpleTabletop = () => {
     doors,
     annotations,
     terrainFeatures,
+    importedWallSegments,
     renderingMode,
     setRenderingMode,
     watabouStyle,
@@ -984,7 +985,7 @@ export const SimpleTabletop = () => {
     // Update combined segments with new map object state
     if (wallGeometryRef.current) {
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
-      combinedSegmentsRef.current = [...wallGeometryRef.current.wallSegments, ...mapObjectSegments];
+      combinedSegmentsRef.current = [...wallGeometryRef.current.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     }
     
     // Clear visibility caches so fog recalculates with new segments
@@ -2080,9 +2081,9 @@ export const SimpleTabletop = () => {
       cachedCanvas = wallDecorationCacheRef.current.canvas;
       cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
       
-      // Update combined segments (walls + vision-blocking map objects) - even with cached walls
+      // Update combined segments (walls + vision-blocking map objects + imported walls) - even with cached walls
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
-      combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments];
+      combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     } else {
       // Generate new decorations and cache them
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
@@ -2147,9 +2148,9 @@ export const SimpleTabletop = () => {
         // Store in separate ref for fog computation
         wallGeometryRef.current = wallGeometry;
         
-        // Update combined segments (walls + vision-blocking map objects)
+        // Update combined segments (walls + vision-blocking map objects + imported walls)
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
-        combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments];
+        combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
       }
     }
 

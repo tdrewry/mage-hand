@@ -312,6 +312,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       doors: dungeonStore.doors,
       annotations: dungeonStore.annotations,
       terrainFeatures: dungeonStore.terrainFeatures,
+      importedWallSegments: dungeonStore.importedWallSegments,
       watabouStyle: dungeonStore.watabouStyle,
       wallEdgeStyle: dungeonStore.wallEdgeStyle,
       wallThickness: dungeonStore.wallThickness,
@@ -635,6 +636,9 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }
         if (projectData.dungeonData.shadowDistance !== undefined) {
           dungeonStore.setShadowDistance(projectData.dungeonData.shadowDistance);
+        }
+        if (projectData.dungeonData.importedWallSegments) {
+          dungeonStore.setImportedWallSegments(projectData.dungeonData.importedWallSegments);
         }
       }
       await new Promise(resolve => setTimeout(resolve, 0));
