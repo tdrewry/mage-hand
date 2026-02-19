@@ -1,113 +1,189 @@
 
+# Migrate All Terrain Features to MapObjects — Full Deprecation of dungeonStore.terrainFeatures
 
-# Universal Grouping System
+## The Goal
 
-## Overview
+Every shape that arrives through any import path must become a first-class **MapObject**. After this change, the `terrainFeatures` array in `dungeonStore` will always be empty and can be removed entirely from state, persistence, rendering, and serialization. No data migration is needed for legacy saves because there are no existing clients.
 
-Replace the existing token-only `groupStore` with a universal grouping system that can contain **any combination** of regions, map objects, tokens, and lights. Groups act as a single unit for selection, dragging, rotation, and can be exported/imported as reusable "prefabs" (e.g., a pre-built room with walls, doors, lights, and encounter tokens).
+---
 
-## Data Model
+## What Currently Uses TerrainFeatures
 
-### New `EntityGroup` type (replaces `TokenGroup`)
+Only two terrain types still use the `TerrainFeature` path at runtime:
 
-```typescript
-interface GroupMember {
-  id: string;
-  type: 'token' | 'region' | 'mapObject' | 'light';
-}
+| Type | Current path | Problem |
+|---|---|---|
+| `water` | `watabouImporter` → `terrainFeatures[]` → `dungeonStore` → `renderTerrainFeatures()` | Cannot be grouped, moved, rotated, or undone |
+| `trap` | Same path as water (same render function) | Same problems |
 
-interface EntityGroup {
-  id: string;
-  name: string;
-  members: GroupMember[];
-  pivot: { x: number; y: number };
-  bounds: { x: number; y: number; width: number; height: number };
-  locked: boolean;
-  visible: boolean;
-}
+`column` and `debris` were previously migrated to MapObjects and are already skipped inside `renderTerrainFeatures`. The skeletons are still there but produce no output.
+
+---
+
+## New MapObject Categories
+
+Add two new values to the `MapObjectCategory` union in `src/types/mapObjectTypes.ts`:
+
+```
+'water' | 'trap'
 ```
 
-Each member references an entity by its ID and type. The group does not own the entities -- it's a lightweight association layer. Deleting a group does not delete its members.
+**Water preset:**
+- `shape: 'custom'`
+- `fillColor: 'rgba(59, 130, 246, 0.35)'` (translucent blue)
+- `strokeColor: 'rgba(96, 165, 250, 0.6)'`
+- `strokeWidth: 1`
+- `castsShadow: false`, `blocksMovement: false`, `blocksVision: false`
+- `revealedByLight: false`
 
-## Architecture
+**Trap preset:**
+- `shape: 'custom'`
+- `fillColor: 'rgba(220, 38, 38, 0.2)'` (translucent red)
+- `strokeColor: '#dc2626'`
+- `strokeWidth: 2`
+- `castsShadow: false`, `blocksMovement: false`, `blocksVision: false`
+- `revealedByLight: true`
 
-### 1. Rewrite `src/stores/groupStore.ts`
+Add labels for both in `MAP_OBJECT_CATEGORY_LABELS` and `MAP_OBJECT_PRESETS`.
 
-- Replace `TokenGroup` and `tokenIds: string[]` with `EntityGroup` and `members: GroupMember[]`.
-- Add helpers: `getMembersByType(groupId, type)`, `getGroupForEntity(entityId, entityType)`, `addMembersToGroup(groupId, members[])`, `removeMemberFromGroup(groupId, entityId)`.
-- Keep existing selection state (`selectedGroupIds`).
-- Add `recalculateBounds(groupId)` that reads positions from all member stores (sessionStore for tokens, regionStore for regions, mapObjectStore for map objects, lightStore for lights).
+---
 
-### 2. Rewrite `src/lib/groupTransforms.ts`
+## New Conversion Methods in `mapObjectStore.ts`
 
-- Replace token-specific bounds calculation with a universal `calculateEntityBounds()` that accepts `GroupMember[]` and reads geometry from the appropriate store.
-- Update `applyGroupTransformToMembers()` to compute deltas and apply position changes to each entity via its store's update method.
-- Keep the transformation matrix math (it's entity-agnostic).
+### `convertWaterToMapObject(tiles, fluidBoundary?): string`
 
-### 3. Update `src/components/SimpleTabletop.tsx` -- Selection Integration
+Creates **one** MapObject per water body:
+- `shape: 'custom'`
+- `category: 'water'`
+- `customPath` = `fluidBoundary` points (the marching-squares contour). Falls back to a bounding rectangle from `tiles` if no fluid boundary.
+- `position` = centroid of `customPath` (or tile bounding box center)
+- `width` / `height` = bounding box of the path
 
-- When clicking an entity (token, region, or map object), check if it belongs to a group via `getGroupForEntity()`.
-- If it does, select all sibling members in their respective stores (highlight them all).
-- When dragging a grouped entity, compute the delta and apply it to **all** group members by calling each store's update method.
-- When rotating or scaling via group handles, transform all member positions relative to the group pivot.
+All the geometry is already computed by `convertWater()` in `watabouImporter.ts`. We just need to move it into a MapObject instead of a TerrainFeature struct.
 
-### 4. Update `src/components/GroupManagerModal.tsx`
+### `convertTrapToMapObject(tiles): string[]`
 
-- Replace the token-only UI with a unified member picker showing tokens, regions, map objects, and lights in categorized sections.
-- Support creating groups from the current multi-selection (if tokens and regions are both selected, group them all).
-- Show member icons by type (token icon, region icon, wall icon, light icon).
+Creates **one** MapObject per trap tile (traps are individual cells, not grouped):
+- `shape: 'custom'`
+- `category: 'trap'`
+- `customPath` = a simple square polygon for the tile bounds (50×50 px)
+- `position` = tile center
 
-### 5. Add Group Control Bar integration
+---
 
-- When a group is selected (via clicking any member), show a bottom bar similar to `MapObjectControlBar` with:
-  - Group name display
-  - Lock/Unlock toggle
-  - Ungroup button (dissolves the group, keeps members)
-  - Export button (see below)
+## Changes to `watabouImporter.ts`
 
-### 6. Export/Import as Prefab
+The `importWatabouDungeon()` function currently returns `terrainFeatures: Omit<TerrainFeature, 'id'>[]` from `convertWater()`. We change this return shape:
 
-**Export (`src/lib/groupSerializer.ts` -- new file)**:
-- `exportGroupToPrefab(groupId)`: Collects all member data from their stores, normalizes positions relative to the group's top-left corner (so the prefab is origin-relative), embeds textures for tokens/regions, and saves as a `.d20prefab` JSON file.
-
-**Import**:
-- `importPrefabToMap(file, placementPosition)`: Parses the prefab, creates new entities in each store with fresh IDs, offsets all positions by the placement point, and creates a new group linking them.
-- Add import UI in the existing project manager or a new toolbar button.
-
-**Prefab data structure**:
+**Before:**
 ```typescript
-interface PrefabData {
-  version: string;
-  name: string;
-  bounds: { width: number; height: number };
-  tokens: Token[];
-  regions: CanvasRegion[];
-  mapObjects: MapObject[];
-  lights: LightSource[];
-  embeddedTextures?: EmbeddedTextures;
-}
+return {
+  regions, doors, annotations,
+  terrainFeatures,   // ← water lives here
+  columnTiles,
+  metadata,
+};
 ```
 
-### 7. Update `src/lib/projectSerializer.ts`
+**After:**
+```typescript
+return {
+  regions, doors, annotations,
+  waterMapObjectData: waterBody | null,   // raw params for convertWaterToMapObject
+  trapTiles: scaledTiles[],               // raw tile coords for convertTrapToMapObject
+  columnTiles,
+  metadata,
+};
+```
 
-- Replace `groups: TokenGroup[]` with `groups: EntityGroup[]` in `ProjectData`.
-- Add migration logic: if loading old data with `tokenIds`, convert to `members` format with `type: 'token'`.
+The `terrainFeatures` field is removed from the return type entirely. The `TerrainFeature` import at the top of the file is also removed.
 
-## Implementation Sequence
+---
 
-1. **New data model**: Rewrite `groupTransforms.ts` types and `groupStore.ts` with the universal `EntityGroup` model and migration for old `TokenGroup` data.
-2. **Bounds calculation**: Implement `recalculateBounds()` that reads from all entity stores.
-3. **Selection propagation**: In `SimpleTabletop.tsx`, when an entity is clicked, check group membership and select all siblings.
-4. **Group dragging**: When dragging a grouped entity, apply delta to all group members.
-5. **Group Manager UI**: Update the modal to show all entity types and support creating groups from mixed selections.
-6. **Group Control Bar**: Add bottom bar with group actions when a group is selected.
-7. **Prefab export/import**: Add `groupSerializer.ts` and integrate with UI for export button on groups and import via file picker.
-8. **Project serializer migration**: Update `ProjectData` type and add backward compatibility.
+## Changes to `WatabouImportCard.tsx`
 
-## Technical Considerations
+Replace the two lines that call the old terrain system:
 
-- **No circular dependencies**: The group store will not import entity stores directly. Instead, bounds recalculation is done via a helper function that receives entity data as arguments (called from the component layer).
-- **Performance**: Group membership lookups use a derived `Map<entityId, groupId>` index rebuilt on group changes.
-- **Lights from lightStore vs MapObject lights**: Both are supported as group members. MapObject lights use `type: 'mapObject'`, standalone lights use `type: 'light'`.
-- **Nested groups**: Not supported in v1 to keep complexity manageable.
+```typescript
+// REMOVE:
+const featuresWithIds = imported.terrainFeatures.map(...)
+setTerrainFeatures(featuresWithIds);
 
+// ADD:
+if (imported.waterMapObjectData) {
+  const waterId = useMapObjectStore.getState()
+    .convertWaterToMapObject(imported.waterMapObjectData.tiles, imported.waterMapObjectData.fluidBoundary);
+  addedEntityIds.push({ id: waterId, type: 'mapObject' });
+}
+imported.trapTiles.forEach(tile => {
+  const trapId = useMapObjectStore.getState().convertTrapToMapObject([tile]);
+  addedEntityIds.push({ id: trapId, type: 'mapObject' });
+});
+```
+
+Remove the `setTerrainFeatures` import from `useDungeonStore`. The `setAnnotations` import stays (annotations are still in dungeonStore for now).
+
+---
+
+## Rendering: Add `'water'` and `'trap'` Branches in `SimpleTabletop.tsx`
+
+The canvas already has a rendering path for MapObjects with `shape: 'custom'` that draws the `customPath` polygon. We need to add **category-aware visual styling** inside that block.
+
+**Water rendering logic** (extracted from `renderWaterTiles` in `dungeonRenderer.ts`):
+1. Fill the `customPath` polygon with translucent blue.
+2. Apply the `computeInsetPath` ripple loop (up to 6 concentric strokes inset from the boundary).
+3. This renders identically in edit and play mode — no mode switch needed.
+
+**Trap rendering logic** (extracted from `renderTrapTiles`):
+1. Fill the `customPath` polygon with translucent red.
+2. Draw a red `×` stroke at the center of the bounds.
+
+The `computeInsetPath` function will be extracted from `dungeonRenderer.ts` into a shared utility file (e.g. `src/utils/pathUtils.ts`, which already exists) so both the old renderer and the new MapObject renderer can use it without circular imports.
+
+---
+
+## Remove All TerrainFeature Code
+
+Once the two new conversion methods exist and the importer no longer produces `TerrainFeature` objects, the following can be deleted or emptied:
+
+| Location | What to remove |
+|---|---|
+| `src/stores/dungeonStore.ts` | `terrainFeatures: []`, `addTerrainFeature`, `updateTerrainFeature`, `removeTerrainFeature`, `clearTerrainFeatures`, `setTerrainFeatures` — the entire terrain section. Also remove from `clearAll()`. |
+| `src/lib/dungeonTypes.ts` | `TerrainFeature` interface (keep the file for `DoorConnection`, `Annotation`, `LightSource`, `WatabouJSON`, `DOOR_TYPE_LABELS`). |
+| `src/lib/dungeonRenderer.ts` | `renderTerrainFeatures()`, `renderWaterTiles()`, `renderTrapTiles()`, `renderColumnTiles()`, `renderDebrisTiles()`. Keep `renderDungeonMapRegions`, `renderDoors`, `renderAnnotations`, `computeInsetPath` (moved to pathUtils). |
+| `src/components/SimpleTabletop.tsx` | Remove the `renderTerrainFeatures` import and the call at line 2164. Remove the `terrainFeatures` destructuring from `useDungeonStore`. Remove the group-drag terrain-propagation block (~lines 5874 and 6395). |
+| `src/components/modals/ClearDataDialog.tsx` | Remove `clearTerrainFeatures` call (after clearing map objects, water MapObjects are cleared with the rest). |
+| `src/lib/autoSaveManager.ts` | Remove `terrainFeatures` from the dungeon data snapshot. |
+| `src/components/cards/ProjectManagerCard.tsx` | Remove `dungeonData.terrainFeatures` read/write in both `applyProjectData` and the rollback path. |
+
+---
+
+## Files Changed (Summary)
+
+```text
+src/types/mapObjectTypes.ts           — add 'water' | 'trap' to MapObjectCategory union + presets + labels
+src/stores/mapObjectStore.ts          — add convertWaterToMapObject(), convertTrapToMapObject()
+src/lib/watabouImporter.ts            — return waterMapObjectData+trapTiles instead of terrainFeatures
+src/components/cards/WatabouImportCard.tsx  — call new conversion methods, remove setTerrainFeatures
+src/components/SimpleTabletop.tsx     — add water/trap rendering in customPath block, remove terrainFeature references (~5 sites)
+src/utils/pathUtils.ts                — add computeInsetPath() utility (extracted from dungeonRenderer)
+src/lib/dungeonRenderer.ts            — remove renderTerrainFeatures + water/trap/column/debris helpers
+src/stores/dungeonStore.ts            — remove terrainFeatures field and all terrain CRUD methods
+src/lib/dungeonTypes.ts               — remove TerrainFeature interface
+src/lib/autoSaveManager.ts            — remove terrainFeatures from dungeon snapshot
+src/components/cards/ProjectManagerCard.tsx  — remove terrainFeatures read/write
+src/components/modals/ClearDataDialog.tsx    — remove clearTerrainFeatures call
+src/lib/version.ts                    — bump to 0.3.0
+```
+
+---
+
+## What This Fixes (recap)
+
+- Water and traps are now **MapObjects** — they participate in group membership, are included in `addedEntityIds`, and get a proper ID in the group.
+- **Undo works** — MapObject CRUD commands exist; water/trap moves will revert correctly.
+- **Rotation works** — `groupTransforms.ts` iterates `mapObject` members; water/trap are now members.
+- **Bounding box works** — `computeGroupAABB` handles `mapObject`; water/trap are included.
+- **Edit-mode rendering fixed** — `shape: 'custom'` with `customPath` renders the organic polygon in both modes, not tile-by-tile blue boxes.
+- **No group-drag special-casing** — the terrain propagation hacks in the mousemove handler can be deleted; the standard MapObject delta path handles it.
+- **Clean export/import** — `terrainFeatures` disappears from `dungeonData`; water/trap live in `mapObjects` alongside doors and walls.
