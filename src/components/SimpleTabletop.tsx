@@ -7027,7 +7027,9 @@ export const SimpleTabletop = () => {
                   points: regionPoints,
                 } as any,
               };
-              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
+              const isRectWithRotation = localRegion.regionType !== 'path' && !!localRegion.rotation;
+              const rectCenter = isRectWithRotation ? { x: localRegion.x + localRegion.width / 2, y: localRegion.y + localRegion.height / 2 } : undefined;
+              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap, isRectWithRotation ? localRegion.rotation : undefined, rectCenter);
               updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
             }
             // Priority 2: World space snapping (only if not in a region and world snapping is enabled)
@@ -7798,7 +7800,9 @@ export const SimpleTabletop = () => {
                   points: regionPoints,
                 } as any,
               };
-              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap);
+              const isRectWithRotation = localRegion.regionType !== 'path' && !!localRegion.rotation;
+              const rectCenter = isRectWithRotation ? { x: localRegion.x + localRegion.width / 2, y: localRegion.y + localRegion.height / 2 } : undefined;
+              const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap, isRectWithRotation ? localRegion.rotation : undefined, rectCenter);
               updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
             }
             // Priority 2: World space snapping
@@ -7965,7 +7969,9 @@ export const SimpleTabletop = () => {
           points: regionPoints,
         } as any,
       };
-      const snappedPos = snapToMapGrid(tokenX, tokenY, regionForSnap);
+      const isRectWithRotation = localRegion.regionType !== 'path' && !!localRegion.rotation;
+      const rectCenter = isRectWithRotation ? { x: localRegion.x + localRegion.width / 2, y: localRegion.y + localRegion.height / 2 } : undefined;
+      const snappedPos = snapToMapGrid(tokenX, tokenY, regionForSnap, isRectWithRotation ? localRegion.rotation : undefined, rectCenter);
       console.log("New token snapped to local region:", snappedPos);
       tokenX = snappedPos.x;
       tokenY = snappedPos.y;

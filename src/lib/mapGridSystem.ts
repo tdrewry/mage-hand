@@ -306,63 +306,86 @@ function renderHexGridRegion(
 }
 
 // Token snapping for map-based grids
-export function snapToMapGrid(x: number, y: number, regions: { map: GameMap; region: GridRegion } | null): { x: number; y: number } {
+// regionRotation: degrees of rotation for the region (rectangle regions only), with pivot at regionCenter
+export function snapToMapGrid(
+  x: number,
+  y: number,
+  regions: { map: GameMap; region: GridRegion } | null,
+  regionRotation?: number,
+  regionCenter?: { x: number; y: number }
+): { x: number; y: number } {
   if (!regions || regions.region.gridType === 'none') {
     return { x, y };
   }
   
   const { region } = regions;
-  
-  // Check if the point is within the polygon
-  if (!isPointInPolygon(x, y, region.points)) {
+  const rotRad = regionRotation ? (regionRotation * Math.PI) / 180 : 0;
+  const hasRotation = !!rotRad && !!regionCenter;
+
+  // For rotated regions, work in local (unrotated) space
+  let localX = x;
+  let localY = y;
+  if (hasRotation) {
+    // Rotate point into region-local space (inverse rotation around center)
+    const dx = x - regionCenter!.x;
+    const dy = y - regionCenter!.y;
+    localX = regionCenter!.x + dx * Math.cos(-rotRad) - dy * Math.sin(-rotRad);
+    localY = regionCenter!.y + dx * Math.sin(-rotRad) + dy * Math.cos(-rotRad);
+  }
+
+  // Check if the point is within the polygon (use original points for path regions,
+  // or unrotated point for rectangle regions with rotation)
+  if (!isPointInPolygon(hasRotation ? localX : x, hasRotation ? localY : y, region.points)) {
     return { x, y }; // Don't snap if outside the region
   }
+
+  // Helper to rotate a snapped local point back to world space
+  const toWorld = (sx: number, sy: number) => {
+    if (!hasRotation) return { x: sx, y: sy };
+    const dx = sx - regionCenter!.x;
+    const dy = sy - regionCenter!.y;
+    return {
+      x: regionCenter!.x + dx * Math.cos(rotRad) - dy * Math.sin(rotRad),
+      y: regionCenter!.y + dx * Math.sin(rotRad) + dy * Math.cos(rotRad),
+    };
+  };
   
   switch (region.gridType) {
-    case 'square':
-      // Calculate bounding box for local coordinates
+    case 'square': {
+      // Calculate bounding box for local coordinates (in unrotated space)
       const minX = Math.min(...region.points.map(p => p.x));
       const minY = Math.min(...region.points.map(p => p.y));
       
-      // Convert to region-local coordinates
-      const localX = x - minX;
-      const localY = y - minY;
+      // Snap the local (unrotated) point to grid cell center
+      const gridCellX = Math.floor((localX - minX) / region.gridSize);
+      const gridCellY = Math.floor((localY - minY) / region.gridSize);
       
-      // Snap to center of grid cells
-      const gridCellX = Math.floor(localX / region.gridSize);
-      const gridCellY = Math.floor(localY / region.gridSize);
+      const snappedLocalX = minX + (gridCellX + 0.5) * region.gridSize;
+      const snappedLocalY = minY + (gridCellY + 0.5) * region.gridSize;
       
-      // Calculate center of the grid cell
-      const centerX = (gridCellX + 0.5) * region.gridSize;
-      const centerY = (gridCellY + 0.5) * region.gridSize;
-      
-      // Convert back to world coordinates
-      const snappedX = centerX + minX;
-      const snappedY = centerY + minY;
-      
-      // Verify the snapped point is still within the polygon
-      if (isPointInPolygon(snappedX, snappedY, region.points)) {
-        return { x: snappedX, y: snappedY };
+      // Verify the snapped local point is still within the polygon
+      if (isPointInPolygon(snappedLocalX, snappedLocalY, region.points)) {
+        return toWorld(snappedLocalX, snappedLocalY);
       }
       return { x, y };
+    }
       
-    case 'hex':
+    case 'hex': {
       // Create hex layout using same coordinate system as rendering
       const layout = createHexLayout(region.gridSize, POINTY_TOP);
       
-      // Convert to hex coordinates and round to nearest hex center
-      const hex = pixelToHex(layout, { x, y });
+      // Snap in local space
+      const hex = pixelToHex(layout, { x: localX, y: localY });
       const roundedHex = hexRound(hex);
-      
-      // Convert back to pixel coordinates (will be at hex center)
-      const snappedPoint = hexToPixel(layout, roundedHex);
+      const snappedLocal = hexToPixel(layout, roundedHex);
       
       // Ensure the snapped point is within the polygon
-      if (isPointInPolygon(snappedPoint.x, snappedPoint.y, region.points)) {
-        return snappedPoint;
+      if (isPointInPolygon(snappedLocal.x, snappedLocal.y, region.points)) {
+        return toWorld(snappedLocal.x, snappedLocal.y);
       }
       
       return { x, y }; // Don't snap if result would be outside region
+    }
       
     default:
       return { x, y };
