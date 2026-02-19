@@ -1,6 +1,6 @@
 import { WatabouJSON } from './dungeonTypes';
 import { CanvasRegion } from '@/stores/regionStore';
-import { DoorConnection, Annotation, TerrainFeature } from './dungeonTypes';
+import { DoorConnection, Annotation } from './dungeonTypes';
 import { groupConnectedTiles, generateSimpleContour } from '@/utils/marchingSquares';
 import { simplifyPath, smoothPath } from '@/utils/pathSimplification';
 
@@ -247,42 +247,31 @@ function convertNote(note: WatabouJSON['notes'][0]): Omit<Annotation, 'id'> {
 }
 
 /**
- * Convert Watabou water tiles to TerrainFeature with fluid boundary
+ * Convert Watabou water tiles to water MapObject data (tiles + fluid boundary)
  */
-function convertWater(waterTiles: { x: number; y: number }[]): Omit<TerrainFeature, 'id'> {
+function convertWater(waterTiles: { x: number; y: number }[]): { tiles: { x: number; y: number }[]; fluidBoundary?: { x: number; y: number }[] } {
   const scaledTiles = waterTiles.map((tile) => ({
     x: tile.x * GRID_SIZE,
     y: tile.y * GRID_SIZE,
   }));
-  
+
   // Generate fluid boundary using marching squares
   let fluidBoundary: { x: number; y: number }[] | undefined;
-  
+
   if (scaledTiles.length > 0) {
-    // Group connected tiles
     const groups = groupConnectedTiles(scaledTiles);
-    
-    // Use the largest group for boundary (handle disconnected water separately)
     if (groups.length > 0) {
       const largestGroup = groups.reduce((a, b) => a.length > b.length ? a : b);
-      
-      // Generate contour
       let contour = generateSimpleContour(largestGroup, GRID_SIZE);
-      
       if (contour.length > 0) {
-        // Simplify and smooth the contour for organic look
         contour = simplifyPath(contour, 3.0);
         contour = smoothPath(contour, 3);
         fluidBoundary = contour;
       }
     }
   }
-  
-  return {
-    type: 'water',
-    tiles: scaledTiles,
-    fluidBoundary,
-  };
+
+  return { tiles: scaledTiles, fluidBoundary };
 }
 
 /**
@@ -300,7 +289,10 @@ export interface ImportedDungeon {
   regions: Omit<CanvasRegion, 'id'>[];
   doors: Omit<DoorConnection, 'id'>[];
   annotations: Omit<Annotation, 'id'>[];
-  terrainFeatures: Omit<TerrainFeature, 'id'>[];
+  /** Water body data for convertWaterToMapObject (null if no water) */
+  waterMapObjectData: { tiles: { x: number; y: number }[]; fluidBoundary?: { x: number; y: number }[] } | null;
+  /** Trap tiles — each becomes an individual MapObject via convertTrapToMapObject */
+  trapTiles: { x: number; y: number }[];
   metadata: {
     title?: string;
     story?: string;
@@ -310,38 +302,43 @@ export interface ImportedDungeon {
 
 /**
  * Import a Watabou dungeon JSON and convert to our format
- * 
- * Note: Columns are NOT added to terrainFeatures. They are returned separately
- * as columnTiles so they can be converted to interactive MapObjects by the caller.
+ *
+ * Water and traps are now returned as raw MapObject data (waterMapObjectData / trapTiles)
+ * so the caller can create first-class MapObjects that participate in groups, undo, rotation, etc.
+ * Columns are returned separately as columnTiles for the same reason.
  */
 export function importWatabouDungeon(json: WatabouJSON): ImportedDungeon & { columnTiles: { x: number; y: number }[] } {
   // First pass: detect connections
   const connections = detectRegionConnections(json.rects, json.doors);
-  
+
   // Second pass: convert rects with connection awareness
-  const regions = json.rects.map((rect, index) => 
+  const regions = json.rects.map((rect, index) =>
     convertRect(rect, index, json.rects, connections)
   );
   const doors = json.doors.map(convertDoor);
   const annotations = json.notes.map(convertNote);
-  
-  // Only water goes into terrainFeatures (rendered but non-interactive)
-  const terrainFeatures: Omit<TerrainFeature, 'id'>[] = [];
-  
-  if (json.water && json.water.length > 0) {
-    terrainFeatures.push(convertWater(json.water));
-  }
-  
+
+  // Water → raw data for MapObject conversion by the caller
+  const waterMapObjectData = (json.water && json.water.length > 0)
+    ? convertWater(json.water)
+    : null;
+
+  // Traps → individual tile coords for MapObject conversion by the caller
+  // (Watabou JSON doesn't have a dedicated trap array; traps come from TerrainFeature.type === 'trap'
+  //  which was previously injected externally. For now we expose an empty array as the hook point.)
+  const trapTiles: { x: number; y: number }[] = [];
+
   // Columns are returned separately for MapObject conversion
   const columnTiles = json.columns && json.columns.length > 0
     ? convertColumnTiles(json.columns)
     : [];
-  
+
   return {
     regions,
     doors,
     annotations,
-    terrainFeatures,
+    waterMapObjectData,
+    trapTiles,
     columnTiles,
     metadata: {
       title: json.title,

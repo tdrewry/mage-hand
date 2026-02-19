@@ -6,6 +6,36 @@ export interface Point {
 }
 
 /**
+ * Compute an inset path by moving each point toward the centroid.
+ * Creates concentric ripple lines that follow the boundary shape.
+ * Used for water shore-ripple rendering.
+ */
+export function computeInsetPath(
+  boundary: Point[],
+  insetDistance: number
+): Point[] {
+  if (boundary.length < 3) return [];
+
+  // Calculate centroid
+  const centroid: Point = {
+    x: boundary.reduce((sum, p) => sum + p.x, 0) / boundary.length,
+    y: boundary.reduce((sum, p) => sum + p.y, 0) / boundary.length,
+  };
+
+  const insetPath: Point[] = [];
+  for (const point of boundary) {
+    const dx = centroid.x - point.x;
+    const dy = centroid.y - point.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= insetDistance) continue; // Would collapse past centroid
+    const ratio = insetDistance / dist;
+    insetPath.push({ x: point.x + dx * ratio, y: point.y + dy * ratio });
+  }
+
+  return insetPath;
+}
+
+/**
  * Check if a point is inside a polygon using the ray casting algorithm.
  * @param point The point to check.
  * @param polygon An array of points defining the polygon vertices.

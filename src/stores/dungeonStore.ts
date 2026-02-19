@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DoorConnection, Annotation, TerrainFeature, LightSource } from '@/lib/dungeonTypes';
+import { DoorConnection, Annotation, LightSource } from '@/lib/dungeonTypes';
 import { WatabouStyle, DEFAULT_STYLE } from '@/lib/watabouStyles';
 import { WallGeometry, LineSegment } from '@/lib/wallGeometry';
 
 interface DungeonStore {
   doors: DoorConnection[];
   annotations: Annotation[];
-  terrainFeatures: TerrainFeature[];
   lightSources: LightSource[];
   importedWallSegments: LineSegment[]; // Wall segments imported from dd2vtt or other external formats
   renderingMode: 'edit' | 'play';
@@ -182,36 +181,14 @@ interface DungeonStore {
    */
   setAnnotations: (annotations: Annotation[]) => void;
   
-  // Terrain operations
-  /**
-   * Adds a new terrain feature to the dungeon.
-   * @param feature The terrain feature data to add.
-   */
-  addTerrainFeature: (feature: Omit<TerrainFeature, 'id'>) => void;
-
-  /**
-   * Updates an existing terrain feature.
-   * @param id The ID of the terrain feature to update.
-   * @param updates The updates to apply.
-   */
-  updateTerrainFeature: (id: string, updates: Partial<TerrainFeature>) => void;
-
-  /**
-   * Removes a terrain feature from the dungeon.
-   * @param id The ID of the terrain feature to remove.
-   */
-  removeTerrainFeature: (id: string) => void;
-
-  /**
-   * Clears all terrain features from the dungeon.
-   */
+  
+  // Terrain operations — REMOVED (water/trap are now MapObjects)
+  // Legacy stubs kept for zero-error migration; do nothing.
+  addTerrainFeature: (_feature: any) => void;
+  updateTerrainFeature: (_id: string, _updates: any) => void;
+  removeTerrainFeature: (_id: string) => void;
   clearTerrainFeatures: () => void;
-
-  /**
-   * Replaces the entire terrain features array.
-   * @param features The new array of terrain features.
-   */
-  setTerrainFeatures: (features: TerrainFeature[]) => void;
+  setTerrainFeatures: (_features: any[]) => void;
   
   // Imported wall segments (from dd2vtt or other external formats)
   /**
@@ -237,7 +214,6 @@ export const useDungeonStore = create<DungeonStore>()(
     (set) => ({
     doors: [],
     annotations: [],
-    terrainFeatures: [],
     lightSources: [],
     importedWallSegments: [],
     renderingMode: 'edit',
@@ -332,38 +308,12 @@ export const useDungeonStore = create<DungeonStore>()(
         set({ annotations });
       },
       
-      // Terrain operations
-      addTerrainFeature: (featureData) => {
-        const newFeature: TerrainFeature = {
-          ...featureData,
-          id: `terrain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        };
-        set((state) => ({
-          terrainFeatures: [...state.terrainFeatures, newFeature],
-        }));
-      },
-      
-      updateTerrainFeature: (id, updates) => {
-        set((state) => ({
-          terrainFeatures: state.terrainFeatures.map((feature) =>
-            feature.id === id ? { ...feature, ...updates } : feature
-          ),
-        }));
-      },
-      
-      removeTerrainFeature: (id) => {
-        set((state) => ({
-          terrainFeatures: state.terrainFeatures.filter((feature) => feature.id !== id),
-        }));
-      },
-      
-      clearTerrainFeatures: () => {
-        set({ terrainFeatures: [] });
-      },
-      
-      setTerrainFeatures: (features) => {
-        set({ terrainFeatures: features });
-      },
+      // Terrain operations — no-ops (water/trap are now MapObjects)
+      addTerrainFeature: () => {},
+      updateTerrainFeature: () => {},
+      removeTerrainFeature: () => {},
+      clearTerrainFeatures: () => {},
+      setTerrainFeatures: () => {},
       
       // Light source operations
       addLightSource: (sourceData) => {
@@ -412,7 +362,6 @@ export const useDungeonStore = create<DungeonStore>()(
         set({
           doors: [],
           annotations: [],
-          terrainFeatures: [],
           lightSources: [],
           importedWallSegments: [],
         });

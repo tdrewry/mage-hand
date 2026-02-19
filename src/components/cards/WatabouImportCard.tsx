@@ -30,12 +30,13 @@ export const WatabouImportCardContent = () => {
   const clearRegions = useRegionStore((state) => state.clearRegions);
 
   const setAnnotations = useDungeonStore((state) => state.setAnnotations);
-  const setTerrainFeatures = useDungeonStore((state) => state.setTerrainFeatures);
   const setImportedWallSegments = useDungeonStore((state) => state.setImportedWallSegments);
   const clearAll = useDungeonStore((state) => state.clearAll);
 
   const convertTerrainFeatureToMapObjects = useMapObjectStore((state) => state.convertTerrainFeatureToMapObjects);
   const convertDoorsToMapObjects = useMapObjectStore((state) => state.convertDoorsToMapObjects);
+  const convertWaterToMapObject = useMapObjectStore((state) => state.convertWaterToMapObject);
+  const convertTrapToMapObject = useMapObjectStore((state) => state.convertTrapToMapObject);
   const addMapObject = useMapObjectStore((state) => state.addMapObject);
   const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
@@ -151,8 +152,22 @@ export const WatabouImportCardContent = () => {
       mapObjectCount += ids.length;
     }
 
-    const featuresWithIds = imported.terrainFeatures.map((feature) => ({ ...feature, id: makeId('terrain') }));
-    setTerrainFeatures(featuresWithIds);
+    // Water → first-class MapObject (supports undo, rotation, group membership)
+    if (imported.waterMapObjectData) {
+      const waterId = convertWaterToMapObject(
+        imported.waterMapObjectData.tiles,
+        imported.waterMapObjectData.fluidBoundary
+      );
+      addedEntityIds.push({ id: waterId, type: 'mapObject' });
+      mapObjectCount += 1;
+    }
+
+    // Trap tiles → individual MapObjects
+    imported.trapTiles.forEach(tile => {
+      const trapId = convertTrapToMapObject(tile);
+      addedEntityIds.push({ id: trapId, type: 'mapObject' });
+      mapObjectCount += 1;
+    });
 
     if (resolvedGroupName && addedEntityIds.length > 0) {
       const { addGroup } = useGroupStore.getState();

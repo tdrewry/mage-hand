@@ -16,13 +16,6 @@ export interface Annotation {
   regionId?: string; // Optional association with a region
 }
 
-export interface TerrainFeature {
-  id: string;
-  type: 'water' | 'column' | 'debris' | 'trap';
-  tiles: { x: number; y: number }[];
-  fluidBoundary?: { x: number; y: number }[]; // Optional smooth contour for organic rendering
-}
-
 export interface LightSource {
   id: string;
   position: { x: number; y: number };
