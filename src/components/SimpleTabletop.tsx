@@ -5668,7 +5668,7 @@ export const SimpleTabletop = () => {
                     if (o) mobjRotSnap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                   } else if (m.type === 'region') {
                     const r = regions.find(x => x.id === m.id);
-                    if (r) mobjRotSnap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                    if (r) mobjRotSnap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined };
                   } else if (m.type === 'light') {
                     const l = useLightStore.getState().lights.find(x => x.id === m.id);
                     if (l) mobjRotSnap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -6138,13 +6138,13 @@ export const SimpleTabletop = () => {
               });
             }
           } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-            const sibRegion = regions.find(r => r.id === member.id);
-            if (sibRegion) {
-              const cx2 = snap.x + sibRegion.width / 2; const cy2 = snap.y + sibRegion.height / 2;
-              const dx = cx2 - pivotX; const dy = cy2 - pivotY;
-              const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-              updateRegion(member.id, { x: newCx - sibRegion.width / 2, y: newCy - sibRegion.height / 2, rotation: (snap.regRotation || 0) + rotationDelta });
-            }
+            // Use snapshot width/height — never read from stale React `regions` closure during mousemove
+            const snapW = snap.width ?? 0;
+            const snapH = snap.height ?? 0;
+            const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
+            const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+            const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+            updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
           } else if (member.type === 'light' && snap.lightPos) {
             const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
             useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
