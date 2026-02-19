@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
+// useShallow removed - using individual selectors instead
 import { MapManager } from "./MapManager";
 import { TokenContextManager } from "./TokenContextManager";
 import { CardManager } from "./CardManager";
@@ -309,54 +309,28 @@ export const SimpleTabletop = () => {
   >([]);
 
   // Use persistent region store
-  const {
-    regions,
-    addRegion,
-    updateRegion,
-    removeRegion,
-    clearRegions,
-    setRegions,
-    selectRegion,
-    deselectRegion,
-    clearSelection,
-    getSelectedRegions,
-  } = useRegionStore(useShallow((s) => ({
-    regions: s.regions,
-    addRegion: s.addRegion,
-    updateRegion: s.updateRegion,
-    removeRegion: s.removeRegion,
-    clearRegions: s.clearRegions,
-    setRegions: s.setRegions,
-    selectRegion: s.selectRegion,
-    deselectRegion: s.deselectRegion,
-    clearSelection: s.clearSelection,
-    getSelectedRegions: s.getSelectedRegions,
-  })));
+  const regions = useRegionStore((s) => s.regions);
+  const addRegion = useRegionStore((s) => s.addRegion);
+  const updateRegion = useRegionStore((s) => s.updateRegion);
+  const removeRegion = useRegionStore((s) => s.removeRegion);
+  const clearRegions = useRegionStore((s) => s.clearRegions);
+  const setRegions = useRegionStore((s) => s.setRegions);
+  const selectRegion = useRegionStore((s) => s.selectRegion);
+  const deselectRegion = useRegionStore((s) => s.deselectRegion);
+  const clearSelection = useRegionStore((s) => s.clearSelection);
+  const getSelectedRegions = useRegionStore((s) => s.getSelectedRegions);
 
   // Dungeon features store
-  const {
-    doors,
-    annotations,
-    terrainFeatures,
-    importedWallSegments,
-    renderingMode,
-    setRenderingMode,
-    watabouStyle,
-    wallEdgeStyle,
-    wallThickness,
-    textureScale,
-  } = useDungeonStore(useShallow((s) => ({
-    doors: s.doors,
-    annotations: s.annotations,
-    terrainFeatures: s.terrainFeatures,
-    importedWallSegments: s.importedWallSegments,
-    renderingMode: s.renderingMode,
-    setRenderingMode: s.setRenderingMode,
-    watabouStyle: s.watabouStyle,
-    wallEdgeStyle: s.wallEdgeStyle,
-    wallThickness: s.wallThickness,
-    textureScale: s.textureScale,
-  })));
+  const doors = useDungeonStore((s) => s.doors);
+  const annotations = useDungeonStore((s) => s.annotations);
+  const terrainFeatures = useDungeonStore((s) => s.terrainFeatures);
+  const importedWallSegments = useDungeonStore((s) => s.importedWallSegments);
+  const renderingMode = useDungeonStore((s) => s.renderingMode);
+  const setRenderingMode = useDungeonStore((s) => s.setRenderingMode);
+  const watabouStyle = useDungeonStore((s) => s.watabouStyle);
+  const wallEdgeStyle = useDungeonStore((s) => s.wallEdgeStyle);
+  const wallThickness = useDungeonStore((s) => s.wallThickness);
+  const textureScale = useDungeonStore((s) => s.textureScale);
 
   // Map objects store
   const mapObjects = useMapObjectStore((state) => state.mapObjects);
@@ -367,11 +341,15 @@ export const SimpleTabletop = () => {
   const updateMapObject = useMapObjectStore((state) => state.updateMapObject);
 
   // Light system store
-  const { lights, addLight, updateLight, removeLight, globalAmbientLight, shadowIntensity, selectedLightIds, selectMultipleLights, clearLightSelection } = useLightStore(useShallow((s) => ({
-    lights: s.lights, addLight: s.addLight, updateLight: s.updateLight, removeLight: s.removeLight,
-    globalAmbientLight: s.globalAmbientLight, shadowIntensity: s.shadowIntensity,
-    selectedLightIds: s.selectedLightIds, selectMultipleLights: s.selectMultipleLights, clearLightSelection: s.clearLightSelection,
-  })));
+  const lights = useLightStore((s) => s.lights);
+  const addLight = useLightStore((s) => s.addLight);
+  const updateLight = useLightStore((s) => s.updateLight);
+  const removeLight = useLightStore((s) => s.removeLight);
+  const globalAmbientLight = useLightStore((s) => s.globalAmbientLight);
+  const shadowIntensity = useLightStore((s) => s.shadowIntensity);
+  const selectedLightIds = useLightStore((s) => s.selectedLightIds);
+  const selectMultipleLights = useLightStore((s) => s.selectMultipleLights);
+  const clearLightSelection = useLightStore((s) => s.clearLightSelection);
 
   // Group store
   const getGroupForEntity = useGroupStore((s) => s.getGroupForEntity);
@@ -380,33 +358,18 @@ export const SimpleTabletop = () => {
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
 
   // Fog of war store
-  const {
-    enabled: fogEnabled,
-    revealAll: fogRevealAll,
-    visionRange: fogVisionRange,
-    fogOpacity,
-    exploredOpacity,
-    serializedExploredAreas,
-    setSerializedExploredAreas,
-    setEnabled: setFogEnabled,
-    setRevealAll: setFogRevealAll,
-    effectSettings,
-    realtimeVisionDuringDrag,
-    realtimeVisionThrottleMs,
-  } = useFogStore(useShallow((s) => ({
-    enabled: s.enabled,
-    revealAll: s.revealAll,
-    visionRange: s.visionRange,
-    fogOpacity: s.fogOpacity,
-    exploredOpacity: s.exploredOpacity,
-    serializedExploredAreas: s.serializedExploredAreas,
-    setSerializedExploredAreas: s.setSerializedExploredAreas,
-    setEnabled: s.setEnabled,
-    setRevealAll: s.setRevealAll,
-    effectSettings: s.effectSettings,
-    realtimeVisionDuringDrag: s.realtimeVisionDuringDrag,
-    realtimeVisionThrottleMs: s.realtimeVisionThrottleMs,
-  })));
+  const fogEnabled = useFogStore((s) => s.enabled);
+  const fogRevealAll = useFogStore((s) => s.revealAll);
+  const fogVisionRange = useFogStore((s) => s.visionRange);
+  const fogOpacity = useFogStore((s) => s.fogOpacity);
+  const exploredOpacity = useFogStore((s) => s.exploredOpacity);
+  const serializedExploredAreas = useFogStore((s) => s.serializedExploredAreas);
+  const setSerializedExploredAreas = useFogStore((s) => s.setSerializedExploredAreas);
+  const setFogEnabled = useFogStore((s) => s.setEnabled);
+  const setFogRevealAll = useFogStore((s) => s.setRevealAll);
+  const effectSettings = useFogStore((s) => s.effectSettings);
+  const realtimeVisionDuringDrag = useFogStore((s) => s.realtimeVisionDuringDrag);
+  const realtimeVisionThrottleMs = useFogStore((s) => s.realtimeVisionThrottleMs);
   
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady } = usePostProcessing({
@@ -576,38 +539,31 @@ export const SimpleTabletop = () => {
     mapObjectId: string;
   } | null>(null);
 
-  const {
-    sessionId,
-    tokens,
-    addToken,
-    updateTokenPosition,
-    updateTokenLabel,
-    updateTokenColor,
-    removeToken,
-    currentPlayerId,
-    players,
-  } = useSessionStore(useShallow((s) => ({
-    sessionId: s.sessionId,
-    tokens: s.tokens,
-    addToken: s.addToken,
-    updateTokenPosition: s.updateTokenPosition,
-    updateTokenLabel: s.updateTokenLabel,
-    updateTokenColor: s.updateTokenColor,
-    removeToken: s.removeToken,
-    currentPlayerId: s.currentPlayerId,
-    players: s.players,
-  })));
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const tokens = useSessionStore((s) => s.tokens);
+  const addToken = useSessionStore((s) => s.addToken);
+  const updateTokenPosition = useSessionStore((s) => s.updateTokenPosition);
+  const updateTokenLabel = useSessionStore((s) => s.updateTokenLabel);
+  const updateTokenColor = useSessionStore((s) => s.updateTokenColor);
+  const removeToken = useSessionStore((s) => s.removeToken);
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const players = useSessionStore((s) => s.players);
 
   // Check if current user is a DM (bypasses fog visibility restrictions)
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
   
   // Get DM fog visibility preference
-  const { dmFogVisibility } = useUiModeStore(useShallow((s) => ({ dmFogVisibility: s.dmFogVisibility })));
+  const dmFogVisibility = useUiModeStore((s) => s.dmFogVisibility);
 
-  const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore(useShallow((s) => ({ maps: s.maps, getVisibleMaps: s.getVisibleMaps, getActiveRegionAt: s.getActiveRegionAt })));
+  const maps = useMapStore((s) => s.maps);
+  const getVisibleMaps = useMapStore((s) => s.getVisibleMaps);
+  const getActiveRegionAt = useMapStore((s) => s.getActiveRegionAt);
 
-  const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore(useShallow((s) => ({ isInCombat: s.isInCombat, currentTurnIndex: s.currentTurnIndex, initiativeOrder: s.initiativeOrder, restrictMovement: s.restrictMovement })));
+  const isInCombat = useInitiativeStore((s) => s.isInCombat);
+  const currentTurnIndex = useInitiativeStore((s) => s.currentTurnIndex);
+  const initiativeOrder = useInitiativeStore((s) => s.initiativeOrder);
+  const restrictMovement = useInitiativeStore((s) => s.restrictMovement);
 
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);

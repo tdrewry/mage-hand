@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
 
@@ -13,18 +13,58 @@ const LoadingScreen = () => (
   </div>
 );
 
-const Index = () => {
-  const [launched, setLaunched] = useState(!isLovableSandbox);
-  // Delay mounting SimpleTabletop to let all zustand persist stores fully hydrate
-  // This prevents "Maximum update depth exceeded" from store rehydration cascades
-  const [ready, setReady] = useState(false);
+/**
+ * Pre-hydrate all persisted zustand stores before mounting SimpleTabletop.
+ * This prevents "Maximum update depth exceeded" caused by cascading
+ * useSyncExternalStore re-renders when multiple stores hydrate during
+ * the component's passive effect phase.
+ */
+function useStoreHydration() {
+  const [hydrated, setHydrated] = useState(false);
+  const attempted = useRef(false);
 
   useEffect(() => {
-    if (launched && !ready) {
-      const timer = setTimeout(() => setReady(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [launched, ready]);
+    if (attempted.current) return;
+    attempted.current = true;
+
+    // Import all persisted stores to trigger their hydration.
+    // Each persist store hydrates from localStorage synchronously on creation,
+    // but React's useSyncExternalStore sees the change during effects.
+    // By importing them here first (outside the heavy component tree),
+    // the hydration completes before SimpleTabletop mounts.
+    Promise.all([
+      import('../stores/sessionStore'),
+      import('../stores/regionStore'),
+      import('../stores/dungeonStore'),
+      import('../stores/fogStore'),
+      import('../stores/lightStore'),
+      import('../stores/mapStore'),
+      import('../stores/mapObjectStore'),
+      import('../stores/initiativeStore'),
+      import('../stores/roleStore'),
+      import('../stores/groupStore'),
+      import('../stores/multiplayerStore'),
+      import('../stores/illuminationStore'),
+      import('../stores/hatchingStore'),
+      import('../stores/visionProfileStore'),
+      import('../stores/cardStore'),
+      import('../stores/uiModeStore'),
+    ]).then(() => {
+      // Give stores a frame to settle after hydration
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setHydrated(true);
+        });
+      });
+    });
+  }, []);
+
+  return hydrated;
+}
+
+const Index = () => {
+  const [launched, setLaunched] = useState(!isLovableSandbox);
+  const hydrated = useStoreHydration();
 
   if (!launched) {
     return (
@@ -45,7 +85,7 @@ const Index = () => {
     );
   }
 
-  if (!ready) {
+  if (!hydrated) {
     return <LoadingScreen />;
   }
 
