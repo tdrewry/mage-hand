@@ -105,6 +105,7 @@ import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 
 import { Z_INDEX } from "../lib/zIndex";
+import { APP_VERSION } from "../lib/version";
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -7541,6 +7542,14 @@ export const SimpleTabletop = () => {
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
+
+      {/* Version Indicator - Bottom Left */}
+      <div
+        className="absolute bottom-4 left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-sm select-none pointer-events-none"
+        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+      >
+        v{APP_VERSION}
+      </div>
 
       {/* Zoom Level Indicator with Menu */}
       <div 
