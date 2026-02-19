@@ -28,6 +28,7 @@ export const WatabouImportCardContent = () => {
   
   const convertTerrainFeatureToMapObjects = useMapObjectStore((state) => state.convertTerrainFeatureToMapObjects);
   const convertDoorsToMapObjects = useMapObjectStore((state) => state.convertDoorsToMapObjects);
+  const addMapObject = useMapObjectStore((state) => state.addMapObject);
   const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
   const addLight = useLightStore((state) => state.addLight);
@@ -138,15 +139,35 @@ export const WatabouImportCardContent = () => {
       });
     }
     
-    // Import wall segments for vision/fog system
+    // Import wall segments for vision/fog system (raw segments still used)
     setImportedWallSegments(imported.wallSegments);
     
     // Convert doors to interactive MapObjects
     const doorIds = convertDoorsToMapObjects(imported.doors);
     
-    // Import lights
-    imported.lights.forEach((light) => {
-      addLight(light);
+    // Add wall polylines as MapObjects
+    imported.wallMapObjects.forEach((wallObj) => {
+      addMapObject(wallObj);
+    });
+    
+    // Add obstacle polylines as separate MapObjects
+    imported.obstacleMapObjects.forEach((obstObj) => {
+      addMapObject(obstObj);
+    });
+    
+    // Import lights as MapObjects with embedded light data
+    // Also add to lightStore for backward compatibility with rendering
+    imported.lightMapObjects.forEach((lightObj) => {
+      addMapObject(lightObj);
+      // Also add to light store for the illumination engine
+      addLight({
+        position: lightObj.position,
+        radius: lightObj.lightRadius || 100,
+        intensity: lightObj.lightIntensity || 1,
+        color: lightObj.lightColor || '#fbbf24',
+        enabled: lightObj.lightEnabled !== false,
+        label: lightObj.label,
+      });
     });
     
     // Set ambient light level
@@ -154,7 +175,7 @@ export const WatabouImportCardContent = () => {
     
     const mapName = file.name.replace(/\.dd2vtt$/i, '');
     toast.success(`Imported dd2vtt map: ${mapName}`, {
-      description: `${imported.metadata.mapWidthPx}×${imported.metadata.mapHeightPx}px, ${imported.wallSegments.length} wall segments, ${doorIds.length} doors, ${imported.lights.length} lights`,
+      description: `${imported.metadata.mapWidthPx}×${imported.metadata.mapHeightPx}px, ${imported.wallMapObjects.length} walls, ${imported.obstacleMapObjects.length} obstacles, ${doorIds.length} doors, ${imported.lightMapObjects.length} lights`,
     });
   };
 

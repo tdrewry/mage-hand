@@ -5098,8 +5098,8 @@ export const SimpleTabletop = () => {
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
         }
-      } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit") {
-        // Start dragging a selected MapObject in edit mode
+      } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
+        // Start dragging a selected MapObject in edit mode (only if not locked)
         setIsDraggingMapObject(true);
         setDraggedMapObjectId(clickedMapObject.id);
         setMapObjectDragOffset({

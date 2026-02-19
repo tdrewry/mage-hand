@@ -6,6 +6,46 @@ import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 
 /**
+ * Calculate distance from a point to a line segment.
+ */
+function pointToSegmentDistance(
+  px: number, py: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number }
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - a.x, py - a.y);
+  let t = ((px - a.x) * dx + (py - a.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+}
+
+/**
+ * Extract line segments from wall-type MapObjects for use in the visibility system.
+ */
+export function extractSegmentsFromWallMapObjects(
+  mapObjects: MapObject[]
+): { start: { x: number; y: number }; end: { x: number; y: number } }[] {
+  const segments: { start: { x: number; y: number }; end: { x: number; y: number } }[] = [];
+  
+  for (const obj of mapObjects) {
+    if (obj.shape !== 'wall' || !obj.wallPoints || obj.wallPoints.length < 2) continue;
+    if (!obj.blocksVision) continue;
+    
+    for (let i = 0; i < obj.wallPoints.length - 1; i++) {
+      segments.push({
+        start: { x: obj.wallPoints[i].x, y: obj.wallPoints[i].y },
+        end: { x: obj.wallPoints[i + 1].x, y: obj.wallPoints[i + 1].y },
+      });
+    }
+  }
+  
+  return segments;
+}
+
+/**
  * Door toggle animation state - tracks recently toggled doors for visual feedback
  */
 interface DoorAnimationState {
@@ -253,6 +293,118 @@ function renderStairsShape(
 }
 
 /**
+ * Render a wall polyline shape.
+ * Wall points are in absolute coordinates, so we need to undo the parent translate.
+ */
+function renderWallShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number,
+  isDMView: boolean = false
+) {
+  const { wallPoints, position, strokeColor, category } = mapObject;
+  if (!wallPoints || wallPoints.length < 2) return;
+  
+  // Only render in editor/DM view - walls are invisible in play mode
+  if (!isDMView) return;
+  
+  // Undo parent translate since wallPoints are in absolute coords
+  ctx.save();
+  ctx.translate(-position.x, -position.y);
+  
+  // Draw wall segments with dashed decoration
+  const isObstacle = category === 'imported-obstacle';
+  ctx.strokeStyle = isObstacle ? '#f97316' : (strokeColor || '#ef4444');
+  ctx.lineWidth = (isObstacle ? 1.5 : 2) / zoom;
+  ctx.setLineDash(isObstacle ? [6 / zoom, 4 / zoom] : []);
+  ctx.globalAlpha = 0.7;
+  
+  ctx.beginPath();
+  ctx.moveTo(wallPoints[0].x, wallPoints[0].y);
+  for (let i = 1; i < wallPoints.length; i++) {
+    ctx.lineTo(wallPoints[i].x, wallPoints[i].y);
+  }
+  ctx.stroke();
+  
+  // Draw small dots at vertices
+  ctx.setLineDash([]);
+  ctx.fillStyle = ctx.strokeStyle;
+  const dotRadius = 3 / zoom;
+  for (const point of wallPoints) {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+/**
+ * Render a light source shape (glowing dot with radius indicator).
+ */
+function renderLightShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number,
+  isDMView: boolean = false
+) {
+  // Only render in editor/DM view
+  if (!isDMView) return;
+  
+  const { lightColor, lightRadius, lightEnabled } = mapObject;
+  const color = lightColor || '#fbbf24';
+  const radius = lightRadius || 100;
+  const enabled = lightEnabled !== false;
+  
+  // Draw radius circle (faint)
+  ctx.globalAlpha = enabled ? 0.2 : 0.1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.setLineDash([8 / zoom, 4 / zoom]);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Draw filled radius preview
+  if (enabled) {
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+    gradient.addColorStop(0, color + '30');
+    gradient.addColorStop(1, color + '00');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Draw center dot with glow
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  if (enabled) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15 / zoom;
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, 8 / zoom, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  
+  // Draw X if disabled
+  if (!enabled) {
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2 / zoom;
+    const s = 6 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(-s, -s);
+    ctx.lineTo(s, s);
+    ctx.moveTo(s, -s);
+    ctx.lineTo(-s, s);
+    ctx.stroke();
+  }
+}
+
+/**
  * Render a single map object to the canvas
  */
 export function renderMapObject(
@@ -285,6 +437,10 @@ export function renderMapObject(
     renderDoorShape(ctx, mapObject, zoom, isDMView);
   } else if (shape === 'stairs') {
     renderStairsShape(ctx, mapObject, zoom);
+  } else if (shape === 'wall') {
+    renderWallShape(ctx, mapObject, zoom, isDMView);
+  } else if (shape === 'light') {
+    renderLightShape(ctx, mapObject, zoom, isDMView);
   } else {
     ctx.beginPath();
     
@@ -306,7 +462,6 @@ export function renderMapObject(
           }
           ctx.closePath();
         } else {
-          // Fallback to rectangle
           ctx.rect(-width / 2, -height / 2, width, height);
         }
         break;
@@ -325,7 +480,24 @@ export function renderMapObject(
     
     const selectionPadding = 4;
     
-    if (shape === 'circle') {
+    if (shape === 'wall' && mapObject.wallPoints && mapObject.wallPoints.length >= 2) {
+      // For walls, highlight the polyline itself
+      ctx.save();
+      ctx.translate(-position.x, -position.y);
+      ctx.lineWidth = 4 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(mapObject.wallPoints[0].x, mapObject.wallPoints[0].y);
+      for (let i = 1; i < mapObject.wallPoints.length; i++) {
+        ctx.lineTo(mapObject.wallPoints[i].x, mapObject.wallPoints[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else if (shape === 'light') {
+      // For lights, draw a circle around center
+      ctx.beginPath();
+      ctx.arc(0, 0, 12 / zoom + selectionPadding, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (shape === 'circle') {
       const radius = Math.min(width, height) / 2 + selectionPadding;
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -539,6 +711,23 @@ export function isPointInMapObject(
     if (Math.abs(localX) <= indicatorHitRadius && Math.abs(localY - backY) <= indicatorHitRadius) {
       return true;
     }
+  }
+  
+  // For wall shapes, check proximity to polyline segments
+  if (shape === 'wall' && mapObject.wallPoints && mapObject.wallPoints.length >= 2) {
+    const hitDistance = 10 / zoom; // 10px hit tolerance
+    const points = mapObject.wallPoints;
+    for (let i = 0; i < points.length - 1; i++) {
+      const dist = pointToSegmentDistance(x, y, points[i], points[i + 1]);
+      if (dist <= hitDistance) return true;
+    }
+    return false;
+  }
+  
+  // For light shapes, check if within the center dot area
+  if (shape === 'light') {
+    const hitRadius = 15 / zoom;
+    return localX * localX + localY * localY <= hitRadius * hitRadius;
   }
   
   // For doors, use a larger hit area for easier selection

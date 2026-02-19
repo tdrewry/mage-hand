@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, DoorOpen, DoorClosed } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock } from 'lucide-react';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
 import { toast } from 'sonner';
@@ -74,6 +74,10 @@ export const MapObjectContextMenuWrapper = ({
   const [blocksVisionValue, setBlocksVisionValue] = useState(false);
   const [revealedByLightValue, setRevealedByLightValue] = useState(true);
   const [categoryValue, setCategoryValue] = useState<MapObjectCategory>('custom');
+  const [lightColorValue, setLightColorValue] = useState('#fbbf24');
+  const [lightRadiusValue, setLightRadiusValue] = useState(100);
+  const [lightIntensityValue, setLightIntensityValue] = useState(1);
+  const [lightEnabledValue, setLightEnabledValue] = useState(true);
 
   // Get the objects to operate on
   const getTargetObjects = (): MapObject[] => {
@@ -111,6 +115,10 @@ export const MapObjectContextMenuWrapper = ({
       setBlocksVisionValue(obj.blocksVision);
       setRevealedByLightValue(obj.revealedByLight);
       setCategoryValue(obj.category);
+      setLightColorValue(obj.lightColor || '#fbbf24');
+      setLightRadiusValue(obj.lightRadius || 100);
+      setLightIntensityValue(obj.lightIntensity || 1);
+      setLightEnabledValue(obj.lightEnabled !== false);
     } else {
       // Multi-selection: use defaults
       setLabelValue('');
@@ -154,6 +162,14 @@ export const MapObjectContextMenuWrapper = ({
       updates.revealedByLight = revealedByLightValue;
       if (!isMultiSelection) {
         updates.category = categoryValue;
+      }
+      
+      // Light-specific properties
+      if (obj.category === 'light' || categoryValue === 'light') {
+        updates.lightColor = lightColorValue;
+        updates.lightRadius = lightRadiusValue;
+        updates.lightIntensity = lightIntensityValue;
+        updates.lightEnabled = lightEnabledValue;
       }
 
       updateMapObject(obj.id, updates);
@@ -234,6 +250,28 @@ export const MapObjectContextMenuWrapper = ({
             </DropdownMenuItem>
           )}
 
+          {/* Lock/Unlock toggle */}
+          <DropdownMenuItem onClick={() => {
+            targetObjects.forEach(obj => {
+              updateMapObject(obj.id, { locked: !obj.locked });
+            });
+            onUpdateCanvas?.();
+            const isLocking = !targetObjects[0]?.locked;
+            toast.success(isLocking ? 'Object locked' : 'Object unlocked');
+          }}>
+            {targetObjects.every(obj => obj.locked) ? (
+              <>
+                <Unlock className="mr-2 h-4 w-4" />
+                Unlock {isMultiSelection ? 'Objects' : 'Object'}
+              </>
+            ) : (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                Lock {isMultiSelection ? 'Objects' : 'Object'}
+              </>
+            )}
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
 
           {/* Quick toggles */}
@@ -280,6 +318,7 @@ export const MapObjectContextMenuWrapper = ({
           <DropdownMenuItem
             onClick={handleDeleteClick}
             className="text-destructive focus:text-destructive"
+            disabled={targetObjects.some(obj => obj.locked)}
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
@@ -471,6 +510,62 @@ export const MapObjectContextMenuWrapper = ({
                 />
               </div>
             </div>
+
+            {/* Light Properties (only for light category) */}
+            {(currentObject?.category === 'light' || categoryValue === 'light') && !isMultiSelection && (
+              <div className="space-y-3">
+                <Label className="text-base font-medium">Light Properties</Label>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="lightEnabled" className="font-normal">Enabled</Label>
+                  <Switch
+                    id="lightEnabled"
+                    checked={lightEnabledValue}
+                    onCheckedChange={setLightEnabledValue}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lightColor">Light Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="lightColor"
+                      type="color"
+                      value={lightColorValue}
+                      onChange={(e) => setLightColorValue(e.target.value)}
+                      className="w-12 h-10 p-1 cursor-pointer"
+                    />
+                    <Input
+                      value={lightColorValue}
+                      onChange={(e) => setLightColorValue(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Radius: {Math.round(lightRadiusValue)}px</Label>
+                  <Slider
+                    value={[lightRadiusValue]}
+                    onValueChange={([v]) => setLightRadiusValue(v)}
+                    min={10}
+                    max={1000}
+                    step={10}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Intensity: {Math.round(lightIntensityValue * 100)}%</Label>
+                  <Slider
+                    value={[lightIntensityValue]}
+                    onValueChange={([v]) => setLightIntensityValue(v)}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
