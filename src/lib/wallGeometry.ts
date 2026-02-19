@@ -128,6 +128,14 @@ export function mapObjectsToSegments(mapObjects: MapObject[]): LineSegment[] {
           });
         }
       }
+    } else if (shape === 'wall' && obj.wallPoints && obj.wallPoints.length >= 2) {
+      // Wall polyline: open path (not closed loop)
+      for (let i = 0; i < obj.wallPoints.length - 1; i++) {
+        segments.push({
+          start: obj.wallPoints[i],
+          end: obj.wallPoints[i + 1],
+        });
+      }
     } else if (shape === 'custom' && obj.customPath && obj.customPath.length > 2) {
       // Custom path
       for (let i = 0; i < obj.customPath.length; i++) {

@@ -139,8 +139,9 @@ export const WatabouImportCardContent = () => {
       });
     }
     
-    // Import wall segments for vision/fog system (raw segments still used)
-    setImportedWallSegments(imported.wallSegments);
+    // Wall segments are now handled via MapObjects (wallMapObjects below),
+    // so we clear importedWallSegments to avoid duplicate/stale segments
+    setImportedWallSegments([]);
     
     // Add door MapObjects with proper rotation from dd2vtt data
     imported.doorMapObjects.forEach((doorObj) => {
