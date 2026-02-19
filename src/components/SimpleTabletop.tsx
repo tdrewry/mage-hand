@@ -505,10 +505,15 @@ export const SimpleTabletop = () => {
       position?: { x: number; y: number };
       rotation?: number;
       wallPoints?: { x: number; y: number }[];
-      x?: number; y?: number; regRotation?: number;
+      x?: number; y?: number; width?: number; height?: number; regRotation?: number;
+      pathPoints?: { x: number; y: number }[];
       lightPos?: { x: number; y: number };
     }
   }>({});
+
+  // Frozen AABB of the group, captured at mousedown. Used for drawing the bounding box
+  // during rotation so it doesn't drift as siblings are updated each frame.
+  const groupFrozenAABBRef = useRef<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null);
 
   // Temporary token positions during region drag to avoid store updates
   const [tempTokenPositions, setTempTokenPositions] = useState<{ [tokenId: string]: { x: number; y: number } }>();
@@ -778,6 +783,7 @@ export const SimpleTabletop = () => {
         if (isRotatingRegion) {
           setIsRotatingRegion(false);
           setTempRegionRotation({});
+          groupFrozenAABBRef.current = null;
         }
       };
 
@@ -4283,7 +4289,9 @@ export const SimpleTabletop = () => {
    * Called once per selected group in the render loop.
    */
   const drawGroupRotationHandle = (ctx: CanvasRenderingContext2D, group: { members: { id: string; type: string }[] }) => {
-    const b = computeGroupBounds(group);
+    // During active rotation use the frozen AABB (captured at mousedown) so the bounding box
+    // doesn't drift as siblings get updated to their rotated positions each frame.
+    const b = (isRotatingRegion && groupFrozenAABBRef.current) ? groupFrozenAABBRef.current : computeGroupBounds(group);
     if (!b) return;
     const handleDist = 40 / transform.zoom;
     const handleSize = 8 / transform.zoom;
@@ -5420,7 +5428,8 @@ export const SimpleTabletop = () => {
                 const pivot = computeGroupCentroid(grpCheck);
                 groupRotationPivotRef.current = pivot;
                 setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
-                // Snapshot ALL members
+                // Snapshot ALL members (including width/height/pathPoints for regions so sibling
+                // rotation never reads from a stale React closure during mousemove).
                 const snap: typeof groupSiblingSnapshotsRef.current = {};
                 for (const m of grpCheck.members) {
                   if (m.type === 'mapObject') {
@@ -5428,7 +5437,7 @@ export const SimpleTabletop = () => {
                     if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                   } else if (m.type === 'region') {
                     const r = regions.find(x => x.id === m.id);
-                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined, regRotation: r.rotation || 0 };
                   } else if (m.type === 'light') {
                     const l = useLightStore.getState().lights.find(x => x.id === m.id);
                     if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5438,6 +5447,8 @@ export const SimpleTabletop = () => {
                   }
                 }
                 groupSiblingSnapshotsRef.current = snap;
+                // Freeze the AABB so the bounding box drawn during rotation doesn't drift
+                groupFrozenAABBRef.current = computeGroupAABB(grpCheck);
                 return;
               }
             }
@@ -5486,7 +5497,7 @@ export const SimpleTabletop = () => {
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                 } else if (m.type === 'region') {
                   const r = regions.find(x => x.id === m.id);
-                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined, regRotation: r.rotation || 0 };
                 } else if (m.type === 'light') {
                   const l = useLightStore.getState().lights.find(x => x.id === m.id);
                   if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5496,6 +5507,7 @@ export const SimpleTabletop = () => {
                 }
               }
               groupSiblingSnapshotsRef.current = snap;
+              groupFrozenAABBRef.current = computeGroupAABB(rotGroup1);
             } else {
               // No group — use the region's own center
               const centerX = selectedRegion.x + selectedRegion.width / 2;
@@ -5745,7 +5757,7 @@ export const SimpleTabletop = () => {
                 if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
               } else if (m.type === 'region') {
                 const r = regions.find(x => x.id === m.id);
-                if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined, regRotation: r.rotation || 0 };
               } else if (m.type === 'light') {
                 const l = useLightStore.getState().lights.find(x => x.id === m.id);
                 if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5755,6 +5767,7 @@ export const SimpleTabletop = () => {
               }
             }
             groupSiblingSnapshotsRef.current = snap;
+            groupFrozenAABBRef.current = computeGroupAABB(rotGroup2);
           } else {
             const centerX = clickedRegion.x + clickedRegion.width / 2;
             const centerY = clickedRegion.y + clickedRegion.height / 2;
@@ -6409,13 +6422,13 @@ export const SimpleTabletop = () => {
               const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
               newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-              const sibRegion = regions.find(r => r.id === member.id);
-              if (sibRegion) {
-                const cx2 = snap.x + sibRegion.width / 2; const cy2 = snap.y + sibRegion.height / 2;
-                const dx = cx2 - pivotX; const dy = cy2 - pivotY;
-                const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-                updateRegion(member.id, { x: newCx - sibRegion.width / 2, y: newCy - sibRegion.height / 2, rotation: (snap.regRotation || 0) + rotationDelta });
-              }
+              // Use snapshot width/height — never read from stale React `regions` closure during mousemove
+              const snapW = snap.width ?? 0;
+              const snapH = snap.height ?? 0;
+              const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
+              const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+              const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+              updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
             } else if (member.type === 'light' && snap.lightPos) {
               const dx = snap.lightPos.x - pivotX; const dy = snap.lightPos.y - pivotY;
               useLightStore.getState().updateLight(member.id, { position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos } });
@@ -7078,6 +7091,7 @@ export const SimpleTabletop = () => {
       // Clear rotation state
       setIsRotatingRegion(false);
       setTempRegionRotation({});
+      groupFrozenAABBRef.current = null;
     }
 
 
