@@ -32,6 +32,7 @@ export interface CanvasRegion {
   // Transformation support
   rotation?: number; // Rotation angle in degrees
   rotationCenter?: { x: number; y: number }; // Custom rotation center
+  locked?: boolean; // Prevent movement, resize, and deletion
 }
 
 interface RegionStore {

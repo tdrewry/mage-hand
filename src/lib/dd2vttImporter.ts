@@ -219,8 +219,9 @@ export function importDD2VTTMap(dd2vtt: DD2VTTFile): ImportedDD2VTTMap {
     backgroundScale: 1,
     backgroundOffsetX: 0,
     backgroundOffsetY: 0,
+    locked: true, // Lock background region by default to prevent accidental moves
   };
-  
+
   // Extract wall segments from both line_of_sight and objects_line_of_sight
   const wallSegments = [
     ...extractWallSegments(line_of_sight, ppg, originX, originY),

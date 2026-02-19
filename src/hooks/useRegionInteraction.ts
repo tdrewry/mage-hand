@@ -45,6 +45,7 @@ export const useRegionInteraction = () => {
   const startRegionDrag = useCallback((regionId: string, worldX: number, worldY: number) => {
     const region = regions.find(r => r.id === regionId);
     if (!region) return;
+    if (region.locked) return; // Locked regions cannot be dragged
 
     setIsDraggingRegion(true);
     setDraggedRegionId(regionId);
