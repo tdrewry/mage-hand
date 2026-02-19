@@ -76,6 +76,7 @@ export const MapObjectContextMenuWrapper = ({
   const [categoryValue, setCategoryValue] = useState<MapObjectCategory>('custom');
   const [lightColorValue, setLightColorValue] = useState('#fbbf24');
   const [lightRadiusValue, setLightRadiusValue] = useState(100);
+  const [lightBrightRadiusValue, setLightBrightRadiusValue] = useState(50);
   const [lightIntensityValue, setLightIntensityValue] = useState(1);
   const [lightEnabledValue, setLightEnabledValue] = useState(true);
 
@@ -117,6 +118,7 @@ export const MapObjectContextMenuWrapper = ({
       setCategoryValue(obj.category);
       setLightColorValue(obj.lightColor || '#fbbf24');
       setLightRadiusValue(obj.lightRadius || 100);
+      setLightBrightRadiusValue(obj.lightBrightRadius || (obj.lightRadius || 100) * 0.5);
       setLightIntensityValue(obj.lightIntensity || 1);
       setLightEnabledValue(obj.lightEnabled !== false);
     } else {
@@ -168,6 +170,7 @@ export const MapObjectContextMenuWrapper = ({
       if (obj.category === 'light' || categoryValue === 'light') {
         updates.lightColor = lightColorValue;
         updates.lightRadius = lightRadiusValue;
+        updates.lightBrightRadius = lightBrightRadiusValue;
         updates.lightIntensity = lightIntensityValue;
         updates.lightEnabled = lightEnabledValue;
       }
@@ -544,12 +547,27 @@ export const MapObjectContextMenuWrapper = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Radius: {Math.round(lightRadiusValue)}px</Label>
+                  <Label>Dim Radius: {Math.round(lightRadiusValue)}px</Label>
                   <Slider
                     value={[lightRadiusValue]}
-                    onValueChange={([v]) => setLightRadiusValue(v)}
+                    onValueChange={([v]) => {
+                      setLightRadiusValue(v);
+                      // Keep bright radius <= dim radius
+                      if (lightBrightRadiusValue > v) setLightBrightRadiusValue(v * 0.5);
+                    }}
                     min={10}
                     max={1000}
+                    step={10}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Bright Radius: {Math.round(lightBrightRadiusValue)}px</Label>
+                  <Slider
+                    value={[lightBrightRadiusValue]}
+                    onValueChange={([v]) => setLightBrightRadiusValue(Math.min(v, lightRadiusValue))}
+                    min={0}
+                    max={lightRadiusValue}
                     step={10}
                   />
                 </div>

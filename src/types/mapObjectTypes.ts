@@ -51,7 +51,8 @@ export interface MapObject {
   
   // Light-specific properties (embedded light data)
   lightColor?: string; // Hex color for the light
-  lightRadius?: number; // Maximum visibility distance in pixels
+  lightRadius?: number; // Maximum visibility distance in pixels (dim zone outer edge)
+  lightBrightRadius?: number; // Bright zone radius in pixels (defaults to lightRadius * 0.5)
   lightIntensity?: number; // 0-1, affects brightness
   lightEnabled?: boolean; // Whether the light is currently active
   
