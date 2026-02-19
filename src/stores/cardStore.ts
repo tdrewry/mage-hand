@@ -198,7 +198,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
   },
   [CardType.WATABOU_IMPORT]: {
-    title: 'Watabou Import',
+    title: 'Import',
     defaultPosition: { x: window.innerWidth / 2 - 250, y: 80 },
     defaultSize: { width: 500, height: 550 },
     minSize: { width: 400, height: 500 },
