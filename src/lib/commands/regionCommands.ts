@@ -6,6 +6,34 @@ import { Command } from '../undoRedoManager';
 import { useRegionStore, CanvasRegion } from '@/stores/regionStore';
 
 /**
+ * Batch command for group rotation — captures before/after state
+ * for every region in a group so undo/redo restores all members together.
+ */
+export class BatchRegionRotationCommand implements Command {
+  type = 'BATCH_REGION_ROTATION';
+  description = 'Rotate group';
+  private entries: Array<{ id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> }>;
+
+  constructor(entries: Array<{ id: string; before: Partial<CanvasRegion>; after: Partial<CanvasRegion> }>) {
+    this.entries = entries;
+  }
+
+  execute(): void {
+    const { updateRegion } = useRegionStore.getState();
+    for (const e of this.entries) {
+      updateRegion(e.id, e.after);
+    }
+  }
+
+  undo(): void {
+    const { updateRegion } = useRegionStore.getState();
+    for (const e of this.entries) {
+      updateRegion(e.id, e.before);
+    }
+  }
+}
+
+/**
  * Command for adding a region
  */
 export class AddRegionCommand implements Command {

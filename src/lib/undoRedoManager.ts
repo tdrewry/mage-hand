@@ -43,6 +43,22 @@ export class UndoRedoManager {
   }
 
   /**
+   * Push a command onto the undo stack WITHOUT executing it.
+   * Use when the action has already been applied to the store
+   * (e.g., live updates during drag/rotation) and you only need
+   * undo/redo capability going forward.
+   */
+  push(command: Command): void {
+    command.timestamp = Date.now();
+    this.undoStack.push(command);
+    this.redoStack = [];
+    if (this.undoStack.length > this.maxStackSize) {
+      this.undoStack.shift();
+    }
+    this.notifyListeners();
+  }
+
+  /**
    * Undo the last command
    */
   undo(): boolean {
