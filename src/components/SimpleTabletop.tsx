@@ -4222,10 +4222,14 @@ export const SimpleTabletop = () => {
    * Compute the full bounding box (not just centroid) for a group from live member positions.
    */
   const computeGroupBounds = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
+    // Always read from live store state (not React closure) so bounds reflect the
+    // latest positions regardless of whether store updates or dragPreview is active.
+    const liveMapObjects = useMapObjectStore.getState().mapObjects;
+    const liveRegions = useRegionStore.getState().regions;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const m of group.members) {
       if (m.type === 'mapObject') {
-        const o = mapObjects.find(x => x.id === m.id);
+        const o = liveMapObjects.find(x => x.id === m.id);
         if (o) {
           if (o.wallPoints && o.wallPoints.length > 0) {
             for (const p of o.wallPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
@@ -4235,7 +4239,7 @@ export const SimpleTabletop = () => {
           }
         }
       } else if (m.type === 'region') {
-        const r = regions.find(x => x.id === m.id);
+        const r = liveRegions.find(x => x.id === m.id);
         if (r) {
           if (r.pathPoints && r.pathPoints.length > 0) {
             for (const p of r.pathPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
@@ -6060,6 +6064,8 @@ export const SimpleTabletop = () => {
       const primarySnap = groupSiblingSnapshotsRef.current[rotatingMapObjectId];
       if (primarySnap?.type === 'mapObject') {
         if (primarySnap.wallPoints) {
+          // Wall: orientation is fully encoded in vertex positions — do NOT update `rotation`
+          // (that field drives local icon spin, causing double-rotation on wall polylines).
           const newWallPoints = primarySnap.wallPoints.map(p => {
             const dx = p.x - pivotX; const dy = p.y - pivotY;
             return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
@@ -6070,9 +6076,10 @@ export const SimpleTabletop = () => {
             position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
             width: Math.max(Math.max(...xs) - Math.min(...xs), 1),
             height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
-            rotation: (primarySnap.rotation || 0) + rotationDelta,
+            // rotation intentionally omitted for walls — vertices carry the geometry
           });
         } else if (primarySnap.position) {
+          // Non-wall (door, light, obstacle): orbit around pivot AND spin locally
           const dx = primarySnap.position.x - pivotX; const dy = primarySnap.position.y - pivotY;
           updateMapObject(rotatingMapObjectId, {
             position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
@@ -6090,6 +6097,7 @@ export const SimpleTabletop = () => {
           if (!snap) continue;
           if (member.type === 'mapObject' && snap.type === 'mapObject') {
             if (snap.wallPoints) {
+              // Wall sibling: rotate vertices only, no rotation field
               const newWallPoints = snap.wallPoints.map(p => {
                 const dx = p.x - pivotX; const dy = p.y - pivotY;
                 return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
@@ -6100,9 +6108,9 @@ export const SimpleTabletop = () => {
                 position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
                 width: Math.max(Math.max(...xs) - Math.min(...xs), 1),
                 height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
-                rotation: (snap.rotation || 0) + rotationDelta,
               });
             } else if (snap.position) {
+              // Non-wall sibling: orbit + spin
               const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
               updateMapObject(member.id, {
                 position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
@@ -6380,9 +6388,10 @@ export const SimpleTabletop = () => {
                   position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
                   width: Math.max(maxX - minX, 1),
                   height: Math.max(maxY - minY, 1),
-                  rotation: (snap.rotation || 0) + rotationDelta,
+                  // rotation omitted for walls — orientation is in wallPoints vertices
                 });
               } else if (snap.position) {
+                // Non-wall: orbit + local spin
                 const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
                 updateMapObject(member.id, {
                   position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
