@@ -65,6 +65,9 @@ export interface MapObject {
   // Annotation-specific properties (category: 'annotation')
   annotationText?: string;     // Full descriptive text shown in popup
   annotationReference?: string; // Short label drawn on the circle badge (e.g. "1", "A")
+
+  // Z-Order: lower = drawn first (underneath). Default derived from CATEGORY_DEFAULT_RENDER_ORDER.
+  renderOrder?: number;
 }
 
 export type MapObjectCategory = 

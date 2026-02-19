@@ -648,6 +648,28 @@ export function renderMapObject(
 }
 
 /**
+ * Default render orders per category.
+ * Lower = drawn first (underneath everything else).
+ */
+export const CATEGORY_DEFAULT_RENDER_ORDER: Record<string, number> = {
+  water:             10,
+  trap:              15,
+  debris:            20,
+  wall:              30,
+  'imported-obstacle': 40,
+  door:              50,
+  custom:            50,
+  decoration:        55,
+  column:            60,
+  furniture:         60,
+  obstacle:          60,
+  statue:            60,
+  stairs:            60,
+  light:             70,
+  annotation:        80,
+};
+
+/**
  * Render all map objects
  */
 export function renderMapObjects(
@@ -658,11 +680,13 @@ export function renderMapObjects(
   style: WatabouStyle = DEFAULT_STYLE,
   isDMView: boolean = false
 ) {
-  // Sort so selected objects render on top
+  // Sort by renderOrder (ascending = drawn first / underneath).
+  // Tie-break: selected objects render on top.
   const sortedObjects = [...mapObjects].sort((a, b) => {
-    const aSelected = selectedIds.includes(a.id) ? 1 : 0;
-    const bSelected = selectedIds.includes(b.id) ? 1 : 0;
-    return aSelected - bSelected;
+    const aOrder = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
+    const bOrder = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return (selectedIds.includes(a.id) ? 1 : 0) - (selectedIds.includes(b.id) ? 1 : 0);
   });
   
   sortedObjects.forEach((obj) => {

@@ -2,6 +2,7 @@ import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
 import { MapObject, MapObjectCategory, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
+import { CATEGORY_DEFAULT_RENDER_ORDER } from '@/lib/mapObjectRenderer';
 import { DoorConnection } from '@/lib/dungeonTypes';
 import { groupConnectedTiles, generateSimpleContour } from '@/utils/marchingSquares';
 import { simplifyPath, smoothPath } from '@/utils/pathSimplification';
@@ -61,6 +62,10 @@ interface MapObjectStore {
   
   // Get vision-blocking objects (for fog calculation)
   getVisionBlockingObjects: () => MapObject[];
+
+  // Z-Order reordering helpers
+  reorderMapObject: (id: string, newRenderOrder: number) => void;
+  normalizeRenderOrders: () => void;
 }
 
 const generateId = () => `map-object-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -321,6 +326,7 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       blocksVision: false,
       revealedByLight: false,
       selected: false,
+      renderOrder: 10,
     };
 
     set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
@@ -359,6 +365,7 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       blocksVision: false,
       revealedByLight: true,
       selected: false,
+      renderOrder: 15,
     };
 
     set(state => ({ mapObjects: [...state.mapObjects, mapObj] }));
@@ -541,6 +548,27 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
   getVisionBlockingObjects: () => {
     const { mapObjects } = get();
     return mapObjects.filter((obj) => obj.blocksVision);
+  },
+
+  reorderMapObject: (id, newRenderOrder) => {
+    set((state) => ({
+      mapObjects: state.mapObjects.map((obj) =>
+        obj.id === id ? { ...obj, renderOrder: newRenderOrder } : obj
+      ),
+    }));
+  },
+
+  normalizeRenderOrders: () => {
+    set((state) => {
+      // Sort by effective render order, then reassign evenly spaced integers (step 10)
+      const sorted = [...state.mapObjects].sort((a, b) => {
+        const aOrder = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
+        const bOrder = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
+        return aOrder - bOrder;
+      });
+      const mapObjects = sorted.map((obj, i) => ({ ...obj, renderOrder: (i + 1) * 10 }));
+      return { mapObjects };
+    });
   },
 });
 
