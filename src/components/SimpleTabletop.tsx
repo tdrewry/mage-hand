@@ -5730,8 +5730,22 @@ export const SimpleTabletop = () => {
       const deltaX = prevObj ? newX - prevObj.position.x : 0;
       const deltaY = prevObj ? newY - prevObj.position.y : 0;
 
-      // Update primary map object position
-      updateMapObject(draggedMapObjectId, { position: { x: newX, y: newY } });
+      // Update primary map object position (wall-aware: shift wallPoints, not just position)
+      if (prevObj && prevObj.shape === 'wall' && prevObj.wallPoints) {
+        const newWallPoints = prevObj.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+        const xs = newWallPoints.map(p => p.x);
+        const ys = newWallPoints.map(p => p.y);
+        const minX = Math.min(...xs); const maxX = Math.max(...xs);
+        const minY = Math.min(...ys); const maxY = Math.max(...ys);
+        updateMapObject(draggedMapObjectId, {
+          wallPoints: newWallPoints,
+          position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+          width: Math.max(maxX - minX, 1),
+          height: Math.max(maxY - minY, 1),
+        });
+      } else {
+        updateMapObject(draggedMapObjectId, { position: { x: newX, y: newY } });
+      }
 
       // Propagate drag delta to all group siblings
       const group = useGroupStore.getState().getGroupForEntity(draggedMapObjectId);
@@ -5741,9 +5755,23 @@ export const SimpleTabletop = () => {
           if (member.type === 'mapObject') {
             const sibling = mapObjects.find(o => o.id === member.id);
             if (sibling) {
-              updateMapObject(member.id, {
-                position: { x: sibling.position.x + deltaX, y: sibling.position.y + deltaY },
-              });
+              if (sibling.shape === 'wall' && sibling.wallPoints) {
+                const newWallPoints = sibling.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                const xs = newWallPoints.map(p => p.x);
+                const ys = newWallPoints.map(p => p.y);
+                const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                updateMapObject(member.id, {
+                  wallPoints: newWallPoints,
+                  position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                  width: Math.max(maxX - minX, 1),
+                  height: Math.max(maxY - minY, 1),
+                });
+              } else {
+                updateMapObject(member.id, {
+                  position: { x: sibling.position.x + deltaX, y: sibling.position.y + deltaY },
+                });
+              }
             }
           } else if (member.type === 'token') {
             updateTokenPosition(member.id, 0, 0); // done via tempPositions below
@@ -5797,7 +5825,23 @@ export const SimpleTabletop = () => {
             if (member.id === draggedRegionId) continue;
             if (member.type === 'mapObject') {
               const sib = mapObjects.find(o => o.id === member.id);
-              if (sib) updateMapObject(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
+              if (sib) {
+                if (sib.shape === 'wall' && sib.wallPoints) {
+                  const newWallPoints = sib.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                  const xs = newWallPoints.map(p => p.x);
+                  const ys = newWallPoints.map(p => p.y);
+                  const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                  updateMapObject(member.id, {
+                    wallPoints: newWallPoints,
+                    position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                    width: Math.max(maxX - minX, 1),
+                    height: Math.max(maxY - minY, 1),
+                  });
+                } else {
+                  updateMapObject(member.id, { position: { x: sib.position.x + deltaX, y: sib.position.y + deltaY } });
+                }
+              }
             } else if (member.type === 'token') {
               const t = tokens.find(tok => tok.id === member.id);
               if (t) newTempPositions[member.id] = { x: t.x + deltaX, y: t.y + deltaY };
