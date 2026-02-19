@@ -2375,6 +2375,20 @@ export const SimpleTabletop = () => {
       }
     }
 
+    // Draw the single shared group rotation handle for any selected grouped regions (edit mode only).
+    // Each group only gets one handle even if multiple members are selected.
+    if (renderingMode === 'edit') {
+      const drawnGroupIds = new Set<string>();
+      regions.forEach(region => {
+        if (!region.selected) return;
+        const grp = useGroupStore.getState().getGroupForEntity(region.id);
+        if (grp && !drawnGroupIds.has(grp.id)) {
+          drawnGroupIds.add(grp.id);
+          drawGroupRotationHandle(ctx, grp);
+        }
+      });
+    }
+
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
     
@@ -4108,28 +4122,32 @@ export const SimpleTabletop = () => {
       ctx.restore();
     });
 
-    // Draw rotation handle - positioned above the region, rotated with region
-    const rotationHandleDistance = 30 / transform.zoom;
-    const rawRotX = x + width / 2;
-    const rawRotY = y - rotationHandleDistance;
-    const rotHandle = rot(rawRotX, rawRotY);
+    // Only draw the individual rotation handle if this region is NOT part of a group.
+    // When grouped, a single shared group-level handle is drawn instead (see drawGroupRotationHandle).
+    const regionGroup = useGroupStore.getState().getGroupForEntity(region.id);
+    if (!regionGroup) {
+      const rotationHandleDistance = 30 / transform.zoom;
+      const rawRotX = x + width / 2;
+      const rawRotY = y - rotationHandleDistance;
+      const rotHandle = rot(rawRotX, rawRotY);
 
-    // Draw connection line from region top-center to rotation handle (both rotated)
-    const topCenter = rot(x + width / 2, y);
-    ctx.strokeStyle = "#4f46e5";
-    ctx.lineWidth = 2 / transform.zoom;
-    ctx.beginPath();
-    ctx.moveTo(topCenter.x, topCenter.y);
-    ctx.lineTo(rotHandle.x, rotHandle.y);
-    ctx.stroke();
+      // Draw connection line from region top-center to rotation handle (both rotated)
+      const topCenter = rot(x + width / 2, y);
+      ctx.strokeStyle = "#4f46e5";
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.beginPath();
+      ctx.moveTo(topCenter.x, topCenter.y);
+      ctx.lineTo(rotHandle.x, rotHandle.y);
+      ctx.stroke();
 
-    // Draw rotation handle (circular)
-    ctx.fillStyle = "#10b981";
-    ctx.strokeStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(rotHandle.x, rotHandle.y, handleSize / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      // Draw rotation handle (circular)
+      ctx.fillStyle = "#10b981";
+      ctx.strokeStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(rotHandle.x, rotHandle.y, handleSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   };
 
   // Function to draw path control handles (for path regions)
@@ -4187,8 +4205,112 @@ export const SimpleTabletop = () => {
     return { x: nx, y: ny };
   };
 
-  // Function to check if mouse is over rotation handle
+
+  /**
+   * Compute the full bounding box (not just centroid) for a group from live member positions.
+   */
+  const computeGroupBounds = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const m of group.members) {
+      if (m.type === 'mapObject') {
+        const o = mapObjects.find(x => x.id === m.id);
+        if (o) {
+          if (o.wallPoints && o.wallPoints.length > 0) {
+            for (const p of o.wallPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+          } else {
+            minX = Math.min(minX, o.position.x - o.width / 2); minY = Math.min(minY, o.position.y - o.height / 2);
+            maxX = Math.max(maxX, o.position.x + o.width / 2); maxY = Math.max(maxY, o.position.y + o.height / 2);
+          }
+        }
+      } else if (m.type === 'region') {
+        const r = regions.find(x => x.id === m.id);
+        if (r) {
+          if (r.pathPoints && r.pathPoints.length > 0) {
+            for (const p of r.pathPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+          } else {
+            minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+            maxX = Math.max(maxX, r.x + r.width); maxY = Math.max(maxY, r.y + r.height);
+          }
+        }
+      } else if (m.type === 'light') {
+        const l = useLightStore.getState().lights.find(x => x.id === m.id);
+        if (l) { minX = Math.min(minX, l.position.x); minY = Math.min(minY, l.position.y); maxX = Math.max(maxX, l.position.x); maxY = Math.max(maxY, l.position.y); }
+      } else if (m.type === 'token') {
+        const t = tokens.find(x => x.id === m.id);
+        if (t) { minX = Math.min(minX, t.x); minY = Math.min(minY, t.y); maxX = Math.max(maxX, t.x); maxY = Math.max(maxY, t.y); }
+      }
+    }
+    if (!isFinite(minX)) return null;
+    return { minX, minY, maxX, maxY };
+  };
+
+  /**
+   * Get the world-space position of a group's single rotation handle.
+   * Placed above the top-center of the group's combined bounding box.
+   */
+  const getGroupRotationHandlePos = (group: { members: { id: string; type: string }[] }): { x: number; y: number } | null => {
+    const b = computeGroupBounds(group);
+    if (!b) return null;
+    const handleDist = 40 / transform.zoom;
+    return { x: (b.minX + b.maxX) / 2, y: b.minY - handleDist };
+  };
+
+  /**
+   * Draw a single shared rotation handle for an entire group.
+   * Called once per selected group in the render loop.
+   */
+  const drawGroupRotationHandle = (ctx: CanvasRenderingContext2D, group: { members: { id: string; type: string }[] }) => {
+    const b = computeGroupBounds(group);
+    if (!b) return;
+    const handleDist = 40 / transform.zoom;
+    const handleSize = 8 / transform.zoom;
+    const cx = (b.minX + b.maxX) / 2;
+    const topY = b.minY;
+    const handleX = cx;
+    const handleY = topY - handleDist;
+
+    ctx.save();
+    // Dashed outline box around entire group
+    ctx.strokeStyle = 'rgba(79, 70, 229, 0.6)';
+    ctx.lineWidth = 1.5 / transform.zoom;
+    ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+    ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+    ctx.setLineDash([]);
+
+    // Stem line
+    ctx.strokeStyle = '#4f46e5';
+    ctx.lineWidth = 2 / transform.zoom;
+    ctx.beginPath();
+    ctx.moveTo(cx, topY);
+    ctx.lineTo(handleX, handleY);
+    ctx.stroke();
+
+    // Handle circle
+    ctx.fillStyle = '#10b981';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 / transform.zoom;
+    ctx.beginPath();
+    ctx.arc(handleX, handleY, handleSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  /**
+   * Hit-test whether the mouse is over the group-level rotation handle.
+   */
+  const isOverGroupRotationHandle = (mouseX: number, mouseY: number, group: { members: { id: string; type: string }[] }): boolean => {
+    const pos = getGroupRotationHandlePos(group);
+    if (!pos) return false;
+    const hitRadius = 12 / transform.zoom;
+    return Math.sqrt((mouseX - pos.x) ** 2 + (mouseY - pos.y) ** 2) <= hitRadius;
+  };
+
+  // Function to check if mouse is over a region's OWN rotation handle (only for ungrouped regions)
   const isOverRotationHandle = (mouseX: number, mouseY: number, region: CanvasRegion) => {
+    // If this region is in a group, its individual handle is suppressed — use isOverGroupRotationHandle instead
+    if (useGroupStore.getState().isEntityInAnyGroup(region.id)) return false;
+
     const handleSize = 30 / transform.zoom;
     const rotationHandleDistance = 30 / transform.zoom;
     const rotation = region.rotation || 0;
@@ -4848,9 +4970,11 @@ export const SimpleTabletop = () => {
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
         if (renderingMode === "edit") {
-          // Check if clicking on rotation handle of an already selected region
-          if (clickedRegion.selected && isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
-            // Don't deselect if clicking on rotation handle - let it handle rotation
+          // Check if clicking on rotation handle (individual or group-level)
+          const clickedRegionGroup = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+          const overGroupHandle = clickedRegionGroup && isOverGroupRotationHandle(worldPos.x, worldPos.y, clickedRegionGroup);
+          if (clickedRegion.selected && (overGroupHandle || isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion))) {
+            // Don't deselect if clicking on a rotation handle - let it handle rotation
             return;
           }
 
@@ -5254,7 +5378,51 @@ export const SimpleTabletop = () => {
         return;
       }
 
-      // PRIORITY 2: Check for ANY handle on selected region first
+      // PRIORITY 2: Check for the GROUP-LEVEL rotation handle (one handle per group, above group bounds).
+      // Must be checked BEFORE individual region handle tests since the handle lives outside any region shape.
+      if (renderingMode === 'edit' && selectedRegionIds.length > 0) {
+        const checkedGroups = new Set<string>();
+        for (const rid of selectedRegionIds) {
+          const grpCheck = useGroupStore.getState().getGroupForEntity(rid);
+          if (grpCheck && !checkedGroups.has(grpCheck.id)) {
+            checkedGroups.add(grpCheck.id);
+            if (isOverGroupRotationHandle(worldPos.x, worldPos.y, grpCheck)) {
+              // Start group rotation using the first region in the group as the driver
+              const primaryRegion = regions.find(r => grpCheck.members.some(m => m.id === r.id && m.type === 'region'));
+              if (primaryRegion) {
+                setIsRotatingRegion(true);
+                setDraggedRegionId(primaryRegion.id);
+                setInitialRegionState(captureRegionTransformState(primaryRegion));
+                setTransformingRegionId(primaryRegion.id);
+                const pivot = computeGroupCentroid(grpCheck);
+                groupRotationPivotRef.current = pivot;
+                setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+                // Snapshot ALL members
+                const snap: typeof groupSiblingSnapshotsRef.current = {};
+                for (const m of grpCheck.members) {
+                  if (m.type === 'mapObject') {
+                    const o = mapObjects.find(x => x.id === m.id);
+                    if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                  } else if (m.type === 'region') {
+                    const r = regions.find(x => x.id === m.id);
+                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
+                  } else if (m.type === 'light') {
+                    const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                    if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                  } else if (m.type === 'token') {
+                    const t = tokens.find(x => x.id === m.id);
+                    if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                  }
+                }
+                groupSiblingSnapshotsRef.current = snap;
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // PRIORITY 3: Check for ANY handle on selected region first
       // This prevents deselection when clicking handles outside the shape boundary
       // But only in edit mode - no region manipulation in play mode
       // Only works for single selection
