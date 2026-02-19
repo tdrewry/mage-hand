@@ -3589,13 +3589,20 @@ export const SimpleTabletop = () => {
       drawRectangleRegion(ctx, effectiveRegion, isSelected, skipStroke);
     }
 
-    // Only show handles and selection in edit mode
+    // Only show handles and selection in edit mode.
+    // Grouped regions suppress per-region handles — the group draws a single
+    // unified bounding box with shared handles instead (see drawGroupRotationHandle).
     if (isSelected && renderingMode === "edit") {
-      if (region.regionType === "path") {
-        drawPathHandles(ctx, region);
-      } else {
-        drawRegionHandles(ctx, region);
+      const regionGroup = useGroupStore.getState().getGroupForEntity(region.id);
+      if (!regionGroup) {
+        // Ungrouped region: draw its own resize + rotation handles
+        if (region.regionType === "path") {
+          drawPathHandles(ctx, region);
+        } else {
+          drawRegionHandles(ctx, region);
+        }
       }
+      // Grouped regions: a single shared handle set is drawn once per group by drawGroupRotationHandle
     }
   };
 
@@ -4297,6 +4304,7 @@ export const SimpleTabletop = () => {
     if (!b) return;
     const handleDist = 40 / transform.zoom;
     const handleSize = 8 / transform.zoom;
+    const resizeHandleSize = 12 / transform.zoom;
     const cx = (b.minX + b.maxX) / 2;
     const topY = b.minY;
     const handleX = cx;
@@ -4310,6 +4318,30 @@ export const SimpleTabletop = () => {
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
     ctx.setLineDash([]);
 
+    // Draw 8 resize handles (corners + edge midpoints) for the unified group bounding box
+    const groupW = b.maxX - b.minX;
+    const groupH = b.maxY - b.minY;
+    const resizeHandles = [
+      { x: b.minX,           y: b.minY },            // nw
+      { x: b.minX + groupW/2, y: b.minY },           // n
+      { x: b.maxX,           y: b.minY },            // ne
+      { x: b.maxX,           y: b.minY + groupH/2 }, // e
+      { x: b.maxX,           y: b.maxY },            // se
+      { x: b.minX + groupW/2, y: b.maxY },           // s
+      { x: b.minX,           y: b.maxY },            // sw
+      { x: b.minX,           y: b.minY + groupH/2 }, // w
+    ];
+    ctx.fillStyle = '#4f46e5';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / transform.zoom;
+    resizeHandles.forEach(h => {
+      ctx.save();
+      ctx.translate(h.x, h.y);
+      ctx.fillRect(-resizeHandleSize / 2, -resizeHandleSize / 2, resizeHandleSize, resizeHandleSize);
+      ctx.strokeRect(-resizeHandleSize / 2, -resizeHandleSize / 2, resizeHandleSize, resizeHandleSize);
+      ctx.restore();
+    });
+
     // Stem line
     ctx.strokeStyle = '#4f46e5';
     ctx.lineWidth = 2 / transform.zoom;
@@ -4318,7 +4350,7 @@ export const SimpleTabletop = () => {
     ctx.lineTo(handleX, handleY);
     ctx.stroke();
 
-    // Handle circle
+    // Handle circle (rotation)
     ctx.fillStyle = '#10b981';
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5 / transform.zoom;
