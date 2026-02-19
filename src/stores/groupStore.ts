@@ -90,7 +90,6 @@ export const useGroupStore = create<GroupStore>()(
         });
 
         // Propagate the group's initial locked state (false) to all members
-        // so children that were individually locked get unlocked to match the group
         members.forEach(({ id, type }) => {
           if (type === 'region') {
             useRegionStore.getState().updateRegion(id, { locked: newGroup.locked });
@@ -104,7 +103,6 @@ export const useGroupStore = create<GroupStore>()(
 
       restoreGroup: (group) => {
         set((state) => {
-          // Replace any existing group with the same ID, or append
           const existing = state.groups.find(g => g.id === group.id);
           const next = existing
             ? state.groups.map(g => g.id === group.id ? group : g)
@@ -130,7 +128,6 @@ export const useGroupStore = create<GroupStore>()(
           const next = state.groups.map(g =>
             g.id === groupId ? { ...g, ...updates } : g
           );
-          // Always rebuild index — id or members may have changed
           rebuildEntityIndex(next);
           return { groups: next };
         });
@@ -140,17 +137,14 @@ export const useGroupStore = create<GroupStore>()(
         const group = get().groups.find(g => g.id === groupId);
         if (!group) return;
 
-        // Update the group's own locked flag
         get().updateGroup(groupId, { locked });
 
-        // Propagate lock state to member entities that support it
         group.members.forEach(({ id, type }) => {
           if (type === 'region') {
             useRegionStore.getState().updateRegion(id, { locked });
           } else if (type === 'mapObject') {
             useMapObjectStore.getState().updateMapObject(id, { locked });
           }
-          // tokens and lights do not have a locked field
         });
       },
 
@@ -236,16 +230,13 @@ export const useGroupStore = create<GroupStore>()(
       version: 2,
       migrate: (persistedState: any, version: number) => {
         if (version < 2) {
-          // Migrate old TokenGroup[] (with tokenIds) to EntityGroup[] (with members)
           const oldGroups = persistedState?.groups || [];
           const migratedGroups = oldGroups.map((g: any) => {
-            if (g.members) return g; // Already migrated
-            // Convert tokenIds -> members
+            if (g.members) return g;
             const tokenIds: string[] = g.tokenIds || [];
             return {
               ...g,
               members: tokenIds.map((id: string) => ({ id, type: 'token' })),
-              // Remove old fields
               tokenIds: undefined,
               transform: undefined,
             };
@@ -254,13 +245,20 @@ export const useGroupStore = create<GroupStore>()(
         }
         return persistedState as any;
       },
-      
 
+      // CRITICAL: Rebuild entityIndex immediately after localStorage rehydration.
+      // The module-level entityIndex is empty until this runs — without it, any call to
+      // getGroupForEntity() right after a page reload returns null (groups appear ungrouped).
+      onRehydrateStorage: () => (state) => {
+        if (state?.groups) {
+          rebuildEntityIndex(state.groups);
+        }
+      },
     }
   )
 );
 
-// Rebuild entity index on store hydration and changes
+// Also rebuild on runtime state changes (for live mutations within the session)
 useGroupStore.subscribe((state) => {
   rebuildEntityIndex(state.groups);
 });
