@@ -5656,119 +5656,32 @@ export const SimpleTabletop = () => {
             groupSiblingSnapshotsRef.current = snap;
           }
         }
-        // Only allow region manipulation in edit mode (and not locked)
-        // Check if we're clicking on a rotation handle first
-        if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
-          setIsRotatingRegion(true);
-          setDraggedRegionId(clickedRegion.id);
-          
-          // Capture initial state for undo
-          setInitialRegionState(captureRegionTransformState(clickedRegion));
-          setTransformingRegionId(clickedRegion.id);
-
-          // Calculate starting angle from group centroid to mouse
-          // Snapshot all group siblings at rotation start (clickedRegion path)
-          const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
-          if (rotGroup2) {
-            // Compute FRESH centroid from ALL members as the single shared pivot
-            const pivot = computeGroupCentroid(rotGroup2);
-            groupRotationPivotRef.current = pivot;
-            setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
-
-            const snap: typeof groupSiblingSnapshotsRef.current = {};
-            for (const m of rotGroup2.members) {
-              if (m.type === 'mapObject') {
-                const o = mapObjects.find(x => x.id === m.id);
-                if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
-              } else if (m.type === 'region') {
-                const r = regions.find(x => x.id === m.id);
-                if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
-              } else if (m.type === 'light') {
-                const l = useLightStore.getState().lights.find(x => x.id === m.id);
-                if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
-              } else if (m.type === 'token') {
-                const t = tokens.find(x => x.id === m.id);
-                if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
-              }
-            }
-            groupSiblingSnapshotsRef.current = snap;
-          } else {
-            // No group — use the region's own center
-            const centerX = clickedRegion.x + clickedRegion.width / 2;
-            const centerY = clickedRegion.y + clickedRegion.height / 2;
-            groupRotationPivotRef.current = null;
-            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
-          }
-
-          // Group tokens inside the region for rotation
-          const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
-          tokens.forEach((token) => {
-            if (isPointInRegion(token.x, token.y, clickedRegion)) {
-              tokensInRegion.push({
-                tokenId: token.id,
-                startX: token.x,
-                startY: token.y,
-              });
-            }
-          });
-
-          setGroupedTokens(tokensInRegion);
-        }
-        // Check if we're clicking on a resize handle
-        else {
-          const handle = getResizeHandle(clickedRegion, worldPos.x, worldPos.y);
-
-          if (handle) {
-            setIsResizingRegion(true);
-            setResizeHandle(handle);
+        // Region manipulation in edit mode (only for selected or grouped regions, not locked)
+        // For grouped regions: start drag immediately on click (same UX as map objects).
+        // For ungrouped regions: require selection first (second-click-to-drag behaviour).
+        else if (clickedRegion && renderingMode === 'edit' && !clickedRegion.locked &&
+          (clickedRegion.selected || useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id))) {
+          // Check if we're clicking on a rotation handle first (ungrouped only — group handle handled in PRIORITY 2)
+          if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
+            setIsRotatingRegion(true);
             setDraggedRegionId(clickedRegion.id);
             
-            // Capture initial state for undo
-            setInitialRegionState(captureRegionTransformState(clickedRegion));
-            setTransformingRegionId(clickedRegion.id);
-          } else {
-            // Start dragging the region - group tokens for smooth movement
-            setIsDraggingRegion(true);
-            setDraggedRegionId(clickedRegion.id);
-            // Snapshot the region's start position for absolute delta computation in mousemove
-            regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
-            
-            // Capture stable visibility snapshot at drag start to prevent flashing
-            if (currentVisibilityRef.current) {
-              stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
-            }
-            
-            // Capture initial state for undo
             setInitialRegionState(captureRegionTransformState(clickedRegion));
             setTransformingRegionId(clickedRegion.id);
 
-            if (clickedRegion.regionType === "path" && clickedRegion.pathPoints) {
-              // For path regions, use the bounding box origin as reference
-              setRegionDragOffset({
-                x: worldPos.x - clickedRegion.x,
-                y: worldPos.y - clickedRegion.y,
-              });
-            } else {
-              // For rectangle regions, use the top-left corner
-              setRegionDragOffset({
-                x: worldPos.x - clickedRegion.x,
-                y: worldPos.y - clickedRegion.y,
-              });
-            }
-
-            // Snapshot all group siblings at drag start so mousemove can apply
-            // deltas from the ORIGINAL positions, not from cumulative live state.
-            const dragGroup = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
-            if (dragGroup) {
+            const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+            if (rotGroup2) {
+              const pivot = computeGroupCentroid(rotGroup2);
+              groupRotationPivotRef.current = pivot;
+              setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
               const snap: typeof groupSiblingSnapshotsRef.current = {};
-              for (const m of dragGroup.members) {
-                if (m.id === clickedRegion.id) continue;
+              for (const m of rotGroup2.members) {
                 if (m.type === 'mapObject') {
                   const o = mapObjects.find(x => x.id === m.id);
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                 } else if (m.type === 'region') {
                   const r = regions.find(x => x.id === m.id);
-                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
+                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regRotation: r.rotation || 0 };
                 } else if (m.type === 'light') {
                   const l = useLightStore.getState().lights.find(x => x.id === m.id);
                   if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -5778,22 +5691,73 @@ export const SimpleTabletop = () => {
                 }
               }
               groupSiblingSnapshotsRef.current = snap;
+            } else {
+              const centerX = clickedRegion.x + clickedRegion.width / 2;
+              const centerY = clickedRegion.y + clickedRegion.height / 2;
+              groupRotationPivotRef.current = null;
+              setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
             }
-
-            // Group tokens inside the region for smooth dragging
-            const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
+            const tokensInRegion2: { tokenId: string; startX: number; startY: number }[] = [];
             tokens.forEach((token) => {
               if (isPointInRegion(token.x, token.y, clickedRegion)) {
-                tokensInRegion.push({
-                  tokenId: token.id,
-                  startX: token.x,
-                  startY: token.y,
-                });
+                tokensInRegion2.push({ tokenId: token.id, startX: token.x, startY: token.y });
               }
             });
+            setGroupedTokens(tokensInRegion2);
+          } else {
+            // For ungrouped regions, check resize handles; for grouped, skip (no resize in group mode)
+            const inGroup = useGroupStore.getState().isEntityInAnyGroup(clickedRegion.id);
+            const handle = !inGroup ? getResizeHandle(clickedRegion, worldPos.x, worldPos.y) : null;
+            if (handle) {
+              setIsResizingRegion(true);
+              setResizeHandle(handle);
+              setDraggedRegionId(clickedRegion.id);
+              setInitialRegionState(captureRegionTransformState(clickedRegion));
+              setTransformingRegionId(clickedRegion.id);
+            } else {
+              // Start dragging the region (for both grouped and ungrouped)
+              setIsDraggingRegion(true);
+              setDraggedRegionId(clickedRegion.id);
+              regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
+              if (currentVisibilityRef.current) {
+                stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
+              }
+              setInitialRegionState(captureRegionTransformState(clickedRegion));
+              setTransformingRegionId(clickedRegion.id);
+              setRegionDragOffset({ x: worldPos.x - clickedRegion.x, y: worldPos.y - clickedRegion.y });
 
-            setGroupedTokens(tokensInRegion);
-            setTokensMovedByRegion(tokensInRegion.map((t) => t.tokenId));
+              // Snapshot all group siblings at drag start
+              const dragGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
+              if (dragGroup2) {
+                const snap: typeof groupSiblingSnapshotsRef.current = {};
+                for (const m of dragGroup2.members) {
+                  if (m.id === clickedRegion.id) continue;
+                  if (m.type === 'mapObject') {
+                    const o = mapObjects.find(x => x.id === m.id);
+                    if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                  } else if (m.type === 'region') {
+                    const r = regions.find(x => x.id === m.id);
+                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y };
+                  } else if (m.type === 'light') {
+                    const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                    if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                  } else if (m.type === 'token') {
+                    const t = tokens.find(x => x.id === m.id);
+                    if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                  }
+                }
+                groupSiblingSnapshotsRef.current = snap;
+              }
+
+              const tokensInRegion3: { tokenId: string; startX: number; startY: number }[] = [];
+              tokens.forEach((token) => {
+                if (isPointInRegion(token.x, token.y, clickedRegion)) {
+                  tokensInRegion3.push({ tokenId: token.id, startX: token.x, startY: token.y });
+                }
+              });
+              setGroupedTokens(tokensInRegion3);
+              setTokensMovedByRegion(tokensInRegion3.map((t) => t.tokenId));
+            }
           }
         }
       } else if (lightPlacementMode && renderingMode === "edit") {
@@ -7058,6 +7022,8 @@ export const SimpleTabletop = () => {
       setRegionDragOffset({ x: 0, y: 0 });
       setResizeHandle(null);
       setDragPreview(null);
+      // Invalidate wall decoration cache so phantom walls don't linger after group moves
+      wallDecorationCacheRef.current = null;
 
       // Clear tokens moved by region tracking
       setTokensMovedByRegion([]);
