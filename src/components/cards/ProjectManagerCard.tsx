@@ -479,14 +479,14 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         (group: any) => {
           // Support both old tokenIds format and new members format
           const members = group.members || (group.tokenIds || []).map((id: string) => ({ id, type: 'token' }));
-          const geometries = members.map((m: any) => ({ id: m.id, x: 0, y: 0, width: 50, height: 50 }));
-          const newGroup = groupStore.addGroup(group.name, members, geometries);
-          groupStore.updateGroup(newGroup.id, {
+          groupStore.restoreGroup({
             id: group.id,
-            pivot: group.pivot,
-            bounds: group.bounds,
-            locked: group.locked,
-            visible: group.visible,
+            name: group.name,
+            members,
+            pivot: group.pivot ?? { x: 0, y: 0 },
+            bounds: group.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
+            locked: group.locked ?? false,
+            visible: group.visible ?? true,
           });
         },
         (processed, total) => setLoadingProgress(`Loading groups (${processed}/${total})...`)
@@ -707,14 +707,14 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     groupStore.clearAllGroups();
     (projectData.groups || []).forEach((group: any) => {
       const members = group.members || (group.tokenIds || []).map((id: string) => ({ id, type: 'token' }));
-      const geometries = members.map((m: any) => ({ id: m.id, x: 0, y: 0, width: 50, height: 50 }));
-      const newGroup = groupStore.addGroup(group.name, members, geometries);
-      groupStore.updateGroup(newGroup.id, {
+      groupStore.restoreGroup({
         id: group.id,
-        pivot: group.pivot,
-        bounds: group.bounds,
-        locked: group.locked,
-        visible: group.visible,
+        name: group.name,
+        members,
+        pivot: group.pivot ?? { x: 0, y: 0 },
+        bounds: group.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
+        locked: group.locked ?? false,
+        visible: group.visible ?? true,
       });
     });
   };

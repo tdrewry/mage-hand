@@ -37,6 +37,8 @@ interface GroupStore {
 
   // Group CRUD
   addGroup: (name: string, members: GroupMember[], geometries: EntityGeometry[]) => EntityGroup;
+  /** Restore a group with its exact original ID (used when loading from save/autosave). */
+  restoreGroup: (group: EntityGroup) => void;
   removeGroup: (groupId: string) => void;
   updateGroup: (groupId: string, updates: Partial<EntityGroup>) => void;
   clearAllGroups: () => void;
@@ -86,6 +88,18 @@ export const useGroupStore = create<GroupStore>()(
         return newGroup;
       },
 
+      restoreGroup: (group) => {
+        set((state) => {
+          // Replace any existing group with the same ID, or append
+          const existing = state.groups.find(g => g.id === group.id);
+          const next = existing
+            ? state.groups.map(g => g.id === group.id ? group : g)
+            : [...state.groups, group];
+          rebuildEntityIndex(next);
+          return { groups: next };
+        });
+      },
+
       removeGroup: (groupId) => {
         set((state) => {
           const next = state.groups.filter(g => g.id !== groupId);
@@ -102,8 +116,8 @@ export const useGroupStore = create<GroupStore>()(
           const next = state.groups.map(g =>
             g.id === groupId ? { ...g, ...updates } : g
           );
-          // Rebuild index if members changed
-          if (updates.members) rebuildEntityIndex(next);
+          // Always rebuild index — id or members may have changed
+          rebuildEntityIndex(next);
           return { groups: next };
         });
       },
