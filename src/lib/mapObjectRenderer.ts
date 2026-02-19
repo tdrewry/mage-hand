@@ -46,6 +46,33 @@ export function extractSegmentsFromWallMapObjects(
 }
 
 /**
+ * Find if a point is near a wall vertex (for drag handle interaction).
+ * Returns { mapObjectId, vertexIndex } or null.
+ */
+export function findWallVertexAtPoint(
+  x: number,
+  y: number,
+  mapObjects: MapObject[],
+  zoom: number = 1
+): { mapObjectId: string; vertexIndex: number } | null {
+  const hitRadius = 8 / zoom;
+  
+  for (const obj of mapObjects) {
+    if (obj.shape !== 'wall' || !obj.wallPoints || obj.locked || !obj.selected) continue;
+    
+    for (let i = 0; i < obj.wallPoints.length; i++) {
+      const dx = x - obj.wallPoints[i].x;
+      const dy = y - obj.wallPoints[i].y;
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        return { mapObjectId: obj.id, vertexIndex: i };
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Door toggle animation state - tracks recently toggled doors for visual feedback
  */
 interface DoorAnimationState {
@@ -300,9 +327,10 @@ function renderWallShape(
   ctx: CanvasRenderingContext2D,
   mapObject: MapObject,
   zoom: number,
-  isDMView: boolean = false
+  isDMView: boolean = false,
+  selected: boolean = false
 ) {
-  const { wallPoints, position, strokeColor, category } = mapObject;
+  const { wallPoints, position, strokeColor, category, locked } = mapObject;
   if (!wallPoints || wallPoints.length < 2) return;
   
   // Only render in editor/DM view - walls are invisible in play mode
@@ -326,14 +354,32 @@ function renderWallShape(
   }
   ctx.stroke();
   
-  // Draw small dots at vertices
+  // Draw vertex handles
   ctx.setLineDash([]);
-  ctx.fillStyle = ctx.strokeStyle;
-  const dotRadius = 3 / zoom;
-  for (const point of wallPoints) {
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
-    ctx.fill();
+  const isEditable = !locked && selected;
+  
+  for (let i = 0; i < wallPoints.length; i++) {
+    const point = wallPoints[i];
+    if (isEditable) {
+      // Draggable handles - larger, filled with white, blue border
+      const handleRadius = 5 / zoom;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2 / zoom;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, handleRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // Small dots at vertices (non-editable)
+      ctx.fillStyle = isObstacle ? '#f97316' : (strokeColor || '#ef4444');
+      ctx.globalAlpha = 0.7;
+      const dotRadius = 3 / zoom;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   
   ctx.restore();
@@ -351,29 +397,41 @@ function renderLightShape(
   // Only render in editor/DM view
   if (!isDMView) return;
   
-  const { lightColor, lightRadius, lightEnabled } = mapObject;
+  const { lightColor, lightRadius, lightBrightRadius, lightEnabled } = mapObject;
   const color = lightColor || '#fbbf24';
-  const radius = lightRadius || 100;
+  const dimRadius = lightRadius || 100;
+  const brightRadius = lightBrightRadius || dimRadius * 0.5;
   const enabled = lightEnabled !== false;
   
-  // Draw radius circle (faint)
-  ctx.globalAlpha = enabled ? 0.2 : 0.1;
+  // Draw dim radius circle (outer)
+  ctx.globalAlpha = enabled ? 0.15 : 0.08;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5 / zoom;
+  ctx.lineWidth = 1 / zoom;
   ctx.setLineDash([8 / zoom, 4 / zoom]);
   ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, dimRadius, 0, Math.PI * 2);
   ctx.stroke();
+  
+  // Draw bright radius circle (inner)
+  if (brightRadius < dimRadius) {
+    ctx.globalAlpha = enabled ? 0.25 : 0.1;
+    ctx.setLineDash([4 / zoom, 2 / zoom]);
+    ctx.beginPath();
+    ctx.arc(0, 0, brightRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
   
-  // Draw filled radius preview
+  // Draw filled radius preview with bright/dim zones
   if (enabled) {
-    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    gradient.addColorStop(0, color + '30');
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, dimRadius);
+    gradient.addColorStop(0, color + '40');
+    gradient.addColorStop(brightRadius / dimRadius, color + '20');
     gradient.addColorStop(1, color + '00');
     ctx.fillStyle = gradient;
+    ctx.globalAlpha = 1;
     ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, dimRadius, 0, Math.PI * 2);
     ctx.fill();
   }
   
@@ -438,7 +496,7 @@ export function renderMapObject(
   } else if (shape === 'stairs') {
     renderStairsShape(ctx, mapObject, zoom);
   } else if (shape === 'wall') {
-    renderWallShape(ctx, mapObject, zoom, isDMView);
+    renderWallShape(ctx, mapObject, zoom, isDMView, selected);
   } else if (shape === 'light') {
     renderLightShape(ctx, mapObject, zoom, isDMView);
   } else {

@@ -35,7 +35,7 @@ import {
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
-import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
+import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, findWallVertexAtPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
 import { generateNegativeSpaceRegion, mapObjectsToSegments } from "../lib/wallGeometry";
 import {
   applyHatchingPattern,
@@ -508,6 +508,10 @@ export const SimpleTabletop = () => {
   const [draggedMapObjectId, setDraggedMapObjectId] = useState<string | null>(null);
   const [mapObjectDragOffset, setMapObjectDragOffset] = useState({ x: 0, y: 0 });
   
+  // Wall vertex dragging state
+  const [isDraggingVertex, setIsDraggingVertex] = useState(false);
+  const [draggedVertexInfo, setDraggedVertexInfo] = useState<{ mapObjectId: string; vertexIndex: number } | null>(null);
+  
   // MapObject context menu state
   const [mapObjectContextMenu, setMapObjectContextMenu] = useState<{
     x: number;
@@ -574,7 +578,7 @@ export const SimpleTabletop = () => {
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
-    if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject) {
+    if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex) {
       const handleGlobalMouseUp = () => {
         // Reset all drag states
         if (isDraggingToken && draggedTokenId) {
@@ -669,6 +673,10 @@ export const SimpleTabletop = () => {
           setDraggedMapObjectId(null);
           setMapObjectDragOffset({ x: 0, y: 0 });
         }
+        if (isDraggingVertex) {
+          setIsDraggingVertex(false);
+          setDraggedVertexInfo(null);
+        }
         if (isPanning) {
           setIsPanning(false);
         }
@@ -683,7 +691,7 @@ export const SimpleTabletop = () => {
         window.removeEventListener("mouseup", handleGlobalMouseUp);
       };
     }
-  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject]);
+  }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject, isDraggingVertex]);
 
   // MapObject context menu is handled by Radix ContextMenu component
   // No need for manual click-outside handling - Radix handles it
@@ -1139,9 +1147,14 @@ export const SimpleTabletop = () => {
             ? tokensWithVision  // All tokens need recompute if blocking geometry changed
             : [...movedTokens, ...illuminationChangedTokens];
           
+          // Get light MapObjects as light sources for fog
+          const lightMapObjectSources = mapObjects.filter(
+            (obj) => obj.category === 'light' && obj.lightEnabled !== false
+          );
+          
           // Check if token visibility data ref is stale (wrong count vs cache)
           const visDataStale = tokenVisibilityDataRef.current.length !== 
-            (tokenVisibilityCacheRef.current.size + lights.filter(l => l.enabled).length);
+            (tokenVisibilityCacheRef.current.size + lights.filter(l => l.enabled).length + lightMapObjectSources.length);
 
           // If no tokens need visibility recomputation AND illumination settings didn't change,
           // skip the expensive Paper.js visibility polygon computation.
@@ -1312,11 +1325,9 @@ export const SimpleTabletop = () => {
             });
           });
 
-          // Add enabled light sources to fog revelation with two-zone gradients
+          // Add enabled light sources from lightStore to fog revelation
           const enabledLights = lights.filter((l) => l.enabled);
           for (const light of enabledLights) {
-            // Compute visibility for this light source using walls + map objects
-            // Pass a mock token-like object with required properties
             const lightVision = await computeTokenVisibilityPaper(
               [{ x: light.position.x, y: light.position.y, id: light.id, gridWidth: 1, gridHeight: 1 }],
               combinedSegmentsRef.current,
@@ -1326,17 +1337,35 @@ export const SimpleTabletop = () => {
 
             if (lightVision) {
               const lightPath2D = paperPathToPath2D(lightVision);
-              
-              // Light sources get two-zone gradient rendering in post-processing
-              // using the lightFalloff setting
               tokenVisData.push({
                 position: light.position,
                 visionRange: light.radius,
                 visibilityPath: lightPath2D,
-                isLightSource: true, // Mark as light source for gradient rendering
+                isLightSource: true,
               });
-              
-              // Clean up paper.js path
+              if (lightVision.remove) lightVision.remove();
+            }
+          }
+          
+          // Add enabled light MapObjects to fog revelation
+          for (const lightObj of lightMapObjectSources) {
+            const radius = lightObj.lightRadius || 100;
+            const lightId = `map-light-${lightObj.id || Math.random()}`;
+            const lightVision = await computeTokenVisibilityPaper(
+              [{ x: lightObj.position.x, y: lightObj.position.y, id: lightId, gridWidth: 1, gridHeight: 1 }],
+              combinedSegmentsRef.current,
+              wallGeometry,
+              radius,
+            );
+
+            if (lightVision) {
+              const lightPath2D = paperPathToPath2D(lightVision);
+              tokenVisData.push({
+                position: lightObj.position,
+                visionRange: radius,
+                visibilityPath: lightPath2D,
+                isLightSource: true,
+              });
               if (lightVision.remove) lightVision.remove();
             }
           }
@@ -5099,14 +5128,20 @@ export const SimpleTabletop = () => {
           setSelectedTokenIds([clickedToken.id]);
         }
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
-        // Start dragging a selected MapObject in edit mode (only if not locked)
-        setIsDraggingMapObject(true);
-        setDraggedMapObjectId(clickedMapObject.id);
-        setMapObjectDragOffset({
-          x: worldPos.x - clickedMapObject.position.x,
-          y: worldPos.y - clickedMapObject.position.y,
-        });
-      } else if (clickedRegion && clickedRegion.selected && renderingMode === "edit" && !clickedRegion.locked) {
+        // Check for wall vertex drag first (before general MapObject drag)
+        const vertexHit = findWallVertexAtPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom);
+        if (vertexHit && renderingMode === "edit") {
+          setIsDraggingVertex(true);
+          setDraggedVertexInfo(vertexHit);
+        } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
+          // Start dragging a selected MapObject in edit mode (only if not locked)
+          setIsDraggingMapObject(true);
+          setDraggedMapObjectId(clickedMapObject.id);
+          setMapObjectDragOffset({
+            x: worldPos.x - clickedMapObject.position.x,
+            y: worldPos.y - clickedMapObject.position.y,
+          });
+        }
         // Only allow region manipulation in edit mode (and not locked)
         // Check if we're clicking on a rotation handle first
         if (isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion)) {
@@ -5397,6 +5432,30 @@ export const SimpleTabletop = () => {
       }
 
       // Force immediate redraw for smooth dragging feedback
+      redrawCanvas();
+    } else if (isDraggingVertex && draggedVertexInfo) {
+      // Wall vertex dragging
+      const worldPos = screenToWorld(mouseX, mouseY);
+      const obj = mapObjects.find(o => o.id === draggedVertexInfo.mapObjectId);
+      if (obj && obj.wallPoints) {
+        const newPoints = [...obj.wallPoints];
+        newPoints[draggedVertexInfo.vertexIndex] = { x: worldPos.x, y: worldPos.y };
+        
+        // Recalculate bounding box
+        const xs = newPoints.map(p => p.x);
+        const ys = newPoints.map(p => p.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+        
+        updateMapObject(draggedVertexInfo.mapObjectId, {
+          wallPoints: newPoints,
+          position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+          width: maxX - minX,
+          height: maxY - minY,
+        });
+      }
       redrawCanvas();
     } else if (isDraggingMapObject && draggedMapObjectId) {
       // MapObject dragging in edit mode
@@ -6005,6 +6064,14 @@ export const SimpleTabletop = () => {
 
       // Update highlights for all tokens after drag ends
       updateAllTokenHighlights();
+
+      // Handle wall vertex drag completion
+      if (isDraggingVertex && draggedVertexInfo) {
+        setIsDraggingVertex(false);
+        setDraggedVertexInfo(null);
+        notifyObstaclesChanged();
+        toast.success("Wall vertex moved");
+      }
 
       // Handle MapObject drag completion
       if (isDraggingMapObject && draggedMapObjectId) {

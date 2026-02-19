@@ -142,8 +142,11 @@ export const WatabouImportCardContent = () => {
     // Import wall segments for vision/fog system (raw segments still used)
     setImportedWallSegments(imported.wallSegments);
     
-    // Convert doors to interactive MapObjects
-    const doorIds = convertDoorsToMapObjects(imported.doors);
+    // Add door MapObjects with proper rotation from dd2vtt data
+    imported.doorMapObjects.forEach((doorObj) => {
+      addMapObject(doorObj);
+    });
+    const doorCount = imported.doorMapObjects.length;
     
     // Add wall polylines as MapObjects
     imported.wallMapObjects.forEach((wallObj) => {
@@ -156,18 +159,10 @@ export const WatabouImportCardContent = () => {
     });
     
     // Import lights as MapObjects with embedded light data
-    // Also add to lightStore for backward compatibility with rendering
+    // Light MapObjects are the single source of truth - they drive both
+    // the visual indicator (DM view) and the illumination/fog engine
     imported.lightMapObjects.forEach((lightObj) => {
       addMapObject(lightObj);
-      // Also add to light store for the illumination engine
-      addLight({
-        position: lightObj.position,
-        radius: lightObj.lightRadius || 100,
-        intensity: lightObj.lightIntensity || 1,
-        color: lightObj.lightColor || '#fbbf24',
-        enabled: lightObj.lightEnabled !== false,
-        label: lightObj.label,
-      });
     });
     
     // Set ambient light level
@@ -175,7 +170,7 @@ export const WatabouImportCardContent = () => {
     
     const mapName = file.name.replace(/\.dd2vtt$/i, '');
     toast.success(`Imported dd2vtt map: ${mapName}`, {
-      description: `${imported.metadata.mapWidthPx}×${imported.metadata.mapHeightPx}px, ${imported.wallMapObjects.length} walls, ${imported.obstacleMapObjects.length} obstacles, ${doorIds.length} doors, ${imported.lightMapObjects.length} lights`,
+      description: `${imported.metadata.mapWidthPx}×${imported.metadata.mapHeightPx}px, ${imported.wallMapObjects.length} walls, ${imported.obstacleMapObjects.length} obstacles, ${doorCount} doors, ${imported.lightMapObjects.length} lights`,
     });
   };
 

@@ -19,7 +19,7 @@ export interface ImportedDD2VTTMap {
   wallSegments: LineSegment[];
   wallMapObjects: Omit<MapObject, 'id'>[]; // Wall polylines as MapObjects
   obstacleMapObjects: Omit<MapObject, 'id'>[]; // Object LoS as separate category
-  doors: DoorConnection[];
+  doorMapObjects: Omit<MapObject, 'id'>[]; // Doors as MapObjects with proper rotation
   lightMapObjects: Omit<MapObject, 'id'>[]; // Lights as MapObjects with embedded data
   ambientLight: number; // 0-1 normalized
   imageDataUrl: string; // Full data URI for storage
@@ -99,34 +99,38 @@ export function extractWallSegments(
 
 /**
  * Convert a dd2vtt portal to a DoorConnection.
+ * Uses the actual angle computed from bounds endpoints for proper rotation.
  */
 export function convertPortalToDoor(
   portal: DD2VTTPortal,
   pixelsPerGrid: number,
   originX: number = 0,
   originY: number = 0
-): DoorConnection {
+): DoorConnection & { computedRotation: number; doorLength: number } {
   const bound0 = portal.bounds[0];
   const bound1 = portal.bounds[1];
   
   const posX = ((bound0.x + bound1.x) / 2 - originX) * pixelsPerGrid;
   const posY = ((bound0.y + bound1.y) / 2 - originY) * pixelsPerGrid;
   
-  const dx = bound1.x - bound0.x;
-  const dy = bound1.y - bound0.y;
+  // Compute actual angle from bounds endpoints
+  const dx = (bound1.x - bound0.x) * pixelsPerGrid;
+  const dy = (bound1.y - bound0.y) * pixelsPerGrid;
+  const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
   
-  let direction: { x: number; y: number };
-  if (Math.abs(dx) > Math.abs(dy)) {
-    direction = { x: 0, y: 1 };
-  } else {
-    direction = { x: 1, y: 0 };
-  }
+  // Compute door length from bounds distance
+  const doorLength = Math.sqrt(dx * dx + dy * dy);
+  
+  // Direction perpendicular to the door span (for vision blocking extensions)
+  const direction = { x: -dy / (doorLength || 1), y: dx / (doorLength || 1) };
   
   return {
     id: `dd2vtt-door-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     position: { x: posX, y: posY },
     direction,
     type: 0,
+    computedRotation: angleDeg,
+    doorLength,
   };
 }
 
@@ -184,7 +188,7 @@ export function convertPolylinesToWallMapObjects(
 }
 
 /**
- * Convert a dd2vtt light to a light MapObject with embedded light data.
+ * Convert a dd2vtt light to a light MapObject with embedded bright/dim data.
  */
 export function convertDD2VTTLightToMapObject(
   light: DD2VTTLight,
@@ -194,6 +198,7 @@ export function convertDD2VTTLightToMapObject(
 ): Omit<MapObject, 'id'> {
   const color = argbToHex(light.color);
   const { a: alpha } = parseARGBColor(light.color);
+  const totalRadius = light.range * pixelsPerGrid;
   
   return {
     position: {
@@ -214,12 +219,51 @@ export function convertDD2VTTLightToMapObject(
     selected: false,
     category: 'light',
     label: 'Imported Light',
-    locked: true, // Lock imported lights by default
+    locked: true,
     lightColor: color,
-    lightRadius: light.range * pixelsPerGrid,
+    lightRadius: totalRadius, // Dim zone outer edge
+    lightBrightRadius: totalRadius * 0.5, // Bright zone = half of total
     lightIntensity: light.intensity * alpha,
     lightEnabled: true,
   };
+}
+
+/**
+ * Convert dd2vtt portals directly to door MapObjects with proper rotation.
+ */
+export function convertPortalsToDoorMapObjects(
+  portals: DD2VTTPortal[],
+  pixelsPerGrid: number,
+  originX: number,
+  originY: number
+): Omit<MapObject, 'id'>[] {
+  return portals.map((portal) => {
+    const door = convertPortalToDoor(portal, pixelsPerGrid, originX, originY);
+    const doorThickness = 6;
+    
+    return {
+      position: door.position,
+      width: door.doorLength,
+      height: doorThickness,
+      rotation: door.computedRotation,
+      shape: 'door' as const,
+      fillColor: '#8b4513',
+      strokeColor: '#5d2e0c',
+      strokeWidth: 2,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: true,
+      revealedByLight: true,
+      selected: false,
+      category: 'door' as const,
+      isOpen: portal.closed ? false : false, // All start closed
+      doorType: 0,
+      doorDirection: door.direction,
+      label: 'Normal',
+      locked: true,
+    };
+  });
 }
 
 /**
@@ -301,8 +345,8 @@ export function importDD2VTTMap(dd2vtt: DD2VTTFile): ImportedDD2VTTMap {
     objects_line_of_sight || [], ppg, originX, originY, 'imported-obstacle'
   );
   
-  // Convert portals to doors
-  const doors = portals.map(portal => convertPortalToDoor(portal, ppg, originX, originY));
+  // Convert portals directly to door MapObjects with proper rotation
+  const doorMapObjects = convertPortalsToDoorMapObjects(portals, ppg, originX, originY);
   
   // Convert lights to MapObjects with embedded light data
   const lightMapObjects = lights.map(light => convertDD2VTTLightToMapObject(light, ppg, originX, originY));
@@ -321,7 +365,7 @@ export function importDD2VTTMap(dd2vtt: DD2VTTFile): ImportedDD2VTTMap {
     wallSegments,
     wallMapObjects,
     obstacleMapObjects,
-    doors,
+    doorMapObjects,
     lightMapObjects,
     ambientLight,
     imageDataUrl,
