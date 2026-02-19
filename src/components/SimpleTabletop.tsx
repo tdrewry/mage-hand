@@ -102,6 +102,7 @@ import { RegionControlBar } from "./RegionControlBar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
 import { useTouchEvents } from "../hooks/useTouchEvents";
+import { useGroupStore } from "../stores/groupStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 
@@ -559,6 +560,50 @@ export const SimpleTabletop = () => {
   const setVisibility = useCardStore((state) => state.setVisibility);
   const bringToFront = useCardStore((state) => state.bringToFront);
   const cards = useCardStore((state) => state.cards);
+
+  // Group store for selection propagation
+  const getGroupForEntity = useGroupStore((state) => state.getGroupForEntity);
+
+  /**
+   * When an entity is clicked, check if it belongs to a group.
+   * If so, select all sibling members across their respective stores.
+   * Returns true if group propagation occurred.
+   */
+  const propagateGroupSelection = useCallback((entityId: string, entityType: 'token' | 'region' | 'mapObject' | 'light') => {
+    const group = getGroupForEntity(entityId);
+    if (!group) return false;
+
+    // Collect IDs by type
+    const tokenIds: string[] = [];
+    const regionIds: string[] = [];
+    const mapObjectIds: string[] = [];
+    const lightIds: string[] = [];
+
+    for (const member of group.members) {
+      switch (member.type) {
+        case 'token': tokenIds.push(member.id); break;
+        case 'region': regionIds.push(member.id); break;
+        case 'mapObject': mapObjectIds.push(member.id); break;
+        case 'light': lightIds.push(member.id); break;
+      }
+    }
+
+    // Select all siblings in their respective stores
+    if (tokenIds.length > 0) setSelectedTokenIds(tokenIds);
+    if (regionIds.length > 0) {
+      clearSelection();
+      regionIds.forEach(id => selectRegion(id));
+      setSelectedRegionIds(regionIds);
+    }
+    if (mapObjectIds.length > 0) {
+      useMapObjectStore.getState().selectMultiple(mapObjectIds);
+    }
+    if (lightIds.length > 0) {
+      selectMultipleLights(lightIds);
+    }
+
+    return true;
+  }, [getGroupForEntity, clearSelection, selectRegion, selectMultipleLights]);
 
   // Register MENU, TOOLS, and MAP cards on mount (only once)
   useEffect(() => {
@@ -4613,29 +4658,39 @@ export const SimpleTabletop = () => {
       if (clickedToken) {
         // Token selection logic
         if (e.ctrlKey || e.metaKey) {
-          // Ctrl+click: toggle selection
+          // Ctrl+click: toggle selection (no group propagation)
           setSelectedTokenIds((prev) =>
             prev.includes(clickedToken.id) ? prev.filter((id) => id !== clickedToken.id) : [...prev, clickedToken.id],
           );
         } else {
-          // Normal click: select only this token
-          setSelectedTokenIds([clickedToken.id]);
+          // Normal click: check for group membership first
+          const propagated = propagateGroupSelection(clickedToken.id, 'token');
+          if (!propagated) {
+            setSelectedTokenIds([clickedToken.id]);
+          }
         }
-        // Clear map object selection when selecting token
-        clearMapObjectSelection();
+        // Clear map object selection when selecting token (unless group propagation already set it)
+        if (!getGroupForEntity(clickedToken.id)) {
+          clearMapObjectSelection();
+        }
       } else if (clickedMapObject) {
         // Map object selection logic
         if (renderingMode === "edit") {
           if (e.ctrlKey || e.metaKey) {
-            // Ctrl+click: toggle selection
+            // Ctrl+click: toggle selection (no group propagation)
             selectMapObject(clickedMapObject.id, true);
           } else {
-            // Normal click: select only this object
-            selectMapObject(clickedMapObject.id, false);
+            // Normal click: check group membership
+            const propagated = propagateGroupSelection(clickedMapObject.id, 'mapObject');
+            if (!propagated) {
+              selectMapObject(clickedMapObject.id, false);
+            }
           }
-          setSelectedTokenIds([]);
-          clearSelection();
-          setSelectedRegionIds([]);
+          if (!getGroupForEntity(clickedMapObject.id)) {
+            setSelectedTokenIds([]);
+            clearSelection();
+            setSelectedRegionIds([]);
+          }
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
           // Trigger visual animation before state change
@@ -4664,13 +4719,18 @@ export const SimpleTabletop = () => {
               selectRegion(clickedRegion.id);
             }
           } else {
-            // Normal click: single select, deselect others
-            clearSelection();
-            selectRegion(clickedRegion.id);
-            setSelectedRegionIds([clickedRegion.id]);
+            // Normal click: check group membership
+            const propagated = propagateGroupSelection(clickedRegion.id, 'region');
+            if (!propagated) {
+              clearSelection();
+              selectRegion(clickedRegion.id);
+              setSelectedRegionIds([clickedRegion.id]);
+            }
           }
-          setSelectedTokenIds([]); // Deselect tokens when selecting region
-          clearMapObjectSelection(); // Deselect map objects when selecting region
+          if (!getGroupForEntity(clickedRegion.id)) {
+            setSelectedTokenIds([]); // Deselect tokens when selecting region
+            clearMapObjectSelection(); // Deselect map objects when selecting region
+          }
         }
         // In play mode, clicking regions does nothing
       } else {
