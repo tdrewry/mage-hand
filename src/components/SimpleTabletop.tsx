@@ -3209,10 +3209,11 @@ export const SimpleTabletop = () => {
   ) => {
     const config = EDGE_STYLES[style];
 
-    ctx.save();
-
     // Only decorate the inner boundaries (region edges), not the outer bounding box
     regions.forEach((region) => {
+      // Per-region save/restore so rotation transforms don't corrupt sibling regions
+      ctx.save();
+
       const points = getRegionEdgePoints(region);
 
       // Calculate total path length for variation
@@ -3223,7 +3224,7 @@ export const SimpleTabletop = () => {
         totalLength += Math.sqrt(dx * dx + dy * dy);
       }
 
-      // Apply rotation for rectangle regions
+      // Apply rotation for rectangle regions (path regions have rotation baked into pathPoints)
       const needsRotation = region.regionType !== "path" && region.rotation;
       if (needsRotation) {
         const centerX = region.x + region.width / 2;
@@ -3344,12 +3345,11 @@ export const SimpleTabletop = () => {
         }
       }
 
-      if (needsRotation) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-      }
+      // Restore per-region transform (replaces the broken setTransform reset)
+      ctx.restore();
     });
 
-    ctx.restore();
+    // Outer save/restore removed — each region now owns its own save/restore above
   };
 
   // Helper to draw ambient occlusion at wall corners
