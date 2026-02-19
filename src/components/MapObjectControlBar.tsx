@@ -1,27 +1,31 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import {
-  Lock, Unlock, Trash2, Pencil, Move, EyeOff, Moon, SunMedium,
-  DoorOpen, DoorClosed, Lightbulb, LightbulbOff
+  Lock, Unlock, Trash2, Move, EyeOff, Moon,
+  DoorOpen, DoorClosed, Lightbulb, LightbulbOff,
+  MousePointer2, RotateCw, Pencil
 } from 'lucide-react';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { MapObject, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
 import { Z_INDEX } from '@/lib/zIndex';
 import { toast } from 'sonner';
 
+export type MapObjectTool = 'drag' | 'rotate' | 'points';
+
 interface MapObjectControlBarProps {
   pointEditMode: boolean;
   onTogglePointEditMode: () => void;
+  mapObjectTool: MapObjectTool;
+  onSetMapObjectTool: (tool: MapObjectTool) => void;
   onUpdateCanvas?: () => void;
 }
 
 export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
   pointEditMode,
   onTogglePointEditMode,
+  mapObjectTool,
+  onSetMapObjectTool,
   onUpdateCanvas,
 }) => {
   const mapObjects = useMapObjectStore((state) => state.mapObjects);
@@ -39,6 +43,7 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
   const isWall = singleSelected?.shape === 'wall';
   const isDoor = singleSelected?.category === 'door';
   const isLight = singleSelected?.category === 'light';
+  const canRotate = !!singleSelected && !isWall && !allLocked;
 
   const handleToggleLock = () => {
     const newLocked = !allLocked;
@@ -78,6 +83,13 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
     ? (singleSelected.label || MAP_OBJECT_CATEGORY_LABELS[singleSelected.category])
     : `${selectedObjects.length} objects`;
 
+  const handleSetTool = (tool: MapObjectTool) => {
+    onSetMapObjectTool(tool);
+    if (tool === 'points' && !pointEditMode) onTogglePointEditMode();
+    if (tool !== 'points' && pointEditMode) onTogglePointEditMode();
+    onUpdateCanvas?.();
+  };
+
   return (
     <div
       className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
@@ -91,6 +103,51 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
 
         <div className="h-4 w-px bg-border" />
 
+        {/* Tool selector: Drag | Rotate | Points */}
+        <Button
+          variant={mapObjectTool === 'drag' ? 'secondary' : 'ghost'}
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={() => handleSetTool('drag')}
+          title="Drag tool — move object"
+          disabled={allLocked}
+        >
+          <MousePointer2 className="h-3 w-3 mr-1" />
+          Drag
+        </Button>
+        {canRotate && (
+          <Button
+            variant={mapObjectTool === 'rotate' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleSetTool('rotate')}
+            title="Rotate tool — drag rotation handle above object"
+          >
+            <RotateCw className="h-3 w-3 mr-1" />
+            Rotate
+          </Button>
+        )}
+        {isWall && singleSelected && (
+          <Button
+            variant={mapObjectTool === 'points' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleSetTool('points')}
+            disabled={!!singleSelected.locked}
+            title={singleSelected.locked ? 'Unlock wall to edit points' : 'Points tool: click line to add, click vertex to remove'}
+          >
+            <Pencil className="h-3 w-3 mr-1" />
+            Points
+          </Button>
+        )}
+        {mapObjectTool === 'points' && pointEditMode && (
+          <span className="text-[10px] text-muted-foreground px-1">
+            Click line +pt · Click vertex −pt
+          </span>
+        )}
+
+        <div className="h-4 w-px bg-border" />
+
         {/* Lock Toggle */}
         <Button
           variant={allLocked ? 'default' : 'ghost'}
@@ -101,29 +158,6 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
           {allLocked ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
           {allLocked ? 'Locked' : 'Lock'}
         </Button>
-
-        {/* Wall-specific: Point Edit Tool */}
-        {isWall && singleSelected && (
-          <>
-            <div className="h-4 w-px bg-border" />
-            <Button
-              variant={pointEditMode ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2 text-xs"
-              onClick={onTogglePointEditMode}
-              disabled={!!singleSelected.locked}
-              title={singleSelected.locked ? 'Unlock wall to edit points' : 'Toggle point edit: click line to add, click vertex to remove'}
-            >
-              <Pencil className="h-3 w-3 mr-1" />
-              Points
-            </Button>
-            {pointEditMode && (
-              <span className="text-[10px] text-muted-foreground px-1">
-                Click line +point · Click vertex −point
-              </span>
-            )}
-          </>
-        )}
 
         {/* Door-specific: Toggle open/close */}
         {isDoor && singleSelected && (
