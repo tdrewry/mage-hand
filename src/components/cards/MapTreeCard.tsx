@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock, CircleDot, Square, Lightbulb, Box, FolderOpen, Folder } from 'lucide-react';
+import { ChevronRight, ChevronDown, Lock, CircleDot, Square, Lightbulb, Box, FolderOpen, Folder, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,7 +9,8 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useGroupStore } from '@/stores/groupStore';
-import { EntityGroup, GroupMember } from '@/lib/groupTransforms';
+import { EntityGroup } from '@/lib/groupTransforms';
+import { toast } from 'sonner';
 
 // Icon map for entity types
 const entityTypeIcon: Record<string, React.ReactNode> = {
@@ -48,7 +49,7 @@ function EntityRow({ entity, depth = 0 }: { entity: TreeEntity; depth?: number }
   );
 }
 
-function GroupNode({ group, entities }: { group: EntityGroup; entities: TreeEntity[] }) {
+function GroupNode({ group, entities, onDelete }: { group: EntityGroup; entities: TreeEntity[]; onDelete: (groupId: string) => void }) {
   const [open, setOpen] = React.useState(true);
   const memberEntities = entities.filter(e => 
     group.members.some(m => m.id === e.id && m.type === e.type)
@@ -56,15 +57,29 @@ function GroupNode({ group, entities }: { group: EntityGroup; entities: TreeEnti
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs w-full text-left">
-        {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-        {open ? <FolderOpen className="h-3.5 w-3.5 text-primary" /> : <Folder className="h-3.5 w-3.5 text-primary" />}
-        <span className="truncate flex-1 font-medium text-foreground">{group.name}</span>
-        <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
-          {memberEntities.length}
-        </Badge>
-        {group.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-0.5">
+        <CollapsibleTrigger className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs flex-1 text-left">
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+          {open ? <FolderOpen className="h-3.5 w-3.5 text-primary" /> : <Folder className="h-3.5 w-3.5 text-primary" />}
+          <span className="truncate flex-1 font-medium text-foreground">{group.name}</span>
+          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+            {memberEntities.length}
+          </Badge>
+          {group.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+        </CollapsibleTrigger>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(group.id);
+          }}
+          title="Delete group (keeps members)"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
       <CollapsibleContent>
         {memberEntities.map(entity => (
           <EntityRow key={`${entity.type}-${entity.id}`} entity={entity} depth={1} />
@@ -80,6 +95,13 @@ export const MapTreeCardContent: React.FC = () => {
   const mapObjects = useMapObjectStore(s => s.mapObjects);
   const lights = useLightStore(s => s.lights);
   const groups = useGroupStore(s => s.groups);
+  const removeGroup = useGroupStore(s => s.removeGroup);
+
+  const handleDeleteGroup = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    removeGroup(groupId);
+    toast.success(`Group "${group?.name || 'Unknown'}" dissolved (members kept)`);
+  };
 
   const allEntities = useMemo<TreeEntity[]>(() => {
     const entities: TreeEntity[] = [];
@@ -129,7 +151,7 @@ export const MapTreeCardContent: React.FC = () => {
 
         {/* Groups */}
         {groups.map(group => (
-          <GroupNode key={group.id} group={group} entities={allEntities} />
+          <GroupNode key={group.id} group={group} entities={allEntities} onDelete={handleDeleteGroup} />
         ))}
 
         {/* Ungrouped entities */}
