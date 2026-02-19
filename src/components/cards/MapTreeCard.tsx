@@ -4,11 +4,10 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useGroupStore } from '@/stores/groupStore';
-import { ChevronRight, ChevronDown, Circle, Square, Lightbulb, Users, MapPin, Layers, Sun } from 'lucide-react';
+import { ChevronRight, ChevronDown, Circle, Square, MapPin, Users, Layers, Sun, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// Unified tree node representing any canvas entity
 interface TreeNode {
   id: string;
   label: string;
@@ -17,7 +16,9 @@ interface TreeNode {
   children: TreeNode[];
   groupId?: string;
   isSelected?: boolean;
+  isLocked?: boolean;
   position?: { x: number; y: number };
+  memberCount?: number;
 }
 
 const ICON_MAP = {
@@ -37,7 +38,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function TreeNodeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(node.type === 'region');
   const hasChildren = node.children.length > 0;
   const Icon = ICON_MAP[node.type] || Layers;
 
@@ -46,7 +47,8 @@ function TreeNodeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
       <div
         className={cn(
           'flex items-center gap-1 py-0.5 px-1 rounded text-xs hover:bg-accent/50 cursor-default select-none',
-          node.isSelected && 'bg-accent'
+          node.isSelected && 'bg-accent',
+          node.type === 'group' && 'bg-accent/20'
         )}
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
         onClick={() => hasChildren && setExpanded(!expanded)}
@@ -62,14 +64,19 @@ function TreeNodeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
         )}
         <Icon className={cn('h-3 w-3 shrink-0', TYPE_COLORS[node.type])} />
         <span className="truncate flex-1 text-foreground">{node.label}</span>
-        {node.groupId && (
-          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">
-            grp
+        {node.isLocked && (
+          <Lock className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
+        )}
+        {node.type === 'group' && !expanded && node.memberCount != null && (
+          <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+            {node.memberCount}
           </Badge>
         )}
-        <span className="text-muted-foreground text-[9px] tabular-nums shrink-0">
-          z:{node.zIndex}
-        </span>
+        {node.type !== 'group' && (
+          <span className="text-muted-foreground text-[9px] tabular-nums shrink-0">
+            z:{node.zIndex}
+          </span>
+        )}
       </div>
       {hasChildren && expanded && (
         <div>
@@ -91,111 +98,106 @@ export const MapTreeCardContent: React.FC = () => {
   const lights = useLightStore((s) => s.lights);
   const selectedLightIds = useLightStore((s) => s.selectedLightIds);
   const groups = useGroupStore((s) => s.groups);
-  const getGroupForEntity = useGroupStore((s) => s.getGroupForEntity);
 
   const tree = useMemo(() => {
-    // Build flat list of all entities with approximate z-order
-    const allEntities: TreeNode[] = [];
+    // Helper to build a node for any entity
+    const makeNode = (
+      id: string, label: string, type: TreeNode['type'],
+      zIndex: number, position?: { x: number; y: number },
+      isSelected?: boolean, isLocked?: boolean
+    ): TreeNode => ({ id, label, type, zIndex, children: [], position, isSelected, isLocked });
 
-    // Regions: z ~5000 base, order by array index
+    // Build entity lookup
+    const entityNodes = new Map<string, TreeNode>();
+
     regions.forEach((r, i) => {
-      allEntities.push({
-        id: r.id,
-        label: `Region ${i + 1}`,
-        type: 'region',
-        zIndex: 5000 + i,
-        children: [],
-        groupId: getGroupForEntity(r.id)?.id,
-        isSelected: r.selected,
-        position: { x: r.x, y: r.y },
-      });
+      const n = makeNode(r.id, `Region ${i + 1}`, 'region', 5000 + i,
+        { x: r.x, y: r.y }, r.selected, r.locked);
+      entityNodes.set(r.id, n);
     });
 
-    // Map objects: z ~10000
     mapObjects.forEach((mo, i) => {
-      allEntities.push({
-        id: mo.id,
-        label: mo.label || mo.shape || `Object ${i + 1}`,
-        type: 'mapObject',
-        zIndex: 10000 + i,
-        children: [],
-        groupId: getGroupForEntity(mo.id)?.id,
-        isSelected: selectedMapObjectIds.includes(mo.id),
-        position: mo.position,
-      });
+      const n = makeNode(mo.id, mo.label || mo.shape || `Object ${i + 1}`, 'mapObject',
+        10000 + i, mo.position, selectedMapObjectIds.includes(mo.id));
+      entityNodes.set(mo.id, n);
     });
 
-    // Tokens: z ~20000
     tokens.forEach((t, i) => {
-      allEntities.push({
-        id: t.id,
-        label: t.label || t.name || `Token ${i + 1}`,
-        type: 'token',
-        zIndex: 20000 + i,
-        children: [],
-        groupId: getGroupForEntity(t.id)?.id,
-        isSelected: selectedTokenIds?.includes(t.id),
-        position: { x: t.x, y: t.y },
-      });
+      const n = makeNode(t.id, t.label || t.name || `Token ${i + 1}`, 'token',
+        20000 + i, { x: t.x, y: t.y }, selectedTokenIds?.includes(t.id));
+      entityNodes.set(t.id, n);
     });
 
-    // Lights: z ~28000
     lights.forEach((l, i) => {
-      allEntities.push({
-        id: l.id,
-        label: l.label || `Light ${i + 1}`,
-        type: 'light',
-        zIndex: 28000 + i,
-        children: [],
-        groupId: getGroupForEntity(l.id)?.id,
-        isSelected: selectedLightIds.includes(l.id),
-        position: l.position,
-      });
+      const n = makeNode(l.id, l.label || `Light ${i + 1}`, 'light',
+        28000 + i, l.position, selectedLightIds.includes(l.id));
+      entityNodes.set(l.id, n);
     });
 
-    // Sort by z-index
-    allEntities.sort((a, b) => a.zIndex - b.zIndex);
+    // Track which entities are consumed by groups
+    const groupedIds = new Set<string>();
 
-    // Build spatial hierarchy: nest entities inside regions that contain them
-    const regionNodes = allEntities.filter((e) => e.type === 'region');
-    const nonRegionNodes = allEntities.filter((e) => e.type !== 'region');
+    // Build group nodes
+    const groupNodes: TreeNode[] = groups.map((g) => {
+      const memberNodes: TreeNode[] = [];
+      let minZ = Infinity;
+      for (const member of g.members) {
+        const node = entityNodes.get(member.id);
+        if (node) {
+          memberNodes.push(node);
+          groupedIds.add(member.id);
+          if (node.zIndex < minZ) minZ = node.zIndex;
+        }
+      }
+      memberNodes.sort((a, b) => a.zIndex - b.zIndex);
+      const anySelected = memberNodes.some((n) => n.isSelected);
+      return {
+        id: g.id,
+        label: g.name,
+        type: 'group' as const,
+        zIndex: minZ === Infinity ? 0 : minZ,
+        children: memberNodes,
+        isSelected: anySelected,
+        isLocked: g.locked,
+        memberCount: memberNodes.length,
+      };
+    });
 
-    // For each non-region entity, check if it falls within a region's bounds
+    // Collect ungrouped entities
+    const ungrouped: TreeNode[] = [];
+    entityNodes.forEach((node, id) => {
+      if (!groupedIds.has(id)) ungrouped.push(node);
+    });
+
+    // Merge groups + ungrouped, sort by z
+    const allRoot = [...ungrouped, ...groupNodes].sort((a, b) => a.zIndex - b.zIndex);
+
+    // Spatial nesting: nest ungrouped non-region items inside regions
+    const regionRoots = allRoot.filter((n) => n.type === 'region');
     const assignedIds = new Set<string>();
 
-    for (const entity of nonRegionNodes) {
-      if (!entity.position) continue;
-      // Find innermost (highest z-index) region containing this entity
-      for (let i = regionNodes.length - 1; i >= 0; i--) {
-        const region = regions.find((r) => r.id === regionNodes[i].id);
+    for (const node of allRoot) {
+      if (node.type === 'region' || node.type === 'group') continue;
+      if (!node.position) continue;
+      for (let i = regionRoots.length - 1; i >= 0; i--) {
+        const region = regions.find((r) => r.id === regionRoots[i].id);
         if (!region) continue;
-        const pos = entity.position;
         if (
-          pos.x >= region.x &&
-          pos.x <= region.x + region.width &&
-          pos.y >= region.y &&
-          pos.y <= region.y + region.height
+          node.position.x >= region.x &&
+          node.position.x <= region.x + region.width &&
+          node.position.y >= region.y &&
+          node.position.y <= region.y + region.height
         ) {
-          regionNodes[i].children.push(entity);
-          assignedIds.add(entity.id);
+          regionRoots[i].children.push(node);
+          regionRoots[i].children.sort((a, b) => a.zIndex - b.zIndex);
+          assignedIds.add(node.id);
           break;
         }
       }
     }
 
-    // Collect unassigned entities
-    const rootNodes: TreeNode[] = [];
-    for (const node of allEntities) {
-      if (node.type === 'region' || !assignedIds.has(node.id)) {
-        rootNodes.push(node);
-      }
-    }
-
-    // Re-sort root nodes by z-index
-    rootNodes.sort((a, b) => a.zIndex - b.zIndex);
-
-    return rootNodes;
-  }, [tokens, regions, mapObjects, lights, groups, selectedTokenIds, selectedMapObjectIds, selectedLightIds, getGroupForEntity]);
+    return allRoot.filter((n) => n.type === 'region' || n.type === 'group' || !assignedIds.has(n.id));
+  }, [tokens, regions, mapObjects, lights, groups, selectedTokenIds, selectedMapObjectIds, selectedLightIds]);
 
   const totalCount = tokens.length + regions.length + mapObjects.length + lights.length;
 
@@ -203,19 +205,17 @@ export const MapTreeCardContent: React.FC = () => {
     <div className="p-2 space-y-2">
       <div className="flex items-center justify-between px-1">
         <span className="text-xs text-muted-foreground">Canvas Entities</span>
-        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-          {totalCount}
-        </Badge>
-      </div>
-
-      {/* Groups summary */}
-      {groups.length > 0 && (
-        <div className="px-1 pb-1 border-b border-border">
-          <span className="text-[10px] text-muted-foreground">
-            {groups.length} group{groups.length !== 1 ? 's' : ''} ({groups.reduce((acc, g) => acc + g.members.length, 0)} members)
-          </span>
+        <div className="flex items-center gap-1">
+          {groups.length > 0 && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {groups.length} grp{groups.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            {totalCount}
+          </Badge>
         </div>
-      )}
+      </div>
 
       {totalCount === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4">No entities on canvas</p>
