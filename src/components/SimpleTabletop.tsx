@@ -494,6 +494,11 @@ export const SimpleTabletop = () => {
   // Using a ref (not state) so reads during mousemove never go stale.
   // We ALWAYS apply transforms relative to these snapshots, never to live store state,
   // to prevent the compounding-delta bug where every frame re-rotates an already-rotated entity.
+
+  // The single shared pivot point for group rotation — computed fresh from ALL members at mousedown.
+  // Using one centroid for the primary region AND all siblings guarantees they all orbit the same point.
+  const groupRotationPivotRef = useRef<{ x: number; y: number } | null>(null);
+
   const groupSiblingSnapshotsRef = useRef<{
     [memberId: string]: {
       type: 'mapObject' | 'region' | 'light' | 'token';
@@ -4132,6 +4137,47 @@ export const SimpleTabletop = () => {
     return Math.atan2(pointY - centerY, pointX - centerX) * (180 / Math.PI);
   };
 
+  /**
+   * Compute the true centroid for a group by building a fresh bounding box
+   * from every member's actual current position. This is used as the single
+   * shared pivot for all rotation operations so that all entities (regions,
+   * walls, lights, doors) orbit the exact same point.
+   */
+  const computeGroupCentroid = (group: { members: { id: string; type: string }[] }): { x: number; y: number } => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const m of group.members) {
+      if (m.type === 'mapObject') {
+        const o = mapObjects.find(x => x.id === m.id);
+        if (o) {
+          if (o.wallPoints && o.wallPoints.length > 0) {
+            for (const p of o.wallPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+          } else {
+            minX = Math.min(minX, o.position.x); minY = Math.min(minY, o.position.y);
+            maxX = Math.max(maxX, o.position.x + o.width); maxY = Math.max(maxY, o.position.y + o.height);
+          }
+        }
+      } else if (m.type === 'region') {
+        const r = regions.find(x => x.id === m.id);
+        if (r) {
+          if (r.pathPoints && r.pathPoints.length > 0) {
+            for (const p of r.pathPoints) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+          } else {
+            minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+            maxX = Math.max(maxX, r.x + r.width); maxY = Math.max(maxY, r.y + r.height);
+          }
+        }
+      } else if (m.type === 'light') {
+        const l = useLightStore.getState().lights.find(x => x.id === m.id);
+        if (l) { minX = Math.min(minX, l.position.x); minY = Math.min(minY, l.position.y); maxX = Math.max(maxX, l.position.x); maxY = Math.max(maxY, l.position.y); }
+      } else if (m.type === 'token') {
+        const t = tokens.find(x => x.id === m.id);
+        if (t) { minX = Math.min(minX, t.x); minY = Math.min(minY, t.y); maxX = Math.max(maxX, t.x); maxY = Math.max(maxY, t.y); }
+      }
+    }
+    if (!isFinite(minX)) return { x: 0, y: 0 };
+    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  };
+
   // Helper function to rotate a point around a center
   const rotatePoint = (px: number, py: number, cx: number, cy: number, angle: number) => {
     const cos = Math.cos((angle * Math.PI) / 180);
@@ -5233,16 +5279,17 @@ export const SimpleTabletop = () => {
           if (isOverRotationHandle(worldPos.x, worldPos.y, selectedRegion)) {
             setIsRotatingRegion(true);
             setDraggedRegionId(selectedRegion.id);
-            const centerX = selectedRegion.x + selectedRegion.width / 2;
-            const centerY = selectedRegion.y + selectedRegion.height / 2;
-            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
 
             // Snapshot all group siblings at rotation start
             const rotGroup1 = useGroupStore.getState().getGroupForEntity(selectedRegion.id);
             if (rotGroup1) {
+              // Compute FRESH centroid from ALL members as the single shared pivot
+              const pivot = computeGroupCentroid(rotGroup1);
+              groupRotationPivotRef.current = pivot;
+              setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               for (const m of rotGroup1.members) {
-                if (m.id === selectedRegion.id) continue;
                 if (m.type === 'mapObject') {
                   const o = mapObjects.find(x => x.id === m.id);
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
@@ -5258,6 +5305,12 @@ export const SimpleTabletop = () => {
                 }
               }
               groupSiblingSnapshotsRef.current = snap;
+            } else {
+              // No group — use the region's own center
+              const centerX = selectedRegion.x + selectedRegion.width / 2;
+              const centerY = selectedRegion.y + selectedRegion.height / 2;
+              groupRotationPivotRef.current = null;
+              setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
             }
 
             // Group tokens for rotation
@@ -5445,17 +5498,17 @@ export const SimpleTabletop = () => {
           setInitialRegionState(captureRegionTransformState(clickedRegion));
           setTransformingRegionId(clickedRegion.id);
 
-          // Calculate starting angle from region center to mouse
-          const centerX = clickedRegion.x + clickedRegion.width / 2;
-          const centerY = clickedRegion.y + clickedRegion.height / 2;
-          setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
-
+          // Calculate starting angle from group centroid to mouse
           // Snapshot all group siblings at rotation start (clickedRegion path)
           const rotGroup2 = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
           if (rotGroup2) {
+            // Compute FRESH centroid from ALL members as the single shared pivot
+            const pivot = computeGroupCentroid(rotGroup2);
+            groupRotationPivotRef.current = pivot;
+            setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+
             const snap: typeof groupSiblingSnapshotsRef.current = {};
             for (const m of rotGroup2.members) {
-              if (m.id === clickedRegion.id) continue;
               if (m.type === 'mapObject') {
                 const o = mapObjects.find(x => x.id === m.id);
                 if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
@@ -5471,6 +5524,12 @@ export const SimpleTabletop = () => {
               }
             }
             groupSiblingSnapshotsRef.current = snap;
+          } else {
+            // No group — use the region's own center
+            const centerX = clickedRegion.x + clickedRegion.width / 2;
+            const centerY = clickedRegion.y + clickedRegion.height / 2;
+            groupRotationPivotRef.current = null;
+            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
           }
 
           // Group tokens inside the region for rotation
@@ -6053,23 +6112,29 @@ export const SimpleTabletop = () => {
       // Use requestAnimationFrame for smooth rendering
       requestAnimationFrame(() => redrawCanvas());
     } else if (isRotatingRegion && draggedRegionId) {
-      // Region rotation - rotate tokens around region center
+      // Group rotation — ALL entities (primary region + siblings) orbit the SAME pivot.
+      // The pivot is the group's fresh bounding-box centroid, computed at mousedown and
+      // stored in groupRotationPivotRef. This eliminates the "different pivot" bug.
       const worldPos = screenToWorld(mouseX, mouseY);
 
-      // Find the region being rotated
       const draggedRegion = regions.find((r) => r.id === draggedRegionId);
       if (draggedRegion) {
-        const centerX = draggedRegion.x + draggedRegion.width / 2;
-        const centerY = draggedRegion.y + draggedRegion.height / 2;
+        // Resolve the single shared pivot: group centroid if in a group, else region center
+        const pivot = groupRotationPivotRef.current ?? {
+          x: draggedRegion.x + draggedRegion.width / 2,
+          y: draggedRegion.y + draggedRegion.height / 2,
+        };
+        const pivotX = pivot.x;
+        const pivotY = pivot.y;
 
-        // Calculate current angle from center to mouse
-        const currentAngle = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
+        // Calculate rotation delta from the SAME pivot that was used for rotationStartAngle
+        const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
         const rotationDelta = currentAngle - rotationStartAngle;
 
-        // Update temporary region rotation
+        // Update the primary region's visual rotation (drawn around its own center by the renderer,
+        // but the visual angle is correct because rotationStartAngle was measured from the pivot)
         setTempRegionRotation({ [draggedRegionId]: rotationDelta });
 
-        // Create drag preview for the region to maintain visibility during rotation
         setDragPreview({
           regionId: draggedRegionId,
           x: draggedRegion.x,
@@ -6080,31 +6145,26 @@ export const SimpleTabletop = () => {
           bezierControlPoints: draggedRegion.bezierControlPoints,
         });
 
-        // Rotate all grouped tokens around region center
+        // Rotate all grouped tokens around the shared pivot
         const newTempPositions: { [tokenId: string]: { x: number; y: number } } = {};
         groupedTokens.forEach((groupedToken) => {
-          const rotatedPos = rotatePoint(groupedToken.startX, groupedToken.startY, centerX, centerY, rotationDelta);
+          const rotatedPos = rotatePoint(groupedToken.startX, groupedToken.startY, pivotX, pivotY, rotationDelta);
           newTempPositions[groupedToken.tokenId] = { x: rotatedPos.x, y: rotatedPos.y };
         });
 
-        // Propagate rotation to group siblings around the GROUP CENTROID (not just region center)
-        // IMPORTANT: Always read from groupSiblingSnapshotsRef (captured at rotation-start).
-        // rotationDelta is already relative to the start angle, so applying it to the SNAPSHOT
-        // positions each frame produces a correct, non-compounding rotation.
+        // Propagate rotation to ALL group siblings around the SAME shared pivot.
+        // Snapshots were captured for ALL members (including primary) at mousedown.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group) {
-          // Use the group's stored pivot as the true rotation centroid
-          const pivotX = group.pivot.x;
-          const pivotY = group.pivot.y;
           const rad = (rotationDelta * Math.PI) / 180;
           const cos = Math.cos(rad); const sin = Math.sin(rad);
           for (const member of group.members) {
-            if (member.id === draggedRegionId) continue;
+            if (member.id === draggedRegionId) continue; // primary region handled above via tempRegionRotation
             const snap = groupSiblingSnapshotsRef.current[member.id];
             if (!snap) continue;
             if (member.type === 'mapObject' && snap.type === 'mapObject') {
               if (snap.wallPoints) {
-                // Rotate every SNAPSHOT wall vertex around the group pivot
+                // Rotate every SNAPSHOT wall vertex around the shared pivot
                 const newWallPoints = snap.wallPoints.map(p => {
                   const dx = p.x - pivotX; const dy = p.y - pivotY;
                   return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
@@ -6131,7 +6191,6 @@ export const SimpleTabletop = () => {
               const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
               newTempPositions[member.id] = { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-              // We need width/height of the region — look it up (read-only, no mutation risk)
               const sibRegion = regions.find(r => r.id === member.id);
               if (sibRegion) {
                 const cx2 = snap.x + sibRegion.width / 2; const cy2 = snap.y + sibRegion.height / 2;
