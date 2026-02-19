@@ -12,7 +12,7 @@
 import { Token, Player } from '../stores/sessionStore';
 import { GameMap } from '../stores/mapStore';
 import { CanvasRegion } from '../stores/regionStore';
-import { TokenGroup } from './groupTransforms';
+import { TokenGroup } from './groupTransforms'; // TokenGroup is now an alias for EntityGroup
 import { InitiativeEntry } from '../stores/initiativeStore';
 import { LightSource } from '../stores/lightStore';
 import { FogSettings } from '../stores/fogStore';

@@ -10,7 +10,7 @@
 
 import { Token } from '../stores/sessionStore';
 import { CanvasRegion } from '../stores/regionStore';
-import { TokenGroup } from './groupTransforms';
+import { TokenGroup } from './groupTransforms'; // TokenGroup is now an alias for EntityGroup
 
 export interface EventPoint {
   x: number;
@@ -155,13 +155,14 @@ export const hitTestRegion = (
   return null;
 };
 
-// Hit test for token groups
+// Hit test for entity groups
 export const hitTestGroup = (
   point: { x: number; y: number },
   group: TokenGroup,
   tokens: Token[]
 ): HitTestResult | null => {
-  const groupTokens = tokens.filter(t => group.tokenIds.includes(t.id));
+  const memberTokenIds = new Set(group.members.map(m => m.id));
+  const groupTokens = tokens.filter(t => memberTokenIds.has(t.id));
   
   // Check if point hits any token in the group
   for (const token of groupTokens) {
@@ -198,7 +199,7 @@ export const performHitTest = (
   // Test individual tokens
   tokens.forEach(token => {
     // Skip tokens that are part of a group (already tested above)
-    const isInGroup = groups.some(g => g.tokenIds.includes(token.id));
+    const isInGroup = groups.some(g => g.members.some(m => m.id === token.id));
     if (!isInGroup) {
       const hit = hitTestToken(point, token);
       if (hit) results.push(hit);

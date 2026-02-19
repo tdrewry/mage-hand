@@ -1,11 +1,38 @@
 /**
- * Group Transformation System
+ * Universal Group Transformation System
  * 
- * Handles grouped token operations with proper transformation matrices
- * Supports rotation, scaling, and translation for token groups
+ * Handles grouped entity operations with proper transformation matrices.
+ * Supports rotation, scaling, and translation for groups of any entity type
+ * (tokens, regions, map objects, lights).
  */
 
-import { Token } from '../stores/sessionStore';
+// ============= Types =============
+
+export type EntityType = 'token' | 'region' | 'mapObject' | 'light';
+
+export interface GroupMember {
+  id: string;
+  type: EntityType;
+}
+
+export interface EntityGroup {
+  id: string;
+  name: string;
+  members: GroupMember[];
+  pivot: { x: number; y: number };
+  bounds: { x: number; y: number; width: number; height: number };
+  locked: boolean;
+  visible: boolean;
+}
+
+/** Position and size data for any entity, used for bounds calculation */
+export interface EntityGeometry {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface TransformMatrix {
   a: number; // scaleX
@@ -16,29 +43,18 @@ export interface TransformMatrix {
   f: number; // translateY
 }
 
-export interface TokenGroup {
-  id: string;
-  name: string;
-  tokenIds: string[];
-  transform: TransformMatrix;
-  pivot: { x: number; y: number };
-  bounds: { x: number; y: number; width: number; height: number };
-  locked: boolean;
-  visible: boolean;
-}
-
 export interface GroupTransformHandles {
   rotation: { x: number; y: number; size: number };
   scale: { x: number; y: number; size: number };
   corners: Array<{ x: number; y: number; type: 'nw' | 'ne' | 'sw' | 'se' }>;
 }
 
-// Identity transformation matrix
+// ============= Matrix Math (entity-agnostic) =============
+
 export const createIdentityMatrix = (): TransformMatrix => ({
   a: 1, b: 0, c: 0, d: 1, e: 0, f: 0
 });
 
-// Create transformation matrix from translation, rotation, and scale
 export const createTransformMatrix = (
   translateX: number = 0,
   translateY: number = 0, 
@@ -51,7 +67,6 @@ export const createTransformMatrix = (
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
   
-  // Create composite transformation: translate to pivot -> scale -> rotate -> translate back -> final translate
   return {
     a: cos * scaleX,
     b: sin * scaleY,
@@ -62,13 +77,11 @@ export const createTransformMatrix = (
   };
 };
 
-// Apply transformation matrix to a point
 export const transformPoint = (point: { x: number; y: number }, matrix: TransformMatrix): { x: number; y: number } => ({
   x: matrix.a * point.x + matrix.c * point.y + matrix.e,
   y: matrix.b * point.x + matrix.d * point.y + matrix.f
 });
 
-// Multiply two transformation matrices
 export const multiplyMatrices = (m1: TransformMatrix, m2: TransformMatrix): TransformMatrix => ({
   a: m1.a * m2.a + m1.c * m2.b,
   b: m1.b * m2.a + m1.d * m2.b,
@@ -78,57 +91,79 @@ export const multiplyMatrices = (m1: TransformMatrix, m2: TransformMatrix): Tran
   f: m1.b * m2.e + m1.d * m2.f + m1.f
 });
 
-// Calculate group bounds from tokens
-export const calculateGroupBounds = (tokens: Token[]): { x: number; y: number; width: number; height: number } => {
-  if (tokens.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+// ============= Universal Bounds =============
+
+/** Calculate bounds from an array of entity geometries (store-agnostic) */
+export const calculateEntityBounds = (geometries: EntityGeometry[]): { x: number; y: number; width: number; height: number } => {
+  if (geometries.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
   
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   
-  tokens.forEach(token => {
-    const tokenWidth = token.gridWidth * 50; // Assume 50px per grid unit
-    const tokenHeight = token.gridHeight * 50;
-    
-    minX = Math.min(minX, token.x);
-    minY = Math.min(minY, token.y);
-    maxX = Math.max(maxX, token.x + tokenWidth);
-    maxY = Math.max(maxY, token.y + tokenHeight);
-  });
+  for (const geo of geometries) {
+    minX = Math.min(minX, geo.x);
+    minY = Math.min(minY, geo.y);
+    maxX = Math.max(maxX, geo.x + geo.width);
+    maxY = Math.max(maxY, geo.y + geo.height);
+  }
   
-  return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY
-  };
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
 
-// Calculate group pivot point (center of bounds)
 export const calculateGroupPivot = (bounds: { x: number; y: number; width: number; height: number }): { x: number; y: number } => ({
   x: bounds.x + bounds.width / 2,
   y: bounds.y + bounds.height / 2
 });
 
-// Generate transformation handles for a group
-export const generateGroupHandles = (group: TokenGroup): GroupTransformHandles => {
-  const { bounds, transform } = group;
+// ============= Group Factory =============
+
+export const createEntityGroup = (
+  name: string,
+  members: GroupMember[],
+  geometries: EntityGeometry[]
+): EntityGroup => {
+  const bounds = calculateEntityBounds(geometries);
   const pivot = calculateGroupPivot(bounds);
   
-  // Transform bounds corners
+  return {
+    id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    members,
+    pivot,
+    bounds,
+    locked: false,
+    visible: true
+  };
+};
+
+/** Recalculate group bounds from fresh geometry data */
+export const recalculateGroupBounds = (group: EntityGroup, geometries: EntityGeometry[]): EntityGroup => {
+  const memberIds = new Set(group.members.map(m => m.id));
+  const memberGeometries = geometries.filter(g => memberIds.has(g.id));
+  const bounds = calculateEntityBounds(memberGeometries);
+  const pivot = calculateGroupPivot(bounds);
+  
+  return { ...group, bounds, pivot };
+};
+
+// ============= Transform Handles =============
+
+export const generateGroupHandles = (group: EntityGroup, bounds?: { x: number; y: number; width: number; height: number }): GroupTransformHandles => {
+  const b = bounds || group.bounds;
+  const pivot = calculateGroupPivot(b);
+  const identity = createIdentityMatrix();
+  
   const corners = [
-    { x: bounds.x, y: bounds.y, type: 'nw' as const },
-    { x: bounds.x + bounds.width, y: bounds.y, type: 'ne' as const },
-    { x: bounds.x, y: bounds.y + bounds.height, type: 'sw' as const },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height, type: 'se' as const }
+    { x: b.x, y: b.y, type: 'nw' as const },
+    { x: b.x + b.width, y: b.y, type: 'ne' as const },
+    { x: b.x, y: b.y + b.height, type: 'sw' as const },
+    { x: b.x + b.width, y: b.y + b.height, type: 'se' as const }
   ].map(corner => ({
-    ...transformPoint(corner, transform),
+    ...transformPoint(corner, identity),
     type: corner.type
   }));
   
-  // Rotation handle - 40px above the top edge
-  const topCenter = { x: pivot.x, y: bounds.y - 40 };
-  const rotation = transformPoint(topCenter, transform);
-  
-  // Scale handle - at bottom-right corner
+  const topCenter = { x: pivot.x, y: b.y - 40 };
+  const rotation = transformPoint(topCenter, identity);
   const scale = corners.find(c => c.type === 'se')!;
   
   return {
@@ -138,93 +173,53 @@ export const generateGroupHandles = (group: TokenGroup): GroupTransformHandles =
   };
 };
 
-// Check if point hits a transformation handle
 export const hitTestGroupHandles = (
   point: { x: number; y: number }, 
   handles: GroupTransformHandles
 ): { type: 'rotation' | 'scale' | 'corner'; corner?: string } | null => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+  if (dist(point, handles.rotation) <= handles.rotation.size) return { type: 'rotation' };
+  if (dist(point, handles.scale) <= handles.scale.size) return { type: 'scale' };
   
-  // Check rotation handle
-  const rotDist = Math.sqrt(
-    Math.pow(point.x - handles.rotation.x, 2) + 
-    Math.pow(point.y - handles.rotation.y, 2)
-  );
-  if (rotDist <= handles.rotation.size) {
-    return { type: 'rotation' };
-  }
-  
-  // Check scale handle
-  const scaleDist = Math.sqrt(
-    Math.pow(point.x - handles.scale.x, 2) + 
-    Math.pow(point.y - handles.scale.y, 2)
-  );
-  if (scaleDist <= handles.scale.size) {
-    return { type: 'scale' };
-  }
-  
-  // Check corner handles
   for (const corner of handles.corners) {
-    const cornerDist = Math.sqrt(
-      Math.pow(point.x - corner.x, 2) + 
-      Math.pow(point.y - corner.y, 2)
-    );
-    if (cornerDist <= 8) {
-      return { type: 'corner', corner: corner.type };
-    }
+    if (dist(point, corner) <= 8) return { type: 'corner', corner: corner.type };
   }
   
   return null;
 };
 
-// Apply transformation to all tokens in a group
-export const applyGroupTransformToTokens = (
-  tokens: Token[],
-  group: TokenGroup,
-  deltaTransform: Partial<TransformMatrix>
-): Token[] => {
-  const newTransform = { ...group.transform, ...deltaTransform };
-  
-  return tokens.map(token => {
-    if (!group.tokenIds.includes(token.id)) return token;
-    
-    const transformed = transformPoint({ x: token.x, y: token.y }, newTransform);
-    return {
-      ...token,
-      x: transformed.x,
-      y: transformed.y
-    };
-  });
+// ============= Backward Compatibility =============
+// Re-export old name for files that haven't migrated yet
+
+/** @deprecated Use EntityGroup instead */
+export type TokenGroup = EntityGroup;
+
+/** @deprecated Use createEntityGroup instead */
+export const createTokenGroup = (name: string, tokens: { id: string; x: number; y: number; gridWidth: number; gridHeight: number }[]): EntityGroup => {
+  const members: GroupMember[] = tokens.map(t => ({ id: t.id, type: 'token' as const }));
+  const geometries: EntityGeometry[] = tokens.map(t => ({
+    id: t.id,
+    x: t.x,
+    y: t.y,
+    width: t.gridWidth * 50,
+    height: t.gridHeight * 50,
+  }));
+  return createEntityGroup(name, members, geometries);
 };
 
-// Create a new token group
-export const createTokenGroup = (
-  name: string,
-  tokens: Token[]
-): TokenGroup => {
-  const bounds = calculateGroupBounds(tokens);
-  const pivot = calculateGroupPivot(bounds);
-  
-  return {
-    id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    name,
-    tokenIds: tokens.map(t => t.id),
-    transform: createIdentityMatrix(),
-    pivot,
-    bounds,
-    locked: false,
-    visible: true
-  };
+/** @deprecated Use recalculateGroupBounds instead */
+export const updateGroupBounds = (group: EntityGroup, tokens: { id: string; x: number; y: number; gridWidth: number; gridHeight: number }[]): EntityGroup => {
+  const geometries: EntityGeometry[] = tokens.map(t => ({
+    id: t.id,
+    x: t.x,
+    y: t.y,
+    width: t.gridWidth * 50,
+    height: t.gridHeight * 50,
+  }));
+  return recalculateGroupBounds(group, geometries);
 };
 
-// Update group bounds when tokens change
-export const updateGroupBounds = (group: TokenGroup, tokens: Token[]): TokenGroup => {
-  const groupTokens = tokens.filter(t => group.tokenIds.includes(t.id));
-  const bounds = calculateGroupBounds(groupTokens);
-  const pivot = calculateGroupPivot(bounds);
-  
-  return {
-    ...group,
-    bounds,
-    pivot
-  };
-};
+/** @deprecated Use calculateEntityBounds instead */
+export const calculateGroupBounds = calculateEntityBounds;
