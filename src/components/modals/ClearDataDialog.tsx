@@ -14,6 +14,7 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useGroupStore } from '@/stores/groupStore';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
 
@@ -32,11 +33,13 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
   const [shouldClearRegions, setShouldClearRegions] = useState(false);
   const [shouldClearMapObjects, setShouldClearMapObjects] = useState(false);
   const [shouldClearMarkers, setShouldClearMarkers] = useState(false);
+  const [shouldClearGroups, setShouldClearGroups] = useState(false);
 
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
   const { clearTerrainFeatures, clearAnnotations } = useDungeonStore();
   const { clearMapObjects } = useMapObjectStore();
+  const { clearAllGroups } = useGroupStore();
 
   const handleClear = () => {
     const cleared: string[] = [];
@@ -71,6 +74,11 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
       cleared.push('markers');
     }
 
+    if (shouldClearGroups) {
+      clearAllGroups();
+      cleared.push('groups');
+    }
+
     if (cleared.length > 0) {
       toast.success(`Cleared: ${cleared.join(', ')}`);
     }
@@ -80,17 +88,19 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
     setShouldClearRegions(false);
     setShouldClearMapObjects(false);
     setShouldClearMarkers(false);
+    setShouldClearGroups(false);
     onOpenChange(false);
   };
 
-  const hasSelection = shouldClearTokens || shouldClearRegions || shouldClearMapObjects || shouldClearMarkers;
-  const allSelected = shouldClearTokens && shouldClearRegions && shouldClearMapObjects && shouldClearMarkers;
+  const hasSelection = shouldClearTokens || shouldClearRegions || shouldClearMapObjects || shouldClearMarkers || shouldClearGroups;
+  const allSelected = shouldClearTokens && shouldClearRegions && shouldClearMapObjects && shouldClearMarkers && shouldClearGroups;
 
   const handleSelectAll = (checked: boolean) => {
     setShouldClearTokens(checked);
     setShouldClearRegions(checked);
     setShouldClearMapObjects(checked);
     setShouldClearMarkers(checked);
+    setShouldClearGroups(checked);
   };
 
   return (
@@ -156,6 +166,17 @@ export const ClearDataDialog: React.FC<ClearDataDialogProps> = ({
             />
             <Label htmlFor="clear-markers" className="cursor-pointer">
               Markers
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="clear-groups"
+              checked={shouldClearGroups}
+              onCheckedChange={(checked) => setShouldClearGroups(checked === true)}
+            />
+            <Label htmlFor="clear-groups" className="cursor-pointer">
+              Groups
             </Label>
           </div>
         </div>
