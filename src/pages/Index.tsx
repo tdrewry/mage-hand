@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
 
@@ -15,6 +15,16 @@ const LoadingScreen = () => (
 
 const Index = () => {
   const [launched, setLaunched] = useState(!isLovableSandbox);
+  // Delay mounting SimpleTabletop to let all zustand persist stores fully hydrate
+  // This prevents "Maximum update depth exceeded" from store rehydration cascades
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (launched && !ready) {
+      const timer = setTimeout(() => setReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [launched, ready]);
 
   if (!launched) {
     return (
@@ -33,6 +43,10 @@ const Index = () => {
         </div>
       </div>
     );
+  }
+
+  if (!ready) {
+    return <LoadingScreen />;
   }
 
   return (
