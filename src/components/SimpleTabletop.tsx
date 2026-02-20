@@ -523,6 +523,8 @@ export const SimpleTabletop = () => {
   // Rotation state
   const [isRotatingRegion, setIsRotatingRegion] = useState(false);
   const [rotationStartAngle, setRotationStartAngle] = useState(0);
+  // Ref mirror of rotationStartAngle — readable in mousemove without stale-closure issues.
+  const rotationStartAngleRef = useRef(0);
   const [tempRegionRotation, setTempRegionRotation] = useState<{ [regionId: string]: number }>({});
   
   // Marquee selection state
@@ -4536,8 +4538,6 @@ export const SimpleTabletop = () => {
       y: cy + dx * sin + dy * cos,
     };
   };
-
-
   /** Delegates to computeGroupAABB — kept as alias so callers don't need updating. */
   const computeGroupBounds = (group: { members: { id: string; type: string }[] }): { minX: number; minY: number; maxX: number; maxY: number } | null => {
     return computeGroupAABB(group);
@@ -5831,7 +5831,7 @@ export const SimpleTabletop = () => {
               // Compute FRESH centroid from ALL members as the single shared pivot
               const pivot = computeGroupCentroid(rotGroup1);
               groupRotationPivotRef.current = pivot;
-              setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+              // start angle set below alongside the ref update
 
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               for (const m of rotGroup1.members) {
@@ -5851,12 +5851,27 @@ export const SimpleTabletop = () => {
               }
               groupSiblingSnapshotsRef.current = snap;
               groupFrozenAABBRef.current = computeGroupAABB(rotGroup1);
+              rotationStartAngleRef.current = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
+              setRotationStartAngle(rotationStartAngleRef.current);
             } else {
-              // No group — use the region's own center
+              // No group — use the region's own center. Still snapshot the primary region so
+              // mousemove always uses a stable ref baseline (avoids the compounding-delta bug).
               const centerX = selectedRegion.x + selectedRegion.width / 2;
               const centerY = selectedRegion.y + selectedRegion.height / 2;
               groupRotationPivotRef.current = null;
-              setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+              const startAngle = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
+              rotationStartAngleRef.current = startAngle;
+              setRotationStartAngle(startAngle);
+              // Snapshot the solo region so primarySnap is available in mousemove
+              groupSiblingSnapshotsRef.current = {
+                [selectedRegion.id]: {
+                  type: 'region',
+                  x: selectedRegion.x, y: selectedRegion.y,
+                  width: selectedRegion.width, height: selectedRegion.height,
+                  pathPoints: selectedRegion.pathPoints ? selectedRegion.pathPoints.map(p => ({ ...p })) : undefined,
+                  regRotation: selectedRegion.rotation || 0,
+                }
+              };
             }
 
             // Group tokens for rotation
@@ -6104,7 +6119,9 @@ export const SimpleTabletop = () => {
           if (rotGroup2) {
             const pivot = computeGroupCentroid(rotGroup2);
             groupRotationPivotRef.current = pivot;
-            setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+            const startAngle2 = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
+            rotationStartAngleRef.current = startAngle2;
+            setRotationStartAngle(startAngle2);
             const snap: typeof groupSiblingSnapshotsRef.current = {};
             for (const m of rotGroup2.members) {
               if (m.type === 'mapObject') {
@@ -6124,10 +6141,22 @@ export const SimpleTabletop = () => {
             groupSiblingSnapshotsRef.current = snap;
             groupFrozenAABBRef.current = computeGroupAABB(rotGroup2);
           } else {
+            // Solo region — snapshot it so mousemove always uses the stable ref baseline
             const centerX = clickedRegion.x + clickedRegion.width / 2;
             const centerY = clickedRegion.y + clickedRegion.height / 2;
             groupRotationPivotRef.current = null;
-            setRotationStartAngle(calculateAngle(centerX, centerY, worldPos.x, worldPos.y));
+            const startAngle3 = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
+            rotationStartAngleRef.current = startAngle3;
+            setRotationStartAngle(startAngle3);
+            groupSiblingSnapshotsRef.current = {
+              [clickedRegion.id]: {
+                type: 'region',
+                x: clickedRegion.x, y: clickedRegion.y,
+                width: clickedRegion.width, height: clickedRegion.height,
+                pathPoints: clickedRegion.pathPoints ? clickedRegion.pathPoints.map(p => ({ ...p })) : undefined,
+                regRotation: clickedRegion.rotation || 0,
+              }
+            };
           }
           const tokensInRegion2: { tokenId: string; startX: number; startY: number }[] = [];
           tokens.forEach((token) => {
@@ -6790,9 +6819,10 @@ export const SimpleTabletop = () => {
         const pivotX = pivot.x;
         const pivotY = pivot.y;
 
-        // Calculate rotation delta from the SAME pivot that was used for rotationStartAngle
+        // Calculate rotation delta from the SAME pivot that was used for rotationStartAngle.
+        // Read from the ref (not React state) to avoid stale-closure issues on the first mousemove.
         const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
-        const rotationDelta = currentAngle - rotationStartAngle;
+        const rotationDelta = currentAngle - rotationStartAngleRef.current;
 
         // Commit the rotation of the PRIMARY dragged region to the store every frame so
         // that on mouseup the store has the correct final value (prevents snap-back).
