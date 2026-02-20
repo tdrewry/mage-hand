@@ -1,107 +1,110 @@
 
-# Fix: Fog of War Cleanup on Mode Transition to Play
 
-## Problem
+# Dice Rolling System
 
-The screenshot shows fog of war being "brutalized" — stale illumination halos and visibility polygons from the edit-mode session appear in play mode. This happens because:
+## Overview
+A complete dice notation parser, roller engine, and interactive UI card for rolling dice in the VTT. The system will parse standard RPG dice notation (e.g. `2d6+4`, `1d20+5`, `4d6kh3`), generate randomized results, and display them in a draggable card with roll history and visual flair.
 
-1. When the DM drags or rotates regions/map objects/walls in edit mode, all visibility polygon caches and PixiJS textures still hold geometry computed at the **pre-edit** positions.
-2. The fog computation `useEffect` does eventually re-run, but it has an early-exit guard (`canSkipPolygonComputation`) that may fire if the dependency hashes look identical at the React level (since the region/map-object stores committed their changes atomically before the mode switch).
-3. The PixiJS layer retains the **previous frame's fog texture and illumination overlay** until `applyFogPostProcessing` produces a new one. If the re-computation is skipped or throttled, that old frame is what the player sees.
+## Architecture
 
-## Solution
+### 1. Dice Engine Library (`src/lib/diceEngine.ts`)
+A pure-logic module with no UI dependencies that handles:
 
-Add a dedicated `useEffect` that watches `renderingMode`. When it detects a transition **to `'play'`**, it performs a synchronous full reset of all caches and the PixiJS post-processing layer, then schedules an immediate fog recompute.
+- **Notation Parsing**: Parse standard RPG dice notation into a structured AST
+  - Basic: `NdX` (e.g. `2d6`, `1d20`, `1d100`)
+  - Modifiers: `+N`, `-N` (e.g. `1d20+5`)
+  - Multiple groups: `2d6+1d4+3`
+  - Keep highest/lowest: `4d6kh3` (keep highest 3), `2d20kl1` (keep lowest 1 -- disadvantage)
+  - Advantage/Disadvantage shorthand: `1d20adv`, `1d20dis`
+  - Standard polyhedral set: d4, d6, d8, d10, d12, d20, d100
 
-### What the effect does
-
-```text
-renderingMode changes → 'play'
-  │
-  ├─ 1. notifyObstaclesChanged()          — rebuilds combinedSegmentsRef
-  ├─ 2. tokenVisibilityCacheRef.clear()   — forces all polygons recomputed
-  ├─ 3. prevTokenPositionsRef.clear()     — no stale position deltas
-  ├─ 4. prevTokenIlluminationRef.clear()  — no stale illumination hashes
-  ├─ 5. clearVisibilityCache()            — clears global Paper.js visibility cache
-  ├─ 6. fogMasksRef.current = null        — forces new mask generation
-  ├─ 7. setPostProcessingVisible(false)   — hides PixiJS layer for one frame
-  └─ 8. requestAnimationFrame → setPostProcessingVisible(true) + redrawCanvas()
-                                          — forces fresh GPU render
-```
-
-Steps 7 and 8 are the critical GPU layer reset. Hiding then immediately re-showing the PixiJS canvas forces it to blit a fresh frame after the fog computation has run. Without this, the PixiJS layer can display stale texture data even after the fog canvas has been updated.
-
-## Files Changed
-
-### `src/components/SimpleTabletop.tsx`
-
-**Add a `useRef` to track previous mode** (near the other `useRef` declarations, ~line 448):
-
-```ts
-const prevRenderingModeRef = useRef<string>(renderingMode);
-```
-
-**Add a new `useEffect` for mode transition cleanup** (after the existing `useEffect` that handles map object changes, around line 1100):
-
-```ts
-// Cleanup fog state when switching from edit → play mode
-useEffect(() => {
-  const wasEdit = prevRenderingModeRef.current === 'edit' || prevRenderingModeRef.current === 'dm';
-  const isNowPlay = renderingMode === 'play';
-  prevRenderingModeRef.current = renderingMode;
-
-  if (!wasEdit || !isNowPlay) return;
-
-  console.log('[Fog] Mode transition edit→play: flushing all visibility caches');
-
-  // 1. Rebuild combined wall+obstacle segments from fresh state
-  if (wallGeometryRef.current) {
-    const mapObjectSegments = mapObjectsToSegments(mapObjects);
-    combinedSegmentsRef.current = [
-      ...wallGeometryRef.current.wallSegments,
-      ...mapObjectSegments,
-      ...importedWallSegments,
-    ];
+- **Types exported**:
+  ```
+  DieType: 4 | 6 | 8 | 10 | 12 | 20 | 100
+  
+  DiceGroup: {
+    count: number
+    sides: DieType | number
+    keepHighest?: number
+    keepLowest?: number
+    results: number[]       // individual die results
+    keptResults: number[]   // after keep filter
   }
 
-  // 2. Notify light system that obstacle geometry has changed
-  notifyObstaclesChanged();
-
-  // 3. Clear all per-token visibility caches
-  tokenVisibilityCacheRef.current.forEach((cached) => {
-    if (cached?.visionPath?.remove) cached.visionPath.remove();
-  });
-  tokenVisibilityCacheRef.current.clear();
-  prevTokenPositionsRef.current.clear();
-  prevTokenIlluminationRef.current?.clear?.();
-
-  // 4. Clear global Paper.js / visibility-polygon cache
-  clearVisibilityCache();
-
-  // 5. Null out the fog mask so fog computation cannot use the stale masks
-  fogMasksRef.current = null;
-
-  // 6. Reset PixiJS post-processing layer for a clean frame
-  if (isPostProcessingReadyRef.current) {
-    setPostProcessingVisible(false);
-    requestAnimationFrame(() => {
-      setPostProcessingVisible(true);
-      redrawCanvas();
-    });
-  } else {
-    redrawCanvas();
+  DiceRollResult: {
+    id: string
+    formula: string         // original input string
+    groups: DiceGroup[]
+    modifier: number        // flat +/- modifier
+    total: number
+    timestamp: number
+    label?: string          // optional label like "Attack Roll"
+    rolledBy?: string       // player name for multiplayer
   }
-}, [renderingMode]);
-```
+  ```
 
-The dependency array intentionally only contains `renderingMode`. The inner logic reads other refs and state directly — this avoids re-triggering on every fog-related state change while still firing exactly once per mode transition.
+- **Functions**:
+  - `parseFormula(formula: string): ParsedFormula` -- validates and parses notation
+  - `rollDice(formula: string, label?: string): DiceRollResult` -- parse + roll in one call
+  - `rollSingle(sides: number): number` -- single die roll (Math.random based)
 
-### `src/lib/version.ts`
+### 2. Dice Store (`src/stores/diceStore.ts`)
+A Zustand store for dice state:
 
-Increment `APP_VERSION` from `'0.3.3'` to `'0.3.4'`.
+- **State**:
+  - `rollHistory: DiceRollResult[]` -- recent rolls (capped at 50)
+  - `currentFormula: string` -- what's typed in the input
+  - `pinnedFormulas: { label: string, formula: string }[]` -- saved quick-roll formulas
 
-## Technical Notes
+- **Actions**:
+  - `roll(formula: string, label?: string): DiceRollResult` -- execute a roll and add to history
+  - `clearHistory()` -- clear roll log
+  - `setFormula(formula: string)` -- update current input
+  - `addPinnedFormula(label, formula)` / `removePinnedFormula(index)`
 
-- `prevRenderingModeRef` correctly handles `'dm'` as well as `'edit'` since the mode string in `dungeonStore` uses `'dm'`/`'play'`, but the toolbar switches between those two strings. The ref comparison is `!== 'play'` → `=== 'play'`, so any non-play → play transition triggers the flush.
-- The `setPostProcessingVisible` import is already present in `usePostProcessing.ts` and re-exported from `postProcessingLayer.ts`. It must be imported into `SimpleTabletop.tsx` directly for this effect (or called through the hook's returned interface). Currently the hook does not expose a `resetLayer` method — the cleanest approach is to import `setPostProcessingVisible` from `'../lib/postProcessingLayer'` directly at the top of `SimpleTabletop.tsx`, which is where all other `postProcessingLayer` calls already reside.
-- The `requestAnimationFrame` gap between hide and show gives React's render cycle (and the fog `useEffect`) one tick to run with `fogMasksRef.current === null`, forcing a full recompute before the PixiJS layer is shown again.
+- Wrapped with `syncPatch` middleware (channel: `'dice'`) so rolls are shared across multiplayer sessions
+- Persisted with zustand/persist for pinned formulas only
+
+### 3. Dice Card UI (`src/components/cards/DiceCard.tsx`)
+A new card type (`CardType.DICE_BOX`) rendered via the BaseCard system:
+
+- **Input bar**: Text input for dice formula with a "Roll" button and validation feedback
+- **Quick-roll buttons**: Row of common dice (d4, d6, d8, d10, d12, d20, d100) as small polyhedral-icon buttons -- single click rolls 1dX
+- **Pinned formulas**: Saved formulas displayed as clickable chips (e.g. "Longsword: 1d8+4")
+- **Result display**: The most recent roll shown prominently with:
+  - Formula echo (e.g. "2d6 + 4")
+  - Individual die results (with kept/dropped styling)
+  - Total with modifier breakdown
+  - Subtle animation on new roll (scale-in or fade)
+- **Roll history**: Scrollable list of past rolls with timestamp, formula, and total
+- **Card config**: Default size ~350x500, resizable, closable, not visible by default
+
+### 4. Card Registration
+- Add `DICE_BOX = 'dice_box'` to the `CardType` enum in `src/types/cardTypes.ts`
+- Add default config in `src/stores/cardStore.ts`
+- Wire up the card in `src/components/CardManager.tsx`
+- Add a menu entry to open the Dice Box from the Menu card
+
+### 5. Version Bump
+- Increment `APP_VERSION` to `0.4.34` in `src/lib/version.ts`
+
+## File Changes Summary
+
+| File | Action |
+|------|--------|
+| `src/lib/diceEngine.ts` | Create -- parser + roller logic |
+| `src/stores/diceStore.ts` | Create -- state management |
+| `src/components/cards/DiceCard.tsx` | Create -- UI card |
+| `src/types/cardTypes.ts` | Edit -- add DICE_BOX enum |
+| `src/stores/cardStore.ts` | Edit -- add default card config |
+| `src/components/CardManager.tsx` | Edit -- render DiceCard |
+| `src/components/cards/MenuCard.tsx` | Edit -- add Dice Box menu item |
+| `src/lib/version.ts` | Edit -- bump to 0.4.34 |
+
+## Future Expansion (not in this phase)
+- Animated 3D dice rolling visuals (BG3-style spinning polyhedrals)
+- Dice roll sharing with toast notifications for other players
+- Inline dice rolling from stat blocks (clickable damage/attack formulas)
+- Roll modifiers from character abilities auto-applied
+- Secret/GM-only rolls
+
