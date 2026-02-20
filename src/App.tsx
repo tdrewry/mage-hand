@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import { useStorageWarning } from "./hooks/useStorageWarning";
 import { useAutoReconnect } from "./hooks/useAutoReconnect";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
+import { useCardStore } from "./stores/cardStore";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,21 @@ const App = () => {
   React.useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
+
+  // Clamp all open cards to the viewport when the window is resized
+  const clampCardsToViewport = useCardStore((state) => state.clampCardsToViewport);
+  React.useEffect(() => {
+    let rafId: number;
+    const handleResize = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(clampCardsToViewport);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(rafId);
+    };
+  }, [clampCardsToViewport]);
 
   // Monitor storage usage and show warnings
   useStorageWarning();

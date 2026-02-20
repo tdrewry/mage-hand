@@ -85,6 +85,11 @@ interface CardStore {
    * @param types The types of cards to remove.
    */
   removeCardsByType: (types: CardType[]) => void;
+
+  /**
+   * Clamps all visible card positions so they remain within the current viewport.
+   */
+  clampCardsToViewport: () => void;
   
   /**
    * Retrieves a card state by its ID.
@@ -472,5 +477,22 @@ export const useCardStore = create<CardStore>((set, get) => ({
 
   getCardByType: (type: CardType) => {
     return get().cards.find((card) => card.type === type);
+  },
+
+  clampCardsToViewport: () => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const MARGIN = 40; // minimum pixels that must stay on-screen
+
+    set((state) => ({
+      cards: state.cards.map((card) => {
+        const maxX = vw - MARGIN;
+        const maxY = vh - MARGIN;
+        const clampedX = Math.min(Math.max(card.position.x, 0), maxX);
+        const clampedY = Math.min(Math.max(card.position.y, 0), maxY);
+        if (clampedX === card.position.x && clampedY === card.position.y) return card;
+        return { ...card, position: { x: clampedX, y: clampedY } };
+      }),
+    }));
   },
 }));
