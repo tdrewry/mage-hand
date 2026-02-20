@@ -1,6 +1,8 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 import { rollDice, type DiceRollResult } from '@/lib/diceEngine';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 
 const MAX_HISTORY = 50;
 
@@ -25,38 +27,47 @@ interface DiceActions {
 
 type DiceStore = DiceState & DiceActions;
 
+const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
+  rollHistory: [],
+  currentFormula: '',
+  pinnedFormulas: [],
+
+  roll: (formula: string, label?: string) => {
+    const username = useMultiplayerStore.getState().currentUsername || 'You';
+    const result = rollDice(formula, label);
+    result.rolledBy = username;
+    set((state) => ({
+      rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
+    }));
+    return result;
+  },
+
+  clearHistory: () => set({ rollHistory: [] }),
+
+  setFormula: (formula: string) => set({ currentFormula: formula }),
+
+  addPinnedFormula: (label: string, formula: string) =>
+    set((state) => ({
+      pinnedFormulas: [...state.pinnedFormulas, { label, formula }],
+    })),
+
+  removePinnedFormula: (index: number) =>
+    set((state) => ({
+      pinnedFormulas: state.pinnedFormulas.filter((_, i) => i !== index),
+    })),
+});
+
+// Wrap with syncPatch middleware — exclude local-only UI state
+const withSyncPatch = syncPatch<DiceStore>({
+  channel: 'dice',
+  excludePaths: ['currentFormula'], // Don't sync what someone is typing
+});
+
+const persistOptions: PersistOptions<DiceStore, Pick<DiceStore, 'pinnedFormulas'>> = {
+  name: 'vtt-dice-store',
+  partialize: (state) => ({ pinnedFormulas: state.pinnedFormulas }),
+};
+
 export const useDiceStore = create<DiceStore>()(
-  persist(
-    (set, get) => ({
-      rollHistory: [],
-      currentFormula: '',
-      pinnedFormulas: [],
-
-      roll: (formula: string, label?: string) => {
-        const result = rollDice(formula, label);
-        set((state) => ({
-          rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
-        }));
-        return result;
-      },
-
-      clearHistory: () => set({ rollHistory: [] }),
-
-      setFormula: (formula: string) => set({ currentFormula: formula }),
-
-      addPinnedFormula: (label: string, formula: string) =>
-        set((state) => ({
-          pinnedFormulas: [...state.pinnedFormulas, { label, formula }],
-        })),
-
-      removePinnedFormula: (index: number) =>
-        set((state) => ({
-          pinnedFormulas: state.pinnedFormulas.filter((_, i) => i !== index),
-        })),
-    }),
-    {
-      name: 'vtt-dice-store',
-      partialize: (state) => ({ pinnedFormulas: state.pinnedFormulas }),
-    }
-  )
+  persist(withSyncPatch(storeCreator), persistOptions)
 );

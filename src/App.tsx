@@ -9,6 +9,7 @@ import { useStorageWarning } from "./hooks/useStorageWarning";
 import { useAutoReconnect } from "./hooks/useAutoReconnect";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { useCardStore } from "./stores/cardStore";
+import { startDiceRollNotifier, stopDiceRollNotifier } from "./lib/diceRollNotifier";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,12 @@ const App = () => {
 
   // Auto-reconnect to multiplayer session on page load
   useAutoReconnect();
+
+  // Start dice roll toast notifications for multiplayer
+  React.useEffect(() => {
+    startDiceRollNotifier();
+    return () => stopDiceRollNotifier();
+  }, []);
 
   return (
   <QueryClientProvider client={queryClient}>
