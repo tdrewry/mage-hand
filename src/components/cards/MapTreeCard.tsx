@@ -585,6 +585,7 @@ export const MapTreeCardContent: React.FC = () => {
   const updateRegion = useRegionStore(s => s.updateRegion);
   const removeRegion = useRegionStore(s => s.removeRegion);
   const selectRegion = useRegionStore(s => s.selectRegion);
+  const deselectRegion = useRegionStore(s => s.deselectRegion);
 
   const mapObjects  = useMapObjectStore(s => s.mapObjects);
   const selectedMapObjectIds = useMapObjectStore(s => s.selectedMapObjectIds);
@@ -592,6 +593,7 @@ export const MapTreeCardContent: React.FC = () => {
   const removeMapObject = useMapObjectStore(s => s.removeMapObject);
   const addMapObject = useMapObjectStore(s => s.addMapObject);
   const selectMapObject = useMapObjectStore(s => s.selectMapObject);
+  const deselectMapObject = useMapObjectStore(s => s.deselectMapObject);
   const reorderMapObject = useMapObjectStore(s => s.reorderMapObject);
   const normalizeRenderOrders = useMapObjectStore(s => s.normalizeRenderOrders);
   const toggleDoor = useMapObjectStore(s => s.toggleDoor);
@@ -633,21 +635,35 @@ export const MapTreeCardContent: React.FC = () => {
   }, [selectedMapObjectIds, selectedTokenIds, regions]);
 
   const handleSelect = useCallback((entity: TreeEntity, additive: boolean) => {
+    const alreadySelected = allSelectedIds.has(entity.id);
+
     if (entity.type === 'mapObject') {
-      selectMapObject(entity.id, additive);
+      // Toggle deselect on plain click of an already-selected item
+      if (!additive && alreadySelected && selectedMapObjectIds.length === 1) {
+        deselectMapObject(entity.id);
+      } else {
+        selectMapObject(entity.id, additive);
+      }
     } else if (entity.type === 'token') {
       if (additive) {
-        const next = allSelectedIds.has(entity.id)
+        const next = selectedTokenIds.includes(entity.id)
           ? selectedTokenIds.filter(id => id !== entity.id)
           : [...selectedTokenIds, entity.id];
         setSelectedTokens?.(next);
+      } else if (!additive && alreadySelected && selectedTokenIds.length === 1) {
+        // Toggle deselect
+        setSelectedTokens?.([]);
       } else {
         setSelectedTokens?.([entity.id]);
       }
     } else if (entity.type === 'region') {
-      selectRegion(entity.id);
+      if (!additive && alreadySelected) {
+        deselectRegion(entity.id);
+      } else {
+        selectRegion(entity.id);
+      }
     }
-  }, [selectMapObject, selectRegion, setSelectedTokens, allSelectedIds, selectedTokenIds]);
+  }, [selectMapObject, deselectMapObject, selectRegion, deselectRegion, setSelectedTokens, allSelectedIds, selectedTokenIds, selectedMapObjectIds]);
 
   const handleSelectAdditive = useCallback((entity: TreeEntity) => {
     handleSelect(entity, true);
