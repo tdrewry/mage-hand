@@ -2,7 +2,8 @@ import React, { useMemo, useState, useRef, useCallback } from 'react';
 import {
   ChevronRight, ChevronDown, Lock, LockOpen, CircleDot, Square,
   Lightbulb, Box, FolderOpen, Folder, Trash2, Pencil, Check, X,
-  Plus, ArrowRightFromLine, GripVertical,
+  Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
+  SortAsc, SortDesc,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -327,6 +328,10 @@ function GroupNode({
   );
 }
 
+// ─── Sort options ──────────────────────────────────────────────────────────────
+type SortField = 'renderOrder' | 'name' | 'type';
+type SortDir   = 'asc' | 'desc';
+
 // ─── Card content ──────────────────────────────────────────────────────────────
 export const MapTreeCardContent: React.FC = () => {
   const tokens      = useSessionStore(s => s.tokens);
@@ -343,6 +348,20 @@ export const MapTreeCardContent: React.FC = () => {
   const normalizeRenderOrders = useMapObjectStore(s => s.normalizeRenderOrders);
   const lights      = useLightStore(s => s.lights);
   const { groups, removeGroup, setGroupLocked, updateGroup, removeMemberFromGroup, addGroup } = useGroupStore();
+
+  // ── Search & sort state ───────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('renderOrder');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir(field === 'renderOrder' ? 'desc' : 'asc');
+    }
+  }, [sortField]);
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const dragEntityRef = useRef<TreeEntity | null>(null);
@@ -508,7 +527,7 @@ export const MapTreeCardContent: React.FC = () => {
     toast.success(`Created group "${name}"`);
   };
 
-  // ── Build flat entity list sorted by renderOrder descending (frontmost first) ─
+  // ── Build flat entity list ────────────────────────────────────────────────
   const allEntities = useMemo<TreeEntity[]>(() => {
     const entities: TreeEntity[] = [];
     tokens.forEach(t => entities.push({
@@ -532,10 +551,30 @@ export const MapTreeCardContent: React.FC = () => {
       renderOrder: TYPE_NOTIONAL_ORDER.light,
     }));
 
-    // Sort descending: highest renderOrder = frontmost = top of list (Photoshop convention)
-    entities.sort((a, b) => getEffectiveRenderOrder(b) - getEffectiveRenderOrder(a));
-    return entities;
-  }, [tokens, regions, mapObjects, lights]);
+    // Apply search filter
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? entities.filter(e =>
+          getEntityName(e).toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q)
+        )
+      : entities;
+
+    // Apply sort
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'renderOrder') {
+        cmp = getEffectiveRenderOrder(a) - getEffectiveRenderOrder(b);
+      } else if (sortField === 'name') {
+        cmp = getEntityName(a).localeCompare(getEntityName(b));
+      } else if (sortField === 'type') {
+        cmp = a.type.localeCompare(b.type);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [tokens, regions, mapObjects, lights, searchQuery, sortField, sortDir]);
 
   const groupedEntityIds = useMemo(() => {
     const set = new Set<string>();
@@ -557,6 +596,52 @@ export const MapTreeCardContent: React.FC = () => {
           {groups.length > 0 && (
             <Badge variant="secondary" className="text-[10px]">{groups.length} groups</Badge>
           )}
+        </div>
+
+        {/* Search bar */}
+        <div className="relative mb-1">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search entities…"
+            className="h-7 text-xs pl-6 pr-6"
+          />
+          {searchQuery && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setSearchQuery('')}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Sort controls */}
+        <div className="flex items-center gap-1 mb-2">
+          <span className="text-[10px] text-muted-foreground mr-0.5">Sort:</span>
+          {(['renderOrder', 'name', 'type'] as SortField[]).map(field => {
+            const active = sortField === field;
+            const labels: Record<SortField, string> = { renderOrder: 'Depth', name: 'Name', type: 'Type' };
+            return (
+              <button
+                key={field}
+                onClick={() => toggleSort(field)}
+                className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors
+                  ${active
+                    ? 'bg-primary/15 border-primary/40 text-primary'
+                    : 'border-border/40 text-muted-foreground hover:text-foreground hover:border-border'
+                  }`}
+              >
+                {labels[field]}
+                {active && (sortDir === 'asc'
+                  ? <SortAsc className="h-2.5 w-2.5 ml-0.5" />
+                  : <SortDesc className="h-2.5 w-2.5 ml-0.5" />
+                )}
+                {!active && <ArrowUpDown className="h-2.5 w-2.5 ml-0.5 opacity-40" />}
+              </button>
+            );
+          })}
         </div>
 
         {/* Info banner */}
@@ -609,7 +694,7 @@ export const MapTreeCardContent: React.FC = () => {
 
         {allEntities.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-4">
-            No entities on the map yet.
+            {searchQuery ? `No entities match "${searchQuery}".` : 'No entities on the map yet.'}
           </p>
         )}
       </div>
