@@ -4524,13 +4524,17 @@ export const SimpleTabletop = () => {
     return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   };
 
-  // Helper function to rotate a point around a center
+  // Helper function to rotate a point around a center (clockwise for positive angle on canvas).
+  // Uses the standard rotation matrix: nx = cx + dx*cos - dy*sin, ny = cy + dx*sin + dy*cos
   const rotatePoint = (px: number, py: number, cx: number, cy: number, angle: number) => {
     const cos = Math.cos((angle * Math.PI) / 180);
     const sin = Math.sin((angle * Math.PI) / 180);
-    const nx = cos * (px - cx) + sin * (py - cy) + cx;
-    const ny = cos * (py - cy) - sin * (px - cx) + cy;
-    return { x: nx, y: ny };
+    const dx = px - cx;
+    const dy = py - cy;
+    return {
+      x: cx + dx * cos - dy * sin,
+      y: cy + dx * sin + dy * cos,
+    };
   };
 
 
