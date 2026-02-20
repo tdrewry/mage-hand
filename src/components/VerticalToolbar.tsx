@@ -174,6 +174,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         minSize: { width: 400, height: 500 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
