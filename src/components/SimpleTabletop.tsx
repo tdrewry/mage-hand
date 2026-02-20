@@ -2295,8 +2295,12 @@ export const SimpleTabletop = () => {
           regionBounds = { x: region.x, y: region.y, width: region.width, height: region.height };
         }
         
-        // Skip rendering if region is outside viewport (with margin for textures)
-        if (!isInViewport(regionBounds, viewport, 200)) {
+        // Skip rendering if region is outside viewport.
+        // Use a zoom-aware margin so partially-visible large regions are never culled.
+        // The margin is at least 200 world units, but scales up at low zoom so large
+        // regions whose bounding box starts off-screen are still rendered correctly.
+        const viewportMargin = Math.max(200, 500 / transform.zoom);
+        if (!isInViewport(regionBounds, viewport, viewportMargin)) {
           return;
         }
         
@@ -4015,8 +4019,48 @@ export const SimpleTabletop = () => {
     const scaledHeight = Math.max(1, imgHeight * scale);
 
     if (repeat === "no-repeat") {
-      // For no-repeat, draw the scaled image once at the offset position
-      ctx.drawImage(img, x + offsetX, y + offsetY, scaledWidth, scaledHeight);
+      // For no-repeat, use source-clipping to avoid exceeding browser canvas size limits.
+      // At high zoom levels, drawing a large image to world-space coordinates would produce
+      // canvas draw calls that exceed the browser's maximum texture dimension (~8192px),
+      // causing the image to be silently clipped. We compute the visible intersection and
+      // draw only that portion using the 9-argument form of drawImage.
+      const destX = x + offsetX;
+      const destY = y + offsetY;
+      const destW = scaledWidth;
+      const destH = scaledHeight;
+
+      // The canvas context is already scaled by transform.zoom; the browser clips draw calls
+      // that are too large in device pixels. To avoid this, we manually clip the destination
+      // rectangle to the current world-space viewport and derive the matching source rectangle.
+      const vpX = -transform.x / transform.zoom;
+      const vpY = -transform.y / transform.zoom;
+      const vpW = (canvasRef.current?.width ?? window.innerWidth) / transform.zoom;
+      const vpH = (canvasRef.current?.height ?? window.innerHeight) / transform.zoom;
+
+      // Clamp destination rect to viewport
+      const clampedDestX = Math.max(destX, vpX);
+      const clampedDestY = Math.max(destY, vpY);
+      const clampedDestRight = Math.min(destX + destW, vpX + vpW);
+      const clampedDestBottom = Math.min(destY + destH, vpY + vpH);
+
+      if (clampedDestRight <= clampedDestX || clampedDestBottom <= clampedDestY) {
+        // Nothing to draw (fully outside viewport)
+        return;
+      }
+
+      // Derive source rectangle proportionally
+      const scaleX = imgWidth / destW;
+      const scaleY = imgHeight / destH;
+      const srcX = (clampedDestX - destX) * scaleX;
+      const srcY = (clampedDestY - destY) * scaleY;
+      const srcW = (clampedDestRight - clampedDestX) * scaleX;
+      const srcH = (clampedDestBottom - clampedDestY) * scaleY;
+
+      ctx.drawImage(
+        img,
+        srcX, srcY, srcW, srcH,
+        clampedDestX, clampedDestY, clampedDestRight - clampedDestX, clampedDestBottom - clampedDestY
+      );
     } else if (isAnimated) {
       // For animated textures, we can't use CanvasPattern (it captures only one frame)
       // Instead, manually tile the current frame using drawImage
@@ -7194,16 +7238,6 @@ export const SimpleTabletop = () => {
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
           const shouldEnforceCollisions = renderingMode === 'play';
           
-          // ALWAYS show this toast to confirm drag end is firing
-          toast.info(`Drag ended: obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds}, mode=${renderingMode}`, {
-            duration: 1500
-          });
-          
-          console.log('[Collision Debug] handleMouseUp - Token drag ended', { 
-            enforceMovementBlocking, enforceRegionBounds, renderingMode,
-            from: dragStartPos, to: { x: token.x, y: token.y }
-          });
-          
           let movementBlocked = false;
           
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
@@ -7214,12 +7248,6 @@ export const SimpleTabletop = () => {
             const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
             const checkRegions = enforceRegionBounds ? regions : [];
             
-            console.log('[Collision Debug] Checking collision', {
-              tokenRadius,
-              blockingObjects: blockingObjects.length,
-              checkRegions: checkRegions.length
-            });
-            
             const collisionResult = checkMovementCollision(
               dragStartPos,
               { x: token.x, y: token.y },
@@ -7228,8 +7256,6 @@ export const SimpleTabletop = () => {
               checkRegions,
               { enforceMovementBlocking, enforceRegionBounds }
             );
-            
-            console.log('[Collision Debug] Result:', collisionResult);
             
             if (collisionResult.blocked) {
               movementBlocked = true;

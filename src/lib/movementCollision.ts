@@ -282,7 +282,6 @@ function checkRegionBoundsOneWay(
   
   // If token started OUTSIDE all regions, allow free movement (can enter regions)
   if (!startedInsideRegion) {
-    console.log('[Collision Debug] Token started outside regions - movement allowed');
     return { blocked: false, validPosition: endPos };
   }
   
@@ -290,13 +289,11 @@ function checkRegionBoundsOneWay(
   for (const region of regions) {
     if (isPointInRegion(endPos, region, tokenRadius)) {
       // Still inside a region (same or different), allow movement
-      console.log('[Collision Debug] Token moved within/between regions - allowed');
       return { blocked: false, validPosition: endPos };
     }
   }
   
   // Token started inside but ended outside all regions - BLOCK
-  console.log('[Collision Debug] Token tried to leave region bounds - BLOCKED');
   return { blocked: true, validPosition: startPos };
 }
 
@@ -337,6 +334,12 @@ function constrainToRegions(
  * Check if a point is inside a region (with token radius buffer).
  */
 function isPointInRegion(point: Point, region: CanvasRegion, tokenRadius: number): boolean {
+  // Small epsilon tolerance to prevent floating-point edge-case failures when a token
+  // is snapped to the exact boundary of a region (e.g. grid snapping to x=0 on a
+  // region that also starts at x=0). Without this, a token that appears visually
+  // "inside" the region can return false and trigger spurious collision blocks.
+  const EPSILON = 2;
+
   if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 3) {
     // Path-based region: use point-in-polygon with inset for token radius
     return isPointInPolygon(point, region.pathPoints, tokenRadius);
@@ -353,9 +356,9 @@ function isPointInRegion(point: Point, region: CanvasRegion, tokenRadius: number
     const localX = (point.x - centerX) * cos - (point.y - centerY) * sin;
     const localY = (point.x - centerX) * sin + (point.y - centerY) * cos;
 
-    // Check if inside with buffer
-    const halfW = region.width / 2 - tokenRadius;
-    const halfH = region.height / 2 - tokenRadius;
+    // Check if inside with buffer (plus epsilon to handle grid-snapped edge positions)
+    const halfW = region.width / 2 - tokenRadius + EPSILON;
+    const halfH = region.height / 2 - tokenRadius + EPSILON;
 
     return Math.abs(localX) <= halfW && Math.abs(localY) <= halfH;
   }
