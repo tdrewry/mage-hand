@@ -272,6 +272,10 @@ export const SimpleTabletop = () => {
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
+  // Pending deselect: token to remove from selection on mouseup IF no drag was detected
+  const pendingDeselectRef = useRef<string | null>(null);
+  // Tracks whether mouse actually moved during a token drag (distinguishes click from drag)
+  const dragMovedRef = useRef(false);
 
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
@@ -6091,11 +6095,16 @@ export const SimpleTabletop = () => {
 
         // Handle selection on mousedown — support shift/ctrl for additive multi-select
         let allSelected: string[];
+        // Reset drag tracking on each new mousedown
+        dragMovedRef.current = false;
+        pendingDeselectRef.current = null;
+
         if (e.shiftKey || e.ctrlKey || e.metaKey) {
           // Additive toggle: add or remove from current selection
           if (selectedTokenIds.includes(clickedToken.id)) {
-            // Already selected — keep it selected for dragging (don't deselect on mousedown)
+            // Already selected with modifier — keep for potential drag, schedule deselect on mouseup if no drag occurs
             allSelected = selectedTokenIds;
+            pendingDeselectRef.current = clickedToken.id;
           } else {
             allSelected = [...selectedTokenIds, clickedToken.id];
             setSelectedTokenIds(allSelected);
@@ -6478,7 +6487,8 @@ export const SimpleTabletop = () => {
 
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (isDraggingToken && draggedTokenId) {
-      // Token dragging
+      // Token dragging — mark that actual movement occurred (clears pending deselect)
+      dragMovedRef.current = true;
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - dragOffset.x;
       const newY = worldPos.y - dragOffset.y;
@@ -7701,6 +7711,15 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       setDragPath([]);
       setInitialTokenState(null);
+
+      // If a modifier-click on an already-selected token happened and no drag occurred,
+      // now remove that token from the selection (deferred deselect).
+      if (!dragMovedRef.current && pendingDeselectRef.current) {
+        const tokenToDeselect = pendingDeselectRef.current;
+        setSelectedTokenIds(prev => prev.filter(id => id !== tokenToDeselect));
+      }
+      pendingDeselectRef.current = null;
+      dragMovedRef.current = false;
       
       // Clear stable visibility snapshot after drag ends
       if (stableVisibilityRef.current) {
