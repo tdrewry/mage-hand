@@ -240,7 +240,21 @@ export function applyFogPostProcessing(
   illuminationData?: IlluminationData
 ): void {
   const edgeBlur = getEffectSettings().edgeBlur;
-  const padding = edgeBlur * 2;
+  
+  // Padding must be large enough to accommodate:
+  // 1. Edge blur falloff (edgeBlur * 2)
+  // 2. The maximum light radius in screen pixels so that light circles near the
+  //    viewport edge are not hard-clipped by the canvas boundary.
+  //    Light source ranges are in world-space pixels; multiply by zoom to get screen pixels.
+  let maxLightRange = 0;
+  if (illuminationData && illuminationData.sources.length > 0) {
+    for (const src of illuminationData.sources) {
+      if (src.enabled && src.range > maxLightRange) maxLightRange = src.range;
+    }
+  }
+  const lightPadding = Math.ceil(maxLightRange * transform.zoom);
+  const padding = Math.max(edgeBlur * 2, lightPadding);
+  
   const paddedWidth = canvasWidth + padding * 2;
   const paddedHeight = canvasHeight + padding * 2;
   
