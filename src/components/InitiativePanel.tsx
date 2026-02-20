@@ -3,7 +3,11 @@ import { InitiativeTrackerCardContent } from './cards/InitiativeTrackerCard';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { Z_INDEX } from '@/lib/zIndex';
 
-export const InitiativePanel: React.FC = () => {
+interface InitiativePanelProps {
+  selectedTokenIds?: string[];
+}
+
+export const InitiativePanel: React.FC<InitiativePanelProps> = ({ selectedTokenIds = [] }) => {
   const { isInCombat } = useInitiativeStore();
 
   // Only show when in combat
@@ -14,7 +18,7 @@ export const InitiativePanel: React.FC = () => {
       className="fixed right-4 top-1/2 -translate-y-1/2 bg-background/60 backdrop-blur-md border border-border rounded-2xl shadow-lg max-h-[80vh] overflow-hidden"
       style={{ zIndex: Z_INDEX.FIXED_UI.SIDE_PANELS }}
     >
-      <InitiativeTrackerCardContent />
+      <InitiativeTrackerCardContent selectedTokenIds={selectedTokenIds} />
     </div>
   );
 };

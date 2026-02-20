@@ -270,6 +270,8 @@ export const SimpleTabletop = () => {
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragPath, setDragPath] = useState<{ x: number; y: number }[]>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
+  // Multi-token drag: stores start positions for every token in the selection at drag start
+  const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
 
   // Grid snapping toggle (default disabled)
   const [isGridSnappingEnabled, setIsGridSnappingEnabled] = useState(false);
@@ -5409,8 +5411,8 @@ export const SimpleTabletop = () => {
 
       if (clickedToken) {
         // Token selection logic
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl+click: toggle selection (no group propagation)
+        if (e.ctrlKey || e.metaKey || (e.shiftKey && renderingMode === 'play')) {
+          // Ctrl+click or Shift+click in play mode: toggle selection (add/remove from multi-select)
           setSelectedTokenIds((prev) =>
             prev.includes(clickedToken.id) ? prev.filter((id) => id !== clickedToken.id) : [...prev, clickedToken.id],
           );
@@ -5449,12 +5451,12 @@ export const SimpleTabletop = () => {
           triggerDoorAnimation(clickedMapObject.id, isOpening);
           toggleDoor(clickedMapObject.id);
         } else if (renderingMode === 'play') {
-          // In play mode, non-door map objects are not interactive — start marquee instead
+          // In play mode, non-door map objects are not interactive — clear selection and start marquee
+          setSelectedTokenIds([]);
           isMarqueeSelectingRef.current = true;
           marqueeStartRef.current = worldPos;
           marqueeEndRef.current = worldPos;
           setIsMarqueeSelecting(true);
-          setSelectedTokenIds([]);
         }
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
@@ -5488,17 +5490,17 @@ export const SimpleTabletop = () => {
             clearMapObjectSelection();
           }
         } else {
-          // In play mode, clicking regions starts marquee instead
+          // In play mode, clicking a region clears token selection and starts marquee
+          setSelectedTokenIds([]);
           isMarqueeSelectingRef.current = true;
           marqueeStartRef.current = worldPos;
           marqueeEndRef.current = worldPos;
           setIsMarqueeSelecting(true);
-          setSelectedTokenIds([]);
         }
       } else {
         // Clicked on empty space
-        if (e.shiftKey) {
-          // Shift+click: add token at clicked position
+        if (e.shiftKey && renderingMode === 'edit') {
+          // Shift+click in edit mode: add token at clicked position
           addTokenToCanvas("", worldPos.x, worldPos.y);
         } else if (renderingMode === 'edit') {
           // In edit mode: start marquee selection
@@ -5513,12 +5515,12 @@ export const SimpleTabletop = () => {
           clearMapObjectSelection();
           clearLightSelection();
         } else {
-          // Play mode: start token-only marquee (visibility-filtered on mouseup)
+          // Play mode: clicking empty space clears token selection, then starts marquee
+          setSelectedTokenIds([]);
           isMarqueeSelectingRef.current = true;
           marqueeStartRef.current = worldPos;
           marqueeEndRef.current = worldPos;
           setIsMarqueeSelecting(true);
-          setSelectedTokenIds([]);
         }
       }
     }
@@ -6086,9 +6088,22 @@ export const SimpleTabletop = () => {
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
         // If token not selected, select it
+        const selectionAfterMouseDown = selectedTokenIds.includes(clickedToken.id)
+          ? selectedTokenIds
+          : [clickedToken.id];
         if (!selectedTokenIds.includes(clickedToken.id)) {
           setSelectedTokenIds([clickedToken.id]);
         }
+
+        // Capture start positions for ALL selected tokens (enables multi-drag)
+        const allSelected = selectedTokenIds.includes(clickedToken.id) ? selectedTokenIds : [clickedToken.id];
+        const startPositions: Record<string, { x: number; y: number }> = {};
+        tokens.forEach(t => {
+          if (allSelected.includes(t.id)) {
+            startPositions[t.id] = { x: t.x, y: t.y };
+          }
+        });
+        multiDragStartPositionsRef.current = startPositions;
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
         // Wall point edit mode: add/remove vertices
         if (wallPointEditMode && clickedMapObject.shape === 'wall' && clickedMapObject.wallPoints) {
@@ -6471,8 +6486,23 @@ export const SimpleTabletop = () => {
         setDragPath((prev) => [...prev, { x: newX, y: newY }]);
       }
 
-      // Update token position in store
+      // Update primary token position
       updateTokenPosition(draggedTokenId, newX, newY);
+
+      // --- Multi-token drag: move all other selected tokens by the same delta ---
+      const startPositions = multiDragStartPositionsRef.current;
+      const primaryStart = startPositions[draggedTokenId];
+      if (primaryStart && selectedTokenIds.length > 1) {
+        const dx = newX - primaryStart.x;
+        const dy = newY - primaryStart.y;
+        selectedTokenIds.forEach(tid => {
+          if (tid === draggedTokenId) return;
+          const tStart = startPositions[tid];
+          if (tStart) {
+            updateTokenPosition(tid, tStart.x + dx, tStart.y + dy);
+          }
+        });
+      }
 
       // Real-time vision preview during drag (if enabled)
       console.log('[DRAG VISION] Checking conditions:', {
@@ -7578,8 +7608,14 @@ export const SimpleTabletop = () => {
                 description: blockDetails
               });
               
-              // Snap back to original position
+              // Snap back primary token and all multi-dragged tokens to their start positions
+              const startPositions = multiDragStartPositionsRef.current;
               updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
+              selectedTokenIds.forEach(tid => {
+                if (tid === draggedTokenId) return;
+                const tStart = startPositions[tid];
+                if (tStart) updateTokenPosition(tid, tStart.x, tStart.y);
+              });
             }
           }
           
@@ -7643,6 +7679,8 @@ export const SimpleTabletop = () => {
           }
         }
       }
+      // Clear multi-drag start positions
+      multiDragStartPositionsRef.current = {};
 
       setIsDraggingToken(false);
       setDraggedTokenId(null);
@@ -8707,7 +8745,7 @@ export const SimpleTabletop = () => {
       />
 
       {/* Initiative Tracker Panel - Bottom middle */}
-      <InitiativePanel />
+      <InitiativePanel selectedTokenIds={selectedTokenIds} />
 
       {/* Unified Selection Toolbar - Shows when 2+ entities or a group is selected */}
       <UnifiedSelectionToolbar
