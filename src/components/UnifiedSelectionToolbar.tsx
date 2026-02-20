@@ -74,8 +74,8 @@ export const UnifiedSelectionToolbar: React.FC<UnifiedSelectionToolbarProps> = (
     groupCount > 0,
   ].filter(Boolean).length;
 
-  // Show toolbar when multiple types OR a group is active
-  const showBar = typeCount >= 2 || groupCount > 0;
+  // Show toolbar when 2+ entities selected (any combination of types) OR a group is active
+  const showBar = entityCount >= 2 || groupCount > 0;
   if (!showBar) return null;
 
   const parts: string[] = [];
@@ -223,8 +223,8 @@ export const UnifiedSelectionToolbar: React.FC<UnifiedSelectionToolbarProps> = (
             </>
           )}
 
-          {/* Create group button (when no single group, i.e. ungrouped multi-select) */}
-          {!singleGroup && typeCount >= 2 && (
+          {/* Create group button — shown whenever 2+ ungrouped entities are selected */}
+          {!singleGroup && entityCount >= 2 && (
             <>
               <Button
                 variant="ghost"
