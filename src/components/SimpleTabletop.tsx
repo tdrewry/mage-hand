@@ -6729,6 +6729,13 @@ export const SimpleTabletop = () => {
         const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
         const rotationDelta = currentAngle - rotationStartAngle;
 
+        // Update tempRegionRotation so the region visually rotates during drag.
+        // This is what the drawRegion function reads to apply live rotation.
+        setTempRegionRotation(prev => ({
+          ...prev,
+          [draggedRegionId]: rotationDelta,
+        }));
+
         setDragPreview({
           regionId: draggedRegionId,
           x: draggedRegion.x,
