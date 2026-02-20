@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useDiceStore } from '@/stores/diceStore';
+import type { RollMetadata } from '@/lib/diceEngine';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { 
@@ -69,6 +70,7 @@ export function StatBlockFromJson({ data }: { data: any }) {
 
 // Main stat block component with classic D&D styling
 function StatBlock({ monster }: { monster: Monster5eTools }) {
+  const monsterName = monster.name;
   const typeString = useMemo(() => {
     if (typeof monster.type === 'string') return monster.type;
     const base = monster.type?.type || 'unknown';
@@ -98,7 +100,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
         <p>
           <span className="font-bold text-[hsl(var(--primary))]">Hit Points</span>{' '}
           <span>{monster.hp.average} (</span>
-          <DiceFormula formula={monster.hp.formula} display={monster.hp.formula} label={`${monster.name} HP`} />
+          <DiceFormula formula={monster.hp.formula} display={monster.hp.formula} label={`${monsterName} HP`} source={monsterName} reason="HP" />
           <span>)</span>
         </p>
         <StatLine label="Speed" value={formatSpeed(monster.speed)} />
@@ -108,12 +110,12 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
 
       {/* Ability Scores */}
       <div className="grid grid-cols-6 gap-1 text-center my-3">
-        <AbilityScore label="STR" score={monster.str} />
-        <AbilityScore label="DEX" score={monster.dex} />
-        <AbilityScore label="CON" score={monster.con} />
-        <AbilityScore label="INT" score={monster.int} />
-        <AbilityScore label="WIS" score={monster.wis} />
-        <AbilityScore label="CHA" score={monster.cha} />
+        <AbilityScore label="STR" score={monster.str} source={monsterName} />
+        <AbilityScore label="DEX" score={monster.dex} source={monsterName} />
+        <AbilityScore label="CON" score={monster.con} source={monsterName} />
+        <AbilityScore label="INT" score={monster.int} source={monsterName} />
+        <AbilityScore label="WIS" score={monster.wis} source={monsterName} />
+        <AbilityScore label="CHA" score={monster.cha} source={monsterName} />
       </div>
 
       <TaperedRule />
@@ -123,6 +125,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
         {monster.save && Object.keys(monster.save).length > 0 && (
           <RollableStatLine
             label="Saving Throws"
+            source={monsterName}
             entries={Object.entries(monster.save).map(([k, v]) => ({
               name: k.charAt(0).toUpperCase() + k.slice(1),
               bonus: String(v),
@@ -133,10 +136,11 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
         {monster.skill && Object.keys(monster.skill).length > 0 && (
           <RollableStatLine
             label="Skills"
+            source={monsterName}
             entries={Object.entries(monster.skill).map(([k, v]) => ({
               name: capitalize(k),
               bonus: String(v),
-              rollLabel: `${capitalize(k)} Check`,
+              rollLabel: `${capitalize(k)}`,
             }))}
           />
         )}
@@ -170,7 +174,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
 
       {/* Traits */}
       {monster.trait && monster.trait.length > 0 && (
-        <EntrySection entries={monster.trait} />
+        <EntrySection entries={monster.trait} source={monsterName} />
       )}
 
       {/* Spellcasting */}
@@ -182,7 +186,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
       {monster.action && monster.action.length > 0 && (
         <>
           <SectionHeader>Actions</SectionHeader>
-          <EntrySection entries={monster.action} />
+          <EntrySection entries={monster.action} source={monsterName} />
         </>
       )}
 
@@ -190,7 +194,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
       {monster.bonus && monster.bonus.length > 0 && (
         <>
           <SectionHeader>Bonus Actions</SectionHeader>
-          <EntrySection entries={monster.bonus} />
+          <EntrySection entries={monster.bonus} source={monsterName} />
         </>
       )}
 
@@ -198,7 +202,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
       {monster.reaction && monster.reaction.length > 0 && (
         <>
           <SectionHeader>Reactions</SectionHeader>
-          <EntrySection entries={monster.reaction} />
+          <EntrySection entries={monster.reaction} source={monsterName} />
         </>
       )}
 
@@ -219,7 +223,7 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
               legendary actions at the start of its turn.
             </p>
           )}
-          <EntrySection entries={monster.legendary} />
+          <EntrySection entries={monster.legendary} source={monsterName} />
         </>
       )}
 
@@ -244,7 +248,7 @@ function StatLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RollableStatLine({ label, entries }: { label: string; entries: { name: string; bonus: string; rollLabel: string }[] }) {
+function RollableStatLine({ label, source, entries }: { label: string; source?: string; entries: { name: string; bonus: string; rollLabel: string }[] }) {
   return (
     <p>
       <span className="font-bold text-[hsl(var(--primary))]">{label}</span>{' '}
@@ -254,7 +258,7 @@ function RollableStatLine({ label, entries }: { label: string; entries: { name: 
           <span key={entry.name}>
             {idx > 0 && ', '}
             {entry.name}{' '}
-            <DiceFormula formula={formula} display={entry.bonus} label={entry.rollLabel} />
+            <DiceFormula formula={formula} display={entry.bonus} label={entry.rollLabel} source={source} reason={entry.rollLabel} />
           </span>
         );
       })}
@@ -262,16 +266,17 @@ function RollableStatLine({ label, entries }: { label: string; entries: { name: 
   );
 }
 
-function AbilityScore({ label, score }: { label: string; score: number }) {
+function AbilityScore({ label, score, source }: { label: string; score: number; source?: string }) {
   const mod = getAbilityModifier(score);
   const formula = `1d20${mod >= 0 ? '+' : ''}${mod}`;
+  const reason = `${label} Check`;
   return (
     <div className="flex flex-col">
       <span className="text-xs font-bold text-[hsl(var(--primary))]">{label}</span>
       <button
         type="button"
         className="text-sm hover:text-[hsl(var(--primary))] cursor-pointer transition-colors"
-        onClick={() => rollInDiceBox(formula, `${label} Check`)}
+        onClick={() => rollInDiceBox(formula, reason, source ? { source, reason } : undefined)}
         title={`Roll ${formula}`}
       >
         {score} ({formatModifier(mod)})
@@ -294,14 +299,14 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EntrySection({ entries }: { entries: MonsterEntry[] }) {
+function EntrySection({ entries, source }: { entries: MonsterEntry[]; source?: string }) {
   return (
     <div className="space-y-2 text-sm">
       {entries.map((entry, idx) => (
         <div key={idx}>
           <p>
             <span className="font-bold italic">{entry.name}.</span>{' '}
-            {formatEntries(entry.entries)}
+            {formatEntries(entry.entries, source, entry.name)}
           </p>
         </div>
       ))}
@@ -371,10 +376,10 @@ function formatDamageList(list: string[]): string {
   }).join('; ');
 }
 
-function formatEntries(entries: (string | MonsterEntryNested)[]): ReactNode {
+function formatEntries(entries: (string | MonsterEntryNested)[], source?: string, actionName?: string): ReactNode {
   return entries.map((entry, idx) => {
     if (typeof entry === 'string') {
-      return <span key={idx}>{cleanEntryText(entry)}{idx < entries.length - 1 ? ' ' : ''}</span>;
+      return <span key={idx}>{cleanEntryText(entry, source, actionName)}{idx < entries.length - 1 ? ' ' : ''}</span>;
     }
     if (entry.type === 'list' && entry.items) {
       return <span key={idx}>{entry.items.map(i => `• ${i}`).join(' ')}{idx < entries.length - 1 ? ' ' : ''}</span>;
@@ -387,7 +392,7 @@ function formatEntries(entries: (string | MonsterEntryNested)[]): ReactNode {
 }
 
 /** Rolls a formula and opens/focuses the Dice Box card */
-function rollInDiceBox(formula: string, label?: string) {
+function rollInDiceBox(formula: string, label?: string, meta?: RollMetadata) {
   const { roll } = useDiceStore.getState();
   const cardStore = useCardStore.getState();
   
@@ -398,16 +403,17 @@ function rollInDiceBox(formula: string, label?: string) {
     cardStore.bringToFront(diceCard.id);
   }
   
-  roll(formula, label);
+  roll(formula, label, meta);
 }
 
 /** Clickable dice formula span */
-function DiceFormula({ formula, display, label }: { formula: string; display: string; label?: string }) {
+function DiceFormula({ formula, display, label, source, reason }: { formula: string; display: string; label?: string; source?: string; reason?: string }) {
+  const meta: RollMetadata | undefined = source ? { source, reason: reason || label } : undefined;
   return (
     <button
       type="button"
       className="inline font-mono text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.7)] underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
-      onClick={(e) => { e.stopPropagation(); rollInDiceBox(formula, label); }}
+      onClick={(e) => { e.stopPropagation(); rollInDiceBox(formula, label, meta); }}
       title={`Roll ${formula}`}
     >
       {display}
@@ -415,7 +421,7 @@ function DiceFormula({ formula, display, label }: { formula: string; display: st
   );
 }
 
-function cleanEntryText(text: string): ReactNode {
+function cleanEntryText(text: string, source?: string, actionName?: string): ReactNode {
   // Regex to find all rollable tags: {@damage X}, {@hit X}, {@dice X}, {@skill X}
   const rollableRegex = /\{@(damage|hit|dice|skill|recharge) ?([^}]*)\}/g;
   // Non-rollable tags cleaned to plain text
@@ -450,19 +456,20 @@ function cleanEntryText(text: string): ReactNode {
 
     if (tagType === 'hit') {
       const formula = `1d20+${rawValue}`;
-      parts.push(<DiceFormula key={match.index} formula={formula} display={`+${rawValue}`} label="Attack Roll" />);
+      const reason = actionName ? `${actionName} Attack` : 'Attack Roll';
+      parts.push(<DiceFormula key={match.index} formula={formula} display={`+${rawValue}`} label={reason} source={source} reason={reason} />);
     } else if (tagType === 'skill') {
-      // {@skill Perception} → display skill name (rollable only from the Skills stat line)
       parts.push(<span key={match.index}>{rawValue}</span>);
     } else if (tagType === 'recharge') {
       const num = rawValue ? rawValue.trim() : '6';
       const display = `(Recharge ${num}${num !== '6' ? '–6' : ''})`;
+      const reason = actionName ? `${actionName} Recharge` : `Recharge (${num}+)`;
       parts.push(
-        <DiceFormula key={match.index} formula="1d6" display={display} label={`Recharge (${num}+)`} />
+        <DiceFormula key={match.index} formula="1d6" display={display} label={reason} source={source} reason={reason} />
       );
     } else {
-      const label = tagType === 'damage' ? 'Damage' : undefined;
-      parts.push(<DiceFormula key={match.index} formula={rawValue} display={rawValue} label={label} />);
+      const reason = tagType === 'damage' ? (actionName ? `${actionName} Damage` : 'Damage') : actionName;
+      parts.push(<DiceFormula key={match.index} formula={rawValue} display={rawValue} label={reason} source={source} reason={reason} />);
     }
 
     lastIndex = match.index + match[0].length;

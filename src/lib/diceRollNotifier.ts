@@ -14,13 +14,12 @@ let unsubscribe: (() => void) | null = null;
 
 /** Format a roll result for display in a toast */
 function formatRollToast(roll: DiceRollResult): string {
-  const diceStr = roll.groups
-    .map((g) => `${g.count}d${g.sides}`)
-    .join('+');
-  const modStr = roll.modifier !== 0
-    ? (roll.modifier > 0 ? `+${roll.modifier}` : `${roll.modifier}`)
-    : '';
-  return `${diceStr}${modStr} → ${roll.total}`;
+  const parts: string[] = [];
+  if (roll.meta?.source) parts.push(String(roll.meta.source));
+  if (roll.meta?.reason) parts.push(String(roll.meta.reason));
+  parts.push(roll.formula);
+  parts.push(`→ ${roll.total}`);
+  return parts.join(', ');
 }
 
 /** Start listening for dice rolls from other players */

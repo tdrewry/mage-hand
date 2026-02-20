@@ -14,6 +14,16 @@ export interface DiceGroup {
   keptResults: number[];
 }
 
+/** Structured metadata describing the context of a dice roll. */
+export interface RollMetadata {
+  /** The creature/token name that owns the roll, e.g. "A.Yeti" */
+  source?: string;
+  /** Why the roll was made, e.g. "Perception", "Attack Roll", "Damage" */
+  reason?: string;
+  /** Arbitrary extra data for future use (chat log, automation, etc.) */
+  [key: string]: unknown;
+}
+
 export interface DiceRollResult {
   id: string;
   formula: string;
@@ -23,6 +33,8 @@ export interface DiceRollResult {
   timestamp: number;
   label?: string;
   rolledBy?: string;
+  /** Structured roll context for display & networking */
+  meta?: RollMetadata;
 }
 
 interface ParsedGroup {
@@ -103,7 +115,7 @@ export function rollSingle(sides: number): number {
 }
 
 /** Parse a formula and execute the roll, returning a full result object. */
-export function rollDice(formula: string, label?: string): DiceRollResult {
+export function rollDice(formula: string, label?: string, meta?: RollMetadata): DiceRollResult {
   const parsed = parseFormula(formula);
 
   const groups: DiceGroup[] = parsed.groups.map((pg) => {
@@ -140,5 +152,6 @@ export function rollDice(formula: string, label?: string): DiceRollResult {
     total,
     timestamp: Date.now(),
     label,
+    meta,
   };
 }
