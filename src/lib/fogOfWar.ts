@@ -5,7 +5,7 @@
 
 import type { CanvasRegion } from '@/stores/regionStore';
 import { computeVisibilityFromSegments, type Point, type LineSegment } from './visibilityEngine';
-import { visibilityPolygonToPaperPath } from './fogGeometry';
+import { visibilityPolygonToPaperPath, getFogScope } from './fogGeometry';
 import paper from 'paper';
 
 export interface FogOfWarState {
@@ -58,12 +58,15 @@ export async function computeTokenVisibilityPaper(
       visionRangePixels
     );
     
-    // Convert visibility polygon to paper.js path
+    // Convert visibility polygon to paper.js path — use fogScope consistently
+    const scope = getFogScope();
+    scope.activate();
     const paperPath = visibilityPolygonToPaperPath(visibility.polygon);
     
-    // Create circular clipping mask for this token
-    const circle = new paper.Path.Circle({
-      center: [token.x, token.y],
+    // Create circular clipping mask using the SAME fogScope to avoid scope mismatch.
+    // Using paper.Path.Circle (global scope) caused intersection misalignment.
+    const circle = new scope.Path.Circle({
+      center: new scope.Point(token.x, token.y),
       radius: visionRangePixels,
     });
     
