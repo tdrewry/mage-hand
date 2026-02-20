@@ -5770,7 +5770,9 @@ export const SimpleTabletop = () => {
                 setTransformingRegionId(primaryRegion.id);
                 const pivot = computeGroupCentroid(grpCheck);
                 groupRotationPivotRef.current = pivot;
-                setRotationStartAngle(calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y));
+                const groupStartAngle = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
+                rotationStartAngleRef.current = groupStartAngle;
+                setRotationStartAngle(groupStartAngle);
                 // Snapshot ALL members (including width/height/pathPoints for regions so sibling
                 // rotation never reads from a stale React closure during mousemove).
                 const snap: typeof groupSiblingSnapshotsRef.current = {};
@@ -5792,6 +5794,22 @@ export const SimpleTabletop = () => {
                 groupSiblingSnapshotsRef.current = snap;
                 // Freeze the AABB so the bounding box drawn during rotation doesn't drift
                 groupFrozenAABBRef.current = computeGroupAABB(grpCheck);
+
+                // Collect tokens sitting ON any region in the group (not formal group members).
+                // These must be rotated visually alongside the group during the drag.
+                const groupRegionMembers = grpCheck.members
+                  .filter(m => m.type === 'region')
+                  .map(m => regions.find(r => r.id === m.id))
+                  .filter(Boolean) as typeof regions;
+                const tokensOnGroupRegions: { tokenId: string; startX: number; startY: number }[] = [];
+                tokens.forEach(token => {
+                  // Skip tokens that are already formal group members (handled via snap)
+                  if (snap[token.id]) return;
+                  if (groupRegionMembers.some(r => isPointInRegion(token.x, token.y, r))) {
+                    tokensOnGroupRegions.push({ tokenId: token.id, startX: token.x, startY: token.y });
+                  }
+                });
+                setGroupedTokens(tokensOnGroupRegions);
                 return;
               }
             }
