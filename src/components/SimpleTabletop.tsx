@@ -8561,8 +8561,9 @@ export const SimpleTabletop = () => {
 
       {/* Region Control Panel - removed, now using Region Controls Card */}
 
-      {/* Main Canvas Container */}
-      <div ref={canvasContainerRef} className="flex-1 relative overflow-hidden">
+      {/* Main Canvas Container — outer div clips UI; inner div allows PixiJS canvas to overhang via negative CSS offset */}
+      <div className="flex-1 relative overflow-hidden" style={{ isolation: 'isolate' }}>
+      <div ref={canvasContainerRef} className="absolute inset-0 overflow-visible">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full touch-none"
@@ -8606,6 +8607,7 @@ export const SimpleTabletop = () => {
             boxSizing: 'border-box',
           }}
         />
+      </div>
       </div>
 
       {/* Token Context Manager */}
