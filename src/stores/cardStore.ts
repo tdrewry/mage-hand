@@ -310,6 +310,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.DICE_BOX]: {
+    title: 'Dice Box',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 350, height: 500 },
+    minSize: { width: 280, height: 350 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

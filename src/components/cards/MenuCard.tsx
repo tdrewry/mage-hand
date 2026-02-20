@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -67,6 +67,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const mapObjectsCard = cards.find((c) => c.type === CardType.MAP_OBJECTS);
   const creatureLibraryCard = cards.find((c) => c.type === CardType.CREATURE_LIBRARY);
   const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
+  const diceBoxCard = cards.find((c) => c.type === CardType.DICE_BOX);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -533,6 +534,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <GitBranch className="h-4 w-4 mr-2" />
           Map Tree
+        </Button>
+
+        <Button 
+          variant={diceBoxCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (diceBoxCard) {
+              setVisibility(diceBoxCard.id, !diceBoxCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.DICE_BOX,
+                title: 'Dice Box',
+                defaultPosition: { x: 320, y: 80 },
+                defaultSize: { width: 350, height: 500 },
+                minSize: { width: 280, height: 350 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <Dices className="h-4 w-4 mr-2" />
+          Dice Box
         </Button>
       </div>
 
