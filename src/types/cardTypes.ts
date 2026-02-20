@@ -22,6 +22,7 @@ export enum CardType {
   MONSTER_STAT_BLOCK = 'monster_stat_block',
   CREATURE_LIBRARY = 'creature_library',
   MAP_TREE = 'map_tree',
+  DICE_BOX = 'dice_box',
 }
 
 export interface ToolsCardProps {

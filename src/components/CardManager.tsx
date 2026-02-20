@@ -20,6 +20,7 @@ import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
+import { DiceCardContent } from '@/components/cards/DiceCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -142,6 +143,7 @@ function getCardTitle(type: CardType): string {
     [CardType.MONSTER_STAT_BLOCK]: 'Monster Stat Block',
     [CardType.CREATURE_LIBRARY]: 'Creature Library',
     [CardType.MAP_TREE]: 'Map Tree',
+    [CardType.DICE_BOX]: 'Dice Box',
   };
   
   return titles[type] || type;
@@ -225,6 +227,8 @@ function renderCardContent(
           <LazyMapTreeCardContent />
         </Suspense>
       );
+    case CardType.DICE_BOX:
+      return <DiceCardContent />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     default:
