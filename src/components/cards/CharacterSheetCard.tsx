@@ -125,6 +125,11 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     toast.success('Creature unlinked');
   };
 
+  const handleOpenEditToken = useCallback(() => {
+    if (!token) return;
+    window.dispatchEvent(new CustomEvent('openEditTokenModal', { detail: { tokenId: token.id } }));
+  }, [token?.id]);
+
   // ── Fallback: legacy characterId mode ───────────────────────────────────
   if (!tokenId && characterId) {
     return <LegacyCharacterSheetFallback characterId={characterId} />;
@@ -142,8 +147,12 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
 
   return (
     <div className="flex flex-col h-full">
-      {/* Token header */}
-      <div className="px-4 pt-3 pb-2 border-b border-border flex items-center gap-3 shrink-0">
+      {/* Token header — click to open Edit Token modal */}
+      <button
+        onClick={handleOpenEditToken}
+        className="px-4 pt-3 pb-2 border-b border-border flex items-center gap-3 shrink-0 w-full text-left hover:bg-muted/40 transition-colors rounded-none"
+        title="Click to edit token"
+      >
         {token.imageUrl ? (
           <img
             src={token.imageUrl}
@@ -152,7 +161,7 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
           />
         ) : (
           <div
-            className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-sm font-bold"
+            className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-sm font-bold shrink-0"
             style={{ backgroundColor: token.color ?? 'hsl(var(--muted))' }}
           >
             {token.name?.[0]?.toUpperCase() ?? '?'}
@@ -160,10 +169,12 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
         )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate">{token.name || 'Unnamed Token'}</p>
-          {token.entityRef?.entityId && (
+          {token.entityRef?.entityId ? (
             <p className="text-xs text-muted-foreground truncate">
               Linked · {token.entityRef.projectionType}
             </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Click to edit token</p>
           )}
         </div>
         {hasQuickRef && (
@@ -171,13 +182,13 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
             size="icon"
             variant="ghost"
             className="h-7 w-7 shrink-0"
-            onClick={() => window.open(quickRef, '_blank')}
+            onClick={(e) => { e.stopPropagation(); window.open(quickRef, '_blank'); }}
             title="Open quick reference"
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </Button>
         )}
-      </div>
+      </button>
 
       {/* Tabs — inactive ones collapse via data-[state=inactive]:hidden */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col flex-1 min-h-0">

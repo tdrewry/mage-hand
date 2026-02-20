@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -118,7 +118,7 @@ export const TokenContextMenu = ({
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
   
   // Edit modal state
-  const [activeTab, setActiveTab] = useState<'label' | 'style' | 'appearance' | 'details'>('label');
+  const [activeTab, setActiveTab] = useState<'label' | 'style' | 'appearance'>('label');
   const [nameValue, setNameValue] = useState('');
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
@@ -267,6 +267,43 @@ export const TokenContextMenu = ({
     }
     setShowTokenEditModal(true);
   };
+
+  // Listen for external "openEditTokenModal" events (e.g. from CharacterSheetCard header click)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { tokenId: tid } = (e as CustomEvent<{ tokenId: string }>).detail;
+      const token = useSessionStore.getState().tokens.find(t => t.id === tid);
+      if (!token) return;
+      // Temporarily set targetTokens by dispatching through existing context-menu flow isn't easy;
+      // instead we trigger a synthetic edit by directly populating state for this token.
+      setActiveTab('label');
+      setShowSaveVariantInput(false);
+      setVariantNameInput('');
+      setNameValue(token.name || '');
+      setLabelValue(token.label || '');
+      setLabelPositionValue(token.labelPosition || 'below');
+      setLabelColorValue(token.labelColor || '#FFFFFF');
+      setLabelBackgroundValue(token.labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
+      setImageUrlValue(token.imageUrl || '');
+      setGridWidthValue(token.gridWidth || 1);
+      setGridHeightValue(token.gridHeight || 1);
+      setNotesValue(token.notes || '');
+      setQuickReferenceUrlValue(token.quickReferenceUrl || '');
+      setTokenColorValue(token.color || '#FF6B6B');
+      setPathStyleValue(token.pathStyle || 'dashed');
+      setPathColorValue(token.pathColor || token.color || '#FFFFFF');
+      setUseTokenColorForPath(token.pathColor === undefined);
+      setPathWeightValue(token.pathWeight ?? 3);
+      setPathOpacityValue(token.pathOpacity ?? 0.7);
+      setPathGaitWidthValue(token.pathGaitWidth ?? 0.6);
+      setFootprintTypeValue(token.footprintType || 'barefoot');
+      setVariantImageUrls({});
+      // Point targetTokens at this token via context trick — we open modal directly
+      setShowTokenEditModal(true);
+    };
+    window.addEventListener('openEditTokenModal', handler);
+    return () => window.removeEventListener('openEditTokenModal', handler);
+  }, []);
 
   // Check if current size matches a preset
   const getCurrentSizePreset = () => {
@@ -935,11 +972,10 @@ export const TokenContextMenu = ({
           </DialogHeader>
           
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="label">Label</TabsTrigger>
               <TabsTrigger value="style">Style</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
-              <TabsTrigger value="details">Details</TabsTrigger>
             </TabsList>
             
             {/* Label Tab */}
@@ -1449,70 +1485,6 @@ export const TokenContextMenu = ({
               </div>
             </TabsContent>
             
-            {/* Details Tab */}
-            <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 mt-4">
-              {/* Linked Creature Section */}
-              <LinkedCreatureSection 
-                token={currentToken}
-                onViewStats={handleViewStats}
-                onUnlink={handleUnlinkCreature}
-                onLinkCreature={handleLinkCreature}
-              />
-              
-              {/* Quick Reference URL */}
-              <div>
-                <Label htmlFor="quick-ref-url" className="flex items-center gap-1">
-                  <Link2 className="h-3 w-3" />
-                  Quick Reference URL
-                </Label>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    id="quick-ref-url"
-                    value={quickReferenceUrlValue}
-                    onChange={(e) => setQuickReferenceUrlValue(e.target.value)}
-                    placeholder="https://dndbeyond.com/characters/..."
-                    className="flex-1"
-                  />
-                  {quickReferenceUrlValue && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => window.open(quickReferenceUrlValue, '_blank')}
-                      title="Open in new tab"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Link to an external character sheet, wiki, or reference
-                </p>
-              </div>
-              
-              {/* Token Notes */}
-              <div>
-                <Label htmlFor="token-notes">Token Notes</Label>
-                <Textarea
-                  id="token-notes"
-                  value={notesValue}
-                  onChange={(e) => setNotesValue(e.target.value)}
-                  placeholder={isMultiSelection 
-                    ? 'Notes will be applied to all selected tokens'
-                    : 'Add GM notes, stats, or other information...'
-                  }
-                  className="mt-2 min-h-[100px] resize-y"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Token-specific notes (not shared with linked entity data)
-                </p>
-              </div>
-              
-              {isMultiSelection && (
-                <p className="text-xs text-amber-500">
-                  ⚠ Entering values will override notes/URL for all {targetTokens.length} selected tokens
-                </p>
-              )}
-            </TabsContent>
           </Tabs>
           
           <DialogFooter className="mt-4">
