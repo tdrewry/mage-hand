@@ -3,13 +3,24 @@ import {
   ChevronRight, ChevronDown, Lock, LockOpen, CircleDot, Square,
   Lightbulb, Box, FolderOpen, Folder, Trash2, Pencil, Check, X,
   Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
-  SortAsc, SortDesc,
+  SortAsc, SortDesc, Eye, EyeOff, ArrowUp, ArrowDown,
+  ChevronsUp, ChevronsDown, Copy, Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -55,6 +66,183 @@ function getEffectiveRenderOrder(entity: TreeEntity): number {
 
 function getEntityName(entity: TreeEntity): string {
   return entity.name || `${entity.type}-${entity.id.slice(-4)}`;
+}
+
+// ─── Context menu actions per entity type ─────────────────────────────────────
+interface EntityContextActions {
+  onSelect: (entity: TreeEntity, additive: boolean) => void;
+  onSelectAdditive: (entity: TreeEntity) => void;
+  onToggleLock: (entity: TreeEntity) => void;
+  onDelete: (entity: TreeEntity) => void;
+  onRename: (entity: TreeEntity) => void;
+  onToggleVisibility?: (entity: TreeEntity) => void;
+  onBringToFront?: (entity: TreeEntity) => void;
+  onSendToBack?: (entity: TreeEntity) => void;
+  onMoveUp?: (entity: TreeEntity) => void;
+  onMoveDown?: (entity: TreeEntity) => void;
+  onDuplicate?: (entity: TreeEntity) => void;
+  onToggleDoor?: (entity: TreeEntity) => void;
+  onEjectFromGroup?: (groupId: string, entityId: string) => void;
+  groupId?: string;
+}
+
+// ─── Tree Context Menu ─────────────────────────────────────────────────────────
+function TreeContextMenu({
+  entity,
+  children,
+  actions,
+  mapObjects,
+}: {
+  entity: TreeEntity;
+  children: React.ReactNode;
+  actions: EntityContextActions;
+  mapObjects?: Array<{ id: string; renderOrder?: number; category: string }>;
+}) {
+  const isMapObject = entity.type === 'mapObject';
+  const isToken = entity.type === 'token';
+  const isRegion = entity.type === 'region';
+  const isLight = entity.type === 'light';
+  const isDoor = isMapObject && mapObjects?.find(o => o.id === entity.id)?.category === 'door';
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-52 text-xs">
+        {/* Universal: select */}
+        <ContextMenuItem
+          className="text-xs gap-2"
+          onClick={() => actions.onSelect(entity, false)}
+        >
+          <CircleDot className="h-3.5 w-3.5" />
+          Select
+        </ContextMenuItem>
+        <ContextMenuItem
+          className="text-xs gap-2"
+          onClick={() => actions.onSelectAdditive(entity)}
+        >
+          <Check className="h-3.5 w-3.5" />
+          Add to Selection
+        </ContextMenuItem>
+
+        <ContextMenuSeparator />
+
+        {/* Rename */}
+        <ContextMenuItem
+          className="text-xs gap-2"
+          onClick={() => actions.onRename(entity)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Rename
+        </ContextMenuItem>
+
+        {/* Lock / unlock */}
+        {(isMapObject || isRegion) && (
+          <ContextMenuItem
+            className="text-xs gap-2"
+            onClick={() => actions.onToggleLock(entity)}
+          >
+            {entity.locked ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+            {entity.locked ? 'Unlock' : 'Lock'}
+          </ContextMenuItem>
+        )}
+
+        {/* Visibility toggle */}
+        {(isToken || isLight) && actions.onToggleVisibility && (
+          <ContextMenuItem
+            className="text-xs gap-2"
+            onClick={() => actions.onToggleVisibility!(entity)}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Toggle Visibility
+          </ContextMenuItem>
+        )}
+
+        {/* Door toggle */}
+        {isDoor && actions.onToggleDoor && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-xs gap-2"
+              onClick={() => actions.onToggleDoor!(entity)}
+            >
+              <Square className="h-3.5 w-3.5" />
+              Toggle Door Open/Closed
+            </ContextMenuItem>
+          </>
+        )}
+
+        {/* Z-order controls — map objects only */}
+        {isMapObject && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="text-xs gap-2">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                Draw Order
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-44 text-xs">
+                <ContextMenuItem className="text-xs gap-2" onClick={() => actions.onBringToFront?.(entity)}>
+                  <ChevronsUp className="h-3.5 w-3.5" />
+                  Bring to Front
+                </ContextMenuItem>
+                <ContextMenuItem className="text-xs gap-2" onClick={() => actions.onMoveUp?.(entity)}>
+                  <ArrowUp className="h-3.5 w-3.5" />
+                  Move Up One Layer
+                </ContextMenuItem>
+                <ContextMenuItem className="text-xs gap-2" onClick={() => actions.onMoveDown?.(entity)}>
+                  <ArrowDown className="h-3.5 w-3.5" />
+                  Move Down One Layer
+                </ContextMenuItem>
+                <ContextMenuItem className="text-xs gap-2" onClick={() => actions.onSendToBack?.(entity)}>
+                  <ChevronsDown className="h-3.5 w-3.5" />
+                  Send to Back
+                </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          </>
+        )}
+
+        {/* Duplicate */}
+        {(isMapObject || isToken) && actions.onDuplicate && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-xs gap-2"
+              onClick={() => actions.onDuplicate!(entity)}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Duplicate
+            </ContextMenuItem>
+          </>
+        )}
+
+        {/* Eject from group */}
+        {actions.groupId && actions.onEjectFromGroup && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-xs gap-2"
+              onClick={() => actions.onEjectFromGroup!(actions.groupId!, entity.id)}
+            >
+              <Unlink className="h-3.5 w-3.5" />
+              Remove from Group
+            </ContextMenuItem>
+          </>
+        )}
+
+        <ContextMenuSeparator />
+
+        {/* Delete */}
+        <ContextMenuItem
+          className="text-xs gap-2 text-destructive focus:text-destructive"
+          onClick={() => actions.onDelete(entity)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 // ─── Inline rename input ───────────────────────────────────────────────────────
@@ -106,6 +294,9 @@ function EntityRow({
   depth = 0,
   groupId,
   selected,
+  renamingId,
+  onRenameCommit,
+  onRenameCancel,
   onToggleLock,
   onEjectFromGroup,
   onAddToNewGroup,
@@ -117,11 +308,16 @@ function EntityRow({
   onDragOver,
   onDrop,
   onDragEnd,
+  contextActions,
+  mapObjects,
 }: {
   entity: TreeEntity;
   depth?: number;
   groupId?: string;
   selected?: boolean;
+  renamingId?: string | null;
+  onRenameCommit?: (entity: TreeEntity, name: string) => void;
+  onRenameCancel?: () => void;
   onToggleLock?: (entity: TreeEntity) => void;
   onEjectFromGroup?: (groupId: string, entityId: string) => void;
   onAddToNewGroup?: (entity: TreeEntity) => void;
@@ -133,11 +329,14 @@ function EntityRow({
   onDragOver?: (e: React.DragEvent, entity: TreeEntity) => void;
   onDrop?: (e: React.DragEvent, entity: TreeEntity) => void;
   onDragEnd?: () => void;
+  contextActions: EntityContextActions;
+  mapObjects?: Array<{ id: string; renderOrder?: number; category: string }>;
 }) {
   const canLock = entity.type === 'region' || entity.type === 'mapObject';
   const canDrag = draggable && entity.type === 'mapObject';
+  const isRenaming = renamingId === entity.id;
 
-  return (
+  const rowContent = (
     <div className="relative">
       {dropIndicator === 'above' && (
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary rounded-full z-10 pointer-events-none" />
@@ -168,11 +367,23 @@ function EntityRow({
         />
 
         {entityTypeIcon[entity.type] || <Box className="h-3.5 w-3.5" />}
-        <span className="truncate flex-1 text-foreground">{getEntityName(entity)}</span>
-        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">{entity.type}</Badge>
+
+        {isRenaming ? (
+          <RenameInput
+            value={getEntityName(entity)}
+            onCommit={(name) => onRenameCommit?.(entity, name)}
+            onCancel={() => onRenameCancel?.()}
+          />
+        ) : (
+          <span className="truncate flex-1 text-foreground">{getEntityName(entity)}</span>
+        )}
+
+        {!isRenaming && (
+          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">{entity.type}</Badge>
+        )}
 
         {/* Eject from group (only when inside a group) */}
-        {groupId && onEjectFromGroup && (
+        {groupId && onEjectFromGroup && !isRenaming && (
           <button
             className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
             title="Remove from group (eject to ungrouped)"
@@ -183,7 +394,7 @@ function EntityRow({
         )}
 
         {/* Create new group (only ungrouped entities) */}
-        {!groupId && onAddToNewGroup && (
+        {!groupId && onAddToNewGroup && !isRenaming && (
           <button
             className="shrink-0 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-80 transition-opacity"
             title="Create a new group with this entity"
@@ -194,7 +405,7 @@ function EntityRow({
         )}
 
         {/* Lock toggle */}
-        {canLock ? (
+        {canLock && !isRenaming ? (
           <button
             className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
             title={entity.locked ? 'Unlock entity' : 'Lock entity'}
@@ -204,14 +415,24 @@ function EntityRow({
               ? <Lock className="h-3 w-3 text-primary" />
               : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
           </button>
-        ) : (
+        ) : !isRenaming ? (
           <span className="h-3 w-3 ml-0.5 shrink-0" />
-        )}
+        ) : null}
       </div>
       {dropIndicator === 'below' && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full z-10 pointer-events-none" />
       )}
     </div>
+  );
+
+  return (
+    <TreeContextMenu
+      entity={entity}
+      actions={{ ...contextActions, groupId, onEjectFromGroup }}
+      mapObjects={mapObjects}
+    >
+      {rowContent}
+    </TreeContextMenu>
   );
 }
 
@@ -220,6 +441,7 @@ function GroupNode({
   group,
   entities,
   selectedIds,
+  renamingId,
   onDelete,
   onToggleLock,
   onToggleEntityLock,
@@ -227,10 +449,15 @@ function GroupNode({
   onEjectFromGroup,
   onSelect,
   onSelectAdditive,
+  onRenameCommit,
+  onRenameCancel,
+  contextActions,
+  mapObjects,
 }: {
   group: EntityGroup;
   entities: TreeEntity[];
   selectedIds: Set<string>;
+  renamingId?: string | null;
   onDelete: (groupId: string) => void;
   onToggleLock: (group: EntityGroup) => void;
   onToggleEntityLock: (entity: TreeEntity) => void;
@@ -238,6 +465,10 @@ function GroupNode({
   onEjectFromGroup: (groupId: string, entityId: string) => void;
   onSelect: (entity: TreeEntity, additive: boolean) => void;
   onSelectAdditive: (entity: TreeEntity) => void;
+  onRenameCommit: (entity: TreeEntity, name: string) => void;
+  onRenameCancel: () => void;
+  contextActions: EntityContextActions;
+  mapObjects?: Array<{ id: string; renderOrder?: number; category: string }>;
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -317,10 +548,15 @@ function GroupNode({
             depth={1}
             groupId={group.id}
             selected={selectedIds.has(entity.id)}
+            renamingId={renamingId}
             onToggleLock={onToggleEntityLock}
             onEjectFromGroup={onEjectFromGroup}
             onSelect={onSelect}
             onSelectAdditive={onSelectAdditive}
+            onRenameCommit={onRenameCommit}
+            onRenameCancel={onRenameCancel}
+            contextActions={contextActions}
+            mapObjects={mapObjects}
           />
         ))}
       </CollapsibleContent>
@@ -337,22 +573,43 @@ export const MapTreeCardContent: React.FC = () => {
   const tokens      = useSessionStore(s => s.tokens);
   const selectedTokenIds = useSessionStore(s => s.selectedTokenIds ?? []);
   const setSelectedTokens = useSessionStore(s => s.setSelectedTokens);
+  const removeToken = useSessionStore(s => s.removeToken);
+  const updateTokenName = useSessionStore(s => s.updateTokenName);
+  const updateTokenHidden = useCallback((id: string, isHidden: boolean) => {
+    useSessionStore.setState(state => ({
+      tokens: state.tokens.map(t => t.id === id ? { ...t, isHidden } : t),
+    }));
+  }, []);
+
   const regions     = useRegionStore(s => s.regions);
   const updateRegion = useRegionStore(s => s.updateRegion);
+  const removeRegion = useRegionStore(s => s.removeRegion);
   const selectRegion = useRegionStore(s => s.selectRegion);
+
   const mapObjects  = useMapObjectStore(s => s.mapObjects);
   const selectedMapObjectIds = useMapObjectStore(s => s.selectedMapObjectIds);
   const updateMapObject = useMapObjectStore(s => s.updateMapObject);
+  const removeMapObject = useMapObjectStore(s => s.removeMapObject);
+  const addMapObject = useMapObjectStore(s => s.addMapObject);
   const selectMapObject = useMapObjectStore(s => s.selectMapObject);
   const reorderMapObject = useMapObjectStore(s => s.reorderMapObject);
   const normalizeRenderOrders = useMapObjectStore(s => s.normalizeRenderOrders);
+  const toggleDoor = useMapObjectStore(s => s.toggleDoor);
+
   const lights      = useLightStore(s => s.lights);
+  const removeLight = useLightStore(s => s.removeLight);
+  const updateLight = useLightStore(s => s.updateLight);
+  const toggleLight = useLightStore(s => s.toggleLight);
+
   const { groups, removeGroup, setGroupLocked, updateGroup, removeMemberFromGroup, addGroup } = useGroupStore();
 
   // ── Search & sort state ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('renderOrder');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // ── Inline rename state ───────────────────────────────────────────────────
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) {
@@ -418,13 +675,10 @@ export const MapTreeCardContent: React.FC = () => {
       return;
     }
 
-    // Compute new renderOrder: midpoint between neighbours in the sorted list.
-    // allEntities is sorted descending (frontmost first), so higher index = lower order.
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     const dropPos: 'above' | 'below' = e.clientY < midY ? 'above' : 'below';
 
-    // Get sorted mapObjects by effective renderOrder ascending
     const sortedObjs = [...mapObjects].sort((a, b) => {
       const ao = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
       const bo = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
@@ -432,18 +686,15 @@ export const MapTreeCardContent: React.FC = () => {
     });
 
     const targetIdx = sortedObjs.findIndex(o => o.id === target.id);
-    // In tree view ascending = bottom of list (lower draw order), so "above" in tree = higher draw order
     let prevOrder: number;
     let nextOrder: number;
 
     if (dropPos === 'above') {
-      // Insert just above target in tree = just after target in ascending draw order
       const prevObj = sortedObjs[targetIdx + 1];
       const nextObj = sortedObjs[targetIdx];
       prevOrder = nextObj ? (nextObj.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[nextObj.category] ?? 50) : 0;
       nextOrder = prevObj ? (prevObj.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[prevObj.category] ?? 50) : prevOrder + 100;
     } else {
-      // Insert just below target in tree = just before target in ascending draw order
       const prevObj = sortedObjs[targetIdx];
       const nextObj = sortedObjs[targetIdx - 1];
       nextOrder = prevObj ? (prevObj.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[prevObj.category] ?? 50) : 0;
@@ -453,9 +704,7 @@ export const MapTreeCardContent: React.FC = () => {
     const newOrder = (prevOrder + nextOrder) / 2;
 
     if (Math.abs(nextOrder - prevOrder) < 1) {
-      // Gap too small — normalize first, then reorder
       normalizeRenderOrders();
-      // After normalization, just set to the target's new order ±5
       const tgt = mapObjects.find(o => o.id === target.id);
       const tgtNorm = tgt ? ((mapObjects.indexOf(tgt) + 1) * 10) : 50;
       reorderMapObject(dragged.id, dropPos === 'above' ? tgtNorm + 5 : tgtNorm - 5);
@@ -471,6 +720,156 @@ export const MapTreeCardContent: React.FC = () => {
     dragEntityRef.current = null;
     setDropTarget(null);
   }, []);
+
+  // ── Context menu action handlers ──────────────────────────────────────────
+
+  const handleDelete = useCallback((entity: TreeEntity) => {
+    if (entity.type === 'mapObject') {
+      removeMapObject(entity.id);
+      toast.success(`Deleted "${getEntityName(entity)}"`);
+    } else if (entity.type === 'token') {
+      removeToken(entity.id);
+      toast.success(`Deleted token "${getEntityName(entity)}"`);
+    } else if (entity.type === 'region') {
+      removeRegion(entity.id);
+      toast.success(`Deleted region`);
+    } else if (entity.type === 'light') {
+      removeLight(entity.id);
+      toast.success(`Deleted light "${getEntityName(entity)}"`);
+    }
+  }, [removeMapObject, removeToken, removeRegion, removeLight]);
+
+  const handleRenameStart = useCallback((entity: TreeEntity) => {
+    setRenamingId(entity.id);
+  }, []);
+
+  const handleRenameCommit = useCallback((entity: TreeEntity, name: string) => {
+    if (entity.type === 'mapObject') {
+      updateMapObject(entity.id, { label: name });
+    } else if (entity.type === 'token') {
+      updateTokenName(entity.id, name);
+    } else if (entity.type === 'light') {
+      updateLight(entity.id, { label: name });
+    }
+    setRenamingId(null);
+    toast.success(`Renamed to "${name}"`);
+  }, [updateMapObject, updateTokenName, updateLight]);
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingId(null);
+  }, []);
+
+  const handleToggleVisibility = useCallback((entity: TreeEntity) => {
+    if (entity.type === 'token') {
+      const token = tokens.find(t => t.id === entity.id);
+      if (token) {
+        updateTokenHidden(entity.id, !token.isHidden);
+        toast.success(`Token ${token.isHidden ? 'shown' : 'hidden'}`);
+      }
+    } else if (entity.type === 'light') {
+      toggleLight(entity.id);
+      toast.success('Light toggled');
+    }
+  }, [tokens, updateTokenHidden, toggleLight]);
+
+  const handleToggleDoor = useCallback((entity: TreeEntity) => {
+    toggleDoor(entity.id);
+    toast.success('Door toggled');
+  }, [toggleDoor]);
+
+  const handleDuplicate = useCallback((entity: TreeEntity) => {
+    if (entity.type === 'mapObject') {
+      const obj = mapObjects.find(o => o.id === entity.id);
+      if (!obj) return;
+      const { id: _id, ...rest } = obj;
+      addMapObject({
+        ...rest,
+        selected: false,
+        position: { x: obj.position.x + 20, y: obj.position.y + 20 },
+      });
+      toast.success(`Duplicated "${getEntityName(entity)}"`);
+    } else if (entity.type === 'token') {
+      const token = tokens.find(t => t.id === entity.id);
+      if (!token) return;
+      const newId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      useSessionStore.getState().addToken({ ...token, id: newId, x: token.x + 50, y: token.y + 50 });
+      toast.success(`Duplicated token "${getEntityName(entity)}"`);
+    }
+  }, [mapObjects, tokens, addMapObject]);
+
+  const getSortedMapObjectIds = useCallback(() => {
+    return [...mapObjects]
+      .sort((a, b) => {
+        const ao = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
+        const bo = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
+        return ao - bo;
+      })
+      .map(o => o.id);
+  }, [mapObjects]);
+
+  const handleBringToFront = useCallback((entity: TreeEntity) => {
+    const sorted = getSortedMapObjectIds();
+    const maxOrder = Math.max(...mapObjects.map(o => o.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[o.category] ?? 50));
+    reorderMapObject(entity.id, maxOrder + 10);
+    toast.success('Brought to front');
+  }, [mapObjects, getSortedMapObjectIds, reorderMapObject]);
+
+  const handleSendToBack = useCallback((entity: TreeEntity) => {
+    const minOrder = Math.min(...mapObjects.map(o => o.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[o.category] ?? 50));
+    reorderMapObject(entity.id, Math.max(0, minOrder - 10));
+    toast.success('Sent to back');
+  }, [mapObjects, reorderMapObject]);
+
+  const handleMoveUp = useCallback((entity: TreeEntity) => {
+    const sorted = [...mapObjects].sort((a, b) => {
+      const ao = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
+      const bo = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
+      return ao - bo;
+    });
+    const currentIdx = sorted.findIndex(o => o.id === entity.id);
+    if (currentIdx < sorted.length - 1) {
+      const above = sorted[currentIdx + 1];
+      const aboveAbove = sorted[currentIdx + 2];
+      const currentOrder = sorted[currentIdx].renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[sorted[currentIdx].category] ?? 50;
+      const aboveOrder = above.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[above.category] ?? 50;
+      const aboveAboveOrder = aboveAbove ? (aboveAbove.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[aboveAbove.category] ?? 50) : aboveOrder + 20;
+      const newOrder = (aboveOrder + aboveAboveOrder) / 2;
+      if (Math.abs(aboveAboveOrder - aboveOrder) < 1) {
+        normalizeRenderOrders();
+        reorderMapObject(entity.id, aboveOrder + 5);
+      } else {
+        reorderMapObject(entity.id, newOrder);
+      }
+      toast.success('Moved up one layer');
+    } else {
+      toast.info('Already at front');
+    }
+  }, [mapObjects, reorderMapObject, normalizeRenderOrders]);
+
+  const handleMoveDown = useCallback((entity: TreeEntity) => {
+    const sorted = [...mapObjects].sort((a, b) => {
+      const ao = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
+      const bo = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
+      return ao - bo;
+    });
+    const currentIdx = sorted.findIndex(o => o.id === entity.id);
+    if (currentIdx > 0) {
+      const below = sorted[currentIdx - 1];
+      const belowBelow = sorted[currentIdx - 2];
+      const belowOrder = below.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[below.category] ?? 50;
+      const belowBelowOrder = belowBelow ? (belowBelow.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[belowBelow.category] ?? 50) : belowOrder - 20;
+      const newOrder = (belowOrder + belowBelowOrder) / 2;
+      if (Math.abs(belowOrder - belowBelowOrder) < 1) {
+        normalizeRenderOrders();
+        reorderMapObject(entity.id, belowOrder - 5);
+      } else {
+        reorderMapObject(entity.id, newOrder);
+      }
+      toast.success('Moved down one layer');
+    } else {
+      toast.info('Already at back');
+    }
+  }, [mapObjects, reorderMapObject, normalizeRenderOrders]);
 
   // ── Other handlers ─────────────────────────────────────────────────────────
   const handleDeleteGroup = (groupId: string) => {
@@ -526,6 +925,27 @@ export const MapTreeCardContent: React.FC = () => {
     addGroup(name, [{ id: entity.id, type: entity.type }], [geometry]);
     toast.success(`Created group "${name}"`);
   };
+
+  // ── Build contextActions object ────────────────────────────────────────────
+  const contextActions: EntityContextActions = useMemo(() => ({
+    onSelect: handleSelect,
+    onSelectAdditive: handleSelectAdditive,
+    onToggleLock: handleToggleEntityLock,
+    onDelete: handleDelete,
+    onRename: handleRenameStart,
+    onToggleVisibility: handleToggleVisibility,
+    onBringToFront: handleBringToFront,
+    onSendToBack: handleSendToBack,
+    onMoveUp: handleMoveUp,
+    onMoveDown: handleMoveDown,
+    onDuplicate: handleDuplicate,
+    onToggleDoor: handleToggleDoor,
+    onEjectFromGroup: handleEjectFromGroup,
+  }), [
+    handleSelect, handleSelectAdditive, handleToggleEntityLock, handleDelete,
+    handleRenameStart, handleToggleVisibility, handleBringToFront, handleSendToBack,
+    handleMoveUp, handleMoveDown, handleDuplicate, handleToggleDoor, handleEjectFromGroup,
+  ]);
 
   // ── Build flat entity list ────────────────────────────────────────────────
   const allEntities = useMemo<TreeEntity[]>(() => {
@@ -583,6 +1003,12 @@ export const MapTreeCardContent: React.FC = () => {
   }, [groups]);
 
   const ungroupedEntities = allEntities.filter(e => !groupedEntityIds.has(e.id));
+
+  // Expose mapObjects as a simpler shape for context menu category detection
+  const mapObjectsForContext = useMemo(() =>
+    mapObjects.map(o => ({ id: o.id, renderOrder: o.renderOrder, category: o.category })),
+    [mapObjects]
+  );
 
   return (
     <ScrollArea className="h-full">
@@ -656,6 +1082,7 @@ export const MapTreeCardContent: React.FC = () => {
             group={group}
             entities={allEntities}
             selectedIds={allSelectedIds}
+            renamingId={renamingId}
             onDelete={handleDeleteGroup}
             onToggleLock={handleToggleGroupLock}
             onToggleEntityLock={handleToggleEntityLock}
@@ -663,6 +1090,10 @@ export const MapTreeCardContent: React.FC = () => {
             onEjectFromGroup={handleEjectFromGroup}
             onSelect={handleSelect}
             onSelectAdditive={handleSelectAdditive}
+            onRenameCommit={handleRenameCommit}
+            onRenameCancel={handleRenameCancel}
+            contextActions={contextActions}
+            mapObjects={mapObjectsForContext}
           />
         ))}
 
@@ -679,16 +1110,21 @@ export const MapTreeCardContent: React.FC = () => {
             key={`${entity.type}-${entity.id}`}
             entity={entity}
             selected={allSelectedIds.has(entity.id)}
+            renamingId={renamingId}
             onToggleLock={handleToggleEntityLock}
             onAddToNewGroup={handleAddToNewGroup}
             onSelect={handleSelect}
             onSelectAdditive={handleSelectAdditive}
+            onRenameCommit={handleRenameCommit}
+            onRenameCancel={handleRenameCancel}
             draggable={entity.type === 'mapObject'}
             dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragEnd={handleDragEnd}
+            contextActions={contextActions}
+            mapObjects={mapObjectsForContext}
           />
         ))}
 
