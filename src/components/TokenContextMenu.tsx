@@ -837,6 +837,14 @@ export const TokenContextMenu = ({
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className="w-56 bg-popover z-[1000]">
+          {/* Character Sheet - always available for single tokens */}
+          {!isMultiSelection && (
+            <ContextMenuItem onClick={handleViewStats}>
+              <FileText className="mr-2 h-4 w-4" />
+              <span>Character Sheet</span>
+            </ContextMenuItem>
+          )}
+          {!isMultiSelection && <ContextMenuSeparator />}
           <ContextMenuItem onClick={handleEditTokenClick} disabled={!canControl}>
             <Edit3 className="mr-2 h-4 w-4" />
             <span>Edit Token{isMultiSelection ? 's' : ''}</span>
@@ -873,13 +881,6 @@ export const TokenContextMenu = ({
                 })}
               </ContextMenuSubContent>
             </ContextMenuSub>
-          )}
-          {/* Character Sheet - always available for single tokens */}
-          {!isMultiSelection && (
-            <ContextMenuItem onClick={handleViewStats}>
-              <FileText className="mr-2 h-4 w-4" />
-              <span>Character Sheet</span>
-            </ContextMenuItem>
           )}
           <ContextMenuSeparator />
           <ContextMenuCheckboxItem
