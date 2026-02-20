@@ -288,39 +288,30 @@ export const TokenContextMenu = ({
   const linkedCreatureType = linkedCreatureId ? getCreatureType(linkedCreatureId) : undefined;
   const hasLinkedCreature = !!linkedCreatureType;
 
-  // Handle opening the linked creature's stat block or character sheet
+  // Handle opening the character sheet card for any token (linked or not)
   const handleViewStats = () => {
-    if (!linkedCreatureId || !linkedCreatureType) return;
+    if (!currentToken) return;
     
-    const cardType = linkedCreatureType === 'monster' 
-      ? CardType.MONSTER_STAT_BLOCK 
-      : CardType.CHARACTER_SHEET;
-    
-    // Use correct metadata key based on creature type
-    const metadataKey = linkedCreatureType === 'monster' ? 'monsterId' : 'characterId';
-    
-    // Check if a card of this type already exists with this creature
+    // Always open as CHARACTER_SHEET with tokenId
     const existingCard = cards.find(c => 
-      c.type === cardType && 
-      c.metadata?.[metadataKey] === linkedCreatureId
+      c.type === CardType.CHARACTER_SHEET && 
+      c.metadata?.tokenId === currentToken.id
     );
     
     if (existingCard) {
-      // Show and bring existing card to front
       setVisibility(existingCard.id, true);
       bringToFront(existingCard.id);
     } else {
-      // Register a new card with the creature ID using correct metadata key
       const cardId = registerCard({
-        type: cardType,
-        title: linkedCreatureType === 'monster' ? 'Monster Stat Block' : 'Character Sheet',
+        type: CardType.CHARACTER_SHEET,
+        title: 'Character Sheet',
         defaultPosition: { x: 360, y: 80 },
-        defaultSize: { width: 420, height: 650 },
-        minSize: { width: 380, height: 500 },
+        defaultSize: { width: 480, height: 680 },
+        minSize: { width: 400, height: 500 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
-        metadata: { [metadataKey]: linkedCreatureId },
+        metadata: { tokenId: currentToken.id },
       });
       bringToFront(cardId);
     }
@@ -834,11 +825,11 @@ export const TokenContextMenu = ({
               </ContextMenuSubContent>
             </ContextMenuSub>
           )}
-          {/* View Stats - only show for single token with linked creature */}
-          {hasLinkedCreature && (
+          {/* Character Sheet - always available for single tokens */}
+          {!isMultiSelection && (
             <ContextMenuItem onClick={handleViewStats}>
               <FileText className="mr-2 h-4 w-4" />
-              <span>View {linkedCreatureType === 'monster' ? 'Stat Block' : 'Character Sheet'}</span>
+              <span>{hasLinkedCreature && linkedCreatureType === 'monster' ? 'Stat Block' : 'Character Sheet'}</span>
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />

@@ -214,7 +214,7 @@ function renderCardContent(
     case CardType.MAP_OBJECTS:
       return <MapObjectPanelCardContent />;
     case CardType.CHARACTER_SHEET:
-      return <CharacterSheetCardContent characterId={(metadata?.characterId as string) || ''} />;
+      return <CharacterSheetCardContent tokenId={(metadata?.tokenId as string) || ''} characterId={(metadata?.characterId as string) || ''} />;
     case CardType.MONSTER_STAT_BLOCK:
       return <MonsterStatBlockCardContent monsterId={(metadata?.monsterId as string) || ''} />;
     case CardType.CREATURE_LIBRARY:
