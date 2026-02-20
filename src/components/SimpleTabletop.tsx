@@ -1171,6 +1171,54 @@ export const SimpleTabletop = () => {
     }
   }, [renderingMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // DM escape hatch: listen for manual fog-refresh requests from the UI
+  useEffect(() => {
+    const handleForceFogRefresh = () => {
+      console.log('[Fog] Force refresh triggered by DM');
+
+      // 1. Rebuild combined wall+obstacle segments from fresh state
+      if (wallGeometryRef.current) {
+        const mapObjectSegments = mapObjectsToSegments(mapObjects);
+        combinedSegmentsRef.current = [
+          ...wallGeometryRef.current.wallSegments,
+          ...mapObjectSegments,
+          ...importedWallSegments,
+        ];
+      }
+
+      // 2. Notify light system that obstacle geometry has changed
+      notifyObstaclesChanged();
+
+      // 3. Clear all per-token visibility caches
+      tokenVisibilityCacheRef.current.forEach((cached) => {
+        if (cached?.visionPath?.remove) cached.visionPath.remove();
+      });
+      tokenVisibilityCacheRef.current.clear();
+      prevTokenPositionsRef.current.clear();
+      prevTokenIlluminationRef.current?.clear?.();
+
+      // 4. Clear global Paper.js / visibility-polygon cache
+      clearVisibilityCache();
+
+      // 5. Null out the fog mask to force fresh computation
+      fogMasksRef.current = null;
+
+      // 6. Reset PixiJS post-processing layer for a clean frame
+      if (isPostProcessingReadyRef.current) {
+        setPostProcessingVisible(false);
+        requestAnimationFrame(() => {
+          setPostProcessingVisible(true);
+          redrawCanvas();
+        });
+      } else {
+        redrawCanvas();
+      }
+    };
+
+    window.addEventListener('fog:force-refresh', handleForceFogRefresh);
+    return () => window.removeEventListener('fog:force-refresh', handleForceFogRefresh);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Compute fog of war masks when tokens move or fog settings change
   // Skip during dragging to prevent stuttering
   useEffect(() => {
