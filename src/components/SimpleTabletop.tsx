@@ -8454,70 +8454,59 @@ export const SimpleTabletop = () => {
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel />
 
-      {/* Unified Selection Toolbar - Shows when multiple entity types are selected */}
-      {(() => {
-        const multiTypeCount = [
-          selectedTokenIds.length > 0,
-          selectedRegionIds.length > 0,
-          selectedMapObjectIds.length > 0,
-          selectedLightIds.length > 0,
-        ].filter(Boolean).length;
-        const isMultiType = multiTypeCount >= 2;
+      {/* Unified Selection Toolbar - Shows when 2+ entities or a group is selected */}
+      <UnifiedSelectionToolbar
+        selectedTokenIds={selectedTokenIds}
+        selectedRegionIds={selectedRegionIds}
+        selectedMapObjectIds={selectedMapObjectIds}
+        selectedLightIds={selectedLightIds}
+        onClearAll={() => {
+          setSelectedTokenIds([]);
+          selectedRegionIds.forEach(id => deselectRegion(id));
+          setSelectedRegionIds([]);
+          clearMapObjectSelection();
+          clearLightSelection();
+          redrawCanvas();
+        }}
+      />
 
-        return isMultiType ? (
-          <UnifiedSelectionToolbar
-            selectedTokenIds={selectedTokenIds}
-            selectedRegionIds={selectedRegionIds}
-            selectedMapObjectIds={selectedMapObjectIds}
-            selectedLightIds={selectedLightIds}
-            onClearAll={() => {
-              setSelectedTokenIds([]);
-              selectedRegionIds.forEach(id => deselectRegion(id));
-              setSelectedRegionIds([]);
-              clearMapObjectSelection();
-              clearLightSelection();
-              redrawCanvas();
-            }}
-          />
-        ) : (
-          <>
-            {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
-            <BulkOperationsToolbar
-              selectedTokenIds={selectedTokenIds}
-              onClearSelection={() => setSelectedTokenIds([])}
-              onUpdateCanvas={handleCanvasUpdate}
-            />
+      {/* Type-specific toolbars - always rendered alongside unified bar */}
+      <>
+        {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
+        <BulkOperationsToolbar
+          selectedTokenIds={selectedTokenIds}
+          onClearSelection={() => setSelectedTokenIds([])}
+          onUpdateCanvas={handleCanvasUpdate}
+        />
 
-            {/* Region Control Bar - Shows when region(s) are selected */}
-            <RegionControlBar
-              selectedRegionIds={selectedRegionIds}
-              onClearSelection={() => {
-                selectedRegionIds.forEach(id => deselectRegion(id));
-                setSelectedRegionIds([]);
-                redrawCanvas();
-              }}
-              onUpdateCanvas={handleCanvasUpdate}
-              onSelectAll={() => {
-                regions.forEach(region => selectRegion(region.id));
-                setSelectedRegionIds(regions.map(r => r.id));
-                redrawCanvas();
-              }}
-            />
+        {/* Region Control Bar - Shows when region(s) are selected */}
+        <RegionControlBar
+          selectedRegionIds={selectedRegionIds}
+          onClearSelection={() => {
+            selectedRegionIds.forEach(id => deselectRegion(id));
+            setSelectedRegionIds([]);
+            redrawCanvas();
+          }}
+          onUpdateCanvas={handleCanvasUpdate}
+          onSelectAll={() => {
+            regions.forEach(region => selectRegion(region.id));
+            setSelectedRegionIds(regions.map(r => r.id));
+            redrawCanvas();
+          }}
+        />
 
-            {/* Map Object Control Bar - Shows when map object(s) are selected */}
-            <MapObjectControlBar
-              pointEditMode={wallPointEditMode}
-              onTogglePointEditMode={() => {
-                setWallPointEditMode(prev => !prev);
-                setMapObjectTool('points');
-              }}
-              mapObjectTool={mapObjectTool}
-              onSetMapObjectTool={setMapObjectTool}
-              onUpdateCanvas={handleCanvasUpdate}
-            />
-          </>
-        );
-      })()}
+        {/* Map Object Control Bar - Shows when map object(s) are selected */}
+        <MapObjectControlBar
+          pointEditMode={wallPointEditMode}
+          onTogglePointEditMode={() => {
+            setWallPointEditMode(prev => !prev);
+            setMapObjectTool('points');
+          }}
+          mapObjectTool={mapObjectTool}
+          onSetMapObjectTool={setMapObjectTool}
+          onUpdateCanvas={handleCanvasUpdate}
+        />
+      </>
 
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
