@@ -4,7 +4,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useFogStore, type EffectQuality } from '@/stores/fogStore';
 import { useUiModeStore, type DmFogVisibility } from '@/stores/uiModeStore';
-import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, Ghost } from 'lucide-react';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, Ghost, RefreshCw } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
@@ -299,6 +299,32 @@ export function FogControlCardContent() {
             </div>
           </>
         )}
+      </div>
+
+      <Separator />
+
+      {/* Force Fog Refresh — DM escape hatch */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <RefreshCw className="h-3 w-3" />
+            Force Fog Refresh
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Re-initialise fog if it looks wrong after editing
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('fog:force-refresh'));
+            toast('Fog refreshed');
+          }}
+          disabled={!enabled}
+        >
+          Refresh
+        </Button>
       </div>
 
       <Separator />
