@@ -623,10 +623,12 @@ export function renderMapObject(
       ctx.stroke();
       ctx.restore();
     } else if (shape === 'light') {
-      // For lights, draw a circle around center
-      ctx.beginPath();
-      ctx.arc(0, 0, 12 / zoom + selectionPadding, 0, Math.PI * 2);
-      ctx.stroke();
+      // For lights, only draw selection indicator in editor/DM view
+      if (isDMView) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 12 / zoom + selectionPadding, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     } else if (shape === 'circle') {
       const radius = Math.min(width, height) / 2 + selectionPadding;
       ctx.beginPath();
