@@ -1,9 +1,8 @@
 import React, { Suspense, useState } from 'react';
-import { APP_VERSION } from '@/lib/version';
+import { LandingScreen } from '@/components/LandingScreen';
+import { useSessionStore } from '@/stores/sessionStore';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
-
-const isLovableSandbox = true;
 
 const LoadingScreen = () => (
   <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
@@ -15,24 +14,16 @@ const LoadingScreen = () => (
 );
 
 const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
-  const [launched, setLaunched] = useState(!isLovableSandbox);
+  const [launched, setLaunched] = useState(false);
+  const players = useSessionStore((state) => state.players);
+
+  // A session exists if at least one player has been assigned a name
+  const hasSession = players.some(p => p.name && p.name.trim().length > 0);
 
   if (!launched) {
     return (
-      <div ref={ref} className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
-        <div className="text-center space-y-6">
-          <h1 className="text-3xl font-bold text-foreground">Tabletop Ready</h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            The application is paused to prevent sandbox crashes. Click below to launch.
-          </p>
-          <p className="text-xs text-muted-foreground/60">v{APP_VERSION}</p>
-          <button
-            onClick={() => setLaunched(true)}
-            className="px-8 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-          >
-            Launch Tabletop
-          </button>
-        </div>
+      <div ref={ref}>
+        <LandingScreen onLaunch={() => setLaunched(true)} hasSession={hasSession} />
       </div>
     );
   }
