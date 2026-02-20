@@ -1,15 +1,20 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { InitiativeCard } from '@/components/InitiativeCard';
 import { TurnCard } from '@/components/TurnCard';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Swords, Dices } from 'lucide-react';
 import { toast } from 'sonner';
 import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
 
-export function InitiativeTrackerCardContent() {
+interface InitiativeTrackerCardContentProps {
+  selectedTokenIds?: string[];
+}
+
+export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: InitiativeTrackerCardContentProps) {
   const {
     currentTurnIndex,
     roundNumber,
@@ -19,12 +24,16 @@ export function InitiativeTrackerCardContent() {
     removeFromInitiative,
     reorderInitiative,
     updateInitiative,
+    addToInitiative,
     resetRound
   } = useInitiativeStore();
 
   const { tokens, players, currentPlayerId } = useSessionStore();
   const { roles } = useRoleStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Local initiative values for the multi-select roll panel
+  const [multiInitValues, setMultiInitValues] = useState<Record<string, string>>({});
 
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const isDM = currentPlayer ? hasPermission(currentPlayer, roles, 'canSeeAllFog') : false;
@@ -64,9 +73,9 @@ export function InitiativeTrackerCardContent() {
   };
 
   const totalCards = initiativeOrder.length + 1;
-  const baseSize = 60; // Reduced from 80
-  const maxSize = 75;  // Reduced from 100
-  const minSize = 45;  // Reduced from 60
+  const baseSize = 60;
+  const maxSize = 75;
+  const minSize = 45;
   
   let cardSize = baseSize;
   if (totalCards > 8) {
@@ -79,15 +88,10 @@ export function InitiativeTrackerCardContent() {
   const visibleInitiativeOrder = initiativeOrder.filter(entry => {
     const token = tokens.find(t => t.id === entry.tokenId);
     if (!token) return false;
-    
-    // DM can see all tokens
     if (isDM) return true;
-    
-    // For players, check if they can see the token
     if (currentPlayer) {
       return canSeeToken(token, currentPlayer, roles);
     }
-    
     return true;
   });
 
@@ -99,8 +103,97 @@ export function InitiativeTrackerCardContent() {
     return token.isHidden === true;
   };
 
+  // Multi-select initiative panel: tokens selected in play mode that are not in initiative
+  const multiSelectedTokens = selectedTokenIds.length > 1
+    ? selectedTokenIds.map(id => tokens.find(t => t.id === id)).filter(Boolean)
+    : [];
+
+  const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+
+  const handleRollAll = () => {
+    multiSelectedTokens.forEach(token => {
+      if (!token) return;
+      const roll = rollD20();
+      setMultiInitValues(prev => ({ ...prev, [token.id]: String(roll) }));
+    });
+  };
+
+  const handleCommitAll = () => {
+    let count = 0;
+    multiSelectedTokens.forEach(token => {
+      if (!token) return;
+      const raw = multiInitValues[token.id];
+      const value = raw !== undefined ? parseInt(raw) : rollD20();
+      if (!isNaN(value)) {
+        addToInitiative(token.id, value);
+        count++;
+      }
+    });
+    setMultiInitValues({});
+    if (count > 0) toast.success(`Added ${count} token${count !== 1 ? 's' : ''} to initiative`);
+  };
+
   return (
     <div className="flex flex-col items-center gap-1.5 p-1.5 bg-background/80 backdrop-blur-sm rounded-lg">
+      {/* Multi-select initiative panel — only visible when 2+ tokens are selected */}
+      {multiSelectedTokens.length > 1 && (
+        <div className="w-full px-1.5 pb-1.5 border-b border-border mb-1">
+          <div className="flex items-center gap-1 mb-1.5">
+            <Swords className="h-3 w-3 text-primary" />
+            <span className="text-xs font-semibold text-primary">Group Initiative</span>
+          </div>
+          <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+            {multiSelectedTokens.map(token => {
+              if (!token) return null;
+              const currentEntry = initiativeOrder.find(e => e.tokenId === token.id);
+              return (
+                <div key={token.id} className="flex items-center gap-1.5">
+                  <div
+                    className="w-5 h-5 rounded-full flex-shrink-0 border border-border"
+                    style={{
+                      backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
+                      backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
+                      backgroundSize: 'cover',
+                    }}
+                  />
+                  <span className="text-xs text-foreground truncate flex-1 min-w-0">
+                    {token.label || token.name}
+                    {currentEntry && (
+                      <span className="text-muted-foreground ml-1">({currentEntry.initiative})</span>
+                    )}
+                  </span>
+                  <Input
+                    type="number"
+                    placeholder="d20"
+                    value={multiInitValues[token.id] ?? ''}
+                    onChange={e => setMultiInitValues(prev => ({ ...prev, [token.id]: e.target.value }))}
+                    className="w-12 h-5 text-center text-xs p-0 px-1"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-1 mt-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-6 text-xs"
+              onClick={handleRollAll}
+            >
+              <Dices className="h-3 w-3 mr-1" />
+              Roll All
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 h-6 text-xs"
+              onClick={handleCommitAll}
+            >
+              Add to Init
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Button
         variant="ghost"
         size="icon"
