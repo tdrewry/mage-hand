@@ -527,11 +527,15 @@ export const SimpleTabletop = () => {
   const rotationStartAngleRef = useRef(0);
   const [tempRegionRotation, setTempRegionRotation] = useState<{ [regionId: string]: number }>({});
   
-  // Marquee selection state
+  // Marquee selection — use refs to avoid React re-renders (eliminates flicker)
+  const isMarqueeSelectingRef = useRef(false);
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const marqueeEndRef = useRef<{ x: number; y: number } | null>(null);
+  // Keep a React state bool only for the completion check in mouseUp (not for rendering)
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
-  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
-  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
-  const [marqueeMode, setMarqueeMode] = useState<'regions' | 'tokens' | 'both' | 'all'>('all');
+  const marqueeStart = marqueeStartRef.current;
+  const marqueeEnd = marqueeEndRef.current;
+  const marqueeDivRef = useRef<HTMLDivElement>(null);
   
   // Undo/Redo: Track initial states before transformations
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -2616,28 +2620,8 @@ export const SimpleTabletop = () => {
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
     
-    // Draw marquee selection rectangle (edit mode always; play mode token-only marquee)
-    if (isMarqueeSelecting && marqueeStart && marqueeEnd) {
-      const minX = Math.min(marqueeStart.x, marqueeEnd.x);
-      const minY = Math.min(marqueeStart.y, marqueeEnd.y);
-      const width = Math.abs(marqueeEnd.x - marqueeStart.x);
-      const height = Math.abs(marqueeEnd.y - marqueeStart.y);
-      
-      ctx.save();
-      // Slightly different tint in play mode to hint tokens-only
-      const fillColor = renderingMode === 'play'
-        ? 'rgba(16, 185, 129, 0.12)' // green tint for player mode
-        : 'rgba(79, 70, 229, 0.15)'; // indigo for edit mode
-      const strokeColor = renderingMode === 'play' ? '#10b981' : '#4f46e5';
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(minX, minY, width, height);
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2 / transform.zoom;
-      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
-      ctx.strokeRect(minX, minY, width, height);
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
+    // Marquee is now rendered as a DOM div above the fog layer (see marqueeDivRef in JSX)
+    // No canvas drawing needed here — this avoids z-order issues with fog post-processing.
 
     // Helper to draw annotation MapObjects to a given context (with world-space transform applied)
     const drawAnnotationsToContext = (targetCtx: CanvasRenderingContext2D) => {
@@ -5283,6 +5267,46 @@ export const SimpleTabletop = () => {
     // Include mapObjects so door state changes are reflected immediately in animation frames
   }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
 
+  // ---------------------------------------------------------------------------
+  // Marquee DOM helpers — update/hide the marquee <div> directly via ref so
+  // that we never trigger a React re-render during the drag (eliminates flicker).
+  // Positions are in SCREEN space (CSS pixels), derived from world coords + transform.
+  // ---------------------------------------------------------------------------
+  const updateMarqueeDivFromRefs = () => {
+    const div = marqueeDivRef.current;
+    const canvas = canvasRef.current;
+    if (!div || !canvas || !marqueeStartRef.current || !marqueeEndRef.current) return;
+
+    const start = marqueeStartRef.current;
+    const end = marqueeEndRef.current;
+
+    // Convert world → screen using the latest transform (via ref to avoid stale closure)
+    const t = transformRef.current;
+    const toScreen = (wx: number, wy: number) => ({
+      sx: wx * t.zoom + t.x,
+      sy: wy * t.zoom + t.y,
+    });
+
+    const s = toScreen(start.x, start.y);
+    const en = toScreen(end.x, end.y);
+
+    const left = Math.min(s.sx, en.sx);
+    const top  = Math.min(s.sy, en.sy);
+    const w    = Math.abs(en.sx - s.sx);
+    const h    = Math.abs(en.sy - s.sy);
+
+    div.style.left    = `${left}px`;
+    div.style.top     = `${top}px`;
+    div.style.width   = `${w}px`;
+    div.style.height  = `${h}px`;
+    div.style.display = 'block';
+  };
+
+  const hideMarqueeDiv = () => {
+    const div = marqueeDivRef.current;
+    if (div) div.style.display = 'none';
+  };
+
   // Add click handler to place tokens or select them
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button === 0 && !isPanning && !isDraggingToken) {
@@ -5340,11 +5364,16 @@ export const SimpleTabletop = () => {
           }
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
-          // Trigger visual animation before state change
           const isOpening = !clickedMapObject.isOpen;
           triggerDoorAnimation(clickedMapObject.id, isOpening);
-          // The useEffect on mapObjects handles segment updates, cache clearing, and redraw
           toggleDoor(clickedMapObject.id);
+        } else if (renderingMode === 'play') {
+          // In play mode, non-door map objects are not interactive — start marquee instead
+          isMarqueeSelectingRef.current = true;
+          marqueeStartRef.current = worldPos;
+          marqueeEndRef.current = worldPos;
+          setIsMarqueeSelecting(true);
+          setSelectedTokenIds([]);
         }
       } else if (clickedRegion) {
         // Only allow region selection in edit mode
@@ -5353,13 +5382,11 @@ export const SimpleTabletop = () => {
           const clickedRegionGroup = useGroupStore.getState().getGroupForEntity(clickedRegion.id);
           const overGroupHandle = clickedRegionGroup && isOverGroupRotationHandle(worldPos.x, worldPos.y, clickedRegionGroup);
           if (clickedRegion.selected && (overGroupHandle || isOverRotationHandle(worldPos.x, worldPos.y, clickedRegion))) {
-            // Don't deselect if clicking on a rotation handle - let it handle rotation
             return;
           }
 
           // Region selection logic - handle multi-select with shift key
           if (e.shiftKey) {
-            // Shift+click: toggle region in selection
             if (selectedRegionIds.includes(clickedRegion.id)) {
               setSelectedRegionIds(prev => prev.filter(id => id !== clickedRegion.id));
               deselectRegion(clickedRegion.id);
@@ -5368,7 +5395,6 @@ export const SimpleTabletop = () => {
               selectRegion(clickedRegion.id);
             }
           } else {
-            // Normal click: check group membership
             const propagated = propagateGroupSelection(clickedRegion.id, 'region');
             if (!propagated) {
               clearSelection();
@@ -5377,11 +5403,17 @@ export const SimpleTabletop = () => {
             }
           }
           if (!getGroupForEntity(clickedRegion.id)) {
-            setSelectedTokenIds([]); // Deselect tokens when selecting region
-            clearMapObjectSelection(); // Deselect map objects when selecting region
+            setSelectedTokenIds([]);
+            clearMapObjectSelection();
           }
+        } else {
+          // In play mode, clicking regions starts marquee instead
+          isMarqueeSelectingRef.current = true;
+          marqueeStartRef.current = worldPos;
+          marqueeEndRef.current = worldPos;
+          setIsMarqueeSelecting(true);
+          setSelectedTokenIds([]);
         }
-        // In play mode, clicking regions does nothing
       } else {
         // Clicked on empty space
         if (e.shiftKey) {
@@ -5389,9 +5421,10 @@ export const SimpleTabletop = () => {
           addTokenToCanvas("", worldPos.x, worldPos.y);
         } else if (renderingMode === 'edit') {
           // In edit mode: start marquee selection
+          isMarqueeSelectingRef.current = true;
+          marqueeStartRef.current = worldPos;
+          marqueeEndRef.current = worldPos;
           setIsMarqueeSelecting(true);
-          setMarqueeStart(worldPos);
-          setMarqueeEnd(worldPos);
           // Clear existing selection when starting new marquee
           selectedRegionIds.forEach(id => deselectRegion(id));
           setSelectedRegionIds([]);
@@ -5400,9 +5433,10 @@ export const SimpleTabletop = () => {
           clearLightSelection();
         } else {
           // Play mode: start token-only marquee (visibility-filtered on mouseup)
+          isMarqueeSelectingRef.current = true;
+          marqueeStartRef.current = worldPos;
+          marqueeEndRef.current = worldPos;
           setIsMarqueeSelecting(true);
-          setMarqueeStart(worldPos);
-          setMarqueeEnd(worldPos);
           setSelectedTokenIds([]);
         }
       }
@@ -6315,11 +6349,11 @@ export const SimpleTabletop = () => {
       return;
     }
 
-    // Handle marquee selection dragging
-    if (isMarqueeSelecting && marqueeStart) {
+    // Handle marquee selection dragging — update DOM div directly (no re-render, no flicker)
+    if (isMarqueeSelectingRef.current && marqueeStartRef.current) {
       const worldPos = screenToWorld(mouseX, mouseY);
-      setMarqueeEnd(worldPos);
-      redrawCanvas();
+      marqueeEndRef.current = worldPos;
+      updateMarqueeDivFromRefs();
       return;
     }
 
@@ -7212,8 +7246,10 @@ export const SimpleTabletop = () => {
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     // Handle marquee selection completion
-    if (isMarqueeSelecting && marqueeStart && marqueeEnd) {
-      // Calculate marquee bounds in world space
+    if (isMarqueeSelectingRef.current && marqueeStartRef.current && marqueeEndRef.current) {
+      // Read from refs for the most up-to-date values
+      const marqueeStart = marqueeStartRef.current;
+      const marqueeEnd = marqueeEndRef.current;
       const minX = Math.min(marqueeStart.x, marqueeEnd.x);
       const maxX = Math.max(marqueeStart.x, marqueeEnd.x);
       const minY = Math.min(marqueeStart.y, marqueeEnd.y);
@@ -7391,9 +7427,11 @@ export const SimpleTabletop = () => {
       }
       
       // Reset marquee state
+      isMarqueeSelectingRef.current = false;
+      marqueeStartRef.current = null;
+      marqueeEndRef.current = null;
       setIsMarqueeSelecting(false);
-      setMarqueeStart(null);
-      setMarqueeEnd(null);
+      hideMarqueeDiv();
       redrawCanvas();
       return;
     }
@@ -8554,6 +8592,19 @@ export const SimpleTabletop = () => {
           ref={overlayCanvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY }}
+        />
+        {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
+            Position/size is driven directly via ref to avoid React re-renders and flicker. */}
+        <div
+          ref={marqueeDivRef}
+          className="absolute pointer-events-none"
+          style={{
+            display: 'none',
+            zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY + 10,
+            border: `2px dashed ${renderingMode === 'play' ? '#10b981' : '#4f46e5'}`,
+            backgroundColor: renderingMode === 'play' ? 'rgba(16,185,129,0.10)' : 'rgba(79,70,229,0.12)',
+            boxSizing: 'border-box',
+          }}
         />
       </div>
 
