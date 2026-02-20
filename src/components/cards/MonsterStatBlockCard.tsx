@@ -121,15 +121,23 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
       {/* Secondary Stats */}
       <div className="space-y-1 text-sm my-3">
         {monster.save && Object.keys(monster.save).length > 0 && (
-          <StatLine 
-            label="Saving Throws" 
-            value={Object.entries(monster.save).map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`).join(', ')} 
+          <RollableStatLine
+            label="Saving Throws"
+            entries={Object.entries(monster.save).map(([k, v]) => ({
+              name: k.charAt(0).toUpperCase() + k.slice(1),
+              bonus: String(v),
+              rollLabel: `${k.charAt(0).toUpperCase() + k.slice(1)} Save`,
+            }))}
           />
         )}
         {monster.skill && Object.keys(monster.skill).length > 0 && (
-          <StatLine 
-            label="Skills" 
-            value={Object.entries(monster.skill).map(([k, v]) => `${capitalize(k)} ${v}`).join(', ')} 
+          <RollableStatLine
+            label="Skills"
+            entries={Object.entries(monster.skill).map(([k, v]) => ({
+              name: capitalize(k),
+              bonus: String(v),
+              rollLabel: `${capitalize(k)} Check`,
+            }))}
           />
         )}
         {monster.vulnerable && monster.vulnerable.length > 0 && (
@@ -236,12 +244,38 @@ function StatLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function RollableStatLine({ label, entries }: { label: string; entries: { name: string; bonus: string; rollLabel: string }[] }) {
+  return (
+    <p>
+      <span className="font-bold text-[hsl(var(--primary))]">{label}</span>{' '}
+      {entries.map((entry, idx) => {
+        const formula = `1d20${entry.bonus.startsWith('+') || entry.bonus.startsWith('-') ? '' : '+'}${entry.bonus}`;
+        return (
+          <span key={entry.name}>
+            {idx > 0 && ', '}
+            {entry.name}{' '}
+            <DiceFormula formula={formula} display={entry.bonus} label={entry.rollLabel} />
+          </span>
+        );
+      })}
+    </p>
+  );
+}
+
 function AbilityScore({ label, score }: { label: string; score: number }) {
   const mod = getAbilityModifier(score);
+  const formula = `1d20${mod >= 0 ? '+' : ''}${mod}`;
   return (
     <div className="flex flex-col">
       <span className="text-xs font-bold text-[hsl(var(--primary))]">{label}</span>
-      <span className="text-sm">{score} ({formatModifier(mod)})</span>
+      <button
+        type="button"
+        className="text-sm hover:text-[hsl(var(--primary))] cursor-pointer transition-colors"
+        onClick={() => rollInDiceBox(formula, `${label} Check`)}
+        title={`Roll ${formula}`}
+      >
+        {score} ({formatModifier(mod)})
+      </button>
     </div>
   );
 }
@@ -382,15 +416,14 @@ function DiceFormula({ formula, display, label }: { formula: string; display: st
 }
 
 function cleanEntryText(text: string): ReactNode {
-  // Regex to find all rollable tags: {@damage X}, {@hit X}, {@dice X}
-  const rollableRegex = /\{@(damage|hit|dice) ([^}]+)\}/g;
+  // Regex to find all rollable tags: {@damage X}, {@hit X}, {@dice X}, {@skill X}
+  const rollableRegex = /\{@(damage|hit|dice|skill|recharge) ?([^}]*)\}/g;
   // Non-rollable tags cleaned to plain text
   const cleanNonRollable = (s: string) => s
     .replace(/\{@creature ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@spell ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@item ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@condition ([^}|]+)(\|[^}]*)?\}/g, '$1')
-    .replace(/\{@skill ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@action ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@sense ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@dc ([^}]+)\}/g, 'DC $1')
@@ -400,7 +433,6 @@ function cleanEntryText(text: string): ReactNode {
       return type;
     })
     .replace(/\{@h\}/g, '')
-    .replace(/\{@recharge( \d+)?\}/g, (_, num) => num ? `(Recharge ${num.trim()}-6)` : '(Recharge 6)')
     .replace(/\{@b ([^}]+)\}/g, '$1')
     .replace(/\{@i ([^}]+)\}/g, '$1');
 
@@ -409,20 +441,26 @@ function cleanEntryText(text: string): ReactNode {
   let match: RegExpExecArray | null;
 
   while ((match = rollableRegex.exec(text)) !== null) {
-    // Push preceding text (cleaned of non-rollable tags)
     if (match.index > lastIndex) {
       parts.push(cleanNonRollable(text.slice(lastIndex, match.index)));
     }
 
-    const tagType = match[1]; // 'damage', 'hit', or 'dice'
-    const rawValue = match[2];
+    const tagType = match[1];
+    const rawValue = match[2].trim();
 
     if (tagType === 'hit') {
-      // {@hit 5} → clickable "+5" that rolls 1d20+5
       const formula = `1d20+${rawValue}`;
       parts.push(<DiceFormula key={match.index} formula={formula} display={`+${rawValue}`} label="Attack Roll" />);
+    } else if (tagType === 'skill') {
+      // {@skill Perception} → display skill name (rollable only from the Skills stat line)
+      parts.push(<span key={match.index}>{rawValue}</span>);
+    } else if (tagType === 'recharge') {
+      const num = rawValue ? rawValue.trim() : '6';
+      const display = `(Recharge ${num}${num !== '6' ? '–6' : ''})`;
+      parts.push(
+        <DiceFormula key={match.index} formula="1d6" display={display} label={`Recharge (${num}+)`} />
+      );
     } else {
-      // {@damage 2d6+3} or {@dice 1d20+5} → clickable formula
       const label = tagType === 'damage' ? 'Damage' : undefined;
       parts.push(<DiceFormula key={match.index} formula={rawValue} display={rawValue} label={label} />);
     }
@@ -430,7 +468,6 @@ function cleanEntryText(text: string): ReactNode {
     lastIndex = match.index + match[0].length;
   }
 
-  // Push remaining text
   if (lastIndex < text.length) {
     parts.push(cleanNonRollable(text.slice(lastIndex)));
   }
