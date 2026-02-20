@@ -5515,8 +5515,10 @@ export const SimpleTabletop = () => {
           clearMapObjectSelection();
           clearLightSelection();
         } else {
-          // Play mode: clicking empty space clears token selection, then starts marquee
-          setSelectedTokenIds([]);
+          // Play mode: clicking empty space — clear selection (unless shift held) then start marquee
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            setSelectedTokenIds([]);
+          }
           isMarqueeSelectingRef.current = true;
           marqueeStartRef.current = worldPos;
           marqueeEndRef.current = worldPos;
@@ -6087,16 +6089,27 @@ export const SimpleTabletop = () => {
         // Capture initial state for undo
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
-        // If token not selected, select it
-        const selectionAfterMouseDown = selectedTokenIds.includes(clickedToken.id)
-          ? selectedTokenIds
-          : [clickedToken.id];
-        if (!selectedTokenIds.includes(clickedToken.id)) {
-          setSelectedTokenIds([clickedToken.id]);
+        // Handle selection on mousedown — support shift/ctrl for additive multi-select
+        let allSelected: string[];
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          // Additive toggle: add or remove from current selection
+          if (selectedTokenIds.includes(clickedToken.id)) {
+            // Already selected — keep it selected for dragging (don't deselect on mousedown)
+            allSelected = selectedTokenIds;
+          } else {
+            allSelected = [...selectedTokenIds, clickedToken.id];
+            setSelectedTokenIds(allSelected);
+          }
+        } else if (selectedTokenIds.includes(clickedToken.id)) {
+          // Token already in selection — keep full selection for multi-drag
+          allSelected = selectedTokenIds;
+        } else {
+          // Normal click on unselected token — select just this one
+          allSelected = [clickedToken.id];
+          setSelectedTokenIds(allSelected);
         }
 
         // Capture start positions for ALL selected tokens (enables multi-drag)
-        const allSelected = selectedTokenIds.includes(clickedToken.id) ? selectedTokenIds : [clickedToken.id];
         const startPositions: Record<string, { x: number; y: number }> = {};
         tokens.forEach(t => {
           if (allSelected.includes(t.id)) {
