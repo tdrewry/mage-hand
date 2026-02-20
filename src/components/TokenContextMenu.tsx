@@ -113,6 +113,9 @@ export const TokenContextMenu = ({
   const { getCreatureType } = useCreatureStore();
   
   const [showTokenEditModal, setShowTokenEditModal] = useState(false);
+  // When the edit modal is opened externally (e.g. character sheet header), we
+  // force it to operate on exactly one specific token regardless of canvas selection.
+  const [forcedSingleTokenId, setForcedSingleTokenId] = useState<string | null>(null);
   const [showImageImportModal, setShowImageImportModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -166,6 +169,10 @@ export const TokenContextMenu = ({
 
   // Get the tokens to operate on (selected tokens or just the clicked token)
   const getTargetTokens = () => {
+    // External open (e.g. character sheet header) always targets exactly one token
+    if (forcedSingleTokenId) {
+      return tokens.filter(t => t.id === forcedSingleTokenId);
+    }
     if (selectedTokenIds.includes(tokenId)) {
       return tokens.filter(t => selectedTokenIds.includes(t.id));
     }
@@ -301,7 +308,8 @@ export const TokenContextMenu = ({
       setPathGaitWidthValue(token.pathGaitWidth ?? 0.6);
       setFootprintTypeValue(token.footprintType || 'barefoot');
       setVariantImageUrls({});
-      // Point targetTokens at this token via context trick — we open modal directly
+      // Force targetTokens to resolve to exactly this token, ignoring canvas selection
+      setForcedSingleTokenId(tid);
       setShowTokenEditModal(true);
     };
     if (!listenForExternalOpen) return;
@@ -961,7 +969,7 @@ export const TokenContextMenu = ({
       </ContextMenu>
 
       {/* Token Edit Modal */}
-      <Dialog open={showTokenEditModal} onOpenChange={setShowTokenEditModal}>
+      <Dialog open={showTokenEditModal} onOpenChange={(open) => { setShowTokenEditModal(open); if (!open) setForcedSingleTokenId(null); }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
