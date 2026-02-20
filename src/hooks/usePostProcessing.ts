@@ -41,9 +41,16 @@ export function usePostProcessing({
   height,
 }: UsePostProcessingOptions) {
   const [isReady, setIsReady] = useState(false);
+  // Keep a ref in sync so redrawCanvas closures always read the latest value
+  const isReadyRef = useRef(false);
   const initRef = useRef(false);
   const initializingRef = useRef(false);
   const { effectSettings } = useFogStore();
+
+  const setReady = (val: boolean) => {
+    isReadyRef.current = val;
+    setIsReady(val);
+  };
 
   // Initialize PixiJS when enabled and dimensions are valid
   useEffect(() => {
@@ -53,8 +60,10 @@ export function usePostProcessing({
     }
 
     if (!enabled || !containerRef.current || !effectSettings.postProcessingEnabled) {
+      // Only hide — don't destroy — so re-enabling is instant
       if (initRef.current) {
         setPostProcessingVisible(false);
+        setReady(false);
       }
       return;
     }
@@ -73,8 +82,8 @@ export function usePostProcessing({
       if (success) {
         initFogCanvas(width, height);
         initRef.current = true;
-        setIsReady(true);
         setPostProcessingVisible(true);
+        setReady(true);
       }
       
       initializingRef.current = false;
@@ -83,14 +92,13 @@ export function usePostProcessing({
     if (!initRef.current) {
       init();
     } else {
+      // Already initialised — just make sure it's visible and mark ready
       setPostProcessingVisible(true);
-      setIsReady(true);
+      setReady(true);
     }
 
-    return () => {
-      // Don't cleanup on every effect change, just hide
-      setPostProcessingVisible(false);
-    };
+    // No cleanup here — we don't want to hide the layer on every dep change.
+    // Hiding is handled explicitly in the `!enabled` branch above.
   }, [enabled, effectSettings.postProcessingEnabled, containerRef, width, height]);
 
   // Cleanup on unmount
@@ -100,7 +108,7 @@ export function usePostProcessing({
         cleanupPostProcessing();
         cleanupFogPostProcessing();
         initRef.current = false;
-        setIsReady(false);
+        setReady(false);
       }
     };
   }, []);
@@ -154,7 +162,10 @@ export function usePostProcessing({
   );
 
   return {
+    // Expose both the reactive state (for triggering re-renders) and the ref
+    // (for use inside canvas draw callbacks that capture stale closures).
     isReady,
+    isReadyRef,
     applyEffects,
   };
 }

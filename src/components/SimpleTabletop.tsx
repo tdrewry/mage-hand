@@ -364,7 +364,7 @@ export const SimpleTabletop = () => {
   } = useFogStore();
   
   // Post-processing hook for fog effects
-  const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady } = usePostProcessing({
+  const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
     containerRef: canvasContainerRef,
     enabled: renderingMode === 'play' && fogEnabled && effectSettings.postProcessingEnabled,
     width: canvasDimensions.width,
@@ -2739,7 +2739,7 @@ export const SimpleTabletop = () => {
     };
 
     // Determine if we should use the overlay canvas for tokens/annotations
-    const useOverlayForTokens = isPostProcessingReady && effectSettings.postProcessingEnabled && fogEnabled;
+    const useOverlayForTokens = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled && fogEnabled;
 
     // If NOT using post-processing (or fog disabled), draw annotations and tokens to main canvas here
     if (!useOverlayForTokens) {
@@ -2791,7 +2791,7 @@ export const SimpleTabletop = () => {
     // Use pre-computed masks from useEffect
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
       // Check if we should use PixiJS post-processing instead of main canvas fog
-      const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
+      const usePostProcessing = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled;
 
       // Only render fog on main canvas if post-processing is disabled
       // When post-processing is enabled, PixiJS layer renders the blurred fog
@@ -2954,7 +2954,7 @@ export const SimpleTabletop = () => {
 
     // Draw off-screen token indicators and overlay content
     // When post-processing is enabled with fog, also draw tokens/annotations to overlay canvas
-    const usePostProcessing = isPostProcessingReady && effectSettings.postProcessingEnabled;
+    const usePostProcessing = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled;
     const overlayCanvas = overlayCanvasRef.current;
     
     if (overlayCanvas) {
