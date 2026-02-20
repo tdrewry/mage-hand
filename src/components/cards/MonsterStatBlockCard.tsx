@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useDiceStore } from '@/stores/diceStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { 
   MONSTER_SIZE_NAMES, 
   formatModifier, 
@@ -92,7 +95,12 @@ function StatBlock({ monster }: { monster: Monster5eTools }) {
       {/* Combat Stats */}
       <div className="space-y-1 text-sm mb-3">
         <StatLine label="Armor Class" value={formatAC(monster.ac)} />
-        <StatLine label="Hit Points" value={`${monster.hp.average} (${monster.hp.formula})`} />
+        <p>
+          <span className="font-bold text-[hsl(var(--primary))]">Hit Points</span>{' '}
+          <span>{monster.hp.average} (</span>
+          <DiceFormula formula={monster.hp.formula} display={monster.hp.formula} label={`${monster.name} HP`} />
+          <span>)</span>
+        </p>
         <StatLine label="Speed" value={formatSpeed(monster.speed)} />
       </div>
 
@@ -259,7 +267,7 @@ function EntrySection({ entries }: { entries: MonsterEntry[] }) {
         <div key={idx}>
           <p>
             <span className="font-bold italic">{entry.name}.</span>{' '}
-            <span>{formatEntries(entry.entries)}</span>
+            {formatEntries(entry.entries)}
           </p>
         </div>
       ))}
@@ -329,28 +337,55 @@ function formatDamageList(list: string[]): string {
   }).join('; ');
 }
 
-function formatEntries(entries: (string | MonsterEntryNested)[]): string {
-  return entries.map(entry => {
+function formatEntries(entries: (string | MonsterEntryNested)[]): ReactNode {
+  return entries.map((entry, idx) => {
     if (typeof entry === 'string') {
-      return cleanEntryText(entry);
+      return <span key={idx}>{cleanEntryText(entry)}{idx < entries.length - 1 ? ' ' : ''}</span>;
     }
     if (entry.type === 'list' && entry.items) {
-      return entry.items.map(i => `• ${i}`).join(' ');
+      return <span key={idx}>{entry.items.map(i => `• ${i}`).join(' ')}{idx < entries.length - 1 ? ' ' : ''}</span>;
     }
     if (entry.entries) {
-      return entry.entries.join(' ');
+      return <span key={idx}>{entry.entries.join(' ')}{idx < entries.length - 1 ? ' ' : ''}</span>;
     }
-    return '';
-  }).join(' ');
+    return null;
+  });
 }
 
-function cleanEntryText(text: string): string {
-  // Remove 5e.tools formatting tags like {@damage 2d6}, {@hit 5}, {@dc 15}, etc.
-  return text
-    .replace(/\{@damage ([^}]+)\}/g, '$1')
-    .replace(/\{@hit ([^}]+)\}/g, '+$1')
-    .replace(/\{@dc ([^}]+)\}/g, 'DC $1')
-    .replace(/\{@dice ([^}]+)\}/g, '$1')
+/** Rolls a formula and opens/focuses the Dice Box card */
+function rollInDiceBox(formula: string, label?: string) {
+  const { roll } = useDiceStore.getState();
+  const cardStore = useCardStore.getState();
+  
+  // Ensure Dice Box is open
+  const diceCard = cardStore.getCardByType(CardType.DICE_BOX);
+  if (diceCard) {
+    cardStore.setVisibility(diceCard.id, true);
+    cardStore.bringToFront(diceCard.id);
+  }
+  
+  roll(formula, label);
+}
+
+/** Clickable dice formula span */
+function DiceFormula({ formula, display, label }: { formula: string; display: string; label?: string }) {
+  return (
+    <button
+      type="button"
+      className="inline font-mono text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.7)] underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
+      onClick={(e) => { e.stopPropagation(); rollInDiceBox(formula, label); }}
+      title={`Roll ${formula}`}
+    >
+      {display}
+    </button>
+  );
+}
+
+function cleanEntryText(text: string): ReactNode {
+  // Regex to find all rollable tags: {@damage X}, {@hit X}, {@dice X}
+  const rollableRegex = /\{@(damage|hit|dice) ([^}]+)\}/g;
+  // Non-rollable tags cleaned to plain text
+  const cleanNonRollable = (s: string) => s
     .replace(/\{@creature ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@spell ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@item ([^}|]+)(\|[^}]*)?\}/g, '$1')
@@ -358,6 +393,7 @@ function cleanEntryText(text: string): string {
     .replace(/\{@skill ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@action ([^}|]+)(\|[^}]*)?\}/g, '$1')
     .replace(/\{@sense ([^}|]+)(\|[^}]*)?\}/g, '$1')
+    .replace(/\{@dc ([^}]+)\}/g, 'DC $1')
     .replace(/\{@atk ([^}]+)\}/g, (_, type) => {
       if (type.includes('m')) return 'Melee';
       if (type.includes('r')) return 'Ranged';
@@ -367,6 +403,39 @@ function cleanEntryText(text: string): string {
     .replace(/\{@recharge( \d+)?\}/g, (_, num) => num ? `(Recharge ${num.trim()}-6)` : '(Recharge 6)')
     .replace(/\{@b ([^}]+)\}/g, '$1')
     .replace(/\{@i ([^}]+)\}/g, '$1');
+
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = rollableRegex.exec(text)) !== null) {
+    // Push preceding text (cleaned of non-rollable tags)
+    if (match.index > lastIndex) {
+      parts.push(cleanNonRollable(text.slice(lastIndex, match.index)));
+    }
+
+    const tagType = match[1]; // 'damage', 'hit', or 'dice'
+    const rawValue = match[2];
+
+    if (tagType === 'hit') {
+      // {@hit 5} → clickable "+5" that rolls 1d20+5
+      const formula = `1d20+${rawValue}`;
+      parts.push(<DiceFormula key={match.index} formula={formula} display={`+${rawValue}`} label="Attack Roll" />);
+    } else {
+      // {@damage 2d6+3} or {@dice 1d20+5} → clickable formula
+      const label = tagType === 'damage' ? 'Damage' : undefined;
+      parts.push(<DiceFormula key={match.index} formula={rawValue} display={rawValue} label={label} />);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Push remaining text
+  if (lastIndex < text.length) {
+    parts.push(cleanNonRollable(text.slice(lastIndex)));
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
 function formatDailyUses(uses: string): string {
