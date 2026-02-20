@@ -39,6 +39,31 @@ export function MonsterStatBlockCardContent({ monsterId }: MonsterStatBlockCardC
   );
 }
 
+// Public export: renders any JSON blob as a stat block (best-effort)
+export function StatBlockFromJson({ data }: { data: any }) {
+  // Attempt to render as a Monster5eTools shape; fields default gracefully
+  const monster: Monster5eTools = {
+    id: data.id ?? 'unknown',
+    name: data.name ?? 'Unknown',
+    source: data.source ?? '',
+    size: data.size ?? 'M',
+    type: data.type ?? { type: 'unknown' },
+    ac: Array.isArray(data.ac) ? data.ac : [{ ac: data.ac ?? 10 }],
+    hp: data.hp ?? { average: 0, formula: '0' },
+    speed: data.speed ?? {},
+    str: data.str ?? 10,
+    dex: data.dex ?? 10,
+    con: data.con ?? 10,
+    int: data.int ?? 10,
+    wis: data.wis ?? 10,
+    cha: data.cha ?? 10,
+    cr: data.cr ?? '—',
+    passive: data.passive ?? 10,
+    ...data,
+  };
+  return <StatBlock monster={monster} />;
+}
+
 // Main stat block component with classic D&D styling
 function StatBlock({ monster }: { monster: Monster5eTools }) {
   const typeString = useMemo(() => {

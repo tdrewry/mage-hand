@@ -1,525 +1,299 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, Suspense, lazy } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
-  Heart,
-  Shield,
-  Zap,
-  Target,
-  BookOpen,
-  Swords,
-  Sparkles,
-  User,
+  FileText,
+  Code2,
+  Layers,
   ExternalLink,
-  RefreshCw
+  Save,
+  AlertCircle,
 } from 'lucide-react';
+import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
-import { useMapStore } from '@/stores/mapStore';
-import { 
-  formatModifier,
-  type DndBeyondCharacter
-} from '@/types/creatureTypes';
 import { toast } from 'sonner';
 
+// Lazy load Monaco to avoid bundle bloat
+const MonacoEditor = lazy(() => import('@monaco-editor/react'));
+
+// Reuse the stat block renderer from MonsterStatBlockCard
+import { MonsterStatBlockCardContent, StatBlockFromJson } from './MonsterStatBlockCard';
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface CharacterSheetCardContentProps {
-  characterId: string;
+  tokenId: string;
+  /** Legacy: kept for backward compat when opened from creature library */
+  characterId?: string;
 }
 
-// Color palette for tokens without images
-const TOKEN_COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
-];
+// ─── Main export ──────────────────────────────────────────────────────────────
 
-const getRandomTokenColor = () => TOKEN_COLORS[Math.floor(Math.random() * TOKEN_COLORS.length)];
+export function CharacterSheetCardContent({ tokenId, characterId }: CharacterSheetCardContentProps) {
+  const { tokens, updateTokenDetails, updateTokenStatBlockJson } = useSessionStore();
+  const { getMonsterById, getCharacterById, getCreatureType } = useCreatureStore();
 
-export function CharacterSheetCardContent({ characterId }: CharacterSheetCardContentProps) {
+  const token = useMemo(() => tokens.find(t => t.id === tokenId), [tokens, tokenId]);
+
+  // ── Derive initial JSON from linked entity if token has no custom JSON yet ──
+  const initialJson = useMemo(() => {
+    if (token?.statBlockJson) return token.statBlockJson;
+
+    const linkedId = token?.entityRef?.entityId;
+    if (!linkedId) return '';
+
+    const creatureType = getCreatureType(linkedId);
+    if (creatureType === 'monster') {
+      const monster = getMonsterById(linkedId);
+      return monster ? JSON.stringify(monster, null, 2) : '';
+    }
+    if (creatureType === 'character') {
+      const character = getCharacterById(linkedId);
+      return character ? JSON.stringify(character, null, 2) : '';
+    }
+    return '';
+  }, [token, getCreatureType, getMonsterById, getCharacterById]);
+
+  const [activeTab, setActiveTab] = useState<'details' | 'json' | 'statblock'>('details');
+  const [jsonValue, setJsonValue] = useState(initialJson);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  // ── Parse JSON for stat block rendering ──────────────────────────────────
+  const parsedMonster = useMemo(() => {
+    if (!jsonValue.trim()) return null;
+    try {
+      const parsed = JSON.parse(jsonValue);
+      setJsonError(null);
+      return parsed;
+    } catch (e: any) {
+      setJsonError(e.message);
+      return null;
+    }
+  }, [jsonValue]);
+
+  const handleJsonChange = useCallback((value: string | undefined) => {
+    const val = value ?? '';
+    setJsonValue(val);
+    try {
+      JSON.parse(val);
+      setJsonError(null);
+    } catch (e: any) {
+      setJsonError(e.message);
+    }
+  }, []);
+
+  const handleSaveJson = () => {
+    if (!token) return;
+    if (jsonError) {
+      toast.error('Fix JSON errors before saving');
+      return;
+    }
+    updateTokenStatBlockJson(token.id, jsonValue);
+    toast.success('Stat block JSON saved');
+  };
+
+  // ── Details tab state ────────────────────────────────────────────────────
+  const [notes, setNotes] = useState(token?.notes ?? '');
+  const [quickRef, setQuickRef] = useState(token?.quickReferenceUrl ?? '');
+
+  const handleSaveDetails = () => {
+    if (!token) return;
+    updateTokenDetails(token.id, notes, quickRef, token.statBlockJson);
+    toast.success('Details saved');
+  };
+
+  // ── Fallback: legacy characterId mode ───────────────────────────────────
+  if (!tokenId && characterId) {
+    return <LegacyCharacterSheetFallback characterId={characterId} />;
+  }
+
+  if (!token) {
+    return (
+      <div className="p-4 text-center text-muted-foreground text-sm">
+        Token not found
+      </div>
+    );
+  }
+
+  const hasQuickRef = quickRef && quickRef.trim().length > 0;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Token header */}
+      <div className="px-4 pt-3 pb-2 border-b border-border flex items-center gap-3 shrink-0">
+        {token.imageUrl ? (
+          <img
+            src={token.imageUrl}
+            alt={token.name}
+            className="w-10 h-10 rounded-full object-cover border border-border"
+          />
+        ) : (
+          <div
+            className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-sm font-bold"
+            style={{ backgroundColor: token.color ?? 'hsl(var(--muted))' }}
+          >
+            {token.name?.[0]?.toUpperCase() ?? '?'}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">{token.name || 'Unnamed Token'}</p>
+          {token.entityRef?.entityId && (
+            <p className="text-xs text-muted-foreground truncate">
+              Linked · {token.entityRef.projectionType}
+            </p>
+          )}
+        </div>
+        {hasQuickRef && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0"
+            onClick={() => window.open(quickRef, '_blank')}
+            title="Open quick reference"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col flex-1 min-h-0">
+        <TabsList className="mx-4 mt-2 grid grid-cols-3 shrink-0">
+          <TabsTrigger value="details" className="text-xs gap-1">
+            <FileText className="w-3 h-3" /> Details
+          </TabsTrigger>
+          <TabsTrigger value="json" className="text-xs gap-1">
+            <Code2 className="w-3 h-3" /> JSON
+          </TabsTrigger>
+          <TabsTrigger value="statblock" className="text-xs gap-1">
+            <Layers className="w-3 h-3" /> Stat Block
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── Details tab ──────────────────────────────────────────────── */}
+        <TabsContent value="details" className="flex-1 min-h-0 px-4 pb-4 mt-3">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 pr-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Notes</Label>
+                <Textarea
+                  placeholder="GM notes for this token…"
+                  className="text-sm resize-none min-h-[120px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quick Reference URL</Label>
+                <Input
+                  placeholder="https://…"
+                  className="text-sm"
+                  value={quickRef}
+                  onChange={(e) => setQuickRef(e.target.value)}
+                />
+              </div>
+              <Button size="sm" onClick={handleSaveDetails} className="w-full">
+                <Save className="w-3.5 h-3.5 mr-1.5" /> Save Details
+              </Button>
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        {/* ── JSON Editor tab ──────────────────────────────────────────── */}
+        <TabsContent value="json" className="flex-1 min-h-0 flex flex-col mt-2 px-0 pb-0">
+          {/* Error banner */}
+          {jsonError && (
+            <div className="mx-4 mb-2 flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
+              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span className="font-mono break-all">{jsonError}</span>
+            </div>
+          )}
+          <div className="flex-1 min-h-0 border-y border-border overflow-hidden">
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                Loading editor…
+              </div>
+            }>
+              <MonacoEditor
+                height="100%"
+                language="json"
+                value={jsonValue}
+                onChange={handleJsonChange}
+                theme="vs-dark"
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 11,
+                  lineNumbers: 'off',
+                  wordWrap: 'on',
+                  scrollBeyondLastLine: false,
+                  folding: true,
+                  renderLineHighlight: 'none',
+                  overviewRulerLanes: 0,
+                  padding: { top: 8, bottom: 8 },
+                }}
+              />
+            </Suspense>
+          </div>
+          <div className="px-4 py-2 shrink-0 flex gap-2">
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={handleSaveJson}
+              disabled={!!jsonError}
+            >
+              <Save className="w-3.5 h-3.5 mr-1.5" /> Save JSON
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* ── Stat Block tab ───────────────────────────────────────────── */}
+        <TabsContent value="statblock" className="flex-1 min-h-0 mt-0">
+          <ScrollArea className="h-full">
+            {parsedMonster ? (
+              <StatBlockFromJson data={parsedMonster} />
+            ) : (
+              <div className="p-6 text-center text-muted-foreground text-sm space-y-2">
+                {jsonError ? (
+                  <>
+                    <AlertCircle className="w-8 h-8 mx-auto text-destructive/50" />
+                    <p>Fix the JSON errors to preview the stat block.</p>
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-8 h-8 mx-auto opacity-30" />
+                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render a stat block here.</p>
+                  </>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ── Legacy fallback for characterId-based cards ────────────────────────────
+function LegacyCharacterSheetFallback({ characterId }: { characterId: string }) {
   const { getCharacterById } = useCreatureStore();
   const character = getCharacterById(characterId);
 
   if (!character) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
-        <p>Character not found</p>
-        <p className="text-xs mt-1">ID: {characterId}</p>
+      <div className="p-4 text-center text-muted-foreground text-sm">
+        Character not found (ID: {characterId})
       </div>
     );
   }
 
   return (
-    <ScrollArea className="h-full">
-      <CharacterSheet character={character} />
-    </ScrollArea>
-  );
-}
-
-function CharacterSheet({ character }: { character: DndBeyondCharacter }) {
-  const [activeTab, setActiveTab] = useState('stats');
-  const { addToken, getViewportTransform } = useSessionStore();
-  const { selectedMapId } = useMapStore();
-
-  const classString = character.classes.map(c => `${c.name} ${c.level}`).join(' / ');
-  const hpPercentage = character.hitPoints.max > 0 
-    ? (character.hitPoints.current / character.hitPoints.max) * 100 
-    : 0;
-
-  const getViewportCenter = () => {
-    const transform = selectedMapId ? getViewportTransform(selectedMapId) : { x: 0, y: 0, zoom: 1 };
-    const worldX = (window.innerWidth / 2 - transform.x) / transform.zoom;
-    const worldY = (window.innerHeight / 2 - transform.y) / transform.zoom;
-    return { x: worldX, y: worldY };
-  };
-
-  const handleCreateToken = async () => {
-    const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const center = getViewportCenter();
-    
-    let imageUrl = '';
-    if (character.portraitUrl) {
-      try {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
-          img.onload = () => { clearTimeout(timeout); resolve(); };
-          img.onerror = () => { clearTimeout(timeout); reject(); };
-          img.src = character.portraitUrl!;
-        });
-        imageUrl = character.portraitUrl;
-      } catch {
-        console.warn(`Could not load portrait for ${character.name}`);
-      }
-    }
-
-    const tokenColor = imageUrl ? undefined : getRandomTokenColor();
-
-    addToken({
-      id: tokenId,
-      name: character.name,
-      imageUrl,
-      x: center.x,
-      y: center.y,
-      gridWidth: 1,
-      gridHeight: 1,
-      label: character.name,
-      labelPosition: 'below' as LabelPosition,
-      roleId: 'player',
-      isHidden: false,
-      color: tokenColor,
-      entityRef: {
-        type: 'local',
-        entityId: character.id,
-        projectionType: 'character',
-      },
-    });
-    
-    toast.success(`Created ${character.name} token`);
-  };
-
-  return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        {character.portraitUrl ? (
-          <img 
-            src={character.portraitUrl} 
-            alt={character.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-primary"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-            <User className="w-8 h-8 text-primary" />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold truncate">{character.name}</h2>
-          <p className="text-sm text-muted-foreground">
-            Level {character.level} {character.race}
-          </p>
-          <p className="text-sm text-muted-foreground truncate">{classString}</p>
-        </div>
-      </div>
-
-      {/* Quick Stats Bar */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <QuickStat 
-          icon={<Shield className="w-4 h-4" />} 
-          label="AC" 
-          value={character.armorClass} 
-        />
-        <QuickStat 
-          icon={<Zap className="w-4 h-4" />} 
-          label="Init" 
-          value={formatModifier(character.initiative)} 
-        />
-        <QuickStat 
-          icon={<Target className="w-4 h-4" />} 
-          label="Prof" 
-          value={formatModifier(character.proficiencyBonus)} 
-        />
-      </div>
-
-      {/* HP Bar */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1">
-            <Heart className="w-4 h-4 text-red-500" />
-            Hit Points
-          </span>
-          <span className="font-medium">
-            {character.hitPoints.current} / {character.hitPoints.max}
-            {character.hitPoints.temp > 0 && (
-              <span className="text-blue-400 ml-1">(+{character.hitPoints.temp})</span>
-            )}
-          </span>
-        </div>
-        <Progress 
-          value={hpPercentage} 
-          className="h-2"
-        />
-      </div>
-
-      {/* Speed */}
-      <div className="text-sm">
-        <span className="text-muted-foreground">Speed:</span>{' '}
-        <span className="font-medium">{character.speed} ft.</span>
-      </div>
-
-      <Separator />
-
-      {/* Ability Scores */}
-      <div className="grid grid-cols-6 gap-1 text-center">
-        <AbilityScore label="STR" score={character.abilities.strength.score} modifier={character.abilities.strength.modifier} />
-        <AbilityScore label="DEX" score={character.abilities.dexterity.score} modifier={character.abilities.dexterity.modifier} />
-        <AbilityScore label="CON" score={character.abilities.constitution.score} modifier={character.abilities.constitution.modifier} />
-        <AbilityScore label="INT" score={character.abilities.intelligence.score} modifier={character.abilities.intelligence.modifier} />
-        <AbilityScore label="WIS" score={character.abilities.wisdom.score} modifier={character.abilities.wisdom.modifier} />
-        <AbilityScore label="CHA" score={character.abilities.charisma.score} modifier={character.abilities.charisma.modifier} />
-      </div>
-
-      <Separator />
-
-      {/* Tabbed Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-4">
-          <TabsTrigger value="stats" className="text-xs">
-            <BookOpen className="w-3 h-3 mr-1" />
-            Skills
-          </TabsTrigger>
-          <TabsTrigger value="features" className="text-xs">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Features
-          </TabsTrigger>
-          <TabsTrigger value="actions" className="text-xs">
-            <Swords className="w-3 h-3 mr-1" />
-            Actions
-          </TabsTrigger>
-          <TabsTrigger value="spells" className="text-xs">
-            ✨ Spells
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="stats" className="mt-3 space-y-3">
-          {/* Saving Throws */}
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Saving Throws</h4>
-            <div className="grid grid-cols-2 gap-1 text-sm">
-              {character.savingThrows.map((save) => (
-                <div 
-                  key={save.ability} 
-                  className={`flex justify-between px-2 py-1 rounded ${save.proficient ? 'bg-primary/10' : ''}`}
-                >
-                  <span className={save.proficient ? 'font-medium' : 'text-muted-foreground'}>
-                    {save.ability}
-                  </span>
-                  <span className={save.proficient ? 'font-bold' : ''}>
-                    {formatModifier(save.modifier)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Skills */}
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Skills</h4>
-            <div className="space-y-0.5 text-sm max-h-48 overflow-y-auto">
-              {character.skills.map((skill) => (
-                <div 
-                  key={skill.name} 
-                  className={`flex justify-between px-2 py-0.5 rounded ${skill.proficient ? 'bg-primary/10' : ''}`}
-                >
-                  <span className={skill.proficient ? 'font-medium' : 'text-muted-foreground'}>
-                    {skill.name}
-                    {skill.expertise && <span className="text-primary ml-1">★</span>}
-                  </span>
-                  <span className={skill.proficient ? 'font-bold' : ''}>
-                    {formatModifier(skill.modifier)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Passive Senses */}
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Passive Senses</h4>
-            <div className="grid grid-cols-1 gap-1 text-sm">
-              <div className="flex justify-between px-2">
-                <span>Passive Perception</span>
-                <span className="font-medium">{character.passivePerception}</span>
-              </div>
-              {character.passiveInvestigation && (
-                <div className="flex justify-between px-2">
-                  <span>Passive Investigation</span>
-                  <span className="font-medium">{character.passiveInvestigation}</span>
-                </div>
-              )}
-              {character.passiveInsight && (
-                <div className="flex justify-between px-2">
-                  <span>Passive Insight</span>
-                  <span className="font-medium">{character.passiveInsight}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Proficiencies */}
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Proficiencies</h4>
-            <div className="space-y-2 text-sm">
-              {character.proficiencies.languages.length > 0 && (
-                <div>
-                  <span className="text-muted-foreground">Languages: </span>
-                  {character.proficiencies.languages.join(', ')}
-                </div>
-              )}
-              {character.proficiencies.armor.length > 0 && (
-                <div>
-                  <span className="text-muted-foreground">Armor: </span>
-                  {character.proficiencies.armor.join(', ')}
-                </div>
-              )}
-              {character.proficiencies.weapons.length > 0 && (
-                <div>
-                  <span className="text-muted-foreground">Weapons: </span>
-                  {character.proficiencies.weapons.join(', ')}
-                </div>
-              )}
-              {character.proficiencies.tools.length > 0 && (
-                <div>
-                  <span className="text-muted-foreground">Tools: </span>
-                  {character.proficiencies.tools.join(', ')}
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="features" className="mt-3">
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {character.features.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No features available
-              </p>
-            ) : (
-              character.features.map((feature, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h5 className="text-sm font-semibold">{feature.name}</h5>
-                    <Badge variant="outline" className="text-xs">
-                      {feature.source}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{feature.description}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="actions" className="mt-3">
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {character.actions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No actions available
-              </p>
-            ) : (
-              character.actions.map((action, idx) => (
-                <div key={idx} className="p-2 bg-secondary/30 rounded space-y-1">
-                  <div className="flex items-center justify-between">
-                    <h5 className="text-sm font-semibold">{action.name}</h5>
-                    {action.attackBonus !== undefined && (
-                      <Badge variant="secondary">
-                        {formatModifier(action.attackBonus)} to hit
-                      </Badge>
-                    )}
-                  </div>
-                  {action.damage && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Damage: </span>
-                      <span className="font-medium">{action.damage}</span>
-                      {action.damageType && (
-                        <span className="text-muted-foreground"> {action.damageType}</span>
-                      )}
-                    </div>
-                  )}
-                  {action.range && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Range: </span>
-                      <span>{action.range}</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">{action.description}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="spells" className="mt-3">
-          {!character.spells ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              This character has no spellcasting abilities
-            </p>
-          ) : (
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {/* Spellcasting Info */}
-              <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                {character.spells.spellcastingAbility && (
-                  <div className="p-2 bg-secondary/30 rounded">
-                    <div className="text-xs text-muted-foreground">Ability</div>
-                    <div className="font-medium">{character.spells.spellcastingAbility}</div>
-                  </div>
-                )}
-                {character.spells.spellSaveDC !== undefined && (
-                  <div className="p-2 bg-secondary/30 rounded">
-                    <div className="text-xs text-muted-foreground">Save DC</div>
-                    <div className="font-medium">{character.spells.spellSaveDC}</div>
-                  </div>
-                )}
-                {character.spells.spellAttackBonus !== undefined && (
-                  <div className="p-2 bg-secondary/30 rounded">
-                    <div className="text-xs text-muted-foreground">Attack</div>
-                    <div className="font-medium">{formatModifier(character.spells.spellAttackBonus)}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Cantrips */}
-              {character.spells.cantrips.length > 0 && (
-                <div>
-                  <h5 className="text-sm font-semibold mb-1">Cantrips</h5>
-                  <div className="flex flex-wrap gap-1">
-                    {character.spells.cantrips.map((spell, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {spell.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Spells by Level */}
-              {character.spells.spellsByLevel.map((level) => (
-                <div key={level.level}>
-                  <div className="flex items-center justify-between mb-1">
-                    <h5 className="text-sm font-semibold">
-                      {level.level === 0 ? 'Cantrips' : `Level ${level.level}`}
-                    </h5>
-                    {level.slots > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {level.slots - level.slotsUsed}/{level.slots} slots
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {level.spells.map((spell, idx) => (
-                      <Badge 
-                        key={idx} 
-                        variant={spell.prepared ? 'default' : 'outline'}
-                        className="text-xs"
-                      >
-                        {spell.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Conditions */}
-      {character.conditions.length > 0 && (
-        <>
-          <Separator />
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Conditions</h4>
-            <div className="flex flex-wrap gap-1">
-              {character.conditions.map((condition, idx) => (
-                <Badge key={idx} variant="destructive" className="text-xs">
-                  {condition}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      <Separator />
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleCreateToken} className="flex-1">
-          <Target className="w-4 h-4 mr-1" />
-          Create Token
-        </Button>
-        {character.sourceUrl && (
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => window.open(character.sourceUrl, '_blank')}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Source info */}
-      <p className="text-xs text-muted-foreground text-center">
-        Last updated: {new Date(character.lastUpdated).toLocaleDateString()}
-      </p>
-    </div>
-  );
-}
-
-// Helper Components
-
-function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
-  return (
-    <div className="p-2 bg-secondary/30 rounded flex flex-col items-center">
-      <div className="flex items-center gap-1 text-muted-foreground text-xs">
-        {icon}
-        {label}
-      </div>
-      <div className="text-lg font-bold">{value}</div>
-    </div>
-  );
-}
-
-function AbilityScore({ label, score, modifier }: { label: string; score: number; modifier: number }) {
-  return (
-    <div className="flex flex-col p-1 bg-secondary/20 rounded">
-      <span className="text-xs font-bold text-primary">{label}</span>
-      <span className="text-sm font-medium">{score}</span>
-      <span className="text-xs text-muted-foreground">({formatModifier(modifier)})</span>
+    <div className="p-4 text-sm text-muted-foreground text-center">
+      <p className="font-medium text-foreground">{character.name}</p>
+      <p>Open this character's token to access the full sheet.</p>
     </div>
   );
 }

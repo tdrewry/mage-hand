@@ -69,6 +69,7 @@ export interface Token {
   // Token-instance data (separate from linked entity)
   notes?: string;              // GM notes for this token instance
   quickReferenceUrl?: string;  // Bridge field for external links
+  statBlockJson?: string;      // Raw 5e.tools-compatible JSON for the stat block editor
 
   // Appearance variants - saved configurations of image + size (e.g., Wild Shape, Mounted)
   appearanceVariants?: AppearanceVariant[];
@@ -218,7 +219,8 @@ export interface SessionState {
    * @param notes The GM notes for this token instance.
    * @param quickReferenceUrl The external reference URL.
    */
-  updateTokenDetails: (tokenId: string, notes?: string, quickReferenceUrl?: string) => void;
+  updateTokenDetails: (tokenId: string, notes?: string, quickReferenceUrl?: string, statBlockJson?: string) => void;
+  updateTokenStatBlockJson: (tokenId: string, json: string) => void;
 
   /**
    * Updates the entity reference for a specific token.
@@ -499,13 +501,21 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     // Sync happens automatically via syncPatch middleware
   },
 
-  updateTokenDetails: (tokenId, notes, quickReferenceUrl) => {
+  updateTokenDetails: (tokenId, notes, quickReferenceUrl, statBlockJson) => {
     set((state) => ({
       tokens: state.tokens.map((token) =>
-        token.id === tokenId ? { ...token, notes, quickReferenceUrl } : token
+        token.id === tokenId ? { ...token, notes, quickReferenceUrl, statBlockJson } : token
       ),
     }));
     // Sync happens automatically via syncPatch middleware
+  },
+
+  updateTokenStatBlockJson: (tokenId, json) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, statBlockJson: json } : token
+      ),
+    }));
   },
 
   updateTokenEntityRef: (tokenId, entityRef) => {
