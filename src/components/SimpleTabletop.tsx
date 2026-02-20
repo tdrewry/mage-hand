@@ -2344,8 +2344,18 @@ export const SimpleTabletop = () => {
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
       combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     } else {
-      // Generate new decorations and cache them
-      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
+      // Generate new decorations and cache them.
+      // Pass map object positions as extra bounds points so the outer bounding box
+      // encompasses all content. Without this, map objects placed outside regions
+      // cause the visibility engine to treat the region boundary as an invisible wall,
+      // creating a hard lighting cutoff at the edge of the region bounds.
+      const mapObjectExtraPoints = mapObjects.flatMap((mo) => {
+        if (mo.wallPoints && mo.wallPoints.length > 0) {
+          return mo.wallPoints;
+        }
+        return [mo.position];
+      });
+      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin, mapObjectExtraPoints);
       if (negativeSpace) {
         wallGeometry = negativeSpace.wallGeometry;
 
