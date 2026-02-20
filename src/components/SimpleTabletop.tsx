@@ -2603,8 +2603,9 @@ export const SimpleTabletop = () => {
     }
     
     // Then render the map objects themselves
-    // Pass isDM for DM-specific UI (door toggle indicators)
-    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM);
+    // Pass isDM for DM-specific UI (door toggle indicators) — but NOT in play mode
+    // so light centers, radius rings, and other editor chrome are hidden from everyone in play mode.
+    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
 
     // Draw scale handles + rotation handle on selected, unlocked, non-wall map objects (edit mode)
     if (renderingMode === 'edit' && selectedMapObjectIds.length === 1) {
