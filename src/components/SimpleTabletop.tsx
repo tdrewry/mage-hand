@@ -3706,9 +3706,9 @@ export const SimpleTabletop = () => {
     const regionData = regions
       .map((r) => {
         if (r.regionType === "path" && r.pathPoints) {
-          return `${r.id}-${r.pathPoints.map((p) => `${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(";")}`;
+          return `${r.id}-${r.pathPoints.map((p) => `${(p.x ?? 0).toFixed(0)},${(p.y ?? 0).toFixed(0)}`).join(";")}`;
         }
-        return `${r.id}-${r.x.toFixed(0)},${r.y.toFixed(0)},${r.width.toFixed(0)},${r.height.toFixed(0)},${r.rotation || 0}`;
+        return `${r.id}-${(r.x ?? 0).toFixed(0)},${(r.y ?? 0).toFixed(0)},${(r.width ?? 0).toFixed(0)},${(r.height ?? 0).toFixed(0)},${r.rotation || 0}`;
       })
       .join("|");
     return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? "play" : "edit"}-${numLights}`;
