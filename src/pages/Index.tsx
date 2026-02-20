@@ -1,4 +1,5 @@
 import React, { Suspense, useState } from 'react';
+import { APP_VERSION } from '@/lib/version';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
 
@@ -24,6 +25,7 @@ const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
           <p className="text-muted-foreground max-w-md mx-auto">
             The application is paused to prevent sandbox crashes. Click below to launch.
           </p>
+          <p className="text-xs text-muted-foreground/60">v{APP_VERSION}</p>
           <button
             onClick={() => setLaunched(true)}
             className="px-8 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
