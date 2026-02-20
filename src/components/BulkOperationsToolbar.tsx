@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, Trash2, Plus, Palette, Scan, Lightbulb, Sparkles, Dices } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,7 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
-  const [initiativeValue, setInitiativeValue] = useState('');
+  const [initiativeValues, setInitiativeValues] = useState<Record<string, string>>({});
   const [showColorModal, setShowColorModal] = useState(false);
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
@@ -126,25 +126,38 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
     toast.success(`Deleted ${selectedTokens.length} token(s)`);
   };
   
-  const handleRollInitiative = () => {
+  const handleRollOne = (tokenId: string) => {
     const roll = Math.floor(Math.random() * 20) + 1;
-    setInitiativeValue(roll.toString());
+    setInitiativeValues(prev => ({ ...prev, [tokenId]: roll.toString() }));
+  };
+
+  const handleRollAll = () => {
+    const newValues: Record<string, string> = {};
+    selectedTokens.forEach(token => {
+      newValues[token.id] = String(Math.floor(Math.random() * 20) + 1);
+    });
+    setInitiativeValues(newValues);
   };
   
   const handleApplyInitiative = () => {
-    const initiative = parseInt(initiativeValue);
-    
-    if (isNaN(initiative)) {
-      toast.error('Please enter a valid initiative value');
-      return;
-    }
-    
+    let count = 0;
     selectedTokens.forEach(token => {
-      addToInitiative(token.id, initiative);
+      const raw = initiativeValues[token.id];
+      const value = raw !== undefined ? parseInt(raw) : NaN;
+      if (!isNaN(value)) {
+        addToInitiative(token.id, value);
+        count++;
+      }
     });
     
+    if (count === 0) {
+      toast.error('Please enter at least one initiative value');
+      return;
+    }
+
     setShowInitiativeModal(false);
-    toast.success(`Added ${selectedTokens.length} token(s) to initiative`);
+    setInitiativeValues({});
+    toast.success(`Added ${count} token(s) to initiative`);
   };
   
   const handleApplyColor = () => {
@@ -318,34 +331,64 @@ export const BulkOperationsToolbar: React.FC<BulkOperationsToolbarProps> = ({
         </DialogContent>
       </Dialog>
       
-      {/* Initiative Modal */}
-      <Dialog open={showInitiativeModal} onOpenChange={setShowInitiativeModal}>
-        <DialogContent>
+      {/* Initiative Modal — per-token initiative entry */}
+      <Dialog open={showInitiativeModal} onOpenChange={(open) => { setShowInitiativeModal(open); if (!open) setInitiativeValues({}); }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add to Initiative</DialogTitle>
             <DialogDescription>
-              Set initiative value for {selectedTokens.length} token(s)
+              Set individual initiative values for {selectedTokens.length} token(s)
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="initiative-value">Initiative Value</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="initiative-value"
-                  type="number"
-                  value={initiativeValue}
-                  onChange={(e) => setInitiativeValue(e.target.value)}
-                  placeholder="Enter initiative value"
-                />
-                <Button onClick={handleRollInitiative} variant="outline">
-                  Roll d20
-                </Button>
-              </div>
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleRollAll}>
+                <Dices className="h-3.5 w-3.5 mr-1.5" />
+                Roll All d20
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {selectedTokens.map(token => (
+                <div key={token.id} className="flex items-center gap-3 p-2 rounded-lg border border-border bg-muted/30">
+                  {/* Token preview */}
+                  <div
+                    className="w-8 h-8 rounded-full flex-shrink-0 border-2 border-border overflow-hidden"
+                  >
+                    {token.imageUrl ? (
+                      <img src={token.imageUrl} alt={token.label || token.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full" style={{ backgroundColor: token.color || '#888' }} />
+                    )}
+                  </div>
+                  {/* Name */}
+                  <span className="flex-1 text-sm font-medium truncate">
+                    {token.label || token.name}
+                  </span>
+                  {/* Per-token input + roll */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Input
+                      type="number"
+                      placeholder="d20"
+                      value={initiativeValues[token.id] ?? ''}
+                      onChange={e => setInitiativeValues(prev => ({ ...prev, [token.id]: e.target.value }))}
+                      className="w-16 h-7 text-center text-sm p-0 px-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleRollOne(token.id)}
+                      title="Roll d20"
+                    >
+                      <Dices className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInitiativeModal(false)}>
+            <Button variant="outline" onClick={() => { setShowInitiativeModal(false); setInitiativeValues({}); }}>
               Cancel
             </Button>
             <Button onClick={handleApplyInitiative}>
