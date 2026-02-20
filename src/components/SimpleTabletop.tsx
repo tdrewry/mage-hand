@@ -2616,20 +2616,22 @@ export const SimpleTabletop = () => {
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
     
-    // Draw marquee selection rectangle (in edit mode only)
-    if (isMarqueeSelecting && marqueeStart && marqueeEnd && renderingMode === 'edit') {
+    // Draw marquee selection rectangle (edit mode always; play mode token-only marquee)
+    if (isMarqueeSelecting && marqueeStart && marqueeEnd) {
       const minX = Math.min(marqueeStart.x, marqueeEnd.x);
       const minY = Math.min(marqueeStart.y, marqueeEnd.y);
       const width = Math.abs(marqueeEnd.x - marqueeStart.x);
       const height = Math.abs(marqueeEnd.y - marqueeStart.y);
       
       ctx.save();
-      // Draw filled background
-      ctx.fillStyle = 'rgba(79, 70, 229, 0.15)'; // Indigo with transparency
+      // Slightly different tint in play mode to hint tokens-only
+      const fillColor = renderingMode === 'play'
+        ? 'rgba(16, 185, 129, 0.12)' // green tint for player mode
+        : 'rgba(79, 70, 229, 0.15)'; // indigo for edit mode
+      const strokeColor = renderingMode === 'play' ? '#10b981' : '#4f46e5';
+      ctx.fillStyle = fillColor;
       ctx.fillRect(minX, minY, width, height);
-      
-      // Draw dashed border
-      ctx.strokeStyle = '#4f46e5';
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 2 / transform.zoom;
       ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
       ctx.strokeRect(minX, minY, width, height);
@@ -5397,12 +5399,11 @@ export const SimpleTabletop = () => {
           clearMapObjectSelection();
           clearLightSelection();
         } else {
-          // Play mode: just deselect
+          // Play mode: start token-only marquee (visibility-filtered on mouseup)
+          setIsMarqueeSelecting(true);
+          setMarqueeStart(worldPos);
+          setMarqueeEnd(worldPos);
           setSelectedTokenIds([]);
-          clearSelection();
-          setSelectedRegionIds([]);
-          clearMapObjectSelection();
-          clearLightSelection();
         }
       }
     }
@@ -7260,6 +7261,7 @@ export const SimpleTabletop = () => {
         }
         
         // Select tokens (both edit and play mode)
+        // In play mode: only tokens that are visible to the current player can be selected.
         const baseTokenSize = 40; // Base size for 1x1 token
         tokens.forEach(token => {
           const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
@@ -7275,8 +7277,24 @@ export const SimpleTabletop = () => {
           const intersects = !(tokenMaxX < minX || tokenMinX > maxX || 
                               tokenMaxY < minY || tokenMinY > maxY);
           
-          if (intersects) {
-            // Check if player can control this token
+          if (!intersects) return;
+
+          if (renderingMode === 'play') {
+            // Play mode: apply visibility gate — only select tokens the player can currently see.
+            if (fogEnabled && !fogRevealAll) {
+              const tokenPoint = { x: token.x, y: token.y };
+              const isCurrentlyIlluminated = isPointInVisibleArea(tokenPoint, currentVisibilityRef.current);
+              if (!isCurrentlyIlluminated) {
+                // Non-illuminated tokens are invisible to players — cannot be selected
+                return;
+              }
+            }
+            // Must also be controllable by this player
+            if (currentPlayer && canControlToken(token, currentPlayer, roles)) {
+              selectedTokenIdsList.push(token.id);
+            }
+          } else {
+            // Edit mode: only controllable tokens
             if (currentPlayer && canControlToken(token, currentPlayer, roles)) {
               selectedTokenIdsList.push(token.id);
             }
