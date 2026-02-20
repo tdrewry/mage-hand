@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dices, X, Pin, Trash2 } from 'lucide-react';
 import { useDiceStore } from '@/stores/diceStore';
 import { parseFormula, type DiceRollResult } from '@/lib/diceEngine';
+import { DiceRoller3D } from '@/components/dice/DiceRoller3D';
 
 const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100] as const;
 
@@ -25,20 +26,43 @@ export const DiceCardContent: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
+  const [rolling3D, setRolling3D] = useState<{
+    dice: { sides: number; result: number }[];
+    pendingResult: DiceRollResult;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleRoll = (formulaOverride?: string) => {
+  const handleRoll = useCallback((formulaOverride?: string) => {
     const f = formulaOverride ?? currentFormula;
     if (!f.trim()) return;
     try {
       parseFormula(f); // validate first
       const result = roll(f);
       setError(null);
-      setAnimatingId(result.id);
+
+      // Build dice array for 3D animation
+      const dice3D: { sides: number; result: number }[] = [];
+      for (const group of result.groups) {
+        for (const val of group.results) {
+          dice3D.push({ sides: group.sides, result: val });
+        }
+      }
+
+      // Cap at 8 dice visually to keep the scene readable
+      const capped = dice3D.slice(0, 8);
+
+      setRolling3D({ dice: capped, pendingResult: result });
     } catch (e: any) {
       setError(e.message);
     }
-  };
+  }, [currentFormula, roll]);
+
+  const handle3DComplete = useCallback(() => {
+    if (rolling3D) {
+      setAnimatingId(rolling3D.pendingResult.id);
+      setRolling3D(null);
+    }
+  }, [rolling3D]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleRoll();
@@ -55,7 +79,7 @@ export const DiceCardContent: React.FC = () => {
     }
   };
 
-  // Clear animation after timeout
+  // Clear result highlight animation after timeout
   useEffect(() => {
     if (!animatingId) return;
     const t = setTimeout(() => setAnimatingId(null), 400);
@@ -129,8 +153,16 @@ export const DiceCardContent: React.FC = () => {
 
       <Separator />
 
-      {/* Latest result */}
-      {latestRoll && (
+      {/* 3D Dice Animation */}
+      {rolling3D && (
+        <DiceRoller3D
+          dice={rolling3D.dice}
+          onComplete={handle3DComplete}
+        />
+      )}
+
+      {/* Latest result (hidden during 3D roll) */}
+      {!rolling3D && latestRoll && (
         <LatestResult roll={latestRoll} isAnimating={animatingId === latestRoll.id} />
       )}
 
@@ -174,12 +206,6 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
         {roll.groups.map((g, gi) => (
           <span key={gi} className="flex gap-0.5">
             {g.results.map((v, vi) => {
-              const kept = g.keptResults.includes(v)
-                // handle duplicates: count how many times v appears in kept vs already rendered
-                && g.keptResults.filter((k) => k === v).length >
-                   g.results.slice(0, vi).filter((r) => r === v && g.keptResults.includes(r)).length -
-                   g.results.slice(0, vi).filter((r) => r === v && !g.keptResults.includes(r)).length
-                   ? true : undefined;
               const isKept = g.keepHighest != null || g.keepLowest != null
                 ? g.keptResults.includes(v)
                 : true;
