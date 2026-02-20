@@ -331,7 +331,11 @@ export function generateWallGeometry(
   // Clean up paper.js
   wallCompoundPath.remove();
   
-
+  console.log('Generated wall geometry using paper.js:', {
+    wallSegments: wallSegments.length,
+    paths: paths.length,
+    regions: regions.length
+  });
 
   return {
     wallPath,
