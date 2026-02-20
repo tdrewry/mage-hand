@@ -1,6 +1,19 @@
 /**
  * Fog Post-Processing Effects
- * Specialized effects for fog of war rendering using PixiJS GPU acceleration
+ *
+ * COORDINATE SPACE
+ * ================
+ * All canvases here (fogCanvas, illuminationCanvas, dimZoneCanvas) are sized
+ * viewport + FIXED_PADDING*2 on each axis — identical to the PixiJS canvas.
+ * Content is rendered with:
+ *
+ *   ctx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y)
+ *   ctx.scale(transform.zoom, transform.zoom)
+ *
+ * This means world-space coordinates map directly to fog-canvas pixels with
+ * no per-frame padding recalculation.  Light circles near the viewport edge
+ * spill freely into the FIXED_PADDING overhang region, which the PixiJS canvas
+ * (sized and CSS-offset identically) renders without clipping.
  */
 
 import {
@@ -10,10 +23,10 @@ import {
   getEffectSettings,
   isPostProcessingReady,
   renderPostProcessing,
-  updateIlluminationData,
+  FIXED_PADDING,
   type EffectSettings,
 } from './postProcessingLayer';
-import { createShaderData, calculateAnimationModifiers, type IlluminationSource } from '@/types/illumination';
+import { calculateAnimationModifiers, type IlluminationSource } from '@/types/illumination';
 
 export interface FogEffectConfig {
   enabled: boolean;
@@ -35,92 +48,80 @@ let fogCanvas: HTMLCanvasElement | null = null;
 let fogCtx: CanvasRenderingContext2D | null = null;
 let illuminationCanvas: HTMLCanvasElement | null = null;
 let illuminationCtx: CanvasRenderingContext2D | null = null;
-let dimZoneCanvas: HTMLCanvasElement | null = null; // Intermediate canvas for dim zone blending
+let dimZoneCanvas: HTMLCanvasElement | null = null;
 let dimZoneCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
-let currentPadding = 0; // Track current padding for off-screen rendering
+
+// Viewport dimensions tracked so we can guard resize calls
+let _lastViewportW = 0;
+let _lastViewportH = 0;
 
 /**
- * Get the current edge padding value
+ * Returns the padding used by the coordinate system.
+ * Always FIXED_PADDING — exposed for callers that previously read a dynamic value.
  */
 export function getEdgePadding(): number {
-  return currentPadding;
+  return FIXED_PADDING;
 }
 
 /**
- * Initialize the fog canvas used for capturing fog state
- * Canvas is larger than viewport to allow blur edges to render off-screen
+ * Initialize (or re-initialize) the off-screen canvases.
+ * They are always sized to (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2).
+ *
+ * The `_padding` parameter is accepted for backward-compatibility but ignored —
+ * FIXED_PADDING is the authoritative value.
  */
-export function initFogCanvas(width: number, height: number, padding: number = 0): void {
-  currentPadding = padding;
-  
-  if (!fogCanvas) {
-    fogCanvas = document.createElement('canvas');
-  }
-  // Canvas is larger by 2x padding (padding on each side)
-  fogCanvas.width = width + padding * 2;
-  fogCanvas.height = height + padding * 2;
+export function initFogCanvas(width: number, height: number, _padding?: number): void {
+  _lastViewportW = width;
+  _lastViewportH = height;
+
+  const totalW = width + FIXED_PADDING * 2;
+  const totalH = height + FIXED_PADDING * 2;
+
+  if (!fogCanvas) fogCanvas = document.createElement('canvas');
+  fogCanvas.width = totalW;
+  fogCanvas.height = totalH;
   fogCtx = fogCanvas.getContext('2d', { willReadFrequently: false });
-  
-  // Initialize illumination canvas at same size
-  if (!illuminationCanvas) {
-    illuminationCanvas = document.createElement('canvas');
-  }
-  illuminationCanvas.width = width + padding * 2;
-  illuminationCanvas.height = height + padding * 2;
+
+  if (!illuminationCanvas) illuminationCanvas = document.createElement('canvas');
+  illuminationCanvas.width = totalW;
+  illuminationCanvas.height = totalH;
   illuminationCtx = illuminationCanvas.getContext('2d', { willReadFrequently: false });
-  
-  // Initialize dim zone canvas for proper blending of overlapping dim areas
-  if (!dimZoneCanvas) {
-    dimZoneCanvas = document.createElement('canvas');
-  }
-  dimZoneCanvas.width = width + padding * 2;
-  dimZoneCanvas.height = height + padding * 2;
+
+  if (!dimZoneCanvas) dimZoneCanvas = document.createElement('canvas');
+  dimZoneCanvas.width = totalW;
+  dimZoneCanvas.height = totalH;
   dimZoneCtx = dimZoneCanvas.getContext('2d', { willReadFrequently: false });
 }
 
 /**
- * Resize the fog canvas
+ * Resize the canvases when the viewport changes.
+ * Same semantics as initFogCanvas — FIXED_PADDING is implicit.
  */
-export function resizeFogCanvas(width: number, height: number, padding: number = 0): void {
-  currentPadding = padding;
-  
-  if (fogCanvas) {
-    fogCanvas.width = width + padding * 2;
-    fogCanvas.height = height + padding * 2;
-  }
-  if (illuminationCanvas) {
-    illuminationCanvas.width = width + padding * 2;
-    illuminationCanvas.height = height + padding * 2;
-  }
-  if (dimZoneCanvas) {
-    dimZoneCanvas.width = width + padding * 2;
-    dimZoneCanvas.height = height + padding * 2;
-  }
+export function resizeFogCanvas(width: number, height: number, _padding?: number): void {
+  _lastViewportW = width;
+  _lastViewportH = height;
+
+  const totalW = width + FIXED_PADDING * 2;
+  const totalH = height + FIXED_PADDING * 2;
+
+  if (fogCanvas) { fogCanvas.width = totalW; fogCanvas.height = totalH; }
+  if (illuminationCanvas) { illuminationCanvas.width = totalW; illuminationCanvas.height = totalH; }
+  if (dimZoneCanvas) { dimZoneCanvas.width = totalW; dimZoneCanvas.height = totalH; }
 }
 
-/**
- * Get the fog canvas context
- */
 export function getFogCanvasContext(): CanvasRenderingContext2D | null {
   return fogCtx;
 }
 
-/**
- * Illumination source data for GPU rendering
- */
 interface IlluminationData {
   sources: IlluminationSource[];
   gridSize: number;
   transform: { x: number; y: number; zoom: number };
 }
 
-/**
- * Parse color string to RGB values (0-1 range)
- */
 function parseColorToRGB(color: string): { r: number; g: number; b: number } {
-  // Handle hex colors
   if (color.startsWith('#')) {
     const hex = color.slice(1);
     const bigint = parseInt(hex, 16);
@@ -130,39 +131,30 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
       b: (bigint & 255) / 255,
     };
   }
-  // Default to white
   return { r: 1, g: 1, b: 1 };
 }
 
 /**
- * Render per-source illumination colors to the illumination canvas
- * Each source's color is clipped to its visibility polygon
- * The tint fills the entire visibility polygon with gradient from center
+ * Render per-source illumination color gradients to the illumination canvas.
+ *
+ * Transform applied: translate(FIXED_PADDING + pan.x, FIXED_PADDING + pan.y) then scale(zoom).
+ * This is identical to the fog canvas transform so the two canvases are pixel-aligned.
  */
 function renderIlluminationOverlay(
   sources: IlluminationSource[],
   transform: { x: number; y: number; zoom: number },
-  padding: number,
   gridSize: number,
   animationTime: number
 ): void {
   if (!illuminationCtx || !illuminationCanvas) return;
-  
+
   const ctx = illuminationCtx;
-  const width = illuminationCanvas.width;
-  const height = illuminationCanvas.height;
-  
-  // Clear the illumination canvas
-  ctx.clearRect(0, 0, width, height);
-  
-  // Use 'screen' blend mode for color mixing - produces brighter results without
-  // oversaturation, and can never darken (only brighten or stay same)
+  ctx.clearRect(0, 0, illuminationCanvas.width, illuminationCanvas.height);
   ctx.globalCompositeOperation = 'screen';
-  
+
   for (const source of sources) {
     if (!source.enabled || !source.colorEnabled || !source.visibilityPolygon) continue;
-    
-    // Calculate animated modifiers (intensity and radius)
+
     const animResult = calculateAnimationModifiers(
       source.animation,
       source.animationSpeed,
@@ -170,59 +162,47 @@ function renderIlluminationOverlay(
       animationTime,
       source.id
     );
-    
+
     ctx.save();
-    
-    // Apply transform with padding offset
-    ctx.translate(padding + transform.x, padding + transform.y);
+    // Unified transform — matches fogCanvas exactly
+    ctx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y);
     ctx.scale(transform.zoom, transform.zoom);
-    
-    // Clip to this source's visibility polygon
+
     ctx.beginPath();
     ctx.clip(source.visibilityPolygon);
-    
-    // Create radial gradient from source position covering the full range
-    // source.range is already in pixels, gridSize is 1
-    // Apply radius modifier for glow animation
-    const rangePixels = source.range * animResult.radiusMod;
+
+    const rangePixels = source.range * gridSize * animResult.radiusMod;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
-    
-    const gradient = ctx.createRadialGradient(
-      pos.x, pos.y, 0,
-      pos.x, pos.y, rangePixels
-    );
-    
+
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, rangePixels);
     const rgb = parseColorToRGB(source.color);
-    
-    // Color tint intensity - modulated by animation
     const intensity = (source.colorIntensity ?? 0.5) * animResult.intensityMod;
-    const brightAlpha = intensity * 0.7; // Scale to max 0.7 alpha
-    const dimAlpha = intensity * 0.3;    // Dim zone is ~40% of bright
-    
+    const brightAlpha = intensity * 0.7;
+    const dimAlpha = intensity * 0.3;
+
     gradient.addColorStop(0, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(brightZone, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${brightAlpha})`);
     gradient.addColorStop(1, `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, ${dimAlpha})`);
-    
-    // Fill a circular area to ensure circular light boundary
+
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
     ctx.fill();
-    
+
     ctx.restore();
   }
-  
-  // Reset composite operation
+
   ctx.globalCompositeOperation = 'source-over';
 }
 
 /**
- * Capture fog state from the main canvas and apply GPU post-processing
- * This is called during the render loop when fog changes
- * 
- * The fog mask is rendered on Canvas 2D, then passed to PixiJS GPU shader
- * for illumination calculations (bright/dim zones, soft edges, stacking)
+ * Capture fog state and push it to the PixiJS GPU pipeline.
+ *
+ * The fog canvas is always sized viewport + FIXED_PADDING*2.  Content rendered
+ * to it with the FIXED_PADDING + pan + zoom transform spills naturally into the
+ * overhang region, and the PixiJS canvas (same size, same CSS offset) renders
+ * it without any clipping.
  */
 export function applyFogPostProcessing(
   sourceCtx: CanvasRenderingContext2D,
@@ -237,80 +217,46 @@ export function applyFogPostProcessing(
   transform: { x: number; y: number; zoom: number },
   illuminationData?: IlluminationData
 ): void {
-  const edgeBlur = getEffectSettings().edgeBlur;
-  
-  // Padding must be large enough to accommodate:
-  // 1. Edge blur falloff (edgeBlur * 2)
-  // 2. The maximum light radius in SCREEN pixels so that light circles near the
-  //    viewport edge are not hard-clipped by the fog canvas boundary.
-  //    Light source ranges are in world-space pixels; multiply by zoom to convert.
-  // Cap at 800px to prevent excessive memory use with very large light sources.
-  let maxLightRange = 0;
-  if (illuminationData && illuminationData.sources.length > 0) {
-    for (const src of illuminationData.sources) {
-      if (src.enabled && src.range > maxLightRange) maxLightRange = src.range;
-    }
-  }
-  const lightPadding = Math.min(Math.ceil(maxLightRange * transform.zoom), 800);
-  const padding = Math.max(edgeBlur * 2, lightPadding);
-  
-  const paddedWidth = canvasWidth + padding * 2;
-  const paddedHeight = canvasHeight + padding * 2;
-  
-  // (Re)initialize fog canvases if their size doesn't match the required padded dimensions.
-  // Pass the actual padding value so all three canvases are created at the correct size.
-  if (!fogCanvas || fogCanvas.width !== paddedWidth || fogCanvas.height !== paddedHeight) {
-    initFogCanvas(canvasWidth, canvasHeight, padding);
-  }
-  
-  if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) {
-    return;
+  const totalW = canvasWidth + FIXED_PADDING * 2;
+  const totalH = canvasHeight + FIXED_PADDING * 2;
+
+  // (Re)initialize if viewport size changed
+  if (!fogCanvas || fogCanvas.width !== totalW || fogCanvas.height !== totalH) {
+    initFogCanvas(canvasWidth, canvasHeight);
   }
 
-  // Throttle updates for performance
+  if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
+
+  // Throttle updates
   const now = performance.now();
   if (now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
   lastUpdateTime = now;
 
-  // Clear fog canvas (including padding area)
-  fogCtx.clearRect(0, 0, paddedWidth, paddedHeight);
+  // Clear including overhang area
+  fogCtx.clearRect(0, 0, totalW, totalH);
 
-  // Apply transform with padding offset
-  // Content is rendered with padding offset so blur edges are outside viewport
+  // Apply unified transform: FIXED_PADDING offset acts as a stable coordinate origin.
   fogCtx.save();
-  fogCtx.translate(padding + transform.x, padding + transform.y);
+  fogCtx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
-  // Render fog layers to off-screen canvas
+  // Render base fog layers
   fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
   fogCtx.fill(fogMasks.unexploredMask);
-
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // CRITICAL: Render illumination zones with proper bright/dim gradient
-  // Each source is clipped to its visibility polygon, ensuring light is blocked by walls.
-  // 
-  // Model:
-  // - Bright zone (inner circle): fully clears fog
-  // - Dim zone (outer ring): partially clears fog based on dimIntensity
-  // - Overlapping sources: the brightest value wins (using intermediate canvas)
-  //
-  // IMPORTANT: The exploredOnlyMask excludes currently visible areas, so we must
-  // first FILL visibility areas with fog before using destination-out to cut through it.
-  const animationTime = performance.now();
-  
+  // Illumination: fill visibility areas then cut bright/dim gradients through them
+  const animationTime = now;
+
   if (illuminationData && illuminationData.sources.length > 0) {
-    // STEP 1: Fill all visibility areas with explored-level fog first
-    // This provides a base layer for the destination-out gradients to work against.
-    // Without this, visible areas have NO fog, so the gradient has nothing to remove.
+    // STEP 1: fill each visibility polygon with explored-level fog
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
-      
+
       const pos = source.position;
-      const rangePixels = source.range;
-      
-      // Fill visibility area with explored fog opacity
+      const rangePixels = source.range * illuminationData.gridSize;
+
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
       fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
@@ -319,15 +265,13 @@ export function applyFogPostProcessing(
       fogCtx.fill();
       fogCtx.restore();
     }
-    
-    // STEP 2: Use destination-out to cut illuminated areas from the fog
-    // We draw radial gradients that define bright center -> dim edge
+
+    // STEP 2: destination-out gradients cut illuminated areas from fog
     fogCtx.globalCompositeOperation = 'destination-out';
-    
+
     for (const source of illuminationData.sources) {
       if (!source.enabled || !source.visibilityPolygon) continue;
-      
-      // Calculate animated modifiers (intensity and radius)
+
       const animResult = calculateAnimationModifiers(
         source.animation,
         source.animationSpeed,
@@ -335,109 +279,64 @@ export function applyFogPostProcessing(
         animationTime,
         source.id
       );
-      
+
       const pos = source.position;
-      const rangePixels = source.range * animResult.radiusMod;
+      const rangePixels = source.range * illuminationData.gridSize * animResult.radiusMod;
       const brightZone = source.brightZone ?? 0.5;
       const brightIntensity = (source.brightIntensity ?? 1.0) * animResult.intensityMod;
-      // Use global dimZoneOpacity as fallback when source doesn't specify dimIntensity
       const globalDimOpacity = getEffectSettings().dimZoneOpacity ?? 0.4;
       const dimIntensity = (source.dimIntensity ?? globalDimOpacity) * animResult.intensityMod;
-      
-      // Save context and clip to this source's visibility polygon
+
       fogCtx.save();
       fogCtx.clip(source.visibilityPolygon);
-      
-      // Create gradient that cuts through fog:
-      // - Center to brightZone: high alpha removes most fog (bright area)
-      // - brightZone to edge: lower alpha removes less fog (dim area)
-      const clearGradient = fogCtx.createRadialGradient(
-        pos.x, pos.y, 0,
-        pos.x, pos.y, rangePixels
-      );
-      
-      // Bright zone: full visibility (alpha = brightIntensity)
+
+      const clearGradient = fogCtx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, rangePixels);
       clearGradient.addColorStop(0, `rgba(255, 255, 255, ${brightIntensity})`);
       clearGradient.addColorStop(brightZone * 0.9, `rgba(255, 255, 255, ${brightIntensity})`);
-      
-      // Transition from bright to dim
       clearGradient.addColorStop(brightZone, `rgba(255, 255, 255, ${(brightIntensity + dimIntensity) / 2})`);
-      
-      // Dim zone: partial visibility (alpha = dimIntensity)
       clearGradient.addColorStop(Math.min(1, brightZone + 0.1), `rgba(255, 255, 255, ${dimIntensity})`);
       clearGradient.addColorStop(1, `rgba(255, 255, 255, ${dimIntensity})`);
-      
+
       fogCtx.fillStyle = clearGradient;
       fogCtx.beginPath();
       fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
       fogCtx.fill();
-      
+
       fogCtx.restore();
     }
-    
+
     fogCtx.globalCompositeOperation = 'source-over';
   }
 
   fogCtx.restore();
 
-  // Render per-source illumination colors on Canvas 2D
-  // Each source's color is clipped to its own visibility polygon
+  // Render color overlays to the illumination canvas then push to PixiJS
   if (illuminationData && illuminationData.sources.length > 0) {
-    renderIlluminationOverlay(illuminationData.sources, transform, padding, illuminationData.gridSize, animationTime);
-    
-    // Send illumination overlay to PixiJS
+    renderIlluminationOverlay(
+      illuminationData.sources,
+      transform,
+      illuminationData.gridSize,
+      animationTime
+    );
     if (illuminationCanvas) {
-      updateIlluminationTexture(illuminationCanvas, padding);
+      updateIlluminationTexture(illuminationCanvas);
     }
   }
 
-  // Update GPU illumination data for bright/dim zone calculations
-  // NOTE: Color is now handled by the illumination texture, but we still
-  // need source positions/ranges for dim zone darkening effects
-  if (illuminationData && illuminationData.sources.length > 0) {
-    const shaderData = createShaderData(
-      illuminationData.sources,
-      illuminationData.gridSize,
-      { 
-        x: padding + transform.x, 
-        y: padding + transform.y, 
-        zoom: transform.zoom 
-      }
-    );
-    updateIlluminationData(shaderData);
-  }
-
-  // Send fog mask to PixiJS for GPU post-processing
-  // The illumination filter will apply blur and gradient effects
-  updateFogTexture(fogCanvas, padding);
+  // Push fog mask to PixiJS
+  updateFogTexture(fogCanvas);
   renderPostProcessing();
 }
 
-/**
- * Update fog effect settings
- */
 export function updateFogEffects(config: Partial<FogEffectConfig>): void {
   const effectSettings: Partial<EffectSettings> = {};
-
-  if (config.edgeBlur !== undefined) {
-    effectSettings.edgeBlur = config.edgeBlur;
-  }
-  if (config.lightFalloff !== undefined) {
-    effectSettings.lightFalloff = config.lightFalloff;
-  }
-  if (config.volumetricEnabled !== undefined) {
-    effectSettings.volumetricEnabled = config.volumetricEnabled;
-  }
-  if (config.effectQuality !== undefined) {
-    effectSettings.effectQuality = config.effectQuality;
-  }
-
+  if (config.edgeBlur !== undefined) effectSettings.edgeBlur = config.edgeBlur;
+  if (config.lightFalloff !== undefined) effectSettings.lightFalloff = config.lightFalloff;
+  if (config.volumetricEnabled !== undefined) effectSettings.volumetricEnabled = config.volumetricEnabled;
+  if (config.effectQuality !== undefined) effectSettings.effectQuality = config.effectQuality;
   updateEffectSettings(effectSettings);
 }
 
-/**
- * Get current fog effect configuration
- */
 export function getFogEffectConfig(): FogEffectConfig {
   const settings = getEffectSettings();
   return {
@@ -449,52 +348,18 @@ export function getFogEffectConfig(): FogEffectConfig {
   };
 }
 
-/**
- * Quality presets for fog effects
- */
 export const FOG_EFFECT_PRESETS = {
-  performance: {
-    edgeBlur: 4,
-    bloomIntensity: 0,
-    volumetricEnabled: false,
-    effectQuality: 'performance' as const,
-  },
-  balanced: {
-    edgeBlur: 8,
-    bloomIntensity: 0.5,
-    volumetricEnabled: false,
-    effectQuality: 'balanced' as const,
-  },
-  cinematic: {
-    edgeBlur: 12,
-    bloomIntensity: 0.8,
-    volumetricEnabled: true,
-    effectQuality: 'cinematic' as const,
-  },
+  performance: { edgeBlur: 4, bloomIntensity: 0, volumetricEnabled: false, effectQuality: 'performance' as const },
+  balanced:    { edgeBlur: 8, bloomIntensity: 0.5, volumetricEnabled: false, effectQuality: 'balanced' as const },
+  cinematic:   { edgeBlur: 12, bloomIntensity: 0.8, volumetricEnabled: true, effectQuality: 'cinematic' as const },
 };
 
-/**
- * Apply a preset configuration
- */
 export function applyFogEffectPreset(preset: keyof typeof FOG_EFFECT_PRESETS): void {
-  const config = FOG_EFFECT_PRESETS[preset];
-  updateFogEffects(config);
+  updateFogEffects(FOG_EFFECT_PRESETS[preset]);
 }
 
-/**
- * Cleanup fog post-processing resources
- */
 export function cleanupFogPostProcessing(): void {
-  if (fogCanvas) {
-    fogCanvas = null;
-    fogCtx = null;
-  }
-  if (illuminationCanvas) {
-    illuminationCanvas = null;
-    illuminationCtx = null;
-  }
-  if (dimZoneCanvas) {
-    dimZoneCanvas = null;
-    dimZoneCtx = null;
-  }
+  fogCanvas = null; fogCtx = null;
+  illuminationCanvas = null; illuminationCtx = null;
+  dimZoneCanvas = null; dimZoneCtx = null;
 }
