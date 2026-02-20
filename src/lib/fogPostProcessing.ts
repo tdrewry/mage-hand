@@ -4,16 +4,20 @@
  * COORDINATE SPACE
  * ================
  * All canvases here (fogCanvas, illuminationCanvas, dimZoneCanvas) are sized
- * viewport + FIXED_PADDING*2 on each axis — identical to the PixiJS canvas.
- * Content is rendered with:
+ * totalSize(contentW) × totalSize(contentH) — identical to the PixiJS canvas.
  *
- *   ctx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y)
+ * "Content" here means the bounding box of all regions + tokens in screen/CSS px,
+ * possibly larger than the browser viewport when the map is zoomed out far.
+ *
+ * Content is rendered with:
+ *   ctx.translate(FIXED_PADDING - originX + transform.x,
+ *                 FIXED_PADDING - originY + transform.y)
  *   ctx.scale(transform.zoom, transform.zoom)
  *
- * This means world-space coordinates map directly to fog-canvas pixels with
- * no per-frame padding recalculation.  Light circles near the viewport edge
- * spill freely into the FIXED_PADDING overhang region, which the PixiJS canvas
- * (sized and CSS-offset identically) renders without clipping.
+ * originX/Y = CSS px distance from the container's (0,0) to the content bbox
+ *             top-left.  Negative when content is above/left of the viewport.
+ * When content fits entirely inside the viewport both are 0 and the formula
+ * collapses to the original FIXED_PADDING + pan.x / pan.y.
  */
 
 import {
@@ -53,9 +57,12 @@ let dimZoneCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
 
-// Viewport dimensions tracked so we can guard resize calls
-let _lastViewportW = 0;
-let _lastViewportH = 0;
+// Content bbox dimensions tracked so we can guard resize calls
+let _lastContentW = 0;
+let _lastContentH = 0;
+// Canvas origin (CSS px offset from container origin to content bbox top-left)
+let _lastOriginX = 0;
+let _lastOriginY = 0;
 
 /**
  * Returns the padding used by the coordinate system.
@@ -67,14 +74,20 @@ export function getEdgePadding(): number {
 
 /**
  * Initialize (or re-initialize) the off-screen canvases.
- * They are always sized to (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2).
- *
- * The `_padding` parameter is accepted for backward-compatibility but ignored —
- * FIXED_PADDING is the authoritative value.
+ * width/height = content bbox size in CSS px.
+ * originX/Y   = CSS px position of the content bbox top-left inside the container.
  */
-export function initFogCanvas(width: number, height: number, _padding?: number): void {
-  _lastViewportW = width;
-  _lastViewportH = height;
+export function initFogCanvas(
+  width: number,
+  height: number,
+  _padding?: number,
+  originX = 0,
+  originY = 0
+): void {
+  _lastContentW = width;
+  _lastContentH = height;
+  _lastOriginX = originX;
+  _lastOriginY = originY;
 
   const totalW = width + FIXED_PADDING * 2;
   const totalH = height + FIXED_PADDING * 2;
@@ -96,12 +109,19 @@ export function initFogCanvas(width: number, height: number, _padding?: number):
 }
 
 /**
- * Resize the canvases when the viewport changes.
- * Same semantics as initFogCanvas — FIXED_PADDING is implicit.
+ * Resize the canvases when the content bbox or viewport changes.
  */
-export function resizeFogCanvas(width: number, height: number, _padding?: number): void {
-  _lastViewportW = width;
-  _lastViewportH = height;
+export function resizeFogCanvas(
+  width: number,
+  height: number,
+  _padding?: number,
+  originX = 0,
+  originY = 0
+): void {
+  _lastContentW = width;
+  _lastContentH = height;
+  _lastOriginX = originX;
+  _lastOriginY = originY;
 
   const totalW = width + FIXED_PADDING * 2;
   const totalH = height + FIXED_PADDING * 2;
@@ -137,14 +157,19 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
 /**
  * Render per-source illumination color gradients to the illumination canvas.
  *
- * Transform applied: translate(FIXED_PADDING + pan.x, FIXED_PADDING + pan.y) then scale(zoom).
+ * Transform applied:
+ *   translate(FIXED_PADDING - originX + pan.x, FIXED_PADDING - originY + pan.y)
+ *   scale(zoom)
+ *
  * This is identical to the fog canvas transform so the two canvases are pixel-aligned.
  */
 function renderIlluminationOverlay(
   sources: IlluminationSource[],
   transform: { x: number; y: number; zoom: number },
   gridSize: number,
-  animationTime: number
+  animationTime: number,
+  originX: number,
+  originY: number
 ): void {
   if (!illuminationCtx || !illuminationCanvas) return;
 
@@ -164,8 +189,8 @@ function renderIlluminationOverlay(
     );
 
     ctx.save();
-    // Unified transform — matches fogCanvas exactly
-    ctx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y);
+    // Content-aware transform — matches fogCanvas exactly
+    ctx.translate(FIXED_PADDING - originX + transform.x, FIXED_PADDING - originY + transform.y);
     ctx.scale(transform.zoom, transform.zoom);
 
     ctx.beginPath();
@@ -199,10 +224,8 @@ function renderIlluminationOverlay(
 /**
  * Capture fog state and push it to the PixiJS GPU pipeline.
  *
- * The fog canvas is always sized viewport + FIXED_PADDING*2.  Content rendered
- * to it with the FIXED_PADDING + pan + zoom transform spills naturally into the
- * overhang region, and the PixiJS canvas (same size, same CSS offset) renders
- * it without any clipping.
+ * canvasWidth/Height = content bbox size in CSS px (may be larger than viewport).
+ * originX/Y          = CSS px offset of the content bbox top-left from the container origin.
  */
 export function applyFogPostProcessing(
   sourceCtx: CanvasRenderingContext2D,
@@ -215,14 +238,22 @@ export function applyFogPostProcessing(
   canvasWidth: number,
   canvasHeight: number,
   transform: { x: number; y: number; zoom: number },
-  illuminationData?: IlluminationData
+  illuminationData?: IlluminationData,
+  originX = 0,
+  originY = 0
 ): void {
   const totalW = canvasWidth + FIXED_PADDING * 2;
   const totalH = canvasHeight + FIXED_PADDING * 2;
 
-  // (Re)initialize if viewport size changed
-  if (!fogCanvas || fogCanvas.width !== totalW || fogCanvas.height !== totalH) {
-    initFogCanvas(canvasWidth, canvasHeight);
+  // (Re)initialize if content size or origin changed
+  if (
+    !fogCanvas ||
+    fogCanvas.width !== totalW ||
+    fogCanvas.height !== totalH ||
+    _lastOriginX !== originX ||
+    _lastOriginY !== originY
+  ) {
+    initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
   }
 
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
@@ -235,9 +266,12 @@ export function applyFogPostProcessing(
   // Clear including overhang area
   fogCtx.clearRect(0, 0, totalW, totalH);
 
-  // Apply unified transform: FIXED_PADDING offset acts as a stable coordinate origin.
+  // Content-aware transform:
+  //   FIXED_PADDING   — standard canvas overhang offset
+  //   - originX       — shifts so the content bbox top-left maps to canvas (FIXED_PADDING, FIXED_PADDING)
+  //   + transform.x   — pan offset from world origin to screen origin
   fogCtx.save();
-  fogCtx.translate(FIXED_PADDING + transform.x, FIXED_PADDING + transform.y);
+  fogCtx.translate(FIXED_PADDING - originX + transform.x, FIXED_PADDING - originY + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
   // Render base fog layers
@@ -316,7 +350,9 @@ export function applyFogPostProcessing(
       illuminationData.sources,
       transform,
       illuminationData.gridSize,
-      animationTime
+      animationTime,
+      originX,
+      originY
     );
     if (illuminationCanvas) {
       updateIlluminationTexture(illuminationCanvas);

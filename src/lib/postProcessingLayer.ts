@@ -3,21 +3,22 @@
  *
  * COORDINATE SPACE DESIGN
  * =======================
- * The PixiJS canvas is larger than the visible viewport by FIXED_PADDING on every
- * side, and is offset by -FIXED_PADDING via CSS so it still covers the viewport.
+ * The PixiJS canvas covers the content bounding box (all regions + tokens in
+ * screen space) plus FIXED_PADDING on every side.  Its CSS top/left are set so
+ * that it starts at (contentLeft - FIXED_PADDING, contentTop - FIXED_PADDING)
+ * relative to the container.
  *
- *   PixiJS canvas size : (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2)
- *   CSS offset          : top: -FIXED_PADDING px; left: -FIXED_PADDING px
+ * When content fits entirely within the viewport the canvas is simply
+ * (viewport + FIXED_PADDING*2) — the same as before.  When content extends
+ * beyond the viewport on any side the canvas grows to cover that content, so
+ * fog is always drawn over every region regardless of pan position.
  *
- * The fog canvas (Canvas 2D) is initialised at the SAME dimensions and uses the
- * SAME translate(FIXED_PADDING + pan.x, FIXED_PADDING + pan.y) / scale(zoom)
- * transform.  Both canvases therefore share one coordinate space — (0,0) in
- * PixiJS always equals (0,0) on the fog canvas.  There are NO negative sprite
- * offsets and NO per-frame padding recalculations.
+ * The fog canvas (Canvas 2D) is initialised at the SAME pixel dimensions and
+ * uses translate(FIXED_PADDING - originX + pan.x, FIXED_PADDING - originY + pan.y)
+ * / scale(zoom) so that world-space coordinates land in the correct fog-canvas pixel.
  *
  * FIXED_PADDING is chosen to be large enough that light circles whose centres are
- * at the viewport edge still render fully.  It is computed once at init/resize
- * from a configurable constant and is NEVER changed during a session.
+ * at the content edge still render fully.
  */
 
 import * as PIXI from 'pixi.js';
@@ -25,9 +26,7 @@ import { Z_INDEX } from './zIndex';
 import { IlluminationFilter } from './shaders/illuminationFilter';
 
 // ---------------------------------------------------------------------------
-// Fixed padding — set large enough to handle the biggest expected light radius
-// at the minimum expected zoom level.  A value of 600 CSS px is comfortable
-// for light ranges up to ~600 screen px.  Increase here if needed.
+// Fixed padding — padding around the content bounding box on every side.
 // ---------------------------------------------------------------------------
 export const FIXED_PADDING = 600;
 
@@ -36,6 +35,9 @@ export interface PostProcessingConfig {
   height: number;
   resolution?: number;
   antialias?: boolean;
+  /** Origin offset: how many CSS px the content bbox top-left is above/left of the container origin. */
+  originX?: number;
+  originY?: number;
 }
 
 export interface EffectSettings {
@@ -67,9 +69,12 @@ let containerRef: HTMLElement | null = null;
 let isInitialized = false;
 let currentSettings: EffectSettings = { ...DEFAULT_EFFECT_SETTINGS };
 
-// Viewport dimensions (without padding) — stored so resize can recompute
-let _viewportW = 0;
-let _viewportH = 0;
+// Stored dimensions — content bbox dimensions (without padding)
+let _contentW = 0;
+let _contentH = 0;
+// CSS origin of the fog canvas relative to the container
+let _originX = 0;
+let _originY = 0;
 
 function getQualityMultiplier(quality: EffectSettings['effectQuality']): number {
   switch (quality) {
@@ -80,16 +85,32 @@ function getQualityMultiplier(quality: EffectSettings['effectQuality']): number 
   }
 }
 
-/** Total canvas dimension in logical px (viewport + 2 × padding). */
-function totalSize(viewportPx: number): number {
-  return viewportPx + FIXED_PADDING * 2;
+/** Total canvas dimension = content size + 2 × padding. */
+function totalSize(contentPx: number): number {
+  return contentPx + FIXED_PADDING * 2;
+}
+
+/** Apply CSS positioning to the PixiJS canvas based on current origin. */
+function applyCanvasCSS(canvas: HTMLCanvasElement, contentW: number, contentH: number): void {
+  canvas.style.position = 'absolute';
+  // The fog canvas starts at (originX - FIXED_PADDING, originY - FIXED_PADDING)
+  // relative to the container.  originX/Y are the CSS px distances from the
+  // container top-left to the content bounding-box top-left (can be negative
+  // when content is above / left of the viewport).
+  canvas.style.top  = `${_originY - FIXED_PADDING}px`;
+  canvas.style.left = `${_originX - FIXED_PADDING}px`;
+  canvas.style.width  = `${totalSize(contentW)}px`;
+  canvas.style.height = `${totalSize(contentH)}px`;
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.FOG_POST_PROCESSING);
 }
 
 /**
  * Initialize the PixiJS post-processing layer.
  *
- * The PixiJS canvas is sized to totalSize(viewport) and positioned so that its
- * extra FIXED_PADDING border overhangs each edge of the parent container.
+ * width/height = content bbox dimensions in CSS px.
+ * originX/Y    = CSS px position of the content bbox top-left inside the container.
+ *                Typically 0 when content fits in the viewport (same as before).
  */
 export async function initPostProcessing(
   container: HTMLElement,
@@ -100,8 +121,10 @@ export async function initPostProcessing(
       await cleanupPostProcessing();
     }
 
-    _viewportW = config.width;
-    _viewportH = config.height;
+    _contentW = config.width;
+    _contentH = config.height;
+    _originX  = config.originX ?? 0;
+    _originY  = config.originY ?? 0;
 
     const qm = getQualityMultiplier(currentSettings.effectQuality);
     const canvasW = Math.floor(totalSize(config.width) * qm);
@@ -118,21 +141,11 @@ export async function initPostProcessing(
     });
 
     const canvas = pixiApp.canvas as HTMLCanvasElement;
-    canvas.style.position = 'absolute';
-    // Overhang by FIXED_PADDING on every side so the extra canvas area sits
-    // outside the viewport — light circles near the edge render into it freely.
-    canvas.style.top = `${-FIXED_PADDING}px`;
-    canvas.style.left = `${-FIXED_PADDING}px`;
-    canvas.style.width = `${totalSize(config.width)}px`;
-    canvas.style.height = `${totalSize(config.height)}px`;
-    canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.FOG_POST_PROCESSING);
+    applyCanvasCSS(canvas, config.width, config.height);
 
     container.appendChild(canvas);
     containerRef = container;
 
-    // BlurFilter — no extra padding needed because sprites are no longer
-    // negatively offset; they start at (0,0) and the canvas is already padded.
     blurFilter = new PIXI.BlurFilter({
       strength: currentSettings.edgeBlur,
       quality: currentSettings.effectQuality === 'performance' ? 2 : 4,
@@ -146,8 +159,6 @@ export async function initPostProcessing(
     fogContainer.filters = [blurFilter, illuminationFilter];
     pixiApp.stage.addChild(fogContainer);
 
-    // Sprites cover the full PixiJS canvas (padded size) starting at (0,0).
-    // The fog canvas passed to updateFogTexture must also be this size.
     fogSprite = new PIXI.Sprite();
     fogSprite.width = canvasW;
     fogSprite.height = canvasH;
@@ -165,8 +176,8 @@ export async function initPostProcessing(
 
     isInitialized = true;
     console.log(
-      `✅ PixiJS post-processing initialized — viewport ${config.width}×${config.height}, ` +
-      `canvas ${canvasW}×${canvasH}, padding ${FIXED_PADDING}px`
+      `✅ PixiJS post-processing initialized — content ${config.width}×${config.height}, ` +
+      `origin (${_originX}, ${_originY}), canvas ${canvasW}×${canvasH}, padding ${FIXED_PADDING}px`
     );
     return true;
   } catch (error) {
@@ -177,8 +188,7 @@ export async function initPostProcessing(
 
 /**
  * Update the fog texture from a padded Canvas 2D source.
- * The source canvas MUST be (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2)
- * — the same size as the PixiJS canvas.  No offset is applied.
+ * The source canvas MUST be totalSize(contentW) × totalSize(contentH).
  */
 export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !fogSprite || !isInitialized) return;
@@ -210,7 +220,6 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
 
 /**
  * Update the illumination overlay texture from a padded Canvas 2D source.
- * Same size requirements as updateFogTexture.
  */
 export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !illuminationSprite || !isInitialized) return;
@@ -262,15 +271,28 @@ export function getEffectSettings(): EffectSettings {
   return { ...currentSettings };
 }
 
+/** Return current origin so fog canvas can use matching translate. */
+export function getPostProcessingOrigin(): { x: number; y: number } {
+  return { x: _originX, y: _originY };
+}
+
 /**
- * Resize the post-processing layer when the viewport changes.
- * Re-creates the PixiJS renderer at the new padded size.
+ * Resize the post-processing layer when content bounds or viewport changes.
+ * width/height = new content bbox dimensions.
+ * originX/Y    = new CSS origin of the content bbox inside the container.
  */
-export function resizePostProcessing(width: number, height: number): void {
+export function resizePostProcessing(
+  width: number,
+  height: number,
+  originX?: number,
+  originY?: number
+): void {
   if (!pixiApp || !isInitialized) return;
 
-  _viewportW = width;
-  _viewportH = height;
+  _contentW = width;
+  _contentH = height;
+  if (originX !== undefined) _originX = originX;
+  if (originY !== undefined) _originY = originY;
 
   const qm = getQualityMultiplier(currentSettings.effectQuality);
   const canvasW = Math.floor(totalSize(width) * qm);
@@ -279,11 +301,7 @@ export function resizePostProcessing(width: number, height: number): void {
   pixiApp.renderer.resize(canvasW, canvasH);
 
   const canvas = pixiApp.canvas as HTMLCanvasElement;
-  canvas.style.width = `${totalSize(width)}px`;
-  canvas.style.height = `${totalSize(height)}px`;
-  // Keep the CSS offset stable
-  canvas.style.top = `${-FIXED_PADDING}px`;
-  canvas.style.left = `${-FIXED_PADDING}px`;
+  applyCanvasCSS(canvas, width, height);
 
   if (fogSprite) {
     fogSprite.width = canvasW;

@@ -10,7 +10,7 @@
  * DO NOT REMOVE these dependencies without consulting DEPENDENCIES.md
  */
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { MapManager } from "./MapManager";
 import { TokenContextManager } from "./TokenContextManager";
 import { CardManager } from "./CardManager";
@@ -364,12 +364,66 @@ export const SimpleTabletop = () => {
     realtimeVisionThrottleMs,
   } = useFogStore();
   
+  // ---------------------------------------------------------------------------
+  // Content-aware fog canvas bounds
+  // ---------------------------------------------------------------------------
+  // Compute the bounding box of all map content (regions + tokens) in CSS px,
+  // using the current pan/zoom transform.  The fog and PixiJS canvases are
+  // sized to cover this bbox (plus FIXED_PADDING) so fog renders correctly even
+  // when content extends far beyond the visible viewport.
+  //
+  // We union the result with the viewport so the fog always covers at least the
+  // visible area.  originX/Y are the CSS px position of the bbox top-left
+  // relative to the container — used to offset the PixiJS canvas CSS position.
+  // ---------------------------------------------------------------------------
+  const fogBounds = useMemo(() => {
+    const vw = canvasDimensions.width;
+    const vh = canvasDimensions.height;
+    if (vw <= 0 || vh <= 0) return { width: vw, height: vh, originX: 0, originY: 0 };
+
+    // Start with the viewport in screen space
+    let minX = 0, minY = 0, maxX = vw, maxY = vh;
+
+    // Expand to include all regions (in world space → screen space)
+    regions.forEach((region) => {
+      let rMinX: number, rMinY: number, rMaxX: number, rMaxY: number;
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
+        const xs = region.pathPoints.map((p) => p.x);
+        const ys = region.pathPoints.map((p) => p.y);
+        rMinX = Math.min(...xs); rMinY = Math.min(...ys);
+        rMaxX = Math.max(...xs); rMaxY = Math.max(...ys);
+      } else {
+        rMinX = region.x; rMinY = region.y;
+        rMaxX = region.x + region.width; rMaxY = region.y + region.height;
+      }
+      // Project world → screen
+      const sMinX = rMinX * transform.zoom + transform.x;
+      const sMinY = rMinY * transform.zoom + transform.y;
+      const sMaxX = rMaxX * transform.zoom + transform.x;
+      const sMaxY = rMaxY * transform.zoom + transform.y;
+      minX = Math.min(minX, sMinX);
+      minY = Math.min(minY, sMinY);
+      maxX = Math.max(maxX, sMaxX);
+      maxY = Math.max(maxY, sMaxY);
+    });
+
+    // Content bbox in screen space
+    const originX = Math.min(0, minX);   // ≤ 0: content extends left of viewport
+    const originY = Math.min(0, minY);   // ≤ 0: content extends above viewport
+    const totalW = Math.max(vw, maxX) - originX;
+    const totalH = Math.max(vh, maxY) - originY;
+
+    return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
+  }, [canvasDimensions.width, canvasDimensions.height, regions, transform]);
+
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
     containerRef: canvasContainerRef,
     enabled: renderingMode === 'play' && fogEnabled && effectSettings.postProcessingEnabled,
-    width: canvasDimensions.width,
-    height: canvasDimensions.height,
+    width: fogBounds.width,
+    height: fogBounds.height,
+    originX: fogBounds.originX,
+    originY: fogBounds.originY,
   });
 
   // Region edge hatching post-processing hook

@@ -24,8 +24,14 @@ import type { IlluminationSource } from '@/types/illumination';
 interface UsePostProcessingOptions {
   containerRef: React.RefObject<HTMLElement>;
   enabled: boolean;
+  /** Content bbox width in CSS px (may be larger than viewport for large maps). */
   width: number;
+  /** Content bbox height in CSS px (may be larger than viewport for large maps). */
   height: number;
+  /** CSS px distance from container origin to content bbox top-left (X axis). Default 0. */
+  originX?: number;
+  /** CSS px distance from container origin to content bbox top-left (Y axis). Default 0. */
+  originY?: number;
 }
 
 export interface IlluminationData {
@@ -39,6 +45,8 @@ export function usePostProcessing({
   enabled,
   width,
   height,
+  originX = 0,
+  originY = 0,
 }: UsePostProcessingOptions) {
   const [isReady, setIsReady] = useState(false);
   // Keep a ref in sync so redrawCanvas closures always read the latest value
@@ -76,11 +84,13 @@ export function usePostProcessing({
       const success = await initPostProcessing(containerRef.current, {
         width,
         height,
+        originX,
+        originY,
         resolution: window.devicePixelRatio || 1,
       });
 
       if (success) {
-        initFogCanvas(width, height);
+        initFogCanvas(width, height, undefined, originX, originY);
         initRef.current = true;
         setPostProcessingVisible(true);
         setReady(true);
@@ -99,7 +109,7 @@ export function usePostProcessing({
 
     // No cleanup here — we don't want to hide the layer on every dep change.
     // Hiding is handled explicitly in the `!enabled` branch above.
-  }, [enabled, effectSettings.postProcessingEnabled, containerRef, width, height]);
+  }, [enabled, effectSettings.postProcessingEnabled, containerRef, width, height, originX, originY]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -113,13 +123,13 @@ export function usePostProcessing({
     };
   }, []);
 
-  // Update size when canvas resizes
+  // Update size/origin when content bounds resize
   useEffect(() => {
     if (initRef.current && isPostProcessingReady() && width > 0 && height > 0) {
-      resizePostProcessing(width, height);
-      resizeFogCanvas(width, height);
+      resizePostProcessing(width, height, originX, originY);
+      resizeFogCanvas(width, height, undefined, originX, originY);
     }
-  }, [width, height]);
+  }, [width, height, originX, originY]);
 
   // Update effect settings when they change
   useEffect(() => {
@@ -155,10 +165,12 @@ export function usePostProcessing({
         width,
         height,
         transform,
-        illuminationData
+        illuminationData,
+        originX,
+        originY
       );
     },
-    [width, height, effectSettings.postProcessingEnabled]
+    [width, height, originX, originY, effectSettings.postProcessingEnabled]
   );
 
   return {
