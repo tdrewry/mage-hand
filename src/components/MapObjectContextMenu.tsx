@@ -178,6 +178,15 @@ export const MapObjectContextMenuWrapper = ({
       updateMapObject(obj.id, updates);
     });
 
+    // If any light's enabled state changed, trigger a fog refresh
+    const hasLightEnabledChange = targetObjects.some(
+      (obj) => (obj.category === 'light' || categoryValue === 'light') &&
+               obj.lightEnabled !== lightEnabledValue
+    );
+    if (hasLightEnabledChange) {
+      window.dispatchEvent(new CustomEvent('fog:force-refresh'));
+    }
+
     setShowEditModal(false);
     onUpdateCanvas?.();
     toast.success(isMultiSelection ? `Updated ${targetObjects.length} objects` : 'Map object updated');

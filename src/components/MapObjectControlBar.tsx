@@ -76,6 +76,8 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
     if (singleSelected && isLight) {
       updateMapObject(singleSelected.id, { lightEnabled: enabled });
       onUpdateCanvas?.();
+      // Trigger fog refresh so illumination changes apply immediately
+      window.dispatchEvent(new CustomEvent('fog:force-refresh'));
     }
   };
 
