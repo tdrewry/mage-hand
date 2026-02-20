@@ -472,6 +472,9 @@ export const SimpleTabletop = () => {
       position: { x: number; y: number };
       visionRange: number;
       visibilityPath: Path2D;
+      /** Raw visibility polygon for wall-occlusion clipping in illumination (no circle clip applied).
+       *  Only set when actual wall segments exist. Used as visibilityPolygon on IlluminationSource. */
+      wallOcclusionPath?: Path2D;
       isLightSource?: boolean; // Light sources get two-zone gradient in post-processing
       tokenIllumination?: Token['illuminationSources']; // Token's custom illumination settings
     }>
@@ -485,6 +488,8 @@ export const SimpleTabletop = () => {
         position: { x: number; y: number };
         visionPath: any; // paper.js Path
         illuminationRange?: number; // Track range to detect changes
+        /** Raw Path2D from visibilityPolygonToPath2D (no circle clip) for use as illumination wall-occlusion mask. */
+        wallOcclusionPath?: Path2D;
       }
     >
   >(new Map());
@@ -1484,11 +1489,25 @@ export const SimpleTabletop = () => {
               visionRangePixels,
             );
 
-            // Cache the new vision path with illumination range for change detection
+            // Cache the new vision path with illumination range for change detection.
+            // Also store a raw (non-circle-clipped) wall-occlusion Path2D for illumination.
+            // This avoids the paper.js scope mismatch that caused diagonal wedge clipping.
+            let wallOcclusionPath: Path2D | undefined;
+            if (combinedSegmentsRef.current.length > 0) {
+              const rawVis = computeVisibilityFromSegments(
+                { x: token.x, y: token.y },
+                combinedSegmentsRef.current,
+                visionRangePixels
+              );
+              if (rawVis.polygon.length > 2) {
+                wallOcclusionPath = visibilityPolygonToPath2D(rawVis.polygon);
+              }
+            }
             tokenVisibilityCacheRef.current.set(token.id, {
               position: { x: token.x, y: token.y },
               visionPath: tokenVision,
               illuminationRange: visionRangePixels,
+              wallOcclusionPath,
             });
 
             // Update previous position
@@ -1564,6 +1583,7 @@ export const SimpleTabletop = () => {
             position: { x: number; y: number };
             visionRange: number;
             visibilityPath: Path2D;
+            wallOcclusionPath?: Path2D;
             isLightSource?: boolean;
             tokenIllumination?: typeof tokens[0]['illuminationSources'];
           }> = [];
@@ -1591,6 +1611,9 @@ export const SimpleTabletop = () => {
               position: cached.position,
               visionRange: visionRangePixels,
               visibilityPath: path2D,
+              // Use the raw (non-circle-clipped) wall-occlusion path for illumination clipping.
+              // This prevents the diagonal wedge caused by paper.js scope mismatch.
+              wallOcclusionPath: cached.wallOcclusionPath,
               isLightSource: false, // Tokens are not light sources
               tokenIllumination: token.illuminationSources,
             });
@@ -3082,7 +3105,11 @@ export const SimpleTabletop = () => {
             animation: tokenSettings?.animation ?? 'none',
             animationSpeed: tokenSettings?.animationSpeed ?? 1.0,
             animationIntensity: tokenSettings?.animationIntensity ?? 0.3,
-            visibilityPolygon: t.visibilityPath,
+            // Use the raw wall-occlusion path (NOT the circle-clipped fog mask path).
+            // This prevents the diagonal wedge clipping caused by paper.js scope mismatch.
+            // When no walls exist, wallOcclusionPath is undefined and applyClipShape (circle)
+            // provides the correct circular boundary on its own.
+            visibilityPolygon: t.wallOcclusionPath,
           };
         });
         
