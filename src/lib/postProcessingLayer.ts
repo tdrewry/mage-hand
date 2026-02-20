@@ -125,11 +125,16 @@ export async function initPostProcessing(
     fogContainer.addChild(fogSprite);
     
     // Create illumination overlay sprite (rendered on top with additive blending)
+    // IMPORTANT: Must be added to the SAME fogContainer so it shares the same
+    // filter coordinate space. Adding it directly to stage causes pixel-offset
+    // misalignment because the BlurFilter internally expands its render area
+    // (adding internal padding), shifting the fog sprite's effective position
+    // relative to anything rendered outside the container.
     illuminationSprite = new PIXI.Sprite();
     illuminationSprite.width = effectiveWidth;
     illuminationSprite.height = effectiveHeight;
     illuminationSprite.blendMode = 'add';
-    pixiApp.stage.addChild(illuminationSprite);
+    fogContainer.addChild(illuminationSprite);
 
     isInitialized = true;
     console.log('✅ PixiJS post-processing initialized with GPU illumination');
