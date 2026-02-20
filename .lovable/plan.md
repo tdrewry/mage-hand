@@ -1,156 +1,107 @@
 
-# Map Tree: Z-Order Rendering + Interactive Selection & Reordering
+# Fix: Fog of War Cleanup on Mode Transition to Play
 
-## The Three Problems
+## Problem
 
-**1. Water/Trap Default Draw Order** — All MapObjects are rendered in one unsorted batch (`renderMapObjects` only sorts by selection). Water and trap have no mechanism to always draw beneath doors, columns, annotations, and other objects.
+The screenshot shows fog of war being "brutalized" — stale illumination halos and visibility polygons from the edit-mode session appear in play mode. This happens because:
 
-**2. Map Tree is display-only** — Clicking an entity in the tree does not select it on the canvas. There is no multi-select UI in the tree.
+1. When the DM drags or rotates regions/map objects/walls in edit mode, all visibility polygon caches and PixiJS textures still hold geometry computed at the **pre-edit** positions.
+2. The fog computation `useEffect` does eventually re-run, but it has an early-exit guard (`canSkipPolygonComputation`) that may fire if the dependency hashes look identical at the React level (since the region/map-object stores committed their changes atomically before the mode switch).
+3. The PixiJS layer retains the **previous frame's fog texture and illumination overlay** until `applyFogPostProcessing` produces a new one. If the re-computation is skipped or throttled, that old frame is what the player sees.
 
-**3. No drag-to-reorder in the tree** — The z-order of entities on the canvas cannot be controlled from the tree at all.
+## Solution
 
----
+Add a dedicated `useEffect` that watches `renderingMode`. When it detects a transition **to `'play'`**, it performs a synchronous full reset of all caches and the PixiJS post-processing layer, then schedules an immediate fog recompute.
 
-## Part 1: Z-Order System
+### What the effect does
 
-### Add `renderOrder` to `MapObject` (`src/types/mapObjectTypes.ts`)
-
-Add an optional field:
-```ts
-renderOrder?: number; // Lower = drawn first (under everything). Default: 50.
+```text
+renderingMode changes → 'play'
+  │
+  ├─ 1. notifyObstaclesChanged()          — rebuilds combinedSegmentsRef
+  ├─ 2. tokenVisibilityCacheRef.clear()   — forces all polygons recomputed
+  ├─ 3. prevTokenPositionsRef.clear()     — no stale position deltas
+  ├─ 4. prevTokenIlluminationRef.clear()  — no stale illumination hashes
+  ├─ 5. clearVisibilityCache()            — clears global Paper.js visibility cache
+  ├─ 6. fogMasksRef.current = null        — forces new mask generation
+  ├─ 7. setPostProcessingVisible(false)   — hides PixiJS layer for one frame
+  └─ 8. requestAnimationFrame → setPostProcessingVisible(true) + redrawCanvas()
+                                          — forces fresh GPU render
 ```
 
-This is a **persistent per-object integer** that fully controls draw position. It replaces the current selection-only sort.
-
-### Category Default Render Orders
-
-A lookup table `CATEGORY_DEFAULT_RENDER_ORDER` maps each `MapObjectCategory` to its default value:
-
-| Category | renderOrder | Rationale |
-|---|---|---|
-| `water` | 10 | Below everything — the "floor puddle" |
-| `trap` | 15 | Slightly above water but still under terrain |
-| `debris` | 20 | Background scatter |
-| `wall` | 30 | Walls sit just above floor decorations |
-| `imported-obstacle` | 40 | Imported shapes |
-| `door` | 50 | Doors above walls |
-| `column` | 60 | Columns on top of floor and doors |
-| `furniture` | 60 | Same tier as columns |
-| `obstacle` | 60 | Same tier |
-| `statue` | 60 | Same tier |
-| `stairs` | 60 | Same tier |
-| `light` | 70 | Light indicators above props |
-| `annotation` | 80 | Labels always on top |
-| `decoration` | 55 | Mid-tier decorations |
-| `custom` | 50 | Neutral default |
-
-### Update `renderMapObjects` Sort (`src/lib/mapObjectRenderer.ts`)
-
-Replace the selection-only sort with a two-key sort:
-
-```ts
-const sortedObjects = [...mapObjects].sort((a, b) => {
-  const aOrder = a.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[a.category] ?? 50;
-  const bOrder = b.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[b.category] ?? 50;
-  if (aOrder !== bOrder) return aOrder - bOrder;
-  // Tie-break: selected on top
-  return (selectedIds.includes(a.id) ? 1 : 0) - (selectedIds.includes(b.id) ? 1 : 0);
-});
-```
-
-### Set `renderOrder` on Conversion
-
-When `convertWaterToMapObject` and `convertTrapToMapObject` run in `mapObjectStore.ts`, the new MapObject is given `renderOrder: 10` (water) and `renderOrder: 15` (trap) explicitly — so even objects created before this change (if any existed) would be upgraded by the sort fallback.
-
----
-
-## Part 2: Map Tree as a Z-Order Controller
-
-### The Tree Display Order is the Z-Order
-
-Currently the tree renders groups first, then ungrouped entities in whatever order they arrive from the store. We need the tree to **mirror the canvas draw order** — items drawn on top appear at the top of the list (Photoshop/CSS convention: top of list = frontmost).
-
-The `allEntities` memo in `MapTreeCardContent` needs to be sorted by `renderOrder` descending (highest renderOrder = top of list = frontmost on canvas).
-
-For entities that don't have a numeric `renderOrder` (tokens, regions, lights), we assign notional values:
-- Tokens: 200 (always frontmost by definition)
-- Lights: 150
-- Regions: 5 (floors, always at the back)
-
-This lets the full tree be a true z-order list.
-
-### Drag-to-Reorder (`src/components/cards/MapTreeCard.tsx`)
-
-Use the HTML5 `draggable` API (no additional dependency needed) on each `EntityRow`. This is the simplest approach that works inside the existing `ScrollArea`.
-
-**Behavior:**
-- Drag an item up/down in the list to change its `renderOrder`.
-- On drop, compute the new `renderOrder` as the midpoint between the neighbours it was dropped between.
-- For **MapObjects**: call `updateMapObject(id, { renderOrder: newValue })`.
-- For **Tokens** and **Regions**: these currently have no `renderOrder` field. For now, drag reordering is only enabled for `mapObject` type entries (which is where it matters most for terrain layering). Tokens always render above map objects. Regions always render below. This is clearly communicated by a static label in the tree ("Tokens always render above map objects").
-- Groups: dragging a group row reorders the group's **lowest `renderOrder`** member to the target position, then shifts all other members by the same delta.
-
-**Implementation detail — avoiding float drift:**
-When the midpoint calculation would produce sub-integer precision after many reorders, a `normalizeRenderOrders()` helper renumbers all mapObjects from 10 to 10*N in steps of 10, preserving relative order. This is called whenever a reorder would produce a gap less than 1.
-
-### Click-to-Select (`src/components/cards/MapTreeCard.tsx`)
-
-Each `EntityRow` gets an `onClick` handler that calls the appropriate store selection method:
-
-| Entity type | Action |
-|---|---|
-| `mapObject` | `useMapObjectStore.getState().selectMapObject(id, false)` |
-| `region` | `useRegionStore.getState().selectRegion(id)` |
-| `token` | `useSessionStore.getState().setSelectedTokens([id])` |
-
-For **additive selection** (Ctrl/Cmd + click on a row): calls the additive variant of each.
-
-The tree also needs to **reflect** selection state back from the canvas — items that are selected on the canvas should be highlighted in the tree. This is done by subscribing to `selectedMapObjectIds` from the map object store, the `selected` flag on regions, and `selectedTokenIds` from the session store inside `MapTreeCardContent`.
-
-### Multi-Select Bubble (`src/components/cards/MapTreeCard.tsx`)
-
-Add a selection indicator **before** each row's icon. It is a small `16×16` rounded checkbox:
-- Unchecked: dimmed circle outline, only visible on row hover (opacity-0 group-hover:opacity-60)
-- Checked: filled primary-colored circle with a checkmark, always visible
-
-Clicking the bubble does **additive** selection (does not clear existing selection). This allows building a multi-selection from the tree without holding Ctrl.
-
-The bubble appears for all entity types but is most useful for mapObjects and tokens.
-
----
+Steps 7 and 8 are the critical GPU layer reset. Hiding then immediately re-showing the PixiJS canvas forces it to blit a fresh frame after the fog computation has run. Without this, the PixiJS layer can display stale texture data even after the fog canvas has been updated.
 
 ## Files Changed
 
-```text
-src/types/mapObjectTypes.ts
-  — Add `renderOrder?: number` field to MapObject interface
-  — Add `CATEGORY_DEFAULT_RENDER_ORDER` constant map
+### `src/components/SimpleTabletop.tsx`
 
-src/lib/mapObjectRenderer.ts
-  — Update renderMapObjects() sort to use renderOrder with category fallback
+**Add a `useRef` to track previous mode** (near the other `useRef` declarations, ~line 448):
 
-src/stores/mapObjectStore.ts
-  — Set renderOrder in convertWaterToMapObject (10) and convertTrapToMapObject (15)
-  — Add reorderMapObject(id, newRenderOrder) helper
-  — Add normalizeRenderOrders() helper
-
-src/components/cards/MapTreeCard.tsx  (largest change)
-  — Sort allEntities by effective render order (descending = frontmost first)
-  — Add SelectionBubble sub-component (checkbox circle)
-  — Add onClick to EntityRow → calls store selection
-  — Add onSelectAdditive to EntityRow → additive selection
-  — Add draggable={true} + onDragStart/onDragOver/onDrop to EntityRow
-  — Add visual drop-target indicator (blue line between rows)
-  — Subscribe to selectedMapObjectIds, selectedRegionIds to highlight active rows
-  — Disable drag for entity types where reordering has no effect (regions, lights)
-  — Add a static info banner: "Drag to reorder draw order. Tokens always draw above map objects."
+```ts
+const prevRenderingModeRef = useRef<string>(renderingMode);
 ```
 
----
+**Add a new `useEffect` for mode transition cleanup** (after the existing `useEffect` that handles map object changes, around line 1100):
 
-## What This Does NOT Change
+```ts
+// Cleanup fog state when switching from edit → play mode
+useEffect(() => {
+  const wasEdit = prevRenderingModeRef.current === 'edit' || prevRenderingModeRef.current === 'dm';
+  const isNowPlay = renderingMode === 'play';
+  prevRenderingModeRef.current = renderingMode;
 
-- The canvas interaction (clicking on the canvas to select) remains unchanged.
-- Groups retain their existing behaviour — the group row is not draggable at this stage (moving a group would require reordering all member `renderOrder` values consistently, which is a follow-up).
-- Tokens and regions do not get `renderOrder` fields — their draw order relative to each other within their own layer is unchanged. Only MapObject-to-MapObject ordering is user-controllable.
-- No new dependencies are introduced.
+  if (!wasEdit || !isNowPlay) return;
+
+  console.log('[Fog] Mode transition edit→play: flushing all visibility caches');
+
+  // 1. Rebuild combined wall+obstacle segments from fresh state
+  if (wallGeometryRef.current) {
+    const mapObjectSegments = mapObjectsToSegments(mapObjects);
+    combinedSegmentsRef.current = [
+      ...wallGeometryRef.current.wallSegments,
+      ...mapObjectSegments,
+      ...importedWallSegments,
+    ];
+  }
+
+  // 2. Notify light system that obstacle geometry has changed
+  notifyObstaclesChanged();
+
+  // 3. Clear all per-token visibility caches
+  tokenVisibilityCacheRef.current.forEach((cached) => {
+    if (cached?.visionPath?.remove) cached.visionPath.remove();
+  });
+  tokenVisibilityCacheRef.current.clear();
+  prevTokenPositionsRef.current.clear();
+  prevTokenIlluminationRef.current?.clear?.();
+
+  // 4. Clear global Paper.js / visibility-polygon cache
+  clearVisibilityCache();
+
+  // 5. Null out the fog mask so fog computation cannot use the stale masks
+  fogMasksRef.current = null;
+
+  // 6. Reset PixiJS post-processing layer for a clean frame
+  if (isPostProcessingReadyRef.current) {
+    setPostProcessingVisible(false);
+    requestAnimationFrame(() => {
+      setPostProcessingVisible(true);
+      redrawCanvas();
+    });
+  } else {
+    redrawCanvas();
+  }
+}, [renderingMode]);
+```
+
+The dependency array intentionally only contains `renderingMode`. The inner logic reads other refs and state directly — this avoids re-triggering on every fog-related state change while still firing exactly once per mode transition.
+
+### `src/lib/version.ts`
+
+Increment `APP_VERSION` from `'0.3.3'` to `'0.3.4'`.
+
+## Technical Notes
+
+- `prevRenderingModeRef` correctly handles `'dm'` as well as `'edit'` since the mode string in `dungeonStore` uses `'dm'`/`'play'`, but the toolbar switches between those two strings. The ref comparison is `!== 'play'` → `=== 'play'`, so any non-play → play transition triggers the flush.
+- The `setPostProcessingVisible` import is already present in `usePostProcessing.ts` and re-exported from `postProcessingLayer.ts`. It must be imported into `SimpleTabletop.tsx` directly for this effect (or called through the hook's returned interface). Currently the hook does not expose a `resetLayer` method — the cleanest approach is to import `setPostProcessingVisible` from `'../lib/postProcessingLayer'` directly at the top of `SimpleTabletop.tsx`, which is where all other `postProcessingLayer` calls already reside.
+- The `requestAnimationFrame` gap between hide and show gives React's render cycle (and the fog `useEffect`) one tick to run with `fogMasksRef.current === null`, forcing a full recompute before the PixiJS layer is shown again.
