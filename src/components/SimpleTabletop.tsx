@@ -2353,8 +2353,8 @@ export const SimpleTabletop = () => {
         const offscreenCanvas = document.createElement("canvas");
         const bounds = wallGeometry.bounds;
         const padding = 50; // Extra padding for thick walls
-        offscreenCanvas.width = Math.ceil(bounds.width + padding * 2);
-        offscreenCanvas.height = Math.ceil(bounds.height + padding * 2);
+        offscreenCanvas.width = Math.max(1, Math.ceil(bounds.width + padding * 2));
+        offscreenCanvas.height = Math.max(1, Math.ceil(bounds.height + padding * 2));
 
         const offscreenCtx = offscreenCanvas.getContext("2d");
         if (offscreenCtx) {
@@ -2434,7 +2434,7 @@ export const SimpleTabletop = () => {
     }
 
     // Draw cached wall with texture and decorations
-    if (cachedCanvas && wallDecorationCacheRef.current) {
+    if (cachedCanvas && wallDecorationCacheRef.current && cachedCanvas.width > 0 && cachedCanvas.height > 0) {
       const cacheBounds = wallDecorationCacheRef.current.bounds;
       ctx.drawImage(cachedCanvas, cacheBounds.x, cacheBounds.y);
     }
@@ -2909,8 +2909,8 @@ export const SimpleTabletop = () => {
         let fogOffscreenCanvas = (window as any).__fogOffscreenCanvas as HTMLCanvasElement | undefined;
         if (!fogOffscreenCanvas || fogOffscreenCanvas.width !== canvas.width || fogOffscreenCanvas.height !== canvas.height) {
           fogOffscreenCanvas = document.createElement('canvas');
-          fogOffscreenCanvas.width = canvas.width;
-          fogOffscreenCanvas.height = canvas.height;
+          fogOffscreenCanvas.width = Math.max(1, canvas.width);
+          fogOffscreenCanvas.height = Math.max(1, canvas.height);
           (window as any).__fogOffscreenCanvas = fogOffscreenCanvas;
         }
         
@@ -2954,10 +2954,12 @@ export const SimpleTabletop = () => {
           
           // Now composite the fog canvas onto the main canvas
           // The main canvas still has regions/textures intact; we're just overlaying fog with transparent holes
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to draw fog canvas at screen coordinates
-          ctx.drawImage(fogOffscreenCanvas, 0, 0);
-          ctx.restore();
+          if (fogOffscreenCanvas.width > 0 && fogOffscreenCanvas.height > 0) {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to draw fog canvas at screen coordinates
+            ctx.drawImage(fogOffscreenCanvas, 0, 0);
+            ctx.restore();
+          }
         }
       } else {
         // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
