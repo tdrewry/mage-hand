@@ -6,22 +6,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import {
-  FileText,
+  User,
   Code2,
   Layers,
   ExternalLink,
   Save,
   AlertCircle,
 } from 'lucide-react';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useSessionStore, type EntityRef } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { LinkedCreatureSection } from '@/components/LinkedCreatureSection';
 import { toast } from 'sonner';
 
 // Lazy load Monaco to avoid bundle bloat
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 // Reuse the stat block renderer from MonsterStatBlockCard
-import { MonsterStatBlockCardContent, StatBlockFromJson } from './MonsterStatBlockCard';
+import { StatBlockFromJson } from './MonsterStatBlockCard';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ interface CharacterSheetCardContentProps {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function CharacterSheetCardContent({ tokenId, characterId }: CharacterSheetCardContentProps) {
-  const { tokens, updateTokenDetails, updateTokenStatBlockJson } = useSessionStore();
+  const { tokens, updateTokenDetails, updateTokenStatBlockJson, updateTokenEntityRef } = useSessionStore();
   const { getMonsterById, getCharacterById, getCreatureType } = useCreatureStore();
 
   const token = useMemo(() => tokens.find(t => t.id === tokenId), [tokens, tokenId]);
@@ -58,7 +59,9 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     return '';
   }, [token, getCreatureType, getMonsterById, getCharacterById]);
 
-  const [activeTab, setActiveTab] = useState<'details' | 'json' | 'statblock'>('details');
+  // Default to "character" tab if JSON is present, otherwise "details"
+  const defaultTab = initialJson.trim() ? 'character' : 'details';
+  const [activeTab, setActiveTab] = useState<'character' | 'json' | 'details'>(defaultTab);
   const [jsonValue, setJsonValue] = useState(initialJson);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
@@ -104,6 +107,22 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     if (!token) return;
     updateTokenDetails(token.id, notes, quickRef, token.statBlockJson);
     toast.success('Details saved');
+  };
+
+  const handleLinkCreature = (creatureId: string, creatureType: 'character' | 'monster') => {
+    if (!token) return;
+    updateTokenEntityRef(token.id, {
+      type: 'local',
+      entityId: creatureId,
+      projectionType: creatureType === 'monster' ? 'stat-block' : 'character',
+    });
+    toast.success(`Token linked to ${creatureType}`);
+  };
+
+  const handleUnlinkCreature = () => {
+    if (!token) return;
+    updateTokenEntityRef(token.id, undefined);
+    toast.success('Creature unlinked');
   };
 
   // ── Fallback: legacy characterId mode ───────────────────────────────────
@@ -160,22 +179,22 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
         )}
       </div>
 
-      {/* Tabs — all TabsContent share the same flex-1 slot; inactive ones collapse via hidden attr */}
+      {/* Tabs — inactive ones collapse via data-[state=inactive]:hidden */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col flex-1 min-h-0">
         <TabsList className="mx-4 mt-2 grid grid-cols-3 shrink-0">
-          <TabsTrigger value="statblock" className="text-xs gap-1">
-            <Layers className="w-3 h-3" /> Stat Block
+          <TabsTrigger value="character" className="text-xs gap-1">
+            <User className="w-3 h-3" /> Character
           </TabsTrigger>
           <TabsTrigger value="json" className="text-xs gap-1">
             <Code2 className="w-3 h-3" /> JSON
           </TabsTrigger>
           <TabsTrigger value="details" className="text-xs gap-1">
-            <FileText className="w-3 h-3" /> Details
+            <Layers className="w-3 h-3" /> Details
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Stat Block tab ───────────────────────────────────────────── */}
-        <TabsContent value="statblock" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0">
+        {/* ── Character (Stat Block) tab ────────────────────────────────── */}
+        <TabsContent value="character" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0">
           <ScrollArea className="h-full">
             {parsedMonster ? (
               <StatBlockFromJson data={parsedMonster} />
@@ -188,8 +207,8 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
                   </>
                 ) : (
                   <>
-                    <Layers className="w-8 h-8 mx-auto opacity-30" />
-                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render a stat block here.</p>
+                    <User className="w-8 h-8 mx-auto opacity-30" />
+                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render the character here.</p>
                   </>
                 )}
               </div>
@@ -199,7 +218,6 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
 
         {/* ── JSON Editor tab ──────────────────────────────────────────── */}
         <TabsContent value="json" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 flex flex-col">
-          {/* Error banner */}
           {jsonError && (
             <div className="mx-4 mt-2 mb-1 flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive shrink-0">
               <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -243,6 +261,14 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
         <TabsContent value="details" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 px-4 pb-4 pt-3">
           <ScrollArea className="h-full">
             <div className="space-y-4 pr-1">
+              {/* Linked creature section */}
+              <LinkedCreatureSection
+                token={token}
+                onViewStats={() => setActiveTab('character')}
+                onUnlink={handleUnlinkCreature}
+                onLinkCreature={handleLinkCreature}
+              />
+
               <div className="space-y-1.5">
                 <Label className="text-xs">Notes</Label>
                 <Textarea
