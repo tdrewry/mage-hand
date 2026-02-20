@@ -483,6 +483,7 @@ export const SimpleTabletop = () => {
       wallOcclusionPath?: Path2D;
       isLightSource?: boolean; // Light sources get two-zone gradient in post-processing
       tokenIllumination?: Token['illuminationSources']; // Token's custom illumination settings
+      mapObjectLightData?: { lightColor?: string; lightRadius?: number; lightBrightRadius?: number; lightIntensity?: number }; // Map object light properties
     }>
   >([]);
 
@@ -1592,6 +1593,7 @@ export const SimpleTabletop = () => {
             wallOcclusionPath?: Path2D;
             isLightSource?: boolean;
             tokenIllumination?: typeof tokens[0]['illuminationSources'];
+            mapObjectLightData?: { lightColor?: string; lightRadius?: number; lightBrightRadius?: number; lightIntensity?: number };
           }> = [];
 
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
@@ -1665,6 +1667,12 @@ export const SimpleTabletop = () => {
                 visionRange: radius,
                 visibilityPath: lightPath2D,
                 isLightSource: true,
+                mapObjectLightData: {
+                  lightColor: lightObj.lightColor,
+                  lightRadius: lightObj.lightRadius,
+                  lightBrightRadius: lightObj.lightBrightRadius,
+                  lightIntensity: lightObj.lightIntensity,
+                },
               });
               if (lightVision.remove) lightVision.remove();
             }
@@ -3095,18 +3103,37 @@ export const SimpleTabletop = () => {
           // the color gradient matches the visibility polygon exactly.
           const rangePixels = t.visionRange;
           
+          // Map object lights carry their own color/intensity; use those over generic defaults
+          const moLight = t.mapObjectLightData;
+          const dimRadius = moLight?.lightRadius ?? rangePixels;
+          const brightRadius = moLight?.lightBrightRadius ?? dimRadius * 0.5;
+          const moColor = moLight?.lightColor ?? '#FFD700';
+          const moIntensity = moLight?.lightIntensity ?? 1.0;
+
           return {
             id: `vis-${idx}`,
             name: t.isLightSource ? 'Light' : 'Vision',
             enabled: true,
             position: t.position,
             range: rangePixels, // Already in pixels - no further conversion needed
-            brightZone: tokenSettings?.brightZone ?? effectSettings.lightFalloff, // Use token setting or global
-            brightIntensity: tokenSettings?.brightIntensity ?? 1.0,
-            dimIntensity: tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0),
-            color: tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF'),
-            colorEnabled: tokenSettings?.colorEnabled ?? false,
-            colorIntensity: tokenSettings?.colorIntensity ?? 0.5,
+            brightZone: moLight
+              ? (brightRadius / dimRadius)          // Map object: derive from pixel radii
+              : (tokenSettings?.brightZone ?? effectSettings.lightFalloff),
+            brightIntensity: moLight
+              ? moIntensity
+              : (tokenSettings?.brightIntensity ?? 1.0),
+            dimIntensity: moLight
+              ? moIntensity * 0.4
+              : (tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0)),
+            color: moLight
+              ? moColor
+              : (tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF')),
+            colorEnabled: moLight
+              ? true                                // Map object lights always apply their color
+              : (tokenSettings?.colorEnabled ?? false),
+            colorIntensity: moLight
+              ? 0.5
+              : (tokenSettings?.colorIntensity ?? 0.5),
             softEdge: tokenSettings?.softEdge ?? true,
             softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
             animation: tokenSettings?.animation ?? 'none',
