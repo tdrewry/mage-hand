@@ -230,7 +230,7 @@ export const exportProjectToFile = async (projectData: ProjectData, filename?: s
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename || `${projectData.metadata.name}-${Date.now()}.d20pro`;
+  a.download = filename || `${projectData.metadata.name}-${Date.now()}.mhsession`;
   
   document.body.appendChild(a);
   a.click();
@@ -275,7 +275,7 @@ export const importProjectFromFile = (file: File): Promise<ProjectData> => {
 // Save project to local storage with automatic cleanup
 export const saveProjectToStorage = (projectData: ProjectData, maxProjects: number = 10): void => {
   try {
-    const key = `d20pro-project-${projectData.metadata.id}`;
+    const key = `magehand-project-${projectData.metadata.id}`;
     const serialized = serializeProject(projectData);
     
     localStorage.setItem(key, JSON.stringify(serialized));
@@ -287,7 +287,7 @@ export const saveProjectToStorage = (projectData: ProjectData, maxProjects: numb
     if (error instanceof Error && error.message.includes('quota')) {
       // Storage full - clean up old projects and try again
       cleanupOldProjects();
-      localStorage.setItem(`d20pro-project-${projectData.metadata.id}`, JSON.stringify(serializeProject(projectData)));
+      localStorage.setItem(`magehand-project-${projectData.metadata.id}`, JSON.stringify(serializeProject(projectData)));
     } else {
       throw error;
     }
@@ -297,7 +297,7 @@ export const saveProjectToStorage = (projectData: ProjectData, maxProjects: numb
 // Load project from local storage
 export const loadProjectFromStorage = (projectId: string): ProjectData | null => {
   try {
-    const key = `d20pro-project-${projectId}`;
+    const key = `magehand-project-${projectId}`;
     const stored = localStorage.getItem(key);
     
     if (!stored) return null;
@@ -312,7 +312,7 @@ export const loadProjectFromStorage = (projectId: string): ProjectData | null =>
 // Get list of saved projects
 export const getSavedProjects = (): ProjectMetadata[] => {
   try {
-    const index = localStorage.getItem('d20pro-project-index');
+    const index = localStorage.getItem('magehand-project-index');
     return index ? JSON.parse(index) : [];
   } catch (error) {
     console.error('Failed to load project index:', error);
@@ -336,13 +336,13 @@ const updateProjectIndex = (metadata: ProjectMetadata, maxProjects: number): voi
     
     // Clean up old project data
     toRemove.forEach(p => {
-      localStorage.removeItem(`d20pro-project-${p.id}`);
+      localStorage.removeItem(`magehand-project-${p.id}`);
     });
     
     projects = projects.slice(0, maxProjects);
   }
   
-  localStorage.setItem('d20pro-project-index', JSON.stringify(projects));
+  localStorage.setItem('magehand-project-index', JSON.stringify(projects));
 };
 
 // Clean up old projects when storage is full
@@ -353,21 +353,21 @@ const cleanupOldProjects = (): void => {
   const toRemove = projects.slice(Math.floor(projects.length / 2));
   
   toRemove.forEach(p => {
-    localStorage.removeItem(`d20pro-project-${p.id}`);
+    localStorage.removeItem(`magehand-project-${p.id}`);
   });
   
   // Update index
   const remaining = projects.slice(0, Math.floor(projects.length / 2));
-  localStorage.setItem('d20pro-project-index', JSON.stringify(remaining));
+  localStorage.setItem('magehand-project-index', JSON.stringify(remaining));
 };
 
 // Delete a saved project
 export const deleteProjectFromStorage = (projectId: string): void => {
-  localStorage.removeItem(`d20pro-project-${projectId}`);
+  localStorage.removeItem(`magehand-project-${projectId}`);
   
   // Update index
   const projects = getSavedProjects().filter(p => p.id !== projectId);
-  localStorage.setItem('d20pro-project-index', JSON.stringify(projects));
+  localStorage.setItem('magehand-project-index', JSON.stringify(projects));
 };
 
 // Create project backup

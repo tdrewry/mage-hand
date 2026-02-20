@@ -4,7 +4,7 @@ import { Role } from '@/stores/roleStore';
 import { VisionProfile } from '@/stores/visionProfileStore';
 import { FogSettings } from '@/stores/fogStore';
 
-const TEMPLATES_STORAGE_KEY = 'd20pro-templates';
+const TEMPLATES_STORAGE_KEY = 'magehand-templates';
 
 export interface SessionTemplate {
   id: string;

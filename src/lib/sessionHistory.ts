@@ -1,6 +1,6 @@
 import { ProjectData, ProjectMetadata } from './projectSerializer';
 
-const HISTORY_KEY_PREFIX = 'd20pro-history-';
+const HISTORY_KEY_PREFIX = 'magehand-history-';
 const MAX_VERSIONS_PER_PROJECT = 5;
 
 export interface ProjectVersion {

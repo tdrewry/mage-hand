@@ -364,7 +364,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
     try {
       const projectData = createCurrentProjectData();
-      await exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.d20pro`);
+      await exportProjectToFile(projectData, `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.mhsession`);
       toast.success('Project exported successfully (with textures)');
     } catch (error) {
       toast.error(`Failed to export project: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1375,7 +1375,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                   size="sm"
                 >
                   <Download className="w-3 h-3 mr-2" />
-                  Export to File (.d20pro)
+                  Export to File (.mhsession)
                 </Button>
               </CardContent>
             </Card>
@@ -1384,7 +1384,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               <CardHeader>
                 <CardTitle className="text-base">Import Project</CardTitle>
                 <CardDescription className="text-xs">
-                  Import from a .d20pro file
+                  Import from a .mhsession file
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1402,7 +1402,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".d20pro,.json"
+                  accept=".mhsession,.json"
                   onChange={handleFileSelected}
                   style={{ display: 'none' }}
                 />

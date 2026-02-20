@@ -12,9 +12,9 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { serializeProject, deserializeProject, ProjectData } from './projectSerializer';
 
-const AUTO_SAVE_KEY = 'd20pro-autosave';
-const AUTO_SAVE_SETTINGS_KEY = 'd20pro-autosave-settings';
-const AUTO_SAVE_TIMESTAMP_KEY = 'd20pro-autosave-timestamp';
+const AUTO_SAVE_KEY = 'magehand-autosave';
+const AUTO_SAVE_SETTINGS_KEY = 'magehand-autosave-settings';
+const AUTO_SAVE_TIMESTAMP_KEY = 'magehand-autosave-timestamp';
 
 export interface AutoSaveSettings {
   enabled: boolean;
