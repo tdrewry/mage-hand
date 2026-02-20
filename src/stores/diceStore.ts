@@ -1,7 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
-import { rollDice, type DiceRollResult } from '@/lib/diceEngine';
+import { rollDice, type DiceRollResult, type RollMetadata } from '@/lib/diceEngine';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 
 const MAX_HISTORY = 50;
@@ -18,7 +18,7 @@ interface DiceState {
 }
 
 interface DiceActions {
-  roll: (formula: string, label?: string) => DiceRollResult;
+  roll: (formula: string, label?: string, meta?: RollMetadata) => DiceRollResult;
   clearHistory: () => void;
   setFormula: (formula: string) => void;
   addPinnedFormula: (label: string, formula: string) => void;
@@ -32,9 +32,9 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
   currentFormula: '',
   pinnedFormulas: [],
 
-  roll: (formula: string, label?: string) => {
+  roll: (formula: string, label?: string, meta?: RollMetadata) => {
     const username = useMultiplayerStore.getState().currentUsername || 'You';
-    const result = rollDice(formula, label);
+    const result = rollDice(formula, label, meta);
     result.rolledBy = username;
     set((state) => ({
       rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),

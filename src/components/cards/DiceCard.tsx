@@ -198,6 +198,7 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
       }`}
       style={{ transitionDuration: '200ms' }}
     >
+      <RollLabel roll={roll} />
       <div className="flex items-baseline justify-between">
         <span className="font-mono text-xs text-muted-foreground">{roll.formula}</span>
         <span className="text-xl font-bold tabular-nums">{roll.total}</span>
@@ -237,12 +238,32 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
   );
 }
 
+/** Compact label showing [source, reason, formula → total] */
+function RollLabel({ roll }: { roll: DiceRollResult }) {
+  const parts: string[] = [];
+  if (roll.meta?.source) parts.push(String(roll.meta.source));
+  if (roll.meta?.reason) parts.push(String(roll.meta.reason));
+  if (parts.length === 0 && roll.label) parts.push(roll.label);
+  if (parts.length === 0) return null;
+  return (
+    <div className="text-xs text-muted-foreground truncate">
+      {parts.join(' · ')}
+    </div>
+  );
+}
+
 function HistoryRow({ roll }: { roll: DiceRollResult }) {
   const time = new Date(roll.timestamp);
   const ts = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+  const contextLabel = roll.meta?.source
+    ? `${roll.meta.source}${roll.meta.reason ? ` · ${roll.meta.reason}` : ''}`
+    : roll.label || '';
   return (
-    <div className="flex items-center justify-between text-xs py-0.5 px-1 rounded hover:bg-muted/30">
+    <div className="flex items-center justify-between text-xs py-0.5 px-1 rounded hover:bg-muted/30 gap-1">
       <span className="text-muted-foreground w-10 shrink-0">{ts}</span>
+      {contextLabel && (
+        <span className="text-muted-foreground truncate max-w-[6rem]" title={contextLabel}>{contextLabel}</span>
+      )}
       <span className="font-mono text-muted-foreground truncate flex-1 mx-1">{roll.formula}</span>
       <span className="font-bold tabular-nums">{roll.total}</span>
     </div>
