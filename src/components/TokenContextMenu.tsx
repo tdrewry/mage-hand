@@ -829,7 +829,7 @@ export const TokenContextMenu = ({
           {!isMultiSelection && (
             <ContextMenuItem onClick={handleViewStats}>
               <FileText className="mr-2 h-4 w-4" />
-              <span>{hasLinkedCreature && linkedCreatureType === 'monster' ? 'Stat Block' : 'Character Sheet'}</span>
+              <span>Character Sheet</span>
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
