@@ -6739,11 +6739,51 @@ export const SimpleTabletop = () => {
         const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
         const rotationDelta = currentAngle - rotationStartAngle;
 
-        // Update tempRegionRotation so the region visually rotates during drag.
-        // This is what the drawRegion function reads to apply live rotation.
+        // Commit the rotation of the PRIMARY dragged region to the store every frame so
+        // that on mouseup the store has the correct final value (prevents snap-back).
+        // For grouped regions, the snapshot is in groupSiblingSnapshotsRef; for solo
+        // regions it is in initialRegionState.
+        const primarySnap = groupSiblingSnapshotsRef.current[draggedRegionId] ?? null;
+        const rad = (rotationDelta * Math.PI) / 180;
+        const cos = Math.cos(rad); const sin = Math.sin(rad);
+
+        if (draggedRegion.regionType === 'path' && (primarySnap?.pathPoints ?? draggedRegion.pathPoints)) {
+          const basePathPoints = primarySnap?.pathPoints ?? draggedRegion.pathPoints!;
+          const newPathPoints = basePathPoints.map(p => {
+            const dx = p.x - pivotX; const dy = p.y - pivotY;
+            return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
+          });
+          const pxs = newPathPoints.map(p => p.x); const pys = newPathPoints.map(p => p.y);
+          const minPX = Math.min(...pxs); const maxPX = Math.max(...pxs);
+          const minPY = Math.min(...pys); const maxPY = Math.max(...pys);
+          updateRegion(draggedRegionId, {
+            pathPoints: newPathPoints,
+            x: minPX, y: minPY,
+            width: Math.max(maxPX - minPX, 1),
+            height: Math.max(maxPY - minPY, 1),
+            rotation: 0,
+          });
+        } else {
+          // Rect region: orbit its bounding-box center around the pivot then add local spin
+          const snapW = (primarySnap?.width ?? (initialRegionState?.width ?? draggedRegion.width)) as number;
+          const snapH = (primarySnap?.height ?? (initialRegionState?.height ?? draggedRegion.height)) as number;
+          const snapX = (primarySnap?.x ?? (initialRegionState?.x ?? draggedRegion.x)) as number;
+          const snapY = (primarySnap?.y ?? (initialRegionState?.y ?? draggedRegion.y)) as number;
+          const baseRot = primarySnap ? (primarySnap.regRotation ?? 0) : (initialRegionState?.rotation ?? draggedRegion.rotation ?? 0);
+          const cx2 = snapX + snapW / 2; const cy2 = snapY + snapH / 2;
+          const dx = cx2 - pivotX; const dy = cy2 - pivotY;
+          const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
+          updateRegion(draggedRegionId, {
+            x: newCx - snapW / 2, y: newCy - snapH / 2,
+            rotation: baseRot + rotationDelta,
+          });
+        }
+
+        // Update tempRegionRotation so drawRegion doesn't add an extra delta on top.
+        // Since we've already committed to the store, temp delta should be 0.
         setTempRegionRotation(prev => ({
           ...prev,
-          [draggedRegionId]: rotationDelta,
+          [draggedRegionId]: 0,
         }));
 
         setDragPreview({
