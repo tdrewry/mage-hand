@@ -52,8 +52,7 @@ export function getEdgePadding(): number {
  * Initialize the fog canvas used for capturing fog state
  * Canvas is larger than viewport to allow blur edges to render off-screen
  */
-export function initFogCanvas(width: number, height: number, edgeBlur: number = 0): void {
-  const padding = edgeBlur * 2;
+export function initFogCanvas(width: number, height: number, padding: number = 0): void {
   currentPadding = padding;
   
   if (!fogCanvas) {
@@ -84,8 +83,7 @@ export function initFogCanvas(width: number, height: number, edgeBlur: number = 
 /**
  * Resize the fog canvas
  */
-export function resizeFogCanvas(width: number, height: number, edgeBlur: number = 0): void {
-  const padding = edgeBlur * 2;
+export function resizeFogCanvas(width: number, height: number, padding: number = 0): void {
   currentPadding = padding;
   
   if (fogCanvas) {
@@ -243,24 +241,26 @@ export function applyFogPostProcessing(
   
   // Padding must be large enough to accommodate:
   // 1. Edge blur falloff (edgeBlur * 2)
-  // 2. The maximum light radius in screen pixels so that light circles near the
-  //    viewport edge are not hard-clipped by the canvas boundary.
-  //    Light source ranges are in world-space pixels; multiply by zoom to get screen pixels.
+  // 2. The maximum light radius in SCREEN pixels so that light circles near the
+  //    viewport edge are not hard-clipped by the fog canvas boundary.
+  //    Light source ranges are in world-space pixels; multiply by zoom to convert.
+  // Cap at 800px to prevent excessive memory use with very large light sources.
   let maxLightRange = 0;
   if (illuminationData && illuminationData.sources.length > 0) {
     for (const src of illuminationData.sources) {
       if (src.enabled && src.range > maxLightRange) maxLightRange = src.range;
     }
   }
-  const lightPadding = Math.ceil(maxLightRange * transform.zoom);
+  const lightPadding = Math.min(Math.ceil(maxLightRange * transform.zoom), 800);
   const padding = Math.max(edgeBlur * 2, lightPadding);
   
   const paddedWidth = canvasWidth + padding * 2;
   const paddedHeight = canvasHeight + padding * 2;
   
-  // Initialize fog canvas if needed (with padding for off-screen blur)
+  // (Re)initialize fog canvases if their size doesn't match the required padded dimensions.
+  // Pass the actual padding value so all three canvases are created at the correct size.
   if (!fogCanvas || fogCanvas.width !== paddedWidth || fogCanvas.height !== paddedHeight) {
-    initFogCanvas(canvasWidth, canvasHeight, edgeBlur);
+    initFogCanvas(canvasWidth, canvasHeight, padding);
   }
   
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) {
