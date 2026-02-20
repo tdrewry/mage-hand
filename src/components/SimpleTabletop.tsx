@@ -5668,7 +5668,24 @@ export const SimpleTabletop = () => {
 
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then map objects, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      const clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
+      let clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
+
+      // If no map object was found at the click point, check if the click landed on the
+      // rotation or scale handles of the currently-selected map object.  Those handles
+      // are rendered outside the object's bounding box so findMapObjectAtPoint misses them.
+      if (!clickedMapObject && renderingMode === 'edit' && selectedMapObjectIds.length === 1) {
+        const selMObj = mapObjects.find(
+          o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape !== 'wall' &&
+               !useGroupStore.getState().isEntityInAnyGroup(o.id)
+        );
+        if (selMObj) {
+          const overRot = isOverMapObjectRotationHandle(selMObj, worldPos.x, worldPos.y);
+          const overScale = !overRot && getMapObjectScaleHandle(selMObj, worldPos.x, worldPos.y) !== null;
+          if (overRot || overScale) {
+            clickedMapObject = selMObj;
+          }
+        }
+      }
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
       if (clickedToken) {
