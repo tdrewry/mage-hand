@@ -1104,11 +1104,12 @@ export const SimpleTabletop = () => {
   // Redraw when map objects change (e.g., door toggle)
   // Must also update combined segments and clear visibility cache
   useEffect(() => {
-    // Update combined segments with new map object state
-    if (wallGeometryRef.current) {
-      const mapObjectSegments = mapObjectsToSegments(mapObjects);
-      combinedSegmentsRef.current = [...wallGeometryRef.current.wallSegments, ...mapObjectSegments, ...importedWallSegments];
-    }
+    // Update combined segments with new map object state.
+    // NOTE: wallGeometryRef.current.wallSegments (region perimeter negative-space) is intentionally
+    // excluded — those are rendering-only geometry. Vision occlusion comes exclusively from
+    // wall/obstacle/door MapObjects and any explicitly imported segments.
+    const mapObjectSegments = mapObjectsToSegments(mapObjects);
+    combinedSegmentsRef.current = [...mapObjectSegments, ...importedWallSegments];
     
     // Clear visibility caches so fog recalculates with new segments
     notifyObstaclesChanged();
@@ -1132,14 +1133,11 @@ export const SimpleTabletop = () => {
 
     console.log('[Fog] Mode transition edit→play: flushing all visibility caches');
 
-    // 1. Rebuild combined wall+obstacle segments from fresh state
-    if (wallGeometryRef.current) {
+    // 1. Rebuild combined wall+obstacle segments from fresh state.
+    // Vision occlusion comes from MapObjects only; region perimeter segments are excluded.
+    {
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
-      combinedSegmentsRef.current = [
-        ...wallGeometryRef.current.wallSegments,
-        ...mapObjectSegments,
-        ...importedWallSegments,
-      ];
+      combinedSegmentsRef.current = [...mapObjectSegments, ...importedWallSegments];
     }
 
     // 2. Notify light system that obstacle geometry has changed
@@ -1176,14 +1174,11 @@ export const SimpleTabletop = () => {
     const handleForceFogRefresh = () => {
       console.log('[Fog] Force refresh triggered by DM');
 
-      // 1. Rebuild combined wall+obstacle segments from fresh state
-      if (wallGeometryRef.current) {
+      // 1. Rebuild combined wall+obstacle segments from fresh state.
+      // Vision occlusion comes from MapObjects only; region perimeter segments are excluded.
+      {
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
-        combinedSegmentsRef.current = [
-          ...wallGeometryRef.current.wallSegments,
-          ...mapObjectSegments,
-          ...importedWallSegments,
-        ];
+        combinedSegmentsRef.current = [...mapObjectSegments, ...importedWallSegments];
       }
 
       // 2. Notify light system that obstacle geometry has changed
@@ -2340,9 +2335,11 @@ export const SimpleTabletop = () => {
       cachedCanvas = wallDecorationCacheRef.current.canvas;
       cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
       
-      // Update combined segments (walls + vision-blocking map objects + imported walls) - even with cached walls
+      // Update combined segments: MapObjects + explicitly imported segments only.
+      // Region perimeter (wallGeometry.wallSegments) is excluded — it's rendering-only geometry,
+      // not intended to block vision/fog.
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
-      combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
+      combinedSegmentsRef.current = [...mapObjectSegments, ...importedWallSegments];
     } else {
       // Generate new decorations and cache them
       const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin);
@@ -2407,9 +2404,10 @@ export const SimpleTabletop = () => {
         // Store in separate ref for fog computation
         wallGeometryRef.current = wallGeometry;
         
-        // Update combined segments (walls + vision-blocking map objects + imported walls)
+        // Update combined segments: MapObjects + explicitly imported segments only.
+        // Region perimeter (wallGeometry.wallSegments) is excluded — it's rendering-only geometry.
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
-        combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
+        combinedSegmentsRef.current = [...mapObjectSegments, ...importedWallSegments];
       }
     }
 
