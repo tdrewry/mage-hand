@@ -148,11 +148,11 @@ export async function initPostProcessing(
 let currentPadding = 0;
 
 /**
- * Update the fog texture from a Canvas 2D source
+ * Update the fog texture from a Canvas 2D source.
  * The source canvas may be larger than the viewport (padded for off-screen blur/light edges).
- * We use a texture frame crop to extract only the viewport-visible region so that
- * sprites are always positioned at (0,0) — avoiding negative-position PixiJS sprites
- * that get clipped by the BlurFilter's internal padding boundary.
+ * We position the sprite at (-padding, -padding) so the padded canvas aligns with the viewport.
+ * The BlurFilter's own `padding` is set large enough to prevent it from clipping
+ * the negative-offset sprite — this is the correct PixiJS v8 approach.
  */
 export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
   if (!pixiApp || !fogSprite || !isInitialized) return;
@@ -161,49 +161,41 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: numbe
     currentPadding = padding;
     const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
 
-    // Viewport dimensions (without padding)
-    const viewportW = sourceCanvas.width - padding * 2;
-    const viewportH = sourceCanvas.height - padding * 2;
+    // Expand blur filter padding so it never clips the negatively-offset sprite
+    if (blurFilter) {
+      blurFilter.padding = padding + 8;
+    }
 
-    // Always recreate texture when source canvas size or padding changes —
-    // PixiJS Texture frames are immutable after creation.
+    // Recreate texture only when canvas dimensions change
     const needsRecreate = !fogTexture ||
       !fogTexture.source ||
       fogTexture.source.width !== sourceCanvas.width ||
-      fogTexture.source.height !== sourceCanvas.height ||
-      fogTexture.frame.x !== padding ||
-      fogTexture.frame.width !== viewportW;
+      fogTexture.source.height !== sourceCanvas.height;
 
     if (needsRecreate) {
-      if (fogTexture) fogTexture.destroy(true);
-      const baseTexture = PIXI.Texture.from(sourceCanvas);
-      // Crop to the viewport region (skip the padding border on all sides).
-      // This keeps the sprite at position (0,0) — no negative-offset clipping.
-      fogTexture = new PIXI.Texture({
-        source: baseTexture.source,
-        frame: new PIXI.Rectangle(padding, padding, viewportW, viewportH),
-      });
+      if (fogTexture) {
+        fogTexture.destroy(false); // don't destroy source — canvas is managed externally
+      }
+      fogTexture = PIXI.Texture.from(sourceCanvas);
       fogSprite.texture = fogTexture;
     } else {
-      // In-place update when dimensions haven't changed
-      fogTexture.source.resource = sourceCanvas;
+      // In-place GPU upload — mark source dirty
       fogTexture.source.update();
     }
 
-    // Sprite always at origin — no negative offsets needed
-    fogSprite.width = viewportW * qualityMultiplier;
-    fogSprite.height = viewportH * qualityMultiplier;
-    fogSprite.x = 0;
-    fogSprite.y = 0;
+    fogSprite.width = sourceCanvas.width * qualityMultiplier;
+    fogSprite.height = sourceCanvas.height * qualityMultiplier;
+    // Offset sprite so the padded canvas aligns with the viewport origin
+    fogSprite.x = -padding * qualityMultiplier;
+    fogSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }
 }
 
 /**
- * Update the illumination overlay texture from a Canvas 2D source
- * This contains pre-rendered per-source color tints clipped to visibility polygons.
- * Uses the same frame-crop technique as updateFogTexture to avoid negative sprite positions.
+ * Update the illumination overlay texture from a Canvas 2D source.
+ * Uses the same negative-offset technique as updateFogTexture.
  */
 export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
   if (!pixiApp || !illuminationSprite || !isInitialized) return;
@@ -211,34 +203,25 @@ export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement, paddi
   try {
     const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
 
-    const viewportW = sourceCanvas.width - padding * 2;
-    const viewportH = sourceCanvas.height - padding * 2;
-
     const needsRecreate = !illuminationTexture ||
       !illuminationTexture.source ||
       illuminationTexture.source.width !== sourceCanvas.width ||
-      illuminationTexture.source.height !== sourceCanvas.height ||
-      illuminationTexture.frame.x !== padding ||
-      illuminationTexture.frame.width !== viewportW;
+      illuminationTexture.source.height !== sourceCanvas.height;
 
     if (needsRecreate) {
-      if (illuminationTexture) illuminationTexture.destroy(true);
-      const baseTexture = PIXI.Texture.from(sourceCanvas);
-      illuminationTexture = new PIXI.Texture({
-        source: baseTexture.source,
-        frame: new PIXI.Rectangle(padding, padding, viewportW, viewportH),
-      });
+      if (illuminationTexture) {
+        illuminationTexture.destroy(false);
+      }
+      illuminationTexture = PIXI.Texture.from(sourceCanvas);
       illuminationSprite.texture = illuminationTexture;
     } else {
-      illuminationTexture.source.resource = sourceCanvas;
       illuminationTexture.source.update();
     }
 
-    // Sprite always at origin — no negative offsets needed
-    illuminationSprite.width = viewportW * qualityMultiplier;
-    illuminationSprite.height = viewportH * qualityMultiplier;
-    illuminationSprite.x = 0;
-    illuminationSprite.y = 0;
+    illuminationSprite.width = sourceCanvas.width * qualityMultiplier;
+    illuminationSprite.height = sourceCanvas.height * qualityMultiplier;
+    illuminationSprite.x = -padding * qualityMultiplier;
+    illuminationSprite.y = -padding * qualityMultiplier;
   } catch (error) {
     console.error('Failed to update illumination texture:', error);
   }
