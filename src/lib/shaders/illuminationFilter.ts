@@ -1,110 +1,30 @@
 /**
  * GPU Illumination Filter for PixiJS
- * Handles all illumination calculations on the GPU using custom shaders
+ *
+ * This is intentionally a PURE POST-PROCESS pass — it applies the BlurFilter
+ * edge softening to the already-composited fog+illumination canvas texture.
+ *
+ * ALL position-aware gradient work (bright/dim zones, visibility polygon clipping,
+ * color tints) is performed on the Canvas 2D side (fogPostProcessing.ts) where the
+ * world→screen coordinate transform is correct and well-tested. We deliberately
+ * avoid duplicating any geometry math here.
+ *
+ * This filter is kept as a separate class (rather than using BlurFilter directly)
+ * so that future GPU-side effects (e.g. vignette, chromatic aberration) can be
+ * added as additional shader stages without touching the fog pipeline.
  */
 
-import { Filter, GlProgram, GpuProgram } from 'pixi.js';
-import { MAX_ILLUMINATION_SOURCES, type IlluminationShaderData } from '@/types/illumination';
+import { Filter, GlProgram } from 'pixi.js';
 
-const vertex = `
-  in vec2 aPosition;
-  out vec2 vTextureCoord;
-  
-  uniform vec4 uInputSize;
-  uniform vec4 uOutputFrame;
-  uniform vec4 uOutputTexture;
-  
-  vec4 filterVertexPosition(void) {
-    vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
-    position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
-    position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
-    return vec4(position, 0.0, 1.0);
-  }
-  
-  vec2 filterTextureCoord(void) {
-    return aPosition * (uOutputFrame.zw * uInputSize.zw);
-  }
-  
-  void main(void) {
-    gl_Position = filterVertexPosition();
-    vTextureCoord = filterTextureCoord();
-  }
-`;
-
-// Simplified fragment shader - color tinting is now handled by a separate
-// Canvas 2D overlay that's clipped to each source's visibility polygon.
-// This shader only handles fog/visibility and dim zone darkening.
-// Simplified fragment shader - bright/dim zones are now rendered on Canvas 2D
-// with per-source visibility polygon clipping. This shader is a pass-through
-// that preserves the fog mask for compositing.
-const fragment = `
-  precision highp float;
-  
-  in vec2 vTextureCoord;
-  out vec4 finalColor;
-  
-  uniform sampler2D uTexture;
-  uniform vec4 uInputSize;
-  
-  // Keep uniforms for potential future effects (soft edges, etc)
-  uniform int uSourceCount;
-  uniform vec2 uPositions[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uRanges[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uBrightZones[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uBrightIntensities[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uDimIntensities[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uSoftEdgeRadii[${MAX_ILLUMINATION_SOURCES}];
-  uniform vec3 uColors[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uColorEnabled[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uGlobalEdgeBlur;
-  
-  void main(void) {
-    vec4 fogColor = texture(uTexture, vTextureCoord);
-    
-    // Pass through the fog mask - bright/dim zones are already
-    // baked in via Canvas 2D radial gradients with visibility clipping
-    finalColor = fogColor;
-  }
-`;
-
-// WebGL 1 fallback (for older browsers)
-// Simplified - color tinting handled by Canvas 2D overlay
-// WebGL 1 fallback - simplified pass-through
-const fragmentGLSL100 = `
-  precision highp float;
-  
-  varying vec2 vTextureCoord;
-  
-  uniform sampler2D uTexture;
-  uniform vec4 uInputSize;
-  
-  uniform int uSourceCount;
-  uniform vec2 uPositions[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uRanges[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uBrightZones[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uBrightIntensities[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uDimIntensities[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uSoftEdgeRadii[${MAX_ILLUMINATION_SOURCES}];
-  uniform vec3 uColors[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uColorEnabled[${MAX_ILLUMINATION_SOURCES}];
-  uniform float uGlobalEdgeBlur;
-  
-  void main(void) {
-    vec4 fogColor = texture2D(uTexture, vTextureCoord);
-    
-    // Pass through - bright/dim zones are baked in via Canvas 2D
-    gl_FragColor = fogColor;
-  }
-`;
-
-const vertexGLSL100 = `
+// Minimal vertex shader — standard filter quad
+const vertexGLSL = `
   attribute vec2 aPosition;
   varying vec2 vTextureCoord;
-  
+
   uniform vec4 uInputSize;
   uniform vec4 uOutputFrame;
   uniform vec4 uOutputTexture;
-  
+
   void main(void) {
     vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
     position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
@@ -114,71 +34,52 @@ const vertexGLSL100 = `
   }
 `;
 
+// Minimal fragment shader — pure pass-through
+// The BlurFilter (applied first in the fogContainer filter array) handles all
+// edge softening. This filter exists as a compositing stage placeholder.
+const fragmentGLSL = `
+  precision highp float;
+  varying vec2 vTextureCoord;
+  uniform sampler2D uTexture;
+
+  void main(void) {
+    gl_FragColor = texture2D(uTexture, vTextureCoord);
+  }
+`;
+
 export interface IlluminationFilterOptions {
+  // Reserved for future per-filter settings (e.g. vignette strength)
   globalEdgeBlur?: number;
 }
 
 export class IlluminationFilter extends Filter {
+  // Intentionally no illumination uniforms — see module docstring above.
+  // The `globalEdgeBlur` property is kept for API compatibility with
+  // postProcessingLayer.ts but has no effect on rendering.
+  private _globalEdgeBlur: number;
+
   constructor(options: IlluminationFilterOptions = {}) {
     const glProgram = GlProgram.from({
-      vertex: vertexGLSL100,
-      fragment: fragmentGLSL100,
+      vertex: vertexGLSL,
+      fragment: fragmentGLSL,
     });
-    
-    // Create default uniform arrays
-    const defaultPositions = new Float32Array(MAX_ILLUMINATION_SOURCES * 2);
-    const defaultRanges = new Float32Array(MAX_ILLUMINATION_SOURCES);
-    const defaultBrightZones = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(0.5);
-    const defaultBrightIntensities = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(1.0);
-    const defaultDimIntensities = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(0.4);
-    const defaultSoftEdgeRadii = new Float32Array(MAX_ILLUMINATION_SOURCES).fill(8);
-    const defaultColors = new Float32Array(MAX_ILLUMINATION_SOURCES * 3);
-    const defaultColorEnabled = new Float32Array(MAX_ILLUMINATION_SOURCES);
-    
-    super({
-      glProgram,
-      resources: {
-        illuminationUniforms: {
-          uSourceCount: { value: 0, type: 'i32' },
-          uPositions: { value: defaultPositions, type: 'vec2<f32>', size: MAX_ILLUMINATION_SOURCES },
-          uRanges: { value: defaultRanges, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uBrightZones: { value: defaultBrightZones, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uBrightIntensities: { value: defaultBrightIntensities, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uDimIntensities: { value: defaultDimIntensities, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uSoftEdgeRadii: { value: defaultSoftEdgeRadii, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uColors: { value: defaultColors, type: 'vec3<f32>', size: MAX_ILLUMINATION_SOURCES },
-          uColorEnabled: { value: defaultColorEnabled, type: 'f32', size: MAX_ILLUMINATION_SOURCES },
-          uGlobalEdgeBlur: { value: options.globalEdgeBlur ?? 8, type: 'f32' },
-        },
-      },
-    });
+
+    super({ glProgram, resources: {} });
+
+    this._globalEdgeBlur = options.globalEdgeBlur ?? 8;
   }
-  
-  /**
-   * Update illumination data from shader data structure
-   */
-  updateIllumination(data: IlluminationShaderData): void {
-    const uniforms = this.resources.illuminationUniforms.uniforms;
-    
-    uniforms.uSourceCount = data.sourceCount;
-    uniforms.uPositions = data.positions;
-    uniforms.uRanges = data.ranges;
-    uniforms.uBrightZones = data.brightZones;
-    uniforms.uBrightIntensities = data.brightIntensities;
-    uniforms.uDimIntensities = data.dimIntensities;
-    uniforms.uSoftEdgeRadii = data.softEdgeRadii;
-    uniforms.uColors = data.colors;
-    uniforms.uColorEnabled = data.colorEnabled;
-  }
-  
-  /**
-   * Set global edge blur amount
-   */
+
+  /** No-op — blur is handled by BlurFilter in the filter chain. */
   set globalEdgeBlur(value: number) {
-    this.resources.illuminationUniforms.uniforms.uGlobalEdgeBlur = value;
+    this._globalEdgeBlur = value;
   }
-  
+
   get globalEdgeBlur(): number {
-    return this.resources.illuminationUniforms.uniforms.uGlobalEdgeBlur as number;
+    return this._globalEdgeBlur;
+  }
+
+  /** No-op — retained for call-site compatibility. */
+  updateIllumination(_data: unknown): void {
+    // Intentional no-op. All illumination is rendered on Canvas 2D.
   }
 }

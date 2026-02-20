@@ -1,12 +1,35 @@
 /**
  * Post-Processing Layer using PixiJS
- * Provides WebGL-based effects for fog of war and unified illumination
+ *
+ * COORDINATE SPACE DESIGN
+ * =======================
+ * The PixiJS canvas is larger than the visible viewport by FIXED_PADDING on every
+ * side, and is offset by -FIXED_PADDING via CSS so it still covers the viewport.
+ *
+ *   PixiJS canvas size : (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2)
+ *   CSS offset          : top: -FIXED_PADDING px; left: -FIXED_PADDING px
+ *
+ * The fog canvas (Canvas 2D) is initialised at the SAME dimensions and uses the
+ * SAME translate(FIXED_PADDING + pan.x, FIXED_PADDING + pan.y) / scale(zoom)
+ * transform.  Both canvases therefore share one coordinate space — (0,0) in
+ * PixiJS always equals (0,0) on the fog canvas.  There are NO negative sprite
+ * offsets and NO per-frame padding recalculations.
+ *
+ * FIXED_PADDING is chosen to be large enough that light circles whose centres are
+ * at the viewport edge still render fully.  It is computed once at init/resize
+ * from a configurable constant and is NEVER changed during a session.
  */
 
 import * as PIXI from 'pixi.js';
 import { Z_INDEX } from './zIndex';
 import { IlluminationFilter } from './shaders/illuminationFilter';
-import type { IlluminationShaderData } from '@/types/illumination';
+
+// ---------------------------------------------------------------------------
+// Fixed padding — set large enough to handle the biggest expected light radius
+// at the minimum expected zoom level.  A value of 600 CSS px is comfortable
+// for light ranges up to ~600 screen px.  Increase here if needed.
+// ---------------------------------------------------------------------------
+export const FIXED_PADDING = 600;
 
 export interface PostProcessingConfig {
   width: number;
@@ -16,12 +39,12 @@ export interface PostProcessingConfig {
 }
 
 export interface EffectSettings {
-  edgeBlur: number;        // 0-20 pixels
-  lightFalloff: number;    // 0-1, default bright zone for new sources
-  bloomThreshold: number;  // 0.5-1 (legacy, unused)
+  edgeBlur: number;
+  lightFalloff: number;
+  bloomThreshold: number;
   volumetricEnabled: boolean;
   effectQuality: 'performance' | 'balanced' | 'cinematic';
-  dimZoneOpacity: number;  // 0-1, how much fog remains in dim zone (default 0.4)
+  dimZoneOpacity: number;
 }
 
 const DEFAULT_EFFECT_SETTINGS: EffectSettings = {
@@ -44,9 +67,10 @@ let containerRef: HTMLElement | null = null;
 let isInitialized = false;
 let currentSettings: EffectSettings = { ...DEFAULT_EFFECT_SETTINGS };
 
-/**
- * Get quality multiplier based on effect quality setting
- */
+// Viewport dimensions (without padding) — stored so resize can recompute
+let _viewportW = 0;
+let _viewportH = 0;
+
 function getQualityMultiplier(quality: EffectSettings['effectQuality']): number {
   switch (quality) {
     case 'performance': return 0.5;
@@ -56,88 +80,94 @@ function getQualityMultiplier(quality: EffectSettings['effectQuality']): number 
   }
 }
 
+/** Total canvas dimension in logical px (viewport + 2 × padding). */
+function totalSize(viewportPx: number): number {
+  return viewportPx + FIXED_PADDING * 2;
+}
+
 /**
- * Initialize the PixiJS post-processing layer
+ * Initialize the PixiJS post-processing layer.
+ *
+ * The PixiJS canvas is sized to totalSize(viewport) and positioned so that its
+ * extra FIXED_PADDING border overhangs each edge of the parent container.
  */
 export async function initPostProcessing(
   container: HTMLElement,
   config: PostProcessingConfig
 ): Promise<boolean> {
   try {
-    // Clean up any existing instance
     if (pixiApp) {
       await cleanupPostProcessing();
     }
 
-    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-    const effectiveWidth = Math.floor(config.width * qualityMultiplier);
-    const effectiveHeight = Math.floor(config.height * qualityMultiplier);
+    _viewportW = config.width;
+    _viewportH = config.height;
 
-    // Create PixiJS application with transparent background
+    const qm = getQualityMultiplier(currentSettings.effectQuality);
+    const canvasW = Math.floor(totalSize(config.width) * qm);
+    const canvasH = Math.floor(totalSize(config.height) * qm);
+
     pixiApp = new PIXI.Application();
-    
     await pixiApp.init({
-      width: effectiveWidth,
-      height: effectiveHeight,
+      width: canvasW,
+      height: canvasH,
       backgroundAlpha: 0,
       antialias: config.antialias ?? true,
       resolution: config.resolution ?? 1,
       autoDensity: true,
     });
 
-    // Style the canvas for overlay positioning
     const canvas = pixiApp.canvas as HTMLCanvasElement;
     canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = `${config.width}px`;
-    canvas.style.height = `${config.height}px`;
+    // Overhang by FIXED_PADDING on every side so the extra canvas area sits
+    // outside the viewport — light circles near the edge render into it freely.
+    canvas.style.top = `${-FIXED_PADDING}px`;
+    canvas.style.left = `${-FIXED_PADDING}px`;
+    canvas.style.width = `${totalSize(config.width)}px`;
+    canvas.style.height = `${totalSize(config.height)}px`;
     canvas.style.pointerEvents = 'none';
     canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.FOG_POST_PROCESSING);
 
-    // Append to container
     container.appendChild(canvas);
     containerRef = container;
 
-    // Create blur filter for fog edges
+    // BlurFilter — no extra padding needed because sprites are no longer
+    // negatively offset; they start at (0,0) and the canvas is already padded.
     blurFilter = new PIXI.BlurFilter({
       strength: currentSettings.edgeBlur,
       quality: currentSettings.effectQuality === 'performance' ? 2 : 4,
     });
-    
-    // Create illumination filter for GPU-based light calculations
+
     illuminationFilter = new IlluminationFilter({
       globalEdgeBlur: currentSettings.edgeBlur,
     });
 
-    // Create a container for the fog sprite
     const fogContainer = new PIXI.Container();
-    // Apply blur FIRST, then illumination. This ensures illumination
-    // clips to the already-blurred visibility boundaries, preventing
-    // color tints and dim effects from bleeding through walls.
     fogContainer.filters = [blurFilter, illuminationFilter];
     pixiApp.stage.addChild(fogContainer);
 
-    // Create fog sprite (will be updated with fog texture)
+    // Sprites cover the full PixiJS canvas (padded size) starting at (0,0).
+    // The fog canvas passed to updateFogTexture must also be this size.
     fogSprite = new PIXI.Sprite();
-    fogSprite.width = effectiveWidth;
-    fogSprite.height = effectiveHeight;
+    fogSprite.width = canvasW;
+    fogSprite.height = canvasH;
+    fogSprite.x = 0;
+    fogSprite.y = 0;
     fogContainer.addChild(fogSprite);
-    
-    // Create illumination overlay sprite (rendered on top with additive blending)
-    // IMPORTANT: Must be added to the SAME fogContainer so it shares the same
-    // filter coordinate space. Adding it directly to stage causes pixel-offset
-    // misalignment because the BlurFilter internally expands its render area
-    // (adding internal padding), shifting the fog sprite's effective position
-    // relative to anything rendered outside the container.
+
     illuminationSprite = new PIXI.Sprite();
-    illuminationSprite.width = effectiveWidth;
-    illuminationSprite.height = effectiveHeight;
+    illuminationSprite.width = canvasW;
+    illuminationSprite.height = canvasH;
+    illuminationSprite.x = 0;
+    illuminationSprite.y = 0;
     illuminationSprite.blendMode = 'add';
     fogContainer.addChild(illuminationSprite);
 
     isInitialized = true;
-    console.log('✅ PixiJS post-processing initialized with GPU illumination');
+    console.log(
+      `✅ PixiJS post-processing initialized — viewport ${config.width}×${config.height}, ` +
+      `canvas ${canvasW}×${canvasH}, padding ${FIXED_PADDING}px`
+    );
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize post-processing:', error);
@@ -145,91 +175,71 @@ export async function initPostProcessing(
   }
 }
 
-let currentPadding = 0;
-
 /**
- * Update the fog texture from a Canvas 2D source.
- * The source canvas may be larger than the viewport (padded for off-screen blur/light edges).
- * We position the sprite at (-padding, -padding) so the padded canvas aligns with the viewport.
- * The BlurFilter's own `padding` is set large enough to prevent it from clipping
- * the negative-offset sprite — this is the correct PixiJS v8 approach.
+ * Update the fog texture from a padded Canvas 2D source.
+ * The source canvas MUST be (viewportW + FIXED_PADDING*2) × (viewportH + FIXED_PADDING*2)
+ * — the same size as the PixiJS canvas.  No offset is applied.
  */
-export function updateFogTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
+export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !fogSprite || !isInitialized) return;
 
   try {
-    currentPadding = padding;
-    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-
-    // Expand blur filter padding so it never clips the negatively-offset sprite
-    if (blurFilter) {
-      blurFilter.padding = padding + 8;
-    }
-
-    // Recreate texture only when canvas dimensions change
-    const needsRecreate = !fogTexture ||
+    const qm = getQualityMultiplier(currentSettings.effectQuality);
+    const needsRecreate =
+      !fogTexture ||
       !fogTexture.source ||
       fogTexture.source.width !== sourceCanvas.width ||
       fogTexture.source.height !== sourceCanvas.height;
 
     if (needsRecreate) {
-      if (fogTexture) {
-        fogTexture.destroy(false); // don't destroy source — canvas is managed externally
-      }
+      if (fogTexture) fogTexture.destroy(false);
       fogTexture = PIXI.Texture.from(sourceCanvas);
       fogSprite.texture = fogTexture;
     } else {
-      // In-place GPU upload — mark source dirty
       fogTexture.source.update();
     }
 
-    fogSprite.width = sourceCanvas.width * qualityMultiplier;
-    fogSprite.height = sourceCanvas.height * qualityMultiplier;
-    // Offset sprite so the padded canvas aligns with the viewport origin
-    fogSprite.x = -padding * qualityMultiplier;
-    fogSprite.y = -padding * qualityMultiplier;
+    fogSprite.width = sourceCanvas.width * qm;
+    fogSprite.height = sourceCanvas.height * qm;
+    fogSprite.x = 0;
+    fogSprite.y = 0;
   } catch (error) {
     console.error('Failed to update fog texture:', error);
   }
 }
 
 /**
- * Update the illumination overlay texture from a Canvas 2D source.
- * Uses the same negative-offset technique as updateFogTexture.
+ * Update the illumination overlay texture from a padded Canvas 2D source.
+ * Same size requirements as updateFogTexture.
  */
-export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement, padding: number = 0): void {
+export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !illuminationSprite || !isInitialized) return;
 
   try {
-    const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-
-    const needsRecreate = !illuminationTexture ||
+    const qm = getQualityMultiplier(currentSettings.effectQuality);
+    const needsRecreate =
+      !illuminationTexture ||
       !illuminationTexture.source ||
       illuminationTexture.source.width !== sourceCanvas.width ||
       illuminationTexture.source.height !== sourceCanvas.height;
 
     if (needsRecreate) {
-      if (illuminationTexture) {
-        illuminationTexture.destroy(false);
-      }
+      if (illuminationTexture) illuminationTexture.destroy(false);
       illuminationTexture = PIXI.Texture.from(sourceCanvas);
       illuminationSprite.texture = illuminationTexture;
     } else {
       illuminationTexture.source.update();
     }
 
-    illuminationSprite.width = sourceCanvas.width * qualityMultiplier;
-    illuminationSprite.height = sourceCanvas.height * qualityMultiplier;
-    illuminationSprite.x = -padding * qualityMultiplier;
-    illuminationSprite.y = -padding * qualityMultiplier;
+    illuminationSprite.width = sourceCanvas.width * qm;
+    illuminationSprite.height = sourceCanvas.height * qm;
+    illuminationSprite.x = 0;
+    illuminationSprite.y = 0;
   } catch (error) {
     console.error('Failed to update illumination texture:', error);
   }
 }
 
-/**
- * Update effect settings
- */
 export function updateEffectSettings(settings: Partial<EffectSettings>): void {
   currentSettings = { ...currentSettings, ...settings };
 
@@ -237,143 +247,85 @@ export function updateEffectSettings(settings: Partial<EffectSettings>): void {
     blurFilter.strength = currentSettings.edgeBlur;
     blurFilter.quality = currentSettings.effectQuality === 'performance' ? 2 : 4;
   }
-  
+
   if (illuminationFilter) {
     illuminationFilter.globalEdgeBlur = currentSettings.edgeBlur;
   }
 }
 
-/**
- * Update illumination data for GPU processing
- * Positions must be scaled by quality multiplier to match render resolution
- */
-export function updateIlluminationData(data: IlluminationShaderData): void {
-  if (!illuminationFilter || !isInitialized) return;
-  
-  const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-  
-  // Scale positions and ranges to match the reduced render resolution
-  const scaledData: IlluminationShaderData = {
-    ...data,
-    positions: new Float32Array(data.positions.length),
-    ranges: new Float32Array(data.ranges.length),
-    softEdgeRadii: new Float32Array(data.softEdgeRadii.length),
-  };
-  
-  for (let i = 0; i < data.sourceCount; i++) {
-    scaledData.positions[i * 2] = data.positions[i * 2] * qualityMultiplier;
-    scaledData.positions[i * 2 + 1] = data.positions[i * 2 + 1] * qualityMultiplier;
-    scaledData.ranges[i] = data.ranges[i] * qualityMultiplier;
-    scaledData.softEdgeRadii[i] = data.softEdgeRadii[i] * qualityMultiplier;
-  }
-  
-  // Copy the rest unchanged
-  scaledData.brightZones = data.brightZones;
-  scaledData.brightIntensities = data.brightIntensities;
-  scaledData.dimIntensities = data.dimIntensities;
-  scaledData.colors = data.colors;
-  
-  illuminationFilter.updateIllumination(scaledData);
+/** No-op — retained for call-site compatibility. Shader is a pass-through. */
+export function updateIlluminationData(_data: unknown): void {
+  // Intentional no-op. All illumination geometry is on Canvas 2D now.
 }
 
-/**
- * Get current effect settings
- */
 export function getEffectSettings(): EffectSettings {
   return { ...currentSettings };
 }
 
 /**
- * Resize the post-processing layer
+ * Resize the post-processing layer when the viewport changes.
+ * Re-creates the PixiJS renderer at the new padded size.
  */
 export function resizePostProcessing(width: number, height: number): void {
   if (!pixiApp || !isInitialized) return;
 
-  const qualityMultiplier = getQualityMultiplier(currentSettings.effectQuality);
-  const effectiveWidth = Math.floor(width * qualityMultiplier);
-  const effectiveHeight = Math.floor(height * qualityMultiplier);
+  _viewportW = width;
+  _viewportH = height;
 
-  pixiApp.renderer.resize(effectiveWidth, effectiveHeight);
-  
+  const qm = getQualityMultiplier(currentSettings.effectQuality);
+  const canvasW = Math.floor(totalSize(width) * qm);
+  const canvasH = Math.floor(totalSize(height) * qm);
+
+  pixiApp.renderer.resize(canvasW, canvasH);
+
   const canvas = pixiApp.canvas as HTMLCanvasElement;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  canvas.style.width = `${totalSize(width)}px`;
+  canvas.style.height = `${totalSize(height)}px`;
+  // Keep the CSS offset stable
+  canvas.style.top = `${-FIXED_PADDING}px`;
+  canvas.style.left = `${-FIXED_PADDING}px`;
 
   if (fogSprite) {
-    fogSprite.width = effectiveWidth;
-    fogSprite.height = effectiveHeight;
+    fogSprite.width = canvasW;
+    fogSprite.height = canvasH;
+    fogSprite.x = 0;
+    fogSprite.y = 0;
   }
-  
+
   if (illuminationSprite) {
-    illuminationSprite.width = effectiveWidth;
-    illuminationSprite.height = effectiveHeight;
+    illuminationSprite.width = canvasW;
+    illuminationSprite.height = canvasH;
+    illuminationSprite.x = 0;
+    illuminationSprite.y = 0;
   }
 }
 
-/**
- * Show/hide the post-processing layer
- */
 export function setPostProcessingVisible(visible: boolean): void {
   if (!pixiApp || !isInitialized) return;
-  
   const canvas = pixiApp.canvas as HTMLCanvasElement;
   canvas.style.display = visible ? 'block' : 'none';
 }
 
-/**
- * Check if post-processing is initialized
- */
 export function isPostProcessingReady(): boolean {
   return isInitialized && pixiApp !== null;
 }
 
-/**
- * Get the PixiJS canvas element
- */
 export function getPostProcessingCanvas(): HTMLCanvasElement | null {
-  return pixiApp?.canvas as HTMLCanvasElement ?? null;
+  return (pixiApp?.canvas as HTMLCanvasElement) ?? null;
 }
 
-/**
- * Clean up the post-processing layer
- */
 export async function cleanupPostProcessing(): Promise<void> {
   try {
-    if (fogTexture) {
-      fogTexture.destroy(true);
-      fogTexture = null;
-    }
-    
-    if (illuminationTexture) {
-      illuminationTexture.destroy(true);
-      illuminationTexture = null;
-    }
-
-    if (blurFilter) {
-      blurFilter.destroy();
-      blurFilter = null;
-    }
-    
-    if (illuminationFilter) {
-      illuminationFilter.destroy();
-      illuminationFilter = null;
-    }
-
-    if (fogSprite) {
-      fogSprite.destroy();
-      fogSprite = null;
-    }
-    
-    if (illuminationSprite) {
-      illuminationSprite.destroy();
-      illuminationSprite = null;
-    }
+    if (fogTexture) { fogTexture.destroy(true); fogTexture = null; }
+    if (illuminationTexture) { illuminationTexture.destroy(true); illuminationTexture = null; }
+    if (blurFilter) { blurFilter.destroy(); blurFilter = null; }
+    if (illuminationFilter) { illuminationFilter.destroy(); illuminationFilter = null; }
+    if (fogSprite) { fogSprite.destroy(); fogSprite = null; }
+    if (illuminationSprite) { illuminationSprite.destroy(); illuminationSprite = null; }
 
     if (pixiApp) {
       const canvas = pixiApp.canvas as HTMLCanvasElement;
-      if (canvas.parentNode) {
-        canvas.parentNode.removeChild(canvas);
-      }
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       pixiApp.destroy(true, { children: true, texture: true });
       pixiApp = null;
     }
@@ -386,9 +338,6 @@ export async function cleanupPostProcessing(): Promise<void> {
   }
 }
 
-/**
- * Render one frame of post-processing effects
- */
 export function renderPostProcessing(): void {
   if (!pixiApp || !isInitialized) return;
   pixiApp.render();
