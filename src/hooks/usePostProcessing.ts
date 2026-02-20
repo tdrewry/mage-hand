@@ -80,7 +80,7 @@ export function usePostProcessing({
       });
 
       if (success) {
-        initFogCanvas(width, height);
+        initFogCanvas(width, height, effectSettings.edgeBlur * 2);
         initRef.current = true;
         setPostProcessingVisible(true);
         setReady(true);
