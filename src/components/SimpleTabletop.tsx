@@ -3934,7 +3934,7 @@ export const SimpleTabletop = () => {
 
     // Draw background image if available
     if (region.backgroundImage) {
-      drawRegionBackground(ctx, region);
+      drawRegionBackground(ctx, region, effectiveRotation);
     } else {
       // Draw solid color background
       ctx.fillStyle = region.backgroundColor || region.color || "rgba(100, 100, 100, 0.3)";
@@ -3980,7 +3980,8 @@ export const SimpleTabletop = () => {
   };
   // Function to draw region background image (optimized with pattern caching)
   // Supports animated GIFs via animatedTextureManager
-  const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion) => {
+  // effectiveRotationDeg: if non-zero, skip axis-aligned viewport clipping (it's invalid under rotation)
+  const drawRegionBackground = (ctx: CanvasRenderingContext2D, region: CanvasRegion, effectiveRotationDeg: number = 0) => {
     if (!region.backgroundImage) return;
 
     // Check for animated texture first
@@ -4081,38 +4082,48 @@ export const SimpleTabletop = () => {
       const destW = scaledWidth;
       const destH = scaledHeight;
 
-      // The canvas context is already scaled by transform.zoom; the browser clips draw calls
-      // that are too large in device pixels. To avoid this, we manually clip the destination
-      // rectangle to the current world-space viewport and derive the matching source rectangle.
-      const vpX = -transform.x / transform.zoom;
-      const vpY = -transform.y / transform.zoom;
-      const vpW = (canvasRef.current?.width ?? window.innerWidth) / transform.zoom;
-      const vpH = (canvasRef.current?.height ?? window.innerHeight) / transform.zoom;
+      // When the region is rotated the canvas context already has a rotation transform applied.
+      // In that case the axis-aligned viewport rectangle does NOT describe the visible area in
+      // the rotated local coordinate space, so the intersection math would produce a wrong
+      // (too-small or zero) rectangle and clip the texture away at high zoom levels.
+      // The ctx.clip() call that wraps this function already constrains output to the region
+      // bounds, so it is safe to skip the viewport intersection and draw the full dest rect.
+      if (effectiveRotationDeg !== 0) {
+        ctx.drawImage(img, destX, destY, destW, destH);
+      } else {
+        // The canvas context is already scaled by transform.zoom; the browser clips draw calls
+        // that are too large in device pixels. To avoid this, we manually clip the destination
+        // rectangle to the current world-space viewport and derive the matching source rectangle.
+        const vpX = -transform.x / transform.zoom;
+        const vpY = -transform.y / transform.zoom;
+        const vpW = (canvasRef.current?.width ?? window.innerWidth) / transform.zoom;
+        const vpH = (canvasRef.current?.height ?? window.innerHeight) / transform.zoom;
 
-      // Clamp destination rect to viewport
-      const clampedDestX = Math.max(destX, vpX);
-      const clampedDestY = Math.max(destY, vpY);
-      const clampedDestRight = Math.min(destX + destW, vpX + vpW);
-      const clampedDestBottom = Math.min(destY + destH, vpY + vpH);
+        // Clamp destination rect to viewport
+        const clampedDestX = Math.max(destX, vpX);
+        const clampedDestY = Math.max(destY, vpY);
+        const clampedDestRight = Math.min(destX + destW, vpX + vpW);
+        const clampedDestBottom = Math.min(destY + destH, vpY + vpH);
 
-      if (clampedDestRight <= clampedDestX || clampedDestBottom <= clampedDestY) {
-        // Nothing to draw (fully outside viewport)
-        return;
+        if (clampedDestRight <= clampedDestX || clampedDestBottom <= clampedDestY) {
+          // Nothing to draw (fully outside viewport)
+          return;
+        }
+
+        // Derive source rectangle proportionally
+        const scaleX = imgWidth / destW;
+        const scaleY = imgHeight / destH;
+        const srcX = (clampedDestX - destX) * scaleX;
+        const srcY = (clampedDestY - destY) * scaleY;
+        const srcW = (clampedDestRight - clampedDestX) * scaleX;
+        const srcH = (clampedDestBottom - clampedDestY) * scaleY;
+
+        ctx.drawImage(
+          img,
+          srcX, srcY, srcW, srcH,
+          clampedDestX, clampedDestY, clampedDestRight - clampedDestX, clampedDestBottom - clampedDestY
+        );
       }
-
-      // Derive source rectangle proportionally
-      const scaleX = imgWidth / destW;
-      const scaleY = imgHeight / destH;
-      const srcX = (clampedDestX - destX) * scaleX;
-      const srcY = (clampedDestY - destY) * scaleY;
-      const srcW = (clampedDestRight - clampedDestX) * scaleX;
-      const srcH = (clampedDestBottom - clampedDestY) * scaleY;
-
-      ctx.drawImage(
-        img,
-        srcX, srcY, srcW, srcH,
-        clampedDestX, clampedDestY, clampedDestRight - clampedDestX, clampedDestBottom - clampedDestY
-      );
     } else if (isAnimated) {
       // For animated textures, we can't use CanvasPattern (it captures only one frame)
       // Instead, manually tile the current frame using drawImage
