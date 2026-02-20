@@ -166,11 +166,14 @@ export interface FloorGeometry {
 /**
  * Generate wall geometry as negative space (bounding box minus all regions)
  * Uses paper.js for proper boolean operations and segment extraction
+ * @param extraPoints - Additional world-space points (e.g. map object positions) to include
+ *                      in the bounding box so map objects outside regions don't act as walls.
  */
 export function generateWallGeometry(
   regions: CanvasRegion[],
   wallThickness: number,
-  margin?: number
+  margin?: number,
+  extraPoints?: { x: number; y: number }[]
 ): WallGeometry {
   const effectiveMargin = margin ?? wallThickness * 2;
   
@@ -232,6 +235,18 @@ export function generateWallGeometry(
       });
     }
   });
+
+  // Also expand bounding box to include any extra points (e.g. map objects outside regions).
+  // This prevents the outer bounding rectangle from acting as an invisible wall that
+  // terminates light rays at the region boundary.
+  if (extraPoints && extraPoints.length > 0) {
+    for (const pt of extraPoints) {
+      minX = Math.min(minX, pt.x);
+      minY = Math.min(minY, pt.y);
+      maxX = Math.max(maxX, pt.x);
+      maxY = Math.max(maxY, pt.y);
+    }
+  }
   
   // Expand bounds by margin
   const bounds = {
@@ -491,24 +506,29 @@ function extractPathPointsFromWallGeometry(wallGeometry: WallGeometry): Array<{ 
 }
 
 /**
- * Generate negative space region from existing regions
+ * Generate negative space region from existing regions.
+ * @param extraPoints - Additional world-space points to include in the bounding box
+ *                      (e.g. map object positions, token positions, light sources).
+ *                      Prevents the outer bounding box from acting as an invisible wall
+ *                      when content exists outside the region boundaries.
  * Returns null if no regions exist
  */
 export function generateNegativeSpaceRegion(
   regions: CanvasRegion[],
   wallThickness: number = 15,
-  margin: number = 5
+  margin: number = 5,
+  extraPoints?: { x: number; y: number }[]
 ): { wallGeometry: WallGeometry; visualRegion: NegativeSpaceRegion } | null {
   if (regions.length === 0) return null;
-  
-  const wallGeometry = generateWallGeometry(regions, wallThickness, margin);
-  
+
+  const wallGeometry = generateWallGeometry(regions, wallThickness, margin, extraPoints);
+
   // Create a visual representation
   const visualRegion: NegativeSpaceRegion = {
     id: 'negative-space',
     pathPoints: extractPathPointsFromWallGeometry(wallGeometry),
     bounds: wallGeometry.bounds,
   };
-  
+
   return { wallGeometry, visualRegion };
 }
