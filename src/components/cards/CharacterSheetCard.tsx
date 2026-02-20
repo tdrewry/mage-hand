@@ -160,59 +160,53 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — all TabsContent share the same flex-1 slot; inactive ones collapse via hidden attr */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col flex-1 min-h-0">
         <TabsList className="mx-4 mt-2 grid grid-cols-3 shrink-0">
-          <TabsTrigger value="details" className="text-xs gap-1">
-            <FileText className="w-3 h-3" /> Details
+          <TabsTrigger value="statblock" className="text-xs gap-1">
+            <Layers className="w-3 h-3" /> Stat Block
           </TabsTrigger>
           <TabsTrigger value="json" className="text-xs gap-1">
             <Code2 className="w-3 h-3" /> JSON
           </TabsTrigger>
-          <TabsTrigger value="statblock" className="text-xs gap-1">
-            <Layers className="w-3 h-3" /> Stat Block
+          <TabsTrigger value="details" className="text-xs gap-1">
+            <FileText className="w-3 h-3" /> Details
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Details tab ──────────────────────────────────────────────── */}
-        <TabsContent value="details" className="flex-1 min-h-0 px-4 pb-4 mt-3">
+        {/* ── Stat Block tab ───────────────────────────────────────────── */}
+        <TabsContent value="statblock" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0">
           <ScrollArea className="h-full">
-            <div className="space-y-4 pr-1">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Notes</Label>
-                <Textarea
-                  placeholder="GM notes for this token…"
-                  className="text-sm resize-none min-h-[120px]"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
+            {parsedMonster ? (
+              <StatBlockFromJson data={parsedMonster} />
+            ) : (
+              <div className="p-6 text-center text-muted-foreground text-sm space-y-2">
+                {jsonError ? (
+                  <>
+                    <AlertCircle className="w-8 h-8 mx-auto text-destructive/50" />
+                    <p>Fix the JSON errors to preview the stat block.</p>
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-8 h-8 mx-auto opacity-30" />
+                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render a stat block here.</p>
+                  </>
+                )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Quick Reference URL</Label>
-                <Input
-                  placeholder="https://…"
-                  className="text-sm"
-                  value={quickRef}
-                  onChange={(e) => setQuickRef(e.target.value)}
-                />
-              </div>
-              <Button size="sm" onClick={handleSaveDetails} className="w-full">
-                <Save className="w-3.5 h-3.5 mr-1.5" /> Save Details
-              </Button>
-            </div>
+            )}
           </ScrollArea>
         </TabsContent>
 
         {/* ── JSON Editor tab ──────────────────────────────────────────── */}
-        <TabsContent value="json" className="flex-1 min-h-0 flex flex-col mt-2 px-0 pb-0">
+        <TabsContent value="json" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 flex flex-col">
           {/* Error banner */}
           {jsonError && (
-            <div className="mx-4 mb-2 flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
+            <div className="mx-4 mt-2 mb-1 flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive shrink-0">
               <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span className="font-mono break-all">{jsonError}</span>
             </div>
           )}
-          <div className="flex-1 min-h-0 border-y border-border overflow-hidden">
+          <div className="flex-1 min-h-0 border-y border-border overflow-hidden mt-2">
             <Suspense fallback={
               <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                 Loading editor…
@@ -238,38 +232,39 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
               />
             </Suspense>
           </div>
-          <div className="px-4 py-2 shrink-0 flex gap-2">
-            <Button
-              size="sm"
-              className="flex-1"
-              onClick={handleSaveJson}
-              disabled={!!jsonError}
-            >
+          <div className="px-4 py-2 shrink-0">
+            <Button size="sm" className="w-full" onClick={handleSaveJson} disabled={!!jsonError}>
               <Save className="w-3.5 h-3.5 mr-1.5" /> Save JSON
             </Button>
           </div>
         </TabsContent>
 
-        {/* ── Stat Block tab ───────────────────────────────────────────── */}
-        <TabsContent value="statblock" className="flex-1 min-h-0 mt-0">
+        {/* ── Details tab ──────────────────────────────────────────────── */}
+        <TabsContent value="details" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 px-4 pb-4 pt-3">
           <ScrollArea className="h-full">
-            {parsedMonster ? (
-              <StatBlockFromJson data={parsedMonster} />
-            ) : (
-              <div className="p-6 text-center text-muted-foreground text-sm space-y-2">
-                {jsonError ? (
-                  <>
-                    <AlertCircle className="w-8 h-8 mx-auto text-destructive/50" />
-                    <p>Fix the JSON errors to preview the stat block.</p>
-                  </>
-                ) : (
-                  <>
-                    <Layers className="w-8 h-8 mx-auto opacity-30" />
-                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render a stat block here.</p>
-                  </>
-                )}
+            <div className="space-y-4 pr-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Notes</Label>
+                <Textarea
+                  placeholder="GM notes for this token…"
+                  className="text-sm resize-none min-h-[120px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
-            )}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quick Reference URL</Label>
+                <Input
+                  placeholder="https://…"
+                  className="text-sm"
+                  value={quickRef}
+                  onChange={(e) => setQuickRef(e.target.value)}
+                />
+              </div>
+              <Button size="sm" onClick={handleSaveDetails} className="w-full">
+                <Save className="w-3.5 h-3.5 mr-1.5" /> Save Details
+              </Button>
+            </div>
           </ScrollArea>
         </TabsContent>
       </Tabs>
