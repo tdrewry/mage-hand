@@ -99,6 +99,7 @@ export const TokenContextManager = ({
       tokenId={contextTokenId}
       onColorChange={onColorChange}
       onUpdateCanvas={onUpdateCanvas}
+      listenForExternalOpen={true}
     >
       <div
         id="map-token-context-trigger"

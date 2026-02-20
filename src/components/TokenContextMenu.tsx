@@ -59,6 +59,8 @@ interface TokenContextMenuProps {
   tokenId: string;
   onColorChange?: (tokenId: string, color: string) => void;
   onUpdateCanvas?: () => void;
+  /** Only ONE instance should set this true — prevents duplicate modal opens */
+  listenForExternalOpen?: boolean;
 }
 
 // Size presets based on D&D creature sizes
@@ -79,7 +81,8 @@ export const TokenContextMenu = ({
   children, 
   tokenId, 
   onColorChange,
-  onUpdateCanvas 
+  onUpdateCanvas,
+  listenForExternalOpen = false,
 }: TokenContextMenuProps) => {
   const { 
     tokens, 
@@ -301,9 +304,10 @@ export const TokenContextMenu = ({
       // Point targetTokens at this token via context trick — we open modal directly
       setShowTokenEditModal(true);
     };
+    if (!listenForExternalOpen) return;
     window.addEventListener('openEditTokenModal', handler);
     return () => window.removeEventListener('openEditTokenModal', handler);
-  }, []);
+  }, [listenForExternalOpen]);
 
   // Check if current size matches a preset
   const getCurrentSizePreset = () => {
