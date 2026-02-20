@@ -106,6 +106,7 @@ import { useGroupStore } from "../stores/groupStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
+import { setPostProcessingVisible } from "../lib/postProcessingLayer";
 
 export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -437,6 +438,9 @@ export const SimpleTabletop = () => {
   // Track previous token positions and illumination ranges to detect changes
   const prevTokenPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevTokenIlluminationRef = useRef<Map<string, { range?: number; settingsHash?: string }>>(new Map());
+
+  // Track previous rendering mode to detect edit → play transitions
+  const prevRenderingModeRef = useRef<string>(renderingMode);
 
   // Performance optimization: Cache for token drawing to reduce redundant renders
   const tokenDrawCache = useRef<Map<string, { lastDrawn: number; data: any }>>(new Map());
@@ -1117,6 +1121,55 @@ export const SimpleTabletop = () => {
       redrawCanvas();
     });
   }, [mapObjects]);
+
+  // Cleanup fog state when switching from edit/dm → play mode
+  useEffect(() => {
+    const wasEdit = prevRenderingModeRef.current !== 'play';
+    const isNowPlay = renderingMode === 'play';
+    prevRenderingModeRef.current = renderingMode;
+
+    if (!wasEdit || !isNowPlay) return;
+
+    console.log('[Fog] Mode transition edit→play: flushing all visibility caches');
+
+    // 1. Rebuild combined wall+obstacle segments from fresh state
+    if (wallGeometryRef.current) {
+      const mapObjectSegments = mapObjectsToSegments(mapObjects);
+      combinedSegmentsRef.current = [
+        ...wallGeometryRef.current.wallSegments,
+        ...mapObjectSegments,
+        ...importedWallSegments,
+      ];
+    }
+
+    // 2. Notify light system that obstacle geometry has changed
+    notifyObstaclesChanged();
+
+    // 3. Clear all per-token visibility caches
+    tokenVisibilityCacheRef.current.forEach((cached) => {
+      if (cached?.visionPath?.remove) cached.visionPath.remove();
+    });
+    tokenVisibilityCacheRef.current.clear();
+    prevTokenPositionsRef.current.clear();
+    prevTokenIlluminationRef.current?.clear?.();
+
+    // 4. Clear global Paper.js / visibility-polygon cache
+    clearVisibilityCache();
+
+    // 5. Null out the fog mask so fog computation cannot use the stale masks
+    fogMasksRef.current = null;
+
+    // 6. Reset PixiJS post-processing layer for a clean frame
+    if (isPostProcessingReadyRef.current) {
+      setPostProcessingVisible(false);
+      requestAnimationFrame(() => {
+        setPostProcessingVisible(true);
+        redrawCanvas();
+      });
+    } else {
+      redrawCanvas();
+    }
+  }, [renderingMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute fog of war masks when tokens move or fog settings change
   // Skip during dragging to prevent stuttering
