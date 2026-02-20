@@ -10,6 +10,14 @@ export interface AnimationResult {
   radiusMod: number;     // Multiplier for radius (0.8-1.2 typically)
 }
 
+/**
+ * Clip shape type for illumination sources.
+ * - 'circle': Standard omnidirectional light (default). Clips to a circle of `range` pixels.
+ * - 'cone':   Directional light cone (future). Will clip to a sector defined by `coneAngle`
+ *             and `coneDirection`.
+ */
+export type IlluminationClipShape = 'circle' | 'cone';
+
 export interface IlluminationSource {
   id: string;
   name: string;
@@ -38,8 +46,19 @@ export interface IlluminationSource {
   animationSpeed: number;           // Animation speed multiplier (0.5-2.0)
   animationIntensity: number;       // How strong the animation effect is (0-1)
   
-  // Pre-computed visibility polygon (set by visibility engine)
+  // Pre-computed visibility polygon (set by visibility engine).
+  // Used as an additional clip mask alongside the clip shape below.
   visibilityPolygon?: Path2D;
+
+  // --- Clip shape ---
+  // Determines the geometric shape that bounds this light source's illumination.
+  // 'circle' (default): standard omnidirectional circle of `range` pixels radius.
+  // 'cone'  (future):   directional wedge; requires coneAngle + coneDirection.
+  clipShape?: IlluminationClipShape;
+
+  // Cone light settings (only used when clipShape === 'cone')
+  coneAngle?: number;       // Full cone angle in radians (e.g. Math.PI / 2 for 90°)
+  coneDirection?: number;   // Direction the cone points, in radians from +X axis
 }
 
 /**

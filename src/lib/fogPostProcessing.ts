@@ -14,10 +14,27 @@
  *                 FIXED_PADDING - originY + transform.y)
  *   ctx.scale(transform.zoom, transform.zoom)
  *
- * originX/Y = CSS px distance from the container's (0,0) to the content bbox
- *             top-left.  Negative when content is above/left of the viewport.
- * When content fits entirely inside the viewport both are 0 and the formula
- * collapses to the original FIXED_PADDING + pan.x / pan.y.
+ * originX/Y = CSS px position of the content bbox top-left relative to the container.
+ * When content fits entirely inside the viewport both are 0 and the formula collapses
+ * to the original FIXED_PADDING + pan.x / pan.y.
+ *
+ * CLIPPING ARCHITECTURE
+ * =====================
+ * Every illumination source has two independent clip masks that are always intersected:
+ *
+ *  1. clipShape — the geometric boundary of the light:
+ *       'circle' (default): a full circle of `range * gridSize` pixels radius.
+ *       'cone'   (future):  a wedge sector defined by coneAngle + coneDirection.
+ *
+ *  2. visibilityPolygon — a Path2D computed by the visibility engine to account for
+ *       wall occlusion.  Optional; when absent only the clipShape is used.
+ *
+ * Canvas clip regions are intersected when multiple ctx.clip() calls are made
+ * inside a save/restore block.  We clip to the geometric shape first, then to
+ * the visibility polygon, giving us visibilityPolygon ∩ clipShape.
+ *
+ * This design makes light cones trivial to add later: set clipShape = 'cone',
+ * provide coneAngle + coneDirection, and the existing rendering code just works.
  */
 
 import {
@@ -155,6 +172,44 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
 }
 
 /**
+ * Apply the geometric clip shape for an illumination source to the current context.
+ *
+ * This MUST be called while the world-space transform is active (translate + scale).
+ * It clips the canvas to the source's geometric boundary (circle or cone).
+ *
+ * If a visibilityPolygon is also present, call ctx.clip(visibilityPolygon) AFTER
+ * this function — Canvas 2D clips intersect, so the result is shape ∩ polygon.
+ *
+ * @param ctx      - 2D context already transformed to world space
+ * @param source   - The illumination source
+ * @param rangePixels - Radius in world pixels (range * gridSize, with any anim modifier)
+ */
+function applyClipShape(
+  ctx: CanvasRenderingContext2D,
+  source: IlluminationSource,
+  rangePixels: number
+): void {
+  const { x, y } = source.position;
+  const clipShape = source.clipShape ?? 'circle';
+
+  ctx.beginPath();
+
+  if (clipShape === 'cone') {
+    const halfAngle = (source.coneAngle ?? Math.PI / 2) / 2;
+    const dir = source.coneDirection ?? 0;
+    // Draw a pie-slice sector from the source origin
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, rangePixels, dir - halfAngle, dir + halfAngle);
+    ctx.closePath();
+  } else {
+    // Default: full circle
+    ctx.arc(x, y, rangePixels, 0, Math.PI * 2);
+  }
+
+  ctx.clip();
+}
+
+/**
  * Render per-source illumination color gradients to the illumination canvas.
  *
  * Transform applied:
@@ -178,7 +233,7 @@ function renderIlluminationOverlay(
   ctx.globalCompositeOperation = 'screen';
 
   for (const source of sources) {
-    if (!source.enabled || !source.colorEnabled || !source.visibilityPolygon) continue;
+    if (!source.enabled || !source.colorEnabled) continue;
 
     const animResult = calculateAnimationModifiers(
       source.animation,
@@ -193,12 +248,17 @@ function renderIlluminationOverlay(
     ctx.translate(FIXED_PADDING - originX + transform.x, FIXED_PADDING - originY + transform.y);
     ctx.scale(transform.zoom, transform.zoom);
 
-    ctx.beginPath();
-    ctx.clip(source.visibilityPolygon);
-
     const rangePixels = source.range * gridSize * animResult.radiusMod;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
+
+    // Clip 1: geometric shape (circle or cone)
+    applyClipShape(ctx, source, rangePixels);
+
+    // Clip 2: visibility polygon from wall occlusion (intersects with shape clip)
+    if (source.visibilityPolygon) {
+      ctx.clip(source.visibilityPolygon);
+    }
 
     const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, rangePixels);
     const rgb = parseColorToRGB(source.color);
@@ -284,27 +344,39 @@ export function applyFogPostProcessing(
   const animationTime = now;
 
   if (illuminationData && illuminationData.sources.length > 0) {
-    // STEP 1: fill each visibility polygon with explored-level fog
+    const gSize = illuminationData.gridSize;
+
+    // STEP 1: Fill the geometric shape + visibility polygon area with explored-level fog.
+    //         This ensures the dim zone never appears darker than explored fog.
     for (const source of illuminationData.sources) {
-      if (!source.enabled || !source.visibilityPolygon) continue;
+      if (!source.enabled) continue;
 
       const pos = source.position;
-      const rangePixels = source.range * illuminationData.gridSize;
+      const rangePixels = source.range * gSize;
 
       fogCtx.save();
-      fogCtx.clip(source.visibilityPolygon);
+
+      // Clip 1: geometric shape (always enforced — fixes rectangular rendering on custom lights)
+      applyClipShape(fogCtx, source, rangePixels);
+
+      // Clip 2: visibility polygon (wall occlusion), intersected with shape clip
+      if (source.visibilityPolygon) {
+        fogCtx.clip(source.visibilityPolygon);
+      }
+
       fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
       fogCtx.beginPath();
       fogCtx.arc(pos.x, pos.y, rangePixels, 0, Math.PI * 2);
       fogCtx.fill();
+
       fogCtx.restore();
     }
 
-    // STEP 2: destination-out gradients cut illuminated areas from fog
+    // STEP 2: destination-out gradients cut illuminated areas from fog.
     fogCtx.globalCompositeOperation = 'destination-out';
 
     for (const source of illuminationData.sources) {
-      if (!source.enabled || !source.visibilityPolygon) continue;
+      if (!source.enabled) continue;
 
       const animResult = calculateAnimationModifiers(
         source.animation,
@@ -315,14 +387,21 @@ export function applyFogPostProcessing(
       );
 
       const pos = source.position;
-      const rangePixels = source.range * illuminationData.gridSize * animResult.radiusMod;
+      const rangePixels = source.range * gSize * animResult.radiusMod;
       const brightZone = source.brightZone ?? 0.5;
       const brightIntensity = (source.brightIntensity ?? 1.0) * animResult.intensityMod;
       const globalDimOpacity = getEffectSettings().dimZoneOpacity ?? 0.4;
       const dimIntensity = (source.dimIntensity ?? globalDimOpacity) * animResult.intensityMod;
 
       fogCtx.save();
-      fogCtx.clip(source.visibilityPolygon);
+
+      // Clip 1: geometric shape
+      applyClipShape(fogCtx, source, rangePixels);
+
+      // Clip 2: visibility polygon (wall occlusion)
+      if (source.visibilityPolygon) {
+        fogCtx.clip(source.visibilityPolygon);
+      }
 
       const clearGradient = fogCtx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, rangePixels);
       clearGradient.addColorStop(0, `rgba(255, 255, 255, ${brightIntensity})`);
