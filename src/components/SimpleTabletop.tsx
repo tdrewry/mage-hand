@@ -2345,17 +2345,57 @@ export const SimpleTabletop = () => {
       combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     } else {
       // Generate new decorations and cache them.
-      // Pass map object positions as extra bounds points so the outer bounding box
-      // encompasses all content. Without this, map objects placed outside regions
-      // cause the visibility engine to treat the region boundary as an invisible wall,
-      // creating a hard lighting cutoff at the edge of the region bounds.
-      const mapObjectExtraPoints = mapObjects.flatMap((mo) => {
+      // Build extra bounds points so the outer wall bounding box encompasses ALL content.
+      // Without this, anything outside region bounds causes the visibility engine to treat
+      // the region boundary corner as an invisible occluder (producing hard light cutoffs
+      // and 45-degree diagonal clipping near bounding-box corners).
+      //
+      // We include:
+      //  • Map object positions (walls, obstacles, doors)
+      //  • Map object LIGHT RADII — the bounding box must reach the outer edge of each
+      //    light's illumination circle, not just its center
+      //  • Token positions — tokens near a bounding-box corner get 45° shadow artifacts
+      //  • LightStore light positions + radii
+      const extraBoundsPoints: { x: number; y: number }[] = [];
+
+      for (const mo of mapObjects) {
         if (mo.wallPoints && mo.wallPoints.length > 0) {
-          return mo.wallPoints;
+          // Wall polylines: include every vertex
+          extraBoundsPoints.push(...mo.wallPoints);
+        } else {
+          // Non-wall: include center
+          extraBoundsPoints.push(mo.position);
+          // If it's a light object, also include its four radius-edge points so the
+          // outer bounding box extends to the full illumination circle
+          if (mo.category === 'light' && mo.lightRadius) {
+            const r = mo.lightRadius;
+            extraBoundsPoints.push(
+              { x: mo.position.x - r, y: mo.position.y },
+              { x: mo.position.x + r, y: mo.position.y },
+              { x: mo.position.x, y: mo.position.y - r },
+              { x: mo.position.x, y: mo.position.y + r },
+            );
+          }
         }
-        return [mo.position];
-      });
-      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin, mapObjectExtraPoints);
+      }
+
+      // Include token positions so tokens near the boundary don't get 45° clipping
+      for (const token of tokens) {
+        extraBoundsPoints.push({ x: token.x, y: token.y });
+      }
+
+      // Include LightStore lights (position + radius)
+      for (const light of lights) {
+        const r = light.radius;
+        extraBoundsPoints.push(
+          { x: light.position.x - r, y: light.position.y },
+          { x: light.position.x + r, y: light.position.y },
+          { x: light.position.x, y: light.position.y - r },
+          { x: light.position.x, y: light.position.y + r },
+        );
+      }
+
+      const negativeSpace = generateNegativeSpaceRegion(regions, 15, margin, extraBoundsPoints);
       if (negativeSpace) {
         wallGeometry = negativeSpace.wallGeometry;
 
