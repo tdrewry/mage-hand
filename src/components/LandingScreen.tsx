@@ -167,7 +167,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     setIsSaving(true);
     try {
       const data = createCurrentProjectData();
-      await exportProjectToFile(data, `session-${Date.now()}.d20pro`);
+      await exportProjectToFile(data, `session-${Date.now()}.mhsession`);
       toast.success('Session saved to disk');
     } catch (err) {
       console.error(err);
@@ -262,7 +262,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     {
       id: 'load',
       label: 'Load Session',
-      description: 'Load a session from a .d20pro file',
+      description: 'Load a session from a .mhsession file',
       icon: FolderOpen,
       disabled: isLoading,
       active: false,
@@ -306,7 +306,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       <div className="relative z-10 w-full max-w-sm mx-auto px-6 space-y-8">
         {/* Title block */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">d20pro</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">Magehand</h1>
           <p className="text-sm text-muted-foreground">The application is paused.</p>
           <p className="text-xs text-muted-foreground/50 font-mono">v{APP_VERSION}</p>
         </div>
@@ -362,7 +362,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       <input
         ref={fileInputRef}
         type="file"
-        accept=".d20pro,.json"
+        accept=".mhsession,.json"
         className="hidden"
         onChange={handleFileSelected}
       />
@@ -414,7 +414,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       <Dialog open={showAbout} onOpenChange={setShowAbout}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">About d20pro</DialogTitle>
+          <DialogTitle className="text-xl font-bold">About Magehand</DialogTitle>
             <DialogDescription>Tabletop virtual game table</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2 text-sm text-muted-foreground">
@@ -422,12 +422,12 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
               <span className="text-foreground font-medium">Version</span>
               <span className="font-mono">{APP_VERSION}</span>
               <span className="text-foreground font-medium">Format</span>
-              <span className="font-mono">.d20pro</span>
+              <span className="font-mono">.mhsession</span>
               <span className="text-foreground font-medium">Platform</span>
               <span>Web (React + PixiJS)</span>
             </div>
             <p className="text-xs text-muted-foreground/70 border-t border-border pt-3">
-              d20pro is a browser-based virtual tabletop application supporting fog of war, token management,
+              Magehand is a browser-based virtual tabletop application supporting fog of war, token management,
               initiative tracking, vision profiles, and multi-layer maps.
             </p>
             <p className="text-xs text-muted-foreground/50">

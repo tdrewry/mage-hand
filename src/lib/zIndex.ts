@@ -1,5 +1,5 @@
 /**
- * Z-Index Layer System for D20PRO Virtual Tabletop
+ * Z-Index Layer System for Magehand Virtual Tabletop
  * 
  * Uses extended ranges to leverage 32-bit numbering space
  * Organized in layers from bottom (canvas) to top (critical overlays)
