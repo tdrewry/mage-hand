@@ -193,19 +193,19 @@ export const DiceCardContent: React.FC = () => {
 function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating: boolean }) {
   return (
     <div
-      className={`rounded-md border border-border bg-muted/40 p-2 space-y-1 transition-transform ${
+      className={`rounded-md border border-border bg-muted/40 p-2 space-y-1 transition-transform overflow-hidden ${
         isAnimating ? 'scale-105' : 'scale-100'
       }`}
       style={{ transitionDuration: '200ms' }}
     >
       <RollLabel roll={roll} />
-      <div className="flex items-baseline justify-between">
-        <span className="font-mono text-xs text-muted-foreground">{roll.formula}</span>
-        <span className="text-xl font-bold tabular-nums">{roll.total}</span>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-mono text-xs text-muted-foreground truncate min-w-0">{roll.formula}</span>
+        <span className="text-xl font-bold tabular-nums shrink-0">{roll.total}</span>
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 overflow-hidden max-h-24">
         {roll.groups.map((g, gi) => (
-          <span key={gi} className="flex gap-0.5">
+          <span key={gi} className="flex gap-0.5 flex-wrap">
             {g.results.map((v, vi) => {
               const isKept = g.keepHighest != null || g.keepLowest != null
                 ? g.keptResults.includes(v)
@@ -213,7 +213,7 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
               return (
                 <span
                   key={vi}
-                  className={`inline-flex items-center justify-center rounded text-xs font-mono min-w-[1.5rem] h-5 px-1 ${
+                  className={`inline-flex items-center justify-center rounded text-xs font-mono min-w-[1.5rem] h-5 px-1 shrink-0 ${
                     isKept
                       ? 'bg-primary/20 text-foreground'
                       : 'bg-muted text-muted-foreground line-through opacity-50'
@@ -223,13 +223,13 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
                 </span>
               );
             })}
-            <span className="text-xs text-muted-foreground self-center">
+            <span className="text-xs text-muted-foreground self-center shrink-0">
               d{g.sides}
             </span>
           </span>
         ))}
         {roll.modifier !== 0 && (
-          <span className="text-xs text-muted-foreground self-center font-mono">
+          <span className="text-xs text-muted-foreground self-center font-mono shrink-0">
             {roll.modifier > 0 ? '+' : ''}{roll.modifier}
           </span>
         )}
