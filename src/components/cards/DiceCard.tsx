@@ -245,7 +245,7 @@ function HistoryRow({ roll }: { roll: DiceRollResult }) {
       </div>
       {expanded && (
         <div className="px-1 pb-1.5 pt-0.5">
-          <RollDetails roll={roll} />
+          <LatestResult roll={roll} isAnimating={false} />
         </div>
       )}
     </div>
