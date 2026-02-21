@@ -12,6 +12,14 @@ import type {
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
 
+export interface ResolutionFlash {
+  tokenId: string;
+  x: number;
+  y: number;
+  color: 'hit' | 'miss';
+  startTime: number;
+}
+
 interface ActionState {
   /** Currently active action (null = no action in progress) */
   currentAction: ActionQueueEntry | null;
@@ -24,6 +32,9 @@ interface ActionState {
   
   /** History of resolved actions */
   actionHistory: ActionHistoryEntry[];
+
+  /** Active resolution flash effects on canvas */
+  resolutionFlashes: ResolutionFlash[];
 }
 
 interface ActionActions {
@@ -53,6 +64,9 @@ interface ActionActions {
   
   /** Clear history */
   clearHistory: () => void;
+
+  /** Clear expired flashes */
+  clearFlashes: () => void;
 }
 
 type ActionStore = ActionState & ActionActions;
@@ -62,6 +76,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
   isTargeting: false,
   targetingMousePos: null,
   actionHistory: [],
+  resolutionFlashes: [],
 
   startAttack: (sourceTokenId, attack) => {
     const token = useSessionStore.getState().tokens.find(t => t.id === sourceTokenId);
@@ -191,6 +206,22 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const { currentAction, actionHistory } = get();
     if (!currentAction || !currentAction.attack) return;
 
+    // Build resolution flashes from targets
+    const sessionTokens = useSessionStore.getState().tokens;
+    const now = Date.now();
+    const flashes: ResolutionFlash[] = currentAction.targets.map(t => {
+      const token = sessionTokens.find(tk => tk.id === t.tokenId);
+      const resolution = currentAction.resolutions[t.tokenId] || 'miss';
+      const isHit = resolution === 'hit' || resolution === 'critical_hit' || resolution === 'critical_threat';
+      return {
+        tokenId: t.tokenId,
+        x: token?.x ?? 0,
+        y: token?.y ?? 0,
+        color: isHit ? 'hit' : 'miss',
+        startTime: now,
+      };
+    });
+
     // Build history entry
     const historyEntry: ActionHistoryEntry = {
       id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -216,7 +247,13 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       isTargeting: false,
       targetingMousePos: null,
       actionHistory: [historyEntry, ...actionHistory].slice(0, 100),
+      resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
+
+    // Auto-clear flashes after 1.5s
+    setTimeout(() => {
+      get().clearFlashes();
+    }, 1500);
   },
 
   cancelAction: () => {
@@ -233,5 +270,10 @@ export const useActionStore = create<ActionStore>((set, get) => ({
 
   clearHistory: () => {
     set({ actionHistory: [] });
+  },
+
+  clearFlashes: () => {
+    const now = Date.now();
+    set({ resolutionFlashes: get().resolutionFlashes.filter(f => now - f.startTime < 1500) });
   },
 }));
