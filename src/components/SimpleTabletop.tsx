@@ -103,6 +103,7 @@ import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
 import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
+import { useActionStore } from "../stores/actionStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
@@ -989,6 +990,13 @@ export const SimpleTabletop = () => {
       // Escape to clear selection
       else if (e.key === 'Escape') {
         e.preventDefault();
+        // Cancel targeting mode if active
+        const actionS = useActionStore.getState();
+        if (actionS.isTargeting) {
+          actionS.cancelAction();
+          redrawCanvas();
+          return;
+        }
         if (selectedRegionIds.length > 0 || selectedTokenIds.length > 0) {
           selectedRegionIds.forEach(id => deselectRegion(id));
           setSelectedRegionIds([]);
@@ -3268,6 +3276,42 @@ export const SimpleTabletop = () => {
         drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
       });
     }
+
+
+    // ── Targeting reticle line (action system) ──
+    const actionState = useActionStore.getState();
+    if (actionState.isTargeting && actionState.currentAction) {
+      const sourceToken = tokens.find(t => t.id === actionState.currentAction!.sourceTokenId);
+      if (sourceToken) {
+        // Draw on main canvas in world-space (transform already applied via ctx)
+        ctx.save();
+        ctx.translate(transform.x, transform.y);
+        ctx.scale(transform.zoom, transform.zoom);
+
+        // Get grid size from the first region's grid, or default 40
+        const currentMap = maps.find(m => m.id === selectedMapId);
+        const gridSize = currentMap?.regions?.[0]?.gridSize || 40;
+
+        const mousePos = actionState.targetingMousePos;
+        // Draw lines to confirmed targets
+        for (const target of actionState.currentAction!.targets) {
+          const targetToken = tokens.find(t => t.id === target.tokenId);
+          if (targetToken) {
+            drawTargetingLineHelper(ctx, sourceToken.x, sourceToken.y, targetToken.x, targetToken.y, target.distance, gridSize, true);
+          }
+        }
+        // Draw line to current mouse position
+        if (mousePos) {
+          const dx = mousePos.x - sourceToken.x;
+          const dy = mousePos.y - sourceToken.y;
+          const distPx = Math.sqrt(dx * dx + dy * dy);
+          const distGrid = distPx / gridSize;
+          drawTargetingLineHelper(ctx, sourceToken.x, sourceToken.y, mousePos.x, mousePos.y, distGrid, gridSize, false);
+        }
+
+        ctx.restore();
+      }
+    }
   };
 
   // Function to draw drag ghost and path
@@ -3326,6 +3370,83 @@ export const SimpleTabletop = () => {
       ctx.textBaseline = "middle";
       ctx.fillText(token.label, x, y);
     }
+
+    ctx.restore();
+  };
+
+  // ── Targeting reticle line helper (action system) ──
+  const drawTargetingLineHelper = (
+    ctx: CanvasRenderingContext2D,
+    x1: number, y1: number,
+    x2: number, y2: number,
+    distGrid: number,
+    gridSize: number,
+    confirmed: boolean
+  ) => {
+    ctx.save();
+
+    // Line style
+    const lineWidth = 2 / transform.zoom;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(confirmed ? [] : [8 / transform.zoom, 4 / transform.zoom]);
+
+    // Red/orange targeting line
+    const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+    gradient.addColorStop(0, confirmed ? 'rgba(239, 68, 68, 0.9)' : 'rgba(251, 191, 36, 0.7)');
+    gradient.addColorStop(1, confirmed ? 'rgba(239, 68, 68, 0.5)' : 'rgba(251, 191, 36, 0.3)');
+    ctx.strokeStyle = gradient;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Targeting reticle at endpoint
+    const reticleRadius = confirmed ? 14 / transform.zoom : 10 / transform.zoom;
+    ctx.strokeStyle = confirmed ? 'rgba(239, 68, 68, 0.9)' : 'rgba(251, 191, 36, 0.8)';
+    ctx.lineWidth = 1.5 / transform.zoom;
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(x2, y2, reticleRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Crosshairs
+    const ch = reticleRadius * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x2 - ch, y2); ctx.lineTo(x2 + ch, y2);
+    ctx.moveTo(x2, y2 - ch); ctx.lineTo(x2, y2 + ch);
+    ctx.stroke();
+
+    if (confirmed) {
+      // Fill confirmed reticle
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+      ctx.beginPath();
+      ctx.arc(x2, y2, reticleRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Distance label at midpoint
+    const midX = (x1 + x2) / 2;
+    const midY = (x1 === x2 && y1 === y2) ? y1 : (y1 + y2) / 2;
+    const distFt = (distGrid * 5).toFixed(0);
+    const fontSize = 11 / transform.zoom;
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const text = `${distFt} ft.`;
+    const tm = ctx.measureText(text);
+    const px = 4 / transform.zoom;
+    const py = 2 / transform.zoom;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(midX - tm.width / 2 - px, midY - fontSize / 2 - py, tm.width + px * 2, fontSize + py * 2, 3 / transform.zoom);
+    ctx.fill();
+
+    ctx.fillStyle = confirmed ? '#ef4444' : '#fbbf24';
+    ctx.fillText(text, midX, midY);
 
     ctx.restore();
   };
@@ -5817,6 +5938,52 @@ export const SimpleTabletop = () => {
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (e.button === 0) {
       // Left click
+
+      // ── ACTION TARGETING: intercept click when in targeting mode ──
+      const actionStore = useActionStore.getState();
+      if (actionStore.isTargeting && actionStore.currentAction) {
+        const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
+        if (clickedToken && clickedToken.id !== actionStore.currentAction.sourceTokenId) {
+          // Calculate distance
+          const sourceToken = tokens.find(t => t.id === actionStore.currentAction!.sourceTokenId);
+          if (sourceToken) {
+            const dx = clickedToken.x - sourceToken.x;
+            const dy = clickedToken.y - sourceToken.y;
+            const currentMap = maps.find(m => m.id === selectedMapId);
+            const gridSize = currentMap?.regions?.[0]?.gridSize || 40;
+            const distGrid = Math.sqrt(dx * dx + dy * dy) / gridSize;
+
+            // Get target's defense value (AC) from stat block if available
+            let defenseValue = 10;
+            let defenseLabel = 'AC';
+            if (clickedToken.statBlockJson) {
+              try {
+                const json = JSON.parse(clickedToken.statBlockJson);
+                if (Array.isArray(json.ac) && json.ac.length > 0) {
+                  defenseValue = typeof json.ac[0] === 'number' ? json.ac[0] : json.ac[0].ac || 10;
+                } else if (typeof json.armorClass === 'number') {
+                  defenseValue = json.armorClass;
+                }
+              } catch { /* use default */ }
+            }
+
+            actionStore.addTarget({
+              tokenId: clickedToken.id,
+              tokenName: clickedToken.name || clickedToken.label || 'Unknown',
+              distance: distGrid,
+              defenseValue,
+              defenseType: 'flat',
+              defenseLabel,
+            });
+
+            // Auto-confirm single target and move to resolve
+            actionStore.confirmTargets();
+            redrawCanvas();
+          }
+        }
+        return; // Consume the click during targeting
+      }
+
       // Handle path drawing mode
       if (pathDrawingMode === "drawing") {
         if (pathDrawingType === "polygon") {
@@ -6469,6 +6636,22 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    // ── ACTION TARGETING: track mouse position for reticle ──
+    const actionStoreState = useActionStore.getState();
+    if (actionStoreState.isTargeting) {
+      const worldPos = screenToWorld(mouseX, mouseY);
+      useActionStore.getState().setTargetingMousePos({ x: worldPos.x, y: worldPos.y });
+      // Update cursor
+      const hoverToken = getTokenAtPosition(worldPos.x, worldPos.y);
+      if (hoverToken && hoverToken.id !== actionStoreState.currentAction?.sourceTokenId) {
+        canvas.style.cursor = 'crosshair';
+      } else {
+        canvas.style.cursor = 'crosshair';
+      }
+      redrawCanvas();
+      // Don't return — allow panning during targeting if right-click drag
+    }
 
     // Handle freehand drawing with throttling to reduce points
     if (isFreehandDrawing && pathDrawingMode === "drawing" && pathDrawingType === "freehand") {

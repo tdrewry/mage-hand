@@ -21,6 +21,7 @@ import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCa
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
 import { DiceCardContent } from '@/components/cards/DiceCard';
+import { ActionCardContent } from '@/components/cards/ActionCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -144,6 +145,7 @@ function getCardTitle(type: CardType): string {
     [CardType.CREATURE_LIBRARY]: 'Creature Library',
     [CardType.MAP_TREE]: 'Map Tree',
     [CardType.DICE_BOX]: 'Dice Box',
+    [CardType.ACTION_CARD]: 'Action',
   };
   
   return titles[type] || type;
@@ -231,6 +233,8 @@ function renderCardContent(
       return <DiceCardContent />;
     case CardType.GROUP_MANAGER:
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
+    case CardType.ACTION_CARD:
+      return <ActionCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

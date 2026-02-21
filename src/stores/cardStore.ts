@@ -319,6 +319,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.ACTION_CARD]: {
+    title: 'Action',
+    defaultPosition: { x: 360, y: 80 },
+    defaultSize: { width: 380, height: 550 },
+    minSize: { width: 320, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

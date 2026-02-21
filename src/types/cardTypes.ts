@@ -23,6 +23,7 @@ export enum CardType {
   CREATURE_LIBRARY = 'creature_library',
   MAP_TREE = 'map_tree',
   DICE_BOX = 'dice_box',
+  ACTION_CARD = 'action_card',
 }
 
 export interface ToolsCardProps {
