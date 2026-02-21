@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dices, X, Pin, Trash2 } from 'lucide-react';
+import { Dices, X, Pin, Trash2, ChevronDown } from 'lucide-react';
 import { useDiceStore } from '@/stores/diceStore';
 import { parseFormula, type DiceRollResult } from '@/lib/diceEngine';
 import { DiceRoller3D } from '@/components/dice/DiceRoller3D';
@@ -203,37 +203,7 @@ function LatestResult({ roll, isAnimating }: { roll: DiceRollResult; isAnimating
         <span className="font-mono text-xs text-muted-foreground truncate min-w-0">{roll.formula}</span>
         <span className="text-xl font-bold tabular-nums shrink-0">{roll.total}</span>
       </div>
-      <div className="flex flex-wrap gap-1 overflow-hidden max-h-24">
-        {roll.groups.map((g, gi) => (
-          <span key={gi} className="flex gap-0.5 flex-wrap">
-            {g.results.map((v, vi) => {
-              const isKept = g.keepHighest != null || g.keepLowest != null
-                ? g.keptResults.includes(v)
-                : true;
-              return (
-                <span
-                  key={vi}
-                  className={`inline-flex items-center justify-center rounded text-xs font-mono min-w-[1.5rem] h-5 px-1 shrink-0 ${
-                    isKept
-                      ? 'bg-primary/20 text-foreground'
-                      : 'bg-muted text-muted-foreground line-through opacity-50'
-                  }`}
-                >
-                  {v}
-                </span>
-              );
-            })}
-            <span className="text-xs text-muted-foreground self-center shrink-0">
-              d{g.sides}
-            </span>
-          </span>
-        ))}
-        {roll.modifier !== 0 && (
-          <span className="text-xs text-muted-foreground self-center font-mono shrink-0">
-            {roll.modifier > 0 ? '+' : ''}{roll.modifier}
-          </span>
-        )}
-      </div>
+      <RollDetails roll={roll} />
     </div>
   );
 }
@@ -253,19 +223,68 @@ function RollLabel({ roll }: { roll: DiceRollResult }) {
 }
 
 function HistoryRow({ roll }: { roll: DiceRollResult }) {
+  const [expanded, setExpanded] = useState(false);
   const time = new Date(roll.timestamp);
   const ts = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
   const contextLabel = roll.meta?.source
     ? `${roll.meta.source}${roll.meta.reason ? ` · ${roll.meta.reason}` : ''}`
     : roll.label || '';
   return (
-    <div className="flex items-center justify-between text-xs py-0.5 px-1 rounded hover:bg-muted/30 gap-1">
-      <span className="text-muted-foreground w-10 shrink-0">{ts}</span>
-      {contextLabel && (
-        <span className="text-muted-foreground truncate max-w-[6rem]" title={contextLabel}>{contextLabel}</span>
+    <div className="rounded hover:bg-muted/30">
+      <div
+        className="flex items-center justify-between text-xs py-0.5 px-1 gap-1 cursor-pointer select-none"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`} />
+        <span className="text-muted-foreground w-10 shrink-0">{ts}</span>
+        {contextLabel && (
+          <span className="text-muted-foreground truncate max-w-[6rem]" title={contextLabel}>{contextLabel}</span>
+        )}
+        <span className="font-mono text-muted-foreground truncate flex-1 mx-1">{roll.formula}</span>
+        <span className="font-bold tabular-nums">{roll.total}</span>
+      </div>
+      {expanded && (
+        <div className="px-1 pb-1.5 pt-0.5">
+          <RollDetails roll={roll} />
+        </div>
       )}
-      <span className="font-mono text-muted-foreground truncate flex-1 mx-1">{roll.formula}</span>
-      <span className="font-bold tabular-nums">{roll.total}</span>
+    </div>
+  );
+}
+
+/** Reusable dice breakdown used in both LatestResult and expanded history */
+function RollDetails({ roll }: { roll: DiceRollResult }) {
+  return (
+    <div className="flex flex-wrap gap-1 overflow-hidden max-h-24">
+      {roll.groups.map((g, gi) => (
+        <span key={gi} className="flex gap-0.5 flex-wrap">
+          {g.results.map((v, vi) => {
+            const isKept = g.keepHighest != null || g.keepLowest != null
+              ? g.keptResults.includes(v)
+              : true;
+            return (
+              <span
+                key={vi}
+                className={`inline-flex items-center justify-center rounded text-xs font-mono min-w-[1.5rem] h-5 px-1 shrink-0 ${
+                  isKept
+                    ? 'bg-primary/20 text-foreground'
+                    : 'bg-muted text-muted-foreground line-through opacity-50'
+                }`}
+              >
+                {v}
+              </span>
+            );
+          })}
+          <span className="text-xs text-muted-foreground self-center shrink-0">
+            d{g.sides}
+          </span>
+        </span>
+      ))}
+      {roll.modifier !== 0 && (
+        <span className="text-xs text-muted-foreground self-center font-mono shrink-0">
+          {roll.modifier > 0 ? '+' : ''}{roll.modifier}
+        </span>
+      )}
     </div>
   );
 }
