@@ -3283,24 +3283,20 @@ export const SimpleTabletop = () => {
     if (actionState.isTargeting && actionState.currentAction) {
       const sourceToken = tokens.find(t => t.id === actionState.currentAction!.sourceTokenId);
       if (sourceToken) {
-        // Draw on main canvas in world-space (transform already applied via ctx)
         ctx.save();
         ctx.translate(transform.x, transform.y);
         ctx.scale(transform.zoom, transform.zoom);
 
-        // Get grid size from the first region's grid, or default 40
         const currentMap = maps.find(m => m.id === selectedMapId);
         const gridSize = currentMap?.regions?.[0]?.gridSize || 40;
 
         const mousePos = actionState.targetingMousePos;
-        // Draw lines to confirmed targets
         for (const target of actionState.currentAction!.targets) {
           const targetToken = tokens.find(t => t.id === target.tokenId);
           if (targetToken) {
             drawTargetingLineHelper(ctx, sourceToken.x, sourceToken.y, targetToken.x, targetToken.y, target.distance, gridSize, true);
           }
         }
-        // Draw line to current mouse position
         if (mousePos) {
           const dx = mousePos.x - sourceToken.x;
           const dy = mousePos.y - sourceToken.y;
@@ -3310,6 +3306,60 @@ export const SimpleTabletop = () => {
         }
 
         ctx.restore();
+      }
+    }
+
+    // ── Resolution flash effects ──
+    if (actionState.resolutionFlashes.length > 0) {
+      const now = Date.now();
+      ctx.save();
+      ctx.translate(transform.x, transform.y);
+      ctx.scale(transform.zoom, transform.zoom);
+
+      for (const flash of actionState.resolutionFlashes) {
+        const elapsed = now - flash.startTime;
+        const duration = 1500;
+        if (elapsed >= duration) continue;
+
+        const progress = elapsed / duration;
+        // Expanding ring that fades out
+        const maxRadius = 40 / transform.zoom;
+        const radius = maxRadius * (0.5 + progress * 0.5);
+        const alpha = 1 - progress;
+
+        const isHit = flash.color === 'hit';
+        const r = isHit ? 239 : 34;
+        const g = isHit ? 68 : 197;
+        const b = isHit ? 68 : 94;
+
+        // Glow fill
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.25})`;
+        ctx.beginPath();
+        ctx.arc(flash.x, flash.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ring stroke
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.9})`;
+        ctx.lineWidth = 3 / transform.zoom;
+        ctx.beginPath();
+        ctx.arc(flash.x, flash.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner pulse ring
+        const innerRadius = maxRadius * 0.3 * (1 - progress);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.beginPath();
+        ctx.arc(flash.x, flash.y, innerRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Continuously re-render while flashes are active
+      const hasActiveFlashes = actionState.resolutionFlashes.some(f => now - f.startTime < 1500);
+      if (hasActiveFlashes) {
+        requestAnimationFrame(() => redrawCanvas());
       }
     }
   };
