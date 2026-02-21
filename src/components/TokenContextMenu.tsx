@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords } from 'lucide-react';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
@@ -53,7 +53,10 @@ import { uploadTexture } from '@/lib/textureSync';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCreatureStore } from '@/stores/creatureStore';
-
+import { useActionStore } from '@/stores/actionStore';
+import { parseAttacksFromJson } from '@/lib/attackParser';
+import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
+import type { AttackDefinition } from '@/types/actionTypes';
 interface TokenContextMenuProps {
   children: React.ReactNode;
   tokenId: string;
@@ -364,6 +367,61 @@ export const TokenContextMenu = ({
       });
       bringToFront(cardId);
     }
+  };
+
+  // Get available attacks for the current token
+  const getAvailableAttacks = (): AttackDefinition[] => {
+    if (!currentToken) return [DEFAULT_SLAM_ATTACK];
+    
+    // Try to parse attacks from stat block JSON
+    if (currentToken.statBlockJson) {
+      try {
+        const json = JSON.parse(currentToken.statBlockJson);
+        return parseAttacksFromJson(json);
+      } catch { /* fall through */ }
+    }
+
+    // Try linked creature data
+    if (currentToken.entityRef?.entityId) {
+      const creature = useCreatureStore.getState();
+      const monster = creature.getMonsterById(currentToken.entityRef.entityId);
+      if (monster) {
+        return parseAttacksFromJson(monster);
+      }
+      const character = creature.getCharacterById(currentToken.entityRef.entityId);
+      if (character) {
+        return parseAttacksFromJson(character);
+      }
+    }
+
+    return [DEFAULT_SLAM_ATTACK];
+  };
+
+  const handleStartAttack = (attack: AttackDefinition) => {
+    if (!currentToken) return;
+    
+    // Open/focus the Action Card
+    const cardStore = useCardStore.getState();
+    let actionCard = cardStore.getCardByType(CardType.ACTION_CARD);
+    if (!actionCard) {
+      const newId = cardStore.registerCard({
+        type: CardType.ACTION_CARD,
+        title: 'Action',
+        defaultPosition: { x: 360, y: 80 },
+        defaultSize: { width: 380, height: 550 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+      actionCard = cardStore.getCard(newId) ?? undefined;
+    }
+    if (actionCard) {
+      cardStore.setVisibility(actionCard.id, true);
+      cardStore.bringToFront(actionCard.id);
+    }
+
+    // Start the attack in the action store
+    useActionStore.getState().startAttack(currentToken.id, attack);
   };
 
   // Handle unlinking a creature from the token
@@ -956,6 +1014,28 @@ export const TokenContextMenu = ({
               </ContextMenuCheckboxItem>
               <ContextMenuSeparator />
             </>
+          )}
+          {/* Attack submenu */}
+          {!isMultiSelection && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <Swords className="mr-2 h-4 w-4" />
+                <span>Attack</span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-56 bg-popover z-[1000]">
+                {getAvailableAttacks().map((attack) => (
+                  <ContextMenuItem
+                    key={attack.id}
+                    onClick={() => handleStartAttack(attack)}
+                  >
+                    <span className="flex-1">{attack.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      +{attack.attackBonus} | {attack.damageFormula} {attack.damageType}
+                    </span>
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
           )}
           <ContextMenuItem onClick={handleInitiativeClick}>
             <Plus className="mr-2 h-4 w-4" />
