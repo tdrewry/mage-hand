@@ -396,8 +396,17 @@ function rollInDiceBox(formula: string, label?: string, meta?: RollMetadata) {
   const { roll } = useDiceStore.getState();
   const cardStore = useCardStore.getState();
   
-  // Ensure Dice Box is open
-  const diceCard = cardStore.getCardByType(CardType.DICE_BOX);
+  // Ensure Dice Box is open — register it if it doesn't exist yet
+  let diceCard = cardStore.getCardByType(CardType.DICE_BOX);
+  if (!diceCard) {
+    const newId = cardStore.registerCard({
+      type: CardType.DICE_BOX,
+      title: 'Dice Box',
+      defaultPosition: { x: 320, y: 80 },
+      defaultSize: { width: 350, height: 500 },
+    });
+    diceCard = cardStore.getCard(newId) ?? undefined;
+  }
   if (diceCard) {
     cardStore.setVisibility(diceCard.id, true);
     cardStore.bringToFront(diceCard.id);
