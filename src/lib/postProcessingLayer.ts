@@ -365,5 +365,12 @@ export async function cleanupPostProcessing(): Promise<void> {
 
 export function renderPostProcessing(): void {
   if (!pixiApp || !isInitialized) return;
-  pixiApp.render();
+  try {
+    pixiApp.render();
+  } catch (err) {
+    // GPU context lost — internal PixiJS state is corrupted
+    console.warn('PixiJS render failed (GPU context lost?), cleaning up:', err);
+    isInitialized = false;
+    cleanupPostProcessing();
+  }
 }
