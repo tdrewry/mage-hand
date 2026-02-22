@@ -31,6 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
 import { toast } from 'sonner';
@@ -89,12 +90,18 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     setServerUrl(localServerUrl);
     setIsConnecting(true);
     try {
+      // Get local player's role IDs from sessionStore
+      const sessionState = useSessionStore.getState();
+      const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+      const localRoles = currentPlayer?.roleIds;
+
       await netManager.connect({
         serverUrl: localServerUrl,
         sessionCode: code.trim().toUpperCase(),
         username: username.trim(),
         inviteToken: inviteToken || undefined,
         password: password || undefined,
+        roles: localRoles,
       });
       setCurrentUsername(username.trim());
       toast.success(`Connected to session ${code.toUpperCase()}`);

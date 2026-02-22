@@ -145,7 +145,7 @@ export class LocalRoomServer {
         if (!sc) return send(ws, this.reject({ code: "bad_request", message: "Missing sessionCode" }));
 
         session = this.getOrCreateSession(sc);
-        ctx = this.buildClientCtx(ws, msg.clientId, msg.p.username, msg.p.password);
+        ctx = this.buildClientCtx(ws, msg.clientId, msg.p.username, msg.p.password, msg.p.roles);
         session.clients.add(ctx);
 
         // Build peers list (existing clients, excluding the new one)
@@ -322,8 +322,11 @@ export class LocalRoomServer {
     return created;
   }
 
-  private buildClientCtx(ws: WebSocket, clientId: string, username: string, password?: string): ClientCtx {
-    const isDm = !!this.auth.dmPassword && password === this.auth.dmPassword;
+  private buildClientCtx(ws: WebSocket, clientId: string, username: string, password?: string, clientRoles?: string[]): ClientCtx {
+    // Priority: 1) DM password match, 2) client-provided roles, 3) default to player
+    const isDmByPassword = !!this.auth.dmPassword && password === this.auth.dmPassword;
+    const isDmByClientRole = clientRoles?.includes("dm") ?? false;
+    const isDm = isDmByPassword || isDmByClientRole;
     const roles = isDm ? ["dm"] : ["player"];
     const permissions = isDm ? FULL_PERMS : PLAYER_PERMS;
 
