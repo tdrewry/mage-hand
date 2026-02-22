@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Network, 
   Users, 
   Copy, 
   Check, 
@@ -10,8 +9,8 @@ import {
   Wifi,
   WifiOff,
   Loader2,
-  RefreshCw,
-  Upload
+  Send,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +31,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
-import { syncManager } from '@/lib/syncManager';
+import { netManager } from '@/lib/net';
+import { sendPing, sendChat } from '@/lib/net/demo';
 import { toast } from 'sonner';
 
 interface SessionManagerProps {
@@ -48,33 +48,27 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     currentSession,
     currentUsername,
     connectedUsers,
+    roles,
+    permissions,
+    lastError,
     setServerUrl,
     setCurrentUsername,
-    currentUserId,
   } = useMultiplayerStore();
-
-  // Check if current user has DM role
-  const currentUser = connectedUsers.find(u => u.userId === currentUserId);
-  const isDM = currentUser?.roleIds.includes('dm') ?? false;
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
   const [username, setUsername] = useState(currentUsername || '');
   const [sessionCode, setSessionCode] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Initialize SyncManager when server URL changes
-  useEffect(() => {
-    if (localServerUrl && localServerUrl !== serverUrl) {
-      setServerUrl(localServerUrl);
-    }
-  }, [localServerUrl, serverUrl, setServerUrl]);
+  const [showDebug, setShowDebug] = useState(false);
+  const [chatText, setChatText] = useState('');
 
   // Generate random session code
   const generateSessionCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid confusing characters
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -82,87 +76,51 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     return code;
   };
 
-  const handleCreateSession = async () => {
+  const handleConnect = async (code: string) => {
     if (!username.trim()) {
       toast.error('Please enter a username');
       return;
     }
-
-    // Persist the current server URL to localStorage
-    setServerUrl(localServerUrl);
-
-    setIsConnecting(true);
-    try {
-      // Initialize sync manager
-      await syncManager.initialize(localServerUrl);
-      await syncManager.connect();
-
-      // Create session
-      await syncManager.createSession(username.trim(), password || undefined);
-      
-      setCurrentUsername(username.trim());
-      toast.success('Session created successfully!');
-    } catch (error) {
-      console.error('Failed to create session:', error);
-      toast.error('Failed to create session. Is the server running?');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const handleJoinSession = async () => {
-    if (!username.trim()) {
-      toast.error('Please enter a username');
-      return;
-    }
-
-    if (!sessionCode.trim()) {
+    if (!code.trim()) {
       toast.error('Please enter a session code');
       return;
     }
 
-    // Persist the current server URL to localStorage
     setServerUrl(localServerUrl);
-
     setIsConnecting(true);
     try {
-      // Initialize sync manager
-      await syncManager.initialize(localServerUrl);
-      await syncManager.connect();
-
-      // Join session
-      await syncManager.joinSession(
-        sessionCode.trim().toUpperCase(), 
-        username.trim(), 
-        password || undefined
-      );
-      
+      await netManager.connect({
+        serverUrl: localServerUrl,
+        sessionCode: code.trim().toUpperCase(),
+        username: username.trim(),
+        inviteToken: inviteToken || undefined,
+        password: password || undefined,
+      });
       setCurrentUsername(username.trim());
-      toast.success(`Joined session ${sessionCode.toUpperCase()}`);
-      onOpenChange(false);
+      toast.success(`Connected to session ${code.toUpperCase()}`);
     } catch (error) {
-      console.error('Failed to join session:', error);
-      toast.error('Failed to join session. Check the code and try again.');
+      console.error('Failed to connect:', error);
+      toast.error('Failed to connect. Is the server running?');
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const handleCreateSession = () => {
+    const code = generateSessionCode();
+    setSessionCode(code);
+    handleConnect(code);
+  };
+
+  const handleJoinSession = () => {
+    handleConnect(sessionCode);
+  };
+
   const handleLeaveSession = () => {
-    syncManager.leaveSession();
+    netManager.disconnect();
     setSessionCode('');
     setPassword('');
     toast.info('Left session');
-  };
-
-  const handleRequestSync = () => {
-    syncManager.rpcRequestFullState();
-    toast.info('Requesting full state sync from DM...');
-  };
-
-  const handleBroadcastState = () => {
-    syncManager.broadcastFullStateSync();
-    toast.success('Broadcasting full state to all players');
   };
 
   const handleCopySessionCode = () => {
@@ -172,6 +130,17 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       toast.success('Session code copied!');
       setTimeout(() => setCopiedCode(false), 2000);
     }
+  };
+
+  const handleSendPing = () => {
+    sendPing(`from ${currentUsername}`);
+    toast.info('Ping sent');
+  };
+
+  const handleSendChat = () => {
+    if (!chatText.trim()) return;
+    sendChat(chatText.trim());
+    setChatText('');
   };
 
   const getConnectionStatusBadge = () => {
@@ -184,11 +153,10 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           </Badge>
         );
       case 'connecting':
-      case 'reconnecting':
         return (
           <Badge variant="secondary">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            {connectionStatus === 'reconnecting' ? 'Reconnecting' : 'Connecting'}
+            Connecting
           </Badge>
         );
       case 'error':
@@ -224,6 +192,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           </DialogDescription>
         </DialogHeader>
 
+        {lastError && (
+          <div className="p-2 rounded bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+            {lastError}
+          </div>
+        )}
+
         {currentSession ? (
           // Active Session View
           <div className="space-y-4">
@@ -258,6 +232,26 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   <span className="text-muted-foreground">Your Username</span>
                   <span className="font-medium text-foreground">{currentUsername}</span>
                 </div>
+                {roles.length > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Roles</span>
+                    <div className="flex gap-1">
+                      {roles.map(r => (
+                        <Badge key={r} variant="secondary" className="text-xs">{r}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {permissions.length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground text-xs">Permissions</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {permissions.map(p => (
+                        <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Connected Users</span>
                   <Badge variant="secondary">
@@ -288,35 +282,40 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              {isDM && (
-                <Button
-                  variant="default"
-                  onClick={handleBroadcastState}
-                  className="w-full"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Broadcast State
+            {/* Debug Section */}
+            <Collapsible open={showDebug} onOpenChange={setShowDebug}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Debug Tools
                 </Button>
-              )}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleRequestSync}
-                  className="flex-1"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Request Sync
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 mt-2">
+                <Button variant="outline" size="sm" onClick={handleSendPing} className="w-full">
+                  Send Ping
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleLeaveSession}
-                  className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                >
-                  Leave Session
-                </Button>
-              </div>
-            </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Chat message..."
+                    value={chatText}
+                    onChange={(e) => setChatText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                    className="bg-input border-border text-foreground text-sm"
+                  />
+                  <Button variant="outline" size="icon" onClick={handleSendChat}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Button
+              variant="outline"
+              onClick={handleLeaveSession}
+              className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
+              Leave Session
+            </Button>
           </div>
         ) : (
           // Session Creation/Join View
@@ -365,14 +364,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   <Label htmlFor="create-server-url">Server URL</Label>
                   <Input
                     id="create-server-url"
-                    placeholder="http://localhost:3000"
+                    placeholder="ws://localhost:3001"
                     value={localServerUrl}
                     onChange={(e) => setLocalServerUrl(e.target.value)}
                     disabled={isConnecting}
                     className="bg-input border-border text-foreground font-mono text-sm"
                   />
+                  <Label htmlFor="create-invite-token">Invite Token (Optional)</Label>
+                  <Input
+                    id="create-invite-token"
+                    placeholder="Enter invite token"
+                    value={inviteToken}
+                    onChange={(e) => setInviteToken(e.target.value)}
+                    disabled={isConnecting}
+                    className="bg-input border-border text-foreground text-sm"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Change this to connect to a remote server
+                    Change server URL to connect to a remote server
                   </p>
                 </CollapsibleContent>
               </Collapsible>
@@ -447,14 +455,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   <Label htmlFor="join-server-url">Server URL</Label>
                   <Input
                     id="join-server-url"
-                    placeholder="http://localhost:3000"
+                    placeholder="ws://localhost:3001"
                     value={localServerUrl}
                     onChange={(e) => setLocalServerUrl(e.target.value)}
                     disabled={isConnecting}
                     className="bg-input border-border text-foreground font-mono text-sm"
                   />
+                  <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
+                  <Input
+                    id="join-invite-token"
+                    placeholder="Enter invite token"
+                    value={inviteToken}
+                    onChange={(e) => setInviteToken(e.target.value)}
+                    disabled={isConnecting}
+                    className="bg-input border-border text-foreground text-sm"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Change this to connect to a remote server
+                    Change server URL to connect to a remote server
                   </p>
                 </CollapsibleContent>
               </Collapsible>
