@@ -22,6 +22,7 @@ import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
+import { emitLocalOp } from "@/lib/net";
 import { useMapStore } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
@@ -7959,6 +7960,17 @@ export const SimpleTabletop = () => {
                 { x: token.x, y: token.y },
                 token.label || token.name
               );
+              // Emit token move to network
+              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
+              // Also emit moves for multi-dragged tokens
+              const startPositions = multiDragStartPositionsRef.current;
+              selectedTokenIds.forEach(tid => {
+                if (tid === draggedTokenId) return;
+                const t = tokens.find(tk => tk.id === tid);
+                if (t && startPositions[tid] && (startPositions[tid].x !== t.x || startPositions[tid].y !== t.y)) {
+                  emitLocalOp({ kind: 'token.move', data: { tokenId: tid, x: t.x, y: t.y } });
+                }
+              });
             }
           }
         }
@@ -8746,6 +8758,8 @@ export const SimpleTabletop = () => {
                 { x: token.x, y: token.y },
                 token.label || token.name
               );
+              // Emit token move to network
+              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
             }
           }
         }
