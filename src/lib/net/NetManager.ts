@@ -2,7 +2,7 @@
 // Singleton wrapper around NetworkSession for the new WebSocket JSON protocol.
 
 import { NetworkSession, type ConnectParams, type NetworkSessionInfo } from "../../../networking/client";
-import type { EngineOp, OpBatchPayload } from "../../../networking/contract/v1";
+import type { EngineOp, OpBatchPayload, PresencePayload } from "../../../networking/contract/v1";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
 
@@ -144,11 +144,37 @@ export class NetManager {
       const store = useMultiplayerStore.getState();
       store.setConnectionStatus("disconnected");
       store.setCurrentSession(null);
+      store.setConnectedUsers([]);
       store.setRoles([]);
       store.setPermissions([]);
       console.log("🔌 [NetManager] Disconnected:", code, reason);
     });
 
-    this.cleanups.push(off1, off2, off3, off4, off5);
+    const off6 = this.session.on("presence", (p: PresencePayload) => {
+      const store = useMultiplayerStore.getState();
+      const user = {
+        userId: p.user.userId,
+        username: p.user.username,
+        roleIds: p.user.roles,
+        connectedAt: Date.now(),
+      };
+
+      switch (p.kind) {
+        case "join":
+          store.addConnectedUser(user);
+          console.log(`👤 [NetManager] User joined: ${p.user.username}`);
+          break;
+        case "leave":
+          store.removeConnectedUser(p.user.userId);
+          console.log(`👤 [NetManager] User left: ${p.user.username}`);
+          break;
+        case "update":
+          store.updateUserRoles(p.user.userId, p.user.roles);
+          console.log(`👤 [NetManager] User updated: ${p.user.username}`, p.user.roles);
+          break;
+      }
+    });
+
+    this.cleanups.push(off1, off2, off3, off4, off5, off6);
   }
 }
