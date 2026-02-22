@@ -52,6 +52,7 @@ export async function initRegionEdgeProcessing(
       antialias: true,
       resolution: config.resolution ?? 1,
       autoDensity: true,
+      preference: 'webgl',
     });
 
     // Style the canvas for overlay positioning
