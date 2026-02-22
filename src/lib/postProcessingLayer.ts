@@ -342,9 +342,13 @@ export async function cleanupPostProcessing(): Promise<void> {
     if (illuminationSprite) { illuminationSprite.destroy(); illuminationSprite = null; }
 
     if (pixiApp) {
-      const canvas = pixiApp.canvas as HTMLCanvasElement;
-      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-      pixiApp.destroy(true, { children: true, texture: true });
+      try {
+        const canvas = pixiApp.canvas as HTMLCanvasElement | undefined;
+        if (canvas?.parentNode) canvas.parentNode.removeChild(canvas);
+        pixiApp.destroy(true, { children: true, texture: true });
+      } catch (destroyErr) {
+        console.warn('PixiJS destroy error (safe to ignore):', destroyErr);
+      }
       pixiApp = null;
     }
 

@@ -197,7 +197,12 @@ export class AutoSaveManager {
       
       console.log('Auto-save completed successfully');
     } catch (error) {
-      console.error('Auto-save failed:', error);
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('Auto-save quota exceeded – disabling auto-save to prevent repeated failures. Free up storage via the Storage Manager.');
+        this.stop();
+      } else {
+        console.error('Auto-save failed:', error);
+      }
     }
   }
 
