@@ -52,11 +52,6 @@ export {
 // Transport adapters
 export { 
   BaseTransport,
-  SocketIOTransport, 
-  createSocketIOTransport,
-  DEFAULT_SEND_EVENT,
-  DEFAULT_RECEIVE_EVENT,
-  type SocketIOTransportConfig,
 } from './transports';
 
 // Types

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { syncManager } from '@/lib/syncManager';
+import { netManager } from '@/lib/net';
 
 interface ConnectedUsersPanelProps {
   trigger?: React.ReactNode;
@@ -65,8 +65,8 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
     // Update locally
     useMultiplayerStore.getState().updateUserRoles(userId, newRoleIds);
 
-    // Sync to server (TODO: implement in syncManager)
-    if (syncManager.isConnected()) {
+    // Sync to server (TODO: implement via netManager)
+    if (netManager.isConnected) {
       console.log('[ConnectedUsers] Role change sync not yet implemented', userId, newRoleIds);
     }
 
