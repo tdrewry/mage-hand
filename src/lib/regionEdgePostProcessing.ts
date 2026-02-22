@@ -323,7 +323,13 @@ export function isRegionEdgeReady(): boolean {
  */
 export function renderRegionEdges(): void {
   if (!pixiApp || !isInitialized) return;
-  pixiApp.render();
+  try {
+    pixiApp.render();
+  } catch (err) {
+    console.warn('Region edge render failed (GPU context lost?), cleaning up:', err);
+    isInitialized = false;
+    cleanupRegionEdgeProcessing();
+  }
 }
 
 /**
