@@ -44,6 +44,9 @@ import {
   getEffectSettings,
   isPostProcessingReady,
   renderPostProcessing,
+  setLastRenderTransform,
+  panOffsetPostProcessing,
+  resetPostProcessingOffset,
   FIXED_PADDING,
   type EffectSettings,
 } from './postProcessingLayer';
@@ -73,6 +76,12 @@ let dimZoneCanvas: HTMLCanvasElement | null = null;
 let dimZoneCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
+
+// Fast-path tracking: when only pan changed, skip Canvas 2D redraw
+let _lastFogMasks: object | null = null;  // identity check
+let _lastIlluminationSources: object | null = null;  // identity check
+let _lastFullRenderTime = 0;
+const FULL_RENDER_INTERVAL = 100; // Force a full redraw at least every 100ms during pan
 
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;
@@ -321,6 +330,25 @@ export function applyFogPostProcessing(
   // Throttle updates
   const now = performance.now();
   if (now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
+
+  // ── CSS-offset fast path ──
+  // If fog masks and illumination sources haven't changed (same object identity),
+  // only the pan transform moved.  Skip the entire Canvas 2D redraw and just
+  // reposition the PixiJS canvas via CSS.  Force a full redraw every
+  // FULL_RENDER_INTERVAL ms to prevent long-term drift.
+  const masksUnchanged = fogMasks === _lastFogMasks;
+  const illuUnchanged = illuminationData?.sources === _lastIlluminationSources ||
+    (!illuminationData && !_lastIlluminationSources);
+  const timeSinceFullRender = now - _lastFullRenderTime;
+
+  if (masksUnchanged && illuUnchanged && timeSinceFullRender < FULL_RENDER_INTERVAL) {
+    // Try CSS-offset; falls back to full redraw if zoom changed
+    if (panOffsetPostProcessing(transform)) {
+      lastUpdateTime = now;
+      return;
+    }
+  }
+
   lastUpdateTime = now;
 
   // Clear including overhang area
@@ -440,7 +468,14 @@ export function applyFogPostProcessing(
 
   // Push fog mask to PixiJS
   updateFogTexture(fogCanvas);
+  resetPostProcessingOffset();
   renderPostProcessing();
+
+  // Track state for CSS-offset fast path
+  _lastFogMasks = fogMasks;
+  _lastIlluminationSources = illuminationData?.sources ?? null;
+  _lastFullRenderTime = performance.now();
+  setLastRenderTransform(transform);
 }
 
 export function updateFogEffects(config: Partial<FogEffectConfig>): void {
@@ -477,4 +512,7 @@ export function cleanupFogPostProcessing(): void {
   fogCanvas = null; fogCtx = null;
   illuminationCanvas = null; illuminationCtx = null;
   dimZoneCanvas = null; dimZoneCtx = null;
+  _lastFogMasks = null;
+  _lastIlluminationSources = null;
+  _lastFullRenderTime = 0;
 }

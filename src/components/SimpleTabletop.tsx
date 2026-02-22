@@ -1731,6 +1731,9 @@ export const SimpleTabletop = () => {
     }, 100); // 100ms debounce
 
     return () => clearTimeout(timeoutId);
+    // NOTE: transform.x/y/zoom intentionally excluded — pan/zoom don't change
+    // visibility polygons or fog masks, and including them caused expensive
+    // Paper.js computations on every mouse-move during canvas drag.
   }, [
     tokens,
     lights,
@@ -1742,9 +1745,6 @@ export const SimpleTabletop = () => {
     renderingMode,
     regions,
     mapObjects, // Re-compute fog when map objects change (they may block vision)
-    transform.x,
-    transform.y,
-    transform.zoom,
     effectSettings.lightFalloff,
     exploredOpacity,
     players, // Re-compute when player data changes (role assignments affect vision)
