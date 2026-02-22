@@ -253,6 +253,7 @@ export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement): void
 }
 
 export function updateEffectSettings(settings: Partial<EffectSettings>): void {
+  const prevQuality = currentSettings.effectQuality;
   currentSettings = { ...currentSettings, ...settings };
 
   if (blurFilter) {
@@ -262,6 +263,12 @@ export function updateEffectSettings(settings: Partial<EffectSettings>): void {
 
   if (illuminationFilter) {
     illuminationFilter.globalEdgeBlur = currentSettings.edgeBlur;
+  }
+
+  // Quality change requires renderer resize — sprite/renderer size mismatch
+  // otherwise causes a white screen (fog texture no longer covers the canvas)
+  if (settings.effectQuality && settings.effectQuality !== prevQuality && isInitialized && _contentW > 0) {
+    resizePostProcessing(_contentW, _contentH, _originX, _originY);
   }
 }
 
