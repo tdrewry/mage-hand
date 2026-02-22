@@ -130,6 +130,11 @@ export class NetManager {
 
   /** Propose a local operation to the server. */
   proposeOp(op: EngineOp, clientOpId?: string): void {
+    if (!this.isConnected) {
+      console.warn("[NetManager] proposeOp called but not connected — op dropped:", op.kind);
+      toast.error("Not connected — operation not sent");
+      return;
+    }
     this.session.proposeOp(op, clientOpId);
   }
 
