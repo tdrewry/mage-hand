@@ -138,6 +138,9 @@ export async function initPostProcessing(
       antialias: config.antialias ?? true,
       resolution: config.resolution ?? 1,
       autoDensity: true,
+      // Force WebGL to prevent "CanvasRenderer is not yet implemented" fallback
+      // when GPU context is lost after long idle periods
+      preference: 'webgl',
     });
 
     const canvas = pixiApp.canvas as HTMLCanvasElement;

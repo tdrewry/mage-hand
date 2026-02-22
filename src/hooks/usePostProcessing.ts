@@ -76,7 +76,7 @@ export function usePostProcessing({
       return;
     }
 
-    const init = async () => {
+    const init = async (retryCount = 0) => {
       if (!containerRef.current || initializingRef.current) return;
       
       initializingRef.current = true;
@@ -94,6 +94,12 @@ export function usePostProcessing({
         initRef.current = true;
         setPostProcessingVisible(true);
         setReady(true);
+      } else if (retryCount < 2) {
+        // GPU context may have been lost after idle — retry after a short delay
+        console.warn(`Post-processing init failed, retrying (${retryCount + 1}/2)…`);
+        initializingRef.current = false;
+        setTimeout(() => init(retryCount + 1), 1000);
+        return;
       }
       
       initializingRef.current = false;
