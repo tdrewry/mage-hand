@@ -1,0 +1,17 @@
+{
+  "name": "vtt-server-local",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "start:dm": "DM_PASSWORD=dm tsx index.ts",
+    "start:3001": "PORT=3001 tsx index.ts"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
+  }
+}

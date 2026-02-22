@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/vtt-network-protocol-v1.schema.json",
+  "title": "VTT Network Protocol v1 (Envelope Base)",
+  "type": "object",
+  "$defs": {
+    "iso8601": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "permissionKey": {
+      "type": "string",
+      "enum": [
+        "control_own_tokens",
+        "control_other_tokens",
+        "see_all_no_fog",
+        "see_friendly_vision",
+        "see_hostile_vision",
+        "see_own_tokens",
+        "see_other_tokens",
+        "see_hidden_tokens",
+        "create_tokens",
+        "delete_own_tokens",
+        "delete_other_tokens",
+        "manage_roles",
+        "assign_player_roles",
+        "assign_token_roles",
+        "edit_map",
+        "manage_initiative",
+        "manage_hostility",
+        "manage_fog"
+      ]
+    }
+  },
+  "required": [
+    "v",
+    "t",
+    "clientId",
+    "ts",
+    "p"
+  ],
+  "properties": {
+    "v": {
+      "$ref": "#/$defs/protocolVersion"
+    },
+    "t": {
+      "type": "string"
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "sessionCode": {
+      "type": "string"
+    },
+    "clientId": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "clientSeq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ts": {
+      "$ref": "#/$defs/iso8601"
+    },
+    "p": {}
+  },
+  "additionalProperties": false
+}
