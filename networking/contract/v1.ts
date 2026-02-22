@@ -144,6 +144,8 @@ export interface WelcomePayload {
   currentSeq: OpSeq;
   snapshot?: SnapshotPointer;
   recentSegments?: OpLogSegmentPointer[];
+  /** Other users already in the session (excludes self). */
+  peers?: UserSummary[];
   features?: {
     opBatching?: boolean;
     maxBatchSize?: number;

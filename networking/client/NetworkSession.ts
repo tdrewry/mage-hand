@@ -75,6 +75,7 @@ export interface NetworkSessionInfo {
   permissions: string[];
   currentSeq: OpSeq;
   snapshot?: SnapshotPointer;
+  peers?: Array<{ userId: string; username: string; roles: string[] }>;
 }
 
 export interface NetworkSessionEvents {
@@ -289,6 +290,7 @@ export class NetworkSession {
           permissions: p.permissions,
           currentSeq: p.currentSeq,
           snapshot: p.snapshot,
+          peers: p.peers,
         };
         this.emitter.emit("connected", this.connectedInfo);
 

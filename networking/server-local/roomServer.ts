@@ -148,6 +148,14 @@ export class LocalRoomServer {
         ctx = this.buildClientCtx(ws, msg.clientId, msg.p.username, msg.p.password);
         session.clients.add(ctx);
 
+        // Build peers list (existing clients, excluding the new one)
+        const peers: UserSummary[] = [];
+        for (const c of session.clients) {
+          if (c !== ctx) {
+            peers.push({ userId: c.userId, username: c.username, roles: c.roles });
+          }
+        }
+
         const welcome: ServerToClientMessage = {
           v: PROTOCOL_VERSION,
           t: "welcome",
@@ -162,6 +170,7 @@ export class LocalRoomServer {
             permissions: ctx.permissions,
             currentSeq: session.seq,
             snapshot: session.snapshot,
+            peers,
             features: { opBatching: true, maxBatchSize: 25, maxMessageBytes: 256_000 },
           } satisfies WelcomePayload,
         };
