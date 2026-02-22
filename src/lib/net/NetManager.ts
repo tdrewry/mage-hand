@@ -5,6 +5,7 @@ import { NetworkSession, type ConnectParams, type NetworkSessionInfo } from "../
 import type { EngineOp, OpBatchPayload, PresencePayload } from "../../../networking/contract/v1";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
+import { toast } from "sonner";
 
 export type NetConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -222,10 +223,15 @@ export class NetManager {
       switch (p.kind) {
         case "join":
           store.addConnectedUser(user);
+          // Don't toast for our own join
+          if (p.user.userId !== store.currentUserId) {
+            toast.info(`${p.user.username} joined the session`, { duration: 3000 });
+          }
           console.log(`👤 [NetManager] User joined: ${p.user.username}`);
           break;
         case "leave":
           store.removeConnectedUser(p.user.userId);
+          toast.info(`${p.user.username} left the session`, { duration: 3000 });
           console.log(`👤 [NetManager] User left: ${p.user.username}`);
           break;
         case "update":
