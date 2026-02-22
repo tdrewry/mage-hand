@@ -47,12 +47,20 @@ class OpBridgeImpl {
     });
 
     this.register("token.sync", (data) => {
+      console.log("🔄 [OpBridge] token.sync handler ENTERED, data:", JSON.stringify(data).slice(0, 500));
       const d = data as { tokens: Array<{ id: string; name: string; x: number; y: number; gridWidth: number; gridHeight: number; color?: string; label: string }> };
+      if (!d || !Array.isArray(d.tokens)) {
+        console.error("🔄 [OpBridge] token.sync: invalid data shape!", data);
+        return;
+      }
       const store = useSessionStore.getState();
+      console.log(`🔄 [OpBridge] token.sync: ${d.tokens.length} incoming, ${store.tokens.length} existing`);
+      let created = 0, updated = 0;
       for (const t of d.tokens) {
         const existing = store.tokens.find((tok) => tok.id === t.id);
         if (existing) {
           store.updateTokenPosition(t.id, t.x, t.y);
+          updated++;
         } else {
           store.addToken({
             id: t.id,
@@ -68,10 +76,12 @@ class OpBridgeImpl {
             isHidden: false,
             color: t.color,
           });
+          created++;
         }
       }
-      console.log(`🔄 [OpBridge] Synced ${d.tokens.length} token(s) from remote`);
-      toast.info(`Synced ${d.tokens.length} token(s) from remote`);
+      const afterCount = useSessionStore.getState().tokens.length;
+      console.log(`🔄 [OpBridge] token.sync DONE: created=${created}, updated=${updated}, total tokens now=${afterCount}`);
+      toast.info(`Synced ${d.tokens.length} token(s): ${created} new, ${updated} updated`);
     });
   }
 
@@ -90,12 +100,14 @@ class OpBridgeImpl {
    * Sets isApplyingRemote to prevent echo loops.
    */
   applyRemoteOps(ops: RemoteOpEntry[]): void {
+    console.log(`📥 [OpBridge] applyRemoteOps called with ${ops.length} op(s):`, ops.map(o => o.op.kind));
     this.isApplyingRemote = true;
     try {
       for (const entry of ops) {
         const handler = this.handlers.get(entry.op.kind);
         if (handler) {
           try {
+            console.log(`📥 [OpBridge] Dispatching "${entry.op.kind}" from ${entry.userId}`);
             handler(entry.op.data, entry.userId);
           } catch (err) {
             console.error(`[OpBridge] Error handling op "${entry.op.kind}":`, err);
@@ -114,11 +126,15 @@ class OpBridgeImpl {
    * Skipped when isApplyingRemote is true (echo prevention).
    */
   emitLocalOp(op: EngineOp, clientOpId?: string): void {
-    if (this.isApplyingRemote) return;
+    if (this.isApplyingRemote) {
+      console.log(`🚫 [OpBridge] emitLocalOp SKIPPED (isApplyingRemote): ${op.kind}`);
+      return;
+    }
     if (!this._proposeOp) {
       console.warn("[OpBridge] proposeOp not wired yet — op dropped:", op.kind);
       return;
     }
+    console.log(`📤 [OpBridge] emitLocalOp: ${op.kind}`, JSON.stringify(op.data).slice(0, 200));
     this._proposeOp(op, clientOpId);
   }
 }
