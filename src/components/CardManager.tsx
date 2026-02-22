@@ -22,6 +22,7 @@ import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlock
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
 import { DiceCardContent } from '@/components/cards/DiceCard';
 import { ActionCardContent } from '@/components/cards/ActionCard';
+import { NetworkDemoCardContent } from '@/components/cards/NetworkDemoCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -146,6 +147,7 @@ function getCardTitle(type: CardType): string {
     [CardType.MAP_TREE]: 'Map Tree',
     [CardType.DICE_BOX]: 'Dice Box',
     [CardType.ACTION_CARD]: 'Action',
+    [CardType.NETWORK_DEMO]: 'Network Demo',
   };
   
   return titles[type] || type;
@@ -235,6 +237,8 @@ function renderCardContent(
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     case CardType.ACTION_CARD:
       return <ActionCardContent />;
+    case CardType.NETWORK_DEMO:
+      return <NetworkDemoCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

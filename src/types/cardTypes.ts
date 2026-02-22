@@ -24,6 +24,7 @@ export enum CardType {
   MAP_TREE = 'map_tree',
   DICE_BOX = 'dice_box',
   ACTION_CARD = 'action_card',
+  NETWORK_DEMO = 'network_demo',
 }
 
 export interface ToolsCardProps {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -68,6 +68,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const creatureLibraryCard = cards.find((c) => c.type === CardType.CREATURE_LIBRARY);
   const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
   const diceBoxCard = cards.find((c) => c.type === CardType.DICE_BOX);
+  const networkDemoCard = cards.find((c) => c.type === CardType.NETWORK_DEMO);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -374,6 +375,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             </Button>
           </>
         )}
+
+        <Button
+          variant={networkDemoCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (networkDemoCard) {
+              setVisibility(networkDemoCard.id, !networkDemoCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.NETWORK_DEMO,
+                title: 'Network Demo',
+                defaultPosition: { x: 320, y: 80 },
+                defaultSize: { width: 380, height: 550 },
+                minSize: { width: 320, height: 400 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <Radio className="h-4 w-4 mr-2" />
+          Network Demo
+        </Button>
       </div>
 
       <Separator />

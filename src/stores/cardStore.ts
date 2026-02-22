@@ -328,6 +328,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.NETWORK_DEMO]: {
+    title: 'Network Demo',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 380, height: 550 },
+    minSize: { width: 320, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({
