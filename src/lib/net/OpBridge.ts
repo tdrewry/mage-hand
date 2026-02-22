@@ -5,6 +5,7 @@
 import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contract/v1";
 import { toast } from "sonner";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
 export type OpHandler = (data: unknown, userId: UserId) => void;
@@ -82,6 +83,22 @@ class OpBridgeImpl {
       const afterCount = useSessionStore.getState().tokens.length;
       console.log(`🔄 [OpBridge] token.sync DONE: created=${created}, updated=${updated}, total tokens now=${afterCount}`);
       toast.info(`Synced ${d.tokens.length} token(s): ${created} new, ${updated} updated`);
+    });
+
+    // ── Token drag preview ops ──
+    this.register("token.drag.begin", (data, userId) => {
+      const d = data as { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" };
+      useDragPreviewStore.getState().beginDrag(d.tokenId, userId, d.startPos, d.mode ?? "freehand");
+    });
+
+    this.register("token.drag.update", (data) => {
+      const d = data as { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] };
+      useDragPreviewStore.getState().updateDrag(d.tokenId, d.pos, d.path);
+    });
+
+    this.register("token.drag.end", (data) => {
+      const d = data as { tokenId: string };
+      useDragPreviewStore.getState().endDrag(d.tokenId);
     });
   }
 
