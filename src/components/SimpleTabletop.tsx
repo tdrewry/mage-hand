@@ -23,6 +23,8 @@ import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { emitLocalOp } from "@/lib/net";
+import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
+import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import { useMapStore } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
@@ -271,6 +273,9 @@ export const SimpleTabletop = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragPath, setDragPath] = useState<{ x: number; y: number }[]>([]);
+
+  // Remote drag previews — subscribe to store for canvas redraws
+  const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -824,6 +829,8 @@ export const SimpleTabletop = () => {
             }
           }
           
+          // ── Safety: emit drag end on global mouseup ──
+          emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
           setIsDraggingToken(false);
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
@@ -885,6 +892,21 @@ export const SimpleTabletop = () => {
   // No need for manual click-outside handling - Radix handles it
 
   // Update highlights whenever tokens or regions change (but not during drag - handled separately)
+  // ── Expire stale remote drag previews every 300ms ──
+  useEffect(() => {
+    const id = setInterval(() => {
+      useDragPreviewStore.getState().expireStale(400);
+    }, 300);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Redraw canvas when remote drag previews change ──
+  useEffect(() => {
+    if (Object.keys(remoteDragPreviews).length > 0) {
+      redrawCanvas();
+    }
+  }, [remoteDragPreviews]);
+
   useEffect(() => {
     // Skip during drag - updateGridHighlights handles the dragged token specifically
     if (isDraggingToken || isDraggingRegion) return;
@@ -3216,6 +3238,9 @@ export const SimpleTabletop = () => {
       if (isDraggingToken && draggedTokenId) {
         drawDragGhostAndPath(ctx);
       }
+
+      // ── Remote drag previews ──
+      drawRemoteDragPreviews(ctx);
     }
 
     // Restore context after all world-space rendering
@@ -3261,7 +3286,9 @@ export const SimpleTabletop = () => {
             if (isDraggingToken && draggedTokenId) {
               drawDragGhostAndPath(overlayCtx);
             }
-            
+            // ── Remote drag previews on overlay ──
+            drawRemoteDragPreviews(overlayCtx);
+
             overlayCtx.restore();
           }
         } else {
@@ -3376,6 +3403,64 @@ export const SimpleTabletop = () => {
     drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
     
     // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
+  };
+
+  // ── Draw remote drag previews (ghost + line from start → current) ──
+  const drawRemoteDragPreviews = (ctx: CanvasRenderingContext2D) => {
+    const previews = Object.values(remoteDragPreviews);
+    if (previews.length === 0) return;
+
+    ctx.save();
+    for (const p of previews) {
+      const baseTokenSize = 40;
+      const token = tokens.find((t) => t.id === p.tokenId);
+      const tokenSize = token ? Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize : baseTokenSize;
+      const radius = tokenSize / 2;
+      const color = token?.color || "#888888";
+
+      // Draw dashed line from start to current position
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(p.startPos.x, p.startPos.y);
+      ctx.lineTo(p.currentPos.x, p.currentPos.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw ghost circle at start position
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.startPos.x, p.startPos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw ghost circle at current drag position
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.currentPos.x, p.currentPos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw border ring on current position
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(p.currentPos.x, p.currentPos.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw username label above current position
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `${11 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      const label = p.userId.slice(0, 8);
+      ctx.fillText(label, p.currentPos.x, p.currentPos.y - radius - 4 / transform.zoom);
+    }
+    ctx.restore();
   };
 
   // Function to draw ONLY the drag path (called before tokens so path appears below token art)
@@ -6372,6 +6457,9 @@ export const SimpleTabletop = () => {
           }
         });
         multiDragStartPositionsRef.current = startPositions;
+
+        // ── Emit drag begin to network ──
+        emitDragBegin({ tokenId: clickedToken.id, startPos: { x: clickedToken.x, y: clickedToken.y }, mode: "freehand" });
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
         // Wall point edit mode: add/remove vertices
         if (wallPointEditMode && clickedMapObject.shape === 'wall' && clickedMapObject.wallPoints) {
@@ -6769,6 +6857,9 @@ export const SimpleTabletop = () => {
       if (distance > 10) {
         // Sample every 10 world units
         setDragPath((prev) => [...prev, { x: newX, y: newY }]);
+
+        // ── Emit drag update to network (throttled 50ms) ──
+        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY } });
       }
 
       // Update primary token position
@@ -7962,6 +8053,8 @@ export const SimpleTabletop = () => {
               );
               // Emit token move to network
               emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
+              // ── Emit drag end to network ──
+              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
               // Also emit moves for multi-dragged tokens
               const startPositions = multiDragStartPositionsRef.current;
               selectedTokenIds.forEach(tid => {
@@ -8555,6 +8648,9 @@ export const SimpleTabletop = () => {
         });
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
         setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+
+        // ── Emit drag begin (touch path) ──
+        emitDragBegin({ tokenId: clickedToken.id, startPos: { x: clickedToken.x, y: clickedToken.y }, mode: "freehand" });
         
         if (currentVisibilityRef.current) {
           stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
@@ -8760,6 +8856,8 @@ export const SimpleTabletop = () => {
               );
               // Emit token move to network
               emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
+              // ── Emit drag end (touch path) ──
+              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
             }
           }
         }
