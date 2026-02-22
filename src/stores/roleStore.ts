@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { syncManager } from '@/lib/syncManager';
+import { netManager } from '@/lib/net';
 
 export interface Role {
   id: string;
@@ -135,7 +135,7 @@ export const useRoleStore = create<RoleState>()(
         }));
         
         // Sync to multiplayer
-        if (syncManager.isConnected()) {
+        if (netManager.isConnected) {
           console.log('[Role] Role added, sync not yet implemented', role);
         }
       },
@@ -148,7 +148,7 @@ export const useRoleStore = create<RoleState>()(
         }));
         
         // Sync to multiplayer
-        if (syncManager.isConnected()) {
+        if (netManager.isConnected) {
           // TODO: Implement role sync
           console.log('[Role] Role updated, sync not yet implemented', roleId, updates);
         }
@@ -195,7 +195,7 @@ export const useRoleStore = create<RoleState>()(
         });
         
         // Sync to multiplayer
-        if (syncManager.isConnected()) {
+        if (netManager.isConnected) {
           // TODO: Implement hostility sync
           console.log('[Role] Hostility changed, sync not yet implemented', roleId, targetRoleId, isHostile);
         }

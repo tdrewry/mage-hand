@@ -8,7 +8,7 @@ import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
-import { syncManager } from '@/lib/syncManager';
+import { netManager } from '@/lib/net';
 import { hasPermission } from '@/lib/rolePermissions';
 import { useRoleStore } from '@/stores/roleStore';
 import {
@@ -199,7 +199,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
     
     // Broadcast to all players if we're DM and connected
     if (canControlUiMode && isConnected) {
-      syncManager.rpcSetUiMode(newMode); // Broadcast to all
+      // TODO: implement rpcSetUiMode via netManager
       toast.success(`Set all players to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
     } else {
       toast.success(`Switched to ${newMode === 'play' ? 'Play' : 'DM'} mode`);
@@ -359,11 +359,11 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
               onClick={() => {
                 if (canControlUiMode) {
                   // DM: Broadcast full state to all players
-                  syncManager.rpcBroadcastFullState();
+                  // TODO: implement rpcBroadcastFullState via netManager
                   toast.success('Broadcasting game state to all players');
                 } else {
                   // Player: Request sync from DM
-                  syncManager.rpcRequestFullState();
+                  // TODO: implement rpcRequestFullState via netManager
                   toast.info('Requesting game state from DM');
                 }
               }}

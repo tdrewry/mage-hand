@@ -1,59 +1,33 @@
 /**
  * Project-specific Sync System
- * Bridges the generic sync-core library with project dependencies
+ * 
+ * NOTE: The old Socket.IO-based sync has been removed.
+ * State synchronization now goes through src/lib/net/ (WebSocket JSON protocol).
+ * This module provides no-op stubs so stores that previously used syncPatch middleware
+ * continue to compile and function without the Socket.IO transport.
  */
 
-import { 
-  createSyncPatch as createSyncPatchCore,
-  createBroadcastFullState as createBroadcastFullStateCore,
-  createSocketIOTransport,
-  createDeduplication,
-  type SyncMiddlewareConfig,
-  type TransportAdapter
-} from '../sync-core';
-import { messageIdManager } from '../messageIdManager';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import type { StateCreator } from 'zustand';
+import type { SyncMiddlewareConfig } from '../sync-core';
 
-// Create a custom deduplication adapter that wraps our existing messageIdManager
-const projectDeduplication = {
-  generateMessageId: (userId: string) => messageIdManager.generateMessageId(userId),
-  shouldProcess: (messageId: string) => messageIdManager.shouldProcess(messageId),
-  markProcessed: (messageId: string) => messageIdManager.markProcessed(messageId),
+/**
+ * No-op syncPatch middleware stub.
+ * Returns the store creator unchanged (passthrough).
+ */
+export function syncPatch<T>(_config: Partial<SyncMiddlewareConfig> & { channel: string }) {
+  return (creator: StateCreator<T, [], []>): StateCreator<T, [], []> => creator;
+}
+
+/**
+ * No-op patchTransport stub for modules that referenced it.
+ */
+export const patchTransport = {
+  setSocket: (_socket: unknown) => {},
+  clearSocket: () => {},
+  getSocket: () => null as unknown,
+  getUserId: () => undefined as string | undefined,
+  setUserId: (_id: string) => {},
 };
-
-// Create transport with project deduplication
-const transport = createSocketIOTransport({
-  deduplication: projectDeduplication,
-});
-
-// Override getUserId to use the multiplayer store
-const originalGetUserId = transport.getUserId.bind(transport);
-transport.getUserId = () => {
-  return useMultiplayerStore.getState().currentUserId || undefined;
-};
-
-/**
- * Project transport instance
- * Use setSocket() after connection and clearSocket() on disconnect
- */
-export const patchTransport = transport;
-
-/**
- * syncPatch middleware factory
- * Pre-configured with project transport and deduplication
- */
-export const syncPatch = createSyncPatchCore({
-  transport: patchTransport,
-  deduplication: projectDeduplication,
-});
-
-/**
- * Broadcast full state for a channel
- */
-export const broadcastFullState = createBroadcastFullStateCore(
-  patchTransport,
-  projectDeduplication
-);
 
 // Re-export types from sync-core
 export type {
@@ -65,6 +39,3 @@ export type {
   SyncEventType,
   SyncEvent,
 } from '../sync-core';
-
-// Re-export event names
-export { DEFAULT_SEND_EVENT, DEFAULT_RECEIVE_EVENT } from '../sync-core';
