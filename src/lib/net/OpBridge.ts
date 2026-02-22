@@ -4,6 +4,7 @@
 
 import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contract/v1";
 import { toast } from "sonner";
+import { useSessionStore } from "@/stores/sessionStore";
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
 export type OpHandler = (data: unknown, userId: UserId) => void;
@@ -42,38 +43,35 @@ class OpBridgeImpl {
 
     this.register("token.move", (data) => {
       const d = data as { tokenId: string; x: number; y: number };
-      import("@/stores/sessionStore").then(({ useSessionStore }) => {
-        useSessionStore.getState().updateTokenPosition(d.tokenId, d.x, d.y);
-      });
+      useSessionStore.getState().updateTokenPosition(d.tokenId, d.x, d.y);
     });
 
     this.register("token.sync", (data) => {
       const d = data as { tokens: Array<{ id: string; name: string; x: number; y: number; gridWidth: number; gridHeight: number; color?: string; label: string }> };
-      import("@/stores/sessionStore").then(({ useSessionStore }) => {
-        const store = useSessionStore.getState();
-        for (const t of d.tokens) {
-          const existing = store.tokens.find((tok) => tok.id === t.id);
-          if (existing) {
-            store.updateTokenPosition(t.id, t.x, t.y);
-          } else {
-            store.addToken({
-              id: t.id,
-              name: t.name,
-              imageUrl: "",
-              x: t.x,
-              y: t.y,
-              gridWidth: t.gridWidth,
-              gridHeight: t.gridHeight,
-              label: t.label,
-              labelPosition: "below",
-              roleId: "",
-              isHidden: false,
-              color: t.color,
-            });
-          }
+      const store = useSessionStore.getState();
+      for (const t of d.tokens) {
+        const existing = store.tokens.find((tok) => tok.id === t.id);
+        if (existing) {
+          store.updateTokenPosition(t.id, t.x, t.y);
+        } else {
+          store.addToken({
+            id: t.id,
+            name: t.name,
+            imageUrl: "",
+            x: t.x,
+            y: t.y,
+            gridWidth: t.gridWidth,
+            gridHeight: t.gridHeight,
+            label: t.label,
+            labelPosition: "below",
+            roleId: "",
+            isHidden: false,
+            color: t.color,
+          });
         }
-        toast.info(`Synced ${d.tokens.length} token(s) from remote`);
-      });
+      }
+      console.log(`🔄 [OpBridge] Synced ${d.tokens.length} token(s) from remote`);
+      toast.info(`Synced ${d.tokens.length} token(s) from remote`);
     });
   }
 
