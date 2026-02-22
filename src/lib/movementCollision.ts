@@ -94,7 +94,10 @@ function checkObjectCollisions(
   for (const obj of blockingObjects) {
     let result: { intersects: boolean; t?: number };
 
-    if (obj.shape === 'circle') {
+    if ((obj.shape === 'wall' || obj.category === 'wall' || obj.category === 'imported-obstacle') && obj.wallPoints && obj.wallPoints.length >= 2) {
+      // Wall polyline collision — check each segment of the polyline
+      result = lineIntersectsPolyline(startPos, endPos, obj.wallPoints, tokenRadius);
+    } else if (obj.shape === 'circle') {
       // Circle collision (columns)
       const objRadius = Math.max(obj.width, obj.height) / 2;
       result = lineIntersectsCircle(
@@ -185,6 +188,119 @@ export function lineIntersectsCircle(
   }
 
   return { intersects: false };
+}
+
+/**
+ * Check if movement line intersects a wall polyline (series of connected segments).
+ * Uses segment-segment intersection with a thickness buffer for tokenRadius.
+ */
+export function lineIntersectsPolyline(
+  lineStart: Point,
+  lineEnd: Point,
+  wallPoints: Point[],
+  tokenRadius: number
+): { intersects: boolean; t?: number } {
+  let closestT = Infinity;
+  const wallThickness = 4 + tokenRadius; // small base thickness + token radius
+
+  for (let i = 0; i < wallPoints.length - 1; i++) {
+    const segStart = wallPoints[i];
+    const segEnd = wallPoints[i + 1];
+
+    // Check segment-segment intersection with thickness
+    const t = segmentToSegmentIntersection(lineStart, lineEnd, segStart, segEnd, wallThickness);
+    if (t !== null && t < closestT) {
+      closestT = t;
+    }
+  }
+
+  if (closestT <= 1) {
+    return { intersects: true, t: closestT };
+  }
+  return { intersects: false };
+}
+
+/**
+ * Find the parametric intersection of two line segments, accounting for thickness.
+ * Returns the parametric t along the movement line, or null if no intersection.
+ */
+function segmentToSegmentIntersection(
+  p1: Point, p2: Point, // movement line
+  p3: Point, p4: Point, // wall segment
+  thickness: number
+): number | null {
+  // First check pure segment-segment intersection
+  const d1x = p2.x - p1.x;
+  const d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x;
+  const d2y = p4.y - p3.y;
+
+  const denom = d1x * d2y - d1y * d2x;
+
+  if (Math.abs(denom) > 0.0001) {
+    const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denom;
+    const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denom;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+      return t;
+    }
+  }
+
+  // If no direct intersection, check if movement passes within thickness of the wall segment
+  // by treating the wall segment as a capsule (rectangle + semicircles at ends)
+  if (thickness > 0) {
+    const movLen = Math.sqrt(d1x * d1x + d1y * d1y);
+    if (movLen < 0.001) {
+      // No movement — check point distance to segment
+      const dist = pointToSegDist(p1, p3, p4);
+      return dist <= thickness ? 0 : null;
+    }
+
+    // Sample along the movement line to find closest approach
+    const steps = Math.max(4, Math.ceil(movLen / thickness));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = p1.x + d1x * t;
+      const py = p1.y + d1y * t;
+      const dist = pointToSegDist({ x: px, y: py }, p3, p4);
+      if (dist <= thickness) {
+        // Binary refine to find entry t
+        let lo = s > 0 ? (s - 1) / steps : 0;
+        let hi = t;
+        for (let iter = 0; iter < 8; iter++) {
+          const mid = (lo + hi) / 2;
+          const mx = p1.x + d1x * mid;
+          const my = p1.y + d1y * mid;
+          if (pointToSegDist({ x: mx, y: my }, p3, p4) <= thickness) {
+            hi = mid;
+          } else {
+            lo = mid;
+          }
+        }
+        return hi;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Distance from point to line segment */
+function pointToSegDist(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 0.0001) {
+    const ex = p.x - a.x;
+    const ey = p.y - a.y;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  const ex = p.x - projX;
+  const ey = p.y - projY;
+  return Math.sqrt(ex * ex + ey * ey);
 }
 
 /**
