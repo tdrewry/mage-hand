@@ -75,6 +75,8 @@ let _contentH = 0;
 // CSS origin of the fog canvas relative to the container
 let _originX = 0;
 let _originY = 0;
+// Last transform used for a full fog render — used for CSS-offset fast path during pan
+let _lastRenderTransform = { x: 0, y: 0, zoom: 0 };
 
 function getQualityMultiplier(quality: EffectSettings['effectQuality']): number {
   switch (quality) {
@@ -380,4 +382,43 @@ export function renderPostProcessing(): void {
     isInitialized = false;
     cleanupPostProcessing();
   }
+}
+
+/**
+ * Record the transform used for the last full fog render.
+ * Called by fogPostProcessing after a full Canvas 2D redraw.
+ */
+export function setLastRenderTransform(transform: { x: number; y: number; zoom: number }): void {
+  _lastRenderTransform = { ...transform };
+}
+
+/**
+ * CSS-offset fast path: during pan (no zoom change), skip the expensive
+ * Canvas 2D fog redraw and just reposition the PixiJS canvas to match.
+ *
+ * Returns true if the fast path was used (caller should skip full redraw).
+ */
+export function panOffsetPostProcessing(transform: { x: number; y: number; zoom: number }): boolean {
+  if (!pixiApp || !isInitialized) return false;
+  // Zoom changed — need full redraw for correct scaling
+  if (_lastRenderTransform.zoom !== transform.zoom || _lastRenderTransform.zoom === 0) return false;
+
+  const dx = transform.x - _lastRenderTransform.x;
+  const dy = transform.y - _lastRenderTransform.y;
+  if (dx === 0 && dy === 0) return false; // nothing to offset
+
+  const canvas = pixiApp.canvas as HTMLCanvasElement;
+  canvas.style.left = `${_originX - FIXED_PADDING + dx}px`;
+  canvas.style.top  = `${_originY - FIXED_PADDING + dy}px`;
+  return true;
+}
+
+/**
+ * Reset the PixiJS canvas CSS position back to its canonical location.
+ * Called after a full fog redraw so there's no stale offset.
+ */
+export function resetPostProcessingOffset(): void {
+  if (!pixiApp || !isInitialized) return;
+  const canvas = pixiApp.canvas as HTMLCanvasElement;
+  applyCanvasCSS(canvas, _contentW, _contentH);
 }
