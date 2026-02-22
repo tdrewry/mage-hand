@@ -11,6 +11,7 @@ import type {
   Msg,
   OpBatchPayload,
   OpSeq,
+  PresencePayload,
   RejectPayload,
   ServerToClientMessage,
   SessionCode,
@@ -82,6 +83,7 @@ export interface NetworkSessionEvents {
   rejected: RejectPayload;
   ack: AckPayload;
   opBatch: OpBatchPayload;
+  presence: PresencePayload;
   snapshotPointer: SnapshotPointer;
   rawMessage: ServerToClientMessage;
   error: { message: string; cause?: unknown };
@@ -319,6 +321,10 @@ export class NetworkSession {
         this.emitter.emit("opBatch", p);
         return;
       }
+
+      case "presence":
+        this.emitter.emit("presence", msg.p as PresencePayload);
+        return;
 
       default:
         return;
