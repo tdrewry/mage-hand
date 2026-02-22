@@ -6,6 +6,7 @@ import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contr
 import { toast } from "sonner";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useDragPreviewStore } from "@/stores/dragPreviewStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
 export type OpHandler = (data: unknown, userId: UserId) => void;
@@ -86,17 +87,22 @@ class OpBridgeImpl {
     });
 
     // ── Token drag preview ops ──
+    // Guard: skip drag previews from the local user to prevent flickering
+    // (the server re-broadcasts our own drag ops back to us).
     this.register("token.drag.begin", (data, userId) => {
+      if (userId === useMultiplayerStore.getState().currentUserId) return;
       const d = data as { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" };
       useDragPreviewStore.getState().beginDrag(d.tokenId, userId, d.startPos, d.mode ?? "freehand");
     });
 
-    this.register("token.drag.update", (data) => {
+    this.register("token.drag.update", (data, userId) => {
+      if (userId === useMultiplayerStore.getState().currentUserId) return;
       const d = data as { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] };
       useDragPreviewStore.getState().updateDrag(d.tokenId, d.pos, d.path);
     });
 
-    this.register("token.drag.end", (data) => {
+    this.register("token.drag.end", (data, userId) => {
+      if (userId === useMultiplayerStore.getState().currentUserId) return;
       const d = data as { tokenId: string };
       useDragPreviewStore.getState().endDrag(d.tokenId);
     });
