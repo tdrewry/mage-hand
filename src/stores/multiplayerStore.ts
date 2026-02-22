@@ -33,6 +33,9 @@ export interface MultiplayerState {
   lastSyncTimestamp: number;
   syncErrors: string[];
   
+  /** True once persist middleware has finished rehydrating from localStorage. */
+  _rehydrated: boolean;
+  
   // Actions
   setServerUrl: (url: string) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -72,6 +75,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
+      _rehydrated: false,
       
       // Actions
       setServerUrl: (url) => set({ serverUrl: url }),
@@ -135,7 +139,23 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         currentUsername: state.currentUsername,
         currentSession: state.currentSession,
         currentUserId: state.currentUserId,
-      })
+        roles: state.roles,
+      }),
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state) {
+            // Reset runtime connection state — we're not connected after a page load
+            state.isConnected = false;
+            state.connectionStatus = 'disconnected';
+            state.connectedUsers = [];
+            state.permissions = [];
+            state.lastError = null;
+            state.isSyncing = false;
+            state.syncErrors = [];
+            state._rehydrated = true;
+          }
+        };
+      },
     }
   )
 );
