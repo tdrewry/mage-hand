@@ -150,7 +150,23 @@ export class NetManager {
       store.setRoles(info.roles);
       store.setPermissions(info.permissions);
       store.setLastError(null);
-      console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", info.roles);
+
+      // Populate connected users from welcome peers list
+      const selfUser = {
+        userId: info.userId,
+        username: info.username,
+        roleIds: info.roles,
+        connectedAt: Date.now(),
+      };
+      const peerUsers = (info.peers ?? []).map((p) => ({
+        userId: p.userId,
+        username: p.username,
+        roleIds: p.roles,
+        connectedAt: Date.now(),
+      }));
+      store.setConnectedUsers([selfUser, ...peerUsers]);
+
+      console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", info.roles, "peers:", peerUsers.length);
     });
 
     const off2 = this.session.on("opBatch", (batch: OpBatchPayload) => {
