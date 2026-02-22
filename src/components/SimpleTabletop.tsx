@@ -3418,11 +3418,29 @@ export const SimpleTabletop = () => {
       const radius = tokenSize / 2;
       const color = token?.color || "#888888";
 
-      // Draw dashed line from start to current position
-      ctx.globalAlpha = 0.35;
+      // Draw movement trail polyline if path has 2+ points
+      if (p.path.length >= 2) {
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5 / transform.zoom;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(p.path[0].x, p.path[0].y);
+        for (let i = 1; i < p.path.length; i++) {
+          ctx.lineTo(p.path[i].x, p.path[i].y);
+        }
+        // Extend to currentPos (may be ahead of last path point)
+        ctx.lineTo(p.currentPos.x, p.currentPos.y);
+        ctx.stroke();
+      }
+
+      // Draw dashed straight-line distance indicator from start to current
+      ctx.globalAlpha = 0.25;
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2 / transform.zoom;
-      ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
+      ctx.lineWidth = 1.5 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
       ctx.beginPath();
       ctx.moveTo(p.startPos.x, p.startPos.y);
       ctx.lineTo(p.currentPos.x, p.currentPos.y);
@@ -6858,8 +6876,8 @@ export const SimpleTabletop = () => {
         // Sample every 10 world units
         setDragPath((prev) => [...prev, { x: newX, y: newY }]);
 
-        // ── Emit drag update to network (throttled 50ms) ──
-        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY } });
+        // ── Emit drag update to network (throttled 50ms) with full path ──
+        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPath });
       }
 
       // Update primary token position
