@@ -34,6 +34,22 @@ export class NetManager {
   private cleanups: Array<() => void> = [];
   private _sessionCode?: string;
 
+  // Reconnection state
+  private _lastConnectParams?: {
+    serverUrl: string;
+    sessionCode: string;
+    username: string;
+    inviteToken?: string;
+    password?: string;
+  };
+  private _reconnectTimer?: number;
+  private _reconnectAttempt = 0;
+  private _maxReconnectAttempts = 20;
+  private _baseDelayMs = 1000;
+  private _maxDelayMs = 30000;
+  private _autoReconnect = true;
+  private _intentionalDisconnect = false;
+
   constructor() {
     this.session = new NetworkSession();
     this.wireEvents();
@@ -52,6 +68,11 @@ export class NetManager {
     store.setLastError(null);
 
     this._sessionCode = params.sessionCode;
+    this._lastConnectParams = params;
+    this._intentionalDisconnect = false;
+    this._reconnectAttempt = 0;
+    this.clearReconnectTimer();
+
     const lastSeenSeq = readLastSeenSeq(params.sessionCode);
 
     const connectParams: ConnectParams = {
@@ -65,6 +86,7 @@ export class NetManager {
 
     try {
       const info = await this.session.connect(connectParams);
+      this._reconnectAttempt = 0;
       return info;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -77,7 +99,19 @@ export class NetManager {
 
   /** Disconnect from the current session. */
   disconnect(): void {
+    this._intentionalDisconnect = true;
+    this.clearReconnectTimer();
     this.session.disconnect(1000, "user_disconnect");
+  }
+
+  /** Enable or disable auto-reconnect. */
+  set autoReconnect(enabled: boolean) {
+    this._autoReconnect = enabled;
+    if (!enabled) this.clearReconnectTimer();
+  }
+
+  get autoReconnect(): boolean {
+    return this._autoReconnect;
   }
 
   /** Whether the session is currently connected. */
@@ -142,12 +176,19 @@ export class NetManager {
 
     const off5 = this.session.on("disconnected", ({ code, reason }) => {
       const store = useMultiplayerStore.getState();
-      store.setConnectionStatus("disconnected");
-      store.setCurrentSession(null);
       store.setConnectedUsers([]);
-      store.setRoles([]);
-      store.setPermissions([]);
       console.log("🔌 [NetManager] Disconnected:", code, reason);
+
+      if (!this._intentionalDisconnect && this._autoReconnect && this._lastConnectParams) {
+        store.setConnectionStatus("reconnecting");
+        console.log("🔄 [NetManager] Will attempt auto-reconnect...");
+        this.scheduleReconnect();
+      } else {
+        store.setConnectionStatus("disconnected");
+        store.setCurrentSession(null);
+        store.setRoles([]);
+        store.setPermissions([]);
+      }
     });
 
     const off6 = this.session.on("presence", (p: PresencePayload) => {
@@ -176,5 +217,61 @@ export class NetManager {
     });
 
     this.cleanups.push(off1, off2, off3, off4, off5, off6);
+  }
+
+  // ── Reconnection ──────────────────────────────────────────
+
+  private scheduleReconnect(): void {
+    if (this._reconnectAttempt >= this._maxReconnectAttempts) {
+      console.warn("⛔ [NetManager] Max reconnect attempts reached, giving up.");
+      const store = useMultiplayerStore.getState();
+      store.setConnectionStatus("error");
+      store.setLastError("Reconnection failed after multiple attempts");
+      return;
+    }
+
+    const delay = Math.min(
+      this._baseDelayMs * Math.pow(2, this._reconnectAttempt) + Math.random() * 500,
+      this._maxDelayMs,
+    );
+    this._reconnectAttempt++;
+    console.log(`🔄 [NetManager] Reconnect attempt ${this._reconnectAttempt} in ${Math.round(delay)}ms`);
+
+    this._reconnectTimer = window.setTimeout(() => {
+      this._reconnectTimer = undefined;
+      this.attemptReconnect();
+    }, delay);
+  }
+
+  private async attemptReconnect(): Promise<void> {
+    const params = this._lastConnectParams;
+    if (!params) return;
+
+    const store = useMultiplayerStore.getState();
+    store.setConnectionStatus("reconnecting");
+
+    try {
+      // Create a fresh session for the reconnect attempt
+      this.session = new NetworkSession();
+      this.cleanups.forEach((fn) => fn());
+      this.cleanups = [];
+      this.wireEvents();
+
+      await this.connect(params);
+      console.log("✅ [NetManager] Reconnected successfully");
+    } catch (err) {
+      console.warn("⚠️ [NetManager] Reconnect attempt failed:", err);
+      if (!this._intentionalDisconnect && this._autoReconnect) {
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  private clearReconnectTimer(): void {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = undefined;
+    }
+    this._reconnectAttempt = 0;
   }
 }
