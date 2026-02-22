@@ -132,6 +132,8 @@ export interface HelloPayload {
   username: string;
   inviteToken?: string;
   password?: string;
+  /** Client's locally-selected role IDs (e.g. ["dm"] or ["player"]). */
+  roles?: string[];
   lastSeenSeq?: OpSeq;
   wantsPresence?: boolean;
   codec?: "json";

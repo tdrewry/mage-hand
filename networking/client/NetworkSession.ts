@@ -54,15 +54,13 @@ export function getOrCreateClientId(storageKey = "vtt.clientId"): ClientId {
 }
 
 export interface ConnectParams {
-  /**
-   * ws:// for LAN/dev and wss:// for hosted.
-   * Convenience: http(s):// will be upgraded to ws(s)://.
-   */
   serverUrl: string;
   sessionCode: SessionCode;
   username: string;
   inviteToken?: string;
   password?: string;
+  /** Client's locally-selected role IDs (e.g. ["dm"] or ["player"]). */
+  roles?: string[];
   /** If reconnecting, last op seq applied locally (for catchup). */
   lastSeenSeq?: OpSeq;
 }
@@ -177,6 +175,7 @@ export class NetworkSession {
             username: params.username,
             inviteToken: params.inviteToken,
             password: params.password,
+            roles: params.roles,
             lastSeenSeq: this.lastAppliedSeq,
             wantsPresence: true,
             codec: "json",

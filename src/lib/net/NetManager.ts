@@ -41,6 +41,7 @@ export class NetManager {
     username: string;
     inviteToken?: string;
     password?: string;
+    roles?: string[];
   };
   private _reconnectTimer?: number;
   private _reconnectAttempt = 0;
@@ -62,6 +63,7 @@ export class NetManager {
     username: string;
     inviteToken?: string;
     password?: string;
+    roles?: string[];
   }): Promise<NetworkSessionInfo> {
     const store = useMultiplayerStore.getState();
     store.setConnectionStatus("connecting");
@@ -81,6 +83,7 @@ export class NetManager {
       username: params.username,
       inviteToken: params.inviteToken,
       password: params.password,
+      roles: params.roles,
       lastSeenSeq: lastSeenSeq > 0 ? lastSeenSeq : undefined,
     };
 
