@@ -141,9 +141,15 @@ export async function initPostProcessing(
       resolution: config.resolution ?? 1,
       autoDensity: true,
       // Force WebGL to prevent "CanvasRenderer is not yet implemented" fallback
-      // when GPU context is lost after long idle periods
       preference: 'webgl',
+      // Disable auto-render — we call render() manually via renderPostProcessing().
+      // This prevents the internal ticker from calling render() on a corrupted
+      // GPU context, which causes cascading "push" errors.
+      autoStart: false,
     });
+
+    // Stop the shared ticker entirely so PixiJS never auto-renders
+    pixiApp.ticker.stop();
 
     const canvas = pixiApp.canvas as HTMLCanvasElement;
     applyCanvasCSS(canvas, config.width, config.height);
@@ -187,6 +193,13 @@ export async function initPostProcessing(
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize post-processing:', error);
+    // Clean up partial init to avoid dangling state
+    if (pixiApp) {
+      try { pixiApp.ticker.stop(); } catch (_) { /* noop */ }
+      try { pixiApp.destroy(true); } catch (_) { /* noop */ }
+      pixiApp = null;
+    }
+    isInitialized = false;
     return false;
   }
 }
@@ -345,6 +358,9 @@ export function getPostProcessingCanvas(): HTMLCanvasElement | null {
 }
 
 export async function cleanupPostProcessing(): Promise<void> {
+  // Mark uninitialised FIRST to prevent any in-flight render calls
+  isInitialized = false;
+
   try {
     if (fogTexture) { fogTexture.destroy(true); fogTexture = null; }
     if (illuminationTexture) { illuminationTexture.destroy(true); illuminationTexture = null; }
@@ -355,6 +371,8 @@ export async function cleanupPostProcessing(): Promise<void> {
 
     if (pixiApp) {
       try {
+        // Stop ticker before destroy to prevent render-during-teardown
+        pixiApp.ticker.stop();
         const canvas = pixiApp.canvas as HTMLCanvasElement | undefined;
         if (canvas?.parentNode) canvas.parentNode.removeChild(canvas);
         pixiApp.destroy(true, { children: true, texture: true });
@@ -365,7 +383,6 @@ export async function cleanupPostProcessing(): Promise<void> {
     }
 
     containerRef = null;
-    isInitialized = false;
     console.log('🧹 PixiJS post-processing cleaned up');
   } catch (error) {
     console.error('Error during cleanup:', error);
