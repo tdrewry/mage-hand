@@ -111,7 +111,10 @@ export class LocalRoomServer {
     this.wss = new WebSocketServer({ port: opts.port });
 
     this.wss.on("connection", (ws) => this.onConnection(ws));
-
+    this.wss.on("error", (err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[LocalRoomServer] failed to listen on port ${opts.port}: ${err.message}`);
+    });
     // eslint-disable-next-line no-console
     console.log(`[LocalRoomServer] listening on ws://localhost:${opts.port}`);
   }

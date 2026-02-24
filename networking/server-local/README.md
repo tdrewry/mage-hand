@@ -19,19 +19,20 @@ npm run start
 ```
 
 By default:
-- Port: `3001`
+- Port: `3001` (auto-falls back to `4001` if `3001` is blocked on your machine)
 - DM password: `dm`
 
 You can override:
 
 ```bash
-PORT=3001 DM_PASSWORD=mysecret npm run start
+PORT=4001 DM_PASSWORD=mysecret npm run start
 ```
+
 
 ## Connect from clients
 
 In your VTT client:
-- **Server URL**: `ws://<host-lan-ip>:3001`
+- **Server URL**: `ws://<host-lan-ip>:<port>` (use the port shown in server startup logs)
 - **Session Code**: (any string; creates/joins that room)
 - **Username**: any
 - **Password**: `dm` to get the `dm` role (full permissions), otherwise you will be `player`.
