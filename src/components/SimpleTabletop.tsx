@@ -570,7 +570,21 @@ export const SimpleTabletop = () => {
   // Counter to force re-render when images load
   const [imageLoadCounter, setImageLoadCounter] = useState(0);
 
-  const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>([]);
+  // Derive selectedRegionIds from the regionStore so that selections made
+  // from the Map Tree (or anywhere else that calls selectRegion) are
+  // automatically reflected in the RegionControlBar.
+  const selectedRegionIds = useMemo(
+    () => regions.filter(r => r.selected).map(r => r.id),
+    [regions]
+  );
+  const setSelectedRegionIds = useCallback((ids: string[] | ((prev: string[]) => string[])) => {
+    const currentIds = regions.filter(r => r.selected).map(r => r.id);
+    const newIds = typeof ids === 'function' ? ids(currentIds) : ids;
+    // Deselect regions no longer in the list
+    currentIds.forEach(id => { if (!newIds.includes(id)) deselectRegion(id); });
+    // Select newly added regions
+    newIds.forEach(id => { if (!currentIds.includes(id)) selectRegion(id); });
+  }, [regions, selectRegion, deselectRegion]);
   const [isDraggingRegion, setIsDraggingRegion] = useState(false);
   const [draggedRegionId, setDraggedRegionId] = useState<string | null>(null);
   const [regionDragOffset, setRegionDragOffset] = useState({ x: 0, y: 0 });
@@ -6263,6 +6277,14 @@ export const SimpleTabletop = () => {
         icon: region.locked ? "🔓" : "🔒",
         action: () => updateRegion(region.id, { locked: !region.locked }),
       },
+      ...(isDM && fogEnabled ? [
+        { type: "separator" as const },
+        {
+          label: "Mark as Explored",
+          icon: "🌫️",
+          action: () => handleMarkRegionsExplored([region.id]),
+        },
+      ] : []),
       { type: "separator" },
       {
         label: "Delete Region",
@@ -6271,7 +6293,7 @@ export const SimpleTabletop = () => {
         danger: true,
         disabled: region.locked,
       },
-    ] as const;
+    ];
 
     menuItems.forEach((item) => {
       if ("type" in item && item.type === "separator") {
