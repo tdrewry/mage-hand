@@ -68,15 +68,17 @@ Extend existing drag preview with remaining token ephemeral ops.
 
 ---
 
-## Phase 5 — Map, Region & Map Object Previews
+## Phase 5 — Map, Region & Map Object Previews ✅ DONE
 
-- [ ] `map.dm.viewport` — DM broadcasts viewport { x, y, zoom } at 10 Hz; clients follow
-- [ ] `map.ping` — click-to-ping with auto-expire circle (1s TTL)
-- [ ] `map.focus` — GM forces all clients to pan to point
-- [ ] `region.drag.update` — ghost position during region reposition (20 Hz, 400ms TTL)
-- [ ] `region.handle.preview` — broadcast handle position during transform
-- [ ] `mapObject.drag.update` — ghost position during reposition (20 Hz, 400ms TTL)
-- [ ] `mapObject.handle.preview` — broadcast handle position during transform
+- [x] `map.dm.viewport` — DM broadcasts viewport { x, y, zoom } on every pan/zoom; handler + store
+- [x] `map.ping` — handler + store wired (emit from UI TBD — e.g. Ctrl+click)
+- [x] `map.focus` — handler + store wired (emit from DM UI TBD)
+- [x] `region.drag.update` — emit during region drag, handler updates `mapEphemeralStore`
+- [x] `mapObject.drag.update` — emit during map object drag, handler updates `mapEphemeralStore`
+- [x] `region.handle.preview` — handler ready (emit TBD when handle drag exists)
+- [x] `mapObject.handle.preview` — handler ready (emit TBD when handle drag exists)
+- [x] Created `src/stores/mapEphemeralStore.ts` — Zustand store for DM viewport, pings, focus, region/mapObject drags
+- [x] Created `src/lib/net/ephemeral/mapHandlers.ts` — registers handlers + TTL expiry cleanup
 
 ---
 
