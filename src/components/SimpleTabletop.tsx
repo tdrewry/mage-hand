@@ -68,7 +68,7 @@ import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache, computeVisibilityFromSegments, visibilityPolygonToPath2D } from "../lib/visibilityEngine";
 import { throttle } from "../lib/throttle";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea } from "../lib/fogGeometry";
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea, getFogScope } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
@@ -9292,6 +9292,59 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   };
 
+  // Mark selected regions as explored (DM fog reveal)
+  const handleMarkRegionsExplored = useCallback((regionIds: string[]) => {
+    if (!fogEnabled) {
+      toast.error('Fog of war must be enabled to reveal regions');
+      return;
+    }
+    const scope = fogScopeRef.current || getFogScope();
+    scope.activate();
+
+    const targetRegions = regions.filter(r => regionIds.includes(r.id));
+    if (targetRegions.length === 0) return;
+
+    let updated = exploredAreaRef.current;
+
+    for (const region of targetRegions) {
+      let regionPath: paper.Path;
+
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 3) {
+        // Free-form polygon region
+        regionPath = new scope.Path();
+        region.pathPoints.forEach(pt => {
+          regionPath.add(new scope.Point(region.x + pt.x, region.y + pt.y));
+        });
+        regionPath.closed = true;
+      } else {
+        // Rectangle region (apply rotation if present)
+        const cx = region.x + region.width / 2;
+        const cy = region.y + region.height / 2;
+        regionPath = new scope.Path.Rectangle({
+          point: [region.x, region.y],
+          size: [region.width, region.height],
+        });
+        if (region.rotation) {
+          regionPath.rotate(region.rotation, new scope.Point(cx, cy));
+        }
+      }
+
+      updated = addVisibleToExplored(updated, regionPath);
+      regionPath.remove();
+    }
+
+    exploredAreaRef.current = updated;
+
+    // Serialize for persistence
+    const serialized = serializeFogGeometry(updated);
+    if (serialized) {
+      setSerializedExploredAreas(serialized);
+    }
+
+    toast.success(`Revealed ${targetRegions.length} region(s) through fog`);
+    redrawCanvas();
+  }, [fogEnabled, regions, setSerializedExploredAreas]);
+
   const addTokenToCanvas = async (
     imageUrl: string,
     x?: number,
@@ -9525,6 +9578,8 @@ export const SimpleTabletop = () => {
             setSelectedRegionIds(regions.map(r => r.id));
             redrawCanvas();
           }}
+          isDM={isDM}
+          onMarkExplored={handleMarkRegionsExplored}
         />
 
         {/* Map Object Control Bar - Shows when map object(s) are selected */}
