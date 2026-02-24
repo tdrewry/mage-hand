@@ -1,161 +1,133 @@
 
 
-# WebSocket JSON Networking Migration
+# Networking Layer Classification Matrix & Ephemeral Implementation Plan
 
-## Overview
+## What We're Doing
 
-Replace the Socket.IO-based networking path with a new WebSocket JSON protocol, using the `NetworkSession` client library already in the repo at `networking/client/`. This creates a clean networking module at `src/lib/net/`, updates the multiplayer store, rewires the SessionManager UI, and implements a minimal operation bridge to prove the round-trip loop.
+This is a two-step effort:
 
-The existing Socket.IO code (`socketClient.ts`, `syncManager.ts`, `sync-core/`) is **not deleted** -- it remains as a fallback. The new path runs in parallel and can be toggled.
+1. **Step 1 (this plan):** Create `docs/NETWORKING-MATRIX.md` -- a comprehensive classification of every user interaction in the VTT, sorted into Ephemeral vs Durable layers, plus a "Potential New Features" section for interactions we don't yet support.
+
+2. **Step 2 (after your review of the matrix):** Author `docs/EPHEMERAL-NETWORKING-PLAN.md` with the implementation plan for wiring up every Ephemeral item.
+
+We will not implement any code in this plan -- the deliverable is the matrix document for your review and refinement.
 
 ---
 
-## Step 1: Create the Networking Module (`src/lib/net/`)
+## Matrix Categories (based on actual stores and features)
 
-### Files to create:
+The matrix will cover these sections, populated from real features found in the codebase:
 
-**`src/lib/net/NetManager.ts`** -- Singleton wrapper around `NetworkSession`
+### 1. Tokens (sessionStore)
+- **Ephemeral:** drag preview (already implemented), rotate/scale handle preview, hover highlights, selection box/lasso, movement path preview during drag, targeting reticle position (actionStore.targetingMousePos)
+- **Durable:** create/delete, move commit, resize commit, label/name/color changes, image changes, illumination source edits, vision settings, ownership/roleId, hidden flag, appearance variant switches, entity ref updates, notes/statblock edits, path style changes
+- **Potential New:** intent indicators ("player is about to move X"), token rotate commit
 
-- Holds one `NetworkSession` instance
-- Exposes: `connect(params)`, `disconnect()`, `isConnected`, `info`
-- On `connected` event: updates `multiplayerStore` with sessionId, userId, roles, permissions, connectionStatus
-- On `opBatch` event: forwards to OpBridge for application, persists `toSeq` to `localStorage` key `vtt.lastSeenSeq.<sessionCode>`
-- On `rejected` / `error` / `disconnected` events: updates store with status and lastError
-- On connect: reads `localStorage` for `lastSeenSeq` and passes it to `NetworkSession.connect()` for automatic catchup
-- Exposes `proposeOp(op)` passthrough to `NetworkSession.proposeOp()`
+### 2. Map & Camera (mapStore, regionStore, viewportTransforms)
+- **Ephemeral:** camera pan/zoom/viewport (per-client, already local-only), ping/laser pointer, GM "focus here" pointer, tool cursor broadcast
+- **Durable:** map create/delete/update, region create/delete/update (polygon edits, grid settings, textures), map reorder, active map selection (if shared)
+- **Potential New:** ping/laser pointer, GM focus pointer, tool cursor broadcast
 
-**`src/lib/net/OpBridge.ts`** -- Translates between EngineOps and Zustand stores
+### 3. Map Objects (mapObjectStore)
+- **Ephemeral:** drag preview while repositioning, door toggle preview
+- **Durable:** create/delete, position/size/rotation commits, door open/close commit, bulk operations, category/style changes
+- **Potential New:** drag preview for map objects
 
-- `applyRemoteOps(ops)`: iterates ops array, dispatches to store actions based on `op.kind`
-- `emitLocalOp(op)`: calls `netManager.proposeOp(op)` (skipped when `isApplyingRemote` flag is true)
-- Maintains `isApplyingRemote` boolean for echo prevention
-- Initial op kinds supported:
-  - `ping` -- logs to console, shows toast
-  - `token.move` -- calls `useSessionStore.getState().updateTokenPosition(tokenId, x, y)`
-  - `chat.post` -- shows toast with sender + message text
-- Op kind registry pattern: a `Map<string, (data, userId) => void>` so new ops can be registered without modifying OpBridge internals
+### 4. Fog of War & Vision (fogStore, lightStore, illuminationStore)
+- **Ephemeral:** realtime vision during drag (already local-only), fog brush cursor preview, temporary reveal preview
+- **Durable:** fog enable/disable, reveal-all toggle, fog opacity settings, explored areas geometry, vision range defaults, light source create/delete/update, ambient light/shadow intensity
+- **Potential New:** fog brush cursor preview, reveal preview before commit
 
-**`src/lib/net/index.ts`** -- Public API surface
+### 5. Chat & Dice (diceStore)
+- **Ephemeral:** typing indicator, "user is rolling" spinner
+- **Durable:** dice roll results (already synced via syncPatch), chat messages (already via chat.post op), pinned formulas
+- **Potential New:** typing indicator, rolling indicator
 
-- Exports singleton `netManager` instance of `NetManager`
-- Re-exports `emitLocalOp` from OpBridge
-- Re-exports types from `networking/contract/v1`
+### 6. Initiative & Combat (initiativeStore)
+- **Ephemeral:** dragging initiative entry preview (reorder handle), current-turn hover highlight
+- **Durable:** start/end combat, add/remove combatant, reorder commit, advance turn, round number, initiative values, restrict movement toggle
+- **Potential New:** initiative reorder drag preview
 
-### Echo Prevention Pattern
+### 7. Groups (groupStore)
+- **Ephemeral:** group selection preview, group drag preview
+- **Durable:** group create/delete, member add/remove, group transforms commit
+- **Potential New:** group drag preview
+
+### 8. Roles & Permissions (roleStore)
+- **Ephemeral:** "request control" / hand raise, presence metadata ("is editing map")
+- **Durable:** role create/update/delete, hostility settings, permission changes, token role assignments
+- **Potential New:** hand raise, editing-state presence
+
+### 9. Actions & Combat Resolution (actionStore)
+- **Ephemeral:** targeting reticle position, resolution flash effects, "action in progress" indicator
+- **Durable:** action resolution results, attack history entries
+- **Potential New:** networked targeting reticle, networked resolution flashes
+
+### 10. UI Mode & Presence (uiModeStore, multiplayerStore)
+- **Ephemeral:** user cursor position, "user is viewing map X" indicator, connected/disconnected presence events (already implemented)
+- **Durable:** DM/play mode switch (RPC), user kick/ban
+- **Potential New:** cursor sharing, "viewing map X" indicator
+
+### 11. Assets
+- **Ephemeral:** upload progress, loading states
+- **Durable:** asset registered (hash, size, mime), token/region image references (via imageHash/textureHash)
+- **Potential New:** upload progress broadcast
+
+---
+
+## Already Implemented (Ephemeral)
+
+- Token drag preview (`token.drag.begin/update/end` ops + dragPreviewStore)
+- Presence join/leave (via WebSocket protocol `presence` messages)
+- Ping op (debug)
+- Chat post op
+- Token move op
+- Token sync op
+
+---
+
+## Document Structure
+
+The `docs/NETWORKING-MATRIX.md` file will use this format:
 
 ```text
-Local action (e.g. token drag)
-  -> store.updateTokenPosition()   [state changes]
-  -> emitLocalOp({ kind: 'token.move', ... })
-     -> checks isApplyingRemote == false? yes -> proposeOp()
+# VTT Networking Classification Matrix
 
-Remote opBatch arrives
-  -> isApplyingRemote = true
-  -> applyRemoteOps() -> store.updateTokenPosition()
-  -> isApplyingRemote = false
-  // emitLocalOp would be skipped if somehow triggered
+## How to Read This Document
+- Ephemeral: high-frequency, lossy, TTL-based, not in snapshots/undo
+- Durable: authoritative, ordered, acked, snapshotable, replayable
+- Status: [implemented] [planned] [potential]
+
+## 1. Tokens
+### Ephemeral
+| Action | Status | Notes |
+|--------|--------|-------|
+| Token drag preview | implemented | 20Hz throttle, 400ms TTL |
+| ... | ... | ... |
+
+### Durable
+| Action | Status | Notes |
+|--------|--------|-------|
+| Token create/delete | planned | ... |
+| ... | ... | ... |
+
+(repeat for each category)
+
+## Potential New Features
+### Ephemeral
+| Action | Category | Description |
+...
+### Durable
+| Action | Category | Description |
+...
 ```
 
 ---
 
-## Step 2: Update the Multiplayer Store
+## Technical Notes
 
-**`src/stores/multiplayerStore.ts`** -- Modify existing store
-
-- Remove the `import type { ConnectionStatus } from '@/lib/socketClient'` dependency
-- Define `ConnectionStatus` locally: `'disconnected' | 'connecting' | 'connected' | 'error'`
-- Add new fields:
-  - `roles: string[]` (from server welcome)
-  - `permissions: string[]` (from server welcome)
-  - `lastError: string | null`
-  - `sessionCode: string` (convenience, also in currentSession)
-- Keep existing fields and actions for backward compatibility with old Socket.IO path
-- Update `DEFAULT_SERVER_URL` from `http://localhost:3001` to `ws://localhost:3001`
-
----
-
-## Step 3: Rewire the SessionManager UI
-
-**`src/components/SessionManager.tsx`** -- Update to use `netManager`
-
-- Import `netManager` from `src/lib/net/` instead of `syncManager`
-- On "Create Session" / "Join Session": call `netManager.connect({ serverUrl, sessionCode, username, password })`
-- The LAN server auto-creates sessions on first `hello`, so both create and join use the same `connect()` call with the session code
-- On "Leave Session": call `netManager.disconnect()`
-- Display: connectionStatus, sessionId, roles, permissions, lastError from `multiplayerStore`
-- Add invite token field (optional, collapsed in Advanced Settings)
-- URL input default changes to `ws://localhost:3001`
-
-No changes needed to `MenuCard.tsx` -- it already opens `SessionManager` via a dialog.
-
----
-
-## Step 4: Add a Demo / Debug Section
-
-**`src/lib/net/demo.ts`** -- Helper functions for testing
-
-- `sendPing(message?: string)`: emits `{ kind: 'ping', data: { message } }`
-- `sendChat(text: string)`: emits `{ kind: 'chat.post', data: { text } }`
-- `sendTokenMove(tokenId, x, y)`: emits `{ kind: 'token.move', data: { tokenId, x, y } }`
-
-**SessionManager UI addition**: When connected, show a small "Debug" collapsible section with:
-- "Send Ping" button
-- A text input + "Send Chat" button
-- These call the demo helpers
-
----
-
-## Step 5: Wire Token Move to Prove the Loop
-
-In `SimpleTabletop.tsx` (or wherever token drag-end is handled), after calling `updateTokenPosition()`:
-
-- Call `emitLocalOp({ kind: 'token.move', data: { tokenId, x, y } })` if connected
-- This is the minimal proof that local changes propagate to other clients
-
-The `OpBridge` incoming handler for `token.move` calls `updateTokenPosition()` with `isApplyingRemote = true`, preventing echo.
-
----
-
-## Step 6: Save Plan and Bump Version
-
-- Save this plan to `Plans/websocket-networking-migration.md`
-- Bump `src/lib/version.ts` from `0.4.46` to `0.4.47`
-
----
-
-## File Summary
-
-| Action | File |
-|--------|------|
-| Create | `src/lib/net/NetManager.ts` |
-| Create | `src/lib/net/OpBridge.ts` |
-| Create | `src/lib/net/index.ts` |
-| Create | `src/lib/net/demo.ts` |
-| Create | `Plans/websocket-networking-migration.md` |
-| Modify | `src/stores/multiplayerStore.ts` |
-| Modify | `src/components/SessionManager.tsx` |
-| Modify | `src/lib/version.ts` |
-
----
-
-## What This Does NOT Do (Future Work)
-
-- Does not remove Socket.IO code (old path remains as fallback)
-- Does not implement full store patch sync via EngineOps (only `token.move` as proof)
-- Does not implement presence events (server sends them, but we skip for now)
-- Does not implement snapshot loading
-- Does not wire fog, map, region, initiative, or light sync to the new protocol
-
----
-
-## Definition of Done
-
-With `networking/server-local` running at `ws://localhost:3001`:
-
-1. Two browser tabs can connect to the same session code
-2. Both see the connection status update to "Connected" with roles/permissions displayed
-3. "Send Ping" in tab A shows a toast in tab B
-4. Dragging a token in tab A moves it in tab B (and vice versa) without echo loops
-5. Disconnecting and reconnecting uses persisted `lastSeenSeq` for catchup
-6. All networking logic lives in `src/lib/net/` -- UI only imports from that module
+- The matrix document will be saved as `docs/NETWORKING-MATRIX.md`
+- No code changes in this step
+- Version bump will happen when we implement Step 2
+- After you review and refine the matrix, we proceed to `docs/EPHEMERAL-NETWORKING-PLAN.md`
 
