@@ -1,133 +1,84 @@
 
 
-# Networking Layer Classification Matrix & Ephemeral Implementation Plan
+# Updates to NETWORKING-MATRIX.md
 
-## What We're Doing
-
-This is a two-step effort:
-
-1. **Step 1 (this plan):** Create `docs/NETWORKING-MATRIX.md` -- a comprehensive classification of every user interaction in the VTT, sorted into Ephemeral vs Durable layers, plus a "Potential New Features" section for interactions we don't yet support.
-
-2. **Step 2 (after your review of the matrix):** Author `docs/EPHEMERAL-NETWORKING-PLAN.md` with the implementation plan for wiring up every Ephemeral item.
-
-We will not implement any code in this plan -- the deliverable is the matrix document for your review and refinement.
+Four additions to the matrix document, placed in the appropriate sections:
 
 ---
 
-## Matrix Categories (based on actual stores and features)
+## 1. Map Objects & Regions -- Drag and Transformation Previews
 
-The matrix will cover these sections, populated from real features found in the codebase:
+**Section 2 (Map & Camera) -- Ephemeral table**, add these rows:
 
-### 1. Tokens (sessionStore)
-- **Ephemeral:** drag preview (already implemented), rotate/scale handle preview, hover highlights, selection box/lasso, movement path preview during drag, targeting reticle position (actionStore.targetingMousePos)
-- **Durable:** create/delete, move commit, resize commit, label/name/color changes, image changes, illumination source edits, vision settings, ownership/roleId, hidden flag, appearance variant switches, entity ref updates, notes/statblock edits, path style changes
-- **Potential New:** intent indicators ("player is about to move X"), token rotate commit
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| Region drag preview | planned | `region.drag.update` | Ghost position during region reposition, 20 Hz throttle, 400 ms TTL |
+| Region resize / rotate handle preview | planned | `region.handle.preview` | Broadcast handle position while dragging transform handles |
+| Map object drag preview | planned | `mapObject.drag.update` | Ghost position during reposition, 20 Hz throttle, 400 ms TTL |
+| Map object rotate / scale handle preview | planned | `mapObject.handle.preview` | Broadcast handle position while dragging transform handles |
 
-### 2. Map & Camera (mapStore, regionStore, viewportTransforms)
-- **Ephemeral:** camera pan/zoom/viewport (per-client, already local-only), ping/laser pointer, GM "focus here" pointer, tool cursor broadcast
-- **Durable:** map create/delete/update, region create/delete/update (polygon edits, grid settings, textures), map reorder, active map selection (if shared)
-- **Potential New:** ping/laser pointer, GM focus pointer, tool cursor broadcast
+These are also currently listed in Section 3 (Map Objects) as `potential`. They will be upgraded to `planned` there and the duplicates in Section 2 provide the cross-reference since regions and map objects both live on the canvas alongside the map.
 
-### 3. Map Objects (mapObjectStore)
-- **Ephemeral:** drag preview while repositioning, door toggle preview
-- **Durable:** create/delete, position/size/rotation commits, door open/close commit, bulk operations, category/style changes
-- **Potential New:** drag preview for map objects
-
-### 4. Fog of War & Vision (fogStore, lightStore, illuminationStore)
-- **Ephemeral:** realtime vision during drag (already local-only), fog brush cursor preview, temporary reveal preview
-- **Durable:** fog enable/disable, reveal-all toggle, fog opacity settings, explored areas geometry, vision range defaults, light source create/delete/update, ambient light/shadow intensity
-- **Potential New:** fog brush cursor preview, reveal preview before commit
-
-### 5. Chat & Dice (diceStore)
-- **Ephemeral:** typing indicator, "user is rolling" spinner
-- **Durable:** dice roll results (already synced via syncPatch), chat messages (already via chat.post op), pinned formulas
-- **Potential New:** typing indicator, rolling indicator
-
-### 6. Initiative & Combat (initiativeStore)
-- **Ephemeral:** dragging initiative entry preview (reorder handle), current-turn hover highlight
-- **Durable:** start/end combat, add/remove combatant, reorder commit, advance turn, round number, initiative values, restrict movement toggle
-- **Potential New:** initiative reorder drag preview
-
-### 7. Groups (groupStore)
-- **Ephemeral:** group selection preview, group drag preview
-- **Durable:** group create/delete, member add/remove, group transforms commit
-- **Potential New:** group drag preview
-
-### 8. Roles & Permissions (roleStore)
-- **Ephemeral:** "request control" / hand raise, presence metadata ("is editing map")
-- **Durable:** role create/update/delete, hostility settings, permission changes, token role assignments
-- **Potential New:** hand raise, editing-state presence
-
-### 9. Actions & Combat Resolution (actionStore)
-- **Ephemeral:** targeting reticle position, resolution flash effects, "action in progress" indicator
-- **Durable:** action resolution results, attack history entries
-- **Potential New:** networked targeting reticle, networked resolution flashes
-
-### 10. UI Mode & Presence (uiModeStore, multiplayerStore)
-- **Ephemeral:** user cursor position, "user is viewing map X" indicator, connected/disconnected presence events (already implemented)
-- **Durable:** DM/play mode switch (RPC), user kick/ban
-- **Potential New:** cursor sharing, "viewing map X" indicator
-
-### 11. Assets
-- **Ephemeral:** upload progress, loading states
-- **Durable:** asset registered (hash, size, mime), token/region image references (via imageHash/textureHash)
-- **Potential New:** upload progress broadcast
+**Section 3 (Map Objects) -- Ephemeral table**: update `Map object drag preview` status from `potential` to `planned`.
 
 ---
 
-## Already Implemented (Ephemeral)
+## 2. DM Broadcast Pan/Zoom
 
-- Token drag preview (`token.drag.begin/update/end` ops + dragPreviewStore)
-- Presence join/leave (via WebSocket protocol `presence` messages)
-- Ping op (debug)
-- Chat post op
-- Token move op
-- Token sync op
+**Section 2 (Map & Camera) -- Ephemeral table**, replace the existing "Camera pan / zoom / viewport" row and add a new row:
 
----
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| Camera pan / zoom / viewport (personal) | N/A (local-only) | -- | Per-client, never networked |
+| DM broadcast pan / zoom to point | planned | `map.dm.viewport` | DM sends { x, y, zoom }; all connected clients (including other DMs) match the viewport. 10 Hz throttle, fires on DM action only. |
 
-## Document Structure
-
-The `docs/NETWORKING-MATRIX.md` file will use this format:
-
-```text
-# VTT Networking Classification Matrix
-
-## How to Read This Document
-- Ephemeral: high-frequency, lossy, TTL-based, not in snapshots/undo
-- Durable: authoritative, ordered, acked, snapshotable, replayable
-- Status: [implemented] [planned] [potential]
-
-## 1. Tokens
-### Ephemeral
-| Action | Status | Notes |
-|--------|--------|-------|
-| Token drag preview | implemented | 20Hz throttle, 400ms TTL |
-| ... | ... | ... |
-
-### Durable
-| Action | Status | Notes |
-|--------|--------|-------|
-| Token create/delete | planned | ... |
-| ... | ... | ... |
-
-(repeat for each category)
-
-## Potential New Features
-### Ephemeral
-| Action | Category | Description |
-...
-### Durable
-| Action | Category | Description |
-...
-```
+This belongs in Ephemeral because it is a transient viewport command -- if a frame is dropped the next update corrects it. It is not stored in snapshots or undo history.
 
 ---
 
-## Technical Notes
+## 3. Connected Player Cursors (with DM hide/show control)
 
-- The matrix document will be saved as `docs/NETWORKING-MATRIX.md`
-- No code changes in this step
-- Version bump will happen when we implement Step 2
-- After you review and refine the matrix, we proceed to `docs/EPHEMERAL-NETWORKING-PLAN.md`
+**Section 10 (UI Mode & Presence) -- Ephemeral table**, update the existing `User cursor position` row and add a control row:
+
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| Connected player cursors | planned | `cursor.update` | userId + world x,y + color, 15 Hz throttle, 500 ms TTL. DM cursor hidden by default. |
+| DM toggle cursor visibility | planned | `cursor.visibility` | DM sends show/hide flag; all clients respect it. Persists for session duration only (ephemeral). |
+
+The cursor rendering itself is ephemeral (high frequency, safe to drop). The DM's hide/show toggle is also ephemeral -- it controls a transient UI state that does not need to survive a full session restart. On reconnect, the server can re-broadcast the current flag as part of the presence handshake.
+
+Remove the duplicate "Cursor sharing" entry from the Potential New Features table in Section 10 since it is now `planned`.
+
+---
+
+## 4. DM Mode Switch Enforcement
+
+**Section 10 (UI Mode & Presence) -- Durable table**, update the existing `DM / play mode switch` row:
+
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| DM / play mode switch (enforced) | planned | `session.mode` | RPC-style. DM sets mode for all connected clients. Non-DM players cannot select "edit" without DM approval. Other DM-role users may independently select edit mode. Enforced server-side via role check. |
+
+This is correctly classified as **Durable** because:
+- It changes authoritative session state that affects what all clients can do.
+- It must survive reconnection (late-join clients need to know the current mode).
+- It requires server-side permission enforcement (role check).
+
+---
+
+## Summary of All Edits
+
+| Section | Table | Change |
+|---------|-------|--------|
+| 2. Map & Camera | Ephemeral | Add region drag/transform preview, map object drag/transform preview, DM broadcast pan/zoom |
+| 2. Map & Camera | Ephemeral | Clarify personal camera row as local-only vs DM broadcast |
+| 3. Map Objects | Ephemeral | Upgrade map object drag preview from `potential` to `planned` |
+| 10. UI Mode | Ephemeral | Upgrade cursor to `planned` with DM hide/show control; add `cursor.visibility` row |
+| 10. UI Mode | Durable | Update `session.mode` row with enforcement notes (DM-only, role-gated) |
+| 10. UI Mode | Potential | Remove "Cursor sharing" (now planned) |
+
+### Technical Details
+
+- Version bump (`src/lib/version.ts`) will accompany this doc update.
+- No code changes -- documentation only.
 
