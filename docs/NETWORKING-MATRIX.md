@@ -67,10 +67,15 @@
 
 | Action | Status | Op Kind | Notes |
 |--------|--------|---------|-------|
-| Camera pan / zoom / viewport | N/A (local-only) | — | Per-client, never networked |
+| Camera pan / zoom / viewport (personal) | N/A (local-only) | — | Per-client, never networked |
+| DM broadcast pan / zoom to point | planned | `map.dm.viewport` | DM sends { x, y, zoom }; all connected clients (including other DMs) match viewport. 10 Hz throttle, fires on DM action only. |
 | Ping / laser pointer | potential | `map.ping` | Position + color, 1 s TTL |
 | GM "focus here" pointer | potential | `map.focus` | Forces camera pan on clients |
 | Tool cursor broadcast | potential | `cursor.update` | userId + position + tool type |
+| Region drag preview | planned | `region.drag.update` | Ghost position during region reposition, 20 Hz throttle, 400 ms TTL |
+| Region resize / rotate handle preview | planned | `region.handle.preview` | Broadcast handle position while dragging transform handles |
+| Map object drag preview | planned | `mapObject.drag.update` | Ghost position during reposition, 20 Hz throttle, 400 ms TTL |
+| Map object rotate / scale handle preview | planned | `mapObject.handle.preview` | Broadcast handle position while dragging transform handles |
 
 ### Durable
 
@@ -101,7 +106,7 @@
 
 | Action | Status | Op Kind | Notes |
 |--------|--------|---------|-------|
-| Map object drag preview | potential | `mapObject.drag.update` | Ghost position during reposition |
+| Map object drag preview | planned | `mapObject.drag.update` | Ghost position during reposition, 20 Hz throttle, 400 ms TTL |
 | Door toggle preview | potential | `mapObject.door.preview` | Flash before commit |
 
 ### Durable
@@ -118,7 +123,7 @@
 
 | Action | Layer | Description |
 |--------|-------|-------------|
-| Map object drag preview | Ephemeral | Ghost position broadcast during drag |
+| Map object drag preview | Ephemeral | Now `planned` — see Ephemeral table above |
 
 ---
 
@@ -307,7 +312,8 @@
 
 | Action | Status | Op Kind | Notes |
 |--------|--------|---------|-------|
-| User cursor position | potential | `cursor.update` | userId + x, y, 15 Hz |
+| Connected player cursors | planned | `cursor.update` | userId + world x,y + color, 15 Hz throttle, 500 ms TTL. DM cursor hidden by default. |
+| DM toggle cursor visibility | planned | `cursor.visibility` | DM sends show/hide flag; all clients respect it. Persists for session duration only (ephemeral). |
 | "User is viewing map X" indicator | potential | `presence.viewingMap` | userId + mapId |
 | Connected / disconnected presence | implemented | (protocol `presence`) | join/leave via WebSocket handshake |
 
@@ -315,14 +321,13 @@
 
 | Action | Status | Op Kind | Notes |
 |--------|--------|---------|-------|
-| DM / play mode switch | planned | `session.mode` | RPC-style, affects all clients |
+| DM / play mode switch (enforced) | planned | `session.mode` | RPC-style. DM sets mode for all connected clients. Non-DM players cannot select "edit" without DM approval. Other DM-role users may independently select edit mode. Enforced server-side via role check. |
 | User kick / ban | planned | `session.kick` / `session.ban` | userId target |
 
 ### Potential New Features
 
 | Action | Layer | Description |
 |--------|-------|-------------|
-| Cursor sharing | Ephemeral | See all connected users' cursors |
 | "Viewing map X" indicator | Ephemeral | Know which map each user is on |
 
 ---
