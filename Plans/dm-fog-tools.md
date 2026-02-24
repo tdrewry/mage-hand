@@ -19,6 +19,23 @@
 
 ---
 
+## Feature 1B: DM Region Reveal (mark region as explored)
+
+**Concept:** DM selects a region, clicks "Mark as Explored" in the region context menu or control bar. The region's polygon shape is unioned into `exploredArea`. Players see that region's terrain at `exploredOpacity`.
+
+### Implementation Steps
+1. Add "Mark as Explored" button to `RegionControlBar` (DM-only, gated by role check)
+2. On click, convert the region's path (pathPoints/bezier or rect) to a Paper.js `Path`
+3. Union it into the existing `exploredArea` via `paper.unite()`
+4. Serialize updated explored area (existing flow)
+5. Support multi-select: "Mark Selected as Explored" for batch reveal
+6. Optional: "Unmark as Explored" — subtract the region shape from `exploredArea` via `paper.subtract()`
+
+### Undo Support
+- Single undo step per action capturing explored polygon before/after
+
+---
+
 ## Feature 2: DM Standalone Light Sources
 
 **Concept:** DM can place light sources directly on the map (not attached to any token). These are full `IlluminationSource` objects that illuminate and reveal areas. DM-only visibility in the light list.
