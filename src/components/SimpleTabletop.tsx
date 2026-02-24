@@ -111,6 +111,8 @@ import { CursorOverlay } from "./CursorOverlay";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
+import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
+import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
@@ -121,6 +123,7 @@ export const SimpleTabletop = () => {
   React.useEffect(() => {
     registerCursorHandlers();
     registerPresenceHandlers();
+    registerTokenHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -6817,6 +6820,14 @@ export const SimpleTabletop = () => {
     if (actionStoreState.isTargeting) {
       const worldPos = screenToWorld(mouseX, mouseY);
       useActionStore.getState().setTargetingMousePos({ x: worldPos.x, y: worldPos.y });
+
+      // ── EPHEMERAL: broadcast action target preview ──
+      if (actionStoreState.currentAction?.sourceTokenId) {
+        ephemeralBus.emit("action.target.preview", {
+          sourceTokenId: actionStoreState.currentAction.sourceTokenId,
+          pos: { x: worldPos.x, y: worldPos.y },
+        });
+      }
       // Update cursor
       const hoverToken = getTokenAtPosition(worldPos.x, worldPos.y);
       if (hoverToken && hoverToken.id !== actionStoreState.currentAction?.sourceTokenId) {
@@ -6858,6 +6869,17 @@ export const SimpleTabletop = () => {
       const worldPos = screenToWorld(mouseX, mouseY);
       marqueeEndRef.current = worldPos;
       updateMarqueeDivFromRefs();
+
+      // ── EPHEMERAL: broadcast selection rectangle preview ──
+      const start = marqueeStartRef.current;
+      ephemeralBus.emit("selection.preview", {
+        rect: {
+          x: Math.min(start.x, worldPos.x),
+          y: Math.min(start.y, worldPos.y),
+          width: Math.abs(worldPos.x - start.x),
+          height: Math.abs(worldPos.y - start.y),
+        },
+      });
       return;
     }
 
@@ -7720,6 +7742,7 @@ export const SimpleTabletop = () => {
 
         if (distance <= radius) {
           setHoveredTokenId(token.id);
+          ephemeralBus.emit("token.hover", { tokenId: token.id });
           foundHoveredToken = true;
 
           // Update cursor based on controllability
@@ -7733,6 +7756,7 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
+        ephemeralBus.emit("token.hover", { tokenId: null });
         
         // Check if hovering over a door (DM in play mode)
         if (isDM && renderingMode === 'play') {
@@ -7768,6 +7792,9 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Clear ephemeral selection preview on mouse up
+    ephemeralBus.emit("selection.preview", {});
+
     // Handle marquee selection completion
     if (isMarqueeSelectingRef.current && marqueeStartRef.current && marqueeEndRef.current) {
       // Read from refs for the most up-to-date values
