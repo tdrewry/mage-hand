@@ -404,6 +404,13 @@ export const SimpleTabletop = () => {
   // Light placement mode
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
 
+  // Fog reveal brush state (DM tool for painting explored areas)
+  const [fogRevealBrushActive, setFogRevealBrushActive] = useState(false);
+  const [fogRevealBrushRadius, setFogRevealBrushRadius] = useState(60); // world-space radius
+  const [isFogBrushPainting, setIsFogBrushPainting] = useState(false);
+  const fogBrushCursorRef = useRef<{ x: number; y: number } | null>(null);
+  const fogBrushPreExploredRef = useRef<paper.CompoundPath | null>(null); // snapshot for undo
+
   // Fog of war store
   const {
     enabled: fogEnabled,
@@ -3334,6 +3341,29 @@ export const SimpleTabletop = () => {
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
       drawMapPings(ctx);
+    }
+
+    // ── Fog Reveal Brush: draw ghost circle at cursor position ──
+    if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && fogBrushCursorRef.current) {
+      const bp = fogBrushCursorRef.current;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y, fogRevealBrushRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+      ctx.fill();
+      ctx.setLineDash([]);
+      // Radius label
+      const labelText = `${Math.round(fogRevealBrushRadius)}px`;
+      const fontSize = 11 / transform.zoom;
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.9)';
+      ctx.textAlign = 'center';
+      ctx.fillText(labelText, bp.x, bp.y - fogRevealBrushRadius - 6 / transform.zoom);
+      ctx.restore();
     }
 
     // Restore context after all world-space rendering
@@ -6398,6 +6428,20 @@ export const SimpleTabletop = () => {
     } else if (e.button === 0) {
       // Left click
 
+      // ── FOG REVEAL BRUSH: intercept click when brush tool is active ──
+      if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {
+        // Capture pre-paint state for undo
+        fogBrushPreExploredRef.current = exploredAreaRef.current
+          ? (exploredAreaRef.current.clone() as paper.CompoundPath)
+          : null;
+        setIsFogBrushPainting(true);
+        stampFogBrushCircle(worldPos.x, worldPos.y);
+        // Broadcast cursor position
+        ephemeralBus.emit("fog.cursor.preview", { pos: { x: worldPos.x, y: worldPos.y }, radius: fogRevealBrushRadius, tool: "reveal" });
+        redrawCanvas();
+        return;
+      }
+
       // ── ACTION TARGETING: intercept click when in targeting mode ──
       const actionStore = useActionStore.getState();
       if (actionStore.isTargeting && actionStore.currentAction) {
@@ -7099,6 +7143,20 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    // ── FOG REVEAL BRUSH: track cursor and paint while dragging ──
+    if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {
+      const worldPos = screenToWorld(mouseX, mouseY);
+      fogBrushCursorRef.current = worldPos;
+      if (isFogBrushPainting) {
+        stampFogBrushCircle(worldPos.x, worldPos.y);
+        ephemeralBus.emit("fog.cursor.preview", { pos: { x: worldPos.x, y: worldPos.y }, radius: fogRevealBrushRadius, tool: "reveal" });
+      }
+      canvas.style.cursor = 'crosshair';
+      redrawCanvas();
+      // Still allow panning via right-click, so don't return if panning
+      if (!isPanning) return;
+    }
 
     // ── EPHEMERAL CURSOR: broadcast world-space position ──
     const worldCursorPos = screenToWorld(mouseX, mouseY);
@@ -8087,6 +8145,15 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // ── FOG REVEAL BRUSH: commit painted area on mouse up ──
+    if (isFogBrushPainting) {
+      setIsFogBrushPainting(false);
+      commitFogBrush();
+      // TODO: undo step — fogBrushPreExploredRef vs current
+      fogBrushPreExploredRef.current = null;
+      return;
+    }
+
     // Clear ephemeral selection preview on mouse up
     ephemeralBus.emit("selection.preview", {});
 
@@ -8858,6 +8925,16 @@ export const SimpleTabletop = () => {
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
 
+    // ── FOG REVEAL BRUSH: scroll adjusts brush radius ──
+    if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {
+      setFogRevealBrushRadius(prev => {
+        const delta = e.deltaY > 0 ? -5 : 5;
+        return Math.max(10, Math.min(300, prev + delta));
+      });
+      redrawCanvas();
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -9319,6 +9396,32 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   };
 
+  // ── Fog Reveal Brush: stamp a circle into exploredArea ──
+  const stampFogBrushCircle = useCallback((worldX: number, worldY: number) => {
+    if (!fogEnabled) return;
+    const scope = fogScopeRef.current || getFogScope();
+    scope.activate();
+    const circle = new scope.Path.Circle(new scope.Point(worldX, worldY), fogRevealBrushRadius);
+    exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, circle);
+    circle.remove();
+  }, [fogEnabled, fogRevealBrushRadius]);
+
+  const commitFogBrush = useCallback(() => {
+    if (!exploredAreaRef.current) return;
+    const serialized = serializeFogGeometry(exploredAreaRef.current);
+    if (serialized) {
+      setSerializedExploredAreas(serialized);
+      ephemeralBus.emit("fog.reveal.preview", {
+        shape: "committed",
+        points: [],
+        serializedExploredAreas: serialized,
+      });
+    }
+    // Broadcast cursor clear
+    ephemeralBus.emit("fog.cursor.preview", { pos: { x: 0, y: 0 }, radius: 0, tool: "reveal" });
+    redrawCanvas();
+  }, [setSerializedExploredAreas]);
+
   // Mark selected regions as explored (DM fog reveal)
   const handleMarkRegionsExplored = useCallback((regionIds: string[]) => {
     if (!fogEnabled) {
@@ -9559,6 +9662,9 @@ export const SimpleTabletop = () => {
         showRegions={showRegions}
         onToggleRegions={() => setShowRegions(!showRegions)}
         onFitToView={handleFitToView}
+        fogRevealBrushActive={fogRevealBrushActive}
+        onToggleFogRevealBrush={() => setFogRevealBrushActive(prev => !prev)}
+        isDM={isDM}
       />
 
       {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
@@ -9575,11 +9681,13 @@ export const SimpleTabletop = () => {
             background: "hsl(var(--canvas-background))",
             cursor: isPanning
               ? "grabbing"
-              : isDraggingToken
-                ? "move"
-                : pathDrawingMode === "drawing"
-                  ? "crosshair"
-                  : "auto",
+              : fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play'
+                ? "crosshair"
+                : isDraggingToken
+                  ? "move"
+                  : pathDrawingMode === "drawing"
+                    ? "crosshair"
+                    : "auto",
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}

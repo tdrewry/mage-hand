@@ -4,18 +4,18 @@
 
 **Concept:** DM selects a "Fog Reveal" tool, clicks/drags on the canvas to stamp circles into the `exploredArea` Paper.js polygon. Players see revealed terrain at `exploredOpacity` (dimmed fog). Does not affect token visibility — tokens still require real illumination to be seen.
 
-### Implementation Steps
-1. Add a new UI mode `fogReveal` to the DM toolbar (VerticalToolbar or similar)
-2. When active, mouse-down + drag paints circles at the cursor position
-3. Each circle is created as a Paper.js `Path.Circle`, then unioned into `exploredArea` via `paper.unite()`
-4. Brush radius is adjustable (slider or scroll-wheel)
-5. Canvas renders a ghost circle at cursor position while tool is active
-6. Serialized explored area updates automatically (existing `serializeFogGeometry`)
-7. Wire `fog.cursor.preview` ephemeral op to broadcast brush position to players (visual only)
-8. Wire `fog.reveal.preview` to broadcast the committed reveal shape for immediate remote rendering
+### Implementation Steps — ✅ DONE (v0.4.92)
+1. ✅ Added `fogRevealBrushActive` toggle in VerticalToolbar (play mode, DM-only, fog-enabled)
+2. ✅ Mouse-down + drag paints circles at cursor position via `stampFogBrushCircle`
+3. ✅ Each circle unioned into `exploredArea` via `addVisibleToExplored` (Paper.js)
+4. ✅ Brush radius adjustable via scroll-wheel (10–300px range)
+5. ✅ Canvas renders ghost circle (dashed outline + fill) at cursor with radius label
+6. ✅ On mouse-up, serialized explored area committed + broadcast via `fog.reveal.preview`
+7. ✅ `fog.cursor.preview` ephemeral op broadcasts brush position to players
+8. ✅ `fog.reveal.preview` with `shape:"committed"` triggers remote redraw
 
 ### Undo Support
-- Each mouse-up commits a single undo step capturing the explored polygon before/after
+- Pre-paint snapshot captured in `fogBrushPreExploredRef` — TODO: wire to undoRedoManager
 
 ---
 
