@@ -12,7 +12,8 @@ const {
   handleSyncPatch,
   handleTextureUpload,
   handleTextureRequest,
-  handleBroadcastFullState
+  handleBroadcastFullState,
+  handleEphemeral
 } = require('./eventHandlers');
 
 const app = express();
@@ -86,6 +87,12 @@ io.on('connection', (socket) => {
   // Full state broadcast from DM
   socket.on('broadcast_full_state', (payload) =>
     handleBroadcastFullState(socket, io, sessionManager, payload)
+  );
+
+  // Ephemeral messages (cursors, drag previews, typing, etc.)
+  // Broadcast only — no logging, no persistence, no sequence tracking
+  socket.on('ephemeral', (payload) =>
+    handleEphemeral(socket, io, sessionManager, payload)
   );
 
   // Disconnection handling

@@ -5,6 +5,8 @@ import { NetworkSession, type ConnectParams, type NetworkSessionInfo } from "../
 import type { EngineOp, OpBatchPayload, PresencePayload } from "../../../networking/contract/v1";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
+import { isEphemeralOp } from "./ephemeral";
+import type { EphemeralOpKind } from "./ephemeral";
 import { toast } from "sonner";
 
 export type NetConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -179,12 +181,27 @@ export class NetManager {
     });
 
     const off2 = this.session.on("opBatch", (batch: OpBatchPayload) => {
-      // Persist last seen seq
+      // Persist last seen seq (only for durable ops)
       if (this._sessionCode && batch.toSeq > 0) {
         writeLastSeenSeq(this._sessionCode, batch.toSeq);
       }
-      // Forward to OpBridge
-      opBridge.applyRemoteOps(batch.ops);
+
+      // Split ops into ephemeral vs durable
+      const durableOps = [];
+      for (const entry of batch.ops) {
+        if (isEphemeralOp(entry.op.kind)) {
+          // Route ephemeral ops directly to EphemeralBus — lazy import to avoid circular ref
+          const { ephemeralBus } = require("./index") as { ephemeralBus: import("./ephemeral").EphemeralBus };
+          ephemeralBus.receive(entry.op.kind as EphemeralOpKind, entry.op.data, entry.userId);
+        } else {
+          durableOps.push(entry);
+        }
+      }
+
+      // Forward only durable ops to OpBridge
+      if (durableOps.length > 0) {
+        opBridge.applyRemoteOps(durableOps);
+      }
     });
 
     const off3 = this.session.on("rejected", (rej) => {
