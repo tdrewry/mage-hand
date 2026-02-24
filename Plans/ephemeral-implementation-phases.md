@@ -38,7 +38,7 @@ Full end-to-end dedicated transport so ephemeral ops never touch the durable pip
 
 ---
 
-## Phase 3 — Cursor & Presence Overlays (Minimal UI)
+## Phase 3 — Cursor & Presence Overlays (Minimal UI) ✅ DONE
 
 First visually testable ephemeral features per contract §3.4.
 
@@ -47,8 +47,11 @@ First visually testable ephemeral features per contract §3.4.
 - [x] Render cursor dots overlay (`CursorOverlay.tsx`) — colored dot + username label, world→screen transform
 - [x] Create `src/lib/net/ephemeral/cursorHandlers.ts` — registers `cursor.update` and `cursor.visibility` handlers + TTL expiry cleanup
 - [x] Wire `cursor.visibility` handler (DM toggle to show/hide cursors globally)
-- [ ] Wire `presence.viewingMap` — broadcast active mapId, display in ConnectedUsersPanel
-- [ ] Wire `presence.activity` — broadcast current activity string
+- [x] Create `src/stores/presenceStore.ts` — Zustand store for viewingMap + activity per user
+- [x] Create `src/lib/net/ephemeral/presenceHandlers.ts` — registers handlers + TTL expiry cleanup
+- [x] Wire `presence.viewingMap` — emit on selectedMapId change, display map name in ConnectedUsersPanel
+- [x] Wire `presence.activity` — handler registered, display activity string in ConnectedUsersPanel
+- [x] Refactor `EphemeralBus.onCacheChange` to support multiple listeners (array-based)
 
 ---
 

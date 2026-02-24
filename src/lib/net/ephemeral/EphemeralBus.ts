@@ -69,13 +69,13 @@ export class EphemeralBus {
   /** Reference to the network send function (set after construction). */
   private _sendFn?: (op: EngineOp) => void;
 
-  /** Callback fired whenever the cache changes (for driving reactive stores). */
-  private _onCacheChange?: (key: string, entry: TTLEntry<EphemeralEvent> | null) => void;
+  /** Callbacks fired whenever the cache changes (for driving reactive stores). */
+  private _cacheChangeListeners: Array<(key: string, entry: TTLEntry<EphemeralEvent> | null) => void> = [];
 
   constructor() {
     this.cache = new TTLCache<EphemeralEvent>({
       onChange: (key, entry) => {
-        this._onCacheChange?.(key, entry);
+        for (const fn of this._cacheChangeListeners) fn(key, entry);
       },
     });
   }
@@ -87,9 +87,12 @@ export class EphemeralBus {
     this._sendFn = fn;
   }
 
-  /** Set a callback for cache changes (for reactive overlay stores). */
-  onCacheChange(fn: (key: string, entry: TTLEntry<EphemeralEvent> | null) => void): void {
-    this._onCacheChange = fn;
+  /** Add a callback for cache changes (for reactive overlay stores). Returns unsubscribe fn. */
+  onCacheChange(fn: (key: string, entry: TTLEntry<EphemeralEvent> | null) => void): () => void {
+    this._cacheChangeListeners.push(fn);
+    return () => {
+      this._cacheChangeListeners = this._cacheChangeListeners.filter((l) => l !== fn);
+    };
   }
 
   // ── Handler Registry ────────────────────────────────────────
@@ -184,6 +187,6 @@ export class EphemeralBus {
     this.cache.dispose();
     this.handlers.clear();
     this._sendFn = undefined;
-    this._onCacheChange = undefined;
+    this._cacheChangeListeners = [];
   }
 }
