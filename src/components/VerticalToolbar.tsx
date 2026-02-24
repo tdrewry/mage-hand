@@ -24,6 +24,7 @@ import {
   Trash2,
   ShieldX,
   Fence,
+  Paintbrush,
 } from 'lucide-react';
 import { useFogStore } from '@/stores/fogStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -56,6 +57,11 @@ interface VerticalToolbarProps {
   showRegions: boolean;
   onToggleRegions: () => void;
   onFitToView?: () => void;
+  
+  // Fog reveal brush (play mode, DM only)
+  fogRevealBrushActive?: boolean;
+  onToggleFogRevealBrush?: () => void;
+  isDM?: boolean;
 }
 
 export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
@@ -73,6 +79,9 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   showRegions,
   onToggleRegions,
   onFitToView,
+  fogRevealBrushActive = false,
+  onToggleFogRevealBrush,
+  isDM = false,
 }) => {
   const [showClearDialog, setShowClearDialog] = useState(false);
   
@@ -421,6 +430,17 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="xs"
           />
+
+          {isDM && fogEnabled && onToggleFogRevealBrush && (
+            <ToolbarButton
+              icon={Paintbrush}
+              label={fogRevealBrushActive ? 'Deactivate Reveal Brush' : 'Fog Reveal Brush'}
+              onClick={onToggleFogRevealBrush}
+              isActive={fogRevealBrushActive}
+              variant="ghost"
+              size="xs"
+            />
+          )}
 
           <ToolbarButton
             icon={showRegions ? Eye : EyeOff}
