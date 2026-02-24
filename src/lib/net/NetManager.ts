@@ -130,7 +130,7 @@ export class NetManager {
     return this.session.info;
   }
 
-  /** Propose a local operation to the server. */
+  /** Propose a local operation to the server (durable path). */
   proposeOp(op: EngineOp, clientOpId?: string): void {
     if (!this.isConnected) {
       console.warn("[NetManager] proposeOp called but not connected — op dropped:", op.kind);
@@ -138,6 +138,12 @@ export class NetManager {
       return;
     }
     this.session.proposeOp(op, clientOpId);
+  }
+
+  /** Send an ephemeral message — no batching, no sequencing, no persistence. */
+  sendEphemeral(kind: string, data: unknown): void {
+    if (!this.isConnected) return;
+    this.session.sendEphemeral(kind, data);
   }
 
   /** Flush any batched outgoing ops immediately. */
@@ -263,7 +269,16 @@ export class NetManager {
       }
     });
 
-    this.cleanups.push(off1, off2, off3, off4, off5, off6);
+    const off7 = this.session.on("ephemeral", ({ kind, data, userId }) => {
+      // Route inbound ephemeral messages directly to EphemeralBus
+      const { ephemeralBus } = require("./index") as { ephemeralBus: import("./ephemeral").EphemeralBus };
+      const { isEphemeralOp } = require("./ephemeral") as { isEphemeralOp: (k: string) => boolean };
+      if (isEphemeralOp(kind)) {
+        ephemeralBus.receive(kind as any, data, userId);
+      }
+    });
+
+    this.cleanups.push(off1, off2, off3, off4, off5, off6, off7);
   }
 
   // ── Reconnection ──────────────────────────────────────────

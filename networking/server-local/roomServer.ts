@@ -230,6 +230,24 @@ export class LocalRoomServer {
           return;
         }
 
+        case "ephemeral": {
+          // Broadcast to all other clients — no logging, no seq, no persistence
+          const relay: ServerToClientMessage = {
+            v: PROTOCOL_VERSION,
+            t: "ephemeral",
+            clientId: "server",
+            sessionId: session.sessionId,
+            sessionCode: session.sessionCode,
+            ts: nowIso(),
+            p: { kind: (msg.p as any).kind, data: (msg.p as any).data, userId: ctx.userId },
+          } as any;
+
+          for (const c of session.clients) {
+            if (c !== ctx) send(c.ws, relay);
+          }
+          return;
+        }
+
         case "catchup_request":
           this.sendCatchup(session, ctx, msg.p.fromSeq, msg.p.limit ?? 500);
           return;

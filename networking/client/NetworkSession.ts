@@ -5,6 +5,7 @@ import type {
   ClientId,
   ClientSeq,
   ClientToServerMessage,
+  EphemeralPayload,
   EngineOp,
   HelloPayload,
   Iso8601,
@@ -17,6 +18,7 @@ import type {
   SessionCode,
   SessionId,
   SnapshotPointer,
+  UserId,
   WelcomePayload,
 } from "../contract/v1";
 import { PROTOCOL_VERSION } from "../contract/v1";
@@ -83,6 +85,7 @@ export interface NetworkSessionEvents {
   ack: AckPayload;
   opBatch: OpBatchPayload;
   presence: PresencePayload;
+  ephemeral: { kind: string; data: unknown; userId: string };
   snapshotPointer: SnapshotPointer;
   rawMessage: ServerToClientMessage;
   error: { message: string; cause?: unknown };
@@ -203,6 +206,21 @@ export class NetworkSession {
       this.batchTimer = undefined;
       this.flushOps();
     }, this.batchWindowMs);
+  }
+
+  /** Send an ephemeral message immediately — no batching, no sequencing. */
+  sendEphemeral(kind: string, data: unknown): void {
+    const msg: ClientToServerMessage = {
+      v: PROTOCOL_VERSION,
+      t: "ephemeral",
+      clientId: this.clientId,
+      sessionCode: this.sessionCode,
+      sessionId: this.connectedInfo?.sessionId,
+      userId: this.connectedInfo?.userId,
+      ts: nowIso(),
+      p: { kind, data },
+    };
+    this.sendMsg(msg);
   }
 
   flushOps(): void {
@@ -326,6 +344,12 @@ export class NetworkSession {
       case "presence":
         this.emitter.emit("presence", msg.p as PresencePayload);
         return;
+
+      case "ephemeral": {
+        const ep = msg.p as EphemeralPayload & { userId: string };
+        this.emitter.emit("ephemeral", { kind: ep.kind, data: ep.data, userId: ep.userId });
+        return;
+      }
 
       default:
         return;

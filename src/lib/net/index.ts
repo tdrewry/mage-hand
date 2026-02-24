@@ -11,7 +11,7 @@ export const netManager = new NetManager();
 export const ephemeralBus = new EphemeralBus();
 
 opBridge.setProposeOp((op, id) => netManager.proposeOp(op, id));
-ephemeralBus.setSendFn((op) => netManager.proposeOp(op));
+ephemeralBus.setSendFn((op) => netManager.sendEphemeral(op.kind, op.data));
 
 /** Convenience: emit a local op to the network (echo-safe). */
 export function emitLocalOp(op: EngineOp, clientOpId?: string): void {
