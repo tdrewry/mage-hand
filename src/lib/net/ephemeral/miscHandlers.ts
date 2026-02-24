@@ -3,8 +3,10 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
+import { useFogStore } from "@/stores/fogStore";
 import type {
   FogCursorPreviewPayload,
+  FogRevealPreviewPayload,
   ChatTypingPayload,
   DiceRollingPayload,
   InitiativeDragPreviewPayload,
@@ -28,8 +30,11 @@ export function registerMiscHandlers(): void {
     store.getState().setFogCursor(userId, { userId, pos: data.pos, radius: data.radius, tool: data.tool });
   });
 
-  ephemeralBus.on("fog.reveal.preview", (_data, _userId) => {
-    // Fog reveal preview — store not needed yet, just acknowledge receipt
+  ephemeralBus.on("fog.reveal.preview", (data: FogRevealPreviewPayload, _userId) => {
+    // Committed reveal — update the fog store so the canvas redraws with the new explored area
+    if (data.shape === "committed" && data.serializedExploredAreas != null) {
+      useFogStore.getState().setSerializedExploredAreas(data.serializedExploredAreas);
+    }
   });
 
   // ── Chat & Dice ──

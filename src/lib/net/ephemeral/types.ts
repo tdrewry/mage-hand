@@ -136,9 +136,11 @@ export interface FogCursorPreviewPayload {
 }
 
 export interface FogRevealPreviewPayload {
-  shape: "circle" | "polygon";
+  shape: "circle" | "polygon" | "committed";
   points: Vec2[];
   radius?: number;
+  /** When shape === "committed", carries the full serialized explored geometry */
+  serializedExploredAreas?: string;
 }
 
 // -- Chat & Dice --
