@@ -116,6 +116,7 @@ import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
 import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
+import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
@@ -307,6 +308,9 @@ export const SimpleTabletop = () => {
   const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
   const remoteSelections = useTokenEphemeralStore((s) => s.selectionPreviews);
   const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
+  const remotePings = useMapEphemeralStore((s) => s.pings);
+  // Local pings (own + remote) for animated rendering — each has a birth timestamp
+  const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -930,6 +934,35 @@ export const SimpleTabletop = () => {
     }, 300);
     return () => clearInterval(id);
   }, []);
+
+  // ── Merge remote pings into activePings for animated rendering ──
+  useEffect(() => {
+    const remotePingValues = Object.values(remotePings);
+    if (remotePingValues.length === 0) return;
+    setActivePings((prev) => {
+      const existingIds = new Set(prev.map((p) => p.id));
+      const newPings = remotePingValues
+        .filter((rp) => !existingIds.has(`remote-${rp.userId}-${rp.ts}`))
+        .map((rp) => ({
+          id: `remote-${rp.userId}-${rp.ts}`,
+          pos: rp.pos,
+          color: rp.color || "#fbbf24",
+          ts: rp.ts,
+        }));
+      return newPings.length > 0 ? [...prev, ...newPings] : prev;
+    });
+  }, [remotePings]);
+
+  // ── Ping animation loop — expire after 1s, redraw while active ──
+  useEffect(() => {
+    if (activePings.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      const now = Date.now();
+      setActivePings((prev) => prev.filter((p) => now - p.ts < 1000));
+      redrawCanvas();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activePings]);
 
   // ── Redraw canvas when remote ephemeral overlays change ──
   useEffect(() => {
@@ -3278,6 +3311,7 @@ export const SimpleTabletop = () => {
       drawRemoteTokenHovers(ctx);
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
+      drawMapPings(ctx);
     }
 
     // Restore context after all world-space rendering
@@ -3659,6 +3693,49 @@ export const SimpleTabletop = () => {
     }
     ctx.restore();
   };
+
+  // ── Draw map pings (expanding + fading circles) ──
+  const drawMapPings = (ctx: CanvasRenderingContext2D) => {
+    if (activePings.length === 0) return;
+    const now = Date.now();
+    ctx.save();
+    for (const ping of activePings) {
+      const age = now - ping.ts;
+      if (age >= 1000) continue;
+      const t = age / 1000; // 0→1
+      const radius = (20 + t * 60) / transform.zoom;
+      const alpha = 1 - t;
+
+      // Outer expanding ring
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.strokeStyle = ping.color;
+      ctx.lineWidth = 3 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(ping.pos.x, ping.pos.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner solid dot (fades slower)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = ping.color;
+      ctx.beginPath();
+      ctx.arc(ping.pos.x, ping.pos.y, 5 / transform.zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Second expanding ring (delayed)
+      if (t > 0.15) {
+        const t2 = (t - 0.15) / 0.85;
+        const radius2 = (20 + t2 * 60) / transform.zoom;
+        ctx.globalAlpha = (1 - t2) * 0.35;
+        ctx.strokeStyle = ping.color;
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.beginPath();
+        ctx.arc(ping.pos.x, ping.pos.y, radius2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+
   const drawDragPathOnly = (ctx: CanvasRenderingContext2D) => {
     if (!draggedTokenId) return;
 
@@ -5888,6 +5965,21 @@ export const SimpleTabletop = () => {
 
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
+
+      // ── CTRL+CLICK: Emit map ping ──
+      if (e.ctrlKey && !e.shiftKey && !e.metaKey) {
+        const cursorColor = useCursorStore.getState().cursors[useSessionStore.getState().currentPlayerId || ""]?.color || "#fbbf24";
+        const pingTs = Date.now();
+        ephemeralBus.emit("map.ping", { pos: { x: worldPos.x, y: worldPos.y }, color: cursorColor });
+        // Also show locally immediately
+        setActivePings((prev) => [...prev, {
+          id: `local-${pingTs}`,
+          pos: { x: worldPos.x, y: worldPos.y },
+          color: cursorColor,
+          ts: pingTs,
+        }]);
+        return;
+      }
 
       // Check if we clicked on a token first (tokens are on top)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
