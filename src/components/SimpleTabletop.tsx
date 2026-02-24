@@ -114,6 +114,7 @@ import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
 import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
@@ -127,6 +128,7 @@ export const SimpleTabletop = () => {
     registerPresenceHandlers();
     registerTokenHandlers();
     registerMapHandlers();
+    registerMiscHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
