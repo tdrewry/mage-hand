@@ -16,6 +16,7 @@ interface RegionControlBarProps {
   onUpdateCanvas?: () => void;
   onSelectAll?: () => void;
   onMarkExplored?: (regionIds: string[]) => void;
+  onUnmarkExplored?: (regionIds: string[]) => void;
   isDM?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   onUpdateCanvas,
   onSelectAll,
   onMarkExplored,
+  onUnmarkExplored,
   isDM = false,
 }) => {
   const { regions, updateRegion, removeRegion } = useRegionStore();
@@ -198,19 +200,32 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
             Color
           </Button>
           
-          {/* Mark as Explored (DM only, fog reveal) */}
-          {isDM && onMarkExplored && (
+          {/* Mark as Explored / Unreveal (DM only, fog reveal) */}
+          {isDM && (onMarkExplored || onUnmarkExplored) && (
             <>
               <div className="h-4 w-px bg-border" />
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 px-2 text-xs" 
-                onClick={() => onMarkExplored(selectedRegionIds)}
-              >
-                <CloudFog className="h-3 w-3 mr-1" />
-                Reveal
-              </Button>
+              {onMarkExplored && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs" 
+                  onClick={() => onMarkExplored(selectedRegionIds)}
+                >
+                  <CloudFog className="h-3 w-3 mr-1" />
+                  Reveal
+                </Button>
+              )}
+              {onUnmarkExplored && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs" 
+                  onClick={() => onUnmarkExplored(selectedRegionIds)}
+                >
+                  <EyeOff className="h-3 w-3 mr-1" />
+                  Unreveal
+                </Button>
+              )}
             </>
           )}
           

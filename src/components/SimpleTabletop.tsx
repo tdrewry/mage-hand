@@ -6284,6 +6284,11 @@ export const SimpleTabletop = () => {
           icon: "🌫️",
           action: () => handleMarkRegionsExplored([region.id]),
         },
+        {
+          label: "Unreveal",
+          icon: "🔲",
+          action: () => handleUnmarkRegionsExplored([region.id]),
+        },
       ] : []),
       { type: "separator" },
       {
@@ -9373,6 +9378,68 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [fogEnabled, regions, setSerializedExploredAreas]);
 
+  // Unmark selected regions as explored (DM fog unreveal — subtract from explored polygon)
+  const handleUnmarkRegionsExplored = useCallback((regionIds: string[]) => {
+    if (!fogEnabled) {
+      toast.error('Fog of war must be enabled to unreveal regions');
+      return;
+    }
+    if (!exploredAreaRef.current) {
+      toast.error('No explored area to subtract from');
+      return;
+    }
+    const scope = fogScopeRef.current || getFogScope();
+    scope.activate();
+
+    const targetRegions = regions.filter(r => regionIds.includes(r.id));
+    if (targetRegions.length === 0) return;
+
+    let updated: paper.PathItem | null = exploredAreaRef.current;
+
+    for (const region of targetRegions) {
+      if (!updated) break;
+
+      let regionPath: paper.Path;
+
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 3) {
+        regionPath = new scope.Path();
+        region.pathPoints.forEach(pt => {
+          regionPath.add(new scope.Point(region.x + pt.x, region.y + pt.y));
+        });
+        regionPath.closed = true;
+      } else {
+        const cx = region.x + region.width / 2;
+        const cy = region.y + region.height / 2;
+        regionPath = new scope.Path.Rectangle({
+          point: [region.x, region.y],
+          size: [region.width, region.height],
+        });
+        if (region.rotation) {
+          regionPath.rotate(region.rotation, new scope.Point(cx, cy));
+        }
+      }
+
+      const subtracted = updated.subtract(regionPath);
+      updated.remove();
+      regionPath.remove();
+      // If the result is empty, set to null
+      updated = subtracted.bounds.width > 0 && subtracted.bounds.height > 0 ? subtracted : null;
+    }
+
+    exploredAreaRef.current = updated as paper.CompoundPath | null;
+
+    const serialized = updated ? serializeFogGeometry(updated as paper.CompoundPath) : '';
+    setSerializedExploredAreas(serialized);
+    ephemeralBus.emit("fog.reveal.preview", {
+      shape: "committed",
+      points: [],
+      serializedExploredAreas: serialized,
+    });
+
+    toast.success(`Unrevealed ${targetRegions.length} region(s)`);
+    redrawCanvas();
+  }, [fogEnabled, regions, setSerializedExploredAreas]);
+
   const addTokenToCanvas = async (
     imageUrl: string,
     x?: number,
@@ -9608,6 +9675,7 @@ export const SimpleTabletop = () => {
           }}
           isDM={isDM}
           onMarkExplored={handleMarkRegionsExplored}
+          onUnmarkExplored={handleUnmarkRegionsExplored}
         />
 
         {/* Map Object Control Bar - Shows when map object(s) are selected */}
