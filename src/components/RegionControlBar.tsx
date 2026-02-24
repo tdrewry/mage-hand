@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,13 +15,17 @@ interface RegionControlBarProps {
   onClearSelection: () => void;
   onUpdateCanvas?: () => void;
   onSelectAll?: () => void;
+  onMarkExplored?: (regionIds: string[]) => void;
+  isDM?: boolean;
 }
 
 export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   selectedRegionIds,
   onClearSelection,
   onUpdateCanvas,
-  onSelectAll
+  onSelectAll,
+  onMarkExplored,
+  isDM = false,
 }) => {
   const { regions, updateRegion, removeRegion } = useRegionStore();
   
@@ -193,6 +197,22 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
             <Palette className="h-3 w-3 mr-1" />
             Color
           </Button>
+          
+          {/* Mark as Explored (DM only, fog reveal) */}
+          {isDM && onMarkExplored && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs" 
+                onClick={() => onMarkExplored(selectedRegionIds)}
+              >
+                <CloudFog className="h-3 w-3 mr-1" />
+                Reveal
+              </Button>
+            </>
+          )}
           
           <div className="h-4 w-px bg-border" />
           
