@@ -110,14 +110,18 @@ import { useActionStore } from "../stores/actionStore";
 import { CursorOverlay } from "./CursorOverlay";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
+import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
 import { setPostProcessingVisible } from "../lib/postProcessingLayer";
 
 export const SimpleTabletop = () => {
-  // Register ephemeral cursor handlers once
-  React.useEffect(() => { registerCursorHandlers(); }, []);
+  // Register ephemeral handlers once
+  React.useEffect(() => {
+    registerCursorHandlers();
+    registerPresenceHandlers();
+  }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
@@ -260,6 +264,11 @@ export const SimpleTabletop = () => {
       }
     }
   }, [selectedMapId, viewportTransforms]);
+
+  // Broadcast presence.viewingMap when the active map changes
+  useEffect(() => {
+    ephemeralBus.emit("presence.viewingMap", { mapId: selectedMapId ?? null });
+  }, [selectedMapId]);
   
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
