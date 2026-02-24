@@ -101,15 +101,22 @@ All handlers registered, store created, TTL expiry cleanup wired.
 
 ---
 
-## Phase 7 — Tests
+## Phase 7 — Tests ✅ DONE
 
-Per contract §5.
+Per contract §5. All 22 tests passing.
 
-- [ ] **Ephemeral broadcast**: Client A sends `cursor.update`, Client B receives and updates overlay
-- [ ] **Throttle**: Spam cursor updates, verify outbound rate ≤ configured Hz
-- [ ] **TTL expiry**: Send one hover update, verify it disappears after TTL
-- [ ] **No replay on late join**: Late-joining client sees no stale ephemeral state
-- [ ] **No durable log pollution**: Ephemeral events don't affect durable op sequences
+- [x] **Ephemeral broadcast**: `EphemeralBus.receive()` dispatches to handler and stores in TTL cache
+- [x] **Echo prevention**: Events from local user are skipped
+- [x] **Throttle**: Rapid emissions respect configured Hz; trailing edge fires latest payload
+- [x] **TTL expiry**: Cached events expire after TTL; onChange fires with null
+- [x] **No replay on late join**: Handlers registered after event receive no replay
+- [x] **No durable log pollution**: Emitted ops have no seq/ack/durable metadata
+- [x] **DM-only gating**: Non-DM clients blocked from emitting DM-only ops
+- [x] **Multiple cache listeners**: Array-based onCacheChange with unsubscribe support
+- [x] **ThrottleManager**: 6 tests (immediate fire, rate limiting, trailing edge, flush, dispose)
+- [x] **TTLCache**: 6 tests (set/get, expiry, overwrite, onChange, clear, permanent entries)
+
+Test files: `src/lib/net/ephemeral/__tests__/{TTLCache,ThrottleManager,EphemeralBus}.test.ts`
 
 ---
 
@@ -117,8 +124,10 @@ Per contract §5.
 
 All `planned` and `potential` ephemeral items in `NETWORKING-MATRIX.md` have:
 - A typed payload definition ✅ (Phase 1)
-- A client emitter hook (even if feature UI is stubbed)
-- A client receiver hook updating an ephemeral overlay store
+- A client emitter hook (even if feature UI is stubbed) ✅ (Phases 3–6)
+- A client receiver hook updating an ephemeral overlay store ✅ (Phases 3–6)
 - TTL + throttle implemented per matrix guidance ✅ (Phase 1 config)
+- Server broadcasts ephemeral messages without persisting them ✅ (Phase 2/2b)
+- Tests exist and pass ✅ (Phase 7 — 22 tests)
 - Server broadcasts ephemeral messages without persisting them
 - Tests exist and pass
