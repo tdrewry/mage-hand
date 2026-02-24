@@ -15,14 +15,14 @@
 
 ---
 
-## Phase 2 — OpBridge Integration & Server Routing
+## Phase 2 — OpBridge Integration & Server Routing ✅ DONE
 
 Route incoming ephemeral ops through `EphemeralBus.receive()` instead of durable handlers.
 
-- [ ] Update `src/lib/net/OpBridge.ts` to detect ephemeral op kinds and route to `ephemeralBus.receive()`
-- [ ] Update server `eventHandlers.js` to add `handleEphemeralMessage()` — broadcast without logging
-- [ ] Ensure ephemeral ops do not increment durable sequence counters
-- [ ] Ensure ephemeral ops are excluded from catch-up / late-join replay
+- [x] Update `src/lib/net/NetManager.ts` to detect ephemeral op kinds and route to `ephemeralBus.receive()`
+- [x] Update server `eventHandlers.js` to add `handleEphemeral()` — broadcast without logging
+- [x] Ensure ephemeral ops do not increment durable sequence counters (server broadcasts via separate `ephemeral` event)
+- [x] Ensure ephemeral ops are excluded from catch-up / late-join replay (not persisted in session state)
 
 ---
 
