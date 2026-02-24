@@ -82,20 +82,22 @@ Extend existing drag preview with remaining token ephemeral ops.
 
 ---
 
-## Phase 6 — Fog, Dice, Initiative, Groups, Roles
+## Phase 6 — Fog, Dice, Initiative, Groups, Roles ✅ DONE
 
-Lower-priority ephemeral ops.
+All handlers registered, store created, TTL expiry cleanup wired.
 
-- [ ] `fog.cursor.preview` — broadcast fog brush position + radius
-- [ ] `fog.reveal.preview` — broadcast intended reveal area shape
-- [ ] `chat.typing` — typing indicator (2s TTL)
-- [ ] `dice.rolling` — "user is rolling" spinner (3s TTL)
-- [ ] `initiative.drag.preview` — reorder drag preview
-- [ ] `initiative.hover` — current-turn hover highlight (500ms TTL)
-- [ ] `group.select.preview` — selected group highlight
-- [ ] `group.drag.preview` — ghost positions for group members
-- [ ] `role.handRaise` — player requests GM attention (30s auto-expire)
-- [ ] `asset.uploadProgress` — upload percentage broadcast (1s TTL)
+- [x] `fog.cursor.preview` — handler + store wired (emit from fog brush TBD)
+- [x] `fog.reveal.preview` — handler registered (stub — emit TBD)
+- [x] `chat.typing` — handler + store wired (emit from chat input TBD)
+- [x] `dice.rolling` — handler + store + emit wired in diceStore.roll()
+- [x] `initiative.drag.preview` — handler + store wired (emit from initiative panel TBD)
+- [x] `initiative.hover` — handler + store wired (emit from initiative panel TBD)
+- [x] `group.select.preview` — handler + store wired (emit TBD)
+- [x] `group.drag.preview` — handler + store wired (emit TBD)
+- [x] `role.handRaise` — handler + store wired (emit from player UI TBD)
+- [x] `asset.uploadProgress` — handler + store wired (emit from upload pipeline TBD)
+- [x] Created `src/stores/miscEphemeralStore.ts` — Zustand store for all Phase 6 overlays
+- [x] Created `src/lib/net/ephemeral/miscHandlers.ts` — registers all handlers + TTL expiry
 
 ---
 

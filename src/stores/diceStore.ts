@@ -3,6 +3,7 @@ import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
 import { rollDice, type DiceRollResult, type RollMetadata } from '@/lib/diceEngine';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { ephemeralBus } from '@/lib/net';
 
 const MAX_HISTORY = 50;
 
@@ -34,6 +35,7 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
 
   roll: (formula: string, label?: string, meta?: RollMetadata) => {
     const username = useMultiplayerStore.getState().currentUsername || 'You';
+    ephemeralBus.emit("dice.rolling", { formula });
     const result = rollDice(formula, label, meta);
     result.rolledBy = username;
     set((state) => ({
