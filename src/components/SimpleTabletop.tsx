@@ -113,6 +113,7 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
+import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
@@ -125,6 +126,7 @@ export const SimpleTabletop = () => {
     registerCursorHandlers();
     registerPresenceHandlers();
     registerTokenHandlers();
+    registerMapHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -249,6 +251,12 @@ export const SimpleTabletop = () => {
         saveTimeoutRef.current = setTimeout(() => {
           setViewportTransform(selectedMapId, newTransform);
         }, 300);
+      }
+
+      // ── EPHEMERAL: DM broadcasts viewport to all clients ──
+      const currentPlayer2 = useSessionStore.getState().players.find(p => p.id === useSessionStore.getState().currentPlayerId);
+      if (currentPlayer2?.roleIds?.includes('dm')) {
+        ephemeralBus.emit("map.dm.viewport", { x: newTransform.x, y: newTransform.y, zoom: newTransform.zoom });
       }
       
       return newTransform;
@@ -6402,7 +6410,6 @@ export const SimpleTabletop = () => {
         }
       }
 
-
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then map objects, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       let clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
@@ -7215,6 +7222,9 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - mapObjectDragOffset.x;
       const newY = worldPos.y - mapObjectDragOffset.y;
 
+      // ── EPHEMERAL: broadcast map object drag position ──
+      ephemeralBus.emit("mapObject.drag.update", { objectId: draggedMapObjectId, pos: { x: newX, y: newY } });
+
       // Compute ABSOLUTE delta from snapshot origin (not from live store — avoids compounding)
       const primarySnap = groupSiblingSnapshotsRef.current[draggedMapObjectId];
       const primaryStartX = primarySnap?.position?.x ?? newX;
@@ -7289,6 +7299,9 @@ export const SimpleTabletop = () => {
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
+
+      // ── EPHEMERAL: broadcast region drag position ──
+      ephemeralBus.emit("region.drag.update", { regionId: draggedRegionId, pos: { x: newX, y: newY } });
 
       // Invalidate wall decoration cache every frame so ghost decorations don't trail the drag
       wallDecorationCacheRef.current = null;
