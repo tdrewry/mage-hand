@@ -9361,6 +9361,12 @@ export const SimpleTabletop = () => {
     const serialized = serializeFogGeometry(updated);
     if (serialized) {
       setSerializedExploredAreas(serialized);
+      // Broadcast to connected players so they redraw with the revealed area
+      ephemeralBus.emit("fog.reveal.preview", {
+        shape: "committed",
+        points: [],
+        serializedExploredAreas: serialized,
+      });
     }
 
     toast.success(`Revealed ${targetRegions.length} region(s) through fog`);
