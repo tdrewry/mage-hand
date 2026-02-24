@@ -3,11 +3,15 @@
 
 import { NetManager } from "./NetManager";
 import { opBridge } from "./OpBridge";
+import { EphemeralBus } from "./ephemeral";
 import type { EngineOp } from "../../../networking/contract/v1";
 
-// Create singleton and wire the circular reference
+// Create singletons and wire circular references
 export const netManager = new NetManager();
+export const ephemeralBus = new EphemeralBus();
+
 opBridge.setProposeOp((op, id) => netManager.proposeOp(op, id));
+ephemeralBus.setSendFn((op) => netManager.proposeOp(op));
 
 /** Convenience: emit a local op to the network (echo-safe). */
 export function emitLocalOp(op: EngineOp, clientOpId?: string): void {
@@ -17,3 +21,5 @@ export function emitLocalOp(op: EngineOp, clientOpId?: string): void {
 export { opBridge } from "./OpBridge";
 export { NetManager } from "./NetManager";
 export type { NetConnectionStatus } from "./NetManager";
+export { EphemeralBus, isEphemeralOp } from "./ephemeral";
+export type { EphemeralOpKind, EphemeralPayloadMap } from "./ephemeral";
