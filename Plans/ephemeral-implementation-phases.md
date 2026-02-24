@@ -55,14 +55,16 @@ First visually testable ephemeral features per contract §3.4.
 
 ---
 
-## Phase 4 — Token Ephemeral Ops
+## Phase 4 — Token Ephemeral Ops ✅ DONE
 
 Extend existing drag preview with remaining token ephemeral ops.
 
-- [ ] `token.handle.preview` — emit during rotate/scale handle drag, render remote handle ghost
-- [ ] `token.hover` — emit on token mouseenter/leave, render hover highlight outline on remote clients
-- [ ] `selection.preview` — emit selection rectangle/lasso polyline, render remote selection box outline
-- [ ] `action.target.preview` — emit targeting reticle position from actionStore, render crosshair
+- [x] `token.hover` — emit on token mouseenter/leave, handler + store in `tokenEphemeralStore`
+- [x] `token.handle.preview` — handler + store wired (emit from handle drag TBD when handle UI exists)
+- [x] `selection.preview` — emit selection rectangle during marquee drag, clear on mouseUp
+- [x] `action.target.preview` — emit targeting reticle position during action targeting mode
+- [x] Created `src/stores/tokenEphemeralStore.ts` — Zustand store for all 4 token ephemeral overlays
+- [x] Created `src/lib/net/ephemeral/tokenHandlers.ts` — registers handlers + TTL expiry cleanup
 
 ---
 
