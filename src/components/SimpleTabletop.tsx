@@ -302,6 +302,9 @@ export const SimpleTabletop = () => {
 
   // Remote drag previews — subscribe to store for canvas redraws
   const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
+  const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
+  const remoteSelections = useTokenEphemeralStore((s) => s.selectionPreviews);
+  const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -926,12 +929,15 @@ export const SimpleTabletop = () => {
     return () => clearInterval(id);
   }, []);
 
-  // ── Redraw canvas when remote drag previews change ──
+  // ── Redraw canvas when remote ephemeral overlays change ──
   useEffect(() => {
-    if (Object.keys(remoteDragPreviews).length > 0) {
+    if (Object.keys(remoteDragPreviews).length > 0 ||
+        Object.keys(remoteHovers).length > 0 ||
+        Object.keys(remoteSelections).length > 0 ||
+        Object.keys(remoteActionTargets).length > 0) {
       redrawCanvas();
     }
-  }, [remoteDragPreviews]);
+  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets]);
 
   useEffect(() => {
     // Skip during drag - updateGridHighlights handles the dragged token specifically
@@ -3265,8 +3271,11 @@ export const SimpleTabletop = () => {
         drawDragGhostAndPath(ctx);
       }
 
-      // ── Remote drag previews ──
+      // ── Remote ephemeral overlays ──
       drawRemoteDragPreviews(ctx);
+      drawRemoteTokenHovers(ctx);
+      drawRemoteSelectionPreviews(ctx);
+      drawRemoteActionTargets(ctx);
     }
 
     // Restore context after all world-space rendering
@@ -3312,8 +3321,11 @@ export const SimpleTabletop = () => {
             if (isDraggingToken && draggedTokenId) {
               drawDragGhostAndPath(overlayCtx);
             }
-            // ── Remote drag previews on overlay ──
+            // ── Remote ephemeral overlays on overlay ──
             drawRemoteDragPreviews(overlayCtx);
+            drawRemoteTokenHovers(overlayCtx);
+            drawRemoteSelectionPreviews(overlayCtx);
+            drawRemoteActionTargets(overlayCtx);
 
             overlayCtx.restore();
           }
@@ -3507,7 +3519,144 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw ONLY the drag path (called before tokens so path appears below token art)
+  // ── Draw remote token hover highlights (colored ring around hovered token) ──
+  const drawRemoteTokenHovers = (ctx: CanvasRenderingContext2D) => {
+    const hovers = Object.values(remoteHovers);
+    if (hovers.length === 0) return;
+
+    ctx.save();
+    for (const h of hovers) {
+      if (!h.tokenId) continue;
+      const token = tokens.find((t) => t.id === h.tokenId);
+      if (!token) continue;
+
+      const baseTokenSize = 40;
+      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+      const radius = tokenSize / 2 + 3 / transform.zoom;
+
+      // Use cursor color for this user
+      const cursorState = useCursorStore.getState().cursors[h.userId];
+      const color = cursorState?.color || "#60a5fa";
+
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 3 / transform.zoom]);
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Small label
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(h.userId.slice(0, 8), token.x, token.y - radius - 2 / transform.zoom);
+    }
+    ctx.restore();
+  };
+
+  // ── Draw remote selection rectangle previews ──
+  const drawRemoteSelectionPreviews = (ctx: CanvasRenderingContext2D) => {
+    const selections = Object.values(remoteSelections);
+    if (selections.length === 0) return;
+
+    ctx.save();
+    for (const s of selections) {
+      if (!s.rect || s.rect.width < 2 || s.rect.height < 2) continue;
+
+      const cursorState = useCursorStore.getState().cursors[s.userId];
+      const color = cursorState?.color || "#a78bfa";
+
+      // Filled rectangle with low opacity
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = color;
+      ctx.fillRect(s.rect.x, s.rect.y, s.rect.width, s.rect.height);
+
+      // Dashed border
+      ctx.globalAlpha = 0.45;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5 / transform.zoom;
+      ctx.setLineDash([5 / transform.zoom, 3 / transform.zoom]);
+      ctx.strokeRect(s.rect.x, s.rect.y, s.rect.width, s.rect.height);
+      ctx.setLineDash([]);
+
+      // User label at top-left
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(s.userId.slice(0, 8), s.rect.x, s.rect.y - 2 / transform.zoom);
+    }
+    ctx.restore();
+  };
+
+  // ── Draw remote action target crosshairs ──
+  const drawRemoteActionTargets = (ctx: CanvasRenderingContext2D) => {
+    const targets = Object.values(remoteActionTargets);
+    if (targets.length === 0) return;
+
+    ctx.save();
+    for (const t of targets) {
+      const cursorState = useCursorStore.getState().cursors[t.userId];
+      const color = cursorState?.color || "#f87171";
+      const r = 12 / transform.zoom;
+      const { x, y } = t.pos;
+
+      // Outer circle
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Crosshair lines
+      ctx.beginPath();
+      ctx.moveTo(x - r * 1.4, y);
+      ctx.lineTo(x - r * 0.5, y);
+      ctx.moveTo(x + r * 0.5, y);
+      ctx.lineTo(x + r * 1.4, y);
+      ctx.moveTo(x, y - r * 1.4);
+      ctx.lineTo(x, y - r * 0.5);
+      ctx.moveTo(x, y + r * 0.5);
+      ctx.lineTo(x, y + r * 1.4);
+      ctx.stroke();
+
+      // Small center dot
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 2 / transform.zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Line from source token to target pos
+      const sourceToken = tokens.find((tk) => tk.id === t.sourceTokenId);
+      if (sourceToken) {
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([4 / transform.zoom, 3 / transform.zoom]);
+        ctx.beginPath();
+        ctx.moveTo(sourceToken.x, sourceToken.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // User label
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(t.userId.slice(0, 8), x, y - r - 3 / transform.zoom);
+    }
+    ctx.restore();
+  };
   const drawDragPathOnly = (ctx: CanvasRenderingContext2D) => {
     if (!draggedTokenId) return;
 
