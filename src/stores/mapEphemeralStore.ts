@@ -49,6 +49,10 @@ interface MapEphemeralState {
   removeRegionDrag: (entityId: string) => void;
   setMapObjectDrag: (entityId: string, drag: RemoteEntityDrag) => void;
   removeMapObjectDrag: (entityId: string) => void;
+
+  /** Follow DM viewport toggle (player-side) */
+  followDM: boolean;
+  setFollowDM: (v: boolean) => void;
 }
 
 export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
@@ -57,6 +61,8 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
   focus: null,
   regionDrags: {},
   mapObjectDrags: {},
+  followDM: false,
+  setFollowDM: (v) => set({ followDM: v }),
 
   setDmViewport: (vp) => set({ dmViewport: vp }),
   addPing: (userId, ping) =>

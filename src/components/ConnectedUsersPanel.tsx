@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Users, Circle, Settings, Shield, UserCog, Map, Activity } from 'lucide-react';
+import { Users, Circle, Settings, Shield, UserCog, Map, Activity, Hand } from 'lucide-react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useMapStore } from '@/stores/mapStore';
+import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
   const { connectedUsers, currentUserId } = useMultiplayerStore();
   const { roles, getRoleById } = useRoleStore();
   const presence = usePresenceStore((s) => s.presence);
+  const handRaises = useMiscEphemeralStore((s) => s.handRaises);
   const maps = useMapStore((s) => s.maps);
   const currentPlayer = useSessionStore((state) => 
     state.players.find(p => p.id === state.currentPlayerId)
@@ -136,7 +138,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                     />
 
                     <div className="flex-1 min-w-0">
-                      {/* Username */}
+                      {/* Username + hand raise */}
                       <div className="flex items-center gap-2 mb-2">
                         <p className="font-medium truncate">
                           {user.username}
@@ -144,6 +146,12 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                             <span className="text-xs text-muted-foreground ml-2">(You)</span>
                           )}
                         </p>
+                        {handRaises[user.userId] && (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-500 animate-pulse">
+                            <Hand className="h-3.5 w-3.5" />
+                            Raised
+                          </span>
+                        )}
                       </div>
 
                       {/* Current roles */}

@@ -284,6 +284,14 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     ephemeralBus.emit("presence.viewingMap", { mapId: selectedMapId ?? null });
   }, [selectedMapId]);
+
+  // ── Follow DM: auto-pan viewport to match DM's broadcast ──
+  const followDM = useMapEphemeralStore((s) => s.followDM);
+  const dmViewport = useMapEphemeralStore((s) => s.dmViewport);
+  useEffect(() => {
+    if (!followDM || !dmViewport) return;
+    setTransformState({ x: dmViewport.x, y: dmViewport.y, zoom: dmViewport.zoom });
+  }, [followDM, dmViewport]);
   
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation

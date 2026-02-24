@@ -5,11 +5,17 @@ import {
   Menu as MenuIcon,
   Users,
   Footprints,
+  Eye,
+  Hand,
 } from 'lucide-react';
 import { useCardStore } from '@/stores/cardStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useMapEphemeralStore } from '@/stores/mapEphemeralStore';
+import { ephemeralBus } from '@/lib/net';
 import { CardType } from '@/types/cardTypes';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
+import { toast } from 'sonner';
 
 interface CircularButtonBarProps {
   mode: 'edit' | 'play';
@@ -24,9 +30,16 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   const setVisibility = useCardStore((state) => state.setVisibility);
   const registerCard = useCardStore((state) => state.registerCard);
   
-  // Use initiativeStore's restrictMovement as the master movement lock
   const movementLocked = useInitiativeStore((state) => state.restrictMovement);
   const setMovementLocked = useInitiativeStore((state) => state.setRestrictMovement);
+
+  const currentPlayer = useSessionStore((state) =>
+    state.players.find(p => p.id === state.currentPlayerId)
+  );
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+
+  const followDM = useMapEphemeralStore((s) => s.followDM);
+  const setFollowDM = useMapEphemeralStore((s) => s.setFollowDM);
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
@@ -54,6 +67,10 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
     }
   };
 
+  const handleHandRaise = () => {
+    ephemeralBus.emit('role.handRaise', {});
+    toast.info('Hand raised!');
+  };
 
   return (
     <Toolbar position="top" className="gap-0.5 px-1.5 py-1">
@@ -106,6 +123,34 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         variant={movementLocked ? 'destructive' : 'ghost'}
         size="xs"
       />
+
+      {!isDM && (
+        <>
+          <ToolbarSeparator />
+          <ToolbarButton
+            icon={Eye}
+            label={followDM ? 'Stop Following DM' : 'Follow DM Viewport'}
+            onClick={() => {
+              setFollowDM(!followDM);
+              toast.info(followDM ? 'Stopped following DM' : 'Following DM viewport');
+            }}
+            isActive={followDM}
+            variant={followDM ? 'active' : 'ghost'}
+            size="xs"
+            className={followDM ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+          />
+        </>
+      )}
+
+      {!isDM && (
+        <ToolbarButton
+          icon={Hand}
+          label="Raise Hand"
+          onClick={handleHandRaise}
+          variant="ghost"
+          size="xs"
+        />
+      )}
     </Toolbar>
   );
 };
