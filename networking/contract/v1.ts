@@ -191,12 +191,19 @@ export interface AssetRegisteredPayload {
   meta?: Record<string, unknown>;
 }
 
+/** Ephemeral payload: fire-and-forget, no sequencing, no persistence. */
+export interface EphemeralPayload {
+  kind: string;
+  data: unknown;
+}
+
 export type ClientToServerMessage =
   | Msg<"hello", HelloPayload>
   | Msg<"propose_ops", ProposeOpsPayload>
   | Msg<"catchup_request", CatchupRequestPayload>
   | Msg<"chat_post", ChatPostPayload>
-  | Msg<"asset_registered", AssetRegisteredPayload>;
+  | Msg<"asset_registered", AssetRegisteredPayload>
+  | Msg<"ephemeral", EphemeralPayload>;
 
 export type ServerToClientMessage =
   | Msg<"welcome", WelcomePayload>
@@ -205,7 +212,8 @@ export type ServerToClientMessage =
   | Msg<"op_batch", OpBatchPayload>
   | Msg<"presence", PresencePayload>
   | Msg<"need_snapshot", NeedSnapshotPayload>
-  | Msg<"snapshot_pointer", SnapshotPointerPayload>;
+  | Msg<"snapshot_pointer", SnapshotPointerPayload>
+  | Msg<"ephemeral", EphemeralPayload & { userId: UserId }>;
 
 // Default export for compatibility when this module is transpiled to CJS
 // (ESM named imports from CJS will fail in Node).

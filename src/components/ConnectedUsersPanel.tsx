@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Users, Circle, Settings, Shield, UserCog } from 'lucide-react';
+import { Users, Circle, Settings, Shield, UserCog, Map, Activity, Hand } from 'lucide-react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { usePresenceStore } from '@/stores/presenceStore';
+import { useMapStore } from '@/stores/mapStore';
+import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +35,9 @@ interface ConnectedUsersPanelProps {
 export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigger }) => {
   const { connectedUsers, currentUserId } = useMultiplayerStore();
   const { roles, getRoleById } = useRoleStore();
+  const presence = usePresenceStore((s) => s.presence);
+  const handRaises = useMiscEphemeralStore((s) => s.handRaises);
+  const maps = useMapStore((s) => s.maps);
   const currentPlayer = useSessionStore((state) => 
     state.players.find(p => p.id === state.currentPlayerId)
   );
@@ -132,7 +138,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                     />
 
                     <div className="flex-1 min-w-0">
-                      {/* Username */}
+                      {/* Username + hand raise */}
                       <div className="flex items-center gap-2 mb-2">
                         <p className="font-medium truncate">
                           {user.username}
@@ -140,6 +146,12 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                             <span className="text-xs text-muted-foreground ml-2">(You)</span>
                           )}
                         </p>
+                        {handRaises[user.userId] && (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-500 animate-pulse">
+                            <Hand className="h-3.5 w-3.5" />
+                            Raised
+                          </span>
+                        )}
                       </div>
 
                       {/* Current roles */}
@@ -166,7 +178,31 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                         )}
                       </div>
 
-                      {/* Role management (DM only) */}
+                      {/* Presence info (viewing map + activity) */}
+                      {(() => {
+                        const p = presence[user.userId];
+                        if (!p) return null;
+                        const mapName = p.viewingMapId
+                          ? maps.find((m) => m.id === p.viewingMapId)?.name ?? "Unknown map"
+                          : null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-2 mb-3 text-xs text-muted-foreground">
+                            {mapName && (
+                              <span className="flex items-center gap-1">
+                                <Map className="h-3 w-3" />
+                                {mapName}
+                              </span>
+                            )}
+                            {p.activity && (
+                              <span className="flex items-center gap-1">
+                                <Activity className="h-3 w-3" />
+                                {p.activity}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {isDM && !isCurrentUser && (
                         <div className="space-y-2">
                           <Separator className="my-2" />

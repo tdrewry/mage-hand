@@ -68,7 +68,7 @@ import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache, computeVisibilityFromSegments, visibilityPolygonToPath2D } from "../lib/visibilityEngine";
 import { throttle } from "../lib/throttle";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea } from "../lib/fogGeometry";
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea, getFogScope } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
@@ -98,7 +98,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog, MousePointer2 } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
@@ -107,12 +107,30 @@ import { checkMovementCollision, getBlockingObjects } from "../lib/movementColli
 import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
+import { CursorOverlay } from "./CursorOverlay";
+import { useCursorStore } from "@/stores/cursorStore";
+import { ephemeralBus } from "@/lib/net";
+import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
+import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
+import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
+import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
+import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
+import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
 import { setPostProcessingVisible } from "../lib/postProcessingLayer";
 
 export const SimpleTabletop = () => {
+  // Register ephemeral handlers once
+  React.useEffect(() => {
+    registerCursorHandlers();
+    registerPresenceHandlers();
+    registerTokenHandlers();
+    registerMapHandlers();
+    registerMiscHandlers();
+  }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
@@ -237,6 +255,12 @@ export const SimpleTabletop = () => {
           setViewportTransform(selectedMapId, newTransform);
         }, 300);
       }
+
+      // ── EPHEMERAL: DM broadcasts viewport to all clients ──
+      const currentPlayer2 = useSessionStore.getState().players.find(p => p.id === useSessionStore.getState().currentPlayerId);
+      if (currentPlayer2?.roleIds?.includes('dm')) {
+        ephemeralBus.emit("map.dm.viewport", { x: newTransform.x, y: newTransform.y, zoom: newTransform.zoom });
+      }
       
       return newTransform;
     });
@@ -255,6 +279,19 @@ export const SimpleTabletop = () => {
       }
     }
   }, [selectedMapId, viewportTransforms]);
+
+  // Broadcast presence.viewingMap when the active map changes
+  useEffect(() => {
+    ephemeralBus.emit("presence.viewingMap", { mapId: selectedMapId ?? null });
+  }, [selectedMapId]);
+
+  // ── Follow DM: auto-pan viewport to match DM's broadcast ──
+  const followDM = useMapEphemeralStore((s) => s.followDM);
+  const dmViewport = useMapEphemeralStore((s) => s.dmViewport);
+  useEffect(() => {
+    if (!followDM || !dmViewport) return;
+    setTransformState({ x: dmViewport.x, y: dmViewport.y, zoom: dmViewport.zoom });
+  }, [followDM, dmViewport]);
   
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
@@ -276,6 +313,12 @@ export const SimpleTabletop = () => {
 
   // Remote drag previews — subscribe to store for canvas redraws
   const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
+  const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
+  const remoteSelections = useTokenEphemeralStore((s) => s.selectionPreviews);
+  const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
+  const remotePings = useMapEphemeralStore((s) => s.pings);
+  // Local pings (own + remote) for animated rendering — each has a birth timestamp
+  const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -900,12 +943,44 @@ export const SimpleTabletop = () => {
     return () => clearInterval(id);
   }, []);
 
-  // ── Redraw canvas when remote drag previews change ──
+  // ── Merge remote pings into activePings for animated rendering ──
   useEffect(() => {
-    if (Object.keys(remoteDragPreviews).length > 0) {
+    const remotePingValues = Object.values(remotePings);
+    if (remotePingValues.length === 0) return;
+    setActivePings((prev) => {
+      const existingIds = new Set(prev.map((p) => p.id));
+      const newPings = remotePingValues
+        .filter((rp) => !existingIds.has(`remote-${rp.userId}-${rp.ts}`))
+        .map((rp) => ({
+          id: `remote-${rp.userId}-${rp.ts}`,
+          pos: rp.pos,
+          color: rp.color || "#fbbf24",
+          ts: rp.ts,
+        }));
+      return newPings.length > 0 ? [...prev, ...newPings] : prev;
+    });
+  }, [remotePings]);
+
+  // ── Ping animation loop — expire after 1s, redraw while active ──
+  useEffect(() => {
+    if (activePings.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      const now = Date.now();
+      setActivePings((prev) => prev.filter((p) => now - p.ts < 1000));
+      redrawCanvas();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activePings]);
+
+  // ── Redraw canvas when remote ephemeral overlays change ──
+  useEffect(() => {
+    if (Object.keys(remoteDragPreviews).length > 0 ||
+        Object.keys(remoteHovers).length > 0 ||
+        Object.keys(remoteSelections).length > 0 ||
+        Object.keys(remoteActionTargets).length > 0) {
       redrawCanvas();
     }
-  }, [remoteDragPreviews]);
+  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets]);
 
   useEffect(() => {
     // Skip during drag - updateGridHighlights handles the dragged token specifically
@@ -3239,8 +3314,12 @@ export const SimpleTabletop = () => {
         drawDragGhostAndPath(ctx);
       }
 
-      // ── Remote drag previews ──
+      // ── Remote ephemeral overlays ──
       drawRemoteDragPreviews(ctx);
+      drawRemoteTokenHovers(ctx);
+      drawRemoteSelectionPreviews(ctx);
+      drawRemoteActionTargets(ctx);
+      drawMapPings(ctx);
     }
 
     // Restore context after all world-space rendering
@@ -3286,8 +3365,11 @@ export const SimpleTabletop = () => {
             if (isDraggingToken && draggedTokenId) {
               drawDragGhostAndPath(overlayCtx);
             }
-            // ── Remote drag previews on overlay ──
+            // ── Remote ephemeral overlays on overlay ──
             drawRemoteDragPreviews(overlayCtx);
+            drawRemoteTokenHovers(overlayCtx);
+            drawRemoteSelectionPreviews(overlayCtx);
+            drawRemoteActionTargets(overlayCtx);
 
             overlayCtx.restore();
           }
@@ -3481,7 +3563,187 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
-  // Function to draw ONLY the drag path (called before tokens so path appears below token art)
+  // ── Draw remote token hover highlights (colored ring around hovered token) ──
+  const drawRemoteTokenHovers = (ctx: CanvasRenderingContext2D) => {
+    const hovers = Object.values(remoteHovers);
+    if (hovers.length === 0) return;
+
+    ctx.save();
+    for (const h of hovers) {
+      if (!h.tokenId) continue;
+      const token = tokens.find((t) => t.id === h.tokenId);
+      if (!token) continue;
+
+      const baseTokenSize = 40;
+      const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+      const radius = tokenSize / 2 + 3 / transform.zoom;
+
+      // Use cursor color for this user
+      const cursorState = useCursorStore.getState().cursors[h.userId];
+      const color = cursorState?.color || "#60a5fa";
+
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 3 / transform.zoom]);
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Small label
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(h.userId.slice(0, 8), token.x, token.y - radius - 2 / transform.zoom);
+    }
+    ctx.restore();
+  };
+
+  // ── Draw remote selection rectangle previews ──
+  const drawRemoteSelectionPreviews = (ctx: CanvasRenderingContext2D) => {
+    const selections = Object.values(remoteSelections);
+    if (selections.length === 0) return;
+
+    ctx.save();
+    for (const s of selections) {
+      if (!s.rect || s.rect.width < 2 || s.rect.height < 2) continue;
+
+      const cursorState = useCursorStore.getState().cursors[s.userId];
+      const color = cursorState?.color || "#a78bfa";
+
+      // Filled rectangle with low opacity
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = color;
+      ctx.fillRect(s.rect.x, s.rect.y, s.rect.width, s.rect.height);
+
+      // Dashed border
+      ctx.globalAlpha = 0.45;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5 / transform.zoom;
+      ctx.setLineDash([5 / transform.zoom, 3 / transform.zoom]);
+      ctx.strokeRect(s.rect.x, s.rect.y, s.rect.width, s.rect.height);
+      ctx.setLineDash([]);
+
+      // User label at top-left
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(s.userId.slice(0, 8), s.rect.x, s.rect.y - 2 / transform.zoom);
+    }
+    ctx.restore();
+  };
+
+  // ── Draw remote action target crosshairs ──
+  const drawRemoteActionTargets = (ctx: CanvasRenderingContext2D) => {
+    const targets = Object.values(remoteActionTargets);
+    if (targets.length === 0) return;
+
+    ctx.save();
+    for (const t of targets) {
+      const cursorState = useCursorStore.getState().cursors[t.userId];
+      const color = cursorState?.color || "#f87171";
+      const r = 12 / transform.zoom;
+      const { x, y } = t.pos;
+
+      // Outer circle
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Crosshair lines
+      ctx.beginPath();
+      ctx.moveTo(x - r * 1.4, y);
+      ctx.lineTo(x - r * 0.5, y);
+      ctx.moveTo(x + r * 0.5, y);
+      ctx.lineTo(x + r * 1.4, y);
+      ctx.moveTo(x, y - r * 1.4);
+      ctx.lineTo(x, y - r * 0.5);
+      ctx.moveTo(x, y + r * 0.5);
+      ctx.lineTo(x, y + r * 1.4);
+      ctx.stroke();
+
+      // Small center dot
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 2 / transform.zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Line from source token to target pos
+      const sourceToken = tokens.find((tk) => tk.id === t.sourceTokenId);
+      if (sourceToken) {
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([4 / transform.zoom, 3 / transform.zoom]);
+        ctx.beginPath();
+        ctx.moveTo(sourceToken.x, sourceToken.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // User label
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(t.userId.slice(0, 8), x, y - r - 3 / transform.zoom);
+    }
+    ctx.restore();
+  };
+
+  // ── Draw map pings (expanding + fading circles) ──
+  const drawMapPings = (ctx: CanvasRenderingContext2D) => {
+    if (activePings.length === 0) return;
+    const now = Date.now();
+    ctx.save();
+    for (const ping of activePings) {
+      const age = now - ping.ts;
+      if (age >= 1000) continue;
+      const t = age / 1000; // 0→1
+      const radius = (20 + t * 60) / transform.zoom;
+      const alpha = 1 - t;
+
+      // Outer expanding ring
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.strokeStyle = ping.color;
+      ctx.lineWidth = 3 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(ping.pos.x, ping.pos.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner solid dot (fades slower)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = ping.color;
+      ctx.beginPath();
+      ctx.arc(ping.pos.x, ping.pos.y, 5 / transform.zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Second expanding ring (delayed)
+      if (t > 0.15) {
+        const t2 = (t - 0.15) / 0.85;
+        const radius2 = (20 + t2 * 60) / transform.zoom;
+        ctx.globalAlpha = (1 - t2) * 0.35;
+        ctx.strokeStyle = ping.color;
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.beginPath();
+        ctx.arc(ping.pos.x, ping.pos.y, radius2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+
   const drawDragPathOnly = (ctx: CanvasRenderingContext2D) => {
     if (!draggedTokenId) return;
 
@@ -5202,6 +5464,7 @@ export const SimpleTabletop = () => {
     setPathDrawingMode("drawing");
     setPathDrawingType(type);
     setCurrentPath([]);
+    ephemeralBus.emit("presence.activity", { activity: type === "freehand" ? "drawing freehand region" : "drawing polygon region" });
     if (type === "polygon") {
       toast.info("Click to add points. Double-click to finish.");
     } else {
@@ -5710,6 +5973,21 @@ export const SimpleTabletop = () => {
 
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
+
+      // ── CTRL+CLICK: Emit map ping ──
+      if (e.ctrlKey && !e.shiftKey && !e.metaKey) {
+        const cursorColor = useCursorStore.getState().cursors[useSessionStore.getState().currentPlayerId || ""]?.color || "#fbbf24";
+        const pingTs = Date.now();
+        ephemeralBus.emit("map.ping", { pos: { x: worldPos.x, y: worldPos.y }, color: cursorColor });
+        // Also show locally immediately
+        setActivePings((prev) => [...prev, {
+          id: `local-${pingTs}`,
+          pos: { x: worldPos.x, y: worldPos.y },
+          color: cursorColor,
+          ts: pingTs,
+        }]);
+        return;
+      }
 
       // Check if we clicked on a token first (tokens are on top)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
@@ -6383,7 +6661,6 @@ export const SimpleTabletop = () => {
         }
       }
 
-
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then map objects, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       let clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
@@ -6424,6 +6701,7 @@ export const SimpleTabletop = () => {
         }
 
         setIsDraggingToken(true);
+        ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
@@ -6763,6 +7041,7 @@ export const SimpleTabletop = () => {
         });
 
         toast.success("Light source placed");
+        ephemeralBus.emit("presence.activity", { activity: "placing light" });
         setLightPlacementMode(false);
       } else if (e.shiftKey && renderingMode === "edit") {
         // Shift+click to remove light sources in edit mode
@@ -6794,11 +7073,23 @@ export const SimpleTabletop = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
+    // ── EPHEMERAL CURSOR: broadcast world-space position ──
+    const worldCursorPos = screenToWorld(mouseX, mouseY);
+    ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
+
     // ── ACTION TARGETING: track mouse position for reticle ──
     const actionStoreState = useActionStore.getState();
     if (actionStoreState.isTargeting) {
       const worldPos = screenToWorld(mouseX, mouseY);
       useActionStore.getState().setTargetingMousePos({ x: worldPos.x, y: worldPos.y });
+
+      // ── EPHEMERAL: broadcast action target preview ──
+      if (actionStoreState.currentAction?.sourceTokenId) {
+        ephemeralBus.emit("action.target.preview", {
+          sourceTokenId: actionStoreState.currentAction.sourceTokenId,
+          pos: { x: worldPos.x, y: worldPos.y },
+        });
+      }
       // Update cursor
       const hoverToken = getTokenAtPosition(worldPos.x, worldPos.y);
       if (hoverToken && hoverToken.id !== actionStoreState.currentAction?.sourceTokenId) {
@@ -6840,6 +7131,17 @@ export const SimpleTabletop = () => {
       const worldPos = screenToWorld(mouseX, mouseY);
       marqueeEndRef.current = worldPos;
       updateMarqueeDivFromRefs();
+
+      // ── EPHEMERAL: broadcast selection rectangle preview ──
+      const start = marqueeStartRef.current;
+      ephemeralBus.emit("selection.preview", {
+        rect: {
+          x: Math.min(start.x, worldPos.x),
+          y: Math.min(start.y, worldPos.y),
+          width: Math.abs(worldPos.x - start.x),
+          height: Math.abs(worldPos.y - start.y),
+        },
+      });
       return;
     }
 
@@ -7171,6 +7473,9 @@ export const SimpleTabletop = () => {
       const newX = worldPos.x - mapObjectDragOffset.x;
       const newY = worldPos.y - mapObjectDragOffset.y;
 
+      // ── EPHEMERAL: broadcast map object drag position ──
+      ephemeralBus.emit("mapObject.drag.update", { objectId: draggedMapObjectId, pos: { x: newX, y: newY } });
+
       // Compute ABSOLUTE delta from snapshot origin (not from live store — avoids compounding)
       const primarySnap = groupSiblingSnapshotsRef.current[draggedMapObjectId];
       const primaryStartX = primarySnap?.position?.x ?? newX;
@@ -7245,6 +7550,9 @@ export const SimpleTabletop = () => {
       const worldPos = screenToWorld(mouseX, mouseY);
       const newX = worldPos.x - regionDragOffset.x;
       const newY = worldPos.y - regionDragOffset.y;
+
+      // ── EPHEMERAL: broadcast region drag position ──
+      ephemeralBus.emit("region.drag.update", { regionId: draggedRegionId, pos: { x: newX, y: newY } });
 
       // Invalidate wall decoration cache every frame so ghost decorations don't trail the drag
       wallDecorationCacheRef.current = null;
@@ -7702,6 +8010,7 @@ export const SimpleTabletop = () => {
 
         if (distance <= radius) {
           setHoveredTokenId(token.id);
+          ephemeralBus.emit("token.hover", { tokenId: token.id });
           foundHoveredToken = true;
 
           // Update cursor based on controllability
@@ -7715,6 +8024,7 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
+        ephemeralBus.emit("token.hover", { tokenId: null });
         
         // Check if hovering over a door (DM in play mode)
         if (isDM && renderingMode === 'play') {
@@ -7750,6 +8060,9 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Clear ephemeral selection preview on mouse up
+    ephemeralBus.emit("selection.preview", {});
+
     // Handle marquee selection completion
     if (isMarqueeSelectingRef.current && marqueeStartRef.current && marqueeEndRef.current) {
       // Read from refs for the most up-to-date values
@@ -8979,6 +9292,59 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   };
 
+  // Mark selected regions as explored (DM fog reveal)
+  const handleMarkRegionsExplored = useCallback((regionIds: string[]) => {
+    if (!fogEnabled) {
+      toast.error('Fog of war must be enabled to reveal regions');
+      return;
+    }
+    const scope = fogScopeRef.current || getFogScope();
+    scope.activate();
+
+    const targetRegions = regions.filter(r => regionIds.includes(r.id));
+    if (targetRegions.length === 0) return;
+
+    let updated = exploredAreaRef.current;
+
+    for (const region of targetRegions) {
+      let regionPath: paper.Path;
+
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 3) {
+        // Free-form polygon region
+        regionPath = new scope.Path();
+        region.pathPoints.forEach(pt => {
+          regionPath.add(new scope.Point(region.x + pt.x, region.y + pt.y));
+        });
+        regionPath.closed = true;
+      } else {
+        // Rectangle region (apply rotation if present)
+        const cx = region.x + region.width / 2;
+        const cy = region.y + region.height / 2;
+        regionPath = new scope.Path.Rectangle({
+          point: [region.x, region.y],
+          size: [region.width, region.height],
+        });
+        if (region.rotation) {
+          regionPath.rotate(region.rotation, new scope.Point(cx, cy));
+        }
+      }
+
+      updated = addVisibleToExplored(updated, regionPath);
+      regionPath.remove();
+    }
+
+    exploredAreaRef.current = updated;
+
+    // Serialize for persistence
+    const serialized = serializeFogGeometry(updated);
+    if (serialized) {
+      setSerializedExploredAreas(serialized);
+    }
+
+    toast.success(`Revealed ${targetRegions.length} region(s) through fog`);
+    redrawCanvas();
+  }, [fogEnabled, regions, setSerializedExploredAreas]);
+
   const addTokenToCanvas = async (
     imageUrl: string,
     x?: number,
@@ -8988,6 +9354,7 @@ export const SimpleTabletop = () => {
     color?: string,
   ) => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    ephemeralBus.emit("presence.activity", { activity: "placing token" });
 
     // Use provided coordinates or default to center of viewport
     let tokenX = x ?? -transform.x / transform.zoom;
@@ -9136,6 +9503,8 @@ export const SimpleTabletop = () => {
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY }}
         />
+        {/* Remote cursor overlay */}
+        <CursorOverlay transform={transform} />
         {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
             Position/size is driven directly via ref to avoid React re-renders and flicker. */}
         <div
@@ -9209,6 +9578,8 @@ export const SimpleTabletop = () => {
             setSelectedRegionIds(regions.map(r => r.id));
             redrawCanvas();
           }}
+          isDM={isDM}
+          onMarkExplored={handleMarkRegionsExplored}
         />
 
         {/* Map Object Control Bar - Shows when map object(s) are selected */}
@@ -9227,6 +9598,29 @@ export const SimpleTabletop = () => {
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
+
+      {/* DM Cursor Sharing Toggle — only visible to DMs */}
+      {isDM && (
+        <div
+          className="absolute bottom-4 left-28 select-none"
+          style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+        >
+          <Button
+            variant={useCursorStore.getState().cursorSharingEnabled ? "default" : "outline"}
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => {
+              const next = !useCursorStore.getState().cursorSharingEnabled;
+              useCursorStore.getState().setCursorSharingEnabled(next);
+              ephemeralBus.emit("cursor.visibility", { visible: next });
+              toast.success(next ? "Cursor sharing enabled" : "Cursor sharing disabled");
+            }}
+          >
+            <MousePointer2 className="h-3.5 w-3.5" />
+            Cursors
+          </Button>
+        </div>
+      )}
 
       {/* Version Indicator - Bottom Left */}
       <div

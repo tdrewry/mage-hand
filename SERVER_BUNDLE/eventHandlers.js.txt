@@ -371,6 +371,23 @@ function handleBroadcastFullState(socket, io, sessionManager, payload) {
   socket.to(session.sessionId).emit('full_state_sync', payload);
 }
 
+/**
+ * Handle ephemeral messages (cursors, drag previews, typing indicators, etc.)
+ * These are broadcast to all other clients in the session WITHOUT:
+ * - Logging to console (high frequency)
+ * - Persisting to session state / op-log
+ * - Incrementing sequence counters
+ * - Being included in late-join catch-up replay
+ */
+function handleEphemeral(socket, io, sessionManager, payload) {
+  const session = sessionManager.getSessionBySocket(socket.id);
+  if (!session) return;
+
+  // Broadcast to all other clients in the session (excluding sender)
+  // No logging, no persistence — fire and forget
+  socket.to(session.sessionId).emit('ephemeral', payload);
+}
+
 module.exports = {
   handleCreateSession,
   handleJoinSession,
@@ -381,5 +398,6 @@ module.exports = {
   handleSyncPatch,
   handleTextureUpload,
   handleTextureRequest,
-  handleBroadcastFullState
+  handleBroadcastFullState,
+  handleEphemeral
 };
