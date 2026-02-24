@@ -19,10 +19,22 @@
 
 Route incoming ephemeral ops through `EphemeralBus.receive()` instead of durable handlers.
 
-- [x] Update `src/lib/net/NetManager.ts` to detect ephemeral op kinds and route to `ephemeralBus.receive()`
+- [x] Update `src/lib/net/NetManager.ts` to detect ephemeral op kinds in `opBatch` and route to `ephemeralBus.receive()` (safety-net filter)
 - [x] Update server `eventHandlers.js` to add `handleEphemeral()` — broadcast without logging
 - [x] Ensure ephemeral ops do not increment durable sequence counters (server broadcasts via separate `ephemeral` event)
 - [x] Ensure ephemeral ops are excluded from catch-up / late-join replay (not persisted in session state)
+
+### Phase 2b — Dedicated Ephemeral Channel ✅ DONE
+
+Full end-to-end dedicated transport so ephemeral ops never touch the durable pipeline.
+
+- [x] Add `EphemeralPayload` type and `"ephemeral"` message to `ClientToServerMessage` and `ServerToClientMessage` in `networking/contract/v1.ts`
+- [x] Add `NetworkSession.sendEphemeral(kind, data)` — sends immediately, no batching or sequencing
+- [x] Handle inbound `"ephemeral"` server messages in `NetworkSession` — emit new `ephemeral` event
+- [x] Add `"ephemeral"` case in `roomServer.ts` — broadcast to all other clients, no logging/seq/opLog
+- [x] Add `NetManager.sendEphemeral()` and wire inbound `ephemeral` event to `EphemeralBus.receive()`
+- [x] Rewire `EphemeralBus.setSendFn` to use `netManager.sendEphemeral()` instead of `netManager.proposeOp()`
+- [x] Update `SERVER_BUNDLE/eventHandlers.js.txt` and `index.js.txt` with Socket.IO `handleEphemeral` (legacy server)
 
 ---
 
