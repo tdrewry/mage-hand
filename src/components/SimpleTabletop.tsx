@@ -107,12 +107,17 @@ import { checkMovementCollision, getBlockingObjects } from "../lib/movementColli
 import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
+import { CursorOverlay } from "./CursorOverlay";
+import { ephemeralBus } from "@/lib/net";
+import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
 import { setPostProcessingVisible } from "../lib/postProcessingLayer";
 
 export const SimpleTabletop = () => {
+  // Register ephemeral cursor handlers once
+  React.useEffect(() => { registerCursorHandlers(); }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
@@ -6794,6 +6799,10 @@ export const SimpleTabletop = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
+    // ── EPHEMERAL CURSOR: broadcast world-space position ──
+    const worldCursorPos = screenToWorld(mouseX, mouseY);
+    ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
+
     // ── ACTION TARGETING: track mouse position for reticle ──
     const actionStoreState = useActionStore.getState();
     if (actionStoreState.isTargeting) {
@@ -9136,6 +9145,8 @@ export const SimpleTabletop = () => {
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ zIndex: Z_INDEX.CANVAS_ELEMENTS.CANVAS_UI_OVERLAY }}
         />
+        {/* Remote cursor overlay */}
+        <CursorOverlay transform={transform} />
         {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
             Position/size is driven directly via ref to avoid React re-renders and flicker. */}
         <div

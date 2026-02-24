@@ -42,10 +42,11 @@ Full end-to-end dedicated transport so ephemeral ops never touch the durable pip
 
 First visually testable ephemeral features per contract §3.4.
 
-- [ ] Create `src/stores/cursorStore.ts` — Zustand store fed by TTLCache for remote cursors
-- [ ] Wire `cursor.update` emit on mouse move in `SimpleTabletop.tsx` (15 Hz throttle, 500ms TTL)
-- [ ] Render cursor dots overlay (userId + color) on canvas
-- [ ] Wire `cursor.visibility` (DM toggle to show/hide own cursor)
+- [x] Create `src/stores/cursorStore.ts` — Zustand store fed by TTLCache for remote cursors
+- [x] Wire `cursor.update` emit on mouse move in `SimpleTabletop.tsx` (~15 Hz throttle via EphemeralBus, 500ms TTL)
+- [x] Render cursor dots overlay (`CursorOverlay.tsx`) — colored dot + username label, world→screen transform
+- [x] Create `src/lib/net/ephemeral/cursorHandlers.ts` — registers `cursor.update` and `cursor.visibility` handlers + TTL expiry cleanup
+- [x] Wire `cursor.visibility` handler (DM toggle to show/hide cursors globally)
 - [ ] Wire `presence.viewingMap` — broadcast active mapId, display in ConnectedUsersPanel
 - [ ] Wire `presence.activity` — broadcast current activity string
 
