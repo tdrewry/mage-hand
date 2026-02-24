@@ -98,7 +98,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog } from "lucide-react";
+import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog, MousePointer2 } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
@@ -108,6 +108,7 @@ import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
 import { CursorOverlay } from "./CursorOverlay";
+import { useCursorStore } from "@/stores/cursorStore";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
@@ -5219,6 +5220,7 @@ export const SimpleTabletop = () => {
     setPathDrawingMode("drawing");
     setPathDrawingType(type);
     setCurrentPath([]);
+    ephemeralBus.emit("presence.activity", { activity: type === "freehand" ? "drawing freehand region" : "drawing polygon region" });
     if (type === "polygon") {
       toast.info("Click to add points. Double-click to finish.");
     } else {
@@ -6441,6 +6443,7 @@ export const SimpleTabletop = () => {
         }
 
         setIsDraggingToken(true);
+        ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
@@ -6780,6 +6783,7 @@ export const SimpleTabletop = () => {
         });
 
         toast.success("Light source placed");
+        ephemeralBus.emit("presence.activity", { activity: "placing light" });
         setLightPlacementMode(false);
       } else if (e.shiftKey && renderingMode === "edit") {
         // Shift+click to remove light sources in edit mode
@@ -9033,6 +9037,7 @@ export const SimpleTabletop = () => {
     color?: string,
   ) => {
     const tokenId = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    ephemeralBus.emit("presence.activity", { activity: "placing token" });
 
     // Use provided coordinates or default to center of viewport
     let tokenX = x ?? -transform.x / transform.zoom;
@@ -9274,6 +9279,29 @@ export const SimpleTabletop = () => {
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
+
+      {/* DM Cursor Sharing Toggle — only visible to DMs */}
+      {isDM && (
+        <div
+          className="absolute bottom-4 left-28 select-none"
+          style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+        >
+          <Button
+            variant={useCursorStore.getState().cursorSharingEnabled ? "default" : "outline"}
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => {
+              const next = !useCursorStore.getState().cursorSharingEnabled;
+              useCursorStore.getState().setCursorSharingEnabled(next);
+              ephemeralBus.emit("cursor.visibility", { visible: next });
+              toast.success(next ? "Cursor sharing enabled" : "Cursor sharing disabled");
+            }}
+          >
+            <MousePointer2 className="h-3.5 w-3.5" />
+            Cursors
+          </Button>
+        </div>
+      )}
 
       {/* Version Indicator - Bottom Left */}
       <div
