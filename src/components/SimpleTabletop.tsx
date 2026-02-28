@@ -406,6 +406,10 @@ export const SimpleTabletop = () => {
   // Light placement mode
   const [lightPlacementMode, setLightPlacementMode] = useState(false);
 
+  // --- Auto-pause animations during pan / fog brush ---
+  // Tracks the user's animation-pause preference before we override it
+  const animPauseBeforeOverrideRef = useRef<boolean | null>(null);
+
   // Fog reveal brush state (DM tool for painting explored areas)
   const [fogRevealBrushActive, setFogRevealBrushActive] = useState(false);
   const fogRevealBrushActiveRef = useRef(false); // ref mirror to avoid stale closures in rAF/interval callbacks
@@ -5957,6 +5961,28 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     redrawCanvas();
   }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
+
+  // --- Auto-pause animations while panning or fog brush is active ---
+  const setAnimationsPaused = useUiModeStore((state) => state.setAnimationsPaused);
+
+  useEffect(() => {
+    const shouldOverride = isPanning || fogRevealBrushActive;
+
+    if (shouldOverride) {
+      // Capture the user's current preference (only once per override session)
+      if (animPauseBeforeOverrideRef.current === null) {
+        animPauseBeforeOverrideRef.current = useUiModeStore.getState().animationsPaused;
+      }
+      // Force pause
+      setAnimationsPaused(true);
+    } else {
+      // Restore only if we previously overrode
+      if (animPauseBeforeOverrideRef.current !== null) {
+        setAnimationsPaused(animPauseBeforeOverrideRef.current);
+        animPauseBeforeOverrideRef.current = null;
+      }
+    }
+  }, [isPanning, fogRevealBrushActive, setAnimationsPaused]);
 
   // Animation loop for hostile tokens, hover effects, and illumination animations
   const animationsPaused = useUiModeStore((state) => state.animationsPaused);
