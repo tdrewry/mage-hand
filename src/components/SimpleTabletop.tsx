@@ -406,12 +406,16 @@ export const SimpleTabletop = () => {
 
   // Fog reveal brush state (DM tool for painting explored areas)
   const [fogRevealBrushActive, setFogRevealBrushActive] = useState(false);
+  const fogRevealBrushActiveRef = useRef(false); // ref mirror to avoid stale closures in rAF/interval callbacks
   const [fogRevealBrushRadius, setFogRevealBrushRadius] = useState(60); // world-space radius
+  const fogRevealBrushRadiusRef = useRef(60); // ref mirror
   const [isFogBrushPainting, setIsFogBrushPainting] = useState(false);
   const fogBrushCursorRef = useRef<{ x: number; y: number } | null>(null);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null); // screen-space mouse pos for brush reticle
   const fogBrushPreExploredRef = useRef<paper.CompoundPath | null>(null); // snapshot for undo
-
+  // Keep refs in sync with state for stale-closure-safe reads in rAF/interval callbacks
+  fogRevealBrushActiveRef.current = fogRevealBrushActive;
+  fogRevealBrushRadiusRef.current = fogRevealBrushRadius;
   // Fog of war store
   const {
     enabled: fogEnabled,
@@ -3441,13 +3445,14 @@ export const SimpleTabletop = () => {
         }
 
         // ── Fog Reveal Brush: draw ghost circle on overlay so it's always above fog ──
-        if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && fogBrushCursorRef.current) {
+        if (fogRevealBrushActiveRef.current && fogEnabled && isDM && renderingMode === 'play' && fogBrushCursorRef.current) {
           const bp = fogBrushCursorRef.current;
+          const brushR = fogRevealBrushRadiusRef.current;
           overlayCtx.save();
           overlayCtx.translate(transform.x, transform.y);
           overlayCtx.scale(transform.zoom, transform.zoom);
           overlayCtx.beginPath();
-          overlayCtx.arc(bp.x, bp.y, fogRevealBrushRadius, 0, Math.PI * 2);
+          overlayCtx.arc(bp.x, bp.y, brushR, 0, Math.PI * 2);
           overlayCtx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
           overlayCtx.lineWidth = 2 / transform.zoom;
           overlayCtx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
@@ -3456,12 +3461,12 @@ export const SimpleTabletop = () => {
           overlayCtx.fill();
           overlayCtx.setLineDash([]);
           // Radius label
-          const labelText = `${Math.round(fogRevealBrushRadius)}px`;
+          const labelText = `${Math.round(brushR)}px`;
           const fontSize = 11 / transform.zoom;
           overlayCtx.font = `${fontSize}px Arial`;
           overlayCtx.fillStyle = 'rgba(100, 200, 255, 0.9)';
           overlayCtx.textAlign = 'center';
-          overlayCtx.fillText(labelText, bp.x, bp.y - fogRevealBrushRadius - 6 / transform.zoom);
+          overlayCtx.fillText(labelText, bp.x, bp.y - brushR - 6 / transform.zoom);
           overlayCtx.restore();
         }
       }
