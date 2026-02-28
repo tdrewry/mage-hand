@@ -89,6 +89,7 @@ import { TextureDownloadProgress } from "./TextureDownloadProgress";
 import { texturePatternCache } from "../lib/texturePatternCache";
 import { animatedTextureManager } from "../lib/animatedTextureManager";
 import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
+import { LRUImageCache } from "../lib/LRUImageCache";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import {
@@ -550,6 +551,9 @@ export const SimpleTabletop = () => {
       mapObjectLightData?: { lightColor?: string; lightRadius?: number; lightBrightRadius?: number; lightIntensity?: number }; // Map object light properties
     }>
   >([]);
+
+  // Cached illuminationSources array — rebuilt only when tokenVisibilityDataRef changes
+  const illuminationSourcesCacheRef = useRef<any[] | null>(null);
 
   // Cache individual token visibility shapes to avoid recomputing unchanged tokens
   const tokenVisibilityCacheRef = useRef<
@@ -1842,6 +1846,8 @@ export const SimpleTabletop = () => {
 
           console.log(`[Fog] Built visData: ${tokenVisData.length} sources (${tokenVisData.filter(t => !t.isLightSource).length} tokens, ${tokenVisData.filter(t => t.isLightSource).length} lights)`);
           tokenVisibilityDataRef.current = tokenVisData;
+          // Invalidate cached illumination sources so they're rebuilt on next frame
+          illuminationSourcesCacheRef.current = null;
 
           // Clean up
           if (visibilityForMask.remove) visibilityForMask.remove();
@@ -2389,8 +2395,8 @@ export const SimpleTabletop = () => {
     }
   };
 
-  // Image cache to prevent re-loading images on every redraw
-  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  // Image cache with LRU eviction to prevent unbounded memory growth
+  const imageCache = useRef(new LRUImageCache(200));
 
   // Helper to get or load a cached image (must be defined before redrawCanvas)
   // For animated GIFs, returns the current frame's ImageBitmap
@@ -3268,59 +3274,51 @@ export const SimpleTabletop = () => {
         }
       } else {
         // Apply PixiJS post-processing effects to fog (blur, light falloff gradients)
-        // Convert old token visibility data to new IlluminationSource format for GPU rendering
-        const illuminationSources = tokenVisibilityDataRef.current.map((t, idx) => {
-          // Use token's custom illumination settings if available, otherwise use global defaults
-          const tokenSettings = t.tokenIllumination?.[0];
-          
-          // IMPORTANT: Always use t.visionRange which was computed with the correct
-          // per-token gridSize when the visibility polygon was created. This ensures
-          // the color gradient matches the visibility polygon exactly.
-          const rangePixels = t.visionRange;
-          
-          // Map object lights carry their own color/intensity; use those over generic defaults
-          const moLight = t.mapObjectLightData;
-          const dimRadius = moLight?.lightRadius ?? rangePixels;
-          const brightRadius = moLight?.lightBrightRadius ?? dimRadius * 0.5;
-          const moColor = moLight?.lightColor ?? '#FFD700';
-          const moIntensity = moLight?.lightIntensity ?? 1.0;
+        // Use cached illumination sources to avoid rebuilding the array every frame
+        if (!illuminationSourcesCacheRef.current) {
+          illuminationSourcesCacheRef.current = tokenVisibilityDataRef.current.map((t, idx) => {
+            const tokenSettings = t.tokenIllumination?.[0];
+            const rangePixels = t.visionRange;
+            const moLight = t.mapObjectLightData;
+            const dimRadius = moLight?.lightRadius ?? rangePixels;
+            const brightRadius = moLight?.lightBrightRadius ?? dimRadius * 0.5;
+            const moColor = moLight?.lightColor ?? '#FFD700';
+            const moIntensity = moLight?.lightIntensity ?? 1.0;
 
-          return {
-            id: `vis-${idx}`,
-            name: t.isLightSource ? 'Light' : 'Vision',
-            enabled: true,
-            position: t.position,
-            range: rangePixels, // Already in pixels - no further conversion needed
-            brightZone: moLight
-              ? (brightRadius / dimRadius)          // Map object: derive from pixel radii
-              : (tokenSettings?.brightZone ?? effectSettings.lightFalloff),
-            brightIntensity: moLight
-              ? moIntensity
-              : (tokenSettings?.brightIntensity ?? 1.0),
-            dimIntensity: moLight
-              ? moIntensity * 0.4
-              : (tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0)),
-            color: moLight
-              ? moColor
-              : (tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF')),
-            colorEnabled: moLight
-              ? true                                // Map object lights always apply their color
-              : (tokenSettings?.colorEnabled ?? false),
-            colorIntensity: moLight
-              ? 0.5
-              : (tokenSettings?.colorIntensity ?? 0.5),
-            softEdge: tokenSettings?.softEdge ?? true,
-            softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
-            animation: tokenSettings?.animation ?? 'none',
-            animationSpeed: tokenSettings?.animationSpeed ?? 1.0,
-            animationIntensity: tokenSettings?.animationIntensity ?? 0.3,
-            // Use the raw wall-occlusion path (NOT the circle-clipped fog mask path).
-            // This prevents the diagonal wedge clipping caused by paper.js scope mismatch.
-            // When no walls exist, wallOcclusionPath is undefined and applyClipShape (circle)
-            // provides the correct circular boundary on its own.
-            visibilityPolygon: t.wallOcclusionPath,
-          };
-        });
+            return {
+              id: `vis-${idx}`,
+              name: t.isLightSource ? 'Light' : 'Vision',
+              enabled: true,
+              position: t.position,
+              range: rangePixels,
+              brightZone: moLight
+                ? (brightRadius / dimRadius)
+                : (tokenSettings?.brightZone ?? effectSettings.lightFalloff),
+              brightIntensity: moLight
+                ? moIntensity
+                : (tokenSettings?.brightIntensity ?? 1.0),
+              dimIntensity: moLight
+                ? moIntensity * 0.4
+                : (tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0)),
+              color: moLight
+                ? moColor
+                : (tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF')),
+              colorEnabled: moLight
+                ? true
+                : (tokenSettings?.colorEnabled ?? false),
+              colorIntensity: moLight
+                ? 0.5
+                : (tokenSettings?.colorIntensity ?? 0.5),
+              softEdge: tokenSettings?.softEdge ?? true,
+              softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
+              animation: tokenSettings?.animation ?? 'none',
+              animationSpeed: tokenSettings?.animationSpeed ?? 1.0,
+              animationIntensity: tokenSettings?.animationIntensity ?? 0.3,
+              visibilityPolygon: t.wallOcclusionPath,
+            };
+          });
+        }
+        const illuminationSources = [...illuminationSourcesCacheRef.current];
         
         // Add real-time drag preview as an additional illumination source
         if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && dragPreviewPosition && draggedTokenId) {
