@@ -102,6 +102,7 @@ import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog,
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
 import { RegionControlBar } from "./RegionControlBar";
+import { FogBrushToolbar } from "./FogBrushToolbar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
 import { useTouchEvents } from "../hooks/useTouchEvents";
@@ -410,6 +411,7 @@ export const SimpleTabletop = () => {
   const [fogRevealBrushRadius, setFogRevealBrushRadius] = useState(60); // world-space radius
   const fogRevealBrushRadiusRef = useRef(60); // ref mirror
   const [isFogBrushPainting, setIsFogBrushPainting] = useState(false);
+  const [fogBrushMode, setFogBrushMode] = useState<'reveal' | 'hide'>('reveal'); // reveal = remove fog, hide = add fog
   const fogBrushCursorRef = useRef<{ x: number; y: number } | null>(null);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null); // screen-space mouse pos for brush reticle
   const fogBrushPreExploredRef = useRef<paper.CompoundPath | null>(null); // snapshot for undo
@@ -9476,15 +9478,30 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   };
 
-  // ── Fog Reveal Brush: stamp a circle into exploredArea ──
+  // ── Fog Reveal Brush: stamp a circle into exploredArea (reveal or hide mode) ──
   const stampFogBrushCircle = useCallback((worldX: number, worldY: number) => {
     if (!fogEnabled) return;
     const scope = fogScopeRef.current || getFogScope();
     scope.activate();
     const circle = new scope.Path.Circle(new scope.Point(worldX, worldY), fogRevealBrushRadius);
-    exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, circle);
+
+    if (fogBrushMode === 'reveal') {
+      // Union: add circle to explored area (remove fog)
+      exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, circle);
+    } else {
+      // Subtract: remove circle from explored area (add fog back)
+      if (exploredAreaRef.current && !exploredAreaRef.current.isEmpty()) {
+        const result = exploredAreaRef.current.subtract(circle, { insert: false });
+        if (exploredAreaRef.current.remove) exploredAreaRef.current.remove();
+        if (result instanceof scope.CompoundPath) {
+          exploredAreaRef.current = result;
+        } else if (result instanceof scope.Path) {
+          exploredAreaRef.current = new scope.CompoundPath({ children: [result] });
+        }
+      }
+    }
     circle.remove();
-  }, [fogEnabled, fogRevealBrushRadius]);
+  }, [fogEnabled, fogRevealBrushRadius, fogBrushMode]);
 
   // Poll fog mask refresh while painting — interval scales with brush radius
   // so smaller brushes refresh faster (cursor center shouldn't leave the previous stamp).
@@ -9800,9 +9817,17 @@ export const SimpleTabletop = () => {
         onToggleFogRevealBrush={() => {
           setFogRevealBrushActive(prev => {
             const next = !prev;
-            // When activating brush, seed reticle position from last known mouse pos
-            if (next && lastMousePosRef.current) {
-              fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+            if (next) {
+              // Clear all selections to prevent selection flashing during brush use
+              setSelectedTokenIds([]);
+              selectedRegionIds.forEach(id => deselectRegion(id));
+              setSelectedRegionIds([]);
+              clearMapObjectSelection();
+              clearLightSelection();
+              // Seed reticle position from last known mouse pos
+              if (lastMousePosRef.current) {
+                fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+              }
               requestAnimationFrame(() => redrawCanvas());
             }
             return next;
@@ -9943,6 +9968,17 @@ export const SimpleTabletop = () => {
         />
       </>
 
+
+      {/* Fog Brush Toolbar - Shows when fog brush is active */}
+      {fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && (
+        <FogBrushToolbar
+          brushRadius={fogRevealBrushRadius}
+          onRadiusChange={setFogRevealBrushRadius}
+          brushMode={fogBrushMode}
+          onBrushModeChange={setFogBrushMode}
+          onClose={() => setFogRevealBrushActive(false)}
+        />
+      )}
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
