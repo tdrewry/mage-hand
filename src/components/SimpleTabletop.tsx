@@ -6461,11 +6461,14 @@ export const SimpleTabletop = () => {
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
 
-    if (e.button === 2) {
-      // Right click
+    if (e.button === 1) {
+      // Middle click — canvas pan
       e.preventDefault();
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
+    } else if (e.button === 2) {
+      // Right click — no longer used for panning (reserved for context menus)
+      e.preventDefault();
     } else if (e.button === 0) {
       // Left click
 
@@ -7196,7 +7199,7 @@ export const SimpleTabletop = () => {
       }
       canvas.style.cursor = 'crosshair';
       redrawCanvas();
-      // Still allow panning via right-click, so don't return if panning
+      // Still allow panning via middle-click, so don't return if panning
       if (!isPanning) return;
     }
 
@@ -8421,8 +8424,8 @@ export const SimpleTabletop = () => {
       return;
     }
 
-    if (e.button === 2) {
-      // Right click
+    if (e.button === 1) {
+      // Middle click — end canvas pan
       setIsPanning(false);
     } else if (e.button === 0) {
       // Left click
