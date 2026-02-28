@@ -3379,28 +3379,8 @@ export const SimpleTabletop = () => {
       drawMapPings(ctx);
     }
 
-    // ── Fog Reveal Brush: draw ghost circle at cursor position ──
-    if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && fogBrushCursorRef.current) {
-      const bp = fogBrushCursorRef.current;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(bp.x, bp.y, fogRevealBrushRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
-      ctx.lineWidth = 2 / transform.zoom;
-      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
-      ctx.fill();
-      ctx.setLineDash([]);
-      // Radius label
-      const labelText = `${Math.round(fogRevealBrushRadius)}px`;
-      const fontSize = 11 / transform.zoom;
-      ctx.font = `${fontSize}px Arial`;
-      ctx.fillStyle = 'rgba(100, 200, 255, 0.9)';
-      ctx.textAlign = 'center';
-      ctx.fillText(labelText, bp.x, bp.y - fogRevealBrushRadius - 6 / transform.zoom);
-      ctx.restore();
-    }
+    // ── Fog Reveal Brush: ghost circle is now drawn on the overlay canvas (see below)
+    // so it appears above the PixiJS fog post-processing layer.
 
     // Restore context after all world-space rendering
     ctx.restore();
@@ -3458,6 +3438,31 @@ export const SimpleTabletop = () => {
           offScreenTokens.forEach((token) => {
             drawOffScreenIndicator(ctx, token, viewX, viewY, viewWidth, viewHeight);
           });
+        }
+
+        // ── Fog Reveal Brush: draw ghost circle on overlay so it's always above fog ──
+        if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && fogBrushCursorRef.current) {
+          const bp = fogBrushCursorRef.current;
+          overlayCtx.save();
+          overlayCtx.translate(transform.x, transform.y);
+          overlayCtx.scale(transform.zoom, transform.zoom);
+          overlayCtx.beginPath();
+          overlayCtx.arc(bp.x, bp.y, fogRevealBrushRadius, 0, Math.PI * 2);
+          overlayCtx.strokeStyle = 'rgba(100, 200, 255, 0.7)';
+          overlayCtx.lineWidth = 2 / transform.zoom;
+          overlayCtx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+          overlayCtx.stroke();
+          overlayCtx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+          overlayCtx.fill();
+          overlayCtx.setLineDash([]);
+          // Radius label
+          const labelText = `${Math.round(fogRevealBrushRadius)}px`;
+          const fontSize = 11 / transform.zoom;
+          overlayCtx.font = `${fontSize}px Arial`;
+          overlayCtx.fillStyle = 'rgba(100, 200, 255, 0.9)';
+          overlayCtx.textAlign = 'center';
+          overlayCtx.fillText(labelText, bp.x, bp.y - fogRevealBrushRadius - 6 / transform.zoom);
+          overlayCtx.restore();
         }
       }
     } else if (!usePostProcessing) {
