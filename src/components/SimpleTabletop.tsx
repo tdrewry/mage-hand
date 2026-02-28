@@ -409,6 +409,7 @@ export const SimpleTabletop = () => {
   const [fogRevealBrushRadius, setFogRevealBrushRadius] = useState(60); // world-space radius
   const [isFogBrushPainting, setIsFogBrushPainting] = useState(false);
   const fogBrushCursorRef = useRef<{ x: number; y: number } | null>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null); // screen-space mouse pos for brush reticle
   const fogBrushPreExploredRef = useRef<paper.CompoundPath | null>(null); // snapshot for undo
 
   // Fog of war store
@@ -3173,6 +3174,19 @@ export const SimpleTabletop = () => {
 
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
+    // SAFETY: If fog is enabled but masks haven't been computed yet, render full black
+    // to prevent accidentally revealing the map on initial load / refresh.
+    if (isPlayMode && fogEnabled && !fogRevealAll && !fogMasksRef.current) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+      ctx.fillRect(
+        -transform.x / transform.zoom,
+        -transform.y / transform.zoom,
+        canvas.width / transform.zoom,
+        canvas.height / transform.zoom
+      );
+      ctx.restore();
+    }
     if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
       // Check if we should use PixiJS post-processing instead of main canvas fog
       const usePostProcessing = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled;
@@ -7181,6 +7195,9 @@ export const SimpleTabletop = () => {
       if (!isPanning) return;
     }
 
+    // Always track screen-space mouse position for fog brush reticle seeding
+    lastMousePosRef.current = { x: mouseX, y: mouseY };
+
     // ── EPHEMERAL CURSOR: broadcast world-space position ──
     const worldCursorPos = screenToWorld(mouseX, mouseY);
     ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
@@ -9450,6 +9467,34 @@ export const SimpleTabletop = () => {
     circle.remove();
   }, [fogEnabled, fogRevealBrushRadius]);
 
+  // Poll fog mask refresh while painting — interval scales with brush radius
+  // so smaller brushes refresh faster (cursor center shouldn't leave the previous stamp).
+  const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isFogBrushPainting) {
+      // Interval: roughly time for cursor to traverse one brush diameter at typical drag speed
+      // Clamp between 80ms (small brush, fast refresh) and 500ms (large brush)
+      const pollMs = Math.max(80, Math.min(500, fogRevealBrushRadius * 3));
+      fogBrushPollRef.current = setInterval(() => {
+        // Invalidate masks so next redraw picks up newly-stamped circles
+        fogMasksRef.current = null;
+        redrawCanvas();
+      }, pollMs);
+    } else {
+      if (fogBrushPollRef.current) {
+        clearInterval(fogBrushPollRef.current);
+        fogBrushPollRef.current = null;
+      }
+    }
+    return () => {
+      if (fogBrushPollRef.current) {
+        clearInterval(fogBrushPollRef.current);
+        fogBrushPollRef.current = null;
+      }
+    };
+  }, [isFogBrushPainting, fogRevealBrushRadius]);
+
   const commitFogBrush = useCallback(() => {
     if (!exploredAreaRef.current) return;
     const serialized = serializeFogGeometry(exploredAreaRef.current);
@@ -9712,7 +9757,17 @@ export const SimpleTabletop = () => {
         onToggleRegions={() => setShowRegions(!showRegions)}
         onFitToView={handleFitToView}
         fogRevealBrushActive={fogRevealBrushActive}
-        onToggleFogRevealBrush={() => setFogRevealBrushActive(prev => !prev)}
+        onToggleFogRevealBrush={() => {
+          setFogRevealBrushActive(prev => {
+            const next = !prev;
+            // When activating brush, seed reticle position from last known mouse pos
+            if (next && lastMousePosRef.current) {
+              fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+              requestAnimationFrame(() => redrawCanvas());
+            }
+            return next;
+          });
+        }}
         isDM={isDM}
       />
 
