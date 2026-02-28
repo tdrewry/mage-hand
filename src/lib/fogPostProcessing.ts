@@ -82,6 +82,7 @@ let _lastFogMasks: object | null = null;  // identity check
 let _lastIlluminationSources: object | null = null;  // identity check
 let _lastFullRenderTime = 0;
 const FULL_RENDER_INTERVAL = 100; // Force a full redraw at least every 100ms during pan
+let _lastZoom = 0; // Track zoom for throttle bypass on zoom changes
 
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;
@@ -327,9 +328,7 @@ export function applyFogPostProcessing(
 
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
 
-  // Throttle updates
   const now = performance.now();
-  if (now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
 
   // ── CSS-offset fast path ──
   // If fog masks and illumination sources haven't changed (same object identity),
@@ -348,6 +347,12 @@ export function applyFogPostProcessing(
       return;
     }
   }
+
+  // Throttle full redraws — but ONLY if zoom hasn't changed.
+  // Zoom changes require an immediate full redraw to avoid visible misalignment
+  // between the main canvas (new zoom) and the stale PixiJS layer (old zoom).
+  const zoomChanged = _lastZoom !== 0 && _lastZoom !== transform.zoom;
+  if (!zoomChanged && now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
 
   lastUpdateTime = now;
 
@@ -475,6 +480,7 @@ export function applyFogPostProcessing(
   _lastFogMasks = fogMasks;
   _lastIlluminationSources = illuminationData?.sources ?? null;
   _lastFullRenderTime = performance.now();
+  _lastZoom = transform.zoom;
   setLastRenderTransform(transform);
 }
 

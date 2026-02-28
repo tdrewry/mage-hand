@@ -1447,8 +1447,14 @@ export const SimpleTabletop = () => {
   // Compute fog of war masks when tokens move or fog settings change
   // Skip during dragging to prevent stuttering
   useEffect(() => {
-    if (!fogEnabled || fogRevealAll || !wallGeometryRef.current || !fogScopeRef.current) {
+    if (!fogEnabled || fogRevealAll) {
+      // Fog explicitly disabled — clear masks
       fogMasksRef.current = null;
+      return;
+    }
+    if (!wallGeometryRef.current || !fogScopeRef.current) {
+      // Prerequisites not ready yet — keep existing masks (if any) to avoid black flash.
+      // They'll be replaced once prerequisites are available on a subsequent run.
       return;
     }
 
