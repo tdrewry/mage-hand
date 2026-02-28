@@ -352,7 +352,16 @@ export function applyFogPostProcessing(
   // Zoom changes require an immediate full redraw to avoid visible misalignment
   // between the main canvas (new zoom) and the stale PixiJS layer (old zoom).
   const zoomChanged = _lastZoom !== 0 && _lastZoom !== transform.zoom;
-  if (!zoomChanged && now - lastUpdateTime < MIN_UPDATE_INTERVAL) return;
+  if (!zoomChanged && now - lastUpdateTime < MIN_UPDATE_INTERVAL) {
+    // Even though a full redraw is throttled, keep the PixiJS canvas aligned
+    // with the main canvas via CSS offset.  Without this, when illumination
+    // sources exist (new array identity every frame → illuUnchanged=false),
+    // the CSS fast-path above is skipped and the fog layer stays at its old
+    // position while the main canvas redraws at the new transform — causing
+    // a visible flash.
+    panOffsetPostProcessing(transform);
+    return;
+  }
 
   lastUpdateTime = now;
 

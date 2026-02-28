@@ -87,6 +87,22 @@ function getQualityMultiplier(quality: EffectSettings['effectQuality']): number 
   }
 }
 
+// WebGL context loss / restore handlers
+function _onContextLost(e: Event): void {
+  e.preventDefault(); // Allow context restoration
+  console.warn('⚠️ PixiJS WebGL context lost — fog layer suspended');
+  isInitialized = false;
+}
+
+function _onContextRestored(): void {
+  console.log('✅ PixiJS WebGL context restored — forcing texture re-upload');
+  isInitialized = true;
+  // Destroy old textures so the next updateFogTexture/updateIlluminationTexture
+  // calls recreate them from the current Canvas 2D sources.
+  if (fogTexture) { fogTexture.destroy(false); fogTexture = null; }
+  if (illuminationTexture) { illuminationTexture.destroy(false); illuminationTexture = null; }
+}
+
 /** Total canvas dimension = content size + 2 × padding. */
 function totalSize(contentPx: number): number {
   return contentPx + FIXED_PADDING * 2;
@@ -186,6 +202,12 @@ export async function initPostProcessing(
     fogContainer.addChild(illuminationSprite);
 
     isInitialized = true;
+
+    // Listen for WebGL context loss (e.g. switching browser tabs can evict the context)
+    const canvas2 = pixiApp.canvas as HTMLCanvasElement;
+    canvas2.addEventListener('webglcontextlost', _onContextLost);
+    canvas2.addEventListener('webglcontextrestored', _onContextRestored);
+
     console.log(
       `✅ PixiJS post-processing initialized — content ${config.width}×${config.height}, ` +
       `origin (${_originX}, ${_originY}), canvas ${canvasW}×${canvasH}, padding ${FIXED_PADDING}px`
@@ -374,7 +396,11 @@ export async function cleanupPostProcessing(): Promise<void> {
         // Stop ticker before destroy to prevent render-during-teardown
         pixiApp.ticker.stop();
         const canvas = pixiApp.canvas as HTMLCanvasElement | undefined;
-        if (canvas?.parentNode) canvas.parentNode.removeChild(canvas);
+        if (canvas) {
+          canvas.removeEventListener('webglcontextlost', _onContextLost);
+          canvas.removeEventListener('webglcontextrestored', _onContextRestored);
+          if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+        }
         pixiApp.destroy(true, { children: true, texture: true });
       } catch (destroyErr) {
         console.warn('PixiJS destroy error (safe to ignore):', destroyErr);
