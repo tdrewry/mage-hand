@@ -8148,8 +8148,29 @@ export const SimpleTabletop = () => {
     // ── FOG REVEAL BRUSH: commit painted area on mouse up ──
     if (isFogBrushPainting) {
       setIsFogBrushPainting(false);
+
+      // Capture before/after for undo
+      const preSerialized = fogBrushPreExploredRef.current
+        ? serializeFogGeometry(fogBrushPreExploredRef.current)
+        : '';
       commitFogBrush();
-      // TODO: undo step — fogBrushPreExploredRef vs current
+      const postSerialized = exploredAreaRef.current
+        ? serializeFogGeometry(exploredAreaRef.current)
+        : '';
+
+      if (preSerialized !== postSerialized) {
+        undoRedoManager.push({
+          type: 'FOG_BRUSH_REVEAL',
+          description: 'Fog brush reveal',
+          execute() {
+            useFogStore.getState().setSerializedExploredAreas(postSerialized);
+          },
+          undo() {
+            useFogStore.getState().setSerializedExploredAreas(preSerialized);
+          },
+        });
+      }
+
       fogBrushPreExploredRef.current = null;
       return;
     }
