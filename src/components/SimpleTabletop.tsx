@@ -9471,14 +9471,35 @@ export const SimpleTabletop = () => {
   // so smaller brushes refresh faster (cursor center shouldn't leave the previous stamp).
   const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Recompute fog masks from current explored+visible state (used during brush painting)
+  const recomputeFogMasksInline = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !fogScopeRef.current) return;
+    fogScopeRef.current.activate();
+
+    const worldBounds = {
+      x: -transform.x / transform.zoom - 5000,
+      y: -transform.y / transform.zoom - 5000,
+      width: canvas.width / transform.zoom + 10000,
+      height: canvas.height / transform.zoom + 10000,
+    };
+
+    const masks = computeFogMasks(
+      exploredAreaRef.current,
+      currentVisibilityRef.current,
+      worldBounds,
+    );
+    fogMasksRef.current = masks;
+  }, [transform]);
+
   useEffect(() => {
     if (isFogBrushPainting) {
       // Interval: roughly time for cursor to traverse one brush diameter at typical drag speed
       // Clamp between 80ms (small brush, fast refresh) and 500ms (large brush)
       const pollMs = Math.max(80, Math.min(500, fogRevealBrushRadius * 3));
       fogBrushPollRef.current = setInterval(() => {
-        // Invalidate masks so next redraw picks up newly-stamped circles
-        fogMasksRef.current = null;
+        // Recompute masks inline instead of nulling them (which would trigger full-black safety overlay)
+        recomputeFogMasksInline();
         redrawCanvas();
       }, pollMs);
     } else {
@@ -9493,7 +9514,7 @@ export const SimpleTabletop = () => {
         fogBrushPollRef.current = null;
       }
     };
-  }, [isFogBrushPainting, fogRevealBrushRadius]);
+  }, [isFogBrushPainting, fogRevealBrushRadius, recomputeFogMasksInline]);
 
   const commitFogBrush = useCallback(() => {
     if (!exploredAreaRef.current) return;
@@ -9507,12 +9528,12 @@ export const SimpleTabletop = () => {
         serializedExploredAreas: serialized,
       });
     }
-    // Invalidate fog masks so the fog useEffect recomputes with updated explored area
-    fogMasksRef.current = null;
+    // Recompute masks inline to avoid black flash from null masks
+    recomputeFogMasksInline();
     // Broadcast cursor clear
     ephemeralBus.emit("fog.cursor.preview", { pos: { x: 0, y: 0 }, radius: 0, tool: "reveal" });
     redrawCanvas();
-  }, [setSerializedExploredAreas]);
+  }, [setSerializedExploredAreas, recomputeFogMasksInline]);
 
   // Mark selected regions as explored (DM fog reveal)
   const handleMarkRegionsExplored = useCallback((regionIds: string[]) => {
