@@ -1297,6 +1297,17 @@ export const SimpleTabletop = () => {
   }, [maps]);
 
   useEffect(() => {
+    // When serialized explored areas change (e.g., from undo/redo or remote sync),
+    // deserialize back into the Paper.js ref and invalidate fog masks
+    if (fogEnabled && serializedExploredAreas && fogScopeRef.current) {
+      const deserialized = deserializeFogGeometry(serializedExploredAreas, fogScopeRef.current);
+      if (deserialized) {
+        exploredAreaRef.current = deserialized;
+      }
+    } else if (!serializedExploredAreas) {
+      exploredAreaRef.current = null;
+    }
+    fogMasksRef.current = null; // Force fog mask recomputation
     redrawCanvas();
   }, [serializedExploredAreas]);
 
@@ -1846,6 +1857,7 @@ export const SimpleTabletop = () => {
     players, // Re-compute when player data changes (role assignments affect vision)
     currentPlayerId, // Re-compute when active player changes
     roles, // Re-compute when roles change (permissions affect which tokens get vision)
+    serializedExploredAreas, // Re-compute when explored areas change (undo/redo, brush commit)
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
@@ -6435,6 +6447,7 @@ export const SimpleTabletop = () => {
           ? (exploredAreaRef.current.clone() as paper.CompoundPath)
           : null;
         setIsFogBrushPainting(true);
+        fogBrushCursorRef.current = worldPos; // Set cursor so ghost circle is visible immediately
         stampFogBrushCircle(worldPos.x, worldPos.y);
         // Broadcast cursor position
         ephemeralBus.emit("fog.cursor.preview", { pos: { x: worldPos.x, y: worldPos.y }, radius: fogRevealBrushRadius, tool: "reveal" });
@@ -9438,6 +9451,8 @@ export const SimpleTabletop = () => {
         serializedExploredAreas: serialized,
       });
     }
+    // Invalidate fog masks so the fog useEffect recomputes with updated explored area
+    fogMasksRef.current = null;
     // Broadcast cursor clear
     ephemeralBus.emit("fog.cursor.preview", { pos: { x: 0, y: 0 }, radius: 0, tool: "reveal" });
     redrawCanvas();
