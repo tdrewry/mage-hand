@@ -1275,6 +1275,7 @@ export const SimpleTabletop = () => {
       exploredAreaRef.current = null;
       currentVisibilityRef.current = null;
       fogMasksRef.current = null;
+      fogSerializeSourceRef.current = true;
       setSerializedExploredAreas("");
     }
   }, [fogEnabled, setSerializedExploredAreas]);
@@ -1296,9 +1297,18 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [maps]);
 
+  // Track whether we are the source of the serialized change (to avoid redundant deserialization)
+  const fogSerializeSourceRef = useRef(false);
+
   useEffect(() => {
-    // When serialized explored areas change (e.g., from undo/redo or remote sync),
-    // deserialize back into the Paper.js ref and invalidate fog masks
+    // When serialized explored areas change from an external source (undo/redo, remote sync),
+    // deserialize back into the Paper.js ref and invalidate fog masks.
+    // Skip if we were the source of the serialization (local fog computation / brush commit).
+    if (fogSerializeSourceRef.current) {
+      fogSerializeSourceRef.current = false;
+      redrawCanvas();
+      return;
+    }
     if (fogEnabled && serializedExploredAreas && fogScopeRef.current) {
       const deserialized = deserializeFogGeometry(serializedExploredAreas, fogScopeRef.current);
       if (deserialized) {
@@ -1691,6 +1701,7 @@ export const SimpleTabletop = () => {
           // Serialize for persistence
           const serialized = serializeFogGeometry(exploredAreaRef.current);
           if (serialized) {
+            fogSerializeSourceRef.current = true;
             setSerializedExploredAreas(serialized);
           }
 
@@ -1857,7 +1868,6 @@ export const SimpleTabletop = () => {
     players, // Re-compute when player data changes (role assignments affect vision)
     currentPlayerId, // Re-compute when active player changes
     roles, // Re-compute when roles change (permissions affect which tokens get vision)
-    serializedExploredAreas, // Re-compute when explored areas change (undo/redo, brush commit)
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
@@ -9444,6 +9454,7 @@ export const SimpleTabletop = () => {
     if (!exploredAreaRef.current) return;
     const serialized = serializeFogGeometry(exploredAreaRef.current);
     if (serialized) {
+      fogSerializeSourceRef.current = true;
       setSerializedExploredAreas(serialized);
       ephemeralBus.emit("fog.reveal.preview", {
         shape: "committed",
@@ -9504,6 +9515,7 @@ export const SimpleTabletop = () => {
     // Serialize for persistence
     const serialized = serializeFogGeometry(updated);
     if (serialized) {
+      fogSerializeSourceRef.current = true;
       setSerializedExploredAreas(serialized);
       // Broadcast to connected players so they redraw with the revealed area
       ephemeralBus.emit("fog.reveal.preview", {
@@ -9568,6 +9580,7 @@ export const SimpleTabletop = () => {
     exploredAreaRef.current = updated as paper.CompoundPath | null;
 
     const serialized = updated ? serializeFogGeometry(updated as paper.CompoundPath) : '';
+    fogSerializeSourceRef.current = true;
     setSerializedExploredAreas(serialized);
     ephemeralBus.emit("fog.reveal.preview", {
       shape: "committed",
