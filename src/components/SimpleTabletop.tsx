@@ -9527,9 +9527,8 @@ export const SimpleTabletop = () => {
     circle.remove();
   }, [fogEnabled, fogRevealBrushRadius, fogBrushMode]);
 
-  // Poll fog mask refresh while painting — interval scales with brush radius
-  // so smaller brushes refresh faster (cursor center shouldn't leave the previous stamp).
-  const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   // Poll fog mask refresh while painting — fixed 90ms interval
+   const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Recompute fog masks from current explored+visible state (used during brush painting)
   const recomputeFogMasksInline = useCallback(() => {
@@ -9555,13 +9554,11 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     if (isFogBrushPainting) {
       // Interval: roughly time for cursor to traverse one brush diameter at typical drag speed
-      // Clamp between 80ms (small brush, fast refresh) and 500ms (large brush)
-      const pollMs = Math.max(80, Math.min(500, fogRevealBrushRadius * 3));
       fogBrushPollRef.current = setInterval(() => {
         // Recompute masks inline instead of nulling them (which would trigger full-black safety overlay)
         recomputeFogMasksInline();
         redrawCanvas();
-      }, pollMs);
+      }, 90);
     } else {
       if (fogBrushPollRef.current) {
         clearInterval(fogBrushPollRef.current);
