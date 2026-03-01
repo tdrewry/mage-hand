@@ -661,6 +661,8 @@ export const SimpleTabletop = () => {
       wallPoints?: { x: number; y: number }[];
       x?: number; y?: number; width?: number; height?: number; regRotation?: number;
       pathPoints?: { x: number; y: number }[];
+      bezierControlPoints?: { cp1: { x: number; y: number }; cp2: { x: number; y: number } }[];
+      regionType?: 'rectangle' | 'path';
       lightPos?: { x: number; y: number };
     }
   }>({});
@@ -7022,7 +7024,7 @@ export const SimpleTabletop = () => {
                 for (const m of mobjDragGroup.members) {
                   if (m.id === clickedMapObject.id) continue;
                   if (m.type === 'mapObject') { const o = mapObjects.find(x => x.id === m.id); if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined }; }
-                  else if (m.type === 'region') { const r = regions.find(x => x.id === m.id); if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y }; }
+                  else if (m.type === 'region') { const r = regions.find(x => x.id === m.id); if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, regionType: r.regionType, pathPoints: r.pathPoints?.map(p => ({ ...p })), bezierControlPoints: r.bezierControlPoints?.map(c => ({ cp1: { ...c.cp1 }, cp2: { ...c.cp2 } })) }; }
                   else if (m.type === 'light') { const l = useLightStore.getState().lights.find(x => x.id === m.id); if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } }; }
                   else if (m.type === 'token') { const t = tokens.find(x => x.id === m.id); if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } }; }
                 }
@@ -7041,7 +7043,7 @@ export const SimpleTabletop = () => {
               for (const m of mobjDragGroup2.members) {
                 if (m.id === clickedMapObject.id) continue;
                 if (m.type === 'mapObject') { const o = mapObjects.find(x => x.id === m.id); if (o) snap2[m.id] = { type: 'mapObject', position: { ...o.position }, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined }; }
-                else if (m.type === 'region') { const r = regions.find(x => x.id === m.id); if (r) snap2[m.id] = { type: 'region', x: r.x, y: r.y }; }
+                else if (m.type === 'region') { const r = regions.find(x => x.id === m.id); if (r) snap2[m.id] = { type: 'region', x: r.x, y: r.y, regionType: r.regionType, pathPoints: r.pathPoints?.map(p => ({ ...p })), bezierControlPoints: r.bezierControlPoints?.map(c => ({ cp1: { ...c.cp1 }, cp2: { ...c.cp2 } })) }; }
                 else if (m.type === 'light') { const l = useLightStore.getState().lights.find(x => x.id === m.id); if (l) snap2[m.id] = { type: 'light', lightPos: { ...l.position } }; }
                 else if (m.type === 'token') { const t = tokens.find(x => x.id === m.id); if (t) snap2[m.id] = { type: 'token', position: { x: t.x, y: t.y } }; }
               }
@@ -7146,7 +7148,7 @@ export const SimpleTabletop = () => {
             if (dragGroup2) {
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               // Include primary so regionDragStartRef is always consistent
-              snap[clickedRegion.id] = { type: 'region', x: clickedRegion.x, y: clickedRegion.y };
+              snap[clickedRegion.id] = { type: 'region', x: clickedRegion.x, y: clickedRegion.y, regionType: clickedRegion.regionType, pathPoints: clickedRegion.pathPoints?.map(p => ({ ...p })), bezierControlPoints: clickedRegion.bezierControlPoints?.map(c => ({ cp1: { ...c.cp1 }, cp2: { ...c.cp2 } })) };
               const groupRegionIdsForSnap = new Set<string>([clickedRegion.id]);
 
               for (const m of dragGroup2.members) {
@@ -7156,7 +7158,7 @@ export const SimpleTabletop = () => {
                   if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
                 } else if (m.type === 'region') {
                   const r = regions.find(x => x.id === m.id);
-                  if (r) { snap[m.id] = { type: 'region', x: r.x, y: r.y }; groupRegionIdsForSnap.add(m.id); }
+                  if (r) { snap[m.id] = { type: 'region', x: r.x, y: r.y, regionType: r.regionType, pathPoints: r.pathPoints?.map(p => ({ ...p })), bezierControlPoints: r.bezierControlPoints?.map(c => ({ cp1: { ...c.cp1 }, cp2: { ...c.cp2 } })) }; groupRegionIdsForSnap.add(m.id); }
                 } else if (m.type === 'light') {
                   const l = useLightStore.getState().lights.find(x => x.id === m.id);
                   if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
@@ -7697,7 +7699,14 @@ export const SimpleTabletop = () => {
               updateMapObject(member.id, { position: { x: snap.position.x + absDeltaX, y: snap.position.y + absDeltaY } });
             }
           } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-            updateRegion(member.id, { x: snap.x + absDeltaX, y: snap.y + absDeltaY });
+            if (snap.regionType === 'path' && snap.pathPoints) {
+              const newPathPoints = snap.pathPoints.map(p => ({ x: p.x + absDeltaX, y: p.y + absDeltaY }));
+              const newBezierControls = snap.bezierControlPoints?.map(c => ({ cp1: { x: c.cp1.x + absDeltaX, y: c.cp1.y + absDeltaY }, cp2: { x: c.cp2.x + absDeltaX, y: c.cp2.y + absDeltaY } }));
+              const newBounds = newBezierControls ? getBezierBounds(newPathPoints, newBezierControls) : getPolygonBounds(newPathPoints);
+              updateRegion(member.id, { x: newBounds.x, y: newBounds.y, width: newBounds.width, height: newBounds.height, pathPoints: newPathPoints, bezierControlPoints: newBezierControls });
+            } else {
+              updateRegion(member.id, { x: snap.x + absDeltaX, y: snap.y + absDeltaY });
+            }
           } else if (member.type === 'light' && snap.lightPos) {
             useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + absDeltaX, y: snap.lightPos.y + absDeltaY } });
           }
@@ -7779,7 +7788,14 @@ export const SimpleTabletop = () => {
             } else if (member.type === 'token' && snap.position) {
               newTempPositions[member.id] = { x: snap.position.x + deltaX, y: snap.position.y + deltaY };
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
-              updateRegion(member.id, { x: snap.x + deltaX, y: snap.y + deltaY });
+              if (snap.regionType === 'path' && snap.pathPoints) {
+                const newPathPoints = snap.pathPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                const newBezierControls = snap.bezierControlPoints?.map(c => ({ cp1: { x: c.cp1.x + deltaX, y: c.cp1.y + deltaY }, cp2: { x: c.cp2.x + deltaX, y: c.cp2.y + deltaY } }));
+                const newBounds = newBezierControls ? getBezierBounds(newPathPoints, newBezierControls) : getPolygonBounds(newPathPoints);
+                updateRegion(member.id, { x: newBounds.x, y: newBounds.y, width: newBounds.width, height: newBounds.height, pathPoints: newPathPoints, bezierControlPoints: newBezierControls });
+              } else {
+                updateRegion(member.id, { x: snap.x + deltaX, y: snap.y + deltaY });
+              }
               groupRegionIds.add(member.id);
             } else if (member.type === 'light' && snap.lightPos) {
               useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + deltaX, y: snap.lightPos.y + deltaY } });
