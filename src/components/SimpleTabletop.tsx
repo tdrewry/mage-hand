@@ -9553,7 +9553,7 @@ export const SimpleTabletop = () => {
 
   useEffect(() => {
     if (isFogBrushPainting) {
-      // Interval: roughly time for cursor to traverse one brush diameter at typical drag speed
+      // Fixed 90ms polling interval for fog brush redraws
       fogBrushPollRef.current = setInterval(() => {
         // Recompute masks inline instead of nulling them (which would trigger full-black safety overlay)
         recomputeFogMasksInline();
