@@ -141,13 +141,17 @@ export function computeVisibilityFromSegments(
   // Convert to visibility-polygon format
   const visSegments = segmentsToVisibilityFormat(segments);
 
-  // Add bounding box if maxDistance specified
+  // Add bounding box if maxDistance specified.
+  // Use 1.4× maxDistance so that illumination animation radius modifiers
+  // (which can expand the circle up to ~1.2×) never exceed the bounding box,
+  // preventing the visibility polygon's square outline from clipping the circle.
   if (maxDistance) {
+    const bbox = maxDistance * 1.4;
     const bounds = [
-      [position.x - maxDistance, position.y - maxDistance],
-      [position.x + maxDistance, position.y - maxDistance],
-      [position.x + maxDistance, position.y + maxDistance],
-      [position.x - maxDistance, position.y + maxDistance],
+      [position.x - bbox, position.y - bbox],
+      [position.x + bbox, position.y - bbox],
+      [position.x + bbox, position.y + bbox],
+      [position.x - bbox, position.y + bbox],
     ];
     
     // Add bounding box as segments
