@@ -605,6 +605,7 @@ type SortDir   = 'asc' | 'desc';
 export const MapTreeCardContent: React.FC = () => {
   const maps = useMapStore(s => s.maps);
   const selectedMapId = useMapStore(s => s.selectedMapId);
+  const addMap = useMapStore(s => s.addMap);
   const updateMap = useMapStore(s => s.updateMap);
   const removeMap = useMapStore(s => s.removeMap);
   const setSelectedMap = useMapStore(s => s.setSelectedMap);
@@ -622,6 +623,7 @@ export const MapTreeCardContent: React.FC = () => {
   }, []);
 
   const regions     = useRegionStore(s => s.regions);
+  const addRegion = useRegionStore(s => s.addRegion);
   const updateRegion = useRegionStore(s => s.updateRegion);
   const removeRegion = useRegionStore(s => s.removeRegion);
   const selectRegion = useRegionStore(s => s.selectRegion);
@@ -639,6 +641,7 @@ export const MapTreeCardContent: React.FC = () => {
   const toggleDoor = useMapObjectStore(s => s.toggleDoor);
 
   const lights      = useLightStore(s => s.lights);
+  const addLight = useLightStore(s => s.addLight);
   const removeLight = useLightStore(s => s.removeLight);
   const updateLight = useLightStore(s => s.updateLight);
   const toggleLight = useLightStore(s => s.toggleLight);
@@ -1342,6 +1345,81 @@ export const MapTreeCardContent: React.FC = () => {
     selectedMapObjectIds.forEach(id => deselectMapObject(id));
   }, [setSelectedTokens, regions, deselectRegion, selectedMapObjectIds, deselectMapObject]);
 
+  // ── Duplicate map handler ─────────────────────────────────────────────────
+  const handleDuplicateMap = useCallback((sourceMapId: string) => {
+    const sourceMap = maps.find(m => m.id === sourceMapId);
+    if (!sourceMap) return;
+
+    const genId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newMapId = `map-${genId()}`;
+
+    // Clone the map itself (addMap generates an id, so we create via the store directly)
+    // We'll use addMap which auto-generates an id, but we need to know the new id.
+    // Instead, directly push into the store:
+    const newMap: typeof sourceMap = {
+      ...sourceMap,
+      id: newMapId,
+      name: `${sourceMap.name} (copy)`,
+      active: true,
+      regions: sourceMap.regions.map(r => ({ ...r, id: `region-${genId()}` })),
+    };
+    useMapStore.setState(state => ({ maps: [...state.maps, newMap] }));
+
+    // Build id mapping for group cloning
+    const idMap = new globalThis.Map<string, string>();
+
+    // Clone tokens on this map
+    const mapTokens = tokens.filter(t => t.mapId === sourceMapId);
+    mapTokens.forEach(token => {
+      const newId = `token-${genId()}`;
+      idMap.set(token.id, newId);
+      useSessionStore.getState().addToken({ ...token, id: newId, mapId: newMapId });
+    });
+
+    // Clone regions (canvas regions) on this map
+    const mapRegions = regions.filter(r => r.mapId === sourceMapId);
+    mapRegions.forEach(region => {
+      const newId = `region-${genId()}`;
+      idMap.set(region.id, newId);
+      const { id: _id, ...rest } = region;
+      addRegion({ ...rest, id: newId, mapId: newMapId } as any);
+    });
+
+    // Clone map objects on this map
+    const mapMapObjects = mapObjects.filter(o => o.mapId === sourceMapId);
+    mapMapObjects.forEach(obj => {
+      const newId = `mapobj-${genId()}`;
+      idMap.set(obj.id, newId);
+      const { id: _id, ...rest } = obj;
+      addMapObject({ ...rest, id: newId, selected: false, mapId: newMapId });
+    });
+
+    // Clone lights on this map
+    const mapLights = lights.filter(l => (l as any).mapId === sourceMapId);
+    mapLights.forEach(light => {
+      const newId = `light-${genId()}`;
+      idMap.set(light.id, newId);
+      const { id: _id, ...rest } = light;
+      addLight({ ...rest, id: newId, mapId: newMapId } as any);
+    });
+
+    // Clone groups whose members are all on this map
+    const mapEntityIds = new Set([...mapTokens.map(t => t.id), ...mapRegions.map(r => r.id), ...mapMapObjects.map(o => o.id), ...mapLights.map(l => l.id)]);
+    groups.forEach(group => {
+      const allOnMap = group.members.every(m => mapEntityIds.has(m.id));
+      if (!allOnMap) return;
+      const newMembers = group.members
+        .map(m => ({ ...m, id: idMap.get(m.id) || m.id }))
+        .filter(m => idMap.has(m.id) || mapEntityIds.has(m.id));
+      if (newMembers.length > 0) {
+        addGroup(`${group.name} (copy)`, newMembers, []);
+      }
+    });
+
+    setSelectedMap(newMapId);
+    toast.success(`Duplicated map "${sourceMap.name}" with ${idMap.size} entities`);
+  }, [maps, tokens, regions, mapObjects, lights, groups, addRegion, addMapObject, addLight, addGroup, setSelectedMap]);
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Sticky header ── */}
@@ -1628,6 +1706,16 @@ export const MapTreeCardContent: React.FC = () => {
                     </ContextMenuItem>
                   </ContextMenuSubContent>
                 </ContextMenuSub>
+
+                {/* Duplicate */}
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-xs gap-2"
+                  onClick={() => handleDuplicateMap(map.id)}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Duplicate Map
+                </ContextMenuItem>
 
                 {/* Delete */}
                 {maps.length > 1 && (
