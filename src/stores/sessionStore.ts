@@ -75,6 +75,9 @@ export interface Token {
   appearanceVariants?: AppearanceVariant[];
   activeVariantId?: string;  // Which variant is currently active
 
+  // Multi-map scoping — which map this token belongs to
+  mapId?: string;
+
   // @deprecated Legacy fields - kept for migration, will be removed in future
   hasVision?: boolean;
   visionRange?: number;

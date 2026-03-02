@@ -59,6 +59,9 @@ export interface IlluminationSource {
   // Cone light settings (only used when clipShape === 'cone')
   coneAngle?: number;       // Full cone angle in radians (e.g. Math.PI / 2 for 90°)
   coneDirection?: number;   // Direction the cone points, in radians from +X axis
+
+  // Multi-map scoping — which map this illumination source belongs to
+  mapId?: string;
 }
 
 /**

@@ -54,7 +54,7 @@ export const MapManagerCardContent = () => {
       name: newMapName,
       bounds: { x: 0, y: 0, width: 1600, height: 1200 },
       backgroundColor: '#2a2a2a',
-      visible: true,
+      active: true,
       zIndex: maps.length,
       regions: [{
         name: 'Main Region',
@@ -160,10 +160,10 @@ export const MapManagerCardContent = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => updateMap(map.id, { visible: !map.visible })}
+                      onClick={() => updateMap(map.id, { active: !map.active })}
                       className="p-1"
                     >
-                      {map.visible ? (
+                      {map.active ? (
                         <Eye className="h-4 w-4" />
                       ) : (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />

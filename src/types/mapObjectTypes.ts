@@ -68,6 +68,9 @@ export interface MapObject {
 
   // Z-Order: lower = drawn first (underneath). Default derived from CATEGORY_DEFAULT_RENDER_ORDER.
   renderOrder?: number;
+
+  // Multi-map scoping — which map this object belongs to
+  mapId?: string;
 }
 
 export type MapObjectCategory = 

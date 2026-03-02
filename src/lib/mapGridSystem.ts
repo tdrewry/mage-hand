@@ -36,7 +36,7 @@ export function renderMapGrids(
   
   // Render maps in z-index order (lowest first, so highest appears on top)
   const sortedMaps = [...maps]
-    .filter(map => map.visible)
+    .filter(map => map.active)
     .sort((a, b) => a.zIndex - b.zIndex);
     
   for (const map of sortedMaps) {

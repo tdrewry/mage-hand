@@ -23,6 +23,8 @@ export interface EntityGroup {
   bounds: { x: number; y: number; width: number; height: number };
   locked: boolean;
   visible: boolean;
+  // Multi-map scoping — which map this group belongs to
+  mapId?: string;
 }
 
 /** Position and size data for any entity, used for bounds calculation */
