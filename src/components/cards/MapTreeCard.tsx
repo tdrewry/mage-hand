@@ -1291,11 +1291,26 @@ export const MapTreeCardContent: React.FC = () => {
     );
   };
 
+  // ── Select all / none handlers ─────────────────────────────────────────────
+  const handleSelectAll = useCallback(() => {
+    setSelectedTokens?.(tokens.map(t => t.id));
+    regions.forEach(r => selectRegion(r.id));
+    mapObjects.forEach(o => selectMapObject(o.id, true));
+    toast.success(`Selected ${tokens.length + regions.length + mapObjects.length} entities`);
+  }, [tokens, regions, mapObjects, setSelectedTokens, selectRegion, selectMapObject]);
+
+  const handleSelectNone = useCallback(() => {
+    setSelectedTokens?.([]);
+    regions.forEach(r => deselectRegion(r.id));
+    selectedMapObjectIds.forEach(id => deselectMapObject(id));
+  }, [setSelectedTokens, regions, deselectRegion, selectedMapObjectIds, deselectMapObject]);
+
   return (
-    <ScrollArea className="h-full">
-      <div className="p-2 space-y-1">
+    <div className="flex flex-col h-full">
+      {/* ── Sticky header ── */}
+      <div className="shrink-0 p-2 pb-0 space-y-1 border-b border-border/40 bg-background">
         {/* Summary badges — click to select all of that type */}
-        <div className="flex items-center gap-1 flex-wrap mb-2">
+        <div className="flex items-center gap-1 flex-wrap mb-1">
           <Badge variant="outline" className="text-[10px]">{maps.length} maps</Badge>
           <Badge
             variant="outline"
@@ -1343,8 +1358,8 @@ export const MapTreeCardContent: React.FC = () => {
           )}
         </div>
 
-        {/* Sort controls */}
-        <div className="flex items-center gap-1 mb-2">
+        {/* Sort controls + Select all/none */}
+        <div className="flex items-center gap-1 pb-2">
           <span className="text-[10px] text-muted-foreground mr-0.5">Sort:</span>
           {(['renderOrder', 'name', 'type'] as SortField[]).map(field => {
             const active = sortField === field;
@@ -1368,7 +1383,29 @@ export const MapTreeCardContent: React.FC = () => {
               </button>
             );
           })}
+
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={handleSelectAll}
+              className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              title="Select all entities"
+            >
+              All
+            </button>
+            <button
+              onClick={handleSelectNone}
+              className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              title="Deselect all entities"
+            >
+              None
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* ── Scrollable entity list ── */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-2 space-y-1">
 
         {/* ── Map nodes ── */}
         {maps.map((map, index) => {
@@ -1488,5 +1525,6 @@ export const MapTreeCardContent: React.FC = () => {
         )}
       </div>
     </ScrollArea>
+    </div>
   );
 };
