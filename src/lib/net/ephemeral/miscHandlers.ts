@@ -33,7 +33,8 @@ export function registerMiscHandlers(): void {
   ephemeralBus.on("fog.reveal.preview", (data: FogRevealPreviewPayload, _userId) => {
     // Committed reveal — update the fog store so the canvas redraws with the new explored area
     if (data.shape === "committed" && data.serializedExploredAreas != null) {
-      useFogStore.getState().setSerializedExploredAreas(data.serializedExploredAreas);
+      const mapId = data.mapId || 'default-map';
+      useFogStore.getState().setSerializedExploredAreasForMap(mapId, data.serializedExploredAreas);
     }
   });
 

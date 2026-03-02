@@ -446,13 +446,14 @@ export const SimpleTabletop = () => {
     visionRange: fogVisionRange,
     fogOpacity,
     exploredOpacity,
-    serializedExploredAreas,
-    setSerializedExploredAreas,
+    serializedExploredAreasPerMap,
+    setSerializedExploredAreasForMap,
     setEnabled: setFogEnabled,
     setRevealAll: setFogRevealAll,
     effectSettings,
     realtimeVisionDuringDrag,
     realtimeVisionThrottleMs,
+    clearExploredAreas,
   } = useFogStore();
   
   // ---------------------------------------------------------------------------
@@ -540,10 +541,26 @@ export const SimpleTabletop = () => {
   // Texture loader for persistent region backgrounds
   useTextureLoader();
 
-  // Track explored areas (accumulated visibility) using paper.js
-  const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
+  // Track explored areas (accumulated visibility) using paper.js — per-map
+  const exploredAreasMapRef = useRef<Map<string, paper.CompoundPath>>(new Map());
   const currentVisibilityRef = useRef<paper.Path | null>(null); // Current visibility for interaction checks
   const stableVisibilityRef = useRef<paper.Path | null>(null); // Snapshot of visibility for stable checks during drag
+
+  /** Get the explored area for the currently selected map (or 'default-map') */
+  const getActiveExploredArea = useCallback((): paper.CompoundPath | null => {
+    const mapId = selectedMapId || 'default-map';
+    return exploredAreasMapRef.current.get(mapId) || null;
+  }, [selectedMapId]);
+
+  /** Set the explored area for the currently selected map (or 'default-map') */
+  const setActiveExploredArea = useCallback((path: paper.CompoundPath | null) => {
+    const mapId = selectedMapId || 'default-map';
+    if (path) {
+      exploredAreasMapRef.current.set(mapId, path);
+    } else {
+      exploredAreasMapRef.current.delete(mapId);
+    }
+  }, [selectedMapId]);
 
   // Portal activation flash effect — maps portalId to start timestamp
   const portalActivationsRef = useRef<Map<string, number>>(new Map());
@@ -1427,9 +1444,10 @@ export const SimpleTabletop = () => {
       maxY = Math.max(maxY, obj.position.y + (obj.height ?? 0));
     });
 
-    // Include explored fog areas if no focused map (global view)
-    if (!selectedMapId && exploredAreaRef.current) {
-      const bounds = exploredAreaRef.current.bounds;
+    // Include explored fog areas for the focused map
+    const activeExplored = getActiveExploredArea();
+    if (activeExplored) {
+      const bounds = activeExplored.bounds;
       if (bounds && bounds.width > 0 && bounds.height > 0) {
         hasContent = true;
         minX = Math.min(minX, bounds.left);
@@ -1508,13 +1526,17 @@ export const SimpleTabletop = () => {
       fogScopeRef.current.setup(canvas);
     }
 
-    // Load serialized explored areas
-    if (fogEnabled && serializedExploredAreas) {
+    // Load serialized explored areas per map
+    if (fogEnabled && serializedExploredAreasPerMap) {
       const scope = fogScopeRef.current;
       if (scope) {
-        const deserialized = deserializeFogGeometry(serializedExploredAreas, scope);
-        if (deserialized) {
-          exploredAreaRef.current = deserialized;
+        for (const [mapId, data] of Object.entries(serializedExploredAreasPerMap)) {
+          if (data) {
+            const deserialized = deserializeFogGeometry(data, scope);
+            if (deserialized) {
+              exploredAreasMapRef.current.set(mapId, deserialized);
+            }
+          }
         }
       }
     }
@@ -1529,13 +1551,13 @@ export const SimpleTabletop = () => {
   // Clear explored areas when fog is disabled
   useEffect(() => {
     if (!fogEnabled) {
-      exploredAreaRef.current = null;
+      exploredAreasMapRef.current.clear();
       currentVisibilityRef.current = null;
       fogMasksRef.current = null;
       fogSerializeSourceRef.current = true;
-      setSerializedExploredAreas("");
+      clearExploredAreas();
     }
-  }, [fogEnabled, setSerializedExploredAreas]);
+  }, [fogEnabled, clearExploredAreas]);
 
   // Redraw canvas when synced game objects change
   useEffect(() => {
@@ -1559,24 +1581,29 @@ export const SimpleTabletop = () => {
 
   useEffect(() => {
     // When serialized explored areas change from an external source (undo/redo, remote sync),
-    // deserialize back into the Paper.js ref and invalidate fog masks.
-    // Skip if we were the source of the serialization (local fog computation / brush commit).
+    // deserialize back into the Paper.js refs and invalidate fog masks.
     if (fogSerializeSourceRef.current) {
       fogSerializeSourceRef.current = false;
       redrawCanvas();
       return;
     }
-    if (fogEnabled && serializedExploredAreas && fogScopeRef.current) {
-      const deserialized = deserializeFogGeometry(serializedExploredAreas, fogScopeRef.current);
-      if (deserialized) {
-        exploredAreaRef.current = deserialized;
+    if (fogEnabled && serializedExploredAreasPerMap && fogScopeRef.current) {
+      for (const [mapId, data] of Object.entries(serializedExploredAreasPerMap)) {
+        if (data) {
+          const deserialized = deserializeFogGeometry(data, fogScopeRef.current);
+          if (deserialized) {
+            exploredAreasMapRef.current.set(mapId, deserialized);
+          }
+        } else {
+          exploredAreasMapRef.current.delete(mapId);
+        }
       }
-    } else if (!serializedExploredAreas) {
-      exploredAreaRef.current = null;
+    } else if (!serializedExploredAreasPerMap || Object.keys(serializedExploredAreasPerMap).length === 0) {
+      exploredAreasMapRef.current.clear();
     }
     fogMasksRef.current = null; // Force fog mask recomputation
     redrawCanvas();
-  }, [serializedExploredAreas]);
+  }, [serializedExploredAreasPerMap]);
 
   // Redraw when map objects change (e.g., door toggle)
   // Must also update combined segments and clear visibility cache
@@ -1955,17 +1982,19 @@ export const SimpleTabletop = () => {
           }
           currentVisibilityRef.current = combinedVisibility.clone({ insert: false }) as paper.Path;
 
-          // Merge into explored areas
-          exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, combinedVisibility);
+          // Merge into explored areas (per-map)
+          const activeExplored = getActiveExploredArea();
+          setActiveExploredArea(addVisibleToExplored(activeExplored, combinedVisibility));
 
           // Clean up combined visibility
           if (combinedVisibility.remove) combinedVisibility.remove();
 
           // Serialize for persistence
-          const serialized = serializeFogGeometry(exploredAreaRef.current);
+          const currentMapId = selectedMapId || 'default-map';
+          const serialized = serializeFogGeometry(getActiveExploredArea());
           if (serialized) {
             fogSerializeSourceRef.current = true;
-            setSerializedExploredAreas(serialized);
+            setSerializedExploredAreasForMap(currentMapId, serialized);
           }
 
           // Compute masks
@@ -1995,7 +2024,7 @@ export const SimpleTabletop = () => {
 
           if (!visibilityForMask) return;
 
-          const masks = computeFogMasks(exploredAreaRef.current, visibilityForMask, worldBounds);
+          const masks = computeFogMasks(getActiveExploredArea(), visibilityForMask, worldBounds);
 
           // Store individual token visibility data for rendering
           const tokenVisData: Array<{
@@ -2124,7 +2153,7 @@ export const SimpleTabletop = () => {
     fogRevealAll,
     fogVisionRange,
     isDraggingToken,
-    setSerializedExploredAreas,
+    setSerializedExploredAreasForMap,
     renderingMode,
     regions,
     mapObjects, // Re-compute fog when map objects change (they may block vision)
@@ -2191,7 +2220,7 @@ export const SimpleTabletop = () => {
           const tokenPoint = { x: token.x, y: token.y };
           const isRevealed = isPointInRevealedArea(
             tokenPoint,
-            exploredAreaRef.current,
+            getActiveExploredArea(),
             currentVisibilityRef.current
           );
           
@@ -3223,7 +3252,7 @@ export const SimpleTabletop = () => {
           const annotationPoint = { x, y };
           const isRevealed = isPointInRevealedArea(
             annotationPoint,
-            exploredAreaRef.current,
+            getActiveExploredArea(),
             currentVisibilityRef.current
           );
           if (!isRevealed) {
@@ -6592,8 +6621,8 @@ export const SimpleTabletop = () => {
       if (!hasFogBypass) {
         const point = { x: worldPos.x, y: worldPos.y };
         const isVisible = isPointInVisibleArea(point, currentVisibilityRef.current);
-        const isExplored = exploredAreaRef.current 
-          ? isPointInRevealedArea(point, exploredAreaRef.current, currentVisibilityRef.current)
+        const isExplored = getActiveExploredArea() 
+          ? isPointInRevealedArea(point, getActiveExploredArea(), currentVisibilityRef.current)
           : false;
         
         // For tokens and regions hidden by fog, block context menu for players
@@ -6841,8 +6870,8 @@ export const SimpleTabletop = () => {
       // ── FOG REVEAL BRUSH: intercept click when brush tool is active ──
       if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {
         // Capture pre-paint state for undo
-        fogBrushPreExploredRef.current = exploredAreaRef.current
-          ? (exploredAreaRef.current.clone() as paper.CompoundPath)
+        fogBrushPreExploredRef.current = getActiveExploredArea()
+          ? (getActiveExploredArea()!.clone() as paper.CompoundPath)
           : null;
         setIsFogBrushPainting(true);
         fogBrushCursorRef.current = worldPos; // Set cursor so ghost circle is visible immediately
@@ -6965,7 +6994,7 @@ export const SimpleTabletop = () => {
           const annotationPoint = { x: ann.position.x, y: ann.position.y };
           const isRevealed = isPointInRevealedArea(
             annotationPoint,
-            exploredAreaRef.current,
+            getActiveExploredArea(),
             currentVisibilityRef.current
           );
           if (!isRevealed) {
@@ -8596,19 +8625,20 @@ export const SimpleTabletop = () => {
         ? serializeFogGeometry(fogBrushPreExploredRef.current)
         : '';
       commitFogBrush();
-      const postSerialized = exploredAreaRef.current
-        ? serializeFogGeometry(exploredAreaRef.current)
+      const postSerialized = getActiveExploredArea()
+        ? serializeFogGeometry(getActiveExploredArea()!)
         : '';
 
       if (preSerialized !== postSerialized) {
+        const undoMapId = selectedMapId || 'default-map';
         undoRedoManager.push({
           type: 'FOG_BRUSH_REVEAL',
           description: 'Fog brush reveal',
           execute() {
-            useFogStore.getState().setSerializedExploredAreas(postSerialized);
+            useFogStore.getState().setSerializedExploredAreasForMap(undoMapId, postSerialized);
           },
           undo() {
-            useFogStore.getState().setSerializedExploredAreas(preSerialized);
+            useFogStore.getState().setSerializedExploredAreasForMap(undoMapId, preSerialized);
           },
         });
       }
@@ -9874,21 +9904,22 @@ export const SimpleTabletop = () => {
 
     if (fogBrushMode === 'reveal') {
       // Union: add circle to explored area (remove fog)
-      exploredAreaRef.current = addVisibleToExplored(exploredAreaRef.current, circle);
+      setActiveExploredArea(addVisibleToExplored(getActiveExploredArea(), circle));
     } else {
       // Subtract: remove circle from explored area (add fog back)
-      if (exploredAreaRef.current && !exploredAreaRef.current.isEmpty()) {
-        const result = exploredAreaRef.current.subtract(circle, { insert: false });
-        if (exploredAreaRef.current.remove) exploredAreaRef.current.remove();
+      const currentExplored = getActiveExploredArea();
+      if (currentExplored && !currentExplored.isEmpty()) {
+        const result = currentExplored.subtract(circle, { insert: false });
+        if (currentExplored.remove) currentExplored.remove();
         if (result instanceof scope.CompoundPath) {
-          exploredAreaRef.current = result;
+          setActiveExploredArea(result);
         } else if (result instanceof scope.Path) {
-          exploredAreaRef.current = new scope.CompoundPath({ children: [result] });
+          setActiveExploredArea(new scope.CompoundPath({ children: [result] }));
         }
       }
     }
     circle.remove();
-  }, [fogEnabled, fogRevealBrushRadius, fogBrushMode]);
+  }, [fogEnabled, fogRevealBrushRadius, fogBrushMode, getActiveExploredArea, setActiveExploredArea]);
 
    // Poll fog mask refresh while painting — fixed 90ms interval
    const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -9907,12 +9938,12 @@ export const SimpleTabletop = () => {
     };
 
     const masks = computeFogMasks(
-      exploredAreaRef.current,
+      getActiveExploredArea(),
       currentVisibilityRef.current,
       worldBounds,
     );
     fogMasksRef.current = masks;
-  }, [transform]);
+  }, [transform, getActiveExploredArea]);
 
   useEffect(() => {
     if (isFogBrushPainting) {
@@ -9937,15 +9968,18 @@ export const SimpleTabletop = () => {
   }, [isFogBrushPainting, fogRevealBrushRadius, recomputeFogMasksInline]);
 
   const commitFogBrush = useCallback(() => {
-    if (!exploredAreaRef.current) return;
-    const serialized = serializeFogGeometry(exploredAreaRef.current);
+    const activeExplored = getActiveExploredArea();
+    if (!activeExplored) return;
+    const currentMapId = selectedMapId || 'default-map';
+    const serialized = serializeFogGeometry(activeExplored);
     if (serialized) {
       fogSerializeSourceRef.current = true;
-      setSerializedExploredAreas(serialized);
+      setSerializedExploredAreasForMap(currentMapId, serialized);
       ephemeralBus.emit("fog.reveal.preview", {
         shape: "committed",
         points: [],
         serializedExploredAreas: serialized,
+        mapId: currentMapId,
       });
     }
     // Recompute masks inline to avoid black flash from null masks
@@ -9953,7 +9987,7 @@ export const SimpleTabletop = () => {
     // Broadcast cursor clear
     ephemeralBus.emit("fog.cursor.preview", { pos: { x: 0, y: 0 }, radius: 0, tool: "reveal" });
     redrawCanvas();
-  }, [setSerializedExploredAreas, recomputeFogMasksInline]);
+  }, [setSerializedExploredAreasForMap, recomputeFogMasksInline, getActiveExploredArea, selectedMapId]);
 
   // Mark selected regions as explored (DM fog reveal)
   const handleMarkRegionsExplored = useCallback((regionIds: string[]) => {
@@ -9967,7 +10001,7 @@ export const SimpleTabletop = () => {
     const targetRegions = regions.filter(r => regionIds.includes(r.id));
     if (targetRegions.length === 0) return;
 
-    let updated = exploredAreaRef.current;
+    let updated = getActiveExploredArea();
 
     for (const region of targetRegions) {
       let regionPath: paper.Path;
@@ -9996,24 +10030,26 @@ export const SimpleTabletop = () => {
       regionPath.remove();
     }
 
-    exploredAreaRef.current = updated;
+    setActiveExploredArea(updated);
 
     // Serialize for persistence
+    const currentMapId = selectedMapId || 'default-map';
     const serialized = serializeFogGeometry(updated);
     if (serialized) {
       fogSerializeSourceRef.current = true;
-      setSerializedExploredAreas(serialized);
+      setSerializedExploredAreasForMap(currentMapId, serialized);
       // Broadcast to connected players so they redraw with the revealed area
       ephemeralBus.emit("fog.reveal.preview", {
         shape: "committed",
         points: [],
         serializedExploredAreas: serialized,
+        mapId: currentMapId,
       });
     }
 
     toast.success(`Revealed ${targetRegions.length} region(s) through fog`);
     redrawCanvas();
-  }, [fogEnabled, regions, setSerializedExploredAreas]);
+  }, [fogEnabled, regions, setSerializedExploredAreasForMap, getActiveExploredArea, setActiveExploredArea, selectedMapId]);
 
   // Unmark selected regions as explored (DM fog unreveal — subtract from explored polygon)
   const handleUnmarkRegionsExplored = useCallback((regionIds: string[]) => {
@@ -10021,7 +10057,7 @@ export const SimpleTabletop = () => {
       toast.error('Fog of war must be enabled to unreveal regions');
       return;
     }
-    if (!exploredAreaRef.current) {
+    if (!getActiveExploredArea()) {
       toast.error('No explored area to subtract from');
       return;
     }
@@ -10031,7 +10067,7 @@ export const SimpleTabletop = () => {
     const targetRegions = regions.filter(r => regionIds.includes(r.id));
     if (targetRegions.length === 0) return;
 
-    let updated: paper.PathItem | null = exploredAreaRef.current;
+    let updated: paper.PathItem | null = getActiveExploredArea();
 
     for (const region of targetRegions) {
       if (!updated) break;
@@ -10063,20 +10099,22 @@ export const SimpleTabletop = () => {
       updated = subtracted.bounds.width > 0 && subtracted.bounds.height > 0 ? subtracted : null;
     }
 
-    exploredAreaRef.current = updated as paper.CompoundPath | null;
+    setActiveExploredArea(updated as paper.CompoundPath | null);
 
+    const currentMapId = selectedMapId || 'default-map';
     const serialized = updated ? serializeFogGeometry(updated as paper.CompoundPath) : '';
     fogSerializeSourceRef.current = true;
-    setSerializedExploredAreas(serialized);
+    setSerializedExploredAreasForMap(currentMapId, serialized);
     ephemeralBus.emit("fog.reveal.preview", {
       shape: "committed",
       points: [],
       serializedExploredAreas: serialized,
+      mapId: currentMapId,
     });
 
     toast.success(`Unrevealed ${targetRegions.length} region(s)`);
     redrawCanvas();
-  }, [fogEnabled, regions, setSerializedExploredAreas]);
+  }, [fogEnabled, regions, setSerializedExploredAreasForMap, getActiveExploredArea, setActiveExploredArea, selectedMapId]);
 
   const addTokenToCanvas = async (
     imageUrl: string,

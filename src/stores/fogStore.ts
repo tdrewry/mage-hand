@@ -331,6 +331,17 @@ const persistOptions: PersistOptions<FogState, Partial<FogState>> = {
     realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,
     effectSettings: state.effectSettings,
   }),
+  // Migrate legacy single explored area to per-map
+  onRehydrateStorage: () => (state) => {
+    if (!state) return;
+    const legacy = state.serializedExploredAreas;
+    const perMap = state.serializedExploredAreasPerMap;
+    if (legacy && (!perMap || Object.keys(perMap).length === 0)) {
+      // Migrate legacy data to 'default-map' key
+      state.serializedExploredAreasPerMap = { 'default-map': legacy };
+      state.serializedExploredAreas = ''; // Clear legacy
+    }
+  },
 };
 
 export const useFogStore = create<FogState>()(

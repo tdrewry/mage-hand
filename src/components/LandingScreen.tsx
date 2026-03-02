@@ -108,6 +108,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       exploredOpacity: fogStore.exploredOpacity,
       showExploredAreas: fogStore.showExploredAreas,
       serializedExploredAreas: fogStore.serializedExploredAreas,
+      serializedExploredAreasPerMap: fogStore.serializedExploredAreasPerMap,
       fogVersion: fogStore.fogVersion,
       realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
       realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
