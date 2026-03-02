@@ -86,6 +86,7 @@ import { undoRedoManager } from "../lib/undoRedoManager";
 import { BatchRegionRotationCommand } from "../lib/commands/regionCommands";
 import { useTextureLoader } from "../hooks/useTextureLoader";
 import { TextureDownloadProgress } from "./TextureDownloadProgress";
+import { FloorNavigationWidget } from "./FloorNavigationWidget";
 import { texturePatternCache } from "../lib/texturePatternCache";
 import { animatedTextureManager } from "../lib/animatedTextureManager";
 import { isInViewport, ViewportBounds } from "../lib/renderOptimizer";
@@ -10016,6 +10017,9 @@ export const SimpleTabletop = () => {
     <div className="w-full h-screen bg-surface flex flex-col relative">
       {/* Texture Download Progress Indicator */}
       <TextureDownloadProgress />
+
+      {/* Floor Navigation Widget */}
+      <FloorNavigationWidget />
 
       {/* Circular Button Bar - Always visible at top */}
       <CircularButtonBar
