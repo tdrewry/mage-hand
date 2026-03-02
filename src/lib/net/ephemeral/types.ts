@@ -141,6 +141,8 @@ export interface FogRevealPreviewPayload {
   radius?: number;
   /** When shape === "committed", carries the full serialized explored geometry */
   serializedExploredAreas?: string;
+  /** Map ID this fog data belongs to (per-map explored areas) */
+  mapId?: string;
 }
 
 // -- Chat & Dice --
