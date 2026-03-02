@@ -1,244 +1,173 @@
 
-# Multi-Map Architecture Implementation Plan
+
+# Per-Map Fog Settings
 
 ## Overview
 
-Transform Magehand from a single-map-with-global-entities model to a true multi-map architecture where every entity (token, region, map object, light, fog) is scoped to a specific map. This includes deprecating the Layer Stack card in favor of a Map-aware Map Tree, redesigning Map Manager with active/inactive semantics, and introducing map creation from source images with grid-aligned scaling.
+Transition the fog of war system from a single global settings store to per-map fog configurations. Each map gets its own independent fog settings (enabled, opacity, vision range, GPU effects, etc.). The Fog Control Card targets whichever map currently has focus. The Map Tree gains buttons to open fog controls for any map and for entire structures.
 
-## Current State Summary
+## Architecture
 
-- `mapStore` has a `maps[]` array with grid regions, viewport persistence, and visibility toggles -- but **no entity scoping**.
-- `sessionStore.tokens[]`, `mapObjectStore.mapObjects[]`, `regionStore.regions[]`, `illuminationStore.lights[]`, `fogStore` are all **global singletons** with no `mapId`.
-- `BackgroundGridCard` operates on a Fabric.js canvas that is not connected to any store -- it is non-functional dead code.
-- `LayerStackCard` uses hardcoded layer types with Fabric.js -- also non-functional dead code.
-- `MapTreeCard` lists all entities globally with no map grouping.
-- Role permissions have `canEditMap` but no map-specific permission key.
+### Current State
+- `fogStore` holds one global set of fog settings (enabled, fogOpacity, exploredOpacity, visionRange, effectSettings, etc.)
+- `FogControlCard` reads/writes directly from this single store
+- `SimpleTabletop` uses `fogEnabled` from the global store for all ~20+ rendering checks
 
----
+### New State
+- Fog settings move into a `Record<string, MapFogSettings>` keyed by `mapId`
+- A new `MapFogSettings` interface holds per-map copies of all configurable fog fields
+- The global store retains helper actions and the `serializedExploredAreasPerMap` data
+- `SimpleTabletop` derives `currentMapFogSettings` from the focused map's entry
+- New sessions create a default entry for the initial `'default-map'`
 
-## Phase 1: Data Model -- Add `mapId` to All Entity Types
+## Technical Details
 
-### 1.1 Token type (`src/stores/sessionStore.ts`)
-- Add optional `mapId?: string` to the `Token` interface.
+### 1. fogStore.ts - Per-Map Settings Record
 
-### 1.2 MapObject type (`src/types/mapObjectTypes.ts`)
-- Add optional `mapId?: string` to the `MapObject` interface.
+Add a new interface and restructure the store:
 
-### 1.3 CanvasRegion type (`src/stores/regionStore.ts`)
-- Add optional `mapId?: string` to the `CanvasRegion` interface.
+```text
+interface MapFogSettings {
+  enabled: boolean
+  revealAll: boolean
+  visionRange: number         // 1-50
+  fogOpacity: number          // 0-1
+  exploredOpacity: number     // 0-1
+  showExploredAreas: boolean
+  effectSettings: FogEffectSettings
+}
+```
 
-### 1.4 IlluminationSource type (`src/types/illumination.ts`)
-- Add optional `mapId?: string` to the `IlluminationSource` interface.
+Replace the flat fields (`enabled`, `revealAll`, `visionRange`, `fogOpacity`, `exploredOpacity`, `showExploredAreas`, `effectSettings`) with:
 
-### 1.5 FogStore -- per-map fog (`src/stores/fogStore.ts`)
-- Change `serializedExploredAreas: string` to `serializedExploredAreasPerMap: Record<string, string>` (mapId to serialized geometry).
-- Keep backward-compatible getter/setter that defaults to the active map.
-- Existing `serializedExploredAreas` migrated to the default map on first load.
+```text
+fogSettingsPerMap: Record<string, MapFogSettings>
+```
 
-### 1.6 GroupStore (`src/stores/groupStore.ts`)
-- Add optional `mapId?: string` to `EntityGroup` in `groupTransforms.ts`.
+Add actions:
+- `getMapFogSettings(mapId: string): MapFogSettings` -- returns settings for a map, falling back to defaults
+- `setMapFogSettings(mapId: string, updates: Partial<MapFogSettings>)` -- partial update for one map
+- `initMapFogSettings(mapId: string)` -- creates a default entry if none exists
+- `removeMapFogSettings(mapId: string)` -- cleanup when a map is deleted
+- `setStructureFogSettings(structureId: string, updates: Partial<MapFogSettings>)` -- applies settings to all maps in a structure (requires reading mapStore to find member maps)
 
-### 1.7 LightStore deprecation
-- `lightStore.ts` appears to be a legacy duplicate of `illuminationStore.ts`. Confirm and mark deprecated; all new code references `illuminationStore`.
+Keep existing fields that remain global:
+- `serializedExploredAreasPerMap` (already per-map)
+- `realtimeVisionDuringDrag`, `realtimeVisionThrottleMs` (local-only feature flags)
+- `fogVersion`
 
----
+Legacy migration in `onRehydrateStorage`:
+- If `fogSettingsPerMap` is empty/missing but old flat fields exist, migrate them into a `'default-map'` entry
+- Preserve existing `serializedExploredAreasPerMap` migration
 
-## Phase 2: Map Store Redesign (`src/stores/mapStore.ts`)
+Update `partialize` to persist `fogSettingsPerMap` instead of the old flat fields.
 
-### 2.1 Replace `visible` with `active` semantics
-- Rename `GameMap.visible` to `GameMap.active` (boolean). Active maps are rendered; inactive maps are hidden.
-- `selectedMapId` remains for "which map is being edited/focused."
-- Multiple maps can be `active: true` simultaneously (compound map viewing).
+Update `resetFog` to clear `fogSettingsPerMap` to `{}`.
 
-### 2.2 Remove or repurpose width/height/backgroundColor
-- `GameMap.bounds` width/height become meaningful: they define the map's canvas extent.
-- `GameMap.backgroundColor` becomes the default region fill color when no art is provided.
-- Display these as "Map Dimensions" and "Default Background" in Map Manager.
-- Show computed grid dimensions: `width / gridSize x height / gridSize` cells.
+Update `clearExploredAreas` -- unchanged (already per-map).
 
-### 2.3 Add image support to GameMap
-- Add `imageUrl?: string`, `imageHash?: string`, `imageScale?: number`, `imageOffsetX?: number`, `imageOffsetY?: number` to `GameMap`.
-- When a map is created from an image, `bounds.width` and `bounds.height` are derived from the image's natural dimensions multiplied by `imageScale`.
+### 2. defaultFogEffectSettings.ts - Add Default MapFogSettings
 
-### 2.4 Compound Map type
-- Add `compoundMapId?: string` to `GameMap` -- if set, this map is a member of a compound map group.
-- Add a new action `saveAsCompoundMap(name: string, mapIds: string[])` that creates a metadata entry linking multiple maps.
-- Compound maps appear as a special entry in Map Manager that expands to show member maps.
+Export a `DEFAULT_MAP_FOG_SETTINGS` constant:
 
----
+```text
+export const DEFAULT_MAP_FOG_SETTINGS: MapFogSettings = {
+  enabled: false,
+  revealAll: false,
+  visionRange: 6,
+  fogOpacity: 0.95,
+  exploredOpacity: 0.4,
+  showExploredAreas: true,
+  effectSettings: DEFAULT_FOG_EFFECT_SETTINGS,
+}
+```
 
-## Phase 3: Map Manager Card Redesign (`src/components/cards/MapManagerCard.tsx`)
+### 3. SimpleTabletop.tsx - Derive Per-Map Fog State
 
-### 3.1 Active/Inactive toggle replaces visibility
-- Replace the Eye/EyeOff icon with an Active/Inactive toggle (switch or highlighted state).
-- Active maps render on canvas; inactive maps are hidden but preserved.
+Replace the current destructured fog fields with a derived memo:
 
-### 3.2 Map creation from source image
-- Add "New Map from Image" button that opens a modal:
-  - File upload or URL input for the source image.
-  - Grid overlay preview with adjustable grid size (slider + number input).
-  - Scale slider to resize the image relative to the grid.
-  - Pixel-nudge controls: 4 arrow buttons to shift the image by 1px in each direction (for sub-grid alignment).
-  - "Create Map" commits: creates a new `GameMap` with computed bounds, stores the image in texture storage, creates a default region covering the full image extent.
+```text
+const currentMapFog = useMemo(() => {
+  return getMapFogSettings(selectedMapId || 'default-map');
+}, [fogSettingsPerMap, selectedMapId]);
 
-### 3.3 Save current canvas as map
-- When only the default map exists, show a "Save as Map" action that names/saves the current state.
-- When a second map is added by any means (import, create), prompt: "Save current canvas as [name]?" with Save/Discard options.
+const fogEnabled = currentMapFog.enabled;
+const fogRevealAll = currentMapFog.revealAll;
+const fogVisionRange = currentMapFog.visionRange;
+const fogOpacity = currentMapFog.fogOpacity;
+const exploredOpacity = currentMapFog.exploredOpacity;
+const effectSettings = currentMapFog.effectSettings;
+```
 
-### 3.4 Drag-to-reorder maps
-- Maps are reorderable via drag handles (already partially implemented via `reorderMaps`).
-- Order determines z-order when multiple maps are active simultaneously.
+By re-assigning to the same local variable names (`fogEnabled`, `fogOpacity`, etc.), the ~20+ downstream references require **zero changes** -- they continue to work as before but now pull from the focused map's settings.
 
-### 3.5 Compound Map management
-- "Save as Compound Map" action: select multiple active maps, name the compound, save.
-- Compound maps appear as collapsible groups in the map list.
-- Activating a compound map activates all its member maps.
+Update the `setFogEnabled` / `setFogRevealAll` callbacks to use `setMapFogSettings(selectedMapId, { enabled: ... })` instead of the old global setters.
 
-### 3.6 Map dimensions and grid info display
-- Show `width x height` px and `cols x rows` grid cells in the expanded map details.
-- Show grid scale if relevant.
+### 4. FogControlCard.tsx - Target Focused Map (or Specified Map)
 
----
+Accept an optional `targetMapId` prop. When provided, the card controls that map's fog settings instead of the focused map. This enables opening fog controls for inactive maps from the Map Tree.
 
-## Phase 4: Map Tree Integration (`src/components/cards/MapTreeCard.tsx`)
+```text
+interface FogControlCardContentProps {
+  targetMapId?: string;      // If provided, controls this map
+  targetLabel?: string;      // Display label (e.g. "Dungeon B1")
+  isStructureMode?: boolean; // If true, applies to all maps in a structure
+  structureId?: string;      // The structure to target
+}
+```
 
-### 4.1 Maps as top-level tree nodes
-- Each active map becomes a collapsible top-level node in the Map Tree.
-- Children are grouped by type: Regions, Map Objects, Tokens, Lights (filtered by `mapId`).
-- Map nodes show active/inactive toggle and are drag-reorderable (synced with Map Manager order).
+The card reads settings via `getMapFogSettings(effectiveMapId)` and writes via `setMapFogSettings(effectiveMapId, ...)`. In structure mode, it uses `setStructureFogSettings(structureId, ...)`.
 
-### 4.2 Bidirectional sync with Map Manager
-- Reordering maps in Map Tree updates `mapStore.reorderMaps`.
-- Toggling active/inactive in Map Tree updates `mapStore.updateMap(id, { active })`.
-- Changes in Map Manager are reflected immediately in Map Tree (both read from `mapStore`).
+Show a header badge indicating which map/structure is being configured.
 
-### 4.3 Unassigned entities section
-- Entities with no `mapId` (legacy data) appear under an "Unassigned" section at the bottom.
-- Provide a context menu action "Move to Map..." to assign a `mapId`.
+### 5. MapTreeCard.tsx - Fog Buttons
 
----
+**Per-map fog button**: Add a Cloud/CloudOff icon button to each map header row (near the active toggle). Clicking it opens a new Fog Control card instance targeting that specific map. Uses the card store's `openCard` with metadata `{ targetMapId, targetLabel }`.
 
-## Phase 5: Deprecate Layer Stack and Background Grid Card
+**Structure fog button**: Add a Cloud icon button to each structure header row. Clicking it opens a Fog Control card in structure mode with metadata `{ isStructureMode: true, structureId, targetLabel }`.
 
-### 5.1 Remove LayerStackCard
-- Delete `src/components/cards/LayerStackCard.tsx`.
-- Delete `src/components/LayerStackModal.tsx`.
-- Remove `CardType.LAYERS` from `cardStore.ts`.
-- Remove Layer Stack references from `VerticalToolbar.tsx`, `ToolsCard.tsx`, `CardManager.tsx`.
-- Reassign the left-hand menu button (Layers icon) to open **Map Tree** instead.
+Import `Cloud, CloudOff` from lucide-react.
 
-### 5.2 Remove BackgroundGridCard
-- Delete `src/components/cards/BackgroundGridCard.tsx`.
-- Remove its `CardType` registration and references.
-- Grid and background settings are now per-map in Map Manager or per-region in the Regions tab.
+### 6. CardManager.tsx / Card System - Support Targeted Fog Cards
 
----
+When rendering a `CardType.FOG` card, pass `metadata.targetMapId`, `metadata.targetLabel`, `metadata.isStructureMode`, and `metadata.structureId` as props to `FogControlCardContent`.
 
-## Phase 6: Rendering Pipeline -- Filter by Active Map
+Multiple fog cards can be open simultaneously (one per map/structure). The card title dynamically shows "Fog Control - {mapName}" or "Fog Control - {structureName}".
 
-### 6.1 SimpleTabletop token filtering
-- In `SimpleTabletop.tsx`, filter rendered tokens: only show tokens where `token.mapId` matches an active map's ID (or `mapId` is undefined for legacy).
+### 7. mapStore.ts - Auto-Init Fog on Map Creation
 
-### 6.2 MapObject rendering filtering
-- In `mapObjectRenderer.ts` and related canvas code, filter `mapObjects` by active map IDs.
+In `addMap`, after creating the map, call `useFogStore.getState().initMapFogSettings(newMap.id)`.
 
-### 6.3 Region rendering filtering
-- Filter `regions` by active map IDs.
+In `removeMap`, call `useFogStore.getState().removeMapFogSettings(id)` to clean up.
 
-### 6.4 Light/Illumination filtering
-- Filter illumination sources by active map IDs.
+### 8. projectSerializer.ts - Update FogSettings Type
 
-### 6.5 Fog per-map
-- When computing fog geometry, use the active map's `serializedExploredAreasPerMap[mapId]`.
-- Fog brush operations write to the current `selectedMapId`'s entry.
+Update `FogSettings` import/usage to include `fogSettingsPerMap` in serialized project data. The old flat fields become optional for backwards compatibility during import.
 
-### 6.6 Wall geometry cache
-- Key wall geometry caches by `mapId` so switching maps doesn't require full recomputation.
+### 9. version.ts - Bump Version
 
----
+Increment `APP_VERSION` to `0.5.44`.
 
-## Phase 7: Role Permissions for Map Management
+## Files Modified
 
-### 7.1 New permission key
-- Add `canManageMaps: boolean` to `Role.permissions`.
-- Default: `true` for DM, `false` for Player.
+| File | Change |
+|------|--------|
+| `src/stores/fogStore.ts` | Add `MapFogSettings`, `fogSettingsPerMap` record, per-map actions, migration |
+| `src/stores/defaultFogEffectSettings.ts` | Add `DEFAULT_MAP_FOG_SETTINGS` export |
+| `src/components/SimpleTabletop.tsx` | Derive per-map fog state via memo, keep same variable names |
+| `src/components/cards/FogControlCard.tsx` | Accept `targetMapId`/structure props, read/write per-map settings |
+| `src/components/cards/MapTreeCard.tsx` | Add Cloud button per map row and per structure header |
+| `src/components/CardManager.tsx` | Pass fog card metadata as props to FogControlCardContent |
+| `src/stores/mapStore.ts` | Call fogStore init/cleanup in addMap/removeMap |
+| `src/lib/projectSerializer.ts` | Update FogSettings type for per-map data |
+| `src/lib/version.ts` | Bump to 0.5.44 |
 
-### 7.2 Permission gating
-- Map Manager card: hide create/delete/reorder/rename actions unless `canManageMaps`.
-- Map Tree: hide map-level active/inactive toggles and reorder unless `canManageMaps`.
-- Map switching (selecting active map): available to all roles (read-only navigation).
-- "New Map from Image" modal: gated by `canManageMaps`.
+## Edge Cases
 
-### 7.3 Update role definitions
-- Update `DEFAULT_DM_ROLE`, `DEFAULT_PLAYER_ROLE`, and all session templates in `sessionTemplates.ts`.
-- Update `RoleManagerCard.tsx` permission labels.
-- Add `canManageMaps` helper to `rolePermissions.ts`.
+- **New session**: Default map gets `initMapFogSettings('default-map')` with fog disabled
+- **Legacy projects**: `onRehydrateStorage` migrates old flat fields to `fogSettingsPerMap['default-map']`
+- **Map deletion**: Fog settings and explored areas for that map are cleaned up
+- **Map duplication**: `handleDuplicateMap` in MapTreeCard copies the source map's fog settings to the new map
+- **Networking**: `fogSettingsPerMap` syncs via the existing `syncPatch` middleware on the fog channel
+- **Structure mode**: Applies identical settings to all member maps; individual maps can still be overridden afterwards
 
----
-
-## Phase 8: Migration and Backward Compatibility
-
-### 8.1 Default map assignment
-- On first load after upgrade, if entities have no `mapId`, assign them to the first map's ID (typically `'default-map'`).
-- Run this migration in each store's persist `onRehydrate` or a one-time migration function.
-
-### 8.2 ProjectData / .mhsession format
-- Add `mapId` to serialized token, region, mapObject, and illumination entries in `ProjectData`.
-- Add `serializedExploredAreasPerMap` to `fogData`.
-- Importing old sessions without `mapId` assigns all entities to the first map.
-
-### 8.3 Import pipeline
-- Watabou, dd2vtt, and prefab imports assign `mapId` of the currently selected map to all imported entities.
-
----
-
-## Phase 9: Version Bump
-- Increment `APP_VERSION` in `src/lib/version.ts`.
-
----
-
-## Files Summary
-
-| Action | File |
-|--------|------|
-| Modify | `src/stores/sessionStore.ts` -- add `mapId` to Token |
-| Modify | `src/types/mapObjectTypes.ts` -- add `mapId` to MapObject |
-| Modify | `src/stores/regionStore.ts` -- add `mapId` to CanvasRegion |
-| Modify | `src/types/illumination.ts` -- add `mapId` to IlluminationSource |
-| Modify | `src/stores/fogStore.ts` -- per-map fog data |
-| Modify | `src/lib/groupTransforms.ts` -- add `mapId` to EntityGroup |
-| Modify | `src/stores/mapStore.ts` -- active/inactive, image fields, compound maps |
-| Rewrite | `src/components/cards/MapManagerCard.tsx` -- active/inactive, image import, compound maps |
-| Modify | `src/components/cards/MapTreeCard.tsx` -- map-level tree nodes, filtering |
-| Delete | `src/components/cards/LayerStackCard.tsx` |
-| Delete | `src/components/LayerStackModal.tsx` |
-| Delete | `src/components/cards/BackgroundGridCard.tsx` |
-| Modify | `src/stores/cardStore.ts` -- remove LAYERS and BACKGROUND_GRID card types |
-| Modify | `src/components/VerticalToolbar.tsx` -- rebind Layers button to Map Tree |
-| Modify | `src/components/cards/ToolsCard.tsx` -- remove Layer Stack reference |
-| Modify | `src/components/CardManager.tsx` -- remove deprecated card mappings |
-| Modify | `src/stores/roleStore.ts` -- add `canManageMaps` permission |
-| Modify | `src/lib/rolePermissions.ts` -- add `canManageMaps` helper |
-| Modify | `src/lib/sessionTemplates.ts` -- add `canManageMaps` to templates |
-| Modify | `src/components/cards/RoleManagerCard.tsx` -- add permission label |
-| Modify | `src/components/SimpleTabletop.tsx` -- filter entities by active maps |
-| Modify | `src/lib/mapObjectRenderer.ts` -- filter by active maps |
-| Modify | `src/lib/projectSerializer.ts` -- mapId in ProjectData |
-| Modify | `src/lib/version.ts` -- version bump |
-| Create | `src/components/modals/MapImageImportModal.tsx` -- grid overlay scaling modal |
-| Create | `Plans/multi-map-architecture.md` -- save this plan |
-
----
-
-## Sequencing Recommendation
-
-Due to the breadth of this change, implement in this order:
-1. **Phase 1** (data model) + **Phase 8.1** (migration) -- foundation, backward compatible
-2. **Phase 2** (map store redesign) -- structural
-3. **Phase 5** (deprecate dead code) -- cleanup, reduces noise
-4. **Phase 6** (rendering filters) -- maps become functional
-5. **Phase 3** (Map Manager UI) -- user-facing map management
-6. **Phase 4** (Map Tree integration) -- hierarchy visualization
-7. **Phase 7** (permissions) -- access control
-8. **Phase 8.2-8.3** (serialization + imports) -- persistence
-9. **Phase 9** (version bump) -- final step
