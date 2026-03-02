@@ -1,0 +1,511 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vtt.lovable.app/schemas/magehand-map-import-v1.schema.json",
+  "title": "Magehand Map Import Bundle v1",
+  "description": "Canonical JSON schema for importing map data into Magehand from external VTT applications (d20pro, etc.). Any application that produces a valid bundle can import maps, tokens, walls, lights, fog, and annotations into Magehand.",
+  "type": "object",
+  "required": ["version", "source", "map"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Must be 1."
+    },
+    "source": {
+      "type": "string",
+      "description": "Identifier for the exporting application.",
+      "examples": ["d20pro", "foundry", "roll20", "custom"]
+    },
+    "sourceMapId": {
+      "type": "string",
+      "description": "Original map identifier from the source application. Used for deduplication on re-import."
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the export was created."
+    },
+
+    "map": { "$ref": "#/definitions/MapProperties" },
+
+    "assets": {
+      "type": "object",
+      "description": "Embedded image assets keyed by a unique asset ID. Keys are arbitrary strings used as references throughout the bundle. Large bundles may omit asset data and provide originalUrl instead.",
+      "additionalProperties": { "$ref": "#/definitions/Asset" }
+    },
+
+    "floor": { "$ref": "#/definitions/FloorImage" },
+    "overlay": { "$ref": "#/definitions/OverlayImage" },
+
+    "tokens": {
+      "type": "array",
+      "description": "Creature/NPC/PC tokens to place on the map.",
+      "items": { "$ref": "#/definitions/Token" }
+    },
+    "tokenRenderOrder": {
+      "type": "array",
+      "description": "Token IDs in bottom-to-top render order. Tokens listed later render on top.",
+      "items": { "type": "string" }
+    },
+
+    "walls": {
+      "type": "array",
+      "description": "Wall segments for vision and movement blocking.",
+      "items": { "$ref": "#/definitions/Wall" }
+    },
+
+    "lights": {
+      "type": "array",
+      "description": "Light sources placed on the map.",
+      "items": { "$ref": "#/definitions/LightSource" }
+    },
+
+    "fog": { "$ref": "#/definitions/FogOfWar" },
+
+    "annotations": {
+      "type": "array",
+      "description": "Map markers / text annotations.",
+      "items": { "$ref": "#/definitions/Annotation" }
+    },
+
+    "objects": {
+      "type": "array",
+      "description": "Generic map objects (items, decorations, zones).",
+      "items": { "$ref": "#/definitions/MapObject" }
+    },
+
+    "templates": {
+      "type": "array",
+      "description": "Spell/ability area templates.",
+      "items": { "$ref": "#/definitions/Template" }
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary key-value metadata from the source application. Preserved but not interpreted by Magehand.",
+      "additionalProperties": true
+    }
+  },
+
+  "definitions": {
+    "Point": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "description": "X coordinate in pixels." },
+        "y": { "type": "number", "description": "Y coordinate in pixels." }
+      }
+    },
+
+    "Color": {
+      "type": "string",
+      "description": "CSS-compatible color string. Hex (#rrggbb, #rrggbbaa), rgb(), rgba(), or named color.",
+      "examples": ["#1a1a2e", "#ff000080", "rgba(255,0,0,0.5)"]
+    },
+
+    "MapProperties": {
+      "type": "object",
+      "required": ["name", "widthPx", "heightPx", "gridSizePx"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Display name for the map."
+        },
+        "widthPx": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Map width in pixels (gridCols × gridSizePx)."
+        },
+        "heightPx": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Map height in pixels (gridRows × gridSizePx)."
+        },
+        "gridSizePx": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Grid cell size in pixels."
+        },
+        "gridType": {
+          "type": "string",
+          "enum": ["square", "hex-row", "hex-col", "none"],
+          "default": "square",
+          "description": "Grid geometry. 'hex-row' = flat-top rows, 'hex-col' = pointy-top columns."
+        },
+        "gridColor": { "$ref": "#/definitions/Color" },
+        "backgroundColor": { "$ref": "#/definitions/Color" },
+        "fogMaskColor": { "$ref": "#/definitions/Color" },
+        "explorationMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, previously revealed areas remain dimly visible when no longer in line of sight."
+        },
+        "hideNegativeSpace": {
+          "type": "boolean",
+          "default": false
+        },
+        "useGradientFog": {
+          "type": "boolean",
+          "default": false,
+          "description": "Soft-edged vs hard-edged fog transitions."
+        }
+      }
+    },
+
+    "Asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded image data. Omit for URL-only references."
+        },
+        "mimeType": {
+          "type": "string",
+          "enum": ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+          "description": "MIME type of the image data."
+        },
+        "originalUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Original URL if the asset was not embedded. Magehand will attempt to fetch this on import."
+        },
+        "widthPx": {
+          "type": "integer",
+          "description": "Native image width in pixels (informational)."
+        },
+        "heightPx": {
+          "type": "integer",
+          "description": "Native image height in pixels (informational)."
+        }
+      }
+    },
+
+    "FloorImage": {
+      "type": "object",
+      "description": "Primary background/floor image for the map.",
+      "additionalProperties": false,
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "Key into the 'assets' object."
+        },
+        "offsetX": {
+          "type": "number",
+          "default": 0,
+          "description": "Horizontal offset in pixels."
+        },
+        "offsetY": {
+          "type": "number",
+          "default": 0,
+          "description": "Vertical offset in pixels."
+        },
+        "scale": {
+          "type": "number",
+          "default": 1,
+          "description": "Image scale factor (1 = native size)."
+        },
+        "rotation": {
+          "type": "number",
+          "default": 0,
+          "description": "Rotation in degrees (clockwise)."
+        }
+      }
+    },
+
+    "OverlayImage": {
+      "type": "object",
+      "description": "Optional overlay image rendered above the floor but below tokens.",
+      "additionalProperties": false,
+      "properties": {
+        "assetId": { "type": "string" },
+        "offsetX": { "type": "number", "default": 0 },
+        "offsetY": { "type": "number", "default": 0 },
+        "scale": { "type": "number", "default": 1 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+      }
+    },
+
+    "Token": {
+      "type": "object",
+      "required": ["id", "name", "x", "y", "sizeGridCells"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique token identifier (from source app). Used for render ordering and deduplication."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name."
+        },
+        "x": {
+          "type": "number",
+          "description": "X position in pixels (top-left corner of footprint)."
+        },
+        "y": {
+          "type": "number",
+          "description": "Y position in pixels (top-left corner of footprint)."
+        },
+        "sizeGridCells": {
+          "type": "number",
+          "minimum": 0.25,
+          "description": "Token footprint width/height in grid cells. E.g. 1 = Medium, 2 = Large, 0.5 = Tiny."
+        },
+        "imageAssetId": {
+          "type": "string",
+          "description": "Key into 'assets' for the token image."
+        },
+        "hp": {
+          "type": "object",
+          "properties": {
+            "current": { "type": "integer" },
+            "max": { "type": "integer" }
+          }
+        },
+        "elevation": {
+          "type": "number",
+          "default": 0,
+          "description": "Elevation in feet (informational)."
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Active status conditions."
+        },
+        "visible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether token is visible to players."
+        },
+        "locked": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, players cannot move this token."
+        },
+        "light": {
+          "$ref": "#/definitions/LightEmission",
+          "description": "Light emitted by this token (e.g. torch, darkvision aura)."
+        }
+      }
+    },
+
+    "Wall": {
+      "type": "object",
+      "required": ["points"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/Point" },
+          "description": "Ordered list of vertices. Two points = single segment, 3+ = polyline."
+        },
+        "blocksVision": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this wall blocks line of sight."
+        },
+        "blocksMovement": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this wall blocks token movement."
+        },
+        "doorState": {
+          "type": "string",
+          "enum": ["none", "closed", "open", "locked", "secret"],
+          "default": "none",
+          "description": "If this wall is a door, its current state."
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "description": "0 = fully transparent to vision, 1 = fully opaque."
+        }
+      }
+    },
+
+    "LightSource": {
+      "type": "object",
+      "required": ["x", "y", "radiusPx"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "radiusPx": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total light radius in pixels (dim light outer edge)."
+        },
+        "brightRadiusPx": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Bright light inner radius in pixels. Defaults to radiusPx × 0.5."
+        },
+        "color": { "$ref": "#/definitions/Color" },
+        "intensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "animation": {
+          "type": "string",
+          "enum": ["none", "flicker", "pulse", "torch"],
+          "default": "none"
+        }
+      }
+    },
+
+    "LightEmission": {
+      "type": "object",
+      "description": "Light emitted by a token.",
+      "additionalProperties": false,
+      "properties": {
+        "radiusPx": { "type": "number", "minimum": 0 },
+        "brightRadiusPx": { "type": "number", "minimum": 0 },
+        "color": { "$ref": "#/definitions/Color" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+      }
+    },
+
+    "FogOfWar": {
+      "type": "object",
+      "description": "Fog of war state. At least one of 'polygons', 'gridReveal', or 'fullReveal' should be present.",
+      "additionalProperties": false,
+      "properties": {
+        "polygons": {
+          "type": "array",
+          "description": "Polygon-based fog regions.",
+          "items": {
+            "type": "object",
+            "required": ["points", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "points": {
+                "type": "array",
+                "minItems": 3,
+                "items": { "$ref": "#/definitions/Point" }
+              },
+              "type": {
+                "type": "string",
+                "enum": ["revealed", "hidden", "negative-space"],
+                "description": "'revealed' = explored area, 'hidden' = forced hidden, 'negative-space' = permanent fog mask."
+              }
+            }
+          }
+        },
+        "gridReveal": {
+          "type": "object",
+          "description": "Cell-level fog reveal grid (alternative to polygon fog).",
+          "required": ["grid", "cellSizePx"],
+          "additionalProperties": false,
+          "properties": {
+            "grid": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "boolean" }
+              },
+              "description": "2D boolean matrix [row][col]. true = revealed, false = fogged."
+            },
+            "cellSizePx": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Size of each grid cell in pixels."
+            }
+          }
+        },
+        "fullReveal": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, entire map is revealed (no fog)."
+        }
+      }
+    },
+
+    "Annotation": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "label": {
+          "type": "string",
+          "description": "Short label displayed on the map."
+        },
+        "text": {
+          "type": "string",
+          "description": "Longer description shown on click/hover."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional icon identifier."
+        },
+        "visibleToPlayers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether players can see this annotation."
+        }
+      }
+    },
+
+    "MapObject": {
+      "type": "object",
+      "required": ["id", "x", "y"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["item", "decoration", "furniture", "hazard", "custom"],
+          "default": "item"
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "widthPx": { "type": "number" },
+        "heightPx": { "type": "number" },
+        "rotation": { "type": "number", "default": 0 },
+        "imageAssetId": { "type": "string" },
+        "visible": { "type": "boolean", "default": true }
+      }
+    },
+
+    "Template": {
+      "type": "object",
+      "required": ["id", "shape"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "shape": {
+          "type": "string",
+          "enum": ["circle", "cone", "line", "square", "cube", "sphere", "cylinder"],
+          "description": "Template shape type."
+        },
+        "originX": { "type": "number" },
+        "originY": { "type": "number" },
+        "radiusPx": { "type": "number", "description": "For circle/sphere/cylinder." },
+        "lengthPx": { "type": "number", "description": "For line/cone." },
+        "widthPx": { "type": "number", "description": "For line width or square side." },
+        "angleDeg": { "type": "number", "description": "Direction angle for cone/line." },
+        "color": { "$ref": "#/definitions/Color" }
+      }
+    }
+  }
+}
