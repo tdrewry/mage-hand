@@ -1777,7 +1777,7 @@ export const SimpleTabletop = () => {
           // This replaces simple ownership-based filtering with role-based logic
           // Use combined segments (walls + vision-blocking map objects)
           const tokensForVision = getTokensForVisionCalculation(
-            tokens,
+            filteredTokens,
             currentPlayer,
             roles,
             combinedSegmentsRef.current,
@@ -1868,8 +1868,8 @@ export const SimpleTabletop = () => {
             ? tokensWithVision  // All tokens need recompute if blocking geometry changed
             : [...movedTokens, ...illuminationChangedTokens];
           
-          // Get light MapObjects as light sources for fog
-          const lightMapObjectSources = mapObjects.filter(
+          // Get light MapObjects as light sources for fog (only from active maps)
+          const lightMapObjectSources = filteredMapObjects.filter(
             (obj) => obj.category === 'light' && obj.lightEnabled !== false
           );
           
@@ -2041,7 +2041,7 @@ export const SimpleTabletop = () => {
             if (!cached.visionPath) return;
 
             // Find the token to get its vision range and gradient settings
-            const token = tokens.find((t) => t.id === tokenId);
+            const token = filteredTokens.find((t) => t.id === tokenId);
             if (!token) return;
 
             const tokenRegion = regions.find(
@@ -2068,8 +2068,8 @@ export const SimpleTabletop = () => {
             });
           });
 
-          // Add enabled light sources from lightStore to fog revelation
-          const enabledLights = lights.filter((l) => l.enabled);
+          // Add enabled light sources from lightStore to fog revelation (only from active maps)
+          const enabledLights = lights.filter((l) => l.enabled && isEntityVisible(l.mapId));
           for (const light of enabledLights) {
             const lightVision = await computeTokenVisibilityPaper(
               [{ x: light.position.x, y: light.position.y, id: light.id, gridWidth: 1, gridHeight: 1 }],
