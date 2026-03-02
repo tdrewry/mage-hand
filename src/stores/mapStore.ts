@@ -16,7 +16,11 @@ export interface GridRegion {
 export interface GameMap {
   id: string;
   name: string;
-  imageUrl?: string;
+  imageUrl?: string; // In-memory image data (excluded from sync)
+  imageHash?: string; // Hash for texture sync
+  imageScale?: number; // Scale factor for the map image (default 1)
+  imageOffsetX?: number; // Pixel offset for sub-grid alignment
+  imageOffsetY?: number; // Pixel offset for sub-grid alignment
   bounds: {
     x: number;
     y: number;
@@ -24,9 +28,14 @@ export interface GameMap {
     height: number;
   };
   backgroundColor: string;
-  visible: boolean;
+  /** @deprecated Use `active` instead */
+  visible?: boolean;
+  /** Whether this map is actively rendered on canvas. Multiple maps can be active simultaneously. */
+  active: boolean;
   zIndex: number;
   regions: GridRegion[];
+  /** If set, this map is a member of a compound map group */
+  compoundMapId?: string;
 }
 
 // Helper type for creating new maps
@@ -112,7 +121,7 @@ const createDefaultMap = (): GameMap => ({
   name: 'Default Battlemap',
   bounds: { x: 0, y: 0, width: 2000, height: 2000 },
   backgroundColor: '#2a2a2a',
-  visible: true,
+  active: true,
   zIndex: 0,
   regions: [
     {
@@ -242,11 +251,11 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
 
   getActiveRegionAt: (x, y) => {
     const { maps } = get();
-    const visibleMaps = maps
-      .filter((map) => map.visible)
+    const activeMaps = maps
+      .filter((map) => map.active)
       .sort((a, b) => b.zIndex - a.zIndex); // Higher z-index first
 
-    for (const map of visibleMaps) {
+    for (const map of activeMaps) {
       // Check if point is within map bounds
       if (
         x >= map.bounds.x &&
@@ -278,7 +287,7 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
   getVisibleMaps: () => {
     const { maps } = get();
     return maps
-      .filter((map) => map.visible)
+      .filter((map) => map.active)
       .sort((a, b) => a.zIndex - b.zIndex); // Lower z-index first for rendering
   },
 });
@@ -290,10 +299,19 @@ const withSyncPatch = syncPatch<MapStore>({
   debug: false,
 })(mapStoreCreator);
 
-// Persist options
+// Persist options with migration from visible → active
 const persistOptions: PersistOptions<MapStore, Partial<MapStore>> = {
   name: 'map-store',
-  version: 2, // Increment version for polygon migration
+  version: 3, // v3: visible → active migration
+  migrate: (persistedState: any, version: number) => {
+    if (version < 3 && persistedState?.maps) {
+      persistedState.maps = persistedState.maps.map((map: any) => ({
+        ...map,
+        active: map.active ?? map.visible ?? true,
+      }));
+    }
+    return persistedState;
+  },
 };
 
 export const useMapStore = create<MapStore>()(

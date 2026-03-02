@@ -20,7 +20,8 @@ export interface FogSettings {
   fogOpacity: number; // 0-1, how dark the fog is for unexplored areas
   exploredOpacity: number; // 0-1, how dark explored but not visible areas are
   showExploredAreas: boolean; // Whether to show previously explored areas as dimmed
-  serializedExploredAreas: string; // Paper.js JSON serialized explored geometry
+  serializedExploredAreas: string; // @deprecated Legacy single-map explored geometry — use serializedExploredAreasPerMap
+  serializedExploredAreasPerMap?: Record<string, string>; // Per-map explored geometry keyed by mapId
   fogVersion: number; // Schema version for migration
   
   // Real-time vision during drag feature flag
@@ -75,6 +76,19 @@ interface FogState extends FogSettings {
    */
   setSerializedExploredAreas: (data: string) => void;
 
+  /**
+   * Sets the serialized explored areas for a specific map.
+   * @param mapId The map ID.
+   * @param data The serialized geometry string.
+   */
+  setSerializedExploredAreasForMap: (mapId: string, data: string) => void;
+
+  /**
+   * Gets the serialized explored areas for a specific map.
+   * @param mapId The map ID.
+   * @returns The serialized geometry string, or empty string.
+   */
+  getSerializedExploredAreasForMap: (mapId: string) => string;
   /**
    * Clears all explored areas, resetting them to unexplored.
    */
@@ -152,6 +166,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
   exploredOpacity: 0.4,
   showExploredAreas: true,
   serializedExploredAreas: '',
+  serializedExploredAreasPerMap: {},
   fogVersion: 1,
   
   // Real-time vision during drag (feature flag - disabled by default)
@@ -200,8 +215,22 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
     set({ serializedExploredAreas: data });
   },
   
+  setSerializedExploredAreasForMap: (mapId, data) => {
+    set((state) => ({
+      serializedExploredAreasPerMap: {
+        ...(state.serializedExploredAreasPerMap || {}),
+        [mapId]: data,
+      },
+    }));
+  },
+  
+  getSerializedExploredAreasForMap: (mapId) => {
+    const state = useFogStore.getState();
+    return state.serializedExploredAreasPerMap?.[mapId] || '';
+  },
+  
   clearExploredAreas: () => {
-    set({ serializedExploredAreas: '' });
+    set({ serializedExploredAreas: '', serializedExploredAreasPerMap: {} });
   },
   
   resetFog: () => {
@@ -213,6 +242,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
       exploredOpacity: 0.4,
       showExploredAreas: true,
       serializedExploredAreas: '',
+      serializedExploredAreasPerMap: {},
       fogVersion: 1,
       realtimeVisionDuringDrag: false,
       realtimeVisionThrottleMs: 32,
@@ -295,6 +325,7 @@ const persistOptions: PersistOptions<FogState, Partial<FogState>> = {
     exploredOpacity: state.exploredOpacity,
     showExploredAreas: state.showExploredAreas,
     serializedExploredAreas: state.serializedExploredAreas,
+    serializedExploredAreasPerMap: state.serializedExploredAreasPerMap,
     fogVersion: state.fogVersion,
     realtimeVisionDuringDrag: state.realtimeVisionDuringDrag,
     realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,

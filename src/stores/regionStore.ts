@@ -33,6 +33,9 @@ export interface CanvasRegion {
   rotation?: number; // Rotation angle in degrees
   rotationCenter?: { x: number; y: number }; // Custom rotation center
   locked?: boolean; // Prevent movement, resize, and deletion
+
+  // Multi-map scoping — which map this region belongs to
+  mapId?: string;
 }
 
 interface RegionStore {
