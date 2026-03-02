@@ -606,6 +606,7 @@ export const MapTreeCardContent: React.FC = () => {
   const maps = useMapStore(s => s.maps);
   const selectedMapId = useMapStore(s => s.selectedMapId);
   const updateMap = useMapStore(s => s.updateMap);
+  const removeMap = useMapStore(s => s.removeMap);
   const setSelectedMap = useMapStore(s => s.setSelectedMap);
   const reorderMaps = useMapStore(s => s.reorderMaps);
 
@@ -651,6 +652,7 @@ export const MapTreeCardContent: React.FC = () => {
 
   // ── Inline rename state ───────────────────────────────────────────────────
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renamingMapId, setRenamingMapId] = useState<string | null>(null);
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) {
@@ -1451,102 +1453,197 @@ export const MapTreeCardContent: React.FC = () => {
           const isMapDropTarget = dropMapTarget === map.id;
 
           return (
-            <div
-              key={map.id}
-              className={`border rounded-lg overflow-hidden transition-colors ${
-                isFocused ? 'border-primary/50 bg-primary/5' : 'border-border/60'
-              } ${isMapDropTarget ? 'ring-2 ring-primary/60 bg-primary/10' : ''}`}
-            >
-              {/* Map header */}
-              <div
-                className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
-                onClick={() => toggleMapNode(map.id)}
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); handleDragOverMap(e, map.id); }}
-                onDragLeave={() => handleDragLeaveMap()}
-                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnMap(map.id); }}
-              >
-                {isExpanded
-                  ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                <Map className="h-3.5 w-3.5 shrink-0 text-primary" />
-                <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
-
-                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
-                  {entityCount}
-                </Badge>
-
-                {/* Collapse/expand groups within this map */}
-                {(() => {
-                  const entityIds = new Set(mapEntities.map(e => e.id));
-                  const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
-                  if (!hasGroups) return null;
-                  const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
-                  const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
-                  return (
-                    <button
-                      className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
-                      title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
-                      onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
-                    >
-                      {anyExpanded
-                        ? <ChevronsUp className="h-3.5 w-3.5" />
-                        : <ChevronsDown className="h-3.5 w-3.5" />}
-                    </button>
-                  );
-                })()}
-
-                {/* Reorder arrows */}
-                <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                  <button
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    disabled={index === 0}
-                    onClick={() => reorderMaps(index, index - 1)}
-                    title="Move map up"
-                  >
-                    <ArrowUp className="h-3 w-3" />
-                  </button>
-                  <button
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    disabled={index >= maps.length - 1}
-                    onClick={() => reorderMaps(index, index + 1)}
-                    title="Move map down"
-                  >
-                    <ArrowDown className="h-3 w-3" />
-                  </button>
-                </div>
-
-                {/* Focus button */}
-                <button
-                  className={`shrink-0 p-0.5 rounded transition-colors ${
-                    isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
-                  }`}
-                  title="Set as focused map"
-                  onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div
+                  key={map.id}
+                  className={`border rounded-lg overflow-hidden transition-colors ${
+                    isFocused ? 'border-primary/50 bg-primary/5' : 'border-border/60'
+                  } ${isMapDropTarget ? 'ring-2 ring-primary/60 bg-primary/10' : ''}`}
                 >
-                  <MousePointer2 className="h-3.5 w-3.5" />
-                </button>
+                  {/* Map header */}
+                  <div
+                    className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
+                    onClick={() => toggleMapNode(map.id)}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); handleDragOverMap(e, map.id); }}
+                    onDragLeave={() => handleDragLeaveMap()}
+                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnMap(map.id); }}
+                  >
+                    {isExpanded
+                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                    <Map className="h-3.5 w-3.5 shrink-0 text-primary" />
 
-                {/* Active toggle */}
-                <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'}>
-                  <Switch
-                    checked={map.active}
-                    onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
-                    className="scale-[0.6]"
-                  />
-                </div>
-              </div>
+                    {renamingMapId === map.id ? (
+                      <div onClick={e => e.stopPropagation()} className="flex-1 min-w-0">
+                        <RenameInput
+                          value={map.name}
+                          onCommit={name => { updateMap(map.id, { name }); setRenamingMapId(null); }}
+                          onCancel={() => setRenamingMapId(null)}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
+                    )}
 
-              {/* Map children */}
-              {isExpanded && (
-                <div className="px-1 pb-1.5">
-                  {entityCount === 0 ? (
-                    <p className="text-[10px] text-muted-foreground text-center py-2 italic">No entities on this map</p>
-                  ) : (
-                    renderEntityList(mapEntities)
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
+                      {entityCount}
+                    </Badge>
+
+                    {/* Collapse/expand groups within this map */}
+                    {(() => {
+                      const entityIds = new Set(mapEntities.map(e => e.id));
+                      const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
+                      if (!hasGroups) return null;
+                      const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
+                      const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
+                      return (
+                        <button
+                          className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                          title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
+                          onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
+                        >
+                          {anyExpanded
+                            ? <ChevronsUp className="h-3.5 w-3.5" />
+                            : <ChevronsDown className="h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })()}
+
+                    {/* Reorder arrows */}
+                    <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                      <button
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        disabled={index === 0}
+                        onClick={() => reorderMaps(index, index - 1)}
+                        title="Move map up"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        disabled={index >= maps.length - 1}
+                        onClick={() => reorderMaps(index, index + 1)}
+                        title="Move map down"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Focus button */}
+                    <button
+                      className={`shrink-0 p-0.5 rounded transition-colors ${
+                        isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
+                      }`}
+                      title="Set as focused map"
+                      onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
+                    >
+                      <MousePointer2 className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Active toggle */}
+                    <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'}>
+                      <Switch
+                        checked={map.active}
+                        onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
+                        className="scale-[0.6]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Map children */}
+                  {isExpanded && (
+                    <div className="px-1 pb-1.5">
+                      {entityCount === 0 ? (
+                        <p className="text-[10px] text-muted-foreground text-center py-2 italic">No entities on this map</p>
+                      ) : (
+                        renderEntityList(mapEntities)
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-52 text-xs">
+                {/* Focus */}
+                <ContextMenuItem
+                  className="text-xs gap-2"
+                  onClick={() => setSelectedMap(map.id)}
+                >
+                  <MousePointer2 className="h-3.5 w-3.5" />
+                  Set as Focused Map
+                </ContextMenuItem>
+
+                <ContextMenuSeparator />
+
+                {/* Rename */}
+                <ContextMenuItem
+                  className="text-xs gap-2"
+                  onClick={() => setRenamingMapId(map.id)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Rename
+                </ContextMenuItem>
+
+                {/* Toggle active */}
+                <ContextMenuItem
+                  className="text-xs gap-2"
+                  onClick={() => updateMap(map.id, { active: !map.active })}
+                >
+                  {map.active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {map.active ? 'Deactivate' : 'Activate'}
+                </ContextMenuItem>
+
+                {/* Expand / Collapse */}
+                <ContextMenuItem
+                  className="text-xs gap-2"
+                  onClick={() => toggleMapNode(map.id)}
+                >
+                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  {isExpanded ? 'Collapse' : 'Expand'}
+                </ContextMenuItem>
+
+                {/* Reorder */}
+                <ContextMenuSeparator />
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger className="text-xs gap-2">
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Reorder
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="w-44 text-xs">
+                    <ContextMenuItem className="text-xs gap-2" disabled={index === 0} onClick={() => reorderMaps(index, 0)}>
+                      <ChevronsUp className="h-3.5 w-3.5" />
+                      Move to Top
+                    </ContextMenuItem>
+                    <ContextMenuItem className="text-xs gap-2" disabled={index === 0} onClick={() => reorderMaps(index, index - 1)}>
+                      <ArrowUp className="h-3.5 w-3.5" />
+                      Move Up
+                    </ContextMenuItem>
+                    <ContextMenuItem className="text-xs gap-2" disabled={index >= maps.length - 1} onClick={() => reorderMaps(index, index + 1)}>
+                      <ArrowDown className="h-3.5 w-3.5" />
+                      Move Down
+                    </ContextMenuItem>
+                    <ContextMenuItem className="text-xs gap-2" disabled={index >= maps.length - 1} onClick={() => reorderMaps(index, maps.length - 1)}>
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                      Move to Bottom
+                    </ContextMenuItem>
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+
+                {/* Delete */}
+                {maps.length > 1 && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      className="text-xs gap-2 text-destructive focus:text-destructive"
+                      onClick={() => { removeMap(map.id); toast.success(`Deleted map "${map.name}"`); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete Map
+                    </ContextMenuItem>
+                  </>
+                )}
+              </ContextMenuContent>
+            </ContextMenu>
           );
         })}
 
