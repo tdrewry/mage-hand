@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MapImageImportModal, type MapImageImportResult } from '@/components/modals/MapImageImportModal';
+import { useRegionStore } from '@/stores/regionStore';
 
 export const MapManagerCardContent = () => {
   const {
@@ -87,6 +88,7 @@ export const MapManagerCardContent = () => {
   const handleImageImportConfirm = (result: MapImageImportResult) => {
     const scaledW = Math.round(result.naturalWidth * result.imageScale);
     const scaledH = Math.round(result.naturalHeight * result.imageScale);
+    const mapCountBefore = useMapStore.getState().maps.length;
     addMap({
       name: result.mapName,
       imageUrl: result.imageUrl,
@@ -112,6 +114,33 @@ export const MapManagerCardContent = () => {
         visible: true,
       }],
     });
+
+    // Create a CanvasRegion in regionStore with the image as background texture
+    const newMaps = useMapStore.getState().maps;
+    const newMap = newMaps.length > mapCountBefore ? newMaps[newMaps.length - 1] : null;
+    if (newMap) {
+      useRegionStore.getState().addRegion({
+        x: 0,
+        y: 0,
+        width: scaledW,
+        height: scaledH,
+        selected: false,
+        color: '#2a2a2a',
+        gridType: 'square',
+        gridSize: result.gridSize,
+        gridScale: 1,
+        gridSnapping: true,
+        gridVisible: true,
+        backgroundImage: result.imageUrl,
+        backgroundRepeat: 'no-repeat',
+        backgroundScale: result.imageScale,
+        backgroundOffsetX: result.imageOffsetX,
+        backgroundOffsetY: result.imageOffsetY,
+        regionType: 'rectangle',
+        mapId: newMap.id,
+      });
+    }
+
     toast.success(`Map "${result.mapName}" created from image`);
   };
 
