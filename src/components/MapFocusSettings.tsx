@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
+import { useMapStore } from '@/stores/mapStore';
 import { Focus } from 'lucide-react';
 
 /**
@@ -16,6 +17,8 @@ export const MapFocusSettings: React.FC = () => {
   const setUnfocusedOpacity = useMapFocusStore((s) => s.setUnfocusedOpacity);
   const setUnfocusedBlur = useMapFocusStore((s) => s.setUnfocusedBlur);
   const setSelectionLockEnabled = useMapFocusStore((s) => s.setSelectionLockEnabled);
+  const autoFocusFollowsToken = useMapStore((s) => s.autoFocusFollowsToken);
+  const setAutoFocusFollowsToken = useMapStore((s) => s.setAutoFocusFollowsToken);
 
   const dimPercent = Math.round((1 - unfocusedOpacity) * 100);
   const isActive = unfocusedOpacity < 1 || unfocusedBlur > 0;
@@ -64,6 +67,15 @@ export const MapFocusSettings: React.FC = () => {
           checked={selectionLockEnabled || isActive}
           onCheckedChange={setSelectionLockEnabled}
           disabled={isActive} // Auto-enabled when effects are active
+        />
+      </div>
+
+      {/* Auto-focus follows active token */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Auto-focus follows turn</Label>
+        <Switch
+          checked={autoFocusFollowsToken}
+          onCheckedChange={setAutoFocusFollowsToken}
         />
       </div>
 
