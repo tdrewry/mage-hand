@@ -10,6 +10,7 @@ export interface LightSource {
   color: string; // Hex color for the light
   enabled: boolean;
   label?: string;
+  mapId?: string; // Multi-map scoping — which map this light belongs to
 }
 
 interface LightState {
