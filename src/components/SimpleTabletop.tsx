@@ -779,6 +779,25 @@ export const SimpleTabletop = () => {
 
   const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore();
 
+  // ── Auto-focus follows active initiative token ──
+  const autoFocusFollowsToken = useMapStore((s) => s.autoFocusFollowsToken);
+  useEffect(() => {
+    if (!autoFocusFollowsToken || !isInCombat || initiativeOrder.length === 0) return;
+    const activeEntry = initiativeOrder[currentTurnIndex];
+    if (!activeEntry) return;
+    const activeToken = tokens.find(t => t.id === activeEntry.tokenId);
+    if (!activeToken?.mapId) return;
+    const currentSelectedMapId = useMapStore.getState().selectedMapId;
+    if (activeToken.mapId !== currentSelectedMapId) {
+      // Ensure target map is active
+      const targetMap = useMapStore.getState().maps.find(m => m.id === activeToken.mapId);
+      if (targetMap && !targetMap.active) {
+        useMapStore.getState().updateMap(activeToken.mapId, { active: true });
+      }
+      useMapStore.getState().setSelectedMap(activeToken.mapId);
+    }
+  }, [autoFocusFollowsToken, isInCombat, currentTurnIndex, initiativeOrder, tokens]);
+
   const registerCard = useCardStore((state) => state.registerCard);
   const getCardByType = useCardStore((state) => state.getCardByType);
   const setVisibility = useCardStore((state) => state.setVisibility);
@@ -917,7 +936,7 @@ export const SimpleTabletop = () => {
           } else {
             toast.info(`Token moved to inactive map "${targetMap.name}"`, { duration: 3000 });
           }
-        } else if (portalAtDrop.portalAutoActivateTarget && targetPortal.mapId) {
+      } else if ((portalAtDrop.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           // Target map already active, just set focus
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
         }
