@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
 import { RegionBulkTextureModal } from './modals/RegionBulkTextureModal';
+import { MAP_OBJECT_PRESETS } from '@/types/mapObjectTypes';
 
 interface RegionControlBarProps {
   selectedRegionIds: string[];
@@ -148,21 +149,18 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       let points: { x: number; y: number }[];
       
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
-        // Path region: use path points directly (offset by region position)
         points = region.pathPoints.map(p => ({ x: region.x + p.x, y: region.y + p.y }));
       } else {
-        // Rectangle region: 4 corners
         const { x, y, width, height } = region;
         points = [
           { x, y },
           { x: x + width, y },
           { x: x + width, y: y + height },
           { x, y: y + height },
-          { x, y }, // close the loop
+          { x, y },
         ];
       }
       
-      // Create a single wall MapObject from the points
       addMapObject({
         position: { x: points[0].x, y: points[0].y },
         width: 0,
@@ -185,6 +183,42 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     });
     
     toast.success(`Created ${wallCount} wall(s) from region edges`);
+  };
+  
+  const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water') => {
+    const preset = MAP_OBJECT_PRESETS[category];
+    let count = 0;
+    
+    selectedRegions.forEach(region => {
+      const customPath = region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2
+        ? region.pathPoints.map(p => ({ x: p.x, y: p.y }))
+        : undefined;
+      
+      const shape = customPath ? 'custom' : (preset.shape || 'rectangle');
+      
+      addMapObject({
+        position: { x: region.x, y: region.y },
+        width: region.width,
+        height: region.height,
+        shape,
+        category,
+        fillColor: preset.fillColor,
+        strokeColor: preset.strokeColor,
+        strokeWidth: preset.strokeWidth ?? 2,
+        opacity: preset.opacity ?? 1,
+        castsShadow: preset.castsShadow ?? false,
+        blocksMovement: preset.blocksMovement ?? false,
+        blocksVision: preset.blocksVision ?? false,
+        revealedByLight: preset.revealedByLight ?? true,
+        selected: false,
+        customPath,
+        mapId: region.mapId,
+      });
+      count++;
+    });
+    
+    const labels = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)' };
+    toast.success(`Created ${count} ${labels[category]} from region(s)`);
   };
   
   return (
@@ -322,7 +356,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
             </>
           )}
           
-          {/* Convert to Walls */}
+          {/* Convert to MapObjects */}
           <div className="h-4 w-px bg-border" />
           <Button
             variant="ghost"
@@ -332,6 +366,33 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
           >
             <Fence className="h-3 w-3 mr-1" />
             Walls
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleConvertToMapObject('obstacle')}
+          >
+            <Box className="h-3 w-3 mr-1" />
+            Obstacle
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleConvertToMapObject('furniture')}
+          >
+            <Armchair className="h-3 w-3 mr-1" />
+            Furniture
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleConvertToMapObject('water')}
+          >
+            <Droplets className="h-3 w-3 mr-1" />
+            Water
           </Button>
           
           <div className="h-4 w-px bg-border" />
