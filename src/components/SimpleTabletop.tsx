@@ -75,7 +75,7 @@ import { useVisionProfileStore } from "../stores/visionProfileStore";
 import { useRoleStore } from "../stores/roleStore";
 import { useUiModeStore, type DmFogVisibility } from "../stores/uiModeStore";
 import { getTokensForVisionCalculation } from "../lib/visionPermissions";
-import { canControlToken, getTokenRelationship } from "../lib/rolePermissions";
+import { canControlToken, canSeeToken, getTokenRelationship } from "../lib/rolePermissions";
 import paper from "paper";
 import { useFogStore } from "../stores/fogStore";
 import { usePostProcessing } from "../hooks/usePostProcessing";
@@ -811,6 +811,29 @@ export const SimpleTabletop = () => {
     if (!activeEntry) return;
     const activeToken = tokens.find(t => t.id === activeEntry.tokenId);
     if (!activeToken?.mapId) return;
+
+    // ── Visibility gate: only recenter if the token is visible to the current player ──
+    const { currentPlayerId, players } = useSessionStore.getState();
+    const currentPlayer = players.find(p => p.id === currentPlayerId);
+    const allRoles = useRoleStore.getState().roles;
+
+    if (currentPlayer) {
+      const playerRoles = currentPlayer.roleIds
+        ? currentPlayer.roleIds.map(rid => allRoles.find(r => r.id === rid)).filter(Boolean)
+        : [];
+      const hasFogBypass = playerRoles.some(r => r?.permissions.canSeeAllFog);
+
+      // Basic role-based visibility check
+      if (!canSeeToken(activeToken, currentPlayer, allRoles)) {
+        return; // Player can't see this token at all — skip recentering
+      }
+
+      // For non-DM players, also check if the token is hidden (isHidden flag)
+      if (!hasFogBypass && activeToken.isHidden) {
+        return;
+      }
+    }
+
     const currentSelectedMapId = useMapStore.getState().selectedMapId;
     if (activeToken.mapId !== currentSelectedMapId) {
       // Ensure target map is active
