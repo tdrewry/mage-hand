@@ -926,8 +926,8 @@ export const SimpleTabletop = () => {
     // After brief delay (simulating fade), move token
     setTimeout(() => {
       // Move token to target portal center
-      const targetCx = targetPortal.position.x + targetPortal.width / 2;
-      const targetCy = targetPortal.position.y + targetPortal.height / 2;
+      const targetCx = targetPortal.position.x;
+      const targetCy = targetPortal.position.y;
       updateTokenPosition(tokenId, targetCx, targetCy);
 
       // Trigger activation flash on target portal
@@ -990,8 +990,8 @@ export const SimpleTabletop = () => {
       if (obj.category !== 'portal' || obj.shape !== 'portal') return false;
       const objMapId = obj.mapId ?? useMapStore.getState().selectedMapId;
       if (objMapId !== tokenMapId) return false;
-      const cx = obj.position.x + obj.width / 2;
-      const cy = obj.position.y + obj.height / 2;
+      const cx = obj.position.x;
+      const cy = obj.position.y;
       const dx = token.x - cx;
       const dy = token.y - cy;
       const portalRadius = Math.max(obj.width, obj.height) / 2;
