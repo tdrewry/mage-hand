@@ -1,4 +1,4 @@
-# Per-Map Fog of War Toggle
+# Per-Map Fog Settings (Implemented v0.5.44)
 
 ## Overview
 Allow fog of war to be enabled/disabled independently per map. One map (e.g. an overworld) can have no fog while a dungeon map uses full fog. The global `fogStore.enabled` remains as a master switch — fog only renders when **both** the global toggle and the map-level toggle are true.

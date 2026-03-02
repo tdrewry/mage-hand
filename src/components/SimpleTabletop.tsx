@@ -439,22 +439,35 @@ export const SimpleTabletop = () => {
   // Keep refs in sync with state for stale-closure-safe reads in rAF/interval callbacks
   fogRevealBrushActiveRef.current = fogRevealBrushActive;
   fogRevealBrushRadiusRef.current = fogRevealBrushRadius;
-  // Fog of war store
-  const {
-    enabled: fogEnabled,
-    revealAll: fogRevealAll,
-    visionRange: fogVisionRange,
-    fogOpacity,
-    exploredOpacity,
-    serializedExploredAreasPerMap,
-    setSerializedExploredAreasForMap,
-    setEnabled: setFogEnabled,
-    setRevealAll: setFogRevealAll,
-    effectSettings,
-    realtimeVisionDuringDrag,
-    realtimeVisionThrottleMs,
-    clearExploredAreas,
-  } = useFogStore();
+  // Fog of war store - per-map settings
+  const fogSettingsPerMap = useFogStore(s => s.fogSettingsPerMap);
+  const serializedExploredAreasPerMap = useFogStore(s => s.serializedExploredAreasPerMap);
+  const setSerializedExploredAreasForMap = useFogStore(s => s.setSerializedExploredAreasForMap);
+  const setMapFogSettings = useFogStore(s => s.setMapFogSettings);
+  const getMapFogSettings = useFogStore(s => s.getMapFogSettings);
+  const realtimeVisionDuringDrag = useFogStore(s => s.realtimeVisionDuringDrag);
+  const realtimeVisionThrottleMs = useFogStore(s => s.realtimeVisionThrottleMs);
+  const clearExploredAreas = useFogStore(s => s.clearExploredAreas);
+
+  // Derive per-map fog state
+  const currentMapFog = useMemo(() => {
+    return getMapFogSettings(selectedMapId || 'default-map');
+  }, [fogSettingsPerMap, selectedMapId, getMapFogSettings]);
+
+  const fogEnabled = currentMapFog.enabled;
+  const fogRevealAll = currentMapFog.revealAll;
+  const fogVisionRange = currentMapFog.visionRange;
+  const fogOpacity = currentMapFog.fogOpacity;
+  const exploredOpacity = currentMapFog.exploredOpacity;
+  const effectSettings = currentMapFog.effectSettings;
+
+  // Fog setters targeting current map
+  const setFogEnabled = useCallback((enabled: boolean) => {
+    setMapFogSettings(selectedMapId || 'default-map', { enabled });
+  }, [selectedMapId, setMapFogSettings]);
+  const setFogRevealAll = useCallback((revealAll: boolean) => {
+    setMapFogSettings(selectedMapId || 'default-map', { revealAll });
+  }, [selectedMapId, setMapFogSettings]);
   
   // ---------------------------------------------------------------------------
   // Content-aware fog canvas bounds

@@ -5,7 +5,7 @@ import {
   Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
   SortAsc, SortDesc, Eye, EyeOff, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, Copy, Unlink, Map, MousePointer2,
-  Building2,
+  Building2, Cloud, CloudOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,9 @@ import { useMapStore } from '@/stores/mapStore';
 import { EntityGroup, EntityGeometry } from '@/lib/groupTransforms';
 import { CATEGORY_DEFAULT_RENDER_ORDER } from '@/lib/mapObjectRenderer';
 import { toast } from 'sonner';
+import { useFogStore } from '@/stores/fogStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 const entityTypeIcon: Record<string, React.ReactNode> = {
@@ -1424,6 +1427,10 @@ export const MapTreeCardContent: React.FC = () => {
       }
     });
 
+    // Copy fog settings from source map
+    const sourceFog = useFogStore.getState().getMapFogSettings(sourceMapId);
+    useFogStore.getState().setMapFogSettings(newMapId, { ...sourceFog });
+
     setSelectedMap(newMapId);
     toast.success(`Duplicated map "${sourceMap.name}" with ${idMap.size} entities`);
   }, [maps, tokens, regions, mapObjects, lights, groups, addRegion, addMapObject, addLight, addGroup, setSelectedMap]);
@@ -1653,6 +1660,34 @@ export const MapTreeCardContent: React.FC = () => {
                       <MousePointer2 className="h-3.5 w-3.5" />
                     </button>
 
+                    {/* Fog toggle button */}
+                    {(() => {
+                      const mapFog = useFogStore.getState().getMapFogSettings(map.id);
+                      const isFogOn = mapFog.enabled;
+                      return (
+                        <button
+                          className={`shrink-0 p-0.5 rounded transition-colors ${
+                            isFogOn ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
+                          }`}
+                          title={isFogOn ? 'Fog enabled — click to open fog controls' : 'Fog disabled — click to open fog controls'}
+                          onClick={e => {
+                            e.stopPropagation();
+                            const cardStore = useCardStore.getState();
+                            cardStore.registerCard({
+                              type: CardType.FOG,
+                              title: `Fog - ${map.name}`,
+                              defaultPosition: { x: 320, y: 80 },
+                              defaultSize: { width: 350, height: 400 },
+                              defaultVisible: true,
+                              metadata: { targetMapId: map.id, targetLabel: map.name },
+                            });
+                          }}
+                        >
+                          {isFogOn ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })()}
+
                     {/* Active toggle */}
                     <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'}>
                       <Switch
@@ -1841,6 +1876,24 @@ export const MapTreeCardContent: React.FC = () => {
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">
                         {structure.name}
                       </span>
+                      {/* Structure fog button */}
+                      <button
+                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                        title="Open fog controls for entire structure"
+                        onClick={() => {
+                          const cardStore = useCardStore.getState();
+                          cardStore.registerCard({
+                            type: CardType.FOG,
+                            title: `Fog - ${structure.name}`,
+                            defaultPosition: { x: 320, y: 80 },
+                            defaultSize: { width: 350, height: 400 },
+                            defaultVisible: true,
+                            metadata: { isStructureMode: true, structureId: structure.id, targetLabel: structure.name },
+                          });
+                        }}
+                      >
+                        <Cloud className="h-3 w-3" />
+                      </button>
                       <button
                         className="text-[10px] text-muted-foreground hover:text-destructive"
                         title="Delete structure"

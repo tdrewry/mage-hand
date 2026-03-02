@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useFogStore } from '@/stores/fogStore';
+import { useMapStore } from '@/stores/mapStore';
 import {
   initPostProcessing,
   cleanupPostProcessing,
@@ -53,7 +54,8 @@ export function usePostProcessing({
   const isReadyRef = useRef(false);
   const initRef = useRef(false);
   const initializingRef = useRef(false);
-  const { effectSettings } = useFogStore();
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const effectSettings = useFogStore(s => s.getMapFogSettings(selectedMapId || 'default-map').effectSettings);
 
   const setReady = (val: boolean) => {
     isReadyRef.current = val;

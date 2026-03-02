@@ -33,6 +33,7 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useFogStore } from '@/stores/fogStore';
+import { useMapStore } from '@/stores/mapStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
@@ -80,7 +81,8 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
 }) => {
   const { clearRegions } = useRegionStore();
   const { clearAllTokens } = useSessionStore();
-  const { enabled: fogEnabled } = useFogStore();
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const fogEnabled = useFogStore(s => s.getMapFogSettings(selectedMapId || 'default-map').enabled);
   const { isInCombat, restrictMovement, setRestrictMovement, startCombat, endCombat } = useInitiativeStore();
   const { enforceMovementBlocking, enforceRegionBounds, setEnforceMovementBlocking, setEnforceRegionBounds } = useDungeonStore();
   

@@ -1,6 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
+import { DEFAULT_MAP_FOG_SETTINGS } from './defaultFogEffectSettings';
 
 export type EffectQuality = 'performance' | 'balanced' | 'cinematic';
 
@@ -13,208 +14,151 @@ export interface FogEffectSettings {
   dimZoneOpacity: number; // 0-1, how much fog remains in dim zone (default 0.4)
 }
 
-export interface FogSettings {
+export interface MapFogSettings {
   enabled: boolean;
   revealAll: boolean; // DM mode - show entire map
   visionRange: number; // Default token vision range in grid units
   fogOpacity: number; // 0-1, how dark the fog is for unexplored areas
   exploredOpacity: number; // 0-1, how dark explored but not visible areas are
   showExploredAreas: boolean; // Whether to show previously explored areas as dimmed
-  serializedExploredAreas: string; // @deprecated Legacy single-map explored geometry — use serializedExploredAreasPerMap
-  serializedExploredAreasPerMap?: Record<string, string>; // Per-map explored geometry keyed by mapId
-  fogVersion: number; // Schema version for migration
-  
-  // Real-time vision during drag feature flag
-  realtimeVisionDuringDrag: boolean;
-  realtimeVisionThrottleMs: number; // Throttle interval in ms (16-100)
-  
-  // Post-processing effect settings
   effectSettings: FogEffectSettings;
 }
 
-interface FogState extends FogSettings {
-  // Actions
-  /**
-   * Enables or disables the fog of war system.
-   * @param enabled True to enable, false to disable.
-   */
-  setEnabled: (enabled: boolean) => void;
+/** @deprecated Use MapFogSettings via fogSettingsPerMap instead */
+export interface FogSettings {
+  enabled?: boolean;
+  revealAll?: boolean;
+  visionRange?: number;
+  fogOpacity?: number;
+  exploredOpacity?: number;
+  showExploredAreas?: boolean;
+  serializedExploredAreas?: string;
+  serializedExploredAreasPerMap?: Record<string, string>;
+  fogVersion?: number;
+  realtimeVisionDuringDrag?: boolean;
+  realtimeVisionThrottleMs?: number;
+  effectSettings?: FogEffectSettings;
+  fogSettingsPerMap?: Record<string, MapFogSettings>;
+}
 
-  /**
-   * Sets whether the entire map should be revealed (DM mode).
-   * @param revealAll True to reveal all, false to use standard fog rules.
-   */
-  setRevealAll: (revealAll: boolean) => void;
+interface FogState {
+  // Per-map fog settings
+  fogSettingsPerMap: Record<string, MapFogSettings>;
 
-  /**
-   * Sets the default vision range for tokens.
-   * @param range The vision range in grid units.
-   */
-  setVisionRange: (range: number) => void;
+  // Global fields (not per-map)
+  serializedExploredAreas: string; // @deprecated Legacy single-map explored geometry
+  serializedExploredAreasPerMap: Record<string, string>; // Per-map explored geometry keyed by mapId
+  fogVersion: number;
+  realtimeVisionDuringDrag: boolean;
+  realtimeVisionThrottleMs: number;
 
-  /**
-   * Sets the opacity of the fog in unexplored areas.
-   * @param opacity Opacity value between 0 and 1.
-   */
-  setFogOpacity: (opacity: number) => void;
+  // Per-map actions
+  getMapFogSettings: (mapId: string) => MapFogSettings;
+  setMapFogSettings: (mapId: string, updates: Partial<MapFogSettings>) => void;
+  initMapFogSettings: (mapId: string) => void;
+  removeMapFogSettings: (mapId: string) => void;
+  setStructureFogSettings: (structureId: string, updates: Partial<MapFogSettings>) => void;
 
-  /**
-   * Sets the opacity of the fog in explored but currently not visible areas.
-   * @param opacity Opacity value between 0 and 1.
-   */
-  setExploredOpacity: (opacity: number) => void;
-
-  /**
-   * Sets whether previously explored areas should be shown as dimmed.
-   * @param show True to show explored areas, false to keep them hidden.
-   */
-  setShowExploredAreas: (show: boolean) => void;
-
-  /**
-   * Sets the serialized explored areas geometry data.
-   * @param data The serialized geometry string.
-   */
+  // Explored area actions
   setSerializedExploredAreas: (data: string) => void;
-
-  /**
-   * Sets the serialized explored areas for a specific map.
-   * @param mapId The map ID.
-   * @param data The serialized geometry string.
-   */
   setSerializedExploredAreasForMap: (mapId: string, data: string) => void;
-
-  /**
-   * Gets the serialized explored areas for a specific map.
-   * @param mapId The map ID.
-   * @returns The serialized geometry string, or empty string.
-   */
   getSerializedExploredAreasForMap: (mapId: string) => string;
-  /**
-   * Clears all explored areas, resetting them to unexplored.
-   */
   clearExploredAreas: () => void;
 
-  /**
-   * Resets the entire fog system to its default state.
-   */
+  // Global actions
   resetFog: () => void;
-  
-  // Real-time vision during drag actions
-  /**
-   * Sets whether vision should be updated in real-time during token dragging.
-   * @param enabled True to enable real-time updates, false to update only after drag.
-   */
   setRealtimeVisionDuringDrag: (enabled: boolean) => void;
-
-  /**
-   * Sets the throttle interval for real-time vision updates.
-   * @param ms The interval in milliseconds.
-   */
   setRealtimeVisionThrottleMs: (ms: number) => void;
-  
-  // Post-processing effect actions
-  /**
-   * Enables or disables PixiJS post-processing for fog effects.
-   * @param enabled True to enable, false to disable.
-   */
-  setPostProcessingEnabled: (enabled: boolean) => void;
-
-  /**
-   * Sets the blur radius for the fog edge.
-   * @param blur The blur radius in pixels (0-20).
-   */
-  setEdgeBlur: (blur: number) => void;
-
-  /**
-   * Sets the light falloff percentage.
-   * @param falloff The percentage of light radius where the bright zone ends (0-1).
-   */
-  setLightFalloff: (falloff: number) => void;
-
-  /**
-   * Enables or disables volumetric fog effects.
-   * @param enabled True to enable, false to disable.
-   */
-  setVolumetricEnabled: (enabled: boolean) => void;
-
-  /**
-   * Sets the quality level for fog effects.
-   * @param quality The quality setting ('performance', 'balanced', or 'cinematic').
-   */
-  setEffectQuality: (quality: EffectQuality) => void;
-
-  /**
-   * Sets the opacity of the dim zone in the fog effect.
-   * @param opacity Opacity value between 0 and 1.
-   */
-  setDimZoneOpacity: (opacity: number) => void;
-
-  /**
-   * Updates multiple fog effect settings at once.
-   * @param settings Partial fog effect settings to apply.
-   */
-  setEffectSettings: (settings: Partial<FogEffectSettings>) => void;
 }
 
 // Define the store creator separately for better type inference
 const fogStoreCreator: StateCreator<FogState> = (set) => ({
-  // Initial state
-  enabled: false,
-  revealAll: false,
-  visionRange: 6, // 6 grid units default
-  fogOpacity: 0.95,
-  exploredOpacity: 0.4,
-  showExploredAreas: true,
+  // Per-map fog settings - default map starts with defaults
+  fogSettingsPerMap: {
+    'default-map': { ...DEFAULT_MAP_FOG_SETTINGS },
+  },
+
+  // Global fields
   serializedExploredAreas: '',
   serializedExploredAreasPerMap: {},
   fogVersion: 1,
-  
-  // Real-time vision during drag (feature flag - disabled by default)
   realtimeVisionDuringDrag: false,
-  realtimeVisionThrottleMs: 32, // ~30fps default
-  
-  // Post-processing effect settings
-  effectSettings: {
-    postProcessingEnabled: true, // Enabled by default with fog
-    edgeBlur: 8,
-    lightFalloff: 0.5, // 50% of light radius is fully bright, rest is dimmer
-    volumetricEnabled: false,
-    effectQuality: 'balanced' as EffectQuality,
-    dimZoneOpacity: 0.4, // 40% fog in dim zone
+  realtimeVisionThrottleMs: 32,
+
+  // Per-map actions
+  getMapFogSettings: (mapId) => {
+    const state = useFogStore.getState();
+    return state.fogSettingsPerMap[mapId] || { ...DEFAULT_MAP_FOG_SETTINGS };
   },
-  
-  // Actions - sync happens automatically via syncPatch middleware
-  setEnabled: (enabled) => {
-    set({ enabled });
+
+  setMapFogSettings: (mapId, updates) => {
+    set((state) => {
+      const current = state.fogSettingsPerMap[mapId] || { ...DEFAULT_MAP_FOG_SETTINGS };
+      // Handle nested effectSettings merge
+      const newSettings = updates.effectSettings
+        ? { ...current, ...updates, effectSettings: { ...current.effectSettings, ...updates.effectSettings } }
+        : { ...current, ...updates };
+      return {
+        fogSettingsPerMap: {
+          ...state.fogSettingsPerMap,
+          [mapId]: newSettings,
+        },
+      };
+    });
   },
-  
-  setRevealAll: (revealAll) => {
-    set({ revealAll });
+
+  initMapFogSettings: (mapId) => {
+    set((state) => {
+      if (state.fogSettingsPerMap[mapId]) return state; // Already exists
+      return {
+        fogSettingsPerMap: {
+          ...state.fogSettingsPerMap,
+          [mapId]: { ...DEFAULT_MAP_FOG_SETTINGS },
+        },
+      };
+    });
   },
-  
-  setVisionRange: (range) => {
-    const clampedRange = Math.max(1, Math.min(50, range));
-    set({ visionRange: clampedRange });
+
+  removeMapFogSettings: (mapId) => {
+    set((state) => {
+      const { [mapId]: _, ...rest } = state.fogSettingsPerMap;
+      const { [mapId]: __, ...exploredRest } = state.serializedExploredAreasPerMap;
+      return {
+        fogSettingsPerMap: rest,
+        serializedExploredAreasPerMap: exploredRest,
+      };
+    });
   },
-  
-  setFogOpacity: (opacity) => {
-    const clampedOpacity = Math.max(0, Math.min(1, opacity));
-    set({ fogOpacity: clampedOpacity });
+
+  setStructureFogSettings: (structureId, updates) => {
+    // Read mapStore to find maps in this structure
+    try {
+      const { useMapStore } = require('./mapStore');
+      const maps = useMapStore.getState().maps;
+      const memberMapIds = maps
+        .filter((m: any) => m.structureId === structureId)
+        .map((m: any) => m.id);
+
+      set((state) => {
+        const newPerMap = { ...state.fogSettingsPerMap };
+        for (const mapId of memberMapIds) {
+          const current = newPerMap[mapId] || { ...DEFAULT_MAP_FOG_SETTINGS };
+          newPerMap[mapId] = updates.effectSettings
+            ? { ...current, ...updates, effectSettings: { ...current.effectSettings, ...updates.effectSettings } }
+            : { ...current, ...updates };
+        }
+        return { fogSettingsPerMap: newPerMap };
+      });
+    } catch {
+      console.warn('setStructureFogSettings: could not access mapStore');
+    }
   },
-  
-  setExploredOpacity: (opacity) => {
-    const clampedOpacity = Math.max(0, Math.min(1, opacity));
-    set({ exploredOpacity: clampedOpacity });
-  },
-  
-  setShowExploredAreas: (show) => {
-    set({ showExploredAreas: show });
-  },
-  
+
+  // Explored area actions
   setSerializedExploredAreas: (data) => {
     set({ serializedExploredAreas: data });
   },
-  
+
   setSerializedExploredAreasForMap: (mapId, data) => {
     set((state) => ({
       serializedExploredAreasPerMap: {
@@ -223,40 +167,29 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
       },
     }));
   },
-  
+
   getSerializedExploredAreasForMap: (mapId) => {
     const state = useFogStore.getState();
     return state.serializedExploredAreasPerMap?.[mapId] || '';
   },
-  
+
   clearExploredAreas: () => {
     set({ serializedExploredAreas: '', serializedExploredAreasPerMap: {} });
   },
-  
+
   resetFog: () => {
     set({
-      enabled: false,
-      revealAll: false,
-      visionRange: 6,
-      fogOpacity: 0.95,
-      exploredOpacity: 0.4,
-      showExploredAreas: true,
+      fogSettingsPerMap: {
+        'default-map': { ...DEFAULT_MAP_FOG_SETTINGS },
+      },
       serializedExploredAreas: '',
       serializedExploredAreasPerMap: {},
       fogVersion: 1,
       realtimeVisionDuringDrag: false,
       realtimeVisionThrottleMs: 32,
-      effectSettings: {
-        postProcessingEnabled: true,
-        edgeBlur: 8,
-        lightFalloff: 0.5,
-        volumetricEnabled: false,
-        effectQuality: 'balanced' as EffectQuality,
-        dimZoneOpacity: 0.4,
-      },
     });
   },
-  
+
   // Real-time vision during drag actions (local-only, not synced)
   setRealtimeVisionDuringDrag: (enabled) => {
     set({ realtimeVisionDuringDrag: enabled });
@@ -265,52 +198,12 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
     const clampedMs = Math.max(16, Math.min(100, ms));
     set({ realtimeVisionThrottleMs: clampedMs });
   },
-  
-  // Post-processing effect actions (local-only, not synced)
-  setPostProcessingEnabled: (enabled) => {
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, postProcessingEnabled: enabled },
-    }));
-  },
-  setEdgeBlur: (blur) => {
-    const clampedBlur = Math.max(0, Math.min(20, blur));
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, edgeBlur: clampedBlur },
-    }));
-  },
-  setLightFalloff: (falloff) => {
-    const clampedFalloff = Math.max(0, Math.min(1, falloff));
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, lightFalloff: clampedFalloff },
-    }));
-  },
-  setVolumetricEnabled: (enabled) => {
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, volumetricEnabled: enabled },
-    }));
-  },
-  setEffectQuality: (quality) => {
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, effectQuality: quality },
-    }));
-  },
-  setDimZoneOpacity: (opacity) => {
-    const clampedOpacity = Math.max(0, Math.min(1, opacity));
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, dimZoneOpacity: clampedOpacity },
-    }));
-  },
-  setEffectSettings: (settings) => {
-    set((state) => ({
-      effectSettings: { ...state.effectSettings, ...settings },
-    }));
-  },
 });
 
 // Wrap with syncPatch middleware - exclude local-only settings
-const withSyncPatch = syncPatch<FogState>({ 
+const withSyncPatch = syncPatch<FogState>({
   channel: 'fog',
-  excludePaths: ['realtimeVisionDuringDrag', 'realtimeVisionThrottleMs', 'effectSettings'], // Local-only settings
+  excludePaths: ['realtimeVisionDuringDrag', 'realtimeVisionThrottleMs'],
   debug: false,
 })(fogStoreCreator);
 
@@ -318,28 +211,42 @@ const withSyncPatch = syncPatch<FogState>({
 const persistOptions: PersistOptions<FogState, Partial<FogState>> = {
   name: 'fog-of-war-store',
   partialize: (state) => ({
-    enabled: state.enabled,
-    revealAll: state.revealAll,
-    visionRange: state.visionRange,
-    fogOpacity: state.fogOpacity,
-    exploredOpacity: state.exploredOpacity,
-    showExploredAreas: state.showExploredAreas,
+    fogSettingsPerMap: state.fogSettingsPerMap,
     serializedExploredAreas: state.serializedExploredAreas,
     serializedExploredAreasPerMap: state.serializedExploredAreasPerMap,
     fogVersion: state.fogVersion,
     realtimeVisionDuringDrag: state.realtimeVisionDuringDrag,
     realtimeVisionThrottleMs: state.realtimeVisionThrottleMs,
-    effectSettings: state.effectSettings,
   }),
-  // Migrate legacy single explored area to per-map
+  // Migrate legacy flat fields to per-map
   onRehydrateStorage: () => (state) => {
     if (!state) return;
+
+    // Migrate legacy single explored area to per-map
     const legacy = state.serializedExploredAreas;
     const perMap = state.serializedExploredAreasPerMap;
     if (legacy && (!perMap || Object.keys(perMap).length === 0)) {
-      // Migrate legacy data to 'default-map' key
       state.serializedExploredAreasPerMap = { 'default-map': legacy };
-      state.serializedExploredAreas = ''; // Clear legacy
+      state.serializedExploredAreas = '';
+    }
+
+    // Migrate legacy flat fog fields → fogSettingsPerMap['default-map']
+    const raw = state as any;
+    if (
+      (!state.fogSettingsPerMap || Object.keys(state.fogSettingsPerMap).length === 0) &&
+      (raw.enabled !== undefined || raw.fogOpacity !== undefined)
+    ) {
+      state.fogSettingsPerMap = {
+        'default-map': {
+          enabled: raw.enabled ?? false,
+          revealAll: raw.revealAll ?? false,
+          visionRange: raw.visionRange ?? 6,
+          fogOpacity: raw.fogOpacity ?? 0.95,
+          exploredOpacity: raw.exploredOpacity ?? 0.4,
+          showExploredAreas: raw.showExploredAreas ?? true,
+          effectSettings: raw.effectSettings ?? { ...DEFAULT_MAP_FOG_SETTINGS.effectSettings },
+        },
+      };
     }
   },
 };
