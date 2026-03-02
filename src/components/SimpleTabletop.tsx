@@ -8919,6 +8919,9 @@ export const SimpleTabletop = () => {
                 }
               });
             }
+            
+            // Check for portal teleportation after valid movement
+            checkPortalTeleport(draggedTokenId);
           }
         }
       }
@@ -9723,6 +9726,9 @@ export const SimpleTabletop = () => {
               // ── Emit drag end (touch path) ──
               emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
             }
+            
+            // Check for portal teleportation after valid movement
+            checkPortalTeleport(draggedTokenId);
           }
         }
 
