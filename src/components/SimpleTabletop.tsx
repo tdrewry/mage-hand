@@ -856,6 +856,73 @@ export const SimpleTabletop = () => {
 
   // Cards now managed independently - no automatic visibility control needed
 
+  // ── Portal teleportation check ──
+  const checkPortalTeleport = useCallback((tokenId: string) => {
+    const token = tokens.find(t => t.id === tokenId);
+    if (!token) return;
+    
+    const allMapObjects = useMapObjectStore.getState().mapObjects;
+    const updateMapObject = useMapObjectStore.getState().updateMapObject;
+    
+    // Find portal at token drop position
+    const portalAtDrop = allMapObjects.find(obj => {
+      if (obj.category !== 'portal' || obj.shape !== 'portal') return false;
+      // Check if token center is within portal radius
+      const dx = token.x - obj.position.x;
+      const dy = token.y - obj.position.y;
+      const portalRadius = Math.min(obj.width, obj.height) / 2;
+      return dx * dx + dy * dy <= portalRadius * portalRadius;
+    });
+    
+    if (!portalAtDrop || !portalAtDrop.portalTargetId) return;
+    
+    // Find target portal
+    const targetPortal = allMapObjects.find(obj => obj.id === portalAtDrop.portalTargetId);
+    if (!targetPortal) {
+      toast.error('Portal target not found');
+      return;
+    }
+    
+    // Perform teleport with fade-out effect
+    const tokenEl = canvasRef.current;
+    if (tokenEl) {
+      // Brief visual feedback via toast
+      toast.success(`Teleporting to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
+    }
+    
+    // After brief delay (simulating fade), move token
+    setTimeout(() => {
+      // Move token to target portal position
+      updateTokenPosition(tokenId, targetPortal.position.x, targetPortal.position.y);
+      
+      // If target portal is on a different map, reassign token's mapId
+      if (targetPortal.mapId && targetPortal.mapId !== portalAtDrop.mapId) {
+        // Reassign mapId via direct store manipulation
+        useSessionStore.setState(state => ({
+          tokens: state.tokens.map(t => t.id === tokenId ? { ...t, mapId: targetPortal.mapId } : t)
+        }));
+        
+        // Check if target map is active
+        const maps = useMapStore.getState().maps;
+        const targetMap = maps.find(m => m.id === targetPortal.mapId);
+        
+        if (targetMap && !targetMap.active) {
+          if (portalAtDrop.portalAutoActivateTarget) {
+            // Auto-activate target map and set focus
+            useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
+            useMapStore.getState().setSelectedMap(targetPortal.mapId!);
+            toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
+          } else {
+            toast.info(`Token moved to inactive map "${targetMap.name}"`, { duration: 3000 });
+          }
+        } else if (portalAtDrop.portalAutoActivateTarget && targetPortal.mapId) {
+          // Target map already active, just set focus
+          useMapStore.getState().setSelectedMap(targetPortal.mapId);
+        }
+      }
+    }, 300); // 300ms fade delay
+  }, [tokens, updateTokenPosition]);
+
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
     if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex || isRotatingMapObject) {
@@ -917,11 +984,16 @@ export const SimpleTabletop = () => {
                 updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
               } else {
                 toast.success('Movement valid', { duration: 800 });
+                
+                // Check for portal teleportation after valid movement
+                checkPortalTeleport(draggedTokenId);
               }
             }
+          } else {
+            // No collision enforcement — still check portal teleport
+            checkPortalTeleport(draggedTokenId);
           }
           
-          // ── Safety: emit drag end on global mouseup ──
           emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
           setIsDraggingToken(false);
           setDraggedTokenId(null);

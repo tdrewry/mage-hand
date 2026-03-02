@@ -501,6 +501,113 @@ function renderLightShape(
 }
 
 /**
+ * Render a portal shape — circular region with a glowing border and portal icon badge
+ */
+function renderPortalShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number,
+  isDMView: boolean = false
+) {
+  const { width, height, fillColor, strokeColor, portalName, portalTargetId, portalHiddenInPlay } = mapObject;
+  const radius = Math.min(width, height) / 2;
+  
+  // In play mode, hidden portals are invisible
+  if (!isDMView && portalHiddenInPlay) return;
+  
+  // Pulsing glow animation
+  const time = performance.now() / 1000;
+  const pulse = 0.6 + 0.4 * Math.sin(time * 2);
+  
+  // Outer glow ring
+  ctx.save();
+  ctx.globalAlpha = 0.3 * pulse;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 4 / zoom;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + 4 / zoom, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  
+  // Filled circle with gradient
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+  gradient.addColorStop(0, strokeColor + '60');
+  gradient.addColorStop(0.7, fillColor);
+  gradient.addColorStop(1, strokeColor + '40');
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Border
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 2 / zoom;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Portal icon (swirl indicator) at center
+  ctx.save();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.globalAlpha = 0.8;
+  const iconSize = Math.min(radius * 0.5, 12 / zoom);
+  // Draw a simple spiral/swirl
+  ctx.beginPath();
+  for (let angle = 0; angle < Math.PI * 3; angle += 0.1) {
+    const r = (angle / (Math.PI * 3)) * iconSize;
+    const x = Math.cos(angle + time) * r;
+    const y = Math.sin(angle + time) * r;
+    if (angle === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+  
+  // Portal name label
+  if (portalName) {
+    const fontSize = 10 / zoom;
+    ctx.font = `${fontSize}px Arial`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(portalName, 0, radius + 6 / zoom);
+  }
+  
+  // Linked indicator (small dot if connected)
+  if (portalTargetId) {
+    ctx.fillStyle = '#22c55e';
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(radius * 0.7, -radius * 0.7, 3 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Unlinked indicator
+    ctx.fillStyle = '#f59e0b';
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(radius * 0.7, -radius * 0.7, 3 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // DM: show hidden indicator
+  if (isDMView && portalHiddenInPlay) {
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5 / zoom;
+    const s = 5 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.7 - s, -radius * 0.7 - s);
+    ctx.lineTo(-radius * 0.7 + s, -radius * 0.7 + s);
+    ctx.moveTo(-radius * 0.7 + s, -radius * 0.7 - s);
+    ctx.lineTo(-radius * 0.7 - s, -radius * 0.7 + s);
+    ctx.stroke();
+  }
+}
+
+/**
  * Render a single map object to the canvas
  */
 export function renderMapObject(
@@ -537,6 +644,8 @@ export function renderMapObject(
     renderWallShape(ctx, mapObject, zoom, isDMView, selected);
   } else if (shape === 'light') {
     renderLightShape(ctx, mapObject, zoom, isDMView);
+  } else if (shape === 'portal') {
+    renderPortalShape(ctx, mapObject, zoom, isDMView);
   } else {
     ctx.beginPath();
     
@@ -657,6 +766,7 @@ export const CATEGORY_DEFAULT_RENDER_ORDER: Record<string, number> = {
   water:             10,
   trap:              15,
   debris:            20,
+  portal:            25,
   wall:              30,
   'imported-obstacle': 40,
   door:              50,
@@ -884,6 +994,12 @@ export function isPointInMapObject(
   if (shape === 'light') {
     const hitRadius = 15 / zoom;
     return localX * localX + localY * localY <= hitRadius * hitRadius;
+  }
+  
+  // For portal shapes, use circle hit-test
+  if (shape === 'portal') {
+    const portalRadius = Math.min(width, height) / 2;
+    return localX * localX + localY * localY <= portalRadius * portalRadius;
   }
   
   // For doors, use a larger hit area for easier selection

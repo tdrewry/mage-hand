@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useRegionStore } from '@/stores/regionStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
 import { RegionBulkTextureModal } from './modals/RegionBulkTextureModal';
@@ -30,7 +31,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   isDM = false,
 }) => {
   const { regions, updateRegion, removeRegion } = useRegionStore();
-  
+  const addMapObject = useMapObjectStore(state => state.addMapObject);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showTextureModal, setShowTextureModal] = useState(false);
@@ -108,6 +109,36 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     onClearSelection();
     onUpdateCanvas?.();
     toast.success(`Deleted ${selectedRegions.length} region(s)`);
+  };
+  
+  const handleConvertToPortal = () => {
+    if (!isSingleSelection || !firstRegion) return;
+    
+    // Create a portal MapObject at the region's center
+    const centerX = firstRegion.x + (firstRegion.width / 2);
+    const centerY = firstRegion.y + (firstRegion.height / 2);
+    const portalSize = Math.min(firstRegion.width, firstRegion.height, 60);
+    
+    addMapObject({
+      position: { x: centerX, y: centerY },
+      width: portalSize,
+      height: portalSize,
+      shape: 'portal',
+      category: 'portal',
+      fillColor: 'rgba(139, 92, 246, 0.25)',
+      strokeColor: '#8b5cf6',
+      strokeWidth: 2,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: false,
+      revealedByLight: false,
+      selected: false,
+      portalName: `Portal ${firstRegion.id.slice(-4)}`,
+      mapId: firstRegion.mapId,
+    });
+    
+    toast.success('Portal created from region');
   };
   
   return (
@@ -226,6 +257,22 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
                   Unreveal
                 </Button>
               )}
+            </>
+          )}
+          
+          {/* Convert to Portal (single selection only) */}
+          {isSingleSelection && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={handleConvertToPortal}
+              >
+                <Waypoints className="h-3 w-3 mr-1" />
+                Portal
+              </Button>
             </>
           )}
           
