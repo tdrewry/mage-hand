@@ -103,6 +103,16 @@ import {
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog, MousePointer2 } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
 import { RoleSelectionModal } from "./modals/RoleSelectionModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { RegionControlBar } from "./RegionControlBar";
 import { FogBrushToolbar } from "./FogBrushToolbar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
@@ -534,6 +544,19 @@ export const SimpleTabletop = () => {
   const exploredAreaRef = useRef<paper.CompoundPath | null>(null);
   const currentVisibilityRef = useRef<paper.Path | null>(null); // Current visibility for interaction checks
   const stableVisibilityRef = useRef<paper.Path | null>(null); // Snapshot of visibility for stable checks during drag
+
+  // Portal activation flash effect — maps portalId to start timestamp
+  const portalActivationsRef = useRef<Map<string, number>>(new Map());
+  
+  // Pending teleport confirmation (DM approval)
+  const [pendingTeleport, setPendingTeleport] = useState<{
+    tokenId: string;
+    tokenName: string;
+    sourcePortalId: string;
+    sourcePortalName: string;
+    targetPortalId: string;
+    targetPortalName: string;
+  } | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
   
   // Real-time vision preview during drag
@@ -888,75 +911,48 @@ export const SimpleTabletop = () => {
 
   // Cards now managed independently - no automatic visibility control needed
 
-  // ── Portal teleportation check ──
-  const checkPortalTeleport = useCallback((tokenId: string) => {
-    const token = tokens.find(t => t.id === tokenId);
-    if (!token) return;
-    
+  // ── Portal teleportation: execute the actual teleport ──
+  const executeTeleport = useCallback((tokenId: string, sourcePortalId: string, targetPortalId: string) => {
     const allMapObjects = useMapObjectStore.getState().mapObjects;
-    const updateMapObject = useMapObjectStore.getState().updateMapObject;
-    
-    // Find portal at token drop position (same map as the token)
-    const tokenMapId = token.mapId ?? useMapStore.getState().selectedMapId;
-    const portalAtDrop = allMapObjects.find(obj => {
-      if (obj.category !== 'portal' || obj.shape !== 'portal') return false;
-      // Portal must be on the same map as the token
-      const objMapId = obj.mapId ?? useMapStore.getState().selectedMapId;
-      if (objMapId !== tokenMapId) return false;
-      // position is top-left; compute center
-      const cx = obj.position.x + obj.width / 2;
-      const cy = obj.position.y + obj.height / 2;
-      const dx = token.x - cx;
-      const dy = token.y - cy;
-      const portalRadius = Math.max(obj.width, obj.height) / 2;
-      return dx * dx + dy * dy <= portalRadius * portalRadius;
-    });
-    
-    if (!portalAtDrop || !portalAtDrop.portalTargetId) return;
-    
-    // Find target portal
-    const targetPortal = allMapObjects.find(obj => obj.id === portalAtDrop.portalTargetId);
-    if (!targetPortal) {
-      toast.error('Portal target not found');
-      return;
-    }
-    
-    // Perform teleport with fade-out effect
-    const tokenEl = canvasRef.current;
-    if (tokenEl) {
-      // Brief visual feedback via toast
-      toast.success(`Teleporting to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
-    }
-    
+    const sourcePortal = allMapObjects.find(obj => obj.id === sourcePortalId);
+    const targetPortal = allMapObjects.find(obj => obj.id === targetPortalId);
+    if (!sourcePortal || !targetPortal) return;
+
+    // Trigger activation flash on source portal
+    portalActivationsRef.current.set(sourcePortalId, performance.now());
+
+    toast.success(`Teleporting to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
+
     // After brief delay (simulating fade), move token
     setTimeout(() => {
-      // Move token to target portal position
-      updateTokenPosition(tokenId, targetPortal.position.x, targetPortal.position.y);
-      
+      // Move token to target portal center
+      const targetCx = targetPortal.position.x + targetPortal.width / 2;
+      const targetCy = targetPortal.position.y + targetPortal.height / 2;
+      updateTokenPosition(tokenId, targetCx, targetCy);
+
+      // Trigger activation flash on target portal
+      portalActivationsRef.current.set(targetPortalId, performance.now());
+
       // If target portal is on a different map, reassign token's mapId
-      if (targetPortal.mapId && targetPortal.mapId !== portalAtDrop.mapId) {
-        // Reassign mapId via direct store manipulation
+      if (targetPortal.mapId && targetPortal.mapId !== sourcePortal.mapId) {
         useSessionStore.setState(state => ({
           tokens: state.tokens.map(t => t.id === tokenId ? { ...t, mapId: targetPortal.mapId } : t)
         }));
-        
-        // Check if target map is active
+
         const maps = useMapStore.getState().maps;
         const targetMap = maps.find(m => m.id === targetPortal.mapId);
-        
+
         if (targetMap && !targetMap.active) {
-          if (portalAtDrop.portalAutoActivateTarget) {
-            // Auto-activate target map and set focus
+          if (sourcePortal.portalAutoActivateTarget) {
             useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
             useMapStore.getState().setSelectedMap(targetPortal.mapId!);
             toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
-            // Center viewport on teleported token
             requestAnimationFrame(() => {
               if (canvasRef.current) {
                 const canvas = canvasRef.current;
                 setTransform(prev => ({
-                  x: canvas.width / 2 - targetPortal.position.x * prev.zoom,
-                  y: canvas.height / 2 - targetPortal.position.y * prev.zoom,
+                  x: canvas.width / 2 - targetCx * prev.zoom,
+                  y: canvas.height / 2 - targetCy * prev.zoom,
                   zoom: prev.zoom,
                 }));
               }
@@ -964,24 +960,69 @@ export const SimpleTabletop = () => {
           } else {
             toast.info(`Token moved to inactive map "${targetMap.name}"`, { duration: 3000 });
           }
-      } else if ((portalAtDrop.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
-          // Target map already active, just set focus
+        } else if ((sourcePortal.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
-          // Center viewport on teleported token
           requestAnimationFrame(() => {
             if (canvasRef.current) {
               const canvas = canvasRef.current;
               setTransform(prev => ({
-                x: canvas.width / 2 - targetPortal.position.x * prev.zoom,
-                y: canvas.height / 2 - targetPortal.position.y * prev.zoom,
+                x: canvas.width / 2 - targetCx * prev.zoom,
+                y: canvas.height / 2 - targetCy * prev.zoom,
                 zoom: prev.zoom,
               }));
             }
           });
         }
       }
-    }, 300); // 300ms fade delay
-  }, [tokens, updateTokenPosition]);
+    }, 300);
+  }, [updateTokenPosition]);
+
+  // ── Portal teleportation check — triggers DM confirmation or auto-teleport ──
+  const checkPortalTeleport = useCallback((tokenId: string) => {
+    const token = tokens.find(t => t.id === tokenId);
+    if (!token) return;
+
+    const allMapObjects = useMapObjectStore.getState().mapObjects;
+
+    // Find portal at token drop position (same map as the token)
+    const tokenMapId = token.mapId ?? useMapStore.getState().selectedMapId;
+    const portalAtDrop = allMapObjects.find(obj => {
+      if (obj.category !== 'portal' || obj.shape !== 'portal') return false;
+      const objMapId = obj.mapId ?? useMapStore.getState().selectedMapId;
+      if (objMapId !== tokenMapId) return false;
+      const cx = obj.position.x + obj.width / 2;
+      const cy = obj.position.y + obj.height / 2;
+      const dx = token.x - cx;
+      const dy = token.y - cy;
+      const portalRadius = Math.max(obj.width, obj.height) / 2;
+      return dx * dx + dy * dy <= portalRadius * portalRadius;
+    });
+
+    if (!portalAtDrop || !portalAtDrop.portalTargetId) return;
+
+    const targetPortal = allMapObjects.find(obj => obj.id === portalAtDrop.portalTargetId);
+    if (!targetPortal) {
+      toast.error('Portal target not found');
+      return;
+    }
+
+    // Trigger activation flash on the source portal immediately
+    portalActivationsRef.current.set(portalAtDrop.id, performance.now());
+
+    // DM gets a confirmation prompt; non-DM teleports instantly
+    if (isDM) {
+      setPendingTeleport({
+        tokenId,
+        tokenName: token.name || 'Token',
+        sourcePortalId: portalAtDrop.id,
+        sourcePortalName: portalAtDrop.portalName || 'Portal',
+        targetPortalId: targetPortal.id,
+        targetPortalName: targetPortal.portalName || 'Portal',
+      });
+    } else {
+      executeTeleport(tokenId, portalAtDrop.id, targetPortal.id);
+    }
+  }, [tokens, isDM, executeTeleport]);
 
   // Global mouseup listener to ensure drag states are always reset
   useEffect(() => {
@@ -2998,6 +3039,24 @@ export const SimpleTabletop = () => {
       );
     }
     
+    // Compute portal activation flash progress (0-1, 600ms duration)
+    const now = performance.now();
+    const FLASH_DURATION = 600;
+    let portalActivations: Map<string, number> | undefined;
+    const activations = portalActivationsRef.current;
+    if (activations.size > 0) {
+      portalActivations = new Map();
+      for (const [id, startTime] of activations) {
+        const elapsed = now - startTime;
+        if (elapsed >= FLASH_DURATION) {
+          activations.delete(id);
+        } else {
+          portalActivations.set(id, elapsed / FLASH_DURATION);
+        }
+      }
+      if (portalActivations.size === 0) portalActivations = undefined;
+    }
+
     // Then render the map objects themselves
     // Pass isDM for DM-specific UI (door toggle indicators) — but NOT in play mode
     // so light centers, radius rings, and other editor chrome are hidden from everyone in play mode.
@@ -3009,12 +3068,12 @@ export const SimpleTabletop = () => {
         ctx.save();
         ctx.globalAlpha *= focusState.unfocusedOpacity;
         if (focusState.unfocusedBlur > 0) ctx.filter = `blur(${focusState.unfocusedBlur}px)`;
-        renderMapObjects(ctx, unfocusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+        renderMapObjects(ctx, unfocusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
         ctx.restore();
       }
-      renderMapObjects(ctx, focusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+      renderMapObjects(ctx, focusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
     } else {
-      renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+      renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
     }
 
     // Draw scale handles + rotation handle on selected, unlocked, non-wall map objects (edit mode)
@@ -10424,6 +10483,29 @@ export const SimpleTabletop = () => {
 
       {/* Role Selection Modal - Shows on session entry */}
       <RoleSelectionModal open={true} />
+
+      {/* Portal Teleport DM Confirmation Dialog */}
+      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) setPendingTeleport(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Teleportation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Teleport <strong>{pendingTeleport?.tokenName}</strong> from{' '}
+              <strong>{pendingTeleport?.sourcePortalName}</strong> to{' '}
+              <strong>{pendingTeleport?.targetPortalName}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingTeleport(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingTeleport) {
+                executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId);
+                setPendingTeleport(null);
+              }
+            }}>Teleport</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
