@@ -556,6 +556,7 @@ export const SimpleTabletop = () => {
     sourcePortalName: string;
     targetPortalId: string;
     targetPortalName: string;
+    dropPosition?: { x: number; y: number };
   } | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
   
@@ -912,7 +913,7 @@ export const SimpleTabletop = () => {
   // Cards now managed independently - no automatic visibility control needed
 
   // ── Portal teleportation: execute the actual teleport ──
-  const executeTeleport = useCallback((tokenId: string, sourcePortalId: string, targetPortalId: string) => {
+  const executeTeleport = useCallback((tokenId: string, sourcePortalId: string, targetPortalId: string, dropPosition?: { x: number; y: number }) => {
     const allMapObjects = useMapObjectStore.getState().mapObjects;
     const sourcePortal = allMapObjects.find(obj => obj.id === sourcePortalId);
     const targetPortal = allMapObjects.find(obj => obj.id === targetPortalId);
@@ -925,10 +926,18 @@ export const SimpleTabletop = () => {
 
     // After brief delay (simulating fade), move token
     setTimeout(() => {
-      // Move token to target portal center
-      const targetCx = targetPortal.position.x;
-      const targetCy = targetPortal.position.y;
-      updateTokenPosition(tokenId, targetCx, targetCy);
+      // Compute relative offset from source portal center, map to target portal
+      let targetX = targetPortal.position.x;
+      let targetY = targetPortal.position.y;
+      if (dropPosition && sourcePortal.width > 0 && sourcePortal.height > 0) {
+        // Normalized offset (-0.5 to 0.5) within source portal
+        const relX = (dropPosition.x - sourcePortal.position.x) / sourcePortal.width;
+        const relY = (dropPosition.y - sourcePortal.position.y) / sourcePortal.height;
+        // Apply same relative offset to target portal dimensions
+        targetX += relX * targetPortal.width;
+        targetY += relY * targetPortal.height;
+      }
+      updateTokenPosition(tokenId, targetX, targetY);
 
       // Trigger activation flash on target portal
       portalActivationsRef.current.set(targetPortalId, performance.now());
@@ -951,8 +960,8 @@ export const SimpleTabletop = () => {
               if (canvasRef.current) {
                 const canvas = canvasRef.current;
                 setTransform(prev => ({
-                  x: canvas.width / 2 - targetCx * prev.zoom,
-                  y: canvas.height / 2 - targetCy * prev.zoom,
+                  x: canvas.width / 2 - targetX * prev.zoom,
+                  y: canvas.height / 2 - targetY * prev.zoom,
                   zoom: prev.zoom,
                 }));
               }
@@ -966,8 +975,8 @@ export const SimpleTabletop = () => {
             if (canvasRef.current) {
               const canvas = canvasRef.current;
               setTransform(prev => ({
-                x: canvas.width / 2 - targetCx * prev.zoom,
-                y: canvas.height / 2 - targetCy * prev.zoom,
+                x: canvas.width / 2 - targetX * prev.zoom,
+                y: canvas.height / 2 - targetY * prev.zoom,
                 zoom: prev.zoom,
               }));
             }
@@ -1011,6 +1020,7 @@ export const SimpleTabletop = () => {
 
     // DM gets a confirmation prompt; non-DM teleports instantly
     if (isDM) {
+      const dropPos = { x: token.x, y: token.y };
       setPendingTeleport({
         tokenId,
         tokenName: token.name || 'Token',
@@ -1018,9 +1028,10 @@ export const SimpleTabletop = () => {
         sourcePortalName: portalAtDrop.portalName || 'Portal',
         targetPortalId: targetPortal.id,
         targetPortalName: targetPortal.portalName || 'Portal',
+        dropPosition: dropPos,
       });
     } else {
-      executeTeleport(tokenId, portalAtDrop.id, targetPortal.id);
+      executeTeleport(tokenId, portalAtDrop.id, targetPortal.id, { x: token.x, y: token.y });
     }
   }, [tokens, isDM, executeTeleport]);
 
@@ -10505,7 +10516,7 @@ export const SimpleTabletop = () => {
             <AlertDialogCancel onClick={() => setPendingTeleport(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (pendingTeleport) {
-                executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId);
+                executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
                 setPendingTeleport(null);
               }
             }}>Teleport</AlertDialogAction>
