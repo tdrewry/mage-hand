@@ -336,7 +336,8 @@ function EntityRow({
   mapObjects?: Array<{ id: string; renderOrder?: number; category: string }>;
 }) {
   const canLock = entity.type === 'region' || entity.type === 'mapObject';
-  const canDrag = draggable && entity.type === 'mapObject';
+  const canDrag = !!draggable;
+  const canDropReorder = draggable && entity.type === 'mapObject';
   const isRenaming = renamingId === entity.id;
 
   const rowContent = (
@@ -351,8 +352,8 @@ function EntityRow({
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         draggable={canDrag}
         onDragStart={canDrag ? (e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart?.(entity); } : undefined}
-        onDragOver={canDrag ? (e) => { e.preventDefault(); onDragOver?.(e, entity); } : undefined}
-        onDrop={canDrag ? (e) => { e.preventDefault(); onDrop?.(e, entity); } : undefined}
+        onDragOver={canDropReorder ? (e) => { e.preventDefault(); onDragOver?.(e, entity); } : undefined}
+        onDrop={canDropReorder ? (e) => { e.preventDefault(); onDrop?.(e, entity); } : undefined}
         onDragEnd={canDrag ? onDragEnd : undefined}
         onClick={(e) => onSelect?.(entity, e.ctrlKey || e.metaKey)}
       >
@@ -456,6 +457,12 @@ function GroupNode({
   onRenameCancel,
   contextActions,
   mapObjects,
+  onDropOnGroup,
+  isDropTarget,
+  onDragOverGroup,
+  onDragLeaveGroup,
+  onDragStartGroup,
+  onDragEndGroup,
 }: {
   group: EntityGroup;
   entities: TreeEntity[];
@@ -472,6 +479,12 @@ function GroupNode({
   onRenameCancel: () => void;
   contextActions: EntityContextActions;
   mapObjects?: Array<{ id: string; renderOrder?: number; category: string }>;
+  onDropOnGroup?: (groupId: string) => void;
+  isDropTarget?: boolean;
+  onDragOverGroup?: (e: React.DragEvent, groupId: string) => void;
+  onDragLeaveGroup?: () => void;
+  onDragStartGroup?: (group: EntityGroup) => void;
+  onDragEndGroup?: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -482,7 +495,20 @@ function GroupNode({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex items-center gap-0.5 group">
+      <div
+        className={`flex items-center gap-0.5 group transition-colors ${
+          isDropTarget ? 'bg-primary/20 ring-1 ring-primary/40 rounded' : ''
+        }`}
+        draggable
+        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStartGroup?.(group); }}
+        onDragEnd={() => onDragEndGroup?.()}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOverGroup?.(e, group.id); }}
+        onDragLeave={() => onDragLeaveGroup?.()}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropOnGroup?.(group.id); }}
+      >
+        {/* Drag handle for group */}
+        <GripVertical className="h-3 w-3 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 cursor-grab ml-1" />
+
         <CollapsibleTrigger className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-accent/50 cursor-pointer text-xs flex-1 text-left min-w-0">
           {open
             ? <ChevronDown  className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -558,6 +584,7 @@ function GroupNode({
             onSelectAdditive={onSelectAdditive}
             onRenameCommit={onRenameCommit}
             onRenameCancel={onRenameCancel}
+            draggable
             contextActions={contextActions}
             mapObjects={mapObjects}
           />
@@ -612,7 +639,7 @@ export const MapTreeCardContent: React.FC = () => {
   const updateLight = useLightStore(s => s.updateLight);
   const toggleLight = useLightStore(s => s.toggleLight);
 
-  const { groups, removeGroup, setGroupLocked, updateGroup, removeMemberFromGroup, addGroup } = useGroupStore();
+  const { groups, removeGroup, setGroupLocked, updateGroup, removeMemberFromGroup, addGroup, addMembersToGroup } = useGroupStore();
 
   // ── Search & sort state ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -632,8 +659,10 @@ export const MapTreeCardContent: React.FC = () => {
   }, [sortField]);
 
   // ── Drag state ────────────────────────────────────────────────────────────
-  const dragEntityRef = useRef<TreeEntity | null>(null);
+  const dragItemsRef = useRef<{ id: string; type: TreeEntity['type'] }[]>([]);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'above' | 'below' } | null>(null);
+  const [dropGroupTarget, setDropGroupTarget] = useState<string | null>(null);
+  const [dropMapTarget, setDropMapTarget] = useState<string | null>(null);
 
   // ── Selection helpers ─────────────────────────────────────────────────────
   const allSelectedIds = useMemo(() => {
@@ -680,11 +709,29 @@ export const MapTreeCardContent: React.FC = () => {
 
   // ── Drag-to-reorder ───────────────────────────────────────────────────────
   const handleDragStart = useCallback((entity: TreeEntity) => {
-    dragEntityRef.current = entity;
+    // Multi-select: if the dragged entity is part of the current selection, drag all selected
+    if (allSelectedIds.has(entity.id) && allSelectedIds.size > 1) {
+      // Build selected items from stores directly to avoid circular dependency with allEntities
+      const items: { id: string; type: TreeEntity['type'] }[] = [];
+      allSelectedIds.forEach(id => {
+        if (tokens.some(t => t.id === id)) items.push({ id, type: 'token' });
+        else if (regions.some(r => r.id === id)) items.push({ id, type: 'region' });
+        else if (mapObjects.some(o => o.id === id)) items.push({ id, type: 'mapObject' });
+        else if (lights.some(l => l.id === id)) items.push({ id, type: 'light' });
+      });
+      dragItemsRef.current = items;
+    } else {
+      dragItemsRef.current = [{ id: entity.id, type: entity.type }];
+    }
+  }, [allSelectedIds, tokens, regions, mapObjects, lights]);
+
+  const handleDragStartGroup = useCallback((group: EntityGroup) => {
+    dragItemsRef.current = group.members.map(m => ({ id: m.id, type: m.type as TreeEntity['type'] }));
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, target: TreeEntity) => {
-    if (!dragEntityRef.current || dragEntityRef.current.id === target.id) return;
+    if (dragItemsRef.current.length === 0) return;
+    if (dragItemsRef.current.some(d => d.id === target.id)) return;
     if (target.type !== 'mapObject') return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
@@ -693,13 +740,14 @@ export const MapTreeCardContent: React.FC = () => {
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, target: TreeEntity) => {
-    const dragged = dragEntityRef.current;
-    if (!dragged || dragged.id === target.id || dragged.type !== 'mapObject') {
+    const items = dragItemsRef.current;
+    if (items.length !== 1 || items[0].id === target.id || items[0].type !== 'mapObject' || target.type !== 'mapObject') {
       setDropTarget(null);
-      dragEntityRef.current = null;
+      dragItemsRef.current = [];
       return;
     }
 
+    const dragged = items[0];
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     const dropPos: 'above' | 'below' = e.clientY < midY ? 'above' : 'below';
@@ -737,14 +785,87 @@ export const MapTreeCardContent: React.FC = () => {
       reorderMapObject(dragged.id, newOrder);
     }
 
-    dragEntityRef.current = null;
+    dragItemsRef.current = [];
     setDropTarget(null);
   }, [mapObjects, reorderMapObject, normalizeRenderOrders]);
 
   const handleDragEnd = useCallback(() => {
-    dragEntityRef.current = null;
+    dragItemsRef.current = [];
     setDropTarget(null);
+    setDropGroupTarget(null);
+    setDropMapTarget(null);
   }, []);
+
+  // ── Drop on group ─────────────────────────────────────────────────────────
+  const handleDragOverGroup = useCallback((e: React.DragEvent, groupId: string) => {
+    if (dragItemsRef.current.length === 0) return;
+    setDropGroupTarget(groupId);
+    setDropTarget(null);
+    setDropMapTarget(null);
+  }, []);
+
+  const handleDragLeaveGroup = useCallback(() => {
+    setDropGroupTarget(null);
+  }, []);
+
+  const handleDropOnGroup = useCallback((groupId: string) => {
+    const items = dragItemsRef.current;
+    if (items.length === 0) { setDropGroupTarget(null); return; }
+
+    const group = groups.find(g => g.id === groupId);
+    if (!group) { setDropGroupTarget(null); return; }
+
+    const newMembers = items
+      .filter(item => !group.members.some(m => m.id === item.id))
+      .map(item => ({ id: item.id, type: item.type }));
+
+    if (newMembers.length > 0) {
+      addMembersToGroup(groupId, newMembers);
+      toast.success(`Added ${newMembers.length} item(s) to "${group.name}"`);
+    }
+
+    dragItemsRef.current = [];
+    setDropGroupTarget(null);
+    setDropTarget(null);
+  }, [groups, addMembersToGroup]);
+
+  // ── Drop on map ───────────────────────────────────────────────────────────
+  const handleDragOverMap = useCallback((e: React.DragEvent, mapId: string) => {
+    if (dragItemsRef.current.length === 0) return;
+    setDropMapTarget(mapId);
+    setDropTarget(null);
+    setDropGroupTarget(null);
+  }, []);
+
+  const handleDragLeaveMap = useCallback(() => {
+    setDropMapTarget(null);
+  }, []);
+
+  const handleDropOnMap = useCallback((mapId: string) => {
+    const items = dragItemsRef.current;
+    if (items.length === 0) { setDropMapTarget(null); return; }
+
+    items.forEach(item => {
+      if (item.type === 'token') {
+        useSessionStore.setState(state => ({
+          tokens: state.tokens.map(t => t.id === item.id ? { ...t, mapId } : t),
+        }));
+      } else if (item.type === 'region') {
+        updateRegion(item.id, { mapId } as any);
+      } else if (item.type === 'mapObject') {
+        updateMapObject(item.id, { mapId } as any);
+      } else if (item.type === 'light') {
+        updateLight(item.id, { mapId } as any);
+      }
+    });
+
+    const mapName = maps.find(m => m.id === mapId)?.name || 'map';
+    toast.success(`Moved ${items.length} item(s) to "${mapName}"`);
+
+    dragItemsRef.current = [];
+    setDropMapTarget(null);
+    setDropTarget(null);
+  }, [maps, updateRegion, updateMapObject, updateLight]);
 
   // ── Context menu action handlers ──────────────────────────────────────────
 
@@ -1097,6 +1218,12 @@ export const MapTreeCardContent: React.FC = () => {
             onRenameCancel={handleRenameCancel}
             contextActions={contextActions}
             mapObjects={mapObjectsForContext}
+            onDropOnGroup={handleDropOnGroup}
+            isDropTarget={dropGroupTarget === group.id}
+            onDragOverGroup={handleDragOverGroup}
+            onDragLeaveGroup={handleDragLeaveGroup}
+            onDragStartGroup={handleDragStartGroup}
+            onDragEndGroup={handleDragEnd}
           />
         ))}
         {setUngrouped.map(entity => (
@@ -1111,7 +1238,7 @@ export const MapTreeCardContent: React.FC = () => {
             onSelectAdditive={handleSelectAdditive}
             onRenameCommit={handleRenameCommit}
             onRenameCancel={handleRenameCancel}
-            draggable={entity.type === 'mapObject'}
+            draggable
             dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
@@ -1188,18 +1315,22 @@ export const MapTreeCardContent: React.FC = () => {
           const isFocused = selectedMapId === map.id;
           const mapEntities = entitiesByMap.byMap[map.id] || [];
           const entityCount = mapEntities.length;
+          const isMapDropTarget = dropMapTarget === map.id;
 
           return (
             <div
               key={map.id}
               className={`border rounded-lg overflow-hidden transition-colors ${
                 isFocused ? 'border-primary/50 bg-primary/5' : 'border-border/60'
-              }`}
+              } ${isMapDropTarget ? 'ring-2 ring-primary/60 bg-primary/10' : ''}`}
             >
               {/* Map header */}
               <div
                 className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
                 onClick={() => toggleMapNode(map.id)}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); handleDragOverMap(e, map.id); }}
+                onDragLeave={() => handleDragLeaveMap()}
+                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnMap(map.id); }}
               >
                 {isExpanded
                   ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
