@@ -120,6 +120,7 @@ import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
+import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
@@ -2021,9 +2022,18 @@ export const SimpleTabletop = () => {
     const baseTokenSize = 40; // Base size for 1x1 token
     const isPlayMode = renderingMode === 'play';
 
+    // Focus-based selection locking
+    const focusState = useMapFocusStore.getState();
+    const focusLock = focusState.selectionLockEnabled || isFocusEffectActive(focusState);
+
     // Check tokens in reverse order (top to bottom)
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i];
+
+      // Skip tokens on non-focused maps when focus lock is active
+      if (focusLock && selectedMapId && token.mapId !== undefined && token.mapId !== selectedMapId) {
+        continue;
+      }
       // Calculate actual token size based on grid dimensions
       const tokenWidth = (token.gridWidth || 1) * baseTokenSize;
       const tokenHeight = (token.gridHeight || 1) * baseTokenSize;
@@ -2069,9 +2079,19 @@ export const SimpleTabletop = () => {
 
   // Hit test for regions
   const getRegionAtPosition = (worldX: number, worldY: number): CanvasRegion | null => {
+    // Focus-based selection locking
+    const focusState = useMapFocusStore.getState();
+    const focusLock = focusState.selectionLockEnabled || isFocusEffectActive(focusState);
+
     // Check regions in reverse order (top to bottom)
     for (let i = regions.length - 1; i >= 0; i--) {
       const region = regions[i];
+
+      // Skip regions on non-focused maps when focus lock is active
+      if (focusLock && selectedMapId && region.mapId !== undefined && region.mapId !== selectedMapId) {
+        continue;
+      }
+
       if (isPointInRegion(worldX, worldY, region)) {
         return region;
       }
@@ -2553,6 +2573,28 @@ export const SimpleTabletop = () => {
     const mapObjects = filteredMapObjects;
     const regions = filteredRegions;
 
+    // ── Map focus blur/fade ──
+    const focusState = useMapFocusStore.getState();
+    const focusActive = isFocusEffectActive(focusState);
+    const currentSelectedMapId = useMapStore.getState().selectedMapId;
+
+    /** Apply dim/blur for entities on non-focused maps. Returns true if effects were applied. */
+    const applyFocusDim = (ctx: CanvasRenderingContext2D, entityMapId: string | undefined): boolean => {
+      if (!focusActive || !currentSelectedMapId) return false;
+      if (entityMapId === undefined || entityMapId === currentSelectedMapId) return false;
+      ctx.save();
+      ctx.globalAlpha *= focusState.unfocusedOpacity;
+      if (focusState.unfocusedBlur > 0) {
+        ctx.filter = `blur(${focusState.unfocusedBlur}px)`;
+      }
+      return true;
+    };
+
+    /** Restore context after focus dim. Only call if applyFocusDim returned true. */
+    const restoreFocusDim = (ctx: CanvasRenderingContext2D) => {
+      ctx.restore();
+    };
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -2644,7 +2686,7 @@ export const SimpleTabletop = () => {
         tokenBottom >= viewY &&
         tokenTop <= viewY + viewHeight
       ) {
-        visibleTokens.push(checkToken);
+        visibleTokens.push({ ...checkToken, _focusDimmed: focusActive && currentSelectedMapId && checkToken.mapId !== undefined && checkToken.mapId !== currentSelectedMapId });
       } else {
         offScreenTokens.push(checkToken);
       }
@@ -2686,7 +2728,9 @@ export const SimpleTabletop = () => {
           return;
         }
         
+        const dimmed = applyFocusDim(ctx, region.mapId);
         drawRegion(ctx, region, true); // skipStroke = true for both modes
+        if (dimmed) restoreFocusDim(ctx);
       });
       
       // Apply GPU-accelerated edge hatching if enabled
@@ -2898,7 +2942,21 @@ export const SimpleTabletop = () => {
     // Then render the map objects themselves
     // Pass isDM for DM-specific UI (door toggle indicators) — but NOT in play mode
     // so light centers, radius rings, and other editor chrome are hidden from everyone in play mode.
-    renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+    if (focusActive && currentSelectedMapId) {
+      // Two-pass render: non-focused (dimmed) first, then focused on top
+      const unfocusedObjs = mapObjects.filter(o => o.mapId !== undefined && o.mapId !== currentSelectedMapId);
+      const focusedObjs = mapObjects.filter(o => o.mapId === undefined || o.mapId === currentSelectedMapId);
+      if (unfocusedObjs.length > 0) {
+        ctx.save();
+        ctx.globalAlpha *= focusState.unfocusedOpacity;
+        if (focusState.unfocusedBlur > 0) ctx.filter = `blur(${focusState.unfocusedBlur}px)`;
+        renderMapObjects(ctx, unfocusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+        ctx.restore();
+      }
+      renderMapObjects(ctx, focusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+    } else {
+      renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play');
+    }
 
     // Draw scale handles + rotation handle on selected, unlocked, non-wall map objects (edit mode)
     if (renderingMode === 'edit' && selectedMapObjectIds.length === 1) {
@@ -3122,8 +3180,10 @@ export const SimpleTabletop = () => {
         
         if (shouldSkipToken) return;
         
-        // Draw token - need to use drawToken with correct context
+        // Apply focus dim for tokens on non-focused maps
+        const tokenDimmed = applyFocusDim(targetCtx, renderToken.mapId);
         drawTokenToContext(targetCtx, renderToken, tokenInFog);
+        if (tokenDimmed) restoreFocusDim(targetCtx);
       });
     };
 
@@ -6933,7 +6993,13 @@ export const SimpleTabletop = () => {
 
       // PRIORITY 2: Check what we're clicking on for dragging (tokens first, then map objects, then regions)
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
-      let clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, isDM && renderingMode === 'play', transform.zoom);
+      // Focus-lock map objects: filter out non-focused map entities
+      const focusStateHit = useMapFocusStore.getState();
+      const focusLockHit = focusStateHit.selectionLockEnabled || isFocusEffectActive(focusStateHit);
+      const mapObjectsForHitTest = focusLockHit && selectedMapId
+        ? mapObjects.filter(o => o.mapId === undefined || o.mapId === selectedMapId)
+        : mapObjects;
+      let clickedMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjectsForHitTest, isDM && renderingMode === 'play', transform.zoom);
 
       // If no map object was found at the click point, check if the click landed on the
       // rotation or scale handles of the currently-selected map object.  Those handles
