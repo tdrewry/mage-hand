@@ -1,6 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
+import { useFogStore } from '@/stores/fogStore';
 
 export interface GridRegion {
   id: string;
@@ -184,6 +185,8 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
     set((state) => ({
       maps: [...state.maps, newMap],
     }));
+    // Auto-init fog settings for new map
+    useFogStore.getState().initMapFogSettings(newMap.id);
     // Sync happens automatically via syncPatch middleware
   },
 
@@ -204,6 +207,8 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
         selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
       };
     });
+    // Cleanup fog settings for removed map
+    useFogStore.getState().removeMapFogSettings(id);
     // Sync happens automatically via syncPatch middleware
   },
 

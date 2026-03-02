@@ -170,7 +170,12 @@ function renderCardContent(
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
-      return <FogControlCardContent />;
+      return <FogControlCardContent
+        targetMapId={metadata?.targetMapId as string}
+        targetLabel={metadata?.targetLabel as string}
+        isStructureMode={metadata?.isStructureMode as boolean}
+        structureId={metadata?.structureId as string}
+      />;
     case CardType.LAYERS:
       return null; // Deprecated: replaced by Map Tree
     case CardType.TOKENS:

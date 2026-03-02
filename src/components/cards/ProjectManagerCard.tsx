@@ -165,17 +165,12 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
           roles: roleStore.roles,
           visionProfiles: visionProfileStore.profiles,
           fogSettings: {
-            enabled: fogStore.enabled,
-            revealAll: fogStore.revealAll,
-            visionRange: fogStore.visionRange,
-            fogOpacity: fogStore.fogOpacity,
-            exploredOpacity: fogStore.exploredOpacity,
-            showExploredAreas: fogStore.showExploredAreas,
+            ...(fogStore.fogSettingsPerMap['default-map'] || {}),
             serializedExploredAreas: '',
             fogVersion: fogStore.fogVersion,
             realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
             realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
-            effectSettings: fogStore.effectSettings,
+            fogSettingsPerMap: fogStore.fogSettingsPerMap,
           },
           gridSize: 50,
         }
@@ -294,17 +289,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     roles: roleStore.roles,
     visionProfiles: visionProfileStore.profiles,
     fogData: {
-      enabled: fogStore.enabled,
-      revealAll: fogStore.revealAll,
-      visionRange: fogStore.visionRange,
-      fogOpacity: fogStore.fogOpacity,
-      exploredOpacity: fogStore.exploredOpacity,
-      showExploredAreas: fogStore.showExploredAreas,
+      ...(fogStore.fogSettingsPerMap['default-map'] || {}),
       serializedExploredAreas: fogStore.serializedExploredAreas,
+      serializedExploredAreasPerMap: fogStore.serializedExploredAreasPerMap,
       fogVersion: fogStore.fogVersion,
       realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
       realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
-      effectSettings: fogStore.effectSettings,
+      fogSettingsPerMap: fogStore.fogSettingsPerMap,
     },
     lights: lightStore.lights,
     cardStates: cardStore.cards,
@@ -560,13 +551,25 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       // Step 12: Apply fog data
       setLoadingProgress('Loading fog of war...');
       if (projectData.fogData) {
-        fogStore.setEnabled(projectData.fogData.enabled);
-        fogStore.setRevealAll(projectData.fogData.revealAll);
-        fogStore.setVisionRange(projectData.fogData.visionRange);
-        fogStore.setFogOpacity(projectData.fogData.fogOpacity);
-        fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
-        fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
-        fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
+        const fogData = projectData.fogData as any;
+        // Import per-map fog settings if present
+        if (fogData.fogSettingsPerMap) {
+          useFogStore.setState({ fogSettingsPerMap: fogData.fogSettingsPerMap });
+        } else {
+          // Legacy: import flat fields into default-map
+          const { DEFAULT_MAP_FOG_SETTINGS } = await import('@/stores/defaultFogEffectSettings');
+          useFogStore.getState().setMapFogSettings('default-map', {
+            enabled: fogData.enabled ?? DEFAULT_MAP_FOG_SETTINGS.enabled,
+            revealAll: fogData.revealAll ?? DEFAULT_MAP_FOG_SETTINGS.revealAll,
+            visionRange: fogData.visionRange ?? DEFAULT_MAP_FOG_SETTINGS.visionRange,
+            fogOpacity: fogData.fogOpacity ?? DEFAULT_MAP_FOG_SETTINGS.fogOpacity,
+            exploredOpacity: fogData.exploredOpacity ?? DEFAULT_MAP_FOG_SETTINGS.exploredOpacity,
+            showExploredAreas: fogData.showExploredAreas ?? DEFAULT_MAP_FOG_SETTINGS.showExploredAreas,
+          });
+        }
+        if (fogData.serializedExploredAreas) {
+          fogStore.setSerializedExploredAreas(fogData.serializedExploredAreas);
+        }
       }
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
@@ -722,13 +725,24 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
     // Fog
     if (projectData.fogData) {
-      fogStore.setEnabled(projectData.fogData.enabled);
-      fogStore.setRevealAll(projectData.fogData.revealAll);
-      fogStore.setVisionRange(projectData.fogData.visionRange);
-      fogStore.setFogOpacity(projectData.fogData.fogOpacity);
-      fogStore.setExploredOpacity(projectData.fogData.exploredOpacity);
-      fogStore.setShowExploredAreas(projectData.fogData.showExploredAreas);
-      fogStore.setSerializedExploredAreas(projectData.fogData.serializedExploredAreas);
+      const fogData = projectData.fogData as any;
+      if (fogData?.fogSettingsPerMap) {
+        fogStore.resetFog();
+        useFogStore.setState({ fogSettingsPerMap: fogData.fogSettingsPerMap });
+      } else if (fogData) {
+        fogStore.getMapFogSettings('default-map'); // ensure init
+        fogStore.setMapFogSettings('default-map', {
+          enabled: fogData.enabled,
+          revealAll: fogData.revealAll,
+          visionRange: fogData.visionRange,
+          fogOpacity: fogData.fogOpacity,
+          exploredOpacity: fogData.exploredOpacity,
+          showExploredAreas: fogData.showExploredAreas,
+        });
+      }
+      if (fogData?.serializedExploredAreas) {
+        fogStore.setSerializedExploredAreas(fogData.serializedExploredAreas);
+      }
     }
 
     // Dungeon features

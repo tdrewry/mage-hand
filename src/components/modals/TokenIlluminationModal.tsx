@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFogStore } from '@/stores/fogStore';
+import { useMapStore } from '@/stores/mapStore';
 import type { IlluminationSource, IlluminationAnimationType } from '@/types/illumination';
 import { DEFAULT_ILLUMINATION } from '@/types/illumination';
 import { ILLUMINATION_PRESETS, type PresetKey, getAllPresets } from '@/lib/illuminationPresets';
@@ -39,7 +40,8 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
   currentIllumination,
   onApply,
 }) => {
-  const { effectSettings } = useFogStore();
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const effectSettings = useFogStore(s => s.getMapFogSettings(selectedMapId || 'default-map').effectSettings);
   const isMultiple = tokenIds.length > 1;
 
   // Local state for form values

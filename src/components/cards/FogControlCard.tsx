@@ -1,11 +1,14 @@
+import { useCallback } from 'react';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useFogStore, type EffectQuality } from '@/stores/fogStore';
+import { useMapStore } from '@/stores/mapStore';
 import { useUiModeStore, type DmFogVisibility } from '@/stores/uiModeStore';
-import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, Ghost, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Circle, Sparkles, Zap, Film, MonitorPlay, Ghost, RefreshCw, MapPin } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   Select,
@@ -16,7 +19,30 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-export function FogControlCardContent() {
+interface FogControlCardContentProps {
+  targetMapId?: string;
+  targetLabel?: string;
+  isStructureMode?: boolean;
+  structureId?: string;
+}
+
+export function FogControlCardContent({
+  targetMapId,
+  targetLabel,
+  isStructureMode,
+  structureId,
+}: FogControlCardContentProps = {}) {
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const effectiveMapId = targetMapId || selectedMapId || 'default-map';
+
+  const fogSettingsPerMap = useFogStore(s => s.fogSettingsPerMap);
+  const getMapFogSettings = useFogStore(s => s.getMapFogSettings);
+  const setMapFogSettings = useFogStore(s => s.setMapFogSettings);
+  const setStructureFogSettings = useFogStore(s => s.setStructureFogSettings);
+  const clearExploredAreas = useFogStore(s => s.clearExploredAreas);
+  const resetFog = useFogStore(s => s.resetFog);
+
+  const settings = getMapFogSettings(effectiveMapId);
   const {
     enabled,
     revealAll,
@@ -24,26 +50,40 @@ export function FogControlCardContent() {
     fogOpacity,
     exploredOpacity,
     effectSettings,
-    setEnabled,
-    setRevealAll,
-    setVisionRange,
-    setFogOpacity,
-    setExploredOpacity,
-    setPostProcessingEnabled,
-    setEdgeBlur,
-    setVolumetricEnabled,
-    setEffectQuality,
-    clearExploredAreas,
-    resetFog,
-  } = useFogStore();
+  } = settings;
 
-  
   const { dmFogVisibility, setDmFogVisibility } = useUiModeStore();
+
+  // Helper to update settings - routes to structure or single map
+  const updateSettings = useCallback((updates: Partial<typeof settings>) => {
+    if (isStructureMode && structureId) {
+      setStructureFogSettings(structureId, updates);
+    } else {
+      setMapFogSettings(effectiveMapId, updates);
+    }
+  }, [isStructureMode, structureId, effectiveMapId, setMapFogSettings, setStructureFogSettings]);
+
+  // Get display label
+  const maps = useMapStore(s => s.maps);
+  const displayLabel = targetLabel || maps.find(m => m.id === effectiveMapId)?.name || effectiveMapId;
 
   return (
     <div className="space-y-4">
+      {/* Target indicator */}
+      {(targetMapId || isStructureMode) && (
+        <div className="flex items-center gap-2 px-2 py-1.5 bg-primary/10 rounded-md">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-medium text-primary truncate">
+            {isStructureMode ? `Structure: ${displayLabel}` : displayLabel}
+          </span>
+          {isStructureMode && (
+            <Badge variant="secondary" className="text-[10px] ml-auto">All maps</Badge>
+          )}
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
-        Control visibility and exploration settings for the map
+        Control visibility and exploration settings for {isStructureMode ? 'all maps in this structure' : 'the map'}
       </p>
 
       {/* Enable/Disable Fog */}
@@ -59,7 +99,7 @@ export function FogControlCardContent() {
         <Switch
           id="fog-enabled"
           checked={enabled}
-          onCheckedChange={setEnabled}
+          onCheckedChange={(v) => updateSettings({ enabled: v })}
         />
       </div>
 
@@ -79,7 +119,7 @@ export function FogControlCardContent() {
         <Switch
           id="reveal-all"
           checked={revealAll}
-          onCheckedChange={setRevealAll}
+          onCheckedChange={(v) => updateSettings({ revealAll: v })}
           disabled={!enabled}
         />
       </div>
@@ -131,7 +171,7 @@ export function FogControlCardContent() {
           max={20}
           step={1}
           value={[visionRange]}
-          onValueChange={([value]) => setVisionRange(value)}
+          onValueChange={([value]) => updateSettings({ visionRange: Math.max(1, Math.min(50, value)) })}
           disabled={!enabled}
           className="w-full"
         />
@@ -141,7 +181,6 @@ export function FogControlCardContent() {
       </div>
 
       <Separator />
-
 
       {/* Fog Opacity */}
       <div className="space-y-2">
@@ -157,7 +196,7 @@ export function FogControlCardContent() {
           max={100}
           step={5}
           value={[fogOpacity * 100]}
-          onValueChange={([value]) => setFogOpacity(value / 100)}
+          onValueChange={([value]) => updateSettings({ fogOpacity: Math.max(0, Math.min(1, value / 100)) })}
           disabled={!enabled}
           className="w-full"
         />
@@ -182,7 +221,7 @@ export function FogControlCardContent() {
           max={100}
           step={5}
           value={[exploredOpacity * 100]}
-          onValueChange={([value]) => setExploredOpacity(value / 100)}
+          onValueChange={([value]) => updateSettings({ exploredOpacity: Math.max(0, Math.min(1, value / 100)) })}
           disabled={!enabled}
           className="w-full"
         />
@@ -208,7 +247,7 @@ export function FogControlCardContent() {
           <Switch
             id="post-processing"
             checked={effectSettings.postProcessingEnabled}
-            onCheckedChange={setPostProcessingEnabled}
+            onCheckedChange={(v) => updateSettings({ effectSettings: { ...effectSettings, postProcessingEnabled: v } })}
             disabled={!enabled}
           />
         </div>
@@ -223,7 +262,7 @@ export function FogControlCardContent() {
               </Label>
               <Select
                 value={effectSettings.effectQuality}
-                onValueChange={(value) => setEffectQuality(value as EffectQuality)}
+                onValueChange={(value) => updateSettings({ effectSettings: { ...effectSettings, effectQuality: value as EffectQuality } })}
                 disabled={!enabled}
               >
                 <SelectTrigger className="w-full">
@@ -266,7 +305,7 @@ export function FogControlCardContent() {
                 max={20}
                 step={1}
                 value={[effectSettings.edgeBlur]}
-                onValueChange={([value]) => setEdgeBlur(value)}
+                onValueChange={([value]) => updateSettings({ effectSettings: { ...effectSettings, edgeBlur: Math.max(0, Math.min(20, value)) } })}
                 disabled={!enabled}
                 className="w-full"
               />
@@ -293,7 +332,7 @@ export function FogControlCardContent() {
               <Switch
                 id="volumetric"
                 checked={effectSettings.volumetricEnabled}
-                onCheckedChange={setVolumetricEnabled}
+                onCheckedChange={(v) => updateSettings({ effectSettings: { ...effectSettings, volumetricEnabled: v } })}
                 disabled={!enabled}
               />
             </div>

@@ -27,6 +27,7 @@ import {
   Paintbrush,
 } from 'lucide-react';
 import { useFogStore } from '@/stores/fogStore';
+import { useMapStore } from '@/stores/mapStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useCardStore } from '@/stores/cardStore';
@@ -85,7 +86,8 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 }) => {
   const [showClearDialog, setShowClearDialog] = useState(false);
   
-  const { enabled: fogEnabled } = useFogStore();
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const fogEnabled = useFogStore(s => s.getMapFogSettings(selectedMapId || 'default-map').enabled);
   const { isInCombat, startCombat, endCombat } = useInitiativeStore();
   const { enforceMovementBlocking, enforceRegionBounds, setEnforceMovementBlocking, setEnforceRegionBounds } = useDungeonStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
