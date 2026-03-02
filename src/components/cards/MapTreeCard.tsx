@@ -73,7 +73,7 @@ function getEntityName(entity: TreeEntity): string {
 
 // ─── Context menu actions per entity type ─────────────────────────────────────
 interface EntityContextActions {
-  onSelect: (entity: TreeEntity, additive: boolean) => void;
+  onSelect: (entity: TreeEntity, additive: boolean, shiftKey?: boolean) => void;
   onSelectAdditive: (entity: TreeEntity) => void;
   onToggleLock: (entity: TreeEntity) => void;
   onDelete: (entity: TreeEntity) => void;
@@ -324,7 +324,7 @@ function EntityRow({
   onToggleLock?: (entity: TreeEntity) => void;
   onEjectFromGroup?: (groupId: string, entityId: string) => void;
   onAddToNewGroup?: (entity: TreeEntity) => void;
-  onSelect?: (entity: TreeEntity, additive: boolean) => void;
+  onSelect?: (entity: TreeEntity, additive: boolean, shiftKey?: boolean) => void;
   onSelectAdditive?: (entity: TreeEntity) => void;
   draggable?: boolean;
   dropIndicator?: 'above' | 'below' | null;
@@ -355,7 +355,7 @@ function EntityRow({
         onDragOver={canDropReorder ? (e) => { e.preventDefault(); onDragOver?.(e, entity); } : undefined}
         onDrop={canDropReorder ? (e) => { e.preventDefault(); onDrop?.(e, entity); } : undefined}
         onDragEnd={canDrag ? onDragEnd : undefined}
-        onClick={(e) => onSelect?.(entity, e.ctrlKey || e.metaKey)}
+        onClick={(e) => onSelect?.(entity, e.ctrlKey || e.metaKey, e.shiftKey)}
       >
         {/* Drag handle */}
         {canDrag ? (
@@ -664,6 +664,9 @@ export const MapTreeCardContent: React.FC = () => {
   const [dropGroupTarget, setDropGroupTarget] = useState<string | null>(null);
   const [dropMapTarget, setDropMapTarget] = useState<string | null>(null);
 
+  // ── Shift-click anchor for range selection ────────────────────────────────
+  const lastClickedEntityIdRef = useRef<string | null>(null);
+
   // ── Selection helpers ─────────────────────────────────────────────────────
   const allSelectedIds = useMemo(() => {
     const set = new Set<string>(selectedMapObjectIds);
@@ -672,11 +675,44 @@ export const MapTreeCardContent: React.FC = () => {
     return set;
   }, [selectedMapObjectIds, selectedTokenIds, regions]);
 
-  const handleSelect = useCallback((entity: TreeEntity, additive: boolean) => {
+  const handleSelect = useCallback((entity: TreeEntity, additive: boolean, shiftKey?: boolean) => {
+    // ── Shift-click range selection ──────────────────────────────────────
+    if (shiftKey && lastClickedEntityIdRef.current) {
+      const anchorId = lastClickedEntityIdRef.current;
+      const entities = allEntitiesRef.current;
+      const anchorIdx = entities.findIndex(e => e.id === anchorId);
+      const targetIdx = entities.findIndex(e => e.id === entity.id);
+      if (anchorIdx !== -1 && targetIdx !== -1) {
+        const start = Math.min(anchorIdx, targetIdx);
+        const end = Math.max(anchorIdx, targetIdx);
+        const rangeEntities = entities.slice(start, end + 1);
+
+        // Additively select all entities in range
+        const newTokenIds = new Set(selectedTokenIds);
+        const newMapObjIds = new Set(selectedMapObjectIds);
+
+        for (const e of rangeEntities) {
+          if (e.type === 'token') {
+            newTokenIds.add(e.id);
+          } else if (e.type === 'mapObject') {
+            selectMapObject(e.id, true);
+          } else if (e.type === 'region') {
+            selectRegion(e.id);
+          }
+          // lights don't have selection in stores currently
+        }
+
+        setSelectedTokens?.([...newTokenIds]);
+        // Don't update anchor on shift-click (keep original anchor)
+        return;
+      }
+    }
+
+    // ── Normal / Ctrl click ─────────────────────────────────────────────
+    lastClickedEntityIdRef.current = entity.id;
     const alreadySelected = allSelectedIds.has(entity.id);
 
     if (entity.type === 'mapObject') {
-      // Toggle deselect on plain click of an already-selected item
       if (!additive && alreadySelected && selectedMapObjectIds.length === 1) {
         deselectMapObject(entity.id);
       } else {
@@ -689,7 +725,6 @@ export const MapTreeCardContent: React.FC = () => {
           : [...selectedTokenIds, entity.id];
         setSelectedTokens?.(next);
       } else if (!additive && alreadySelected && selectedTokenIds.length === 1) {
-        // Toggle deselect
         setSelectedTokens?.([]);
       } else {
         setSelectedTokens?.([entity.id]);
@@ -1145,6 +1180,10 @@ export const MapTreeCardContent: React.FC = () => {
 
     return filtered;
   }, [tokens, regions, mapObjects, lights, searchQuery, sortField, sortDir]);
+
+  // Keep a ref in sync for use in handleSelect (defined before allEntities)
+  const allEntitiesRef = useRef<TreeEntity[]>([]);
+  allEntitiesRef.current = allEntities;
 
   const groupedEntityIds = useMemo(() => {
     const set = new Set<string>();
