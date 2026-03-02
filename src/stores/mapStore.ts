@@ -13,6 +13,11 @@ export interface GridRegion {
   visible: boolean;
 }
 
+export interface Structure {
+  id: string;
+  name: string;
+}
+
 export interface GameMap {
   id: string;
   name: string;
@@ -36,6 +41,10 @@ export interface GameMap {
   regions: GridRegion[];
   /** If set, this map is a member of a compound map group */
   compoundMapId?: string;
+  /** If set, this map belongs to a structure (e.g., multi-floor building) */
+  structureId?: string;
+  /** Floor number within a structure for ordering */
+  floorNumber?: number;
 }
 
 // Helper type for creating new maps
@@ -46,11 +55,10 @@ type CreateMapData = Omit<GameMap, 'id' | 'regions'> & {
 interface MapStore {
   maps: GameMap[];
   selectedMapId: string | null;
+  structures: Structure[];
+  /** Whether focus auto-follows the active token's map */
+  autoFocusFollowsToken: boolean;
   
-  /**
-   * Adds a new map to the store.
-   * @param map The map data to add.
-   */
   addMap: (map: CreateMapData) => void;
 
   /**
@@ -114,6 +122,17 @@ interface MapStore {
    * @returns An array of visible GameMap objects.
    */
   getVisibleMaps: () => GameMap[];
+
+  // Structure management
+  addStructure: (name: string) => string;
+  removeStructure: (id: string) => void;
+  renameStructure: (id: string, name: string) => void;
+  assignMapToStructure: (mapId: string, structureId: string, floorNumber?: number) => void;
+  removeMapFromStructure: (mapId: string) => void;
+  setAutoFocusFollowsToken: (value: boolean) => void;
+
+  /** Navigate to adjacent floor within same structure. Returns the map id navigated to, or null. */
+  navigateFloor: (direction: 'up' | 'down') => string | null;
 }
 
 const createDefaultMap = (): GameMap => ({
@@ -146,6 +165,8 @@ const createDefaultMap = (): GameMap => ({
 const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
   maps: [createDefaultMap()],
   selectedMapId: 'default-map',
+  structures: [],
+  autoFocusFollowsToken: false,
 
   addMap: (mapData) => {
     const newMap: GameMap = {
@@ -288,14 +309,81 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
     const { maps } = get();
     return maps
       .filter((map) => map.active)
-      .sort((a, b) => a.zIndex - b.zIndex); // Lower z-index first for rendering
+      .sort((a, b) => a.zIndex - b.zIndex);
+  },
+
+  // ── Structure management ────────────────────────────────────────────────
+  addStructure: (name) => {
+    const id = `structure-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    set((state) => ({ structures: [...state.structures, { id, name }] }));
+    return id;
+  },
+
+  removeStructure: (id) => {
+    set((state) => ({
+      structures: state.structures.filter(s => s.id !== id),
+      maps: state.maps.map(m => m.structureId === id ? { ...m, structureId: undefined, floorNumber: undefined } : m),
+    }));
+  },
+
+  renameStructure: (id, name) => {
+    set((state) => ({
+      structures: state.structures.map(s => s.id === id ? { ...s, name } : s),
+    }));
+  },
+
+  assignMapToStructure: (mapId, structureId, floorNumber) => {
+    set((state) => {
+      // Auto-assign floor number if not provided
+      let floor = floorNumber;
+      if (floor === undefined) {
+        const existing = state.maps.filter(m => m.structureId === structureId && m.floorNumber !== undefined);
+        const maxFloor = existing.length > 0 ? Math.max(...existing.map(m => m.floorNumber!)) : 0;
+        floor = maxFloor + 1;
+      }
+      return {
+        maps: state.maps.map(m => m.id === mapId ? { ...m, structureId, floorNumber: floor } : m),
+      };
+    });
+  },
+
+  removeMapFromStructure: (mapId) => {
+    set((state) => ({
+      maps: state.maps.map(m => m.id === mapId ? { ...m, structureId: undefined, floorNumber: undefined } : m),
+    }));
+  },
+
+  setAutoFocusFollowsToken: (value) => set({ autoFocusFollowsToken: value }),
+
+  navigateFloor: (direction) => {
+    const { maps, selectedMapId } = get();
+    const currentMap = maps.find(m => m.id === selectedMapId);
+    if (!currentMap?.structureId || currentMap.floorNumber === undefined) return null;
+
+    const floorsInStructure = maps
+      .filter(m => m.structureId === currentMap.structureId && m.floorNumber !== undefined)
+      .sort((a, b) => a.floorNumber! - b.floorNumber!);
+
+    const currentIdx = floorsInStructure.findIndex(m => m.id === currentMap.id);
+    const targetIdx = direction === 'up' ? currentIdx + 1 : currentIdx - 1;
+    if (targetIdx < 0 || targetIdx >= floorsInStructure.length) return null;
+
+    const target = floorsInStructure[targetIdx];
+    set({ selectedMapId: target.id });
+    // Auto-activate if inactive
+    if (!target.active) {
+      set((state) => ({
+        maps: state.maps.map(m => m.id === target.id ? { ...m, active: true } : m),
+      }));
+    }
+    return target.id;
   },
 });
 
 // Wrap with syncPatch middleware
 const withSyncPatch = syncPatch<MapStore>({ 
   channel: 'maps',
-  excludePaths: ['selectedMapId'], // Local selection state
+  excludePaths: ['selectedMapId', 'autoFocusFollowsToken'],
   debug: false,
 })(mapStoreCreator);
 

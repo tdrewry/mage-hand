@@ -5,6 +5,7 @@ import {
   Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
   SortAsc, SortDesc, Eye, EyeOff, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, Copy, Unlink, Map, MousePointer2,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -610,6 +611,12 @@ export const MapTreeCardContent: React.FC = () => {
   const removeMap = useMapStore(s => s.removeMap);
   const setSelectedMap = useMapStore(s => s.setSelectedMap);
   const reorderMaps = useMapStore(s => s.reorderMaps);
+  const structures = useMapStore(s => s.structures);
+  const addStructure = useMapStore(s => s.addStructure);
+  const removeStructure = useMapStore(s => s.removeStructure);
+  const renameStructure = useMapStore(s => s.renameStructure);
+  const assignMapToStructure = useMapStore(s => s.assignMapToStructure);
+  const removeMapFromStructure = useMapStore(s => s.removeMapFromStructure);
 
   const tokens      = useSessionStore(s => s.tokens);
   const selectedTokenIds = useSessionStore(s => s.selectedTokenIds ?? []);
@@ -1522,8 +1529,28 @@ export const MapTreeCardContent: React.FC = () => {
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-2 space-y-1">
 
-        {/* ── Map nodes ── */}
-        {maps.map((map, index) => {
+        {/* ── Structure headers + Map nodes ── */}
+        {(() => {
+          // Group maps: structures first, then unstructured
+          const structuredMaps = new globalThis.Map<string, typeof maps>();
+          const unstructuredMaps: typeof maps = [];
+          maps.forEach(map => {
+            if (map.structureId) {
+              const list = structuredMaps.get(map.structureId) || [];
+              list.push(map);
+              structuredMaps.set(map.structureId, list);
+            } else {
+              unstructuredMaps.push(map);
+            }
+          });
+
+          // Sort floors within each structure
+          structuredMaps.forEach((list, key) => {
+            list.sort((a, b) => (a.floorNumber ?? 0) - (b.floorNumber ?? 0));
+            structuredMaps.set(key, list);
+          });
+
+          const renderMapNode = (map: typeof maps[0], index: number) => {
           const isExpanded = expandedMapNodes.has(map.id);
           const isFocused = selectedMapId === map.id;
           const mapEntities = entitiesByMap.byMap[map.id] || [];
@@ -1562,6 +1589,12 @@ export const MapTreeCardContent: React.FC = () => {
                       </div>
                     ) : (
                       <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
+                    )}
+
+                    {map.structureId && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 shrink-0 text-muted-foreground">
+                        F{map.floorNumber ?? '?'}
+                      </Badge>
                     )}
 
                     <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
@@ -1707,6 +1740,65 @@ export const MapTreeCardContent: React.FC = () => {
                   </ContextMenuSubContent>
                 </ContextMenuSub>
 
+                {/* Structure / Floor assignment */}
+                <ContextMenuSeparator />
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger className="text-xs gap-2">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Structure
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="w-52 text-xs">
+                    {map.structureId && (
+                      <>
+                        <ContextMenuItem
+                          className="text-xs gap-2"
+                          onClick={() => removeMapFromStructure(map.id)}
+                        >
+                          <Unlink className="h-3.5 w-3.5" />
+                          Remove from Structure
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          className="text-xs gap-2"
+                          onClick={() => {
+                            const floor = prompt('Floor number:', String(map.floorNumber ?? 1));
+                            if (floor !== null) updateMap(map.id, { floorNumber: parseInt(floor) || 1 });
+                          }}
+                        >
+                          <ArrowUpDown className="h-3.5 w-3.5" />
+                          Set Floor Number ({map.floorNumber ?? '?'})
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                      </>
+                    )}
+                    {structures.map(s => (
+                      <ContextMenuItem
+                        key={s.id}
+                        className="text-xs gap-2"
+                        disabled={map.structureId === s.id}
+                        onClick={() => assignMapToStructure(map.id, s.id)}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        {map.structureId === s.id ? `✓ ${s.name}` : s.name}
+                      </ContextMenuItem>
+                    ))}
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      className="text-xs gap-2"
+                      onClick={() => {
+                        const name = prompt('New structure name:', 'Building');
+                        if (name) {
+                          const sid = addStructure(name);
+                          assignMapToStructure(map.id, sid);
+                          toast.success(`Created structure "${name}"`);
+                        }
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New Structure…
+                    </ContextMenuItem>
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+
                 {/* Duplicate */}
                 <ContextMenuSeparator />
                 <ContextMenuItem
@@ -1733,7 +1825,55 @@ export const MapTreeCardContent: React.FC = () => {
               </ContextMenuContent>
             </ContextMenu>
           );
-        })}
+          };
+
+          return (
+            <>
+              {/* Structures */}
+              {structures.map(structure => {
+                const structMaps = structuredMaps.get(structure.id);
+                if (!structMaps || structMaps.length === 0) return null;
+                return (
+                  <div key={structure.id} className="space-y-1">
+                    <div className="flex items-center gap-1.5 px-1 py-0.5">
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">
+                        {structure.name}
+                      </span>
+                      <button
+                        className="text-[10px] text-muted-foreground hover:text-destructive"
+                        title="Delete structure"
+                        onClick={() => { removeStructure(structure.id); toast.success(`Removed structure "${structure.name}"`); }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                        title="Rename structure"
+                        onClick={() => {
+                          const name = prompt('Rename structure:', structure.name);
+                          if (name) renameStructure(structure.id, name);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </div>
+                    {structMaps.map((map) => {
+                      const globalIdx = maps.findIndex(m => m.id === map.id);
+                      return renderMapNode(map, globalIdx);
+                    })}
+                  </div>
+                );
+              })}
+
+              {/* Unstructured maps */}
+              {unstructuredMaps.map((map) => {
+                const globalIdx = maps.findIndex(m => m.id === map.id);
+                return renderMapNode(map, globalIdx);
+              })}
+            </>
+          );
+        })()}
 
         {/* ── Unassigned entities ── */}
         {entitiesByMap.unassigned.length > 0 && (
