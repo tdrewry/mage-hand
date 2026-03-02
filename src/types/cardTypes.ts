@@ -3,6 +3,7 @@ export enum CardType {
   ROSTER = 'roster',
   TOOLS = 'tools',
   FOG = 'fog',
+  /** @deprecated Replaced by MAP_TREE */
   LAYERS = 'layers',
   TOKENS = 'tokens',
   MAP_CONTROLS = 'map_controls',
@@ -11,6 +12,7 @@ export enum CardType {
   PROJECT_MANAGER = 'project_manager',
   REGION_CONTROL = 'region_control',
   WATABOU_IMPORT = 'watabou_import',
+  /** @deprecated Removed in multi-map architecture */
   BACKGROUND_GRID = 'background_grid',
   INITIATIVE_TRACKER = 'initiative_tracker',
   STYLES = 'styles',

@@ -88,25 +88,25 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   
-  const layerCard = cards.find((c) => c.type === CardType.LAYERS);
+  const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
   const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
   const watabouCard = cards.find((c) => c.type === CardType.WATABOU_IMPORT);
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
 
-  const handleToggleLayerCard = () => {
-    if (layerCard) {
-      setVisibility(layerCard.id, !layerCard.isVisible);
+  const handleToggleMapTreeCard = () => {
+    if (mapTreeCard) {
+      setVisibility(mapTreeCard.id, !mapTreeCard.isVisible);
     } else {
       registerCard({
-        type: CardType.LAYERS,
-        title: 'Layer Stack',
+        type: CardType.MAP_TREE,
+        title: 'Map Tree',
         defaultPosition: { x: 20, y: 80 },
-        defaultSize: { width: 280, height: 450 },
-        minSize: { width: 250, height: 400 },
+        defaultSize: { width: 320, height: 500 },
+        minSize: { width: 260, height: 300 },
         isResizable: true,
         isClosable: true,
+        defaultVisible: true,
       });
     }
   };
@@ -405,16 +405,16 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
+                  variant={mapTreeCard?.isVisible ? "default" : "ghost"}
                   size="icon"
-                  onClick={handleToggleLayerCard}
+                  onClick={handleToggleMapTreeCard}
                   className="w-10 h-10"
                 >
                   <Layers className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="left">
-                <p>Manage Layers</p>
+                <p>Map Tree</p>
               </TooltipContent>
             </Tooltip>
           </>
@@ -559,36 +559,16 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant={mapTreeCard?.isVisible ? "default" : "ghost"}
                   size="icon"
-                  onClick={() => {
-                    if (backgroundGridCard) {
-                      setVisibility(backgroundGridCard.id, true);
-                    }
-                  }}
-                  className="w-10 h-10"
-                >
-                  <Grid3X3 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p>Background & Grid</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={layerCard?.isVisible ? "default" : "ghost"}
-                  size="icon"
-                  onClick={handleToggleLayerCard}
+                  onClick={handleToggleMapTreeCard}
                   className="w-10 h-10"
                 >
                   <Layers className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="left">
-                <p>Manage Layers</p>
+                <p>Map Tree</p>
               </TooltipContent>
             </Tooltip>
           </>

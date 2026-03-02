@@ -2,12 +2,10 @@ import { useEffect } from 'react';
 import { BaseCard } from '@/components/cards/BaseCard';
 import { RosterCardContent } from '@/components/cards/RosterCard';
 import { FogControlCardContent } from '@/components/cards/FogControlCard';
-import { LayerStackCardContent } from '@/components/cards/LayerStackCard';
 import { TokenPanelCardContent } from '@/components/cards/TokenPanelCard';
 import { MapControlsCardContent } from '@/components/cards/MapControlsCard';
 import { MapManagerCardContent } from '@/components/cards/MapManagerCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
-import { BackgroundGridCardContent } from '@/components/cards/BackgroundGridCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
 import { MenuCardContent } from '@/components/cards/MenuCard';
@@ -174,7 +172,7 @@ function renderCardContent(
     case CardType.FOG:
       return <FogControlCardContent />;
     case CardType.LAYERS:
-      return <LayerStackCardContent />;
+      return null; // Deprecated: replaced by Map Tree
     case CardType.TOKENS:
       return <TokenPanelCardContent onAddToken={addToken} />;
     case CardType.MAP_CONTROLS:
@@ -184,15 +182,7 @@ function renderCardContent(
     case CardType.WATABOU_IMPORT:
       return <WatabouImportCardContent />;
     case CardType.BACKGROUND_GRID:
-      return (
-        <BackgroundGridCardContent
-          fabricCanvas={null}
-          gridColor="#000000"
-          gridOpacity={50}
-          onGridColorChange={() => {}}
-          onGridOpacityChange={() => {}}
-        />
-      );
+      return null; // Deprecated: removed in multi-map architecture
     case CardType.PROJECT_MANAGER:
       return (
         <ProjectManagerCardContent
