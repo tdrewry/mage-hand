@@ -5,7 +5,7 @@ import {
   Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
   SortAsc, SortDesc, Eye, EyeOff, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, Copy, Unlink, Map, MousePointer2,
-  Building2, Cloud, CloudOff,
+  Building2, Cloud, CloudOff, Image,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1608,6 +1608,11 @@ export const MapTreeCardContent: React.FC = () => {
                     <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
                       {entityCount}
                     </Badge>
+
+                    {/* Texture indicator */}
+                    {regions.some(r => r.mapId === map.id && (r.backgroundImage || r.textureHash)) && (
+                      <span title="Has textured regions"><Image className="h-3 w-3 shrink-0 text-muted-foreground" /></span>
+                    )}
 
                     {/* Collapse/expand groups within this map */}
                     {(() => {
