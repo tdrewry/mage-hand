@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, Square, Move, Trash2, Eye, EyeOff, SunMedium, Moon, DoorOpen, DoorClosed } from 'lucide-react';
+import { Circle, Square, Move, Trash2, Eye, EyeOff, SunMedium, Moon, DoorOpen, DoorClosed, Waypoints, Link2, Link2Off } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
 
 export const MapObjectPanelCardContent = () => {
@@ -26,6 +27,11 @@ export const MapObjectPanelCardContent = () => {
   const selectedObjects = mapObjects.filter((obj) => selectedMapObjectIds.includes(obj.id));
   const singleSelected = selectedObjects.length === 1 ? selectedObjects[0] : null;
   const isDoor = singleSelected?.category === 'door';
+  const isPortal = singleSelected?.category === 'portal';
+  
+  // All portals for linking UI
+  const allPortals = mapObjects.filter(obj => obj.category === 'portal');
+  const maps = useMapStore(state => state.maps);
   
   // Local state for bulk property editing
   const [bulkCastsShadow, setBulkCastsShadow] = useState(false);
@@ -57,6 +63,9 @@ export const MapObjectPanelCardContent = () => {
       ) : (
         <DoorClosed className="w-3 h-3 mr-2 text-red-500" />
       );
+    }
+    if (obj.category === 'portal') {
+      return <Waypoints className="w-3 h-3 mr-2" style={{ color: obj.strokeColor || '#8b5cf6' }} />;
     }
     if (obj.shape === 'circle') {
       return <Circle className="w-3 h-3 mr-2" style={{ color: obj.fillColor }} />;
@@ -139,8 +148,106 @@ export const MapObjectPanelCardContent = () => {
             </>
           )}
           
+          {/* Portal-specific controls */}
+          {isPortal && singleSelected && (
+            <>
+              <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Waypoints className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">Portal Settings</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="portal-name" className="text-xs">Portal Name</Label>
+                  <Input
+                    id="portal-name"
+                    value={singleSelected.portalName || ''}
+                    onChange={(e) => updateMapObject(singleSelected.id, { portalName: e.target.value })}
+                    placeholder="Enter portal name..."
+                    className="h-8 text-sm"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs">Link to Portal</Label>
+                  <Select
+                    value={singleSelected.portalTargetId || '__none__'}
+                    onValueChange={(value) => updateMapObject(singleSelected.id, { 
+                      portalTargetId: value === '__none__' ? undefined : value 
+                    })}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Select target portal..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        <span className="flex items-center gap-2">
+                          <Link2Off className="w-3 h-3" />
+                          No link
+                        </span>
+                      </SelectItem>
+                      {allPortals
+                        .filter(p => p.id !== singleSelected.id)
+                        .map(portal => {
+                          const portalMap = maps.find(m => m.id === portal.mapId);
+                          return (
+                            <SelectItem key={portal.id} value={portal.id}>
+                              <span className="flex items-center gap-2">
+                                <Link2 className="w-3 h-3" />
+                                {portal.portalName || 'Unnamed'} 
+                                {portalMap ? ` (${portalMap.name})` : ''}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                    </SelectContent>
+                  </Select>
+                  {singleSelected.portalTargetId && (
+                    <p className="text-xs text-green-600">
+                      ✓ Linked — tokens dropped here will teleport
+                    </p>
+                  )}
+                </div>
+                
+                <Separator />
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portal-hidden" className="text-xs flex items-center gap-2 cursor-pointer">
+                    <EyeOff className="w-3 h-3" />
+                    Hidden in Play Mode
+                  </Label>
+                  <Switch
+                    id="portal-hidden"
+                    checked={singleSelected.portalHiddenInPlay ?? false}
+                    onCheckedChange={(checked) => updateMapObject(singleSelected.id, { portalHiddenInPlay: checked })}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portal-auto-activate" className="text-xs flex items-center gap-2 cursor-pointer">
+                    <Eye className="w-3 h-3" />
+                    Auto-activate Target Map
+                  </Label>
+                  <Switch
+                    id="portal-auto-activate"
+                    checked={singleSelected.portalAutoActivateTarget ?? false}
+                    onCheckedChange={(checked) => updateMapObject(singleSelected.id, { portalAutoActivateTarget: checked })}
+                  />
+                </div>
+                
+                <p className="text-xs text-muted-foreground">
+                  {singleSelected.portalAutoActivateTarget 
+                    ? 'Teleport will auto-activate the target map and set it as focused.' 
+                    : 'Teleporting to an inactive map will hide the token.'}
+                </p>
+              </div>
+              
+              <Separator />
+            </>
+          )}
+          
           {/* Single object properties */}
-          {singleSelected && !isDoor && (
+          {singleSelected && !isDoor && !isPortal && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="obj-label" className="text-xs">Label</Label>

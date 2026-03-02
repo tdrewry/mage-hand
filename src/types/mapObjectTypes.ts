@@ -3,7 +3,7 @@
  * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light' | 'annotation';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light' | 'annotation' | 'portal';
 
 export interface MapObject {
   id: string;
@@ -69,6 +69,12 @@ export interface MapObject {
   // Z-Order: lower = drawn first (underneath). Default derived from CATEGORY_DEFAULT_RENDER_ORDER.
   renderOrder?: number;
 
+  // Portal-specific properties (category: 'portal')
+  portalName?: string;           // Display name for the portal
+  portalTargetId?: string;       // ID of the linked portal MapObject
+  portalHiddenInPlay?: boolean;  // Hidden from players in play mode
+  portalAutoActivateTarget?: boolean; // Auto-activate and focus target map on teleport (off by default)
+
   // Multi-map scoping — which map this object belongs to
   mapId?: string;
 }
@@ -88,6 +94,7 @@ export type MapObjectCategory =
   | 'wall'
   | 'imported-obstacle'
   | 'light'
+  | 'portal'
   | 'custom';
 
 export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
@@ -105,6 +112,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   wall: 'Wall',
   'imported-obstacle': 'Imported Obstacle',
   light: 'Light Source',
+  portal: 'Portal',
   custom: 'Custom',
 };
 
@@ -298,6 +306,19 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     height: 24,
     fillColor: '#3b82f6',
     strokeColor: '#ffffff',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
+  },
+  portal: {
+    shape: 'portal',
+    width: 60,
+    height: 60,
+    fillColor: 'rgba(139, 92, 246, 0.25)',
+    strokeColor: '#8b5cf6',
     strokeWidth: 2,
     opacity: 1,
     castsShadow: false,
