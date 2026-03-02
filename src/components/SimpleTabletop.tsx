@@ -1576,6 +1576,21 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [maps]);
 
+  // When the focused map changes, clear fog visibility caches so the new map's
+  // explored area and filtered entity set are used for a full recomputation.
+  useEffect(() => {
+    if (!selectedMapId) return;
+    tokenVisibilityCacheRef.current.forEach((cached) => {
+      if (cached?.visionPath?.remove) cached.visionPath.remove();
+    });
+    tokenVisibilityCacheRef.current.clear();
+    prevTokenPositionsRef.current.clear();
+    fogMasksRef.current = null;
+    illuminationSourcesCacheRef.current = null;
+    console.log('[Fog] Map switch — cleared fog caches for', selectedMapId);
+    redrawCanvas();
+  }, [selectedMapId]);
+
   // Track whether we are the source of the serialized change (to avoid redundant deserialization)
   const fogSerializeSourceRef = useRef(false);
 
@@ -2147,7 +2162,7 @@ export const SimpleTabletop = () => {
     // visibility polygons or fog masks, and including them caused expensive
     // Paper.js computations on every mouse-move during canvas drag.
   }, [
-    tokens,
+    filteredTokens,
     lights,
     fogEnabled,
     fogRevealAll,
@@ -2155,13 +2170,15 @@ export const SimpleTabletop = () => {
     isDraggingToken,
     setSerializedExploredAreasForMap,
     renderingMode,
-    regions,
-    mapObjects, // Re-compute fog when map objects change (they may block vision)
+    filteredRegions,
+    filteredMapObjects, // Re-compute fog when map objects change (they may block vision)
     effectSettings.lightFalloff,
     exploredOpacity,
     players, // Re-compute when player data changes (role assignments affect vision)
     currentPlayerId, // Re-compute when active player changes
     roles, // Re-compute when roles change (permissions affect which tokens get vision)
+    selectedMapId, // Re-compute fog when switching maps (per-map explored areas)
+    isEntityVisible, // Re-compute when active map set changes
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
@@ -3508,9 +3525,10 @@ export const SimpleTabletop = () => {
       drawAnnotationsToContext(ctx);
     }
 
-    // Draw light sources in edit mode using new system
+    // Draw light sources in edit mode using new system (only from active maps)
     if (renderingMode === "edit" && lights.length > 0) {
-      renderLightSources(ctx, lights, transform);
+      const activeLights = lights.filter(l => isEntityVisible(l.mapId));
+      if (activeLights.length > 0) renderLightSources(ctx, activeLights, transform);
     }
 
     // Draw current path being drawn
@@ -7555,6 +7573,7 @@ export const SimpleTabletop = () => {
           radius: 200, // World space units
           enabled: true,
           label: `Light ${lights.length + 1}`,
+          mapId: selectedMapId || undefined,
         });
 
         toast.success("Light source placed");
