@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Grid3x3, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -60,7 +60,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
   const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
-  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
+  
   const visionProfileCard = cards.find((c) => c.type === CardType.VISION_PROFILE_MANAGER);
   const roleManagerCard = cards.find((c) => c.type === CardType.ROLE_MANAGER);
   const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
@@ -103,22 +103,6 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
     }
   };
 
-  const handleToggleBackgroundGrid = () => {
-    if (backgroundGridCard) {
-      setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.BACKGROUND_GRID,
-        title: 'Background & Grid',
-        defaultPosition: { x: 320, y: 80 },
-        defaultSize: { width: 400, height: 450 },
-        minSize: { width: 350, height: 400 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
 
   const handleToggleVisionProfiles = () => {
     if (visionProfileCard) {
@@ -477,15 +461,6 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           Map Manager
         </Button>
 
-        <Button 
-          variant={backgroundGridCard?.isVisible ? "default" : "outline"}
-          size="sm"
-          onClick={handleToggleBackgroundGrid}
-          className="w-full"
-        >
-          <Grid3x3 className="h-4 w-4 mr-2" />
-          Background & Grid
-        </Button>
 
         <Button 
           variant={visionProfileCard?.isVisible ? "default" : "outline"}

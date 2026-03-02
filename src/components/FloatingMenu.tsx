@@ -50,7 +50,7 @@ export const FloatingMenu = ({
   
   const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
   const mapControlsCard = cards.find((c) => c.type === CardType.MAP_CONTROLS);
-  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
+  
 
   const handleToggleTokenCard = () => {
     if (tokenCard) {
@@ -91,11 +91,6 @@ export const FloatingMenu = ({
       label: 'Tokens',
     },
     {
-      id: 'background',
-      icon: Palette,
-      label: 'Background',
-    },
-    {
       id: 'visibility',
       icon: Eye,
       label: 'Visibility',
@@ -114,8 +109,7 @@ export const FloatingMenu = ({
           {menuItems.map((item) => {
             const isActive = 
               (item.id === 'tokens' && tokenCard?.isVisible) ||
-              (item.id === 'maps' && mapControlsCard?.isVisible) ||
-              (item.id === 'background' && backgroundGridCard?.isVisible);
+              (item.id === 'maps' && mapControlsCard?.isVisible);
             
             return (
               <ToolbarButton
@@ -127,10 +121,6 @@ export const FloatingMenu = ({
                     handleToggleTokenCard();
                   } else if (item.id === 'maps') {
                     handleToggleMapControlsCard();
-                  } else if (item.id === 'background') {
-                    if (backgroundGridCard) {
-                      setVisibility(backgroundGridCard.id, !backgroundGridCard.isVisible);
-                    }
                   } else {
                     setActiveModal(item.id);
                   }

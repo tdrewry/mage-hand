@@ -14,7 +14,7 @@ import {
   Palette,
   CloudFog,
   Swords,
-  Grid3X3,
+  
   Undo,
   Redo,
   History,
@@ -95,12 +95,11 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   
-  const layerCard = cards.find((c) => c.type === CardType.LAYERS);
+  const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
   const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
   const watabouCard = cards.find((c) => c.type === CardType.WATABOU_IMPORT);
   const fogCard = cards.find((c) => c.type === CardType.FOG);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const backgroundGridCard = cards.find((c) => c.type === CardType.BACKGROUND_GRID);
   const stylesCard = cards.find((c) => c.type === CardType.STYLES);
   const historyCard = cards.find((c) => c.type === CardType.HISTORY);
 
@@ -138,16 +137,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     }
   };
 
-  const handleToggleLayerCard = () => {
-    if (layerCard) {
-      setVisibility(layerCard.id, !layerCard.isVisible);
+  const handleToggleMapTreeCard = () => {
+    if (mapTreeCard) {
+      setVisibility(mapTreeCard.id, !mapTreeCard.isVisible);
     } else {
       registerCard({
-        type: CardType.LAYERS,
-        title: 'Layer Stack',
+        type: CardType.MAP_TREE,
+        title: 'Map Tree',
         defaultPosition: { x: 20, y: 80 },
-        defaultSize: { width: 280, height: 450 },
-        minSize: { width: 250, height: 400 },
+        defaultSize: { width: 320, height: 500 },
+        minSize: { width: 260, height: 300 },
         isResizable: true,
         isClosable: true,
         defaultVisible: true,
@@ -350,9 +349,9 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
 
           <ToolbarButton
             icon={Layers}
-            label="Manage Layers"
-            onClick={handleToggleLayerCard}
-            isActive={layerCard?.isVisible}
+            label="Map Tree"
+            onClick={handleToggleMapTreeCard}
+            isActive={mapTreeCard?.isVisible}
             variant="ghost"
             size="xs"
           />
@@ -483,22 +482,10 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={Grid3X3}
-            label="Background & Grid"
-            onClick={() => {
-              if (backgroundGridCard) {
-                setVisibility(backgroundGridCard.id, true);
-              }
-            }}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
             icon={Layers}
-            label="Manage Layers"
-            onClick={handleToggleLayerCard}
-            isActive={layerCard?.isVisible}
+            label="Map Tree"
+            onClick={handleToggleMapTreeCard}
+            isActive={mapTreeCard?.isVisible}
             variant="ghost"
             size="xs"
           />
