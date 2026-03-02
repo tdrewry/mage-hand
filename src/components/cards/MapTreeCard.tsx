@@ -1294,11 +1294,33 @@ export const MapTreeCardContent: React.FC = () => {
   return (
     <ScrollArea className="h-full">
       <div className="p-2 space-y-1">
-        {/* Summary badges */}
+        {/* Summary badges — click to select all of that type */}
         <div className="flex items-center gap-1 flex-wrap mb-2">
           <Badge variant="outline" className="text-[10px]">{maps.length} maps</Badge>
-          <Badge variant="outline" className="text-[10px]">{tokens.length} tokens</Badge>
-          <Badge variant="outline" className="text-[10px]">{mapObjects.length} objects</Badge>
+          <Badge
+            variant="outline"
+            className="text-[10px] cursor-pointer hover:bg-primary/15 hover:border-primary/40 transition-colors"
+            onClick={() => {
+              setSelectedTokens?.(tokens.map(t => t.id));
+              toast.success(`Selected ${tokens.length} token(s)`);
+            }}
+          >{tokens.length} tokens</Badge>
+          <Badge
+            variant="outline"
+            className="text-[10px] cursor-pointer hover:bg-primary/15 hover:border-primary/40 transition-colors"
+            onClick={() => {
+              regions.forEach(r => selectRegion(r.id));
+              toast.success(`Selected ${regions.length} region(s)`);
+            }}
+          >{regions.length} regions</Badge>
+          <Badge
+            variant="outline"
+            className="text-[10px] cursor-pointer hover:bg-primary/15 hover:border-primary/40 transition-colors"
+            onClick={() => {
+              mapObjects.forEach(o => selectMapObject(o.id, true));
+              toast.success(`Selected ${mapObjects.length} object(s)`);
+            }}
+          >{mapObjects.length} objects</Badge>
           <Badge variant="outline" className="text-[10px]">{lights.length} lights</Badge>
         </div>
 
