@@ -795,6 +795,17 @@ export const SimpleTabletop = () => {
         useMapStore.getState().updateMap(activeToken.mapId, { active: true });
       }
       useMapStore.getState().setSelectedMap(activeToken.mapId);
+      // Center viewport on the active token after map switch
+      requestAnimationFrame(() => {
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          setTransform(prev => ({
+            x: canvas.width / 2 - activeToken.x * prev.zoom,
+            y: canvas.height / 2 - activeToken.y * prev.zoom,
+            zoom: prev.zoom,
+          }));
+        }
+      });
     }
   }, [autoFocusFollowsToken, isInCombat, currentTurnIndex, initiativeOrder, tokens]);
 
@@ -933,12 +944,34 @@ export const SimpleTabletop = () => {
             useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
             useMapStore.getState().setSelectedMap(targetPortal.mapId!);
             toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
+            // Center viewport on teleported token
+            requestAnimationFrame(() => {
+              if (canvasRef.current) {
+                const canvas = canvasRef.current;
+                setTransform(prev => ({
+                  x: canvas.width / 2 - targetPortal.position.x * prev.zoom,
+                  y: canvas.height / 2 - targetPortal.position.y * prev.zoom,
+                  zoom: prev.zoom,
+                }));
+              }
+            });
           } else {
             toast.info(`Token moved to inactive map "${targetMap.name}"`, { duration: 3000 });
           }
       } else if ((portalAtDrop.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           // Target map already active, just set focus
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
+          // Center viewport on teleported token
+          requestAnimationFrame(() => {
+            if (canvasRef.current) {
+              const canvas = canvasRef.current;
+              setTransform(prev => ({
+                x: canvas.width / 2 - targetPortal.position.x * prev.zoom,
+                y: canvas.height / 2 - targetPortal.position.y * prev.zoom,
+                zoom: prev.zoom,
+              }));
+            }
+          });
         }
       }
     }, 300); // 300ms fade delay
