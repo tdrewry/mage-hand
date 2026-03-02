@@ -115,7 +115,6 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   const handleConvertToPortal = () => {
     if (!isSingleSelection || !firstRegion) return;
     
-    // Create a portal MapObject at the region's center
     const centerX = firstRegion.x + (firstRegion.width / 2);
     const centerY = firstRegion.y + (firstRegion.height / 2);
     const portalSize = Math.min(firstRegion.width, firstRegion.height, 60);
@@ -139,6 +138,10 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       mapId: firstRegion.mapId,
     });
     
+    // Remove the source region
+    removeRegion(firstRegion.id);
+    onClearSelection();
+    onUpdateCanvas?.();
     toast.success('Portal created from region');
   };
   
@@ -150,6 +153,12 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
         points = region.pathPoints.map(p => ({ x: region.x + p.x, y: region.y + p.y }));
+        // Close the polyline so the wall forms a closed shape
+        const first = points[0];
+        const last = points[points.length - 1];
+        if (first.x !== last.x || first.y !== last.y) {
+          points.push({ x: first.x, y: first.y });
+        }
       } else {
         const { x, y, width, height } = region;
         points = [
@@ -180,8 +189,13 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
         mapId: region.mapId,
       });
       wallCount++;
+      
+      // Remove the source region
+      removeRegion(region.id);
     });
     
+    onClearSelection();
+    onUpdateCanvas?.();
     toast.success(`Created ${wallCount} wall(s) from region edges`);
   };
   
@@ -190,9 +204,17 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     let count = 0;
     
     selectedRegions.forEach(region => {
-      const customPath = region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2
-        ? region.pathPoints.map(p => ({ x: p.x, y: p.y }))
-        : undefined;
+      let customPath: { x: number; y: number }[] | undefined;
+      
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
+        customPath = region.pathPoints.map(p => ({ x: p.x, y: p.y }));
+        // Close the polyline so the shape matches the region
+        const first = customPath[0];
+        const last = customPath[customPath.length - 1];
+        if (first.x !== last.x || first.y !== last.y) {
+          customPath.push({ x: first.x, y: first.y });
+        }
+      }
       
       const shape = customPath ? 'custom' : (preset.shape || 'rectangle');
       
@@ -215,8 +237,13 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
         mapId: region.mapId,
       });
       count++;
+      
+      // Remove the source region
+      removeRegion(region.id);
     });
     
+    onClearSelection();
+    onUpdateCanvas?.();
     const labels = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)' };
     toast.success(`Created ${count} ${labels[category]} from region(s)`);
   };
