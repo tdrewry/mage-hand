@@ -1158,17 +1158,28 @@ export const SimpleTabletop = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [transform]);
 
-  // Fit to View - calculates bounds of all content and zooms to fit
+  // Fit to View - calculates bounds of focused map's content and zooms to fit
   const handleFitToView = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Scope to focused map entities only
+    const scopedTokens = selectedMapId
+      ? tokens.filter(t => t.mapId === selectedMapId)
+      : tokens;
+    const scopedRegions = selectedMapId
+      ? regions.filter(r => r.mapId === selectedMapId)
+      : regions;
+    const scopedMapObjects = selectedMapId
+      ? mapObjects.filter(o => o.mapId === selectedMapId)
+      : mapObjects;
 
     // Calculate bounding box of all content
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasContent = false;
 
     // Include tokens with their illumination radius
-    tokens.forEach(token => {
+    scopedTokens.forEach(token => {
       hasContent = true;
       const tokenCenterX = token.x;
       const tokenCenterY = token.y;
@@ -1188,11 +1199,10 @@ export const SimpleTabletop = () => {
       }
       // Fallback to fog vision range
       if (maxRadius === 0 && token.hasVision) {
-        maxRadius = fogVisionRange * 40; // Convert grid units to pixels
+        maxRadius = fogVisionRange * 40;
       }
       
-      // Expand bounds by token size and illumination radius
-      const tokenRadius = Math.max(token.gridWidth, token.gridHeight) * 20; // Approximate token size
+      const tokenRadius = Math.max(token.gridWidth, token.gridHeight) * 20;
       const totalRadius = tokenRadius + maxRadius;
       
       minX = Math.min(minX, tokenCenterX - totalRadius);
@@ -1201,8 +1211,17 @@ export const SimpleTabletop = () => {
       maxY = Math.max(maxY, tokenCenterY + totalRadius);
     });
 
-    // Include explored fog areas if available
-    if (exploredAreaRef.current) {
+    // Include map objects
+    scopedMapObjects.forEach(obj => {
+      hasContent = true;
+      minX = Math.min(minX, obj.position.x);
+      minY = Math.min(minY, obj.position.y);
+      maxX = Math.max(maxX, obj.position.x + (obj.width ?? 0));
+      maxY = Math.max(maxY, obj.position.y + (obj.height ?? 0));
+    });
+
+    // Include explored fog areas if no focused map (global view)
+    if (!selectedMapId && exploredAreaRef.current) {
       const bounds = exploredAreaRef.current.bounds;
       if (bounds && bounds.width > 0 && bounds.height > 0) {
         hasContent = true;
@@ -1214,7 +1233,7 @@ export const SimpleTabletop = () => {
     }
 
     // Include visible regions
-    regions.forEach(region => {
+    scopedRegions.forEach(region => {
       hasContent = true;
       
       const regionX = region.x;
@@ -1250,7 +1269,7 @@ export const SimpleTabletop = () => {
     const canvasHeight = canvas.height;
     const zoomX = canvasWidth / paddedWidth;
     const zoomY = canvasHeight / paddedHeight;
-    const newZoom = Math.min(zoomX, zoomY, 5); // Cap at max zoom of 5
+    const newZoom = Math.min(zoomX, zoomY, 5);
 
     // Calculate center of content
     const contentCenterX = (minX + maxX) / 2;
@@ -1263,8 +1282,11 @@ export const SimpleTabletop = () => {
       zoom: Math.max(0.1, newZoom),
     });
 
-    toast.success(`Fit to view (${Math.round(newZoom * 100)}%)`);
-  }, [tokens, regions, fogVisionRange, setTransform]);
+    const mapLabel = selectedMapId
+      ? maps.find(m => m.id === selectedMapId)?.name ?? 'map'
+      : 'all maps';
+    toast.success(`Fit to view: ${mapLabel} (${Math.round(newZoom * 100)}%)`);
+  }, [tokens, regions, mapObjects, fogVisionRange, setTransform, selectedMapId, maps]);
 
   // Canvas rendering now auto-updates via dependencies - no manual event listening needed
 
