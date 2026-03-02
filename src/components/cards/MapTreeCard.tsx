@@ -617,6 +617,7 @@ export const MapTreeCardContent: React.FC = () => {
   const renameStructure = useMapStore(s => s.renameStructure);
   const assignMapToStructure = useMapStore(s => s.assignMapToStructure);
   const removeMapFromStructure = useMapStore(s => s.removeMapFromStructure);
+  const setStructureExclusiveFocus = useMapStore(s => s.setStructureExclusiveFocus);
 
   const tokens      = useSessionStore(s => s.tokens);
   const selectedTokenIds = useSessionStore(s => s.selectedTokenIds ?? []);
@@ -1856,6 +1857,16 @@ export const MapTreeCardContent: React.FC = () => {
                         }}
                       >
                         <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        className={`text-[10px] ${structure.exclusiveFocus ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
+                        title={structure.exclusiveFocus ? 'Exclusive focus ON — only the focused floor is active' : 'Exclusive focus OFF — multiple floors can be active'}
+                        onClick={() => {
+                          setStructureExclusiveFocus(structure.id, !structure.exclusiveFocus);
+                          toast.success(structure.exclusiveFocus ? 'Exclusive focus disabled' : 'Exclusive focus enabled');
+                        }}
+                      >
+                        <Eye className="h-3 w-3" />
                       </button>
                     </div>
                     {structMaps.map((map) => {

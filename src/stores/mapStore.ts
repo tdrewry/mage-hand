@@ -16,6 +16,8 @@ export interface GridRegion {
 export interface Structure {
   id: string;
   name: string;
+  /** When true, focusing a map in this structure deactivates all other maps in the structure */
+  exclusiveFocus?: boolean;
 }
 
 export interface GameMap {
@@ -130,6 +132,7 @@ interface MapStore {
   assignMapToStructure: (mapId: string, structureId: string, floorNumber?: number) => void;
   removeMapFromStructure: (mapId: string) => void;
   setAutoFocusFollowsToken: (value: boolean) => void;
+  setStructureExclusiveFocus: (structureId: string, value: boolean) => void;
 
   /** Navigate to adjacent floor within same structure. Returns the map id navigated to, or null. */
   navigateFloor: (direction: 'up' | 'down') => string | null;
@@ -206,6 +209,29 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
 
   setSelectedMap: (id) => {
     set({ selectedMapId: id });
+
+    // Enforce exclusive focus for structures
+    if (id) {
+      const { maps, structures } = get();
+      const focusedMap = maps.find(m => m.id === id);
+      if (focusedMap?.structureId) {
+        const structure = structures.find(s => s.id === focusedMap.structureId);
+        if (structure?.exclusiveFocus) {
+          set((state) => ({
+            maps: state.maps.map(m => {
+              if (m.structureId === focusedMap.structureId && m.id !== id) {
+                return { ...m, active: false };
+              }
+              // Ensure the focused map is active
+              if (m.id === id && !m.active) {
+                return { ...m, active: true };
+              }
+              return m;
+            }),
+          }));
+        }
+      }
+    }
   },
 
   reorderMaps: (fromIndex, toIndex) => {
@@ -355,6 +381,30 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
 
   setAutoFocusFollowsToken: (value) => set({ autoFocusFollowsToken: value }),
 
+  setStructureExclusiveFocus: (structureId, value) => {
+    set((state) => ({
+      structures: state.structures.map(s =>
+        s.id === structureId ? { ...s, exclusiveFocus: value } : s
+      ),
+    }));
+
+    // If enabling, immediately enforce: deactivate non-focused sibling maps
+    if (value) {
+      const { maps, selectedMapId } = get();
+      const focusedMap = maps.find(m => m.id === selectedMapId);
+      if (focusedMap?.structureId === structureId) {
+        set((state) => ({
+          maps: state.maps.map(m => {
+            if (m.structureId === structureId && m.id !== selectedMapId) {
+              return { ...m, active: false };
+            }
+            return m;
+          }),
+        }));
+      }
+    }
+  },
+
   navigateFloor: (direction) => {
     const { maps, selectedMapId } = get();
     const currentMap = maps.find(m => m.id === selectedMapId);
@@ -369,12 +419,27 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
     if (targetIdx < 0 || targetIdx >= floorsInStructure.length) return null;
 
     const target = floorsInStructure[targetIdx];
-    set({ selectedMapId: target.id });
-    // Auto-activate if inactive
-    if (!target.active) {
+    const structure = get().structures.find(s => s.id === currentMap.structureId);
+
+    if (structure?.exclusiveFocus) {
+      // Exclusive: activate target, deactivate all other structure maps
       set((state) => ({
-        maps: state.maps.map(m => m.id === target.id ? { ...m, active: true } : m),
+        selectedMapId: target.id,
+        maps: state.maps.map(m => {
+          if (m.structureId === currentMap.structureId) {
+            return { ...m, active: m.id === target.id };
+          }
+          return m;
+        }),
       }));
+    } else {
+      set({ selectedMapId: target.id });
+      // Auto-activate if inactive
+      if (!target.active) {
+        set((state) => ({
+          maps: state.maps.map(m => m.id === target.id ? { ...m, active: true } : m),
+        }));
+      }
     }
     return target.id;
   },
