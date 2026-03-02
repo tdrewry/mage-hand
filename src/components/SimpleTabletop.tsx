@@ -896,13 +896,19 @@ export const SimpleTabletop = () => {
     const allMapObjects = useMapObjectStore.getState().mapObjects;
     const updateMapObject = useMapObjectStore.getState().updateMapObject;
     
-    // Find portal at token drop position
+    // Find portal at token drop position (same map as the token)
+    const tokenMapId = token.mapId ?? useMapStore.getState().selectedMapId;
     const portalAtDrop = allMapObjects.find(obj => {
       if (obj.category !== 'portal' || obj.shape !== 'portal') return false;
-      // Check if token center is within portal radius
-      const dx = token.x - obj.position.x;
-      const dy = token.y - obj.position.y;
-      const portalRadius = Math.min(obj.width, obj.height) / 2;
+      // Portal must be on the same map as the token
+      const objMapId = obj.mapId ?? useMapStore.getState().selectedMapId;
+      if (objMapId !== tokenMapId) return false;
+      // position is top-left; compute center
+      const cx = obj.position.x + obj.width / 2;
+      const cy = obj.position.y + obj.height / 2;
+      const dx = token.x - cx;
+      const dy = token.y - cy;
+      const portalRadius = Math.max(obj.width, obj.height) / 2;
       return dx * dx + dy * dy <= portalRadius * portalRadius;
     });
     
