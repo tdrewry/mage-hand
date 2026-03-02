@@ -4,11 +4,12 @@ import {
   Lightbulb, Box, FolderOpen, Folder, Trash2, Pencil, Check, X,
   Plus, ArrowRightFromLine, GripVertical, Search, ArrowUpDown,
   SortAsc, SortDesc, Eye, EyeOff, ArrowUp, ArrowDown,
-  ChevronsUp, ChevronsDown, Copy, Unlink,
+  ChevronsUp, ChevronsDown, Copy, Unlink, Map, MousePointer2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,6 +27,7 @@ import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useLightStore } from '@/stores/lightStore';
 import { useGroupStore } from '@/stores/groupStore';
+import { useMapStore } from '@/stores/mapStore';
 import { EntityGroup, EntityGeometry } from '@/lib/groupTransforms';
 import { CATEGORY_DEFAULT_RENDER_ORDER } from '@/lib/mapObjectRenderer';
 import { toast } from 'sonner';
@@ -50,6 +52,7 @@ interface TreeEntity {
   id: string;
   name: string;
   type: 'token' | 'region' | 'mapObject' | 'light';
+  mapId?: string;
   groupId?: string;
   x: number;
   y: number;
@@ -570,6 +573,12 @@ type SortDir   = 'asc' | 'desc';
 
 // ─── Card content ──────────────────────────────────────────────────────────────
 export const MapTreeCardContent: React.FC = () => {
+  const maps = useMapStore(s => s.maps);
+  const selectedMapId = useMapStore(s => s.selectedMapId);
+  const updateMap = useMapStore(s => s.updateMap);
+  const setSelectedMap = useMapStore(s => s.setSelectedMap);
+  const reorderMaps = useMapStore(s => s.reorderMaps);
+
   const tokens      = useSessionStore(s => s.tokens);
   const selectedTokenIds = useSessionStore(s => s.selectedTokenIds ?? []);
   const setSelectedTokens = useSessionStore(s => s.setSelectedTokens);
@@ -968,21 +977,25 @@ export const MapTreeCardContent: React.FC = () => {
     const entities: TreeEntity[] = [];
     tokens.forEach(t => entities.push({
       id: t.id, name: t.name || t.label || '', type: 'token',
+      mapId: (t as any).mapId,
       x: t.x, y: t.y,
       renderOrder: TYPE_NOTIONAL_ORDER.token,
     }));
     regions.forEach(r => entities.push({
       id: r.id, name: r.id.slice(0, 8), type: 'region',
+      mapId: (r as any).mapId,
       x: r.x, y: r.y, locked: r.locked,
       renderOrder: TYPE_NOTIONAL_ORDER.region,
     }));
     mapObjects.forEach(o => entities.push({
       id: o.id, name: o.label || o.shape || '', type: 'mapObject',
+      mapId: (o as any).mapId,
       x: o.position.x, y: o.position.y, locked: o.locked,
       renderOrder: o.renderOrder ?? CATEGORY_DEFAULT_RENDER_ORDER[o.category] ?? 50,
     }));
     lights.forEach(l => entities.push({
       id: l.id, name: l.label || '', type: 'light',
+      mapId: (l as any).mapId,
       x: l.position.x, y: l.position.y,
       renderOrder: TYPE_NOTIONAL_ORDER.light,
     }));
@@ -1020,24 +1033,107 @@ export const MapTreeCardContent: React.FC = () => {
 
   const ungroupedEntities = allEntities.filter(e => !groupedEntityIds.has(e.id));
 
-  // Expose mapObjects as a simpler shape for context menu category detection
+  // ── Group entities by mapId ────────────────────────────────────────────────
+  const entitiesByMap = useMemo(() => {
+    const byMap: Record<string, TreeEntity[]> = {};
+    const unassigned: TreeEntity[] = [];
+    allEntities.forEach(e => {
+      if (e.mapId) {
+        (byMap[e.mapId] ??= []).push(e);
+      } else {
+        unassigned.push(e);
+      }
+    });
+    return { byMap, unassigned };
+  }, [allEntities]);
+
+  // ── Expanded map nodes state ──────────────────────────────────────────────
+  const [expandedMapNodes, setExpandedMapNodes] = useState<Set<string>>(
+    () => new Set(maps.map(m => m.id))
+  );
+  const [unassignedExpanded, setUnassignedExpanded] = useState(true);
+
+  const toggleMapNode = useCallback((mapId: string) => {
+    setExpandedMapNodes(prev => {
+      const next = new Set(prev);
+      next.has(mapId) ? next.delete(mapId) : next.add(mapId);
+      return next;
+    });
+  }, []);
   const mapObjectsForContext = useMemo(() =>
     mapObjects.map(o => ({ id: o.id, renderOrder: o.renderOrder, category: o.category })),
     [mapObjects]
   );
+
+  // Helper to render a list of entities (grouped and ungrouped) for a given set
+  const renderEntityList = (entitySet: TreeEntity[]) => {
+    const setGroupedIds = new Set<string>();
+    groups.forEach(g => g.members.forEach(m => setGroupedIds.add(m.id)));
+    const setUngrouped = entitySet.filter(e => !setGroupedIds.has(e.id));
+
+    // Only show groups that have members in this entity set
+    const entityIds = new Set(entitySet.map(e => e.id));
+    const relevantGroups = groups.filter(g =>
+      g.members.some(m => entityIds.has(m.id))
+    );
+
+    return (
+      <>
+        {relevantGroups.map(group => (
+          <GroupNode
+            key={group.id}
+            group={group}
+            entities={entitySet}
+            selectedIds={allSelectedIds}
+            renamingId={renamingId}
+            onDelete={handleDeleteGroup}
+            onToggleLock={handleToggleGroupLock}
+            onToggleEntityLock={handleToggleEntityLock}
+            onRename={handleRenameGroup}
+            onEjectFromGroup={handleEjectFromGroup}
+            onSelect={handleSelect}
+            onSelectAdditive={handleSelectAdditive}
+            onRenameCommit={handleRenameCommit}
+            onRenameCancel={handleRenameCancel}
+            contextActions={contextActions}
+            mapObjects={mapObjectsForContext}
+          />
+        ))}
+        {setUngrouped.map(entity => (
+          <EntityRow
+            key={`${entity.type}-${entity.id}`}
+            entity={entity}
+            selected={allSelectedIds.has(entity.id)}
+            renamingId={renamingId}
+            onToggleLock={handleToggleEntityLock}
+            onAddToNewGroup={handleAddToNewGroup}
+            onSelect={handleSelect}
+            onSelectAdditive={handleSelectAdditive}
+            onRenameCommit={handleRenameCommit}
+            onRenameCancel={handleRenameCancel}
+            draggable={entity.type === 'mapObject'}
+            dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            contextActions={contextActions}
+            mapObjects={mapObjectsForContext}
+          />
+        ))}
+      </>
+    );
+  };
 
   return (
     <ScrollArea className="h-full">
       <div className="p-2 space-y-1">
         {/* Summary badges */}
         <div className="flex items-center gap-1 flex-wrap mb-2">
+          <Badge variant="outline" className="text-[10px]">{maps.length} maps</Badge>
           <Badge variant="outline" className="text-[10px]">{tokens.length} tokens</Badge>
-          <Badge variant="outline" className="text-[10px]">{regions.length} regions</Badge>
           <Badge variant="outline" className="text-[10px]">{mapObjects.length} objects</Badge>
           <Badge variant="outline" className="text-[10px]">{lights.length} lights</Badge>
-          {groups.length > 0 && (
-            <Badge variant="secondary" className="text-[10px]">{groups.length} groups</Badge>
-          )}
         </div>
 
         {/* Search bar */}
@@ -1086,63 +1182,112 @@ export const MapTreeCardContent: React.FC = () => {
           })}
         </div>
 
-        {/* Info banner */}
-        <div className="text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1 mb-2 leading-relaxed">
-          Drag map objects to reorder draw order. Tokens always draw above map objects.
-        </div>
+        {/* ── Map nodes ── */}
+        {maps.map((map, index) => {
+          const isExpanded = expandedMapNodes.has(map.id);
+          const isFocused = selectedMapId === map.id;
+          const mapEntities = entitiesByMap.byMap[map.id] || [];
+          const entityCount = mapEntities.length;
 
-        {/* ── Groups ── */}
-        {groups.map(group => (
-          <GroupNode
-            key={group.id}
-            group={group}
-            entities={allEntities}
-            selectedIds={allSelectedIds}
-            renamingId={renamingId}
-            onDelete={handleDeleteGroup}
-            onToggleLock={handleToggleGroupLock}
-            onToggleEntityLock={handleToggleEntityLock}
-            onRename={handleRenameGroup}
-            onEjectFromGroup={handleEjectFromGroup}
-            onSelect={handleSelect}
-            onSelectAdditive={handleSelectAdditive}
-            onRenameCommit={handleRenameCommit}
-            onRenameCancel={handleRenameCancel}
-            contextActions={contextActions}
-            mapObjects={mapObjectsForContext}
-          />
-        ))}
+          return (
+            <div
+              key={map.id}
+              className={`border rounded-lg overflow-hidden transition-colors ${
+                isFocused ? 'border-primary/50 bg-primary/5' : 'border-border/60'
+              }`}
+            >
+              {/* Map header */}
+              <div
+                className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
+                onClick={() => toggleMapNode(map.id)}
+              >
+                {isExpanded
+                  ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                <Map className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
 
-        {/* ── Ungrouped section header ── */}
-        {ungroupedEntities.length > 0 && groups.length > 0 && (
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-2 pt-2 pb-1 border-t border-border/40 mt-2">
-            Ungrouped
+                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
+                  {entityCount}
+                </Badge>
+
+                {/* Reorder arrows */}
+                <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                  <button
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    disabled={index === 0}
+                    onClick={() => reorderMaps(index, index - 1)}
+                    title="Move map up"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    disabled={index >= maps.length - 1}
+                    onClick={() => reorderMaps(index, index + 1)}
+                    title="Move map down"
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Focus button */}
+                <button
+                  className={`shrink-0 p-0.5 rounded transition-colors ${
+                    isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
+                  }`}
+                  title="Set as focused map"
+                  onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
+                >
+                  <MousePointer2 className="h-3.5 w-3.5" />
+                </button>
+
+                {/* Active toggle */}
+                <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'}>
+                  <Switch
+                    checked={map.active}
+                    onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
+                    className="scale-[0.6]"
+                  />
+                </div>
+              </div>
+
+              {/* Map children */}
+              {isExpanded && (
+                <div className="px-1 pb-1.5">
+                  {entityCount === 0 ? (
+                    <p className="text-[10px] text-muted-foreground text-center py-2 italic">No entities on this map</p>
+                  ) : (
+                    renderEntityList(mapEntities)
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* ── Unassigned entities ── */}
+        {entitiesByMap.unassigned.length > 0 && (
+          <div className="border border-dashed border-border/60 rounded-lg overflow-hidden">
+            <div
+              className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30"
+              onClick={() => setUnassignedExpanded(!unassignedExpanded)}
+            >
+              {unassignedExpanded
+                ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+              <span className="text-xs font-medium text-muted-foreground flex-1">Unassigned</span>
+              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">
+                {entitiesByMap.unassigned.length}
+              </Badge>
+            </div>
+            {unassignedExpanded && (
+              <div className="px-1 pb-1.5">
+                {renderEntityList(entitiesByMap.unassigned)}
+              </div>
+            )}
           </div>
         )}
-
-        {/* ── Ungrouped entities ── */}
-        {ungroupedEntities.map(entity => (
-          <EntityRow
-            key={`${entity.type}-${entity.id}`}
-            entity={entity}
-            selected={allSelectedIds.has(entity.id)}
-            renamingId={renamingId}
-            onToggleLock={handleToggleEntityLock}
-            onAddToNewGroup={handleAddToNewGroup}
-            onSelect={handleSelect}
-            onSelectAdditive={handleSelectAdditive}
-            onRenameCommit={handleRenameCommit}
-            onRenameCancel={handleRenameCancel}
-            draggable={entity.type === 'mapObject'}
-            dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            contextActions={contextActions}
-            mapObjects={mapObjectsForContext}
-          />
-        ))}
 
         {allEntities.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-4">
