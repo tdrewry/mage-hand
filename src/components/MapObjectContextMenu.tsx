@@ -27,8 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff } from 'lucide-react';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
 import { toast } from 'sonner';
 
@@ -80,6 +81,16 @@ export const MapObjectContextMenuWrapper = ({
   const [lightIntensityValue, setLightIntensityValue] = useState(1);
   const [lightEnabledValue, setLightEnabledValue] = useState(true);
 
+  // Portal-specific state
+  const [portalNameValue, setPortalNameValue] = useState('');
+  const [portalTargetIdValue, setPortalTargetIdValue] = useState<string | undefined>(undefined);
+  const [portalHiddenInPlayValue, setPortalHiddenInPlayValue] = useState(false);
+  const [portalAutoActivateValue, setPortalAutoActivateValue] = useState(false);
+
+  const allMapObjects = useMapObjectStore((state) => state.mapObjects);
+  const allPortals = allMapObjects.filter(obj => obj.category === 'portal');
+  const maps = useMapStore(state => state.maps);
+
   // Get the objects to operate on
   const getTargetObjects = (): MapObject[] => {
     if (selectedMapObjectIds.includes(mapObjectId)) {
@@ -121,6 +132,11 @@ export const MapObjectContextMenuWrapper = ({
       setLightBrightRadiusValue(obj.lightBrightRadius || (obj.lightRadius || 100) * 0.5);
       setLightIntensityValue(obj.lightIntensity || 1);
       setLightEnabledValue(obj.lightEnabled !== false);
+      // Portal fields
+      setPortalNameValue(obj.portalName || '');
+      setPortalTargetIdValue(obj.portalTargetId);
+      setPortalHiddenInPlayValue(obj.portalHiddenInPlay ?? false);
+      setPortalAutoActivateValue(obj.portalAutoActivateTarget ?? false);
     } else {
       // Multi-selection: use defaults
       setLabelValue('');
@@ -173,6 +189,14 @@ export const MapObjectContextMenuWrapper = ({
         updates.lightBrightRadius = lightBrightRadiusValue;
         updates.lightIntensity = lightIntensityValue;
         updates.lightEnabled = lightEnabledValue;
+      }
+
+      // Portal-specific properties
+      if (obj.category === 'portal') {
+        updates.portalName = portalNameValue;
+        updates.portalTargetId = portalTargetIdValue;
+        updates.portalHiddenInPlay = portalHiddenInPlayValue;
+        updates.portalAutoActivateTarget = portalAutoActivateValue;
       }
 
       updateMapObject(obj.id, updates);
@@ -561,7 +585,6 @@ export const MapObjectContextMenuWrapper = ({
                     value={[lightRadiusValue]}
                     onValueChange={([v]) => {
                       setLightRadiusValue(v);
-                      // Keep bright radius <= dim radius
                       if (lightBrightRadiusValue > v) setLightBrightRadiusValue(v * 0.5);
                     }}
                     min={10}
@@ -591,6 +614,95 @@ export const MapObjectContextMenuWrapper = ({
                     step={0.05}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Portal Properties (only for portal category) */}
+            {currentObject?.category === 'portal' && !isMultiSelection && (
+              <div className="space-y-3">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Waypoints className="w-4 h-4 text-purple-500" />
+                  Portal Settings
+                </Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="portalName">Portal Name</Label>
+                  <Input
+                    id="portalName"
+                    value={portalNameValue}
+                    onChange={(e) => setPortalNameValue(e.target.value)}
+                    placeholder="Enter portal name..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Link to Portal</Label>
+                  <Select
+                    value={portalTargetIdValue || '__none__'}
+                    onValueChange={(value) => setPortalTargetIdValue(value === '__none__' ? undefined : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select target portal..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        <span className="flex items-center gap-2">
+                          <Link2Off className="w-3 h-3" />
+                          No link
+                        </span>
+                      </SelectItem>
+                      {allPortals
+                        .filter(p => p.id !== currentObject.id)
+                        .map(portal => {
+                          const portalMap = maps.find(m => m.id === portal.mapId);
+                          return (
+                            <SelectItem key={portal.id} value={portal.id}>
+                              <span className="flex items-center gap-2">
+                                <Link2 className="w-3 h-3" />
+                                {portal.portalName || 'Unnamed'}
+                                {portalMap ? ` (${portalMap.name})` : ''}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                    </SelectContent>
+                  </Select>
+                  {portalTargetIdValue && (
+                    <p className="text-xs text-green-600">
+                      ✓ Linked — tokens dropped here will teleport
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portalHidden" className="font-normal flex items-center gap-2">
+                    <EyeOff className="w-3 h-3" />
+                    Hidden in Play Mode
+                  </Label>
+                  <Switch
+                    id="portalHidden"
+                    checked={portalHiddenInPlayValue}
+                    onCheckedChange={setPortalHiddenInPlayValue}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portalAutoActivate" className="font-normal flex items-center gap-2">
+                    <Eye className="w-3 h-3" />
+                    Auto-activate Target Map
+                  </Label>
+                  <Switch
+                    id="portalAutoActivate"
+                    checked={portalAutoActivateValue}
+                    onCheckedChange={setPortalAutoActivateValue}
+                  />
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {portalAutoActivateValue
+                    ? 'Teleport will auto-activate the target map and set it as focused.'
+                    : 'Teleporting to an inactive map will hide the token.'}
+                </p>
               </div>
             )}
           </div>
