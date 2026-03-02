@@ -502,12 +502,14 @@ function renderLightShape(
 
 /**
  * Render a portal shape — circular region with a glowing border and portal icon badge
+ * @param activationProgress - 0 to 1 for activation flash effect (0 = no flash)
  */
 function renderPortalShape(
   ctx: CanvasRenderingContext2D,
   mapObject: MapObject,
   zoom: number,
-  isDMView: boolean = false
+  isDMView: boolean = false,
+  activationProgress: number = 0
 ) {
   const { width, height, fillColor, strokeColor, portalName, portalTargetId, portalHiddenInPlay } = mapObject;
   const radius = Math.min(width, height) / 2;
@@ -605,6 +607,28 @@ function renderPortalShape(
     ctx.lineTo(-radius * 0.7 - s, -radius * 0.7 + s);
     ctx.stroke();
   }
+
+  // Activation flash effect — expanding bright ring
+  if (activationProgress > 0) {
+    const flashAlpha = 1 - activationProgress;
+    const flashRadius = radius * (1 + activationProgress * 0.8);
+    ctx.save();
+    ctx.globalAlpha = flashAlpha * 0.8;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = (3 + activationProgress * 4) / zoom;
+    ctx.shadowColor = strokeColor;
+    ctx.shadowBlur = 12 / zoom;
+    ctx.beginPath();
+    ctx.arc(0, 0, flashRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner bright fill pulse
+    ctx.globalAlpha = flashAlpha * 0.3;
+    ctx.fillStyle = strokeColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 /**
@@ -616,7 +640,8 @@ export function renderMapObject(
   zoom: number,
   selected: boolean = false,
   style: WatabouStyle = DEFAULT_STYLE,
-  isDMView: boolean = false
+  isDMView: boolean = false,
+  portalActivationProgress: number = 0
 ) {
   const { position, width, height, shape, fillColor, strokeColor, strokeWidth, opacity, rotation } = mapObject;
   
@@ -645,7 +670,7 @@ export function renderMapObject(
   } else if (shape === 'light') {
     renderLightShape(ctx, mapObject, zoom, isDMView);
   } else if (shape === 'portal') {
-    renderPortalShape(ctx, mapObject, zoom, isDMView);
+    renderPortalShape(ctx, mapObject, zoom, isDMView, portalActivationProgress);
   } else {
     ctx.beginPath();
     
@@ -790,7 +815,8 @@ export function renderMapObjects(
   zoom: number,
   selectedIds: string[] = [],
   style: WatabouStyle = DEFAULT_STYLE,
-  isDMView: boolean = false
+  isDMView: boolean = false,
+  portalActivations?: Map<string, number>
 ) {
   // Sort by renderOrder (ascending = drawn first / underneath).
   // Tie-break: selected objects render on top.
@@ -802,7 +828,8 @@ export function renderMapObjects(
   });
   
   sortedObjects.forEach((obj) => {
-    renderMapObject(ctx, obj, zoom, selectedIds.includes(obj.id), style, isDMView);
+    const activation = portalActivations?.get(obj.id) ?? 0;
+    renderMapObject(ctx, obj, zoom, selectedIds.includes(obj.id), style, isDMView, activation);
   });
 }
 
