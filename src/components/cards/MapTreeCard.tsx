@@ -463,6 +463,8 @@ function GroupNode({
   onDragLeaveGroup,
   onDragStartGroup,
   onDragEndGroup,
+  open,
+  onOpenChange,
 }: {
   group: EntityGroup;
   entities: TreeEntity[];
@@ -485,8 +487,9 @@ function GroupNode({
   onDragLeaveGroup?: () => void;
   onDragStartGroup?: (group: EntityGroup) => void;
   onDragEndGroup?: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
 
   const memberEntities = entities.filter(e =>
@@ -494,7 +497,7 @@ function GroupNode({
   );
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={onOpenChange}>
       <div
         className={`flex items-center gap-0.5 group transition-colors ${
           isDropTarget ? 'bg-primary/20 ring-1 ring-primary/40 rounded' : ''
@@ -1212,6 +1215,30 @@ export const MapTreeCardContent: React.FC = () => {
     () => new Set(maps.map(m => m.id))
   );
   const [unassignedExpanded, setUnassignedExpanded] = useState(true);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+
+  const toggleGroupOpen = useCallback((groupId: string) => {
+    setCollapsedGroupIds(prev => {
+      const next = new Set(prev);
+      next.has(groupId) ? next.delete(groupId) : next.add(groupId);
+      return next;
+    });
+  }, []);
+
+  const toggleAllGroupsInMap = useCallback((mapId: string) => {
+    const entityIds = new Set((entitiesByMap.byMap[mapId] || []).map(e => e.id));
+    const relevantGroupIds = groups
+      .filter(g => g.members.some(m => entityIds.has(m.id)))
+      .map(g => g.id);
+    if (relevantGroupIds.length === 0) return;
+    // If any are expanded, collapse all; otherwise expand all
+    const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
+    setCollapsedGroupIds(prev => {
+      const next = new Set(prev);
+      relevantGroupIds.forEach(id => anyExpanded ? next.add(id) : next.delete(id));
+      return next;
+    });
+  }, [groups, entitiesByMap, collapsedGroupIds]);
 
   const toggleMapNode = useCallback((mapId: string) => {
     setExpandedMapNodes(prev => {
@@ -1263,6 +1290,14 @@ export const MapTreeCardContent: React.FC = () => {
             onDragLeaveGroup={handleDragLeaveGroup}
             onDragStartGroup={handleDragStartGroup}
             onDragEndGroup={handleDragEnd}
+            open={!collapsedGroupIds.has(group.id)}
+            onOpenChange={(isOpen) => {
+              setCollapsedGroupIds(prev => {
+                const next = new Set(prev);
+                isOpen ? next.delete(group.id) : next.add(group.id);
+                return next;
+              });
+            }}
           />
         ))}
         {setUngrouped.map(entity => (
@@ -1439,6 +1474,26 @@ export const MapTreeCardContent: React.FC = () => {
                 <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
                   {entityCount}
                 </Badge>
+
+                {/* Collapse/expand groups within this map */}
+                {(() => {
+                  const entityIds = new Set(mapEntities.map(e => e.id));
+                  const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
+                  if (!hasGroups) return null;
+                  const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
+                  const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
+                  return (
+                    <button
+                      className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                      title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
+                      onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
+                    >
+                      {anyExpanded
+                        ? <ChevronsUp className="h-3.5 w-3.5" />
+                        : <ChevronsDown className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })()}
 
                 {/* Reorder arrows */}
                 <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
