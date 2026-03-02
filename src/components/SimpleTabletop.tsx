@@ -118,6 +118,7 @@ import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
 import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
+import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 
 import { Z_INDEX } from "../lib/zIndex";
@@ -230,6 +231,9 @@ export const SimpleTabletop = () => {
   
   // Canvas dimensions for post-processing
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+
+  // ── Multi-map entity filtering (must be before fogBounds which uses isEntityVisible) ──
+  const { isEntityVisible } = useActiveMapFilter();
 
   // Pan and zoom state - initialize from session store
   const selectedMapId = useMapStore((state) => state.selectedMapId);
@@ -460,7 +464,7 @@ export const SimpleTabletop = () => {
     let minX = 0, minY = 0, maxX = vw, maxY = vh;
 
     // Expand to include all regions (in world space → screen space)
-    regions.forEach((region) => {
+    regions.filter(r => isEntityVisible(r.mapId)).forEach((region) => {
       let rMinX: number, rMinY: number, rMaxX: number, rMaxY: number;
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
         const xs = region.pathPoints.map((p) => p.x);
@@ -489,7 +493,7 @@ export const SimpleTabletop = () => {
     const totalH = Math.max(vh, maxY) - originY;
 
     return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
-  }, [canvasDimensions.width, canvasDimensions.height, regions, transform]);
+  }, [canvasDimensions.width, canvasDimensions.height, regions, transform, isEntityVisible]);
 
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
@@ -763,6 +767,13 @@ export const SimpleTabletop = () => {
   const { dmFogVisibility } = useUiModeStore();
 
   const { maps, getVisibleMaps, getActiveRegionAt } = useMapStore();
+
+  // ── Multi-map filtered entity lists ──
+
+  // Filtered entity lists — only entities belonging to active maps (or unassigned legacy entities)
+  const filteredTokens = useMemo(() => tokens.filter(t => isEntityVisible(t.mapId)), [tokens, isEntityVisible]);
+  const filteredMapObjects = useMemo(() => mapObjects.filter(o => isEntityVisible(o.mapId)), [mapObjects, isEntityVisible]);
+  const filteredRegions = useMemo(() => regions.filter(r => isEntityVisible(r.mapId)), [regions, isEntityVisible]);
 
   const { isInCombat, currentTurnIndex, initiativeOrder, restrictMovement } = useInitiativeStore();
 
@@ -2441,6 +2452,12 @@ export const SimpleTabletop = () => {
 
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
+
+    // ── Multi-map filtering: shadow raw store arrays with map-scoped versions ──
+    // All rendering code below uses these local aliases instead of the raw store data.
+    const tokens = filteredTokens;
+    const mapObjects = filteredMapObjects;
+    const regions = filteredRegions;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -5962,7 +5979,7 @@ export const SimpleTabletop = () => {
   // Redraw when transform, tokens, regions, path, or combat state changes
   useEffect(() => {
     redrawCanvas();
-  }, [transform, tokens, regions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
+  }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
 
   // --- Auto-pause animations while panning or fog brush is active ---
   const setAnimationsPaused = useUiModeStore((state) => state.setAnimationsPaused);
@@ -6494,6 +6511,10 @@ export const SimpleTabletop = () => {
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Use map-filtered entities for hit-testing
+    const tokens = filteredTokens;
+    const mapObjects = filteredMapObjects;
+    const regions = filteredRegions;
 
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -7223,6 +7244,10 @@ export const SimpleTabletop = () => {
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Use map-filtered entities for hit-testing
+    const tokens = filteredTokens;
+    const mapObjects = filteredMapObjects;
+    const regions = filteredRegions;
 
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -8246,6 +8271,10 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Use map-filtered entities for hit-testing
+    const tokens = filteredTokens;
+    const mapObjects = filteredMapObjects;
+    const regions = filteredRegions;
     // ── FOG REVEAL BRUSH: commit painted area on mouse up ──
     if (isFogBrushPainting) {
       setIsFogBrushPainting(false);
