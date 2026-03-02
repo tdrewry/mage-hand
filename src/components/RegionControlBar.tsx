@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -141,6 +141,52 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     toast.success('Portal created from region');
   };
   
+  const handleConvertToWalls = () => {
+    let wallCount = 0;
+    
+    selectedRegions.forEach(region => {
+      let points: { x: number; y: number }[];
+      
+      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
+        // Path region: use path points directly (offset by region position)
+        points = region.pathPoints.map(p => ({ x: region.x + p.x, y: region.y + p.y }));
+      } else {
+        // Rectangle region: 4 corners
+        const { x, y, width, height } = region;
+        points = [
+          { x, y },
+          { x: x + width, y },
+          { x: x + width, y: y + height },
+          { x, y: y + height },
+          { x, y }, // close the loop
+        ];
+      }
+      
+      // Create a single wall MapObject from the points
+      addMapObject({
+        position: { x: points[0].x, y: points[0].y },
+        width: 0,
+        height: 0,
+        shape: 'wall',
+        category: 'wall',
+        fillColor: 'transparent',
+        strokeColor: '#ef4444',
+        strokeWidth: 2,
+        opacity: 1,
+        castsShadow: false,
+        blocksMovement: true,
+        blocksVision: true,
+        revealedByLight: false,
+        selected: false,
+        wallPoints: points,
+        mapId: region.mapId,
+      });
+      wallCount++;
+    });
+    
+    toast.success(`Created ${wallCount} wall(s) from region edges`);
+  };
+  
   return (
     <>
       <div 
@@ -275,6 +321,18 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
               </Button>
             </>
           )}
+          
+          {/* Convert to Walls */}
+          <div className="h-4 w-px bg-border" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={handleConvertToWalls}
+          >
+            <Fence className="h-3 w-3 mr-1" />
+            Walls
+          </Button>
           
           <div className="h-4 w-px bg-border" />
           
