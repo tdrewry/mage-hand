@@ -1,9 +1,10 @@
 // src/lib/net/ephemeral/miscHandlers.ts
-// Registers ephemeral handlers for fog, dice, initiative, groups, roles, and assets.
+// Registers ephemeral handlers for fog, dice, initiative, groups, roles, actions, and assets.
 
 import { ephemeralBus } from "@/lib/net";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useFogStore } from "@/stores/fogStore";
+import { useActionStore } from "@/stores/actionStore";
 import type {
   FogCursorPreviewPayload,
   FogRevealPreviewPayload,
@@ -15,6 +16,7 @@ import type {
   GroupDragPreviewPayload,
   RoleHandRaisePayload,
   AssetUploadProgressPayload,
+  ActionQueueSyncPayload,
 } from "./types";
 
 let registered = false;
@@ -68,6 +70,11 @@ export function registerMiscHandlers(): void {
   // ── Roles ──
   ephemeralBus.on("role.handRaise", (_data: RoleHandRaisePayload, userId) => {
     store.getState().setHandRaise(userId);
+  });
+
+  // ── Actions (DM queue sync) ──
+  ephemeralBus.on("action.queue.sync", (data: ActionQueueSyncPayload, _userId) => {
+    useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory);
   });
 
   // ── Assets ──

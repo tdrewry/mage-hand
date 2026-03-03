@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type {
   ActionQueueEntry,
   AttackDefinition,
@@ -13,7 +14,21 @@ import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectImpact } from '@/types/effectTypes';
+import { ephemeralBus } from '@/lib/net';
 
+/** Broadcast the current action queue state to other DM sessions */
+function broadcastActionQueue() {
+  const { currentAction, pendingActions, actionHistory } = useActionStore.getState();
+  try {
+    ephemeralBus.emit('action.queue.sync', {
+      currentAction,
+      pendingActions,
+      actionHistory,
+    });
+  } catch {
+    // ephemeralBus may not be connected — silently ignore
+  }
+}
 export interface ResolutionFlash {
   tokenId: string;
   x: number;
@@ -90,11 +105,16 @@ interface ActionActions {
 
   /** Clear expired flashes */
   clearFlashes: () => void;
+
+  /** Hydrate the full action queue from an external source (ephemeral sync) */
+  hydrateQueue: (currentAction: ActionQueueEntry | null, pendingActions: ActionQueueEntry[], actionHistory: ActionHistoryEntry[]) => void;
 }
 
 type ActionStore = ActionState & ActionActions;
 
-export const useActionStore = create<ActionStore>((set, get) => ({
+export const useActionStore = create<ActionStore>()(
+  persist(
+    (set, get) => ({
   currentAction: null,
   pendingActions: [],
   isTargeting: false,
@@ -498,4 +518,40 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const now = Date.now();
     set({ resolutionFlashes: get().resolutionFlashes.filter(f => now - f.startTime < 1500) });
   },
-}));
+
+  hydrateQueue: (currentAction, pendingActions, actionHistory) => {
+    set({
+      currentAction,
+      pendingActions,
+      actionHistory,
+      isTargeting: currentAction?.phase === 'targeting',
+      targetingMousePos: null,
+      resolutionFlashes: [],
+    });
+  },
+}),
+    {
+      name: 'vtt-action-store',
+      partialize: (state) => ({
+        currentAction: state.currentAction,
+        pendingActions: state.pendingActions,
+        actionHistory: state.actionHistory,
+      }),
+    }
+  )
+);
+
+// Auto-broadcast action queue changes to other DM sessions via ephemeral bus
+let _lastBroadcastJson = '';
+useActionStore.subscribe((state) => {
+  // Only broadcast meaningful queue state changes (skip flashes, mouse pos)
+  const snapshot = JSON.stringify({
+    ca: state.currentAction,
+    pa: state.pendingActions,
+    ah: state.actionHistory,
+  });
+  if (snapshot !== _lastBroadcastJson) {
+    _lastBroadcastJson = snapshot;
+    broadcastActionQueue();
+  }
+});
