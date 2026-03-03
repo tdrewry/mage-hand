@@ -28,6 +28,7 @@ export const FIREBALL: EffectTemplate = {
   damageType: 'fire',
   description: 'A bright streak flashes to a point and blossoms into a 20-foot-radius explosion of flame.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const LIGHTNING_BOLT: EffectTemplate = {
@@ -89,6 +90,7 @@ export const WALL_OF_FIRE: EffectTemplate = {
   damageType: 'fire',
   description: 'A wall of fire up to 60 feet long, 20 feet high, and 1 foot thick appears.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const GREASE: EffectTemplate = {
@@ -110,6 +112,7 @@ export const GREASE: EffectTemplate = {
   damageType: undefined,
   description: 'Slick grease covers a 10-foot square. The area becomes difficult terrain.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const WEB: EffectTemplate = {
@@ -131,6 +134,7 @@ export const WEB: EffectTemplate = {
   damageType: undefined,
   description: 'Thick, sticky webbing fills a 20-foot cube. The area is difficult terrain.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const BURNING_HANDS: EffectTemplate = {
@@ -171,6 +175,7 @@ export const DARKNESS: EffectTemplate = {
   damageType: undefined,
   description: 'Magical darkness spreads from a point within range to fill a 15-foot-radius sphere.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const SPIRIT_GUARDIANS: EffectTemplate = {
@@ -191,6 +196,7 @@ export const SPIRIT_GUARDIANS: EffectTemplate = {
   damageType: 'radiant',
   description: 'Spirits flit around you in a 15-foot radius. Enemies take damage when entering or starting their turn.',
   isBuiltIn: true,
+  ranged: true,
 };
 
 export const THUNDERWAVE: EffectTemplate = {
