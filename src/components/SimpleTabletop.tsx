@@ -264,7 +264,7 @@ export const SimpleTabletop = () => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
   // ── Multi-map entity filtering (must be before fogBounds which uses isEntityVisible) ──
-  const { isEntityVisible } = useActiveMapFilter();
+  const { activeMapIds, isEntityVisible } = useActiveMapFilter();
 
   // Pan and zoom state - initialize from session store
   const selectedMapId = useMapStore((state) => state.selectedMapId);
@@ -1146,10 +1146,11 @@ export const SimpleTabletop = () => {
         origin: effect.origin,
         direction: effect.direction ?? 0,
         gridSize,
-        tokens: [{ ...token }] as Token[], // Only test the moved token
+        tokens: [{ ...token }] as Token[],
         mapObjects: [],
         casterId: effect.casterId,
         mapId: tokenMapId,
+        activeMapIds: useMapStore.getState().maps.filter(m => m.active).reduce((s, m) => s.add(m.id), new Set<string>()),
       });
 
       const tokenHit = impacts.find(i => i.targetId === tokenId && i.targetType === 'token');
@@ -6779,6 +6780,7 @@ export const SimpleTabletop = () => {
           mapObjects: filteredMapObjects,
           casterId: placement.casterId,
           mapId: activeMapId,
+          activeMapIds,
         });
 
         // Place the effect

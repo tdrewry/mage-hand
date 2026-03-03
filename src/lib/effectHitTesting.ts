@@ -37,6 +37,8 @@ export interface HitTestParams {
   casterId?: string;
   /** Only test tokens/objects on this map */
   mapId?: string;
+  /** Set of currently active map IDs – tokens/objects on inactive maps are excluded */
+  activeMapIds?: Set<string>;
 }
 
 /**
@@ -52,6 +54,7 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
     mapObjects,
     casterId,
     mapId,
+    activeMapIds,
   } = params;
 
   const impacts: EffectImpact[] = [];
@@ -61,9 +64,12 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
   const effectGeom = buildEffectGeometry(template, origin, direction, gridSize);
 
   // --- Test tokens ---
-  const filteredTokens = mapId
+  let filteredTokens = mapId
     ? tokens.filter((t) => t.mapId === mapId || !t.mapId)
     : tokens;
+  if (activeMapIds && activeMapIds.size > 0) {
+    filteredTokens = filteredTokens.filter((t) => !t.mapId || activeMapIds.has(t.mapId));
+  }
 
   for (const token of filteredTokens) {
     // Burst exclusion: skip caster
@@ -83,9 +89,12 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
   }
 
   // --- Test map objects ---
-  const filteredObjects = mapId
+  let filteredObjects = mapId
     ? mapObjects.filter((o) => (o as any).mapId === mapId || !(o as any).mapId)
     : mapObjects;
+  if (activeMapIds && activeMapIds.size > 0) {
+    filteredObjects = filteredObjects.filter((o) => !(o as any).mapId || activeMapIds.has((o as any).mapId));
+  }
 
   for (const obj of filteredObjects) {
     const footprint = mapObjectFootprintRect(obj);
