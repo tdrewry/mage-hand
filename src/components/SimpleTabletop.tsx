@@ -11,7 +11,6 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-// MapManager import removed — now uses card system exclusively
 import { TokenContextManager } from "./TokenContextManager";
 import { CardManager } from "./CardManager";
 import { CircularButtonBar } from "./CircularButtonBar";
@@ -149,7 +148,6 @@ export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
-  // showMapManager state removed — Map Manager now uses the card system exclusively
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
 
   // Helper function to capture full region transform state for undo/redo
@@ -10410,7 +10408,6 @@ export const SimpleTabletop = () => {
       <VerticalToolbar
         mode={renderingMode}
         fabricCanvas={null}
-        onOpenMapManager={undefined}
         onAddRegion={addNewRegion}
         onStartPolygonDraw={() => startPathDrawing("polygon")}
         onStartFreehandDraw={() => startPathDrawing("freehand")}

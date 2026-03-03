@@ -114,213 +114,38 @@ export interface SessionState {
   selectedTokenIds: string[];
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
-  // Per-map viewport transforms (mapId -> transform)
   viewportTransforms: Record<string, ViewportTransform>;
-  /**
-   * Adds a new token to the session.
-   * @param token The token to add.
-   */
+
   addToken: (token: Token) => void;
-
-  /**
-   * Replaces the entire tokens array.
-   * @param tokens The new array of tokens.
-   */
   setTokens: (tokens: Token[]) => void;
-
-  /**
-   * Updates the position of a specific token.
-   * @param tokenId The ID of the token.
-   * @param x The new x-coordinate.
-   * @param y The new y-coordinate.
-   */
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
-
-  /**
-   * Updates the label text of a specific token.
-   * @param tokenId The ID of the token.
-   * @param label The new label text.
-   */
   updateTokenLabel: (tokenId: string, label: string) => void;
-
-  /**
-   * Updates the name of a specific token.
-   * @param tokenId The ID of the token.
-   * @param name The new name.
-   */
   updateTokenName: (tokenId: string, name: string) => void;
-
-  /**
-   * Updates the label position for a specific token.
-   * @param tokenId The ID of the token.
-   * @param labelPosition The new label position ('above', 'center', or 'below').
-   */
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
-
-  /**
-   * Updates the label style for a specific token.
-   * @param tokenId The ID of the token.
-   * @param labelColor The new text color.
-   * @param labelBackgroundColor The new background color.
-   */
   updateTokenLabelStyle: (tokenId: string, labelColor?: string, labelBackgroundColor?: string) => void;
-
-  /**
-   * Updates the color of a specific token.
-   * @param tokenId The ID of the token.
-   * @param color The new color string.
-   */
   updateTokenColor: (tokenId: string, color: string) => void;
-
-  /**
-   * Updates the image and/or image hash for a specific token.
-   * @param tokenId The ID of the token.
-   * @param imageUrl The new image URL.
-   * @param imageHash The new image hash for synchronization.
-   */
   updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
-
-  /**
-   * Updates whether a token has vision.
-   * @param tokenId The ID of the token.
-   * @param hasVision True if it has vision, false otherwise.
-   */
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
-
-  /**
-   * Updates the vision range of a specific token.
-   * @param tokenId The ID of the token.
-   * @param visionRange The new vision range in grid units.
-   */
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
-
-  /**
-   * Updates the illumination source settings for a specific token.
-   * @param tokenId The ID of the token.
-   * @param illumination Partial illumination source settings to apply.
-   */
   updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
-
-  /**
-   * Sets the owner (role) of a specific token.
-   * @param tokenId The ID of the token.
-   * @param ownerId The ID of the role that owns the token.
-   */
   setTokenOwner: (tokenId: string, ownerId: string) => void;
-
-  /**
-   * Updates the size of a specific token.
-   * @param tokenId The ID of the token.
-   * @param gridWidth The new width in grid units.
-   * @param gridHeight The new height in grid units.
-   */
   updateTokenSize: (tokenId: string, gridWidth: number, gridHeight: number) => void;
-
-  /**
-   * Updates the details (notes, quickReferenceUrl) of a specific token.
-   * @param tokenId The ID of the token.
-   * @param notes The GM notes for this token instance.
-   * @param quickReferenceUrl The external reference URL.
-   */
   updateTokenDetails: (tokenId: string, notes?: string, quickReferenceUrl?: string, statBlockJson?: string) => void;
   updateTokenStatBlockJson: (tokenId: string, json: string) => void;
-
-  /**
-   * Updates the entity reference for a specific token.
-   * @param tokenId The ID of the token.
-   * @param entityRef The entity reference object.
-   */
   updateTokenEntityRef: (tokenId: string, entityRef: EntityRef | undefined) => void;
-
-  /**
-   * Adds an appearance variant to a token.
-   * @param tokenId The ID of the token.
-   * @param variant The appearance variant to add.
-   */
   addAppearanceVariant: (tokenId: string, variant: AppearanceVariant) => void;
-
-  /**
-   * Removes an appearance variant from a token.
-   * @param tokenId The ID of the token.
-   * @param variantId The ID of the variant to remove.
-   */
   removeAppearanceVariant: (tokenId: string, variantId: string) => void;
-
-  /**
-   * Updates an existing appearance variant.
-   * @param tokenId The ID of the token.
-   * @param variantId The ID of the variant to update.
-   * @param updates Partial updates to apply.
-   */
   updateAppearanceVariant: (tokenId: string, variantId: string, updates: Partial<AppearanceVariant>) => void;
-
-  /**
-   * Sets the active appearance variant (applies its image/size to the token).
-   * @param tokenId The ID of the token.
-   * @param variantId The ID of the variant to activate.
-   */
   setActiveVariant: (tokenId: string, variantId: string) => void;
-
-  /**
-   * Removes a token from the session.
-   * @param tokenId The ID of the token to remove.
-   */
   removeToken: (tokenId: string) => void;
-
-  /**
-   * Clears all tokens from the current session.
-   */
   clearAllTokens: () => void;
-
-  /**
-   * Sets the list of currently selected tokens.
-   * @param tokenIds Array of token IDs to select.
-   */
   setSelectedTokens: (tokenIds: string[]) => void;
-
-  /**
-   * Sets the global token visibility rule.
-   * @param visibility The visibility setting ('all', 'owned', or 'dm-only').
-   */
   setTokenVisibility: (visibility: TokenVisibility) => void;
-
-  /**
-   * Sets the global label visibility rule.
-   * @param visibility The visibility setting ('show', 'hide', or 'selected').
-   */
   setLabelVisibility: (visibility: LabelVisibility) => void;
-
-  /**
-   * Adds a new player to the session.
-   * @param player The player to add.
-   */
   addPlayer: (player: Player) => void;
-
-  /**
-   * Sets the current player and their role.
-   * @param playerId The ID of the current player.
-   * @param role The role of the player ('dm' or 'player').
-   */
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
-
-  /**
-   * Initializes the session with the given ID.
-   * @param sessionId The session ID.
-   */
   initializeSession: (sessionId?: string) => void;
-
-  /**
-   * Sets the viewport transform (pan and zoom) for a specific map.
-   * @param mapId The ID of the map.
-   * @param transform The new viewport transform.
-   */
   setViewportTransform: (mapId: string, transform: ViewportTransform) => void;
-
-  /**
-   * Gets the viewport transform for a specific map.
-   * @param mapId The ID of the map.
-   * @returns The viewport transform for that map.
-   */
   getViewportTransform: (mapId: string) => ViewportTransform;
 }
 
@@ -336,22 +161,13 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   viewportTransforms: {},
   
   addToken: (token) => {
-    set((state) => ({
-      tokens: [...state.tokens, token],
-    }));
-    // Sync happens automatically via syncPatch middleware
+    set((state) => ({ tokens: [...state.tokens, token] }));
   },
   
-  setTokens: (tokens) => {
-    set({ tokens });
-  },
+  setTokens: (tokens) => set({ tokens }),
   
   updateTokenPosition: (tokenId, x, y) => {
-    // Movement lock is now handled by initiativeStore.restrictMovement
-    // The actual blocking happens in the UI layer (SimpleTabletop/useTokenInteraction)
     const state = get();
-    
-    // Throttle position updates to prevent localStorage overflow
     const existingToken = state.tokens.find(t => t.id === tokenId);
     
     // Only update if position actually changed significantly (avoid micro-movements)
@@ -363,7 +179,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
           token.id === tokenId ? { ...token, x, y } : token
         ),
       }));
-      // Sync happens automatically via syncPatch middleware (throttled)
     }
   },
 
@@ -373,7 +188,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, label } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenName: (tokenId, name) => {
@@ -382,7 +196,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, name } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenLabelPosition: (tokenId, labelPosition) => {
@@ -391,7 +204,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, labelPosition } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenLabelStyle: (tokenId, labelColor, labelBackgroundColor) => {
@@ -400,7 +212,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, labelColor, labelBackgroundColor } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenColor: (tokenId, color) => {
@@ -409,7 +220,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, color } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenImage: (tokenId, imageUrl, imageHash) => {
@@ -418,7 +228,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, imageUrl, imageHash } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenVision: (tokenId, hasVision) => {
@@ -427,7 +236,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, hasVision } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenVisionRange: (tokenId, visionRange) => {
@@ -436,26 +244,20 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, visionRange } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenIllumination: (tokenId, illumination) => {
     const existingToken = get().tokens.find(t => t.id === tokenId);
     if (!existingToken) return;
 
-    // Merge illumination into the first source, or create one if none exists
     const existingSources = existingToken.illuminationSources || [];
     let updatedSources: IlluminationSource[];
 
     if (existingSources.length > 0) {
-      // Update the first source with the new settings
       updatedSources = existingSources.map((source, index) =>
-        index === 0
-          ? { ...source, ...illumination }
-          : source
+        index === 0 ? { ...source, ...illumination } : source
       );
     } else {
-      // Create a new illumination source
       updatedSources = [{
         id: `illum-${tokenId}-${Date.now()}`,
         name: 'Vision',
@@ -483,7 +285,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
           : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   setTokenOwner: (tokenId, ownerId) => {
@@ -492,7 +293,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, ownerId } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenSize: (tokenId, gridWidth, gridHeight) => {
@@ -501,7 +301,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, gridWidth, gridHeight } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenDetails: (tokenId, notes, quickReferenceUrl, statBlockJson) => {
@@ -510,7 +309,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, notes, quickReferenceUrl, statBlockJson } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateTokenStatBlockJson: (tokenId, json) => {
@@ -527,7 +325,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
         token.id === tokenId ? { ...token, entityRef } : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   addAppearanceVariant: (tokenId, variant) => {
@@ -537,32 +334,22 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
           ? { 
               ...token, 
               appearanceVariants: [...(token.appearanceVariants || []), variant],
-              // If this is the first variant, also set it as active
               activeVariantId: token.appearanceVariants?.length ? token.activeVariantId : variant.id,
             } 
           : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   removeAppearanceVariant: (tokenId, variantId) => {
     set((state) => ({
       tokens: state.tokens.map((token) => {
         if (token.id !== tokenId) return token;
-        
         const updatedVariants = (token.appearanceVariants || []).filter(v => v.id !== variantId);
-        // If we removed the active variant, clear the activeVariantId
         const newActiveId = token.activeVariantId === variantId ? undefined : token.activeVariantId;
-        
-        return {
-          ...token,
-          appearanceVariants: updatedVariants,
-          activeVariantId: newActiveId,
-        };
+        return { ...token, appearanceVariants: updatedVariants, activeVariantId: newActiveId };
       }),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateAppearanceVariant: (tokenId, variantId, updates) => {
@@ -578,7 +365,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
           : token
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   setActiveVariant: (tokenId, variantId) => {
@@ -588,7 +374,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     const variant = token.appearanceVariants?.find(v => v.id === variantId);
     if (!variant) return;
 
-    // Apply the variant's settings to the token
     set((state) => ({
       tokens: state.tokens.map((t) =>
         t.id === tokenId
@@ -597,13 +382,11 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
               activeVariantId: variantId,
               gridWidth: variant.gridWidth,
               gridHeight: variant.gridHeight,
-              // Note: imageUrl is not stored in variant - caller must load from IndexedDB and call updateTokenImage
               imageHash: variant.imageHash,
             }
           : t
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
   
   removeToken: (tokenId) => {
@@ -611,7 +394,6 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
       tokens: state.tokens.filter((token) => token.id !== tokenId),
       selectedTokenIds: state.selectedTokenIds.filter(id => id !== tokenId),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   clearAllTokens: () =>

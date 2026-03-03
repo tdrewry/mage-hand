@@ -29,24 +29,6 @@ export enum CardType {
   NETWORK_DEMO = 'network_demo',
 }
 
-export interface ToolsCardProps {
-  mode: 'edit' | 'play';
-  fabricCanvas?: any;
-  onOpenMapManager?: () => void;
-  onAddRegion?: () => void;
-  onStartPolygonDraw?: () => void;
-  onStartFreehandDraw?: () => void;
-  onFinishPolygonDraw?: () => void;
-  isDrawingPolygon?: boolean;
-  isDrawingFreehand?: boolean;
-  isGridSnappingEnabled?: boolean;
-  onToggleGridSnapping?: () => void;
-  showNegativeSpacePanel: boolean;
-  onToggleNegativeSpacePanel: () => void;
-  showRegions: boolean;
-  onToggleRegions: () => void;
-}
-
 export interface CardPosition {
   x: number;
   y: number;
