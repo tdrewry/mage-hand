@@ -45,6 +45,7 @@ interface VerticalToolbarProps {
   fabricCanvas?: FabricCanvas | null;
   
   // Edit mode props
+  /** @deprecated Use card system instead */
   onOpenMapManager?: () => void;
   onAddRegion?: () => void;
   onStartPolygonDraw?: () => void;
@@ -252,7 +253,24 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           <ToolbarButton
             icon={MapPlus}
             label="Map Manager"
-            onClick={onOpenMapManager || (() => {})}
+            onClick={() => {
+              const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
+              if (mapManagerCard) {
+                setVisibility(mapManagerCard.id, !mapManagerCard.isVisible);
+              } else {
+                registerCard({
+                  type: CardType.MAP_MANAGER,
+                  title: 'Map Manager',
+                  defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+                  defaultSize: { width: 600, height: 500 },
+                  minSize: { width: 400, height: 300 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+            }}
+            isActive={cards.find((c) => c.type === CardType.MAP_MANAGER)?.isVisible}
             variant="ghost"
             size="xs"
           />
