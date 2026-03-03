@@ -1111,7 +1111,80 @@ export const SimpleTabletop = () => {
     }
   }, [tokens, isDM, executeTeleport]);
 
-  // Global mouseup listener to ensure drag states are always reset
+  // ── Trap trigger check — detects when a token lands inside a persistent effect area ──
+  const checkTrapTrigger = useCallback((tokenId: string) => {
+    const token = tokens.find(t => t.id === tokenId);
+    if (!token) return;
+
+    const effectState = useEffectStore.getState();
+    const tokenMapId = token.mapId ?? useMapStore.getState().selectedMapId;
+
+    // Only check persistent effects on the same map
+    const persistentEffects = effectState.placedEffects.filter(
+      e => e.template.persistence === 'persistent' && e.mapId === tokenMapId
+    );
+    if (persistentEffects.length === 0) return;
+
+    const allTokens = useSessionStore.getState().tokens;
+    const allMapObjects = useMapObjectStore.getState().mapObjects;
+
+    // Determine grid size from region or default
+    const regions = useRegionStore.getState().regions;
+    const tokenRegion = regions.find(r => {
+      const rx = r.x ?? 0, ry = r.y ?? 0;
+      const rw = r.width ?? 0, rh = r.height ?? 0;
+      return token.x >= rx && token.x <= rx + rw && token.y >= ry && token.y <= ry + rh;
+    });
+    const gridSize = tokenRegion ? (tokenRegion.gridSize ?? 40) * (tokenRegion.gridScale ?? 1) : 40;
+
+    for (const effect of persistentEffects) {
+      const impacts = computeEffectImpacts({
+        template: effect.template,
+        origin: effect.origin,
+        direction: effect.direction ?? 0,
+        gridSize,
+        tokens: [{ ...token }] as Token[], // Only test the moved token
+        mapObjects: [],
+        casterId: effect.casterId,
+        mapId: tokenMapId,
+      });
+
+      const tokenHit = impacts.find(i => i.targetId === tokenId && i.targetType === 'token');
+      if (!tokenHit) continue;
+
+      // Token entered a trap/persistent effect — open Action Card
+      const cardStore = useCardStore.getState();
+      const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+      if (actionCard) {
+        cardStore.setVisibility(actionCard.id, true);
+      } else {
+        cardStore.registerCard({
+          type: CardType.ACTION_CARD,
+          title: 'Action',
+          defaultPosition: { x: window.innerWidth - 420, y: 80 },
+          defaultSize: { width: 400, height: 500 },
+          minSize: { width: 340, height: 400 },
+          isResizable: true,
+          isClosable: true,
+          defaultVisible: true,
+        });
+      }
+
+      useActionStore.getState().startEffectAction({
+        sourceTokenId: effect.casterId,
+        templateId: effect.templateId,
+        templateName: effect.template.name,
+        damageType: effect.template.damageType,
+        damageFormula: undefined, // DM resolves damage manually for traps
+        placedEffectId: effect.id,
+        impacts: [tokenHit],
+      });
+
+      // Only trigger once per move (first matching effect)
+      break;
+    }
+  }, [tokens]);
+
   useEffect(() => {
     if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex || isRotatingMapObject) {
       const handleGlobalMouseUp = () => {
@@ -9298,6 +9371,8 @@ export const SimpleTabletop = () => {
             
             // Check for portal teleportation after valid movement
             checkPortalTeleport(draggedTokenId);
+            // Check if token entered a persistent effect (trap trigger)
+            checkTrapTrigger(draggedTokenId);
           }
         }
       }
@@ -10105,6 +10180,8 @@ export const SimpleTabletop = () => {
             
             // Check for portal teleportation after valid movement
             checkPortalTeleport(draggedTokenId);
+            // Check if token entered a persistent effect (trap trigger)
+            checkTrapTrigger(draggedTokenId);
           }
         }
 
