@@ -698,6 +698,10 @@ export const SimpleTabletop = () => {
   const [isFreehandDrawing, setIsFreehandDrawing] = useState(false);
   const [lastFreehandPoint, setLastFreehandPoint] = useState<{ x: number; y: number } | null>(null);
 
+  // Door drawing state (two-click: hinge then far edge)
+  const [doorDrawingActive, setDoorDrawingActive] = useState(false);
+  const [doorHingePoint, setDoorHingePoint] = useState<{ x: number; y: number } | null>(null);
+
   // Track tokens moved by region drag to prevent individual snapping
   const [tokensMovedByRegion, setTokensMovedByRegion] = useState<string[]>([]);
 
@@ -1374,6 +1378,13 @@ export const SimpleTabletop = () => {
       // Escape to clear selection
       else if (e.key === 'Escape') {
         e.preventDefault();
+        // Cancel door drawing if active
+        if (doorDrawingActive) {
+          setDoorDrawingActive(false);
+          setDoorHingePoint(null);
+          redrawCanvas();
+          return;
+        }
         // Cancel targeting mode if active
         const actionS = useActionStore.getState();
         if (actionS.isTargeting) {
@@ -3573,6 +3584,54 @@ export const SimpleTabletop = () => {
           ctx.arc(point.x, point.y, 4 / transform.zoom, 0, 2 * Math.PI);
           ctx.fill();
         });
+      }
+      ctx.restore();
+    }
+
+    // Draw door drawing preview (hinge point + line to cursor)
+    if (doorDrawingActive && doorHingePoint) {
+      ctx.save();
+      const hingeSize = 6 / transform.zoom;
+      const doorThickness = 6;
+
+      // Draw hinge point
+      ctx.fillStyle = '#8b4513';
+      ctx.strokeStyle = '#5d2e0c';
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.beginPath();
+      ctx.arc(doorHingePoint.x, doorHingePoint.y, hingeSize, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw preview line to current mouse position
+      if (lastMousePosRef.current) {
+        const cursorWorld = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+        const dx = cursorWorld.x - doorHingePoint.x;
+        const dy = cursorWorld.y - doorHingePoint.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+
+        if (length > 1) {
+          const angle = Math.atan2(dy, dx);
+          const halfThick = (doorThickness / 2) / 1; // world units
+
+          // Draw a rectangle from hinge to cursor
+          ctx.save();
+          ctx.translate(doorHingePoint.x, doorHingePoint.y);
+          ctx.rotate(angle);
+          ctx.fillStyle = 'rgba(139, 69, 19, 0.4)';
+          ctx.strokeStyle = '#5d2e0c';
+          ctx.lineWidth = 2 / transform.zoom;
+          ctx.setLineDash([5 / transform.zoom, 5 / transform.zoom]);
+          ctx.fillRect(0, -halfThick, length, doorThickness);
+          ctx.strokeRect(0, -halfThick, length, doorThickness);
+          ctx.restore();
+
+          // Draw far edge marker
+          ctx.fillStyle = '#ff6b6b';
+          ctx.beginPath();
+          ctx.arc(cursorWorld.x, cursorWorld.y, 4 / transform.zoom, 0, 2 * Math.PI);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }
@@ -6020,6 +6079,82 @@ export const SimpleTabletop = () => {
     toast.success("Path region created");
   };
 
+  // Door drawing tool: toggle on/off
+  const toggleDoorDrawing = () => {
+    if (doorDrawingActive) {
+      // Cancel
+      setDoorDrawingActive(false);
+      setDoorHingePoint(null);
+    } else {
+      // Activate — cancel any other drawing modes
+      setPathDrawingMode("none");
+      setCurrentPath([]);
+      setIsFreehandDrawing(false);
+      setDoorDrawingActive(true);
+      setDoorHingePoint(null);
+      toast.info("Click to place the door hinge, then click the far edge.");
+    }
+  };
+
+  // Handle a click during door drawing
+  const handleDoorDrawClick = (worldX: number, worldY: number) => {
+    if (!doorHingePoint) {
+      // First click: set hinge
+      setDoorHingePoint({ x: worldX, y: worldY });
+      toast.info("Now click the far edge of the door.");
+      return;
+    }
+
+    // Second click: create door
+    const hinge = doorHingePoint;
+    const dx = worldX - hinge.x;
+    const dy = worldY - hinge.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+
+    if (length < 5) {
+      toast.error("Door is too small");
+      return;
+    }
+
+    // Angle from hinge to far edge (in degrees)
+    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+    // Center of the door
+    const cx = hinge.x + dx / 2;
+    const cy = hinge.y + dy / 2;
+
+    const doorThickness = 6;
+
+    const selectedMapId = useMapStore.getState().selectedMapId;
+
+    useMapObjectStore.getState().addMapObject({
+      position: { x: cx, y: cy },
+      width: length,
+      height: doorThickness,
+      rotation: angleDeg,
+      shape: 'door',
+      fillColor: '#8b4513',
+      strokeColor: '#5d2e0c',
+      strokeWidth: 2,
+      opacity: 1,
+      castsShadow: false,
+      blocksMovement: false,
+      blocksVision: true,
+      revealedByLight: true,
+      selected: false,
+      category: 'door',
+      isOpen: false,
+      doorType: 0,
+      label: 'Normal',
+      mapId: selectedMapId || undefined,
+    });
+
+    toast.success("Door created");
+
+    // Reset for next door (stay in door drawing mode)
+    setDoorHingePoint(null);
+  };
+
   // Function to check if point is in any region (supports both rect and path)
   const isPointInRegion = (x: number, y: number, region: CanvasRegion): boolean => {
     if (region.regionType === "path" && region.pathPoints) {
@@ -6958,6 +7093,12 @@ export const SimpleTabletop = () => {
         return; // Consume the click during targeting
       }
 
+      // Handle door drawing mode
+      if (doorDrawingActive) {
+        handleDoorDrawClick(worldPos.x, worldPos.y);
+        return;
+      }
+
       // Handle path drawing mode
       if (pathDrawingMode === "drawing") {
         if (pathDrawingType === "polygon") {
@@ -7669,6 +7810,11 @@ export const SimpleTabletop = () => {
       }
       redrawCanvas();
       // Don't return — allow panning during targeting if right-click drag
+    }
+
+    // Redraw preview during door drawing (so the line follows cursor)
+    if (doorDrawingActive && doorHingePoint) {
+      redrawCanvas();
     }
 
     // Handle freehand drawing with throttling to reduce points
@@ -10265,6 +10411,8 @@ export const SimpleTabletop = () => {
         onFinishPolygonDraw={finishPathDrawing}
         isDrawingPolygon={pathDrawingMode === "drawing" && pathDrawingType === "polygon"}
         isDrawingFreehand={pathDrawingMode === "drawing" && pathDrawingType === "freehand"}
+        isDrawingDoor={doorDrawingActive}
+        onStartDoorDraw={toggleDoorDrawing}
         isGridSnappingEnabled={isGridSnappingEnabled}
         onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
         showRegions={showRegions}
@@ -10311,9 +10459,9 @@ export const SimpleTabletop = () => {
                 ? "crosshair"
                 : isDraggingToken
                   ? "move"
-                  : pathDrawingMode === "drawing"
-                    ? "crosshair"
-                    : "auto",
+                   : pathDrawingMode === "drawing" || doorDrawingActive
+                     ? "crosshair"
+                     : "auto",
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
