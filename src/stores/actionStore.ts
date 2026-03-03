@@ -11,6 +11,7 @@ import type {
 } from '@/types/actionTypes';
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useEffectStore } from '@/stores/effectStore';
 import type { EffectImpact } from '@/types/effectTypes';
 
 export interface ResolutionFlash {
@@ -336,6 +337,15 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const { currentAction, actionHistory } = get();
     if (!currentAction || !currentAction.attack) return;
 
+    // Remove the placed effect for instant effect actions
+    if (currentAction.effectInfo?.placedEffectId && currentAction.category === 'effect') {
+      const effectStore = useEffectStore.getState();
+      const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
+      if (tpl?.persistence === 'instant') {
+        effectStore.removeEffect(currentAction.effectInfo.placedEffectId);
+      }
+    }
+
     // Build resolution flashes from targets
     const sessionTokens = useSessionStore.getState().tokens;
     const now = Date.now();
@@ -387,6 +397,17 @@ export const useActionStore = create<ActionStore>((set, get) => ({
   },
 
   cancelAction: () => {
+    const { currentAction } = get();
+
+    // Remove the placed effect for instant effect actions
+    if (currentAction?.effectInfo?.placedEffectId && currentAction.category === 'effect') {
+      const effectStore = useEffectStore.getState();
+      const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
+      if (tpl?.persistence === 'instant') {
+        effectStore.removeEffect(currentAction.effectInfo.placedEffectId);
+      }
+    }
+
     set({
       currentAction: null,
       isTargeting: false,

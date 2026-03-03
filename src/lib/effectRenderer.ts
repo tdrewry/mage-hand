@@ -31,27 +31,16 @@ export interface EffectRenderContext {
 /**
  * Render all placed effects onto the canvas.
  */
+/**
+ * Render all placed effects onto the canvas.
+ * All effects (instant and persistent) remain visible until explicitly removed.
+ */
 export function renderPlacedEffects(
   rc: EffectRenderContext,
   effects: PlacedEffect[],
-  onExpireInstant?: (effectId: string) => void,
 ): void {
   for (const effect of effects) {
-    const age = rc.time - effect.placedAt;
-
-    // Instant effects: play a 600 ms expand-then-fade animation
-    if (effect.template.persistence === 'instant') {
-      const INSTANT_DURATION = 600;
-      if (age > INSTANT_DURATION) {
-        // Notify caller to clean up expired instant effects
-        onExpireInstant?.(effect.id);
-        continue;
-      }
-      const progress = age / INSTANT_DURATION; // 0 → 1
-      renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, progress, true);
-    } else {
-      renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, 0, false);
-    }
+    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0);
   }
 }
 
@@ -113,8 +102,6 @@ function renderEffect(
   template: EffectTemplate,
   origin: { x: number; y: number },
   direction: number,
-  instantProgress: number,
-  isInstant: boolean,
 ): void {
   rc.ctx.save();
 
@@ -126,16 +113,8 @@ function renderEffect(
     template.id,
   );
 
-  let opacity = template.opacity * anim.opacityMod;
-  let scale = anim.scaleMod;
-
-  // Instant effects: expand then fade
-  if (isInstant) {
-    const expandPhase = Math.min(instantProgress / 0.3, 1.0); // 0-30% = expand
-    const fadePhase = Math.max((instantProgress - 0.5) / 0.5, 0); // 50-100% = fade
-    scale *= 0.2 + expandPhase * 0.8; // grow from 20% to 100%
-    opacity *= 1.0 - fadePhase;        // fade out in second half
-  }
+  const opacity = template.opacity * anim.opacityMod;
+  const scale = anim.scaleMod;
 
   if (opacity <= 0.01) {
     rc.ctx.restore();
