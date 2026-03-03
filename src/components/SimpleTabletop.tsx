@@ -135,6 +135,23 @@ import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
 import { setPostProcessingVisible } from "../lib/postProcessingLayer";
+import {
+  drawTokenLabel as drawTokenLabelHelper,
+  drawGhostToken as drawGhostTokenHelper,
+  drawDirectionArrow as drawDirectionArrowHelper,
+  drawTargetingLineHelper as drawTargetingLineHelperFn,
+  drawOffScreenIndicator as drawOffScreenIndicatorFn,
+  drawMapPings as drawMapPingsFn,
+  drawRemoteDragPreviews as drawRemoteDragPreviewsFn,
+  drawRemoteTokenHovers as drawRemoteTokenHoversFn,
+  drawRemoteSelectionPreviews as drawRemoteSelectionPreviewsFn,
+  drawRemoteActionTargets as drawRemoteActionTargetsFn,
+} from "../lib/canvasDrawHelpers";
+import {
+  isPointInRegion,
+  calculateTokenHexOccupancy,
+  calculateTokenSquareOccupancy,
+} from "../lib/gridOccupancy";
 
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
