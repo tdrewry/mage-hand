@@ -3949,10 +3949,7 @@ export const SimpleTabletop = () => {
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
         if (mapEffects.length > 0) {
-          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects, (expiredId) => {
-            // Clean up expired instant effects from the store
-            useEffectStore.getState().removeEffect(expiredId);
-          });
+          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
         }
         if (effectState.placement?.previewOrigin) {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
