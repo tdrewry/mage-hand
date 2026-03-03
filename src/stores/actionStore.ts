@@ -11,6 +11,7 @@ import type {
 } from '@/types/actionTypes';
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
+import type { EffectImpact } from '@/types/effectTypes';
 
 export interface ResolutionFlash {
   tokenId: string;
@@ -40,6 +41,17 @@ interface ActionState {
 interface ActionActions {
   /** Start a new attack action from a source token */
   startAttack: (sourceTokenId: string, attack: AttackDefinition) => void;
+  
+  /** Start an effect-based action with pre-populated targets (skips targeting phase) */
+  startEffectAction: (params: {
+    sourceTokenId?: string;
+    templateId: string;
+    templateName: string;
+    damageType?: string;
+    damageFormula?: string;
+    placedEffectId: string;
+    impacts: EffectImpact[];
+  }) => void;
   
   /** Add a target to the current action */
   addTarget: (target: ActionTarget) => void;
@@ -97,6 +109,95 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     };
 
     set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
+  },
+
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, placedEffectId, impacts }) => {
+    const sessionTokens = useSessionStore.getState().tokens;
+    const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
+
+    // Convert EffectImpacts to ActionTargets (only tokens, not mapObjects)
+    const targets: ActionTarget[] = impacts
+      .filter(i => i.targetType === 'token')
+      .map(i => {
+        const token = sessionTokens.find(t => t.id === i.targetId);
+        return {
+          tokenId: i.targetId,
+          tokenName: token?.name || token?.label || 'Unknown',
+          distance: i.distanceFromOrigin,
+          defenseValue: 10, // Default — DM can adjust
+          defenseType: 'flat' as const,
+          defenseLabel: 'Save DC',
+        };
+      });
+
+    if (targets.length === 0) return;
+
+    // Build a synthetic attack definition from the effect template
+    const effectAttack: AttackDefinition = {
+      id: `effect-${templateId}`,
+      name: templateName,
+      attackBonus: 0,
+      damageFormula: damageFormula || '0',
+      damageType: damageType || 'untyped',
+      description: `Effect: ${templateName}`,
+    };
+
+    // Roll damage for each target
+    const rollResults: Record<string, ActionRollResult> = {};
+    const damageResults: Record<string, DamageResult> = {};
+
+    for (const target of targets) {
+      // Effects use saving throws, not attack rolls — populate a placeholder
+      rollResults[target.tokenId] = {
+        naturalRoll: 0,
+        totalRoll: 0,
+        attackBonus: 0,
+        formula: 'Save',
+      };
+
+      // Roll damage
+      if (damageFormula && damageFormula !== '0') {
+        const result = rollDice(damageFormula);
+        const diceResults = result.groups.flatMap(g => g.keptResults);
+        damageResults[target.tokenId] = {
+          formula: damageFormula,
+          total: result.total,
+          diceResults,
+          damageType: damageType || 'untyped',
+          adjustedTotal: result.total,
+        };
+      } else {
+        damageResults[target.tokenId] = {
+          formula: '0',
+          total: 0,
+          diceResults: [],
+          damageType: damageType || 'untyped',
+          adjustedTotal: 0,
+        };
+      }
+    }
+
+    const entry: ActionQueueEntry = {
+      id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      phase: 'resolve', // Skip targeting — targets are pre-populated
+      category: 'effect',
+      sourceTokenId: sourceTokenId || 'environment',
+      sourceTokenName: sourceToken?.name || sourceToken?.label || 'Environment',
+      attack: effectAttack,
+      targets,
+      rollResults,
+      damageResults,
+      resolutions: {},
+      timestamp: Date.now(),
+      effectInfo: {
+        templateId,
+        templateName,
+        damageType,
+        placedEffectId,
+      },
+    };
+
+    set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
   },
 
   addTarget: (target) => {
