@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -379,23 +380,25 @@ function TargetResolveCard({
             ([key, cfg]) => {
               const Icon = cfg.icon;
               const isActive = resolution === key;
-              const isSuggested = key === suggested;
               return (
-                <button
-                  key={key}
-                  onClick={() => onSetResolution(key)}
-                  className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
-                    isActive
-                      ? cfg.color + ' border-2'
-                      : isSuggested
-                        ? 'border-primary/50 bg-primary/5'
-                        : 'border-border/50 hover:bg-muted/50'
-                  }`}
-                  title={cfg.label}
-                >
-                  <Icon className="w-3 h-3" />
-                  <span className="leading-tight text-center">{cfg.label.split(' ').map(w => w[0]).join('')}</span>
-                </button>
+                <Tooltip key={key}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onSetResolution(key)}
+                      className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
+                        isActive
+                          ? cfg.color + ' border-2'
+                          : 'border-border/50 hover:bg-muted/50'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      <span className="leading-tight text-center">{cfg.label.split(' ').map(w => w[0]).join('')}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    {cfg.label}
+                  </TooltipContent>
+                </Tooltip>
               );
             }
           )}
