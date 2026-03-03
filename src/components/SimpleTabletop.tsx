@@ -155,7 +155,7 @@ import {
 import { useEffectStore } from "../stores/effectStore";
 import { renderPlacedEffects, renderPlacementPreview } from "../lib/effectRenderer";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
-import { isDirectionalShape } from "../types/effectTypes";
+
 
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
@@ -6744,30 +6744,47 @@ export const SimpleTabletop = () => {
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
 
-      // ── EFFECT PLACEMENT: place the effect on click ──
+      // ── EFFECT PLACEMENT: two-step flow (1. origin, 2. direction) ──
       const effectState = useEffectStore.getState();
       if (effectState.placement) {
-        const template = effectState.placement.template;
+        const placement = effectState.placement;
+
+        if (placement.step === 'origin') {
+          // Step 1: lock origin point
+          effectState.setPlacementOrigin(worldPos);
+          redrawCanvas();
+          return;
+        }
+
+        // Step 2: direction confirmed — place the effect
+        const template = placement.template;
         const activeMapId = selectedMapId || 'default-map';
         const effectGridSize = filteredRegions[0]?.gridSize || 40;
-        const direction = effectState.placement.previewDirection;
+        const origin = placement.origin!;
+        let direction = Math.atan2(worldPos.y - origin.y, worldPos.x - origin.x);
+
+        // Snap direction to nearest 45° if alignToGrid is set
+        if (template.alignToGrid) {
+          const snap = Math.PI / 4; // 45°
+          direction = Math.round(direction / snap) * snap;
+        }
 
         // Compute hit-test impacts
         const impacts = computeEffectImpacts({
           template,
-          origin: worldPos,
+          origin,
           direction,
           gridSize: effectGridSize,
           tokens: filteredTokens,
           mapObjects: filteredMapObjects,
-          casterId: effectState.placement.casterId,
+          casterId: placement.casterId,
           mapId: activeMapId,
         });
 
         // Place the effect
-        const placed = effectState.placeEffect(template.id, worldPos, activeMapId, {
+        const placed = effectState.placeEffect(template.id, origin, activeMapId, {
           direction,
-          casterId: effectState.placement.casterId,
+          casterId: placement.casterId,
           impactedTargets: impacts,
         });
 
@@ -6797,11 +6814,11 @@ export const SimpleTabletop = () => {
 
           // Start effect action with pre-populated targets
           useActionStore.getState().startEffectAction({
-            sourceTokenId: effectState.placement?.casterId,
+            sourceTokenId: placement.casterId,
             templateId: template.id,
             templateName: template.name,
             damageType: template.damageType,
-            damageFormula: effectState.placement?.damageFormula,
+            damageFormula: placement.damageFormula,
             placedEffectId: placed.id,
             impacts,
           });
@@ -7966,15 +7983,24 @@ export const SimpleTabletop = () => {
     const effectPlacement = useEffectStore.getState().placement;
     if (effectPlacement) {
       const worldPos = screenToWorld(mouseX, mouseY);
-      let direction = 0;
-      if (isDirectionalShape(effectPlacement.template.shape) && effectPlacement.casterId) {
-        // Compute direction from caster to mouse
-        const casterToken = tokens.find(t => t.id === effectPlacement.casterId);
-        if (casterToken) {
-          direction = Math.atan2(worldPos.y - casterToken.y, worldPos.x - casterToken.x);
+
+      if (effectPlacement.step === 'origin') {
+        // Step 1: preview follows mouse as the origin point
+        useEffectStore.getState().updatePlacementPreview(worldPos, 0);
+      } else {
+        // Step 2: origin is locked, compute direction from origin to mouse
+        const origin = effectPlacement.origin!;
+        let direction = Math.atan2(worldPos.y - origin.y, worldPos.x - origin.x);
+
+        // Snap direction to nearest 45° if alignToGrid is set
+        if (effectPlacement.template.alignToGrid) {
+          const snap = Math.PI / 4;
+          direction = Math.round(direction / snap) * snap;
         }
+
+        useEffectStore.getState().updatePlacementPreview(origin, direction);
       }
-      useEffectStore.getState().updatePlacementPreview(worldPos, direction);
+
       canvas.style.cursor = 'crosshair';
       redrawCanvas();
       if (!isPanning) return;

@@ -47,6 +47,8 @@ export interface EffectTemplate {
 
   // Placement
   placementMode: EffectPlacementMode;
+  /** If true, effect rotation snaps to the nearest 45° grid axis */
+  alignToGrid?: boolean;
 
   // Persistence
   persistence: EffectPersistence;
@@ -119,13 +121,19 @@ export interface EffectImpact {
 // Placement-mode state (while the user is aiming an effect)
 // ---------------------------------------------------------------------------
 
+export type EffectPlacementStep = 'origin' | 'direction';
+
 export interface EffectPlacementState {
   templateId: string;
   template: EffectTemplate;
   casterId?: string;
   /** Override damage formula for this placement (e.g. "8d6") */
   damageFormula?: string;
-  /** Live preview position (world coords) */
+  /** Current step in the two-step placement flow */
+  step: EffectPlacementStep;
+  /** Locked origin point (set after first click) */
+  origin: { x: number; y: number } | null;
+  /** Live preview position (world coords) — cursor position */
   previewOrigin: { x: number; y: number } | null;
   /** Live preview direction (radians) */
   previewDirection: number;

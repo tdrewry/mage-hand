@@ -52,6 +52,7 @@ interface EffectState {
 
   // --- Placement mode ---
   startPlacement: (templateId: string, casterId?: string, damageFormula?: string) => void;
+  setPlacementOrigin: (origin: { x: number; y: number }) => void;
   updatePlacementPreview: (origin: { x: number; y: number }, direction: number) => void;
   cancelPlacement: () => void;
 
@@ -156,9 +157,21 @@ export const useEffectStore = create<EffectState>((set, get) => {
           template,
           casterId,
           damageFormula,
+          step: 'origin',
+          origin: null,
           previewOrigin: null,
           previewDirection: 0,
         },
+      });
+    },
+
+    /** Advance from origin step to direction step */
+    setPlacementOrigin: (origin: { x: number; y: number }) => {
+      set((s) => {
+        if (!s.placement) return s;
+        return {
+          placement: { ...s.placement, step: 'direction', origin, previewOrigin: origin },
+        };
       });
     },
 
@@ -190,7 +203,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
         origin,
         direction: options.direction,
         casterId: options.casterId,
-        placedAt: Date.now(),
+        placedAt: performance.now(),
         roundsRemaining:
           template.persistence === 'persistent'
             ? template.durationRounds ?? 0

@@ -47,6 +47,7 @@ interface TemplateFormData {
   persistence: EffectPersistence;
   durationRounds: number;
   recurring: boolean;
+  alignToGrid: boolean;
   color: string;
   opacity: number;
   animation: EffectAnimationType;
@@ -65,6 +66,7 @@ const INITIAL_FORM: TemplateFormData = {
   persistence: 'instant',
   durationRounds: 0,
   recurring: true,
+  alignToGrid: false,
   color: '#FF4500',
   opacity: 0.55,
   animation: 'none',
@@ -84,6 +86,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     persistence: t.persistence,
     durationRounds: t.durationRounds ?? 0,
     recurring: t.recurring !== false,
+    alignToGrid: t.alignToGrid ?? false,
     color: t.color,
     opacity: t.opacity,
     animation: t.animation,
@@ -224,6 +227,17 @@ function TemplateFormFields({
           </>
         )}
       </div>
+
+      <div className="flex items-center gap-1">
+        <Switch
+          checked={form.alignToGrid}
+          onCheckedChange={(v) => update('alignToGrid', v)}
+          className="scale-75"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          Align to grid (45° snap)
+        </span>
+      </div>
     </>
   );
 }
@@ -250,6 +264,7 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
       persistence: form.persistence,
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+      alignToGrid: form.alignToGrid || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,
@@ -292,6 +307,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
       persistence: form.persistence,
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+      alignToGrid: form.alignToGrid || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,
