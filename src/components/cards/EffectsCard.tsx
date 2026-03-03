@@ -48,6 +48,7 @@ interface TemplateFormData {
   durationRounds: number;
   recurring: boolean;
   alignToGrid: boolean;
+  targetCaster: boolean;
   color: string;
   opacity: number;
   animation: EffectAnimationType;
@@ -67,6 +68,7 @@ const INITIAL_FORM: TemplateFormData = {
   durationRounds: 0,
   recurring: true,
   alignToGrid: false,
+  targetCaster: false,
   color: '#FF4500',
   opacity: 0.55,
   animation: 'none',
@@ -87,6 +89,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     durationRounds: t.durationRounds ?? 0,
     recurring: t.recurring !== false,
     alignToGrid: t.alignToGrid ?? false,
+    targetCaster: t.targetCaster ?? false,
     color: t.color,
     opacity: t.opacity,
     animation: t.animation,
@@ -238,6 +241,17 @@ function TemplateFormFields({
           Align to grid (45° snap)
         </span>
       </div>
+
+      <div className="flex items-center gap-1">
+        <Switch
+          checked={form.targetCaster}
+          onCheckedChange={(v) => update('targetCaster', v)}
+          className="scale-75"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          Include caster in targets
+        </span>
+      </div>
     </>
   );
 }
@@ -265,6 +279,7 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
       alignToGrid: form.alignToGrid || undefined,
+      targetCaster: form.targetCaster || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,
@@ -308,6 +323,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
       alignToGrid: form.alignToGrid || undefined,
+      targetCaster: form.targetCaster || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,

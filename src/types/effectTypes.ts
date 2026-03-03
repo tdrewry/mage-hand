@@ -72,6 +72,9 @@ export interface EffectTemplate {
 
   /** If true this is a built-in template that cannot be deleted */
   isBuiltIn?: boolean;
+
+  /** If true, the caster token is included in hit-testing (default false) */
+  targetCaster?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +146,14 @@ export interface EffectPlacementState {
   previewOrigin: { x: number; y: number } | null;
   /** Live preview direction (radians) */
   previewDirection: number;
+
+  /** Snapshot of the caster token's position and size (for token-sourced placement) */
+  casterToken?: {
+    x: number;
+    y: number;
+    gridWidth: number;
+    gridHeight: number;
+  };
 }
 
 // ---------------------------------------------------------------------------

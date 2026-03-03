@@ -153,7 +153,7 @@ import {
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
 import { useEffectStore } from "../stores/effectStore";
-import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint } from "../lib/effectRenderer";
+import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint, computeTokenSourcedOrigin } from "../lib/effectRenderer";
 import { EffectContextMenu } from "./EffectContextMenu";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
 
@@ -1715,7 +1715,39 @@ export const SimpleTabletop = () => {
     redrawCanvas();
   }, [maps]);
 
-  // When the focused map changes, clear fog visibility caches so the new map's
+  // ── Token-sourced effect placement: auto-inject selected token as caster ──
+  useEffect(() => {
+    const unsub = useEffectStore.subscribe((state, prevState) => {
+      const placement = state.placement;
+      const prevPlacement = prevState.placement;
+      // Detect new placement that just started (step='origin' means no caster token yet)
+      if (placement && !prevPlacement && placement.step === 'origin' && selectedTokenIds.length === 1) {
+        const token = tokens.find(t => t.id === selectedTokenIds[0]);
+        if (token) {
+          const casterToken = {
+            x: token.x,
+            y: token.y,
+            gridWidth: token.gridWidth,
+            gridHeight: token.gridHeight,
+          };
+          // Upgrade to token-sourced: set caster and skip to direction step
+          useEffectStore.setState({
+            placement: {
+              ...placement,
+              casterId: token.id,
+              casterToken,
+              step: 'direction',
+              origin: { x: token.x, y: token.y },
+              previewOrigin: { x: token.x, y: token.y },
+            },
+          });
+        }
+      }
+    });
+    return unsub;
+  }, [selectedTokenIds, tokens]);
+
+
   // explored area and filtered entity set are used for a full recomputation.
   useEffect(() => {
     if (!selectedMapId) return;
@@ -6793,14 +6825,23 @@ export const SimpleTabletop = () => {
         const template = placement.template;
         const activeMapId = selectedMapId || 'default-map';
         const effectGridSize = filteredRegions[0]?.gridSize || 40;
-        const origin = placement.origin!;
-        let direction = Math.atan2(worldPos.y - origin.y, worldPos.x - origin.x);
+
+        // Compute direction from the correct base point
+        const baseOrigin = placement.casterToken
+          ? { x: placement.casterToken.x, y: placement.casterToken.y }
+          : placement.origin!;
+        let direction = Math.atan2(worldPos.y - baseOrigin.y, worldPos.x - baseOrigin.x);
 
         // Snap direction to nearest 45° if alignToGrid is set
         if (template.alignToGrid) {
           const snap = Math.PI / 4; // 45°
           direction = Math.round(direction / snap) * snap;
         }
+
+        // For token-sourced placement, compute perimeter origin
+        const origin = placement.casterToken
+          ? computeTokenSourcedOrigin(placement.casterToken, direction, effectGridSize, template.shape)
+          : placement.origin!;
 
         // Compute hit-test impacts
         const impacts = computeEffectImpacts({
@@ -8053,8 +8094,10 @@ export const SimpleTabletop = () => {
         useEffectStore.getState().updatePlacementPreview(worldPos, 0);
       } else {
         // Step 2: origin is locked, compute direction from origin to mouse
-        const origin = effectPlacement.origin!;
-        let direction = Math.atan2(worldPos.y - origin.y, worldPos.x - origin.x);
+        const baseOrigin = effectPlacement.casterToken
+          ? { x: effectPlacement.casterToken.x, y: effectPlacement.casterToken.y }
+          : effectPlacement.origin!;
+        let direction = Math.atan2(worldPos.y - baseOrigin.y, worldPos.x - baseOrigin.x);
 
         // Snap direction to nearest 45° if alignToGrid is set
         if (effectPlacement.template.alignToGrid) {
@@ -8062,7 +8105,19 @@ export const SimpleTabletop = () => {
           direction = Math.round(direction / snap) * snap;
         }
 
-        useEffectStore.getState().updatePlacementPreview(origin, direction);
+        // For token-sourced placement, compute perimeter origin
+        const effectGridSize = filteredRegions[0]?.gridSize || 40;
+        if (effectPlacement.casterToken) {
+          const perimeterOrigin = computeTokenSourcedOrigin(
+            effectPlacement.casterToken,
+            direction,
+            effectGridSize,
+            effectPlacement.template.shape,
+          );
+          useEffectStore.getState().updatePlacementPreview(perimeterOrigin, direction);
+        } else {
+          useEffectStore.getState().updatePlacementPreview(effectPlacement.origin!, direction);
+        }
       }
 
       canvas.style.cursor = 'crosshair';
