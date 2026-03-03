@@ -44,6 +44,8 @@ interface TemplateFormData {
   length: number;
   width: number;
   angle: number;
+  maxLength: number;
+  segmentWidth: number;
   persistence: EffectPersistence;
   durationRounds: number;
   recurring: boolean;
@@ -66,6 +68,8 @@ const INITIAL_FORM: TemplateFormData = {
   length: 12,
   width: 1,
   angle: 53,
+  maxLength: 12,
+  segmentWidth: 0.2,
   persistence: 'instant',
   durationRounds: 0,
   recurring: true,
@@ -89,6 +93,8 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     length: t.length ?? 12,
     width: t.width ?? 1,
     angle: t.angle ?? 53,
+    maxLength: t.maxLength ?? 12,
+    segmentWidth: t.segmentWidth ?? 0.2,
     persistence: t.persistence,
     durationRounds: t.durationRounds ?? 0,
     recurring: t.recurring !== false,
@@ -118,6 +124,7 @@ function TemplateFormFields({
   const needsLength = form.shape === 'line' || form.shape === 'cone';
   const needsWidth = form.shape === 'line' || form.shape === 'rectangle' || form.shape === 'rectangle-burst';
   const needsAngle = form.shape === 'cone';
+  const needsPolyline = form.shape === 'polyline';
 
   return (
     <>
@@ -138,6 +145,7 @@ function TemplateFormFields({
             <SelectItem value="rectangle">Rectangle</SelectItem>
             <SelectItem value="circle-burst">Circle Burst</SelectItem>
             <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
+            <SelectItem value="polyline">Polyline (Wall)</SelectItem>
           </SelectContent>
         </Select>
         <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
@@ -175,6 +183,18 @@ function TemplateFormFields({
             <label className="text-[10px] text-muted-foreground">Angle°</label>
             <Input type="number" value={form.angle} onChange={(e) => update('angle', +e.target.value)} className="h-7 text-xs" min={1} max={360} />
           </div>
+        )}
+        {needsPolyline && (
+          <>
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">Max Length</label>
+              <Input type="number" value={form.maxLength} onChange={(e) => update('maxLength', +e.target.value)} className="h-7 text-xs" min={1} />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">Thickness</label>
+              <Input type="number" value={form.segmentWidth} onChange={(e) => update('segmentWidth', +e.target.value)} className="h-7 text-xs" min={0.1} step={0.1} />
+            </div>
+          </>
         )}
       </div>
 
@@ -302,6 +322,8 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
       length: form.length,
       width: form.width,
       angle: form.angle,
+      maxLength: form.shape === 'polyline' ? form.maxLength : undefined,
+      segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
       placementMode: 'free',
       persistence: form.persistence,
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
@@ -349,6 +371,8 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
       length: form.length,
       width: form.width,
       angle: form.angle,
+      maxLength: form.shape === 'polyline' ? form.maxLength : undefined,
+      segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
       persistence: form.persistence,
       durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
@@ -561,8 +585,17 @@ export function EffectsCardContent() {
                 Drop {(placement.multiDropPlaced ?? 0) + 1} of {placement.multiDropTotal}
               </div>
             )}
+            {placement.step === 'polyline' && (
+              <div className="text-primary font-medium mt-0.5">
+                {(placement.polylineWaypoints?.length ?? 0) === 0
+                  ? 'Click to start wall'
+                  : `${((placement.polylineWaypoints?.length ?? 1) - 1)} segments · Double-click or Enter to finish`}
+              </div>
+            )}
             <div className="text-muted-foreground mt-0.5">
-              Click on map to place · ESC to cancel
+              {placement.step === 'polyline'
+                ? 'Click waypoints to draw wall · Double-click/Enter to finish · ESC to cancel'
+                : 'Click on map to place · ESC to cancel'}
             </div>
           </div>
         )}

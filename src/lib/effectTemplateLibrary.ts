@@ -74,12 +74,12 @@ export const CONE_OF_COLD: EffectTemplate = {
 export const WALL_OF_FIRE: EffectTemplate = {
   id: 'builtin-wall-of-fire',
   name: 'Wall of Fire',
-  shape: 'line',
-  length: 12,              // 60 ft long
-  width: 0.2,              // 1 ft thick (thin visual)
+  shape: 'polyline',
+  maxLength: 12,             // 60 ft total length
+  segmentWidth: 0.2,         // 1 ft thick
   placementMode: 'free',
   persistence: 'persistent',
-  durationRounds: 10,      // concentration, up to 1 minute
+  durationRounds: 10,        // concentration, up to 1 minute
   color: '#FF6600',
   secondaryColor: '#FF0000',
   opacity: 0.65,
@@ -88,7 +88,7 @@ export const WALL_OF_FIRE: EffectTemplate = {
   category: 'spell',
   level: 4,
   damageType: 'fire',
-  description: 'A wall of fire up to 60 feet long, 20 feet high, and 1 foot thick appears.',
+  description: 'A wall of fire up to 60 feet long, 20 feet high, and 1 foot thick appears. Click waypoints to draw, double-click or Enter to finish.',
   isBuiltIn: true,
   ranged: true,
 };

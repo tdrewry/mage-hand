@@ -1483,6 +1483,72 @@ export const SimpleTabletop = () => {
           toast.success(`Selected all ${regions.length} region(s)`);
         }
       }
+      // Enter to finalize polyline placement
+      else if (e.key === 'Enter') {
+        const effectS = useEffectStore.getState();
+        if (effectS.placement?.step === 'polyline') {
+          e.preventDefault();
+          const pl = effectS.placement;
+          const waypoints = pl.polylineWaypoints ?? [];
+          const effectGridSize = filteredRegions[0]?.gridSize || 40;
+          if (waypoints.length >= 2) {
+            // Hit-test across all segments
+            const activeMapId = selectedMapId || 'default-map';
+            const impacts = computeEffectImpacts({
+              template: pl.template,
+              origin: waypoints[0],
+              direction: 0,
+              gridSize: effectGridSize,
+              tokens: filteredTokens,
+              mapObjects: filteredMapObjects,
+              casterId: pl.casterId,
+              mapId: activeMapId,
+              activeMapIds,
+              waypoints,
+            });
+            const placed = effectS.placeEffect(pl.template.id, waypoints[0], activeMapId, {
+              direction: 0,
+              casterId: pl.casterId,
+              impactedTargets: impacts,
+              waypoints,
+            });
+            effectS.cancelPlacement();
+
+            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+            if (tokenImpacts.length > 0) {
+              const cardStore = useCardStore.getState();
+              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+              if (actionCard) {
+                cardStore.setVisibility(actionCard.id, true);
+              } else {
+                cardStore.registerCard({
+                  type: CardType.ACTION_CARD,
+                  title: 'Action',
+                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
+                  defaultSize: { width: 400, height: 500 },
+                  minSize: { width: 340, height: 400 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+              useActionStore.getState().startEffectAction({
+                sourceTokenId: pl.casterId,
+                templateId: pl.template.id,
+                templateName: pl.template.name,
+                damageType: pl.template.damageType,
+                damageFormula: pl.damageFormula,
+                placedEffectId: placed.id,
+                impacts,
+              });
+            }
+          } else {
+            effectS.cancelPlacement();
+          }
+          redrawCanvas();
+          return;
+        }
+      }
       // Escape to clear selection
       else if (e.key === 'Escape') {
         e.preventDefault();
@@ -6811,12 +6877,145 @@ export const SimpleTabletop = () => {
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
 
+      // Helper: finalize a polyline placement
+      const finalizePolylinePlacement = (
+        pl: typeof effectState.placement & object,
+        waypoints: { x: number; y: number }[],
+        effectGridSize: number,
+      ) => {
+        if (waypoints.length < 2) {
+          useEffectStore.getState().cancelPlacement();
+          redrawCanvas();
+          return;
+        }
+        const template = pl.template;
+        const activeMapId = selectedMapId || 'default-map';
+
+        // Hit-test across all segments
+        const impacts = computeEffectImpacts({
+          template,
+          origin: waypoints[0],
+          direction: 0,
+          gridSize: effectGridSize,
+          tokens: filteredTokens,
+          mapObjects: filteredMapObjects,
+          casterId: pl.casterId,
+          mapId: activeMapId,
+          activeMapIds,
+          waypoints,
+        });
+
+        // Place the effect with waypoints
+        const placed = useEffectStore.getState().placeEffect(template.id, waypoints[0], activeMapId, {
+          direction: 0,
+          casterId: pl.casterId,
+          impactedTargets: impacts,
+          waypoints,
+        });
+
+        useEffectStore.getState().cancelPlacement();
+
+        // Open Action Card if tokens were hit
+        const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+        if (tokenImpacts.length > 0) {
+          const cardStore = useCardStore.getState();
+          const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+          if (actionCard) {
+            cardStore.setVisibility(actionCard.id, true);
+          } else {
+            cardStore.registerCard({
+              type: CardType.ACTION_CARD,
+              title: 'Action',
+              defaultPosition: { x: window.innerWidth - 420, y: 80 },
+              defaultSize: { width: 400, height: 500 },
+              minSize: { width: 340, height: 400 },
+              isResizable: true,
+              isClosable: true,
+              defaultVisible: true,
+            });
+          }
+
+          useActionStore.getState().startEffectAction({
+            sourceTokenId: pl.casterId,
+            templateId: template.id,
+            templateName: template.name,
+            damageType: template.damageType,
+            damageFormula: pl.damageFormula,
+            placedEffectId: placed.id,
+            impacts,
+          });
+        }
+      };
+
       // ── EFFECT PLACEMENT: two-step flow (1. origin, 2. direction) ──
       // Multi-drop effects repeat the origin step `count` times.
       const effectState = useEffectStore.getState();
       if (effectState.placement) {
         const placement = effectState.placement;
         const isMultiDrop = !!(placement.multiDropTotal && placement.multiDropTotal > 1);
+
+        // ── POLYLINE PLACEMENT: add waypoint on each click ──
+        if (placement.step === 'polyline') {
+          const template = placement.template;
+          const maxLen = template.maxLength ?? 12;
+          const currentWaypoints = placement.polylineWaypoints ?? [];
+          const usedLen = placement.polylineLengthUsed ?? 0;
+          const effectGridSize = filteredRegions[0]?.gridSize || 40;
+
+          if (currentWaypoints.length === 0) {
+            // First click: set first waypoint
+            useEffectStore.setState({
+              placement: {
+                ...placement,
+                polylineWaypoints: [worldPos],
+                origin: worldPos,
+                previewOrigin: worldPos,
+              },
+            });
+          } else {
+            // Subsequent click: add waypoint, enforce max length
+            const last = currentWaypoints[currentWaypoints.length - 1];
+            const dx = worldPos.x - last.x;
+            const dy = worldPos.y - last.y;
+            const segLenPx = Math.sqrt(dx * dx + dy * dy);
+            const segLenUnits = segLenPx / effectGridSize;
+            const remainLen = maxLen - usedLen;
+
+            if (remainLen <= 0) {
+              redrawCanvas();
+              return;
+            }
+
+            // Clamp segment to remaining length
+            let endPoint = worldPos;
+            let addedLen = segLenUnits;
+            if (segLenUnits > remainLen) {
+              const ratio = remainLen / segLenUnits;
+              endPoint = { x: last.x + dx * ratio, y: last.y + dy * ratio };
+              addedLen = remainLen;
+            }
+
+            const newWaypoints = [...currentWaypoints, endPoint];
+            const newUsedLen = usedLen + addedLen;
+
+            // Auto-finalize if max length reached
+            if (newUsedLen >= maxLen - 0.01) {
+              finalizePolylinePlacement(placement, newWaypoints, effectGridSize);
+            } else {
+              useEffectStore.setState({
+                placement: {
+                  ...placement,
+                  polylineWaypoints: newWaypoints,
+                  polylineLengthUsed: newUsedLen,
+                  previewOrigin: endPoint,
+                },
+              });
+            }
+          }
+
+          redrawCanvas();
+          return;
+        }
 
         if (placement.step === 'origin') {
           // For multi-drop: each click places one sub-effect immediately (no direction step)
@@ -8197,7 +8396,10 @@ export const SimpleTabletop = () => {
     if (effectPlacement) {
       const worldPos = screenToWorld(mouseX, mouseY);
 
-      if (effectPlacement.step === 'origin') {
+      if (effectPlacement.step === 'polyline') {
+        // Polyline: preview follows mouse for the next segment
+        useEffectStore.getState().updatePlacementPreview(worldPos, 0);
+      } else if (effectPlacement.step === 'origin') {
         // Step 1: preview follows mouse as the origin point
         useEffectStore.getState().updatePlacementPreview(worldPos, 0);
       } else {
@@ -10939,7 +11141,72 @@ export const SimpleTabletop = () => {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onDoubleClick={() => pathDrawingMode === "drawing" && pathDrawingType === "polygon" && finishPathDrawing()}
+          onDoubleClick={(e) => {
+            // Polyline finalization on double-click
+            const effectS = useEffectStore.getState();
+            if (effectS.placement?.step === 'polyline') {
+              const pl = effectS.placement;
+              const waypoints = pl.polylineWaypoints ?? [];
+              const effectGridSize = filteredRegions[0]?.gridSize || 40;
+              if (waypoints.length >= 2) {
+                const activeMapId = selectedMapId || 'default-map';
+                const impacts = computeEffectImpacts({
+                  template: pl.template,
+                  origin: waypoints[0],
+                  direction: 0,
+                  gridSize: effectGridSize,
+                  tokens: filteredTokens,
+                  mapObjects: filteredMapObjects,
+                  casterId: pl.casterId,
+                  mapId: activeMapId,
+                  activeMapIds,
+                  waypoints,
+                });
+                const placed = effectS.placeEffect(pl.template.id, waypoints[0], activeMapId, {
+                  direction: 0,
+                  casterId: pl.casterId,
+                  impactedTargets: impacts,
+                  waypoints,
+                });
+                effectS.cancelPlacement();
+
+                const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+                if (tokenImpacts.length > 0) {
+                  const cardStore = useCardStore.getState();
+                  const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+                  if (actionCard) {
+                    cardStore.setVisibility(actionCard.id, true);
+                  } else {
+                    cardStore.registerCard({
+                      type: CardType.ACTION_CARD,
+                      title: 'Action',
+                      defaultPosition: { x: window.innerWidth - 420, y: 80 },
+                      defaultSize: { width: 400, height: 500 },
+                      minSize: { width: 340, height: 400 },
+                      isResizable: true,
+                      isClosable: true,
+                      defaultVisible: true,
+                    });
+                  }
+                  useActionStore.getState().startEffectAction({
+                    sourceTokenId: pl.casterId,
+                    templateId: pl.template.id,
+                    templateName: pl.template.name,
+                    damageType: pl.template.damageType,
+                    damageFormula: pl.damageFormula,
+                    placedEffectId: placed.id,
+                    impacts,
+                  });
+                }
+              } else {
+                effectS.cancelPlacement();
+              }
+              redrawCanvas();
+              return;
+            }
+            // Existing polygon path drawing
+            if (pathDrawingMode === "drawing" && pathDrawingType === "polygon") finishPathDrawing();
+          }}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
           onTouchStart={touchHandlers.handleTouchStart}

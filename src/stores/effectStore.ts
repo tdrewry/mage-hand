@@ -66,6 +66,7 @@ interface EffectState {
       casterId?: string;
       impactedTargets?: EffectImpact[];
       groupId?: string;
+      waypoints?: { x: number; y: number }[];
     },
   ) => PlacedEffect;
   removeEffect: (effectId: string) => void;
@@ -169,13 +170,18 @@ export const useEffectStore = create<EffectState>((set, get) => {
       const isMultiDrop = !!template.multiDrop;
       const multiDropGroupId = isMultiDrop ? `group-${Date.now()}-${Math.random().toString(36).substr(2, 6)}` : undefined;
 
+      // Polyline shape: go directly to polyline step
+      const isPolyline = template.shape === 'polyline';
+
+      const initialStep = isPolyline ? 'polyline' as const : (skipToDirection ? 'direction' as const : 'origin' as const);
+
       set({
         placement: {
           templateId,
           template,
           casterId,
           damageFormula,
-          step: skipToDirection ? 'direction' : 'origin',
+          step: initialStep,
           origin: skipToDirection ? tokenOrigin : null,
           previewOrigin: tokenOrigin,
           previewDirection: 0,
@@ -183,6 +189,8 @@ export const useEffectStore = create<EffectState>((set, get) => {
           multiDropGroupId,
           multiDropTotal: template.multiDrop?.count,
           multiDropPlaced: isMultiDrop ? 0 : undefined,
+          polylineWaypoints: isPolyline ? [] : undefined,
+          polylineLengthUsed: isPolyline ? 0 : undefined,
         },
       });
     },
@@ -234,6 +242,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
         impactedTargets: options.impactedTargets ?? [],
         triggeredTokenIds: [],
         groupId: options.groupId,
+        waypoints: options.waypoints,
       };
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));

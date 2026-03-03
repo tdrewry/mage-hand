@@ -16,7 +16,8 @@ export type EffectShape =
   | 'cone'
   | 'rectangle'
   | 'circle-burst'
-  | 'rectangle-burst';
+  | 'rectangle-burst'
+  | 'polyline';
 
 export type EffectAnimationType =
   | 'none'
@@ -51,6 +52,8 @@ export interface EffectTemplate {
   length?: number;        // line / cone
   width?: number;         // line / rectangle
   angle?: number;         // cone — full angle in degrees
+  maxLength?: number;     // polyline — max total path length in grid units
+  segmentWidth?: number;  // polyline — wall thickness in grid units (default 0.2)
 
   // Placement
   placementMode: EffectPlacementMode;
@@ -127,6 +130,9 @@ export interface PlacedEffect {
 
   /** Links multi-drop instances for shared resolution */
   groupId?: string;
+
+  /** Polyline waypoints (world coords) — for polyline shape */
+  waypoints?: { x: number; y: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +152,7 @@ export interface EffectImpact {
 // Placement-mode state (while the user is aiming an effect)
 // ---------------------------------------------------------------------------
 
-export type EffectPlacementStep = 'origin' | 'direction';
+export type EffectPlacementStep = 'origin' | 'direction' | 'polyline';
 
 export interface EffectPlacementState {
   templateId: string;
@@ -178,6 +184,12 @@ export interface EffectPlacementState {
   multiDropTotal?: number;
   /** Number of drops already placed (0-indexed) */
   multiDropPlaced?: number;
+
+  // Polyline waypoint tracking
+  /** Committed waypoints so far (world coords) */
+  polylineWaypoints?: { x: number; y: number }[];
+  /** Total polyline length used so far (in grid units) */
+  polylineLengthUsed?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,4 +212,11 @@ export function isBurstShape(shape: EffectShape): boolean {
  */
 export function isDirectionalShape(shape: EffectShape): boolean {
   return shape === 'cone' || shape === 'line';
+}
+
+/**
+ * Returns true if the shape is a polyline (wall-style waypoint placement).
+ */
+export function isPolylineShape(shape: EffectShape): boolean {
+  return shape === 'polyline';
 }
