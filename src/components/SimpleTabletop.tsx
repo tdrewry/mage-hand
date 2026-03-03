@@ -1799,18 +1799,79 @@ export const SimpleTabletop = () => {
             gridHeight: token.gridHeight,
           };
           const isRanged = placement.template.ranged === true;
-          // Ranged token-sourced: keep step='origin' so user picks placement point
-          // Non-ranged: skip to direction step with origin locked to token
-          useEffectStore.setState({
-            placement: {
-              ...placement,
+          const wantsSkipRotation = placement.template.skipRotation === true;
+
+          if (!isRanged && wantsSkipRotation) {
+            // Token-sourced + skipRotation: auto-place immediately at token origin
+            const activeMapId = selectedMapId || 'default-map';
+            const effectGridSize = filteredRegions[0]?.gridSize || 40;
+
+            const impacts = computeEffectImpacts({
+              template: placement.template,
+              origin: { x: token.x, y: token.y },
+              direction: 0,
+              gridSize: effectGridSize,
+              tokens: filteredTokens,
+              mapObjects: filteredMapObjects,
               casterId: token.id,
-              casterToken,
-              step: isRanged ? 'origin' : 'direction',
-              origin: isRanged ? null : { x: token.x, y: token.y },
-              previewOrigin: { x: token.x, y: token.y },
-            },
-          });
+              mapId: activeMapId,
+              activeMapIds,
+            });
+
+            const placed = useEffectStore.getState().placeEffect(placement.template.id, { x: token.x, y: token.y }, activeMapId, {
+              direction: 0,
+              casterId: token.id,
+              impactedTargets: impacts,
+            });
+
+            useEffectStore.getState().cancelPlacement();
+
+            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+            if (tokenImpacts.length > 0) {
+              const cardStore = useCardStore.getState();
+              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+              if (actionCard) {
+                cardStore.setVisibility(actionCard.id, true);
+              } else {
+                cardStore.registerCard({
+                  type: CardType.ACTION_CARD,
+                  title: 'Action',
+                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
+                  defaultSize: { width: 400, height: 500 },
+                  minSize: { width: 340, height: 400 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+
+              useActionStore.getState().startEffectAction({
+                sourceTokenId: token.id,
+                templateId: placement.template.id,
+                templateName: placement.template.name,
+                damageType: placement.template.damageType,
+                damageFormula: placement.damageFormula,
+                damageDice: placement.template.damageDice,
+                placedEffectId: placed.id,
+                impacts,
+              });
+            }
+
+            redrawCanvas();
+          } else {
+            // Ranged token-sourced: keep step='origin' so user picks placement point
+            // Non-ranged: skip to direction step with origin locked to token
+            useEffectStore.setState({
+              placement: {
+                ...placement,
+                casterId: token.id,
+                casterToken,
+                step: isRanged ? 'origin' : 'direction',
+                origin: isRanged ? null : { x: token.x, y: token.y },
+                previewOrigin: { x: token.x, y: token.y },
+              },
+            });
+          }
         }
       }
     });
@@ -7118,7 +7179,69 @@ export const SimpleTabletop = () => {
             return;
           }
 
-          // Standard single-drop: lock origin point
+          // Standard single-drop
+          if (placement.template.skipRotation) {
+            // Skip rotation step — place immediately at origin with direction=0
+            const template = placement.template;
+            const activeMapId = selectedMapId || 'default-map';
+            const effectGridSize = filteredRegions[0]?.gridSize || 40;
+
+            const impacts = computeEffectImpacts({
+              template,
+              origin: worldPos,
+              direction: 0,
+              gridSize: effectGridSize,
+              tokens: filteredTokens,
+              mapObjects: filteredMapObjects,
+              casterId: placement.casterId,
+              mapId: activeMapId,
+              activeMapIds,
+            });
+
+            const placed = effectState.placeEffect(template.id, worldPos, activeMapId, {
+              direction: 0,
+              casterId: placement.casterId,
+              impactedTargets: impacts,
+            });
+
+            effectState.cancelPlacement();
+
+            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+            if (tokenImpacts.length > 0) {
+              const cardStore = useCardStore.getState();
+              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+              if (actionCard) {
+                cardStore.setVisibility(actionCard.id, true);
+              } else {
+                cardStore.registerCard({
+                  type: CardType.ACTION_CARD,
+                  title: 'Action',
+                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
+                  defaultSize: { width: 400, height: 500 },
+                  minSize: { width: 340, height: 400 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+
+              useActionStore.getState().startEffectAction({
+                sourceTokenId: placement.casterId,
+                templateId: template.id,
+                templateName: template.name,
+                damageType: template.damageType,
+                damageFormula: placement.damageFormula,
+                damageDice: template.damageDice,
+                placedEffectId: placed.id,
+                impacts,
+              });
+            }
+
+            redrawCanvas();
+            return;
+          }
+
+          // Standard: lock origin point and advance to direction step
           effectState.setPlacementOrigin(worldPos);
           redrawCanvas();
           return;

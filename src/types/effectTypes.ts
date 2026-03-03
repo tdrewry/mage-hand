@@ -97,6 +97,9 @@ export interface EffectTemplate {
   /** If true, effect can be placed at a distance from the source token (ranged spell) */
   ranged?: boolean;
 
+  /** If true, skip the rotation/direction step during placement (e.g. circles that don't need aiming) */
+  skipRotation?: boolean;
+
   /** Multi-drop configuration for effects that place multiple instances */
   multiDrop?: MultiDropConfig;
 }
