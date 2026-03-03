@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectTemplate, EffectCategory } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw } from 'lucide-react';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,16 @@ function EffectTemplateRow({ template, onSelect, onDelete }: EffectTemplateRowPr
               <AnimIcon className="w-3 h-3 inline" />
             </>
           )}
+          {template.persistence === 'persistent' && (
+            <>
+              <span>·</span>
+              <span title={template.recurring === false ? 'One-shot' : 'Recurring'}>
+                {template.recurring === false
+                  ? <Ban className="w-3 h-3 inline" />
+                  : <Repeat className="w-3 h-3 inline" />}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -103,6 +113,7 @@ export function EffectsCardContent() {
   const startPlacement = useEffectStore((s) => s.startPlacement);
   const removeEffect = useEffectStore((s) => s.removeEffect);
   const resetTriggeredTokens = useEffectStore((s) => s.resetTriggeredTokens);
+  const toggleRecurring = useEffectStore((s) => s.toggleRecurring);
   const deleteCustomTemplate = useEffectStore((s) => s.deleteCustomTemplate);
   const placement = useEffectStore((s) => s.placement);
 
@@ -195,6 +206,19 @@ export function EffectsCardContent() {
                     style={{ backgroundColor: e.template.color }}
                   />
                   <span className="flex-1 truncate">{e.template.name}</span>
+                  {e.template.persistence === 'persistent' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      title={e.template.recurring === false ? 'One-shot (click to make recurring)' : 'Recurring each round (click to make one-shot)'}
+                      onClick={() => toggleRecurring(e.id)}
+                    >
+                      {e.template.recurring === false
+                        ? <Ban className="w-3 h-3 text-muted-foreground" />
+                        : <Repeat className="w-3 h-3 text-primary" />}
+                    </Button>
+                  )}
                   {e.roundsRemaining !== undefined && e.roundsRemaining > 0 && (
                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
                       {e.roundsRemaining}r

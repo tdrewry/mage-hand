@@ -51,6 +51,8 @@ export interface EffectTemplate {
   // Persistence
   persistence: EffectPersistence;
   durationRounds?: number; // persistent effects: 0 = until dismissed
+  /** If true, triggeredTokenIds reset each round so tokens re-trigger. Default: true for persistent effects. */
+  recurring?: boolean;
 
   // Visual
   color: string;           // primary colour (hex)

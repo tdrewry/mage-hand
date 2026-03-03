@@ -71,6 +71,7 @@ interface EffectState {
   tickRound: () => void; // decrement roundsRemaining, remove expired
   markTokenTriggered: (effectId: string, tokenId: string) => void;
   resetTriggeredTokens: (effectId: string) => void;
+  toggleRecurring: (effectId: string) => void;
 
   // --- Bulk ---
   clearAll: () => void;
@@ -219,13 +220,18 @@ export const useEffectStore = create<EffectState>((set, get) => {
       set((s) => {
         const updated = s.placedEffects
           .map((e) => {
+            // Determine if this effect should reset triggers each round
+            // Default: recurring is true for persistent effects unless explicitly set to false
+            const isRecurring = e.template.recurring !== false;
+
             if (e.roundsRemaining === undefined || e.roundsRemaining === 0) {
-              // Reset triggered tokens each round for persistent effects
-              return e.triggeredTokenIds.length > 0
+              // Reset triggered tokens only for recurring effects
+              return (isRecurring && e.triggeredTokenIds.length > 0)
                 ? { ...e, triggeredTokenIds: [] }
                 : e;
             }
-            return { ...e, roundsRemaining: e.roundsRemaining - 1, triggeredTokenIds: [] };
+            const newTriggered = isRecurring ? [] : e.triggeredTokenIds;
+            return { ...e, roundsRemaining: e.roundsRemaining - 1, triggeredTokenIds: newTriggered };
           })
           .filter((e) => e.roundsRemaining === undefined || e.roundsRemaining >= 0);
         return { placedEffects: updated };
@@ -246,6 +252,16 @@ export const useEffectStore = create<EffectState>((set, get) => {
       set((s) => ({
         placedEffects: s.placedEffects.map((e) =>
           e.id === effectId ? { ...e, triggeredTokenIds: [] } : e
+        ),
+      }));
+    },
+
+    toggleRecurring: (effectId) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId
+            ? { ...e, template: { ...e.template, recurring: e.template.recurring === false ? true : false } }
+            : e
         ),
       }));
     },
