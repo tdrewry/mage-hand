@@ -152,6 +152,10 @@ import {
   calculateTokenHexOccupancy,
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
+import { useEffectStore } from "../stores/effectStore";
+import { renderPlacedEffects, renderPlacementPreview } from "../lib/effectRenderer";
+import { computeEffectImpacts } from "../lib/effectHitTesting";
+import { isDirectionalShape } from "../types/effectTypes";
 
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
@@ -1397,6 +1401,13 @@ export const SimpleTabletop = () => {
         if (doorDrawingActive) {
           setDoorDrawingActive(false);
           setDoorHingePoint(null);
+          redrawCanvas();
+          return;
+        }
+        // Cancel effect placement if active
+        const effectS = useEffectStore.getState();
+        if (effectS.placement) {
+          effectS.cancelPlacement();
           redrawCanvas();
           return;
         }
@@ -3850,6 +3861,20 @@ export const SimpleTabletop = () => {
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
       drawMapPings(ctx);
+
+      // ── Placed spell/trap effects ──
+      {
+        const effectState = useEffectStore.getState();
+        const activeMapId = selectedMapId || 'default-map';
+        const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+        const effectGridSize = regions[0]?.gridSize || 40;
+        if (mapEffects.length > 0) {
+          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
+        }
+        if (effectState.placement?.previewOrigin) {
+          renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
+        }
+      }
     }
 
     // ── Fog Reveal Brush: ghost circle is now drawn on the overlay canvas (see below)
@@ -6551,8 +6576,13 @@ export const SimpleTabletop = () => {
       region.backgroundImage && animatedTextureManager.isAnimated(region.backgroundImage)
     );
 
+    // Check for active effect animations or placement preview
+    const effectState = useEffectStore.getState();
+    const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant');
+    const hasEffectPlacement = !!effectState.placement;
+
     // Only run animation loop if there's something to animate
-    if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination && !hasAnimatedTextures) return;
+    if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination && !hasAnimatedTextures && !hasAnimatedEffects && !hasEffectPlacement) return;
 
     // Set up throttled animation loop (limit to ~30 FPS)
     let animationId: number;
@@ -6634,6 +6664,39 @@ export const SimpleTabletop = () => {
 
       // Convert screen coordinates to world coordinates
       const worldPos = screenToWorld(clickX, clickY);
+
+      // ── EFFECT PLACEMENT: place the effect on click ──
+      const effectState = useEffectStore.getState();
+      if (effectState.placement) {
+        const template = effectState.placement.template;
+        const activeMapId = selectedMapId || 'default-map';
+        const effectGridSize = filteredRegions[0]?.gridSize || 40;
+        const direction = effectState.placement.previewDirection;
+
+        // Compute hit-test impacts
+        const impacts = computeEffectImpacts({
+          template,
+          origin: worldPos,
+          direction,
+          gridSize: effectGridSize,
+          tokens: filteredTokens,
+          mapObjects: filteredMapObjects,
+          casterId: effectState.placement.casterId,
+          mapId: activeMapId,
+        });
+
+        // Place the effect
+        effectState.placeEffect(template.id, worldPos, activeMapId, {
+          direction,
+          casterId: effectState.placement.casterId,
+          impactedTargets: impacts,
+        });
+
+        // Exit placement mode
+        effectState.cancelPlacement();
+        redrawCanvas();
+        return;
+      }
 
       // ── CTRL+CLICK: Emit map ping ──
       if (e.ctrlKey && !e.shiftKey && !e.metaKey) {
@@ -7785,6 +7848,24 @@ export const SimpleTabletop = () => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    // ── EFFECT PLACEMENT PREVIEW: update preview origin/direction ──
+    const effectPlacement = useEffectStore.getState().placement;
+    if (effectPlacement) {
+      const worldPos = screenToWorld(mouseX, mouseY);
+      let direction = 0;
+      if (isDirectionalShape(effectPlacement.template.shape) && effectPlacement.casterId) {
+        // Compute direction from caster to mouse
+        const casterToken = tokens.find(t => t.id === effectPlacement.casterId);
+        if (casterToken) {
+          direction = Math.atan2(worldPos.y - casterToken.y, worldPos.x - casterToken.x);
+        }
+      }
+      useEffectStore.getState().updatePlacementPreview(worldPos, direction);
+      canvas.style.cursor = 'crosshair';
+      redrawCanvas();
+      if (!isPanning) return;
+    }
 
     // ── FOG REVEAL BRUSH: track cursor and paint while dragging ──
     if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {
