@@ -167,3 +167,46 @@ export class TransformRegionCommand implements Command {
     useRegionStore.getState().updateRegion(this.regionId, this.previousState);
   }
 }
+
+/**
+ * Command for converting a region to a map object (portal, wall, obstacle, etc.)
+ * On undo: removes the created map object and restores the region.
+ * On redo: removes the region and re-adds the map object.
+ */
+export class ConvertRegionToMapObjectCommand implements Command {
+  type = 'CONVERT_REGION_TO_MAP_OBJECT';
+  description: string;
+  private region: CanvasRegion;
+  private createdMapObjectId: string;
+  private addMapObject: (obj: any) => string;
+  private removeMapObject: (id: string) => void;
+  private mapObjectData: any;
+
+  constructor(
+    region: CanvasRegion,
+    createdMapObjectId: string,
+    mapObjectData: any,
+    addMapObject: (obj: any) => string,
+    removeMapObject: (id: string) => void,
+    label: string = 'map object'
+  ) {
+    this.region = region;
+    this.createdMapObjectId = createdMapObjectId;
+    this.mapObjectData = mapObjectData;
+    this.addMapObject = addMapObject;
+    this.removeMapObject = removeMapObject;
+    this.description = `Convert region to ${label}`;
+  }
+
+  execute(): void {
+    // Redo: remove region, re-add map object
+    useRegionStore.getState().removeRegion(this.region.id);
+    this.createdMapObjectId = this.addMapObject({ ...this.mapObjectData, id: this.createdMapObjectId });
+  }
+
+  undo(): void {
+    // Remove the created map object and restore the region
+    this.removeMapObject(this.createdMapObjectId);
+    useRegionStore.getState().addRegion(this.region);
+  }
+}

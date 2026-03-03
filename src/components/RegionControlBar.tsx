@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets, ArrowRightLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
 import { RegionBulkTextureModal } from './modals/RegionBulkTextureModal';
 import { MAP_OBJECT_PRESETS } from '@/types/mapObjectTypes';
+import { undoRedoManager } from '@/lib/undoRedoManager';
+import { ConvertRegionToMapObjectCommand } from '@/lib/commands/regionCommands';
 
 interface RegionControlBarProps {
   selectedRegionIds: string[];
@@ -33,9 +36,11 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
 }) => {
   const { regions, updateRegion, removeRegion } = useRegionStore();
   const addMapObject = useMapObjectStore(state => state.addMapObject);
+  const removeMapObject = useMapObjectStore(state => state.removeMapObject);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showTextureModal, setShowTextureModal] = useState(false);
+  const [showConvertMenu, setShowConvertMenu] = useState(false);
   const [colorValue, setColorValue] = useState('#4F46E5');
   
   const selectedRegions = regions.filter(r => selectedRegionIds.includes(r.id));
@@ -53,7 +58,6 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   
   const isSingleSelection = selectedRegions.length === 1;
   const allLocked = selectedRegions.every(r => r.locked);
-  const someLocked = selectedRegions.some(r => r.locked);
   
   const handleToggleLock = () => {
     const newLocked = !allLocked;
@@ -119,12 +123,12 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     const centerY = firstRegion.y + (firstRegion.height / 2);
     const portalSize = Math.min(firstRegion.width, firstRegion.height, 60);
     
-    addMapObject({
+    const mapObjData = {
       position: { x: centerX, y: centerY },
       width: portalSize,
       height: portalSize,
-      shape: 'portal',
-      category: 'portal',
+      shape: 'portal' as const,
+      category: 'portal' as const,
       fillColor: 'rgba(139, 92, 246, 0.25)',
       strokeColor: '#8b5cf6',
       strokeWidth: 2,
@@ -136,22 +140,25 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       selected: false,
       portalName: `Portal ${firstRegion.id.slice(-4)}`,
       mapId: firstRegion.mapId,
-    });
+    };
+    const newId = addMapObject(mapObjData);
     
-    // Remove the source region
+    const regionSnapshot = { ...firstRegion };
     removeRegion(firstRegion.id);
+    undoRedoManager.push(new ConvertRegionToMapObjectCommand(regionSnapshot, newId, mapObjData, addMapObject, removeMapObject, 'portal'));
+    
+    setShowConvertMenu(false);
     onClearSelection();
     onUpdateCanvas?.();
     toast.success('Portal created from region');
   };
   
   const handleConvertToWalls = () => {
-    let wallCount = 0;
-    
     selectedRegions.forEach(region => {
       let points: { x: number; y: number }[];
       
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
+        // pathPoints are relative to region position; make them absolute
         points = region.pathPoints.map(p => ({ x: region.x + p.x, y: region.y + p.y }));
         // Close the polyline so the wall forms a closed shape
         const first = points[0];
@@ -170,12 +177,12 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
         ];
       }
       
-      addMapObject({
-        position: { x: points[0].x, y: points[0].y },
+      const wallData = {
+        position: { x: 0, y: 0 },
         width: 0,
         height: 0,
-        shape: 'wall',
-        category: 'wall',
+        shape: 'wall' as const,
+        category: 'wall' as const,
         fillColor: 'transparent',
         strokeColor: '#ef4444',
         strokeWidth: 2,
@@ -187,21 +194,22 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
         selected: false,
         wallPoints: points,
         mapId: region.mapId,
-      });
-      wallCount++;
+      };
+      const newId = addMapObject(wallData);
       
-      // Remove the source region
+      const regionSnapshot = { ...region };
       removeRegion(region.id);
+      undoRedoManager.push(new ConvertRegionToMapObjectCommand(regionSnapshot, newId, wallData, addMapObject, removeMapObject, 'wall'));
     });
     
+    setShowConvertMenu(false);
     onClearSelection();
     onUpdateCanvas?.();
-    toast.success(`Created ${wallCount} wall(s) from region edges`);
+    toast.success(`Created ${selectedRegions.length} wall(s) from region edges`);
   };
   
   const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water') => {
     const preset = MAP_OBJECT_PRESETS[category];
-    let count = 0;
     
     selectedRegions.forEach(region => {
       let customPath: { x: number; y: number }[] | undefined;
@@ -218,7 +226,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       
       const shape = customPath ? 'custom' : (preset.shape || 'rectangle');
       
-      addMapObject({
+      const mapObjData = {
         position: { x: region.x, y: region.y },
         width: region.width,
         height: region.height,
@@ -235,17 +243,19 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
         selected: false,
         customPath,
         mapId: region.mapId,
-      });
-      count++;
+      };
+      const newId = addMapObject(mapObjData);
       
-      // Remove the source region
+      const regionSnapshot = { ...region };
       removeRegion(region.id);
+      undoRedoManager.push(new ConvertRegionToMapObjectCommand(regionSnapshot, newId, mapObjData, addMapObject, removeMapObject, category));
     });
     
+    setShowConvertMenu(false);
     onClearSelection();
     onUpdateCanvas?.();
     const labels = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)' };
-    toast.success(`Created ${count} ${labels[category]} from region(s)`);
+    toast.success(`Created ${selectedRegions.length} ${labels[category]} from region(s)`);
   };
   
   return (
@@ -367,60 +377,68 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
             </>
           )}
           
-          {/* Convert to Portal (single selection only) */}
-          {isSingleSelection && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleConvertToPortal}
-              >
-                <Waypoints className="h-3 w-3 mr-1" />
-                Portal
-              </Button>
-            </>
-          )}
-          
-          {/* Convert to MapObjects */}
           <div className="h-4 w-px bg-border" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={handleConvertToWalls}
-          >
-            <Fence className="h-3 w-3 mr-1" />
-            Walls
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => handleConvertToMapObject('obstacle')}
-          >
-            <Box className="h-3 w-3 mr-1" />
-            Obstacle
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => handleConvertToMapObject('furniture')}
-          >
-            <Armchair className="h-3 w-3 mr-1" />
-            Furniture
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => handleConvertToMapObject('water')}
-          >
-            <Droplets className="h-3 w-3 mr-1" />
-            Water
-          </Button>
+          
+          {/* Convert To — popover menu */}
+          <Popover open={showConvertMenu} onOpenChange={setShowConvertMenu}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <ArrowRightLeft className="h-3 w-3 mr-1" />
+                Convert
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" side="top" align="center">
+              <div className="flex flex-col gap-0.5">
+                {isSingleSelection && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs justify-start"
+                    onClick={handleConvertToPortal}
+                  >
+                    <Waypoints className="h-3 w-3 mr-2" />
+                    Portal
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={handleConvertToWalls}
+                >
+                  <Fence className="h-3 w-3 mr-2" />
+                  Walls
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={() => handleConvertToMapObject('obstacle')}
+                >
+                  <Box className="h-3 w-3 mr-2" />
+                  Obstacle
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={() => handleConvertToMapObject('furniture')}
+                >
+                  <Armchair className="h-3 w-3 mr-2" />
+                  Furniture
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={() => handleConvertToMapObject('water')}
+                >
+                  <Droplets className="h-3 w-3 mr-2" />
+                  Water
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           
           <div className="h-4 w-px bg-border" />
           
