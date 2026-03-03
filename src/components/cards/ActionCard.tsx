@@ -138,7 +138,7 @@ function TargetingPhase() {
 }
 
 function ResolvePhase() {
-  const { currentAction, pendingActions, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
+  const { currentAction, pendingActions, setResolution, overrideDamage, commitAction, cancelAction, cancelAllActions, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
@@ -246,6 +246,11 @@ function ResolvePhase() {
           <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
             Cancel
           </Button>
+          {queueCount > 0 && (
+            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={cancelAllActions}>
+              Skip All
+            </Button>
+          )}
           <Button size="sm" className="flex-1" onClick={commitAction} disabled={!allResolved}>
             Commit Results
           </Button>

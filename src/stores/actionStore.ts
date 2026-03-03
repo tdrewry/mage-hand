@@ -79,6 +79,9 @@ interface ActionActions {
   /** Cancel the current action */
   cancelAction: () => void;
   
+  /** Cancel the current action and all queued actions */
+  cancelAllActions: () => void;
+  
   /** Update targeting mouse position */
   setTargetingMousePos: (pos: { x: number; y: number } | null) => void;
   
@@ -448,6 +451,37 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       currentAction: nextAction || null,
       pendingActions: remainingActions,
       isTargeting: nextAction?.phase === 'targeting',
+      targetingMousePos: null,
+    });
+  },
+
+  cancelAllActions: () => {
+    const { currentAction, pendingActions } = get();
+    const allActions = [currentAction, ...pendingActions].filter(Boolean) as ActionQueueEntry[];
+    const effectStore = useEffectStore.getState();
+
+    for (const action of allActions) {
+      if (action.category === 'effect' && action.effectInfo) {
+        const tpl = effectStore.getTemplate(action.effectInfo.templateId);
+        if (tpl?.persistence === 'instant') {
+          if (action.effectInfo.groupId) {
+            const groupEffects = effectStore.placedEffects.filter(
+              e => e.groupId === action.effectInfo!.groupId
+            );
+            for (const fx of groupEffects) {
+              effectStore.dismissEffect(fx.id);
+            }
+          } else {
+            effectStore.dismissEffect(action.effectInfo.placedEffectId);
+          }
+        }
+      }
+    }
+
+    set({
+      currentAction: null,
+      pendingActions: [],
+      isTargeting: false,
       targetingMousePos: null,
     });
   },
