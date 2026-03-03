@@ -5983,6 +5983,7 @@ export const SimpleTabletop = () => {
     // Create region with reasonable size (200x200 units) centered in viewport
     const regionSize = 200;
 
+    const selectedMapId = useMapStore.getState().selectedMapId;
     const newRegion: CanvasRegion = {
       id: regionId,
       x: viewportCenterX - regionSize / 2,
@@ -5997,6 +5998,7 @@ export const SimpleTabletop = () => {
       gridSnapping: false, // Default to disabled per-region
       gridVisible: true, // Default to visible
       regionType: "rectangle", // Default to rectangle
+      mapId: selectedMapId || undefined,
     };
 
     addRegion(newRegion);
@@ -6051,6 +6053,7 @@ export const SimpleTabletop = () => {
     // Generate Bezier control points for smooth curves (only in freehand mode)
     const bezierControls = pathDrawingType === "freehand" ? generateBezierControlPoints(finalPath) : undefined;
     const bounds = bezierControls ? getBezierBounds(finalPath, bezierControls) : getPolygonBounds(finalPath);
+    const selectedMapId = useMapStore.getState().selectedMapId;
     const newRegion: CanvasRegion = {
       id: `path-region-${Date.now()}`,
       x: bounds.x,
@@ -6068,6 +6071,7 @@ export const SimpleTabletop = () => {
       pathPoints: [...finalPath],
       bezierControlPoints: bezierControls,
       smoothing: bezierControls ? true : undefined, // Enable smoothing for freehand paths with curves
+      mapId: selectedMapId || undefined,
     };
 
     addRegion(newRegion);
@@ -10363,6 +10367,7 @@ export const SimpleTabletop = () => {
 
     try {
       // Add to store
+      const selectedMapId = useMapStore.getState().selectedMapId;
       addToken({
         id: tokenId,
         imageUrl,
@@ -10377,6 +10382,7 @@ export const SimpleTabletop = () => {
         color: tokenColor,
         roleId: "player", // Default to player role
         isHidden: false,
+        mapId: selectedMapId || undefined,
       });
 
       toast.success("Token added to map");
