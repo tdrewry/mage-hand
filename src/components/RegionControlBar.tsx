@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets, ArrowRightLeft } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets, ArrowRightLeft, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -376,6 +376,31 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
               )}
             </>
           )}
+          
+          {/* Duplicate */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 px-2 text-xs" 
+            onClick={() => {
+              const { addRegion } = useRegionStore.getState();
+              selectedRegions.forEach(region => {
+                const { id, selected, ...rest } = region;
+                addRegion({
+                  ...rest,
+                  x: region.x + 30,
+                  y: region.y + 30,
+                  selected: false,
+                  pathPoints: region.pathPoints ? region.pathPoints.map(p => ({ x: p.x, y: p.y })) : undefined,
+                });
+              });
+              onUpdateCanvas?.();
+              toast.success(`Duplicated ${selectedRegions.length} region(s)`);
+            }}
+          >
+            <Copy className="h-3 w-3 mr-1" />
+            Dup
+          </Button>
           
           <div className="h-4 w-px bg-border" />
           

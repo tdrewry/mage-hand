@@ -24,12 +24,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin, Copy } from 'lucide-react';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
 import { TokenPathPreviewCanvas } from './TokenPathPreviewCanvas';
-import { useSessionStore, type LabelPosition, type AppearanceVariant, type PathStyle, type FootprintType } from '../stores/sessionStore';
+import { useSessionStore, type Token, type LabelPosition, type AppearanceVariant, type PathStyle, type FootprintType } from '../stores/sessionStore';
 import { FOOTPRINT_TYPES, PATH_STYLES } from '@/lib/footprintShapes';
 import {
   Select,
@@ -1087,8 +1087,33 @@ export const TokenContextMenu = ({
             <Plus className="mr-2 h-4 w-4" />
             <span>Add to Initiative</span>
           </ContextMenuItem>
+          {/* Duplicate */}
+          <ContextMenuItem onClick={() => {
+            if (!canControl) {
+              toast.error("You don't have permission to duplicate these tokens");
+              return;
+            }
+            const { addToken } = useSessionStore.getState();
+            targetTokens.forEach(token => {
+              const newToken: Token = {
+                ...token,
+                id: `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: token.x + 30,
+                y: token.y + 30,
+                name: token.name ? `${token.name} (copy)` : '',
+                label: token.label ? `${token.label} (copy)` : '',
+              };
+              addToken(newToken);
+            });
+            onUpdateCanvas?.();
+            toast.success(`Duplicated ${targetTokens.length} token${targetTokens.length > 1 ? 's' : ''}`);
+          }} disabled={!canControl}>
+            <Copy className="mr-2 h-4 w-4" />
+            <span>Duplicate{isMultiSelection ? ` ${targetTokens.length}` : ''}</span>
+          </ContextMenuItem>
           {/* Move to Map submenu */}
           <MoveToMapSubmenu targetTokens={targetTokens} canControl={!!canControl} />
+          <ContextMenuSeparator />
           <ContextMenuItem onClick={handleDeleteClick} className="text-destructive" disabled={!canDelete}>
             <Trash2 className="mr-2 h-4 w-4" />
             <span>Delete Token{isMultiSelection ? 's' : ''}</span>
