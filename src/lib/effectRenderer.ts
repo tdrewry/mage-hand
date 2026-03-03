@@ -52,6 +52,9 @@ export function renderPlacedEffects(
 
 /**
  * Render a placement preview (semi-transparent, pulsing outline).
+ * In step 'origin': shows the shape centered on the cursor.
+ * In step 'direction': shows the shape at the locked origin, oriented toward cursor,
+ * plus a crosshair at the origin and a guide line.
  */
 export function renderPlacementPreview(
   rc: EffectRenderContext,
@@ -61,12 +64,38 @@ export function renderPlacementPreview(
   const { template, previewOrigin, previewDirection } = placement;
 
   rc.ctx.save();
-  // Extra transparency for preview
+
+  // Draw the effect shape preview
   rc.ctx.globalAlpha = 0.4 + Math.sin(rc.time * 0.004) * 0.15;
   drawShape(rc, template, previewOrigin, previewDirection, 1.0);
   // Outline
   rc.ctx.globalAlpha = 0.8;
   strokeShape(rc, template, previewOrigin, previewDirection);
+
+  // In direction step, draw origin crosshair and guide line
+  if (placement.step === 'direction' && placement.origin) {
+    const o = placement.origin;
+    const gs = rc.gridSize;
+    const crossSize = gs * 0.5;
+
+    // Crosshair at origin
+    rc.ctx.globalAlpha = 0.9;
+    rc.ctx.strokeStyle = '#ffffff';
+    rc.ctx.lineWidth = 2;
+    rc.ctx.setLineDash([]);
+    rc.ctx.beginPath();
+    rc.ctx.moveTo(o.x - crossSize, o.y);
+    rc.ctx.lineTo(o.x + crossSize, o.y);
+    rc.ctx.moveTo(o.x, o.y - crossSize);
+    rc.ctx.lineTo(o.x, o.y + crossSize);
+    rc.ctx.stroke();
+
+    // Small circle at origin
+    rc.ctx.beginPath();
+    rc.ctx.arc(o.x, o.y, gs * 0.15, 0, Math.PI * 2);
+    rc.ctx.stroke();
+  }
+
   rc.ctx.restore();
 }
 
