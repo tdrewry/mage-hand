@@ -1138,6 +1138,9 @@ export const SimpleTabletop = () => {
     const gridSize = tokenRegion ? (tokenRegion.gridSize ?? 40) * (tokenRegion.gridScale ?? 1) : 40;
 
     for (const effect of persistentEffects) {
+      // Skip if this token already triggered this effect
+      if (effect.triggeredTokenIds?.includes(tokenId)) continue;
+
       const impacts = computeEffectImpacts({
         template: effect.template,
         origin: effect.origin,
@@ -1151,6 +1154,9 @@ export const SimpleTabletop = () => {
 
       const tokenHit = impacts.find(i => i.targetId === tokenId && i.targetType === 'token');
       if (!tokenHit) continue;
+
+      // Mark this token as triggered for this effect
+      useEffectStore.getState().markTokenTriggered(effect.id, tokenId);
 
       // Token entered a trap/persistent effect — open Action Card
       const cardStore = useCardStore.getState();

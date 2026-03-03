@@ -95,6 +95,9 @@ export interface PlacedEffect {
 
   // Hit-test results (computed on placement / trigger)
   impactedTargets: EffectImpact[];
+
+  /** Token IDs that have already triggered this effect (prevents re-triggering) */
+  triggeredTokenIds: string[];
 }
 
 // ---------------------------------------------------------------------------
