@@ -342,7 +342,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       const effectStore = useEffectStore.getState();
       const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
-        effectStore.removeEffect(currentAction.effectInfo.placedEffectId);
+        effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
       }
     }
 
@@ -404,7 +404,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       const effectStore = useEffectStore.getState();
       const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
-        effectStore.removeEffect(currentAction.effectInfo.placedEffectId);
+        effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
       }
     }
 

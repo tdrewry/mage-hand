@@ -97,6 +97,9 @@ export interface PlacedEffect {
   roundsRemaining?: number; // persistent effects
   mapId: string;
 
+  /** When set (performance.now()), the effect is fading out and will be auto-removed */
+  dismissedAt?: number;
+
   // Hit-test results (computed on placement / trigger)
   impactedTargets: EffectImpact[];
 

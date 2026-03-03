@@ -68,6 +68,10 @@ interface EffectState {
     },
   ) => PlacedEffect;
   removeEffect: (effectId: string) => void;
+  /** Start a fade-out dismiss animation; effect auto-removes after fade completes */
+  dismissEffect: (effectId: string) => void;
+  /** Remove any effects whose fade-out animation has completed */
+  cleanupDismissedEffects: () => void;
   clearEffectsForMap: (mapId: string) => void;
   tickRound: () => void; // decrement roundsRemaining, remove expired
   markTokenTriggered: (effectId: string, tokenId: string) => void;
@@ -220,6 +224,26 @@ export const useEffectStore = create<EffectState>((set, get) => {
     removeEffect: (effectId) => {
       set((s) => ({
         placedEffects: s.placedEffects.filter((e) => e.id !== effectId),
+      }));
+    },
+
+    dismissEffect: (effectId) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId && !e.dismissedAt
+            ? { ...e, dismissedAt: performance.now() }
+            : e
+        ),
+      }));
+    },
+
+    cleanupDismissedEffects: () => {
+      const now = performance.now();
+      const FADE_DURATION = 500;
+      set((s) => ({
+        placedEffects: s.placedEffects.filter(
+          (e) => !e.dismissedAt || (now - e.dismissedAt) < FADE_DURATION
+        ),
       }));
     },
 

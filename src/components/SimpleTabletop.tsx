@@ -153,7 +153,7 @@ import {
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
 import { useEffectStore } from "../stores/effectStore";
-import { renderPlacedEffects, renderPlacementPreview } from "../lib/effectRenderer";
+import { renderPlacedEffects, renderPlacementPreview, type EffectDismissHit } from "../lib/effectRenderer";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
 
 
@@ -455,6 +455,7 @@ export const SimpleTabletop = () => {
   const fogBrushCursorRef = useRef<{ x: number; y: number } | null>(null);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null); // screen-space mouse pos for brush reticle
   const fogBrushPreExploredRef = useRef<paper.CompoundPath | null>(null); // snapshot for undo
+  const effectDismissHitsRef = useRef<EffectDismissHit[]>([]);
   // Keep refs in sync with state for stale-closure-safe reads in rAF/interval callbacks
   fogRevealBrushActiveRef.current = fogRevealBrushActive;
   fogRevealBrushRadiusRef.current = fogRevealBrushRadius;
@@ -3949,7 +3950,16 @@ export const SimpleTabletop = () => {
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
         if (mapEffects.length > 0) {
-          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
+          const hits = renderPlacedEffects(
+            { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+            mapEffects,
+            { showDismissButtons: isDM },
+          );
+          effectDismissHitsRef.current = hits;
+          // Clean up fully-faded dismissed effects
+          effectState.cleanupDismissedEffects();
+        } else {
+          effectDismissHitsRef.current = [];
         }
         if (effectState.placement?.previewOrigin) {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
@@ -4016,7 +4026,15 @@ export const SimpleTabletop = () => {
               const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
               const effectGridSize = regions[0]?.gridSize || 40;
               if (mapEffects.length > 0) {
-                renderPlacedEffects({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
+                const hits = renderPlacedEffects(
+                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+                  mapEffects,
+                  { showDismissButtons: isDM },
+                );
+                effectDismissHitsRef.current = hits;
+                effectState.cleanupDismissedEffects();
+              } else {
+                effectDismissHitsRef.current = [];
               }
               if (effectState.placement?.previewOrigin) {
                 renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
@@ -6672,7 +6690,7 @@ export const SimpleTabletop = () => {
 
     // Check for active effect animations or placement preview
     const effectState = useEffectStore.getState();
-    const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant');
+    const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant' || !!e.dismissedAt);
     const hasEffectPlacement = !!effectState.placement;
 
     // Only run animation loop if there's something to animate
@@ -7322,6 +7340,20 @@ export const SimpleTabletop = () => {
           }
         }
         return; // Consume the click during targeting
+      }
+
+      // ── EFFECT DISMISS BUTTON: check if DM clicked a dismiss button ──
+      if (isDM && effectDismissHitsRef.current.length > 0) {
+        const hit = effectDismissHitsRef.current.find(h => {
+          const dx = worldPos.x - h.center.x;
+          const dy = worldPos.y - h.center.y;
+          return Math.sqrt(dx * dx + dy * dy) <= h.radius * 1.5; // slightly generous hit area
+        });
+        if (hit) {
+          useEffectStore.getState().dismissEffect(hit.effectId);
+          redrawCanvas();
+          return;
+        }
       }
 
       // ── EFFECT PLACEMENT: skip all entity interactions, go straight to click handler ──
