@@ -57,17 +57,17 @@ interface ActionActions {
   /** Add a target to the current action */
   addTarget: (target: ActionTarget) => void;
   
-  /** Remove a target from the current action (dismiss without resolving) */
-  removeTarget: (tokenId: string) => void;
+  /** Remove a target entry by targetKey */
+  removeTarget: (targetKey: string) => void;
   
   /** Confirm targets and move to resolve phase (rolls attack + damage) */
   confirmTargets: () => void;
   
-  /** Set DM resolution for a target */
-  setResolution: (targetTokenId: string, resolution: AttackResolution) => void;
+  /** Set DM resolution for a target entry */
+  setResolution: (targetKey: string, resolution: AttackResolution) => void;
   
-  /** Override damage for a target */
-  overrideDamage: (targetTokenId: string, adjustedTotal: number) => void;
+  /** Override damage for a target entry */
+  overrideDamage: (targetKey: string, adjustedTotal: number) => void;
   
   /** Finalize and commit the action — log to history */
   commitAction: () => void;
@@ -120,11 +120,14 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
     // Convert EffectImpacts to ActionTargets (only tokens, not mapObjects)
+    let hitIndex = 0;
     const targets: ActionTarget[] = impacts
       .filter(i => i.targetType === 'token')
       .map(i => {
         const token = sessionTokens.find(t => t.id === i.targetId);
+        hitIndex++;
         return {
+          targetKey: `${i.targetId}-hit${hitIndex}`,
           tokenId: i.targetId,
           tokenName: token?.name || token?.label || 'Unknown',
           distance: i.distanceFromOrigin,
@@ -151,19 +154,17 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const damageResults: Record<string, DamageResult> = {};
 
     for (const target of targets) {
-      // Effects use saving throws, not attack rolls — populate a placeholder
-      rollResults[target.tokenId] = {
+      rollResults[target.targetKey] = {
         naturalRoll: 0,
         totalRoll: 0,
         attackBonus: 0,
         formula: 'Save',
       };
 
-      // Roll damage
       if (damageFormula && damageFormula !== '0') {
         const result = rollDice(damageFormula);
         const diceResults = result.groups.flatMap(g => g.keptResults);
-        damageResults[target.tokenId] = {
+        damageResults[target.targetKey] = {
           formula: damageFormula,
           total: result.total,
           diceResults,
@@ -171,7 +172,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
           adjustedTotal: result.total,
         };
       } else {
-        damageResults[target.tokenId] = {
+        damageResults[target.targetKey] = {
           formula: '0',
           total: 0,
           diceResults: [],
@@ -216,16 +217,15 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     });
   },
 
-  removeTarget: (tokenId) => {
+  removeTarget: (targetKey) => {
     const { currentAction } = get();
     if (!currentAction) return;
 
-    const newTargets = currentAction.targets.filter(t => t.tokenId !== tokenId);
-    const { [tokenId]: _roll, ...rollResults } = currentAction.rollResults;
-    const { [tokenId]: _dmg, ...damageResults } = currentAction.damageResults;
-    const { [tokenId]: _res, ...resolutions } = currentAction.resolutions;
+    const newTargets = currentAction.targets.filter(t => t.targetKey !== targetKey);
+    const { [targetKey]: _roll, ...rollResults } = currentAction.rollResults;
+    const { [targetKey]: _dmg, ...damageResults } = currentAction.damageResults;
+    const { [targetKey]: _res, ...resolutions } = currentAction.resolutions;
 
-    // If no targets remain, cancel the entire action
     if (newTargets.length === 0) {
       get().cancelAction();
       return;
@@ -251,23 +251,21 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const damageResults: Record<string, DamageResult> = {};
 
     for (const target of currentAction.targets) {
-      // Attack roll: 1d20 + attackBonus
       const attackFormula = `1d20+${currentAction.attack.attackBonus}`;
       const attackResult = rollDice(attackFormula);
       const naturalRoll = attackResult.groups[0]?.keptResults[0] ?? 0;
       
-      rollResults[target.tokenId] = {
+      rollResults[target.targetKey] = {
         naturalRoll,
         totalRoll: attackResult.total,
         attackBonus: currentAction.attack.attackBonus,
         formula: attackFormula,
       };
 
-      // Damage roll
       const damageResult = rollDice(currentAction.attack.damageFormula);
       const diceResults = damageResult.groups.flatMap(g => g.keptResults);
       
-      damageResults[target.tokenId] = {
+      damageResults[target.targetKey] = {
         formula: currentAction.attack.damageFormula,
         total: damageResult.total,
         diceResults,
@@ -288,13 +286,12 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     });
   },
 
-  setResolution: (targetTokenId, resolution) => {
+  setResolution: (targetKey, resolution) => {
     const { currentAction } = get();
     if (!currentAction || currentAction.phase !== 'resolve') return;
 
-    // Auto-adjust damage based on resolution
     const damageResults = { ...currentAction.damageResults };
-    const existing = damageResults[targetTokenId];
+    const existing = damageResults[targetKey];
     if (existing) {
       let adjustedTotal = existing.total;
       if (resolution === 'critical_miss' || resolution === 'miss') {
@@ -302,24 +299,23 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       } else if (resolution === 'critical_hit') {
         adjustedTotal = existing.total * 2;
       }
-      // critical_threat keeps normal damage until confirmed
-      damageResults[targetTokenId] = { ...existing, adjustedTotal };
+      damageResults[targetKey] = { ...existing, adjustedTotal };
     }
 
     set({
       currentAction: {
         ...currentAction,
-        resolutions: { ...currentAction.resolutions, [targetTokenId]: resolution },
+        resolutions: { ...currentAction.resolutions, [targetKey]: resolution },
         damageResults,
       },
     });
   },
 
-  overrideDamage: (targetTokenId, adjustedTotal) => {
+  overrideDamage: (targetKey, adjustedTotal) => {
     const { currentAction } = get();
     if (!currentAction || currentAction.phase !== 'resolve') return;
 
-    const existing = currentAction.damageResults[targetTokenId];
+    const existing = currentAction.damageResults[targetKey];
     if (!existing) return;
 
     set({
@@ -327,7 +323,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
         ...currentAction,
         damageResults: {
           ...currentAction.damageResults,
-          [targetTokenId]: { ...existing, adjustedTotal },
+          [targetKey]: { ...existing, adjustedTotal },
         },
       },
     });
@@ -351,7 +347,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const now = Date.now();
     const flashes: ResolutionFlash[] = currentAction.targets.map(t => {
       const token = sessionTokens.find(tk => tk.id === t.tokenId);
-      const resolution = currentAction.resolutions[t.tokenId] || 'miss';
+      const resolution = currentAction.resolutions[t.targetKey] || 'miss';
       const isHit = resolution === 'hit' || resolution === 'critical_hit' || resolution === 'critical_threat';
       return {
         tokenId: t.tokenId,
@@ -376,9 +372,9 @@ export const useActionStore = create<ActionStore>((set, get) => ({
         distance: t.distance,
         defenseValue: t.defenseValue,
         defenseLabel: t.defenseLabel,
-        attackRoll: currentAction.rollResults[t.tokenId],
-        damage: currentAction.damageResults[t.tokenId],
-        resolution: currentAction.resolutions[t.tokenId] || 'miss',
+        attackRoll: currentAction.rollResults[t.targetKey],
+        damage: currentAction.damageResults[t.targetKey],
+        resolution: currentAction.resolutions[t.targetKey] || 'miss',
       })),
     };
 

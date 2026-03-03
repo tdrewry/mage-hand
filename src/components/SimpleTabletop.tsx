@@ -7061,15 +7061,8 @@ export const SimpleTabletop = () => {
               );
               const allImpacts = allGroupEffects.flatMap(e => e.impactedTargets);
 
-              // Deduplicate by targetId (keep closest)
-              const impactMap = new Map<string, typeof allImpacts[0]>();
-              for (const imp of allImpacts) {
-                const existing = impactMap.get(imp.targetId);
-                if (!existing || imp.distanceFromOrigin < existing.distanceFromOrigin) {
-                  impactMap.set(imp.targetId, imp);
-                }
-              }
-              const mergedImpacts = Array.from(impactMap.values());
+              // Keep all impacts — tokens hit by multiple drops get multiple entries
+              const mergedImpacts = allImpacts;
 
               effectState.cancelPlacement();
 
@@ -7694,6 +7687,7 @@ export const SimpleTabletop = () => {
             }
 
             actionStore.addTarget({
+              targetKey: `${clickedToken.id}-${Date.now()}`,
               tokenId: clickedToken.id,
               tokenName: clickedToken.name || clickedToken.label || 'Unknown',
               distance: distGrid,
