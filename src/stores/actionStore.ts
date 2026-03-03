@@ -51,6 +51,7 @@ interface ActionActions {
     damageType?: string;
     damageFormula?: string;
     placedEffectId: string;
+    groupId?: string;
     impacts: EffectImpact[];
   }) => void;
   
@@ -115,7 +116,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
   },
 
-  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, placedEffectId, impacts }) => {
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, placedEffectId, groupId, impacts }) => {
     const sessionTokens = useSessionStore.getState().tokens;
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
@@ -199,6 +200,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
         templateName,
         damageType,
         placedEffectId,
+        groupId,
       },
     };
 
@@ -333,12 +335,22 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const { currentAction, actionHistory } = get();
     if (!currentAction || !currentAction.attack) return;
 
-    // Remove the placed effect for instant effect actions
-    if (currentAction.effectInfo?.placedEffectId && currentAction.category === 'effect') {
+    // Remove placed effects for instant effect actions (including all multi-drop group members)
+    if (currentAction.category === 'effect' && currentAction.effectInfo) {
       const effectStore = useEffectStore.getState();
       const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
-        effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+        if (currentAction.effectInfo.groupId) {
+          // Dismiss all effects in this multi-drop group
+          const groupEffects = effectStore.placedEffects.filter(
+            e => e.groupId === currentAction.effectInfo!.groupId
+          );
+          for (const fx of groupEffects) {
+            effectStore.dismissEffect(fx.id);
+          }
+        } else {
+          effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+        }
       }
     }
 
@@ -395,12 +407,21 @@ export const useActionStore = create<ActionStore>((set, get) => ({
   cancelAction: () => {
     const { currentAction } = get();
 
-    // Remove the placed effect for instant effect actions
-    if (currentAction?.effectInfo?.placedEffectId && currentAction.category === 'effect') {
+    // Remove placed effects for instant effect actions (including all multi-drop group members)
+    if (currentAction?.category === 'effect' && currentAction.effectInfo) {
       const effectStore = useEffectStore.getState();
       const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
-        effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+        if (currentAction.effectInfo.groupId) {
+          const groupEffects = effectStore.placedEffects.filter(
+            e => e.groupId === currentAction.effectInfo!.groupId
+          );
+          for (const fx of groupEffects) {
+            effectStore.dismissEffect(fx.id);
+          }
+        } else {
+          effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+        }
       }
     }
 

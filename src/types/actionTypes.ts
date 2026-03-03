@@ -96,6 +96,8 @@ export interface ActionQueueEntry {
     templateName: string;
     damageType?: string;
     placedEffectId: string;
+    /** Group ID linking multi-drop effect instances */
+    groupId?: string;
   };
 }
 
