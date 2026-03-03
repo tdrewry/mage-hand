@@ -60,7 +60,6 @@ interface TemplateFormData {
   animation: EffectAnimationType;
   animationSpeed: number;
   category: EffectCategory;
-  damageType: string;
   damageDice: DamageDiceEntry[];
   level: string;
   multiDropCount: number;
@@ -87,7 +86,6 @@ const INITIAL_FORM: TemplateFormData = {
   animation: 'none',
   animationSpeed: 1,
   category: 'custom',
-  damageType: '',
   damageDice: [],
   level: '',
   multiDropCount: 1,
@@ -115,7 +113,6 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     animation: t.animation,
     animationSpeed: t.animationSpeed,
     category: t.category,
-    damageType: t.damageType ?? '',
     damageDice: t.damageDice ?? [],
     level: t.level !== undefined ? String(t.level) : '',
     multiDropCount: t.multiDrop?.count ?? 1,
@@ -300,20 +297,17 @@ function TemplateFormFields({
         onChange={(rows) => update('damageDice', rows)}
       />
 
-      <div className="flex gap-2">
-        <Input
-          value={form.damageType}
-          onChange={(e) => update('damageType', e.target.value)}
-          placeholder="Primary damage type"
-          className="h-7 text-xs flex-1"
-        />
-        <NumericInput
-          value={form.level ? Number(form.level) : 0}
-          onChange={(v) => update('level', String(v))}
-          className="h-7 text-xs w-20"
-          min={0}
-          max={9}
-        />
+      <div className="flex gap-2 items-end">
+        <div className="flex-1">
+          <label className="text-[10px] text-muted-foreground">Spell Level</label>
+          <NumericInput
+            value={form.level ? Number(form.level) : 0}
+            onChange={(v) => update('level', String(v))}
+            className="h-7 text-xs"
+            min={0}
+            max={9}
+          />
+        </div>
       </div>
 
       <div className="flex gap-2 items-center">
@@ -414,7 +408,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     animation: form.animation,
     animationSpeed: form.animationSpeed,
     category: form.category,
-    damageType: form.damageType || undefined,
+    damageType: cleanedDice.length > 0 ? cleanedDice[0].damageType : undefined,
     damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
     level: form.level ? Number(form.level) : undefined,
     multiDrop: form.multiDropCount > 1 ? { count: form.multiDropCount } : undefined,
