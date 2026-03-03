@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectTemplate, EffectCategory } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
@@ -104,20 +105,45 @@ export function EffectsCardContent() {
   const deleteCustomTemplate = useEffectStore((s) => s.deleteCustomTemplate);
   const placement = useEffectStore((s) => s.placement);
 
+  const [damageFormula, setDamageFormula] = useState('');
+
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
 
   const handleSelect = (templateId: string) => {
-    startPlacement(templateId);
+    startPlacement(templateId, undefined, damageFormula || undefined);
   };
 
   return (
     <ScrollArea className="h-full">
       <div className="p-2 space-y-3">
+        {/* Damage formula input */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Damage Dice
+          </label>
+          <Input
+            value={damageFormula}
+            onChange={(e) => setDamageFormula(e.target.value)}
+            placeholder="e.g. 8d6, 2d10+4"
+            className="h-7 text-xs font-mono"
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Auto-rolls when effect hits tokens
+          </p>
+        </div>
+
+        <Separator />
+
         {/* Placement status */}
         {placement && (
           <div className="bg-primary/10 border border-primary/30 rounded p-2 text-xs">
             <span className="font-medium">Placing:</span> {placement.template.name}
+            {placement.damageFormula && (
+              <span className="ml-1 font-mono text-muted-foreground">
+                ({placement.damageFormula})
+              </span>
+            )}
             <div className="text-muted-foreground mt-0.5">
               Click on map to place · ESC to cancel
             </div>

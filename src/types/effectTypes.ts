@@ -118,6 +118,8 @@ export interface EffectPlacementState {
   templateId: string;
   template: EffectTemplate;
   casterId?: string;
+  /** Override damage formula for this placement (e.g. "8d6") */
+  damageFormula?: string;
   /** Live preview position (world coords) */
   previewOrigin: { x: number; y: number } | null;
   /** Live preview direction (radians) */

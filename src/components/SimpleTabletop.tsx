@@ -6722,7 +6722,7 @@ export const SimpleTabletop = () => {
             templateId: template.id,
             templateName: template.name,
             damageType: template.damageType,
-            damageFormula: undefined, // DM will set damage manually or from spell description
+            damageFormula: effectState.placement?.damageFormula,
             placedEffectId: placed.id,
             impacts,
           });
