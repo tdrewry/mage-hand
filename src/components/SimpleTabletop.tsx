@@ -1730,14 +1730,16 @@ export const SimpleTabletop = () => {
             gridWidth: token.gridWidth,
             gridHeight: token.gridHeight,
           };
-          // Upgrade to token-sourced: set caster and skip to direction step
+          const isRanged = placement.template.ranged === true;
+          // Ranged token-sourced: keep step='origin' so user picks placement point
+          // Non-ranged: skip to direction step with origin locked to token
           useEffectStore.setState({
             placement: {
               ...placement,
               casterId: token.id,
               casterToken,
-              step: 'direction',
-              origin: { x: token.x, y: token.y },
+              step: isRanged ? 'origin' : 'direction',
+              origin: isRanged ? null : { x: token.x, y: token.y },
               previewOrigin: { x: token.x, y: token.y },
             },
           });
