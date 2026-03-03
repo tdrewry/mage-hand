@@ -43,7 +43,6 @@ interface CardManagerProps {
 export function CardManager({ 
   children, 
   sessionId, 
-  toolsCardProps,
   activeRegionId,
   onToggleSnapping = () => {},
   onToggleGridVisibility = () => {}
@@ -119,12 +118,10 @@ export function CardManager({
 
 // Helper function to get card titles
 function getCardTitle(type: CardType): string {
-  const titles: Record<CardType, string> = {
+  const titles: Partial<Record<CardType, string>> = {
     [CardType.MENU]: 'Menu',
     [CardType.ROSTER]: 'Roster',
-    [CardType.TOOLS]: 'Tools',
     [CardType.FOG]: 'Fog Control',
-    [CardType.LAYERS]: 'Layer Stack',
     [CardType.TOKENS]: 'Token Panel',
     [CardType.MAP_CONTROLS]: 'Map Controls',
     [CardType.MAP_MANAGER]: 'Map Manager',
@@ -132,7 +129,6 @@ function getCardTitle(type: CardType): string {
     [CardType.PROJECT_MANAGER]: 'Project Manager',
     [CardType.REGION_CONTROL]: 'Region Control',
     [CardType.WATABOU_IMPORT]: 'Import',
-    [CardType.BACKGROUND_GRID]: 'Background & Grid',
     [CardType.INITIATIVE_TRACKER]: 'Initiative Tracker',
     [CardType.STYLES]: 'Map',
     [CardType.VISION_PROFILE_MANAGER]: 'Vision Profile Manager',
@@ -165,8 +161,6 @@ function renderCardContent(
   switch (type) {
     case CardType.MENU:
       return <MenuCardContent sessionId={sessionId} />;
-    case CardType.TOOLS:
-      return null; // TOOLS card removed - replaced by VerticalToolbar
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
@@ -176,8 +170,6 @@ function renderCardContent(
         isStructureMode={metadata?.isStructureMode as boolean}
         structureId={metadata?.structureId as string}
       />;
-    case CardType.LAYERS:
-      return null; // Deprecated: replaced by Map Tree
     case CardType.TOKENS:
       return <TokenPanelCardContent onAddToken={addToken} />;
     case CardType.MAP_CONTROLS:
@@ -186,8 +178,6 @@ function renderCardContent(
       return <MapManagerCardContent />;
     case CardType.WATABOU_IMPORT:
       return <WatabouImportCardContent />;
-    case CardType.BACKGROUND_GRID:
-      return null; // Deprecated: removed in multi-map architecture
     case CardType.PROJECT_MANAGER:
       return (
         <ProjectManagerCardContent

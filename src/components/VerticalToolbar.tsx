@@ -45,8 +45,6 @@ interface VerticalToolbarProps {
   fabricCanvas?: FabricCanvas | null;
   
   // Edit mode props
-  /** @deprecated Use card system instead */
-  onOpenMapManager?: () => void;
   onAddRegion?: () => void;
   onStartPolygonDraw?: () => void;
   onStartFreehandDraw?: () => void;
@@ -72,7 +70,6 @@ interface VerticalToolbarProps {
 export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   mode,
   fabricCanvas,
-  onOpenMapManager,
   onAddRegion,
   onStartPolygonDraw,
   onStartFreehandDraw,

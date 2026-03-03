@@ -182,12 +182,8 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
       }))
     };
     
-    set((state) => ({
-      maps: [...state.maps, newMap],
-    }));
-    // Auto-init fog settings for new map
+    set((state) => ({ maps: [...state.maps, newMap] }));
     useFogStore.getState().initMapFogSettings(newMap.id);
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateMap: (id, updates) => {
@@ -196,7 +192,6 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
         map.id === id ? { ...map, ...updates } : map
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   removeMap: (id) => {
@@ -207,15 +202,12 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
         selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
       };
     });
-    // Cleanup fog settings for removed map
     useFogStore.getState().removeMapFogSettings(id);
-    // Sync happens automatically via syncPatch middleware
   },
 
   setSelectedMap: (id) => {
     set({ selectedMapId: id });
 
-    // Enforce exclusive focus for structures
     if (id) {
       const { maps, structures } = get();
       const focusedMap = maps.find(m => m.id === id);
@@ -227,7 +219,6 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
               if (m.structureId === focusedMap.structureId && m.id !== id) {
                 return { ...m, active: false };
               }
-              // Ensure the focused map is active
               if (m.id === id && !m.active) {
                 return { ...m, active: true };
               }
@@ -245,14 +236,12 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
       const [removed] = newMaps.splice(fromIndex, 1);
       newMaps.splice(toIndex, 0, removed);
       
-      // Update z-indices based on new order
       newMaps.forEach((map, index) => {
         map.zIndex = index;
       });
       
       return { maps: newMaps };
     });
-    // Sync happens automatically via syncPatch middleware
   },
 
   addRegion: (mapId, regionData) => {
@@ -268,7 +257,6 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
           : map
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   updateRegion: (mapId, regionId, updates) => {
@@ -284,7 +272,6 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
           : map
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   removeRegion: (mapId, regionId) => {
@@ -298,7 +285,6 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
           : map
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
 
   getActiveRegionAt: (x, y) => {

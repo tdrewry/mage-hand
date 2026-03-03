@@ -149,13 +149,6 @@ interface DungeonStore {
    */
   setDoors: (doors: DoorConnection[]) => void;
   
-  // Terrain operations — REMOVED (water/trap/annotations are now MapObjects)
-  // Legacy stubs kept for zero-error migration; do nothing.
-  addTerrainFeature: (_feature: any) => void;
-  updateTerrainFeature: (_id: string, _updates: any) => void;
-  removeTerrainFeature: (_id: string) => void;
-  clearTerrainFeatures: () => void;
-  setTerrainFeatures: (_features: any[]) => void;
   
   // Imported wall segments (from dd2vtt or other external formats)
   /**
@@ -241,12 +234,6 @@ export const useDungeonStore = create<DungeonStore>()(
         set({ doors });
       },
       
-      // Terrain operations — no-ops (water/trap/annotations are now MapObjects)
-      addTerrainFeature: () => {},
-      updateTerrainFeature: () => {},
-      removeTerrainFeature: () => {},
-      clearTerrainFeatures: () => {},
-      setTerrainFeatures: () => {},
       
       // Light source operations
       addLightSource: (sourceData) => {

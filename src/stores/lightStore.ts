@@ -5,23 +5,20 @@ import { syncPatch } from '@/lib/sync';
 export interface LightSource {
   id: string;
   position: { x: number; y: number };
-  radius: number; // Maximum visibility distance in pixels
-  intensity: number; // 0-1, affects shadow darkness
-  color: string; // Hex color for the light
+  radius: number;
+  intensity: number;
+  color: string;
   enabled: boolean;
   label?: string;
-  mapId?: string; // Multi-map scoping — which map this light belongs to
+  mapId?: string;
 }
 
 interface LightState {
   lights: LightSource[];
-  globalAmbientLight: number; // 0-1, baseline illumination
-  shadowIntensity: number; // 0-1, how dark shadows are
-  
-  // Selection state
+  globalAmbientLight: number;
+  shadowIntensity: number;
   selectedLightIds: string[];
   
-  // Actions
   addLight: (light: Omit<LightSource, 'id'> & { id?: string }) => string;
   updateLight: (id: string, updates: Partial<LightSource>) => void;
   removeLight: (id: string) => void;
@@ -30,8 +27,6 @@ interface LightState {
   setGlobalAmbientLight: (level: number) => void;
   setShadowIntensity: (intensity: number) => void;
   clearAllLights: () => void;
-  
-  // Selection actions
   selectLight: (id: string, additive?: boolean) => void;
   deselectLight: (id: string) => void;
   clearLightSelection: () => void;
@@ -40,26 +35,16 @@ interface LightState {
 
 let nextLightId = 1;
 
-// Define the store creator separately for better type inference
 const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
   lights: [],
-  globalAmbientLight: 0.2, // 20% ambient light by default
-  shadowIntensity: 0.7, // Shadows are 70% opaque by default
+  globalAmbientLight: 0.2,
+  shadowIntensity: 0.7,
   selectedLightIds: [],
   
   addLight: (light) => {
-    // Use provided ID if available (for synced lights), otherwise generate new
     const id = light.id || `light-${nextLightId++}`;
-    const newLight: LightSource = {
-      ...light,
-      id,
-    };
-    
-    set((state) => ({
-      lights: [...state.lights, newLight],
-    }));
-    // Sync happens automatically via syncPatch middleware
-    
+    const newLight: LightSource = { ...light, id };
+    set((state) => ({ lights: [...state.lights, newLight] }));
     return id;
   },
   
@@ -69,14 +54,12 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
         light.id === id ? { ...light, ...updates } : light
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
   
   removeLight: (id) => {
     set((state) => ({
       lights: state.lights.filter((light) => light.id !== id),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
   
   toggleLight: (id) => {
@@ -85,12 +68,9 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
         light.id === id ? { ...light, enabled: !light.enabled } : light
       ),
     }));
-    // Sync happens automatically via syncPatch middleware
   },
   
-  setLights: (lights) => {
-    set({ lights });
-  },
+  setLights: (lights) => set({ lights }),
   
   setGlobalAmbientLight: (level) => {
     set({ globalAmbientLight: Math.max(0, Math.min(1, level)) });
@@ -100,9 +80,7 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
     set({ shadowIntensity: Math.max(0, Math.min(1, intensity)) });
   },
   
-  clearAllLights: () => {
-    set({ lights: [], selectedLightIds: [] });
-  },
+  clearAllLights: () => set({ lights: [], selectedLightIds: [] }),
   
   selectLight: (id, additive = false) => {
     set((state) => {
@@ -120,22 +98,16 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
     }));
   },
   
-  clearLightSelection: () => {
-    set({ selectedLightIds: [] });
-  },
+  clearLightSelection: () => set({ selectedLightIds: [] }),
   
-  selectMultipleLights: (ids) => {
-    set({ selectedLightIds: ids });
-  },
+  selectMultipleLights: (ids) => set({ selectedLightIds: ids }),
 });
 
-// Wrap with syncPatch middleware
 const withSyncPatch = syncPatch<LightState>({ 
   channel: 'lights',
   debug: false,
 })(lightStoreCreator);
 
-// Persist options
 const persistOptions: PersistOptions<LightState, Partial<LightState>> = {
   name: 'light-store',
   partialize: (state) => ({
