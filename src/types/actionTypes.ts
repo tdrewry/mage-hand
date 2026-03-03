@@ -5,7 +5,7 @@
  * interactions (attacks, abilities, spells, etc.)
  */
 
-export type ActionCategory = 'attack' | 'ability' | 'skill' | 'spell' | 'trap' | 'environment';
+export type ActionCategory = 'attack' | 'ability' | 'skill' | 'spell' | 'trap' | 'environment' | 'effect';
 
 export type AttackResolution = 'critical_miss' | 'miss' | 'hit' | 'critical_threat' | 'critical_hit';
 
@@ -87,6 +87,14 @@ export interface ActionQueueEntry {
   
   /** Timestamp for history */
   timestamp: number;
+
+  /** Effect template info (when category === 'effect') */
+  effectInfo?: {
+    templateId: string;
+    templateName: string;
+    damageType?: string;
+    placedEffectId: string;
+  };
 }
 
 /** Default "Slam" attack available to all tokens */

@@ -6686,7 +6686,7 @@ export const SimpleTabletop = () => {
         });
 
         // Place the effect
-        effectState.placeEffect(template.id, worldPos, activeMapId, {
+        const placed = effectState.placeEffect(template.id, worldPos, activeMapId, {
           direction,
           casterId: effectState.placement.casterId,
           impactedTargets: impacts,
@@ -6694,6 +6694,40 @@ export const SimpleTabletop = () => {
 
         // Exit placement mode
         effectState.cancelPlacement();
+
+        // Auto-open Action Card with impacted targets if any token impacts exist
+        const tokenImpacts = impacts.filter(i => i.targetType === 'token');
+        if (tokenImpacts.length > 0) {
+          // Open the Action Card
+          const cardStore = useCardStore.getState();
+          const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+          if (actionCard) {
+            cardStore.setVisibility(actionCard.id, true);
+          } else {
+            cardStore.registerCard({
+              type: CardType.ACTION_CARD,
+              title: 'Action',
+              defaultPosition: { x: window.innerWidth - 420, y: 80 },
+              defaultSize: { width: 400, height: 500 },
+              minSize: { width: 340, height: 400 },
+              isResizable: true,
+              isClosable: true,
+              defaultVisible: true,
+            });
+          }
+
+          // Start effect action with pre-populated targets
+          useActionStore.getState().startEffectAction({
+            sourceTokenId: effectState.placement?.casterId,
+            templateId: template.id,
+            templateName: template.name,
+            damageType: template.damageType,
+            damageFormula: undefined, // DM will set damage manually or from spell description
+            placedEffectId: placed.id,
+            impacts,
+          });
+        }
+
         redrawCanvas();
         return;
       }
