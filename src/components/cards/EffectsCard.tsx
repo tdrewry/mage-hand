@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -35,15 +35,298 @@ function groupByCategory(templates: EffectTemplate[]): Record<string, EffectTemp
   return groups;
 }
 
+// --- Shared form fields type ---
+
+interface TemplateFormData {
+  name: string;
+  shape: EffectShape;
+  radius: number;
+  length: number;
+  width: number;
+  angle: number;
+  persistence: EffectPersistence;
+  durationRounds: number;
+  recurring: boolean;
+  color: string;
+  opacity: number;
+  animation: EffectAnimationType;
+  animationSpeed: number;
+  category: EffectCategory;
+  damageType: string;
+}
+
+const INITIAL_FORM: TemplateFormData = {
+  name: '',
+  shape: 'circle',
+  radius: 4,
+  length: 12,
+  width: 1,
+  angle: 53,
+  persistence: 'instant',
+  durationRounds: 0,
+  recurring: true,
+  color: '#FF4500',
+  opacity: 0.55,
+  animation: 'none',
+  animationSpeed: 1,
+  category: 'custom',
+  damageType: '',
+};
+
+function templateToForm(t: EffectTemplate): TemplateFormData {
+  return {
+    name: t.name,
+    shape: t.shape,
+    radius: t.radius ?? 4,
+    length: t.length ?? 12,
+    width: t.width ?? 1,
+    angle: t.angle ?? 53,
+    persistence: t.persistence,
+    durationRounds: t.durationRounds ?? 0,
+    recurring: t.recurring !== false,
+    color: t.color,
+    opacity: t.opacity,
+    animation: t.animation,
+    animationSpeed: t.animationSpeed,
+    category: t.category,
+    damageType: t.damageType ?? '',
+  };
+}
+
+// --- Shared Form Fields Component ---
+
+function TemplateFormFields({
+  form,
+  update,
+}: {
+  form: TemplateFormData;
+  update: <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) => void;
+}) {
+  const needsRadius = form.shape === 'circle' || form.shape === 'circle-burst';
+  const needsLength = form.shape === 'line' || form.shape === 'cone';
+  const needsWidth = form.shape === 'line' || form.shape === 'rectangle' || form.shape === 'rectangle-burst';
+  const needsAngle = form.shape === 'cone';
+
+  return (
+    <>
+      <Input
+        value={form.name}
+        onChange={(e) => update('name', e.target.value)}
+        placeholder="Template name"
+        className="h-7 text-xs"
+      />
+
+      <div className="flex gap-2">
+        <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
+          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="circle">Circle</SelectItem>
+            <SelectItem value="line">Line</SelectItem>
+            <SelectItem value="cone">Cone</SelectItem>
+            <SelectItem value="rectangle">Rectangle</SelectItem>
+            <SelectItem value="circle-burst">Circle Burst</SelectItem>
+            <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
+          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="spell">Spell</SelectItem>
+            <SelectItem value="trap">Trap</SelectItem>
+            <SelectItem value="hazard">Hazard</SelectItem>
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2">
+        {needsRadius && (
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Radius</label>
+            <Input type="number" value={form.radius} onChange={(e) => update('radius', +e.target.value)} className="h-7 text-xs" min={1} />
+          </div>
+        )}
+        {needsLength && (
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Length</label>
+            <Input type="number" value={form.length} onChange={(e) => update('length', +e.target.value)} className="h-7 text-xs" min={1} />
+          </div>
+        )}
+        {needsWidth && (
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Width</label>
+            <Input type="number" value={form.width} onChange={(e) => update('width', +e.target.value)} className="h-7 text-xs" min={1} />
+          </div>
+        )}
+        {needsAngle && (
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Angle°</label>
+            <Input type="number" value={form.angle} onChange={(e) => update('angle', +e.target.value)} className="h-7 text-xs" min={1} max={360} />
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2 items-end">
+        <div>
+          <label className="text-[10px] text-muted-foreground">Color</label>
+          <input type="color" value={form.color} onChange={(e) => update('color', e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer" />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-muted-foreground">Opacity</label>
+          <Input type="number" value={form.opacity} onChange={(e) => update('opacity', +e.target.value)} className="h-7 text-xs" min={0.1} max={1} step={0.05} />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-muted-foreground">Animation</label>
+          <Select value={form.animation} onValueChange={(v) => update('animation', v as EffectAnimationType)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="flicker">Flicker</SelectItem>
+              <SelectItem value="crackle">Crackle</SelectItem>
+              <SelectItem value="pulse">Pulse</SelectItem>
+              <SelectItem value="expand">Expand</SelectItem>
+              <SelectItem value="swirl">Swirl</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Input
+        value={form.damageType}
+        onChange={(e) => update('damageType', e.target.value)}
+        placeholder="Damage type (fire, cold, etc.)"
+        className="h-7 text-xs"
+      />
+
+      <div className="flex gap-2 items-center">
+        <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
+          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="instant">Instant</SelectItem>
+            <SelectItem value="persistent">Persistent</SelectItem>
+          </SelectContent>
+        </Select>
+        {form.persistence === 'persistent' && (
+          <>
+            <div className="flex-1">
+              <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Switch
+                checked={form.recurring}
+                onCheckedChange={(v) => update('recurring', v)}
+                className="scale-75"
+              />
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                {form.recurring ? 'Recurring' : 'One-shot'}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// --- Create Template Form ---
+
+function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
+  const addCustomTemplate = useEffectStore((s) => s.addCustomTemplate);
+  const [form, setForm] = useState<TemplateFormData>({ ...INITIAL_FORM });
+
+  const update = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const handleCreate = () => {
+    if (!form.name.trim()) return;
+    addCustomTemplate({
+      name: form.name.trim(),
+      shape: form.shape,
+      radius: form.radius,
+      length: form.length,
+      width: form.width,
+      angle: form.angle,
+      placementMode: 'free',
+      persistence: form.persistence,
+      durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
+      recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+      color: form.color,
+      opacity: form.opacity,
+      animation: form.animation,
+      animationSpeed: form.animationSpeed,
+      category: form.category,
+      damageType: form.damageType || undefined,
+    });
+    setForm({ ...INITIAL_FORM });
+    onCreated();
+  };
+
+  return (
+    <div className="space-y-2 p-2 border border-border rounded bg-muted/30">
+      <TemplateFormFields form={form} update={update} />
+      <Button size="sm" className="w-full h-7 text-xs" onClick={handleCreate} disabled={!form.name.trim()}>
+        <Plus className="w-3 h-3 mr-1" /> Create Template
+      </Button>
+    </div>
+  );
+}
+
+// --- Edit Template Form ---
+
+function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDone: () => void }) {
+  const updateCustomTemplate = useEffectStore((s) => s.updateCustomTemplate);
+  const [form, setForm] = useState<TemplateFormData>(() => templateToForm(template));
+
+  const update = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    updateCustomTemplate(template.id, {
+      name: form.name.trim(),
+      shape: form.shape,
+      radius: form.radius,
+      length: form.length,
+      width: form.width,
+      angle: form.angle,
+      persistence: form.persistence,
+      durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
+      recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+      color: form.color,
+      opacity: form.opacity,
+      animation: form.animation,
+      animationSpeed: form.animationSpeed,
+      category: form.category,
+      damageType: form.damageType || undefined,
+    });
+    onDone();
+  };
+
+  return (
+    <div className="space-y-2 p-2 border border-primary/40 rounded bg-primary/5">
+      <TemplateFormFields form={form} update={update} />
+      <div className="flex gap-2">
+        <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleSave} disabled={!form.name.trim()}>
+          <Check className="w-3 h-3 mr-1" /> Save
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onDone}>
+          <X className="w-3 h-3 mr-1" /> Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // --- Template Row ---
 
 interface EffectTemplateRowProps {
   template: EffectTemplate;
   onSelect: (id: string) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
-function EffectTemplateRow({ template, onSelect, onDelete }: EffectTemplateRowProps) {
+function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTemplateRowProps) {
   const AnimIcon = ANIMATION_ICONS[template.animation] || Wand2;
 
   return (
@@ -95,6 +378,17 @@ function EffectTemplateRow({ template, onSelect, onDelete }: EffectTemplateRowPr
         </Badge>
       )}
 
+      {!template.isBuiltIn && onEdit && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100"
+          onClick={(e) => { e.stopPropagation(); onEdit(template.id); }}
+        >
+          <Pencil className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      )}
+
       {!template.isBuiltIn && onDelete && (
         <Button
           variant="ghost"
@@ -105,193 +399,6 @@ function EffectTemplateRow({ template, onSelect, onDelete }: EffectTemplateRowPr
           <Trash2 className="w-3 h-3 text-destructive" />
         </Button>
       )}
-    </div>
-  );
-}
-
-// --- Create Template Form ---
-
-const INITIAL_FORM = {
-  name: '',
-  shape: 'circle' as EffectShape,
-  radius: 4,
-  length: 12,
-  width: 1,
-  angle: 53,
-  persistence: 'instant' as EffectPersistence,
-  durationRounds: 0,
-  recurring: true,
-  color: '#FF4500',
-  opacity: 0.55,
-  animation: 'none' as EffectAnimationType,
-  animationSpeed: 1,
-  category: 'custom' as EffectCategory,
-  damageType: '',
-};
-
-function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
-  const addCustomTemplate = useEffectStore((s) => s.addCustomTemplate);
-  const [form, setForm] = useState({ ...INITIAL_FORM });
-
-  const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const handleCreate = () => {
-    if (!form.name.trim()) return;
-    addCustomTemplate({
-      name: form.name.trim(),
-      shape: form.shape,
-      radius: form.radius,
-      length: form.length,
-      width: form.width,
-      angle: form.angle,
-      placementMode: 'free',
-      persistence: form.persistence,
-      durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
-      recurring: form.persistence === 'persistent' ? form.recurring : undefined,
-      color: form.color,
-      opacity: form.opacity,
-      animation: form.animation,
-      animationSpeed: form.animationSpeed,
-      category: form.category,
-      damageType: form.damageType || undefined,
-    });
-    setForm({ ...INITIAL_FORM });
-    onCreated();
-  };
-
-  const needsRadius = form.shape === 'circle' || form.shape === 'circle-burst';
-  const needsLength = form.shape === 'line' || form.shape === 'cone';
-  const needsWidth = form.shape === 'line' || form.shape === 'rectangle' || form.shape === 'rectangle-burst';
-  const needsAngle = form.shape === 'cone';
-
-  return (
-    <div className="space-y-2 p-2 border border-border rounded bg-muted/30">
-      {/* Name */}
-      <Input
-        value={form.name}
-        onChange={(e) => update('name', e.target.value)}
-        placeholder="Template name"
-        className="h-7 text-xs"
-      />
-
-      {/* Shape + Category row */}
-      <div className="flex gap-2">
-        <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="circle">Circle</SelectItem>
-            <SelectItem value="line">Line</SelectItem>
-            <SelectItem value="cone">Cone</SelectItem>
-            <SelectItem value="rectangle">Rectangle</SelectItem>
-            <SelectItem value="circle-burst">Circle Burst</SelectItem>
-            <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="spell">Spell</SelectItem>
-            <SelectItem value="trap">Trap</SelectItem>
-            <SelectItem value="hazard">Hazard</SelectItem>
-            <SelectItem value="custom">Custom</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Dimension fields */}
-      <div className="flex gap-2">
-        {needsRadius && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Radius</label>
-            <Input type="number" value={form.radius} onChange={(e) => update('radius', +e.target.value)} className="h-7 text-xs" min={1} />
-          </div>
-        )}
-        {needsLength && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Length</label>
-            <Input type="number" value={form.length} onChange={(e) => update('length', +e.target.value)} className="h-7 text-xs" min={1} />
-          </div>
-        )}
-        {needsWidth && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Width</label>
-            <Input type="number" value={form.width} onChange={(e) => update('width', +e.target.value)} className="h-7 text-xs" min={1} />
-          </div>
-        )}
-        {needsAngle && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Angle°</label>
-            <Input type="number" value={form.angle} onChange={(e) => update('angle', +e.target.value)} className="h-7 text-xs" min={1} max={360} />
-          </div>
-        )}
-      </div>
-
-      {/* Color + Opacity + Animation */}
-      <div className="flex gap-2 items-end">
-        <div>
-          <label className="text-[10px] text-muted-foreground">Color</label>
-          <input type="color" value={form.color} onChange={(e) => update('color', e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer" />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Opacity</label>
-          <Input type="number" value={form.opacity} onChange={(e) => update('opacity', +e.target.value)} className="h-7 text-xs" min={0.1} max={1} step={0.05} />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Animation</label>
-          <Select value={form.animation} onValueChange={(v) => update('animation', v as EffectAnimationType)}>
-            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="flicker">Flicker</SelectItem>
-              <SelectItem value="crackle">Crackle</SelectItem>
-              <SelectItem value="pulse">Pulse</SelectItem>
-              <SelectItem value="expand">Expand</SelectItem>
-              <SelectItem value="swirl">Swirl</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Damage type */}
-      <Input
-        value={form.damageType}
-        onChange={(e) => update('damageType', e.target.value)}
-        placeholder="Damage type (fire, cold, etc.)"
-        className="h-7 text-xs"
-      />
-
-      {/* Persistence + Recurring */}
-      <div className="flex gap-2 items-center">
-        <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="instant">Instant</SelectItem>
-            <SelectItem value="persistent">Persistent</SelectItem>
-          </SelectContent>
-        </Select>
-        {form.persistence === 'persistent' && (
-          <>
-            <div className="flex-1">
-              <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
-            </div>
-            <div className="flex items-center gap-1">
-              <Switch
-                checked={form.recurring}
-                onCheckedChange={(v) => update('recurring', v)}
-                className="scale-75"
-              />
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                {form.recurring ? 'Recurring' : 'One-shot'}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-
-      <Button size="sm" className="w-full h-7 text-xs" onClick={handleCreate} disabled={!form.name.trim()}>
-        <Plus className="w-3 h-3 mr-1" /> Create Template
-      </Button>
     </div>
   );
 }
@@ -310,12 +417,19 @@ export function EffectsCardContent() {
 
   const [damageFormula, setDamageFormula] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
 
   const handleSelect = (templateId: string) => {
+    if (editingTemplateId) return; // Don't place while editing
     startPlacement(templateId, undefined, damageFormula || undefined);
+  };
+
+  const handleEdit = (templateId: string) => {
+    setEditingTemplateId(templateId);
+    setShowCreateForm(false);
   };
 
   return (
@@ -343,7 +457,7 @@ export function EffectsCardContent() {
         <div>
           <button
             className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full"
-            onClick={() => setShowCreateForm((v) => !v)}
+            onClick={() => { setShowCreateForm((v) => !v); setEditingTemplateId(null); }}
           >
             {showCreateForm ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             Create Template
@@ -389,12 +503,21 @@ export function EffectsCardContent() {
               </div>
               <div className="space-y-0.5">
                 {templates.map((t) => (
-                  <EffectTemplateRow
-                    key={t.id}
-                    template={t}
-                    onSelect={handleSelect}
-                    onDelete={t.isBuiltIn ? undefined : deleteCustomTemplate}
-                  />
+                  editingTemplateId === t.id ? (
+                    <EditTemplateForm
+                      key={t.id}
+                      template={t}
+                      onDone={() => setEditingTemplateId(null)}
+                    />
+                  ) : (
+                    <EffectTemplateRow
+                      key={t.id}
+                      template={t}
+                      onSelect={handleSelect}
+                      onDelete={t.isBuiltIn ? undefined : deleteCustomTemplate}
+                      onEdit={t.isBuiltIn ? undefined : handleEdit}
+                    />
+                  )
                 ))}
               </div>
               <Separator className="mt-2" />
