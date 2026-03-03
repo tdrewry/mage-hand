@@ -315,6 +315,54 @@ export const METEOR_SWARM: EffectTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Polyline wall spell templates
+// ---------------------------------------------------------------------------
+
+export const WALL_OF_FORCE: EffectTemplate = {
+  id: 'builtin-wall-of-force',
+  name: 'Wall of Force',
+  shape: 'polyline',
+  maxLength: 20,             // 100 ft total length (ten 10-ft panels)
+  segmentWidth: 0.05,        // ~3 inches thick (nearly invisible barrier)
+  placementMode: 'free',
+  persistence: 'persistent',
+  durationRounds: 100,       // 10 minutes concentration
+  color: '#88CCFF',
+  secondaryColor: '#FFFFFF',
+  opacity: 0.3,
+  animation: 'pulse',
+  animationSpeed: 0.5,
+  category: 'spell',
+  level: 5,
+  damageType: undefined,
+  description: 'An invisible wall of force up to 100 feet long springs into existence. Click waypoints to draw, double-click or Enter to finish.',
+  isBuiltIn: true,
+  ranged: true,
+};
+
+export const WALL_OF_THORNS: EffectTemplate = {
+  id: 'builtin-wall-of-thorns',
+  name: 'Wall of Thorns',
+  shape: 'polyline',
+  maxLength: 12,             // 60 ft long
+  segmentWidth: 1,           // 5 ft thick
+  placementMode: 'free',
+  persistence: 'persistent',
+  durationRounds: 100,       // 10 minutes concentration
+  color: '#2E5A1E',
+  secondaryColor: '#4A7A2E',
+  opacity: 0.6,
+  animation: 'none',
+  animationSpeed: 1.0,
+  category: 'spell',
+  level: 6,
+  damageType: 'piercing',
+  description: 'A tangled wall of tough, pliable thorny brush up to 60 feet long and 5 feet thick. Click waypoints to draw, double-click or Enter to finish.',
+  isBuiltIn: true,
+  ranged: true,
+};
+
+// ---------------------------------------------------------------------------
 // Aggregate collections
 // ---------------------------------------------------------------------------
 
@@ -324,6 +372,8 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
   CONE_OF_COLD,
   BURNING_HANDS,
   WALL_OF_FIRE,
+  WALL_OF_FORCE,
+  WALL_OF_THORNS,
   GREASE,
   WEB,
   DARKNESS,
