@@ -72,12 +72,12 @@ waypoints?: { x: number; y: number }[]; // polyline vertices (world coords)
 - Will be addressed after the card-based effect flow is stable
 - Likely model: `TokenAction { effectTemplateId, damageFormula, ... }`
 
-## Implementation Order
-1. **Multi-drop** — simpler extension, adds `groupId` + count-based placement loop
-2. **Polyline walls** — new shape type, new placement mode, new hit-testing geometry
+## Implementation Status
+1. ✅ **Multi-drop** — implemented with `groupId` + count-based placement loop. Templates: Storm of Vengeance, Meteor Swarm.
+2. ✅ **Polyline walls** — new `'polyline'` shape type with waypoint placement, max length enforcement, segment hit-testing, and rendering. Wall of Fire converted to polyline.
 3. **Token actions** — separate task, depends on stable effect + action card integration
 
 ## Design Notes
 - Multi-drop effects resolve as ONE action in the Action Card (all targets merged)
 - Polyline walls are persistent by default (walls don't make sense as instant)
-- Both features should work with ranged placement (origin away from caster)
+- Both features work with ranged placement (origin away from caster)

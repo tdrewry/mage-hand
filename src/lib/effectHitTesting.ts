@@ -2,8 +2,8 @@
  * Effect Hit-Testing Engine
  *
  * Computes which tokens and map objects are impacted by a placed effect.
- * Supports all 6 effect shapes: circle, line, cone, rectangle,
- * circle-burst, rectangle-burst.
+ * Supports all effect shapes: circle, line, cone, rectangle,
+ * circle-burst, rectangle-burst, polyline.
  *
  * Hit-testing works in world-coordinate space (pixels). Shape dimensions
  * stored in grid units are converted using the supplied gridSize.
@@ -39,6 +39,8 @@ export interface HitTestParams {
   mapId?: string;
   /** Set of currently active map IDs – tokens/objects on inactive maps are excluded */
   activeMapIds?: Set<string>;
+  /** Polyline waypoints (world coords) — for polyline shape */
+  waypoints?: { x: number; y: number }[];
 }
 
 /**
@@ -55,13 +57,16 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
     casterId,
     mapId,
     activeMapIds,
+    waypoints,
   } = params;
 
   const impacts: EffectImpact[] = [];
   const isBurst = isBurstShape(template.shape);
 
-  // Build the effect polygon / geometry in world pixels
-  const effectGeom = buildEffectGeometry(template, origin, direction, gridSize);
+  // Build the effect geometry — polyline returns multiple polys (one per segment)
+  const effectGeoms = template.shape === 'polyline' && waypoints && waypoints.length >= 2
+    ? buildPolylineGeometries(waypoints, (template.segmentWidth ?? 0.2) * gridSize)
+    : [buildEffectGeometry(template, origin, direction, gridSize)];
 
   // --- Test tokens ---
   let filteredTokens = mapId
@@ -78,15 +83,19 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
     if (!isBurst && casterId && token.id === casterId && !template.targetCaster) continue;
 
     const footprint = tokenFootprintRect(token, gridSize);
-    const overlap = computeOverlap(effectGeom, footprint);
-    if (overlap <= 0) continue;
+    let maxOverlap = 0;
+    for (const geom of effectGeoms) {
+      const overlap = computeOverlap(geom, footprint);
+      if (overlap > maxOverlap) maxOverlap = overlap;
+    }
+    if (maxOverlap <= 0) continue;
 
     const dist = distancePx(origin, { x: token.x, y: token.y }) / gridSize;
     impacts.push({
       targetId: token.id,
       targetType: 'token',
       distanceFromOrigin: Math.round(dist * 100) / 100,
-      overlapPercent: Math.round(overlap * 100) / 100,
+      overlapPercent: Math.round(maxOverlap * 100) / 100,
     });
   }
 
@@ -100,8 +109,12 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
 
   for (const obj of filteredObjects) {
     const footprint = mapObjectFootprintRect(obj);
-    const overlap = computeOverlap(effectGeom, footprint);
-    if (overlap <= 0) continue;
+    let maxOverlap = 0;
+    for (const geom of effectGeoms) {
+      const overlap = computeOverlap(geom, footprint);
+      if (overlap > maxOverlap) maxOverlap = overlap;
+    }
+    if (maxOverlap <= 0) continue;
 
     const center = rectCenter(footprint);
     const dist = distancePx(origin, center) / gridSize;
@@ -109,7 +122,7 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
       targetId: obj.id,
       targetType: 'mapObject',
       distanceFromOrigin: Math.round(dist * 100) / 100,
-      overlapPercent: Math.round(overlap * 100) / 100,
+      overlapPercent: Math.round(maxOverlap * 100) / 100,
     });
   }
 
@@ -173,6 +186,9 @@ function buildEffectGeometry(
         (template.angle ?? 53) * (Math.PI / 180),
         direction,
       );
+    case 'polyline':
+      // Polyline handled separately via buildPolylineGeometries
+      return buildCirclePoly(origin, gridSize);
     default:
       // Fallback: tiny circle at origin
       return buildCirclePoly(origin, gridSize);
@@ -463,4 +479,48 @@ function distancePx(
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+// ---------------------------------------------------------------------------
+// Polyline geometry builder (one ConvexPoly per segment)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a list of rectangle polygons, one per segment of the polyline.
+ * Each segment is treated as a rotated rectangle of the given width.
+ */
+function buildPolylineGeometries(
+  waypoints: { x: number; y: number }[],
+  widthPx: number,
+): ConvexPoly[] {
+  const polys: ConvexPoly[] = [];
+  const hw = widthPx / 2;
+
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = waypoints[i];
+    const b = waypoints[i + 1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen < 0.5) continue;
+
+    const dir = Math.atan2(dy, dx);
+    const cos = Math.cos(dir);
+    const sin = Math.sin(dir);
+
+    // Rectangle from a to b with given width
+    const locals = [
+      { x: 0, y: -hw },
+      { x: segLen, y: -hw },
+      { x: segLen, y: hw },
+      { x: 0, y: hw },
+    ];
+    const vertices = locals.map((p) => ({
+      x: a.x + p.x * cos - p.y * sin,
+      y: a.y + p.x * sin + p.y * cos,
+    }));
+    polys.push({ vertices, bounds: polyBounds(vertices) });
+  }
+
+  return polys;
 }

@@ -52,7 +52,12 @@ export function renderPlacedEffects(
       if (fadeMul <= 0.01) continue; // fully faded — skip rendering
     }
 
-    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, fadeMul, effect.animationPaused);
+    // Polyline effects use waypoints for rendering
+    if (effect.template.shape === 'polyline' && effect.waypoints && effect.waypoints.length >= 2) {
+      renderPolylineEffect(rc, effect, fadeMul);
+    } else {
+      renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, fadeMul, effect.animationPaused);
+    }
   }
 }
 
@@ -119,6 +124,13 @@ export function renderPlacementPreview(
   const { template, previewOrigin, previewDirection } = placement;
 
   rc.ctx.save();
+
+  // Polyline placement preview
+  if (placement.step === 'polyline') {
+    renderPolylinePlacementPreview(rc, placement);
+    rc.ctx.restore();
+    return;
+  }
 
   // For token-sourced placement, compute perimeter origin (non-ranged only)
   let effectOrigin = previewOrigin;
@@ -355,6 +367,9 @@ function buildPath(
       return buildLinePath(origin, (template.length ?? 12) * gridSize, (template.width ?? 1) * gridSize, direction);
     case 'cone':
       return buildConePath(origin, (template.length ?? 6) * gridSize, (template.angle ?? 53) * (Math.PI / 180), direction);
+    case 'polyline':
+      // Polyline is rendered differently — this fallback creates an empty path
+      return new Path2D();
     default:
       return buildCirclePath(origin, gridSize);
   }
@@ -490,4 +505,168 @@ function hashId(str: string): number {
 
 function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
+}
+
+// ---------------------------------------------------------------------------
+// Polyline rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a placed polyline effect (thick stroked path with rounded caps).
+ */
+function renderPolylineEffect(
+  rc: EffectRenderContext,
+  effect: PlacedEffect,
+  fadeMul: number,
+): void {
+  const { ctx, time, gridSize } = rc;
+  const template = effect.template;
+  const waypoints = effect.waypoints!;
+  const widthPx = (template.segmentWidth ?? 0.2) * gridSize;
+
+  const anim = effect.animationPaused
+    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+    : computeAnimation(template.animation, template.animationSpeed, time, effect.id);
+
+  const opacity = template.opacity * anim.opacityMod * fadeMul;
+  if (opacity <= 0.01) return;
+
+  ctx.save();
+
+  // Outer glow
+  if (template.secondaryColor && template.animation !== 'none') {
+    ctx.globalAlpha = Math.min(1, opacity * 0.3 * anim.glowMod);
+    ctx.strokeStyle = template.secondaryColor;
+    ctx.lineWidth = widthPx * 1.8;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(waypoints[0].x, waypoints[0].y);
+    for (let i = 1; i < waypoints.length; i++) {
+      ctx.lineTo(waypoints[i].x, waypoints[i].y);
+    }
+    ctx.stroke();
+  }
+
+  // Main wall stroke
+  ctx.globalAlpha = Math.min(1, opacity);
+  ctx.strokeStyle = template.color;
+  ctx.lineWidth = widthPx;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(waypoints[0].x, waypoints[0].y);
+  for (let i = 1; i < waypoints.length; i++) {
+    ctx.lineTo(waypoints[i].x, waypoints[i].y);
+  }
+  ctx.stroke();
+
+  // Inner bright core
+  ctx.globalAlpha = Math.min(1, opacity * 0.6);
+  ctx.strokeStyle = template.secondaryColor ?? '#ffffff';
+  ctx.lineWidth = Math.max(1, widthPx * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(waypoints[0].x, waypoints[0].y);
+  for (let i = 1; i < waypoints.length; i++) {
+    ctx.lineTo(waypoints[i].x, waypoints[i].y);
+  }
+  ctx.stroke();
+
+  // Draw waypoint dots
+  ctx.globalAlpha = Math.min(1, opacity * 0.5);
+  ctx.fillStyle = '#ffffff';
+  for (const wp of waypoints) {
+    ctx.beginPath();
+    ctx.arc(wp.x, wp.y, Math.max(2, widthPx * 0.3), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/**
+ * Render the polyline placement preview: committed segments + live segment to cursor.
+ */
+function renderPolylinePlacementPreview(
+  rc: EffectRenderContext,
+  placement: EffectPlacementState,
+): void {
+  const { ctx, gridSize, time } = rc;
+  const template = placement.template;
+  const waypoints = placement.polylineWaypoints ?? [];
+  const widthPx = (template.segmentWidth ?? 0.2) * gridSize;
+  const maxLenPx = (template.maxLength ?? 12) * gridSize;
+  const usedPx = (placement.polylineLengthUsed ?? 0) * gridSize;
+
+  // Draw spell intent line from caster if token-sourced
+  if (placement.casterToken && waypoints.length > 0) {
+    renderSpellIntentLine(rc, placement.casterToken, waypoints[0], template.color);
+  }
+
+  // Draw committed segments
+  if (waypoints.length >= 2) {
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = template.color;
+    ctx.lineWidth = widthPx;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(waypoints[0].x, waypoints[0].y);
+    for (let i = 1; i < waypoints.length; i++) {
+      ctx.lineTo(waypoints[i].x, waypoints[i].y);
+    }
+    ctx.stroke();
+  }
+
+  // Draw waypoint markers
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = template.color;
+  for (const wp of waypoints) {
+    ctx.beginPath();
+    ctx.arc(wp.x, wp.y, Math.max(3, widthPx * 0.4), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw live segment from last waypoint to cursor
+  if (waypoints.length > 0 && placement.previewOrigin) {
+    const last = waypoints[waypoints.length - 1];
+    const cursor = placement.previewOrigin;
+
+    // Clamp cursor distance to remaining length
+    const dx = cursor.x - last.x;
+    const dy = cursor.y - last.y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    const remainPx = maxLenPx - usedPx;
+    let endX = cursor.x;
+    let endY = cursor.y;
+    if (segLen > remainPx && segLen > 0) {
+      endX = last.x + (dx / segLen) * remainPx;
+      endY = last.y + (dy / segLen) * remainPx;
+    }
+
+    // Dashed preview line
+    ctx.globalAlpha = 0.4 + Math.sin(time * 0.004) * 0.15;
+    ctx.strokeStyle = template.color;
+    ctx.lineWidth = widthPx;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Length remaining indicator
+    const remainUnits = Math.max(0, (template.maxLength ?? 12) - (placement.polylineLengthUsed ?? 0));
+    const remainFt = remainUnits * 5;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = remainUnits < 2 ? '#ef4444' : '#ffffff';
+    ctx.font = `bold ${Math.max(10, gridSize * 0.3)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${remainFt}ft left`, (last.x + endX) / 2, (last.y + endY) / 2 - widthPx - 4);
+  }
 }
