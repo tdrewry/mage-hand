@@ -136,7 +136,7 @@ function TargetingPhase() {
 }
 
 function ResolvePhase() {
-  const { currentAction, setResolution, overrideDamage, commitAction, cancelAction } = useActionStore();
+  const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.tokenId]);
@@ -179,6 +179,7 @@ function ResolvePhase() {
               damageType={currentAction.attack!.damageType}
               onSetResolution={(r) => setResolution(target.tokenId, r)}
               onOverrideDamage={(v) => overrideDamage(target.tokenId, v)}
+              onDismiss={() => removeTarget(target.tokenId)}
             />
           );
         })}
@@ -209,6 +210,7 @@ interface TargetResolveCardProps {
   damageType: string;
   onSetResolution: (r: AttackResolution) => void;
   onOverrideDamage: (v: number) => void;
+  onDismiss: () => void;
 }
 
 function TargetResolveCard({
@@ -222,6 +224,7 @@ function TargetResolveCard({
   damageType,
   onSetResolution,
   onOverrideDamage,
+  onDismiss,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
   const isHit = roll.totalRoll >= defenseValue;
@@ -253,7 +256,16 @@ function TargetResolveCard({
           <Shield className="w-4 h-4 text-muted-foreground" />
           <span className="font-semibold text-sm">{targetName}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{(distance * 5).toFixed(0)} ft.</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{(distance * 5).toFixed(0)} ft.</span>
+          <button
+            onClick={onDismiss}
+            className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+            title="Dismiss target"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Attack roll vs defense */}

@@ -56,6 +56,9 @@ interface ActionActions {
   /** Add a target to the current action */
   addTarget: (target: ActionTarget) => void;
   
+  /** Remove a target from the current action (dismiss without resolving) */
+  removeTarget: (tokenId: string) => void;
+  
   /** Confirm targets and move to resolve phase (rolls attack + damage) */
   confirmTargets: () => void;
   
@@ -208,6 +211,32 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       currentAction: {
         ...currentAction,
         targets: [...currentAction.targets, target],
+      },
+    });
+  },
+
+  removeTarget: (tokenId) => {
+    const { currentAction } = get();
+    if (!currentAction) return;
+
+    const newTargets = currentAction.targets.filter(t => t.tokenId !== tokenId);
+    const { [tokenId]: _roll, ...rollResults } = currentAction.rollResults;
+    const { [tokenId]: _dmg, ...damageResults } = currentAction.damageResults;
+    const { [tokenId]: _res, ...resolutions } = currentAction.resolutions;
+
+    // If no targets remain, cancel the entire action
+    if (newTargets.length === 0) {
+      get().cancelAction();
+      return;
+    }
+
+    set({
+      currentAction: {
+        ...currentAction,
+        targets: newTargets,
+        rollResults,
+        damageResults,
+        resolutions,
       },
     });
   },
