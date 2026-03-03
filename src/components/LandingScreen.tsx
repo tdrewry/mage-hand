@@ -39,6 +39,9 @@ import { useLightStore } from '@/stores/lightStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useIlluminationStore } from '@/stores/illuminationStore';
+import { useCreatureStore } from '@/stores/creatureStore';
+import { useHatchingStore } from '@/stores/hatchingStore';
 import {
   createProjectMetadata,
   exportProjectToFile,
@@ -73,6 +76,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const cardStore = useCardStore();
   const dungeonStore = useDungeonStore();
   const mapObjectStore = useMapObjectStore();
+  const illuminationStore = useIlluminationStore();
+  const creatureStore = useCreatureStore();
+  const hatchingStore = useHatchingStore();
 
   // --- Session helpers ---
   const createCurrentProjectData = (): ProjectData => ({
@@ -114,14 +120,31 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     dungeonData: {
       doors: dungeonStore.doors,
       importedWallSegments: dungeonStore.importedWallSegments,
+      lightSources: dungeonStore.lightSources,
+      renderingMode: dungeonStore.renderingMode,
       watabouStyle: dungeonStore.watabouStyle,
       wallEdgeStyle: dungeonStore.wallEdgeStyle,
       wallThickness: dungeonStore.wallThickness,
       textureScale: dungeonStore.textureScale,
       lightDirection: dungeonStore.lightDirection,
       shadowDistance: dungeonStore.shadowDistance,
+      enforceMovementBlocking: dungeonStore.enforceMovementBlocking,
+      enforceRegionBounds: dungeonStore.enforceRegionBounds,
     },
     mapObjects: mapObjectStore.mapObjects,
+    illumination: {
+      lights: illuminationStore.lights,
+      globalAmbientLight: illuminationStore.globalAmbientLight,
+    },
+    creatures: {
+      characters: creatureStore.characters,
+      monsters: creatureStore.monsters,
+    },
+    hatching: {
+      enabled: hatchingStore.enabled,
+      hatchingOptions: hatchingStore.hatchingOptions,
+    },
+    viewportTransforms: sessionStore.viewportTransforms,
   });
 
   const clearAllStores = () => {
@@ -208,15 +231,117 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const applyAndLaunch = async (data: ProjectData) => {
     try {
       clearAllStores();
-      // Apply loaded data to stores
+
+      // Core entities
       if (data.tokens) sessionStore.setTokens(data.tokens);
       if (data.maps) data.maps.forEach(m => mapStore.addMap(m));
       if (data.regions) data.regions.forEach(r => regionStore.addRegion(r));
+      if (data.groups) data.groups.forEach(g => useGroupStore.getState().restoreGroup(g));
+      if (data.mapObjects) useMapObjectStore.getState().setMapObjects(data.mapObjects);
       if (data.lights) lightStore.setLights(data.lights);
+
+      // Roles & vision profiles
       if (data.roles) {
         roleStore.clearRoles();
         data.roles.forEach(r => roleStore.addRole(r));
       }
+      if (data.visionProfiles) {
+        useVisionProfileStore.getState().clearProfiles();
+        data.visionProfiles.forEach(vp => useVisionProfileStore.getState().addProfile(vp));
+      }
+
+      // Initiative
+      if (data.initiative) {
+        const initStore = useInitiativeStore.getState();
+        initStore.setInitiativeOrder(data.initiative.initiativeOrder || []);
+        if (data.initiative.isInCombat) {
+          initStore.startCombat();
+          initStore.setCurrentTurn(data.initiative.currentTurnIndex || 0);
+        }
+        initStore.setRestrictMovement(data.initiative.restrictMovement ?? false);
+      }
+
+      // Fog of war
+      if (data.fogData) {
+        const fs = useFogStore.getState();
+        if (data.fogData.fogSettingsPerMap) {
+          Object.entries(data.fogData.fogSettingsPerMap).forEach(([mapId, settings]) => {
+            fs.setMapFogSettings(mapId, settings);
+          });
+        }
+        if (data.fogData.serializedExploredAreas) {
+          fs.setSerializedExploredAreas(data.fogData.serializedExploredAreas);
+        }
+        if (data.fogData.serializedExploredAreasPerMap) {
+          Object.entries(data.fogData.serializedExploredAreasPerMap).forEach(([mapId, serialized]) => {
+            fs.setSerializedExploredAreasForMap(mapId, serialized);
+          });
+        }
+        if (data.fogData.realtimeVisionDuringDrag !== undefined) {
+          fs.setRealtimeVisionDuringDrag(data.fogData.realtimeVisionDuringDrag);
+        }
+        if (data.fogData.realtimeVisionThrottleMs !== undefined) {
+          fs.setRealtimeVisionThrottleMs(data.fogData.realtimeVisionThrottleMs);
+        }
+      }
+
+      // Dungeon data
+      if (data.dungeonData) {
+        const ds = useDungeonStore.getState();
+        if (data.dungeonData.doors) ds.setDoors(data.dungeonData.doors);
+        if (data.dungeonData.importedWallSegments) ds.setImportedWallSegments(data.dungeonData.importedWallSegments);
+        if (data.dungeonData.lightSources) ds.setLightSources(data.dungeonData.lightSources);
+        if (data.dungeonData.renderingMode) ds.setRenderingMode(data.dungeonData.renderingMode);
+        if (data.dungeonData.watabouStyle) ds.setWatabouStyle(data.dungeonData.watabouStyle);
+        if (data.dungeonData.wallEdgeStyle) ds.setWallEdgeStyle(data.dungeonData.wallEdgeStyle);
+        if (data.dungeonData.wallThickness !== undefined) ds.setWallThickness(data.dungeonData.wallThickness);
+        if (data.dungeonData.textureScale !== undefined) ds.setTextureScale(data.dungeonData.textureScale);
+        if (data.dungeonData.lightDirection !== undefined) ds.setLightDirection(data.dungeonData.lightDirection);
+        if (data.dungeonData.shadowDistance !== undefined) ds.setShadowDistance(data.dungeonData.shadowDistance);
+        if (data.dungeonData.enforceMovementBlocking !== undefined) ds.setEnforceMovementBlocking(data.dungeonData.enforceMovementBlocking);
+        if (data.dungeonData.enforceRegionBounds !== undefined) ds.setEnforceRegionBounds(data.dungeonData.enforceRegionBounds);
+      }
+
+      // Illumination (unified system)
+      if (data.illumination) {
+        const illumStore = useIlluminationStore.getState();
+        illumStore.setLights(data.illumination.lights || []);
+        if (data.illumination.globalAmbientLight !== undefined) {
+          illumStore.setGlobalAmbientLight(data.illumination.globalAmbientLight);
+        }
+      }
+
+      // Creatures (characters & monsters)
+      if (data.creatures) {
+        const cs = useCreatureStore.getState();
+        if (data.creatures.characters) {
+          data.creatures.characters.forEach(c => cs.addCharacter(c));
+        }
+        if (data.creatures.monsters) {
+          cs.addMonsters(data.creatures.monsters);
+        }
+      }
+
+      // Hatching settings
+      if (data.hatching) {
+        const hs = useHatchingStore.getState();
+        hs.setEnabled(data.hatching.enabled);
+        if (data.hatching.hatchingOptions) hs.setOptions(data.hatching.hatchingOptions);
+      }
+
+      // Viewport transforms
+      if (data.viewportTransforms) {
+        Object.entries(data.viewportTransforms).forEach(([mapId, transform]) => {
+          useSessionStore.getState().setViewportTransform(mapId, transform);
+        });
+      }
+
+      // Settings
+      if (data.settings) {
+        if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
+        if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
+      }
+
       toast.success('Session loaded');
       onLaunch();
     } catch (err) {

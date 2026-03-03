@@ -22,6 +22,9 @@ import { CardState } from '../types/cardTypes';
 import { MapObject } from '../types/mapObjectTypes';
 import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
 import { getAllTokenMappings, importTokenTextures } from './tokenTextureStorage';
+import type { IlluminationSource } from '@/types/illumination';
+import type { DndBeyondCharacter, Monster5eTools } from '@/types/creatureTypes';
+import type { DysonHatchingOptions } from '@/lib/shaders/dysonHatchingFilter';
 
 export interface ProjectMetadata {
   id: string;
@@ -83,6 +86,23 @@ export interface ProjectData {
   cardStates?: CardState[];
   dungeonData?: any; // Optional dungeon data
   mapObjects?: MapObject[]; // Interactive map features (doors, columns, etc.)
+  // Unified illumination sources (standalone lights)
+  illumination?: {
+    lights: IlluminationSource[];
+    globalAmbientLight?: number;
+  };
+  // Creature library snapshot
+  creatures?: {
+    characters: DndBeyondCharacter[];
+    monsters: Monster5eTools[];
+  };
+  // Edge hatching settings
+  hatching?: {
+    enabled: boolean;
+    hatchingOptions: DysonHatchingOptions;
+  };
+  // Per-map viewport transforms
+  viewportTransforms?: Record<string, { x: number; y: number; zoom: number }>;
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }
