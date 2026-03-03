@@ -26,6 +26,7 @@ export const FIREBALL: EffectTemplate = {
   category: 'spell',
   level: 3,
   damageType: 'fire',
+  damageDice: [{ formula: '8d6', damageType: 'fire' }],
   description: 'A bright streak flashes to a point and blossoms into a 20-foot-radius explosion of flame.',
   isBuiltIn: true,
   ranged: true,
@@ -47,6 +48,7 @@ export const LIGHTNING_BOLT: EffectTemplate = {
   category: 'spell',
   level: 3,
   damageType: 'lightning',
+  damageDice: [{ formula: '8d6', damageType: 'lightning' }],
   description: 'A stroke of lightning forming a 100-foot line, 5 feet wide, blasts out from you.',
   isBuiltIn: true,
 };
@@ -67,6 +69,7 @@ export const CONE_OF_COLD: EffectTemplate = {
   category: 'spell',
   level: 5,
   damageType: 'cold',
+  damageDice: [{ formula: '8d8', damageType: 'cold' }],
   description: 'A blast of cold air erupts in a 60-foot cone.',
   isBuiltIn: true,
 };
@@ -88,6 +91,7 @@ export const WALL_OF_FIRE: EffectTemplate = {
   category: 'spell',
   level: 4,
   damageType: 'fire',
+  damageDice: [{ formula: '5d8', damageType: 'fire' }],
   description: 'A wall of fire up to 60 feet long, 20 feet high, and 1 foot thick appears. Click waypoints to draw, double-click or Enter to finish.',
   isBuiltIn: true,
   ranged: true,
@@ -153,6 +157,7 @@ export const BURNING_HANDS: EffectTemplate = {
   category: 'spell',
   level: 1,
   damageType: 'fire',
+  damageDice: [{ formula: '3d6', damageType: 'fire' }],
   description: 'A thin sheet of flames shoots forth from your outstretched fingertips in a 15-foot cone.',
   isBuiltIn: true,
 };
@@ -194,6 +199,7 @@ export const SPIRIT_GUARDIANS: EffectTemplate = {
   category: 'spell',
   level: 3,
   damageType: 'radiant',
+  damageDice: [{ formula: '3d8', damageType: 'radiant' }],
   description: 'Spirits flit around you in a 15-foot radius. Enemies take damage when entering or starting their turn.',
   isBuiltIn: true,
   ranged: true,
@@ -215,6 +221,7 @@ export const THUNDERWAVE: EffectTemplate = {
   category: 'spell',
   level: 1,
   damageType: 'thunder',
+  damageDice: [{ formula: '2d8', damageType: 'thunder' }],
   description: 'A wave of thunderous force sweeps out from you in a 15-foot cube.',
   isBuiltIn: true,
 };
@@ -281,6 +288,7 @@ export const STORM_OF_VENGEANCE_BOLTS: EffectTemplate = {
   category: 'spell',
   level: 9,
   damageType: 'lightning',
+  damageDice: [{ formula: '10d6', damageType: 'lightning' }],
   description: 'Six bolts of lightning strike six creatures of your choice under the storm cloud. Each bolt hits a 5-ft area.',
   isBuiltIn: true,
   ranged: true,
@@ -305,6 +313,10 @@ export const METEOR_SWARM: EffectTemplate = {
   category: 'spell',
   level: 9,
   damageType: 'fire',
+  damageDice: [
+    { formula: '20d6', damageType: 'fire' },
+    { formula: '20d6', damageType: 'bludgeoning' },
+  ],
   description: 'Four blazing orbs crash to the ground at different points, each creating a 40-foot-radius sphere of fire.',
   isBuiltIn: true,
   ranged: true,
@@ -312,6 +324,34 @@ export const METEOR_SWARM: EffectTemplate = {
     count: 4,
     perDropRadius: 8,
   },
+};
+
+// ---------------------------------------------------------------------------
+// Multi-damage-type spell templates
+// ---------------------------------------------------------------------------
+
+export const FLAME_STRIKE: EffectTemplate = {
+  id: 'builtin-flame-strike',
+  name: 'Flame Strike',
+  shape: 'circle',
+  radius: 2,               // 10 ft radius
+  placementMode: 'free',
+  persistence: 'instant',
+  color: '#FF6347',
+  secondaryColor: '#FFD700',
+  opacity: 0.6,
+  animation: 'expand',
+  animationSpeed: 1.5,
+  category: 'spell',
+  level: 5,
+  damageType: 'fire',
+  damageDice: [
+    { formula: '4d6', damageType: 'fire' },
+    { formula: '4d6', damageType: 'radiant' },
+  ],
+  description: 'A vertical column of divine fire roars down. Half fire, half radiant damage in a 10-foot-radius, 40-foot-high cylinder.',
+  isBuiltIn: true,
+  ranged: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -371,6 +411,7 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
   LIGHTNING_BOLT,
   CONE_OF_COLD,
   BURNING_HANDS,
+  FLAME_STRIKE,
   WALL_OF_FIRE,
   WALL_OF_FORCE,
   WALL_OF_THORNS,
