@@ -4,6 +4,7 @@ import {
   Square,
   Pen,
   LineSquiggle,
+  DoorClosed,
   Magnet,
   Settings2,
   Eye,
@@ -51,6 +52,8 @@ interface VerticalToolbarProps {
   onFinishPolygonDraw?: () => void;
   isDrawingPolygon?: boolean;
   isDrawingFreehand?: boolean;
+  isDrawingDoor?: boolean;
+  onStartDoorDraw?: () => void;
   isGridSnappingEnabled?: boolean;
   onToggleGridSnapping?: () => void;
   
@@ -75,6 +78,8 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   onFinishPolygonDraw,
   isDrawingPolygon = false,
   isDrawingFreehand = false,
+  isDrawingDoor = false,
+  onStartDoorDraw,
   isGridSnappingEnabled = false,
   onToggleGridSnapping,
   showRegions,
@@ -285,8 +290,18 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             icon={LineSquiggle}
             label="Draw Freehand"
             onClick={onStartFreehandDraw || (() => {})}
-            disabled={isDrawingPolygon}
+            disabled={isDrawingPolygon || isDrawingDoor}
             isActive={isDrawingFreehand}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={DoorClosed}
+            label={isDrawingDoor ? 'Cancel Door Tool' : 'Draw Door'}
+            onClick={onStartDoorDraw || (() => {})}
+            disabled={isDrawingPolygon || isDrawingFreehand}
+            isActive={isDrawingDoor}
             variant="ghost"
             size="xs"
           />
