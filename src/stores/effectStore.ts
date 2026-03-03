@@ -77,6 +77,7 @@ interface EffectState {
   markTokenTriggered: (effectId: string, tokenId: string) => void;
   resetTriggeredTokens: (effectId: string) => void;
   toggleRecurring: (effectId: string) => void;
+  toggleAnimationPaused: (effectId: string) => void;
 
   // --- Bulk ---
   clearAll: () => void;
@@ -298,6 +299,16 @@ export const useEffectStore = create<EffectState>((set, get) => {
         placedEffects: s.placedEffects.map((e) =>
           e.id === effectId
             ? { ...e, template: { ...e.template, recurring: e.template.recurring === false ? true : false } }
+            : e
+        ),
+      }));
+    },
+
+    toggleAnimationPaused: (effectId) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId
+            ? { ...e, animationPaused: !e.animationPaused }
             : e
         ),
       }));
