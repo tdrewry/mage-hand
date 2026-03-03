@@ -47,6 +47,7 @@ export type EphemeralOpKind =
   | "action.target.preview"
   | "action.flash"
   | "action.inProgress"
+  | "action.queue.sync"
   // Assets
   | "asset.uploadProgress";
 
@@ -220,6 +221,12 @@ export interface ActionInProgressPayload {
   sourceTokenId?: string;
 }
 
+export interface ActionQueueSyncPayload {
+  currentAction: any | null;
+  pendingActions: any[];
+  actionHistory: any[];
+}
+
 // -- Assets --
 
 export interface AssetUploadProgressPayload {
@@ -260,6 +267,7 @@ export interface EphemeralPayloadMap {
   "action.target.preview": ActionTargetPreviewPayload;
   "action.flash": ActionFlashPayload;
   "action.inProgress": ActionInProgressPayload;
+  "action.queue.sync": ActionQueueSyncPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
 }
 
@@ -332,6 +340,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "action.target.preview":  { throttleMs: 50,  ttlMs: 500,  keyStrategy: "userId" },
   "action.flash":           { throttleMs: 0,   ttlMs: 1000, keyStrategy: "entityId" },
   "action.inProgress":      { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
+  "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session", dmOnly: true },
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
