@@ -161,28 +161,41 @@ function ResolvePhase() {
         <Separator />
 
         {/* Per-target resolution */}
-        {currentAction.targets.map(target => {
-          const roll = currentAction.rollResults[target.targetKey];
-          const damage = currentAction.damageResults[target.targetKey];
-          const resolution = currentAction.resolutions[target.targetKey];
+        {(() => {
+          // Build per-token drop counters for multi-hit labeling
+          const tokenDropIndex = new Map<string, number>();
+          const tokenDropTotal = new Map<string, number>();
+          for (const t of currentAction.targets) {
+            tokenDropTotal.set(t.tokenId, (tokenDropTotal.get(t.tokenId) || 0) + 1);
+          }
+          return currentAction.targets.map(target => {
+            const roll = currentAction.rollResults[target.targetKey];
+            const damage = currentAction.damageResults[target.targetKey];
+            const resolution = currentAction.resolutions[target.targetKey];
+            const dropIdx = (tokenDropIndex.get(target.tokenId) || 0) + 1;
+            tokenDropIndex.set(target.tokenId, dropIdx);
+            const total = tokenDropTotal.get(target.tokenId) || 1;
+            const dropLabel = total > 1 ? `Drop ${dropIdx} of ${total}` : undefined;
 
-          return (
-            <TargetResolveCard
-              key={target.targetKey}
-              targetName={target.tokenName}
-              distance={target.distance}
-              defenseValue={target.defenseValue}
-              defenseLabel={target.defenseLabel}
-              roll={roll}
-              damage={damage}
-              resolution={resolution}
-              damageType={currentAction.attack!.damageType}
-              onSetResolution={(r) => setResolution(target.targetKey, r)}
-              onOverrideDamage={(v) => overrideDamage(target.targetKey, v)}
-              onDismiss={() => removeTarget(target.targetKey)}
-            />
-          );
-        })}
+            return (
+              <TargetResolveCard
+                key={target.targetKey}
+                targetName={target.tokenName}
+                distance={target.distance}
+                defenseValue={target.defenseValue}
+                defenseLabel={target.defenseLabel}
+                roll={roll}
+                damage={damage}
+                resolution={resolution}
+                damageType={currentAction.attack!.damageType}
+                dropLabel={dropLabel}
+                onSetResolution={(r) => setResolution(target.targetKey, r)}
+                onOverrideDamage={(v) => overrideDamage(target.targetKey, v)}
+                onDismiss={() => removeTarget(target.targetKey)}
+              />
+            );
+          });
+        })()}
 
         <Separator />
 
@@ -238,6 +251,7 @@ interface TargetResolveCardProps {
   damage: import('@/types/actionTypes').DamageResult;
   resolution?: AttackResolution;
   damageType: string;
+  dropLabel?: string;
   onSetResolution: (r: AttackResolution) => void;
   onOverrideDamage: (v: number) => void;
   onDismiss: () => void;
@@ -252,6 +266,7 @@ function TargetResolveCard({
   damage,
   resolution,
   damageType,
+  dropLabel,
   onSetResolution,
   onOverrideDamage,
   onDismiss,
@@ -285,6 +300,11 @@ function TargetResolveCard({
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-muted-foreground" />
           <span className="font-semibold text-sm">{targetName}</span>
+          {dropLabel && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+              {dropLabel}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{(distance * 5).toFixed(0)} ft.</span>
