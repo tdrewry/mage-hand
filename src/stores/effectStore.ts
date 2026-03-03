@@ -219,12 +219,15 @@ export const useEffectStore = create<EffectState>((set, get) => {
       set((s) => {
         const updated = s.placedEffects
           .map((e) => {
-            if (e.roundsRemaining === undefined || e.roundsRemaining === 0) return e;
-            return { ...e, roundsRemaining: e.roundsRemaining - 1 };
+            if (e.roundsRemaining === undefined || e.roundsRemaining === 0) {
+              // Reset triggered tokens each round for persistent effects
+              return e.triggeredTokenIds.length > 0
+                ? { ...e, triggeredTokenIds: [] }
+                : e;
+            }
+            return { ...e, roundsRemaining: e.roundsRemaining - 1, triggeredTokenIds: [] };
           })
           .filter((e) => e.roundsRemaining === undefined || e.roundsRemaining >= 0);
-        // Effects with roundsRemaining reaching -1 after decrement are removed
-        // (they had roundsRemaining === 0 which means "until dismissed", so they stay)
         return { placedEffects: updated };
       });
     },
