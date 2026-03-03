@@ -16,6 +16,13 @@ import type {
 } from '@/types/effectTypes';
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const FADE_OUT_DURATION = 500; // ms
+const DISMISS_BUTTON_RADIUS = 12; // px (screen space)
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -26,22 +33,47 @@ export interface EffectRenderContext {
   /** Grid cell size in pixels */
   gridSize: number;
   /** Canvas transform already applied (translate + scale). Positions are world coords. */
+  /** Current zoom level — needed for screen-space dismiss button sizing */
+  zoom?: number;
+}
+
+/** Hit-test info for dismiss buttons rendered on the canvas */
+export interface EffectDismissHit {
+  effectId: string;
+  /** World-coordinate center of the dismiss button */
+  center: { x: number; y: number };
+  /** World-space radius of the button */
+  radius: number;
 }
 
 /**
  * Render all placed effects onto the canvas.
- */
-/**
- * Render all placed effects onto the canvas.
- * All effects (instant and persistent) remain visible until explicitly removed.
+ * Returns hit-test data for dismiss buttons so the caller can handle clicks.
  */
 export function renderPlacedEffects(
   rc: EffectRenderContext,
   effects: PlacedEffect[],
-): void {
+  options?: { showDismissButtons?: boolean },
+): EffectDismissHit[] {
+  const dismissHits: EffectDismissHit[] = [];
   for (const effect of effects) {
-    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0);
+    // Compute fade-out multiplier
+    let fadeMul = 1.0;
+    if (effect.dismissedAt) {
+      const fadeAge = rc.time - effect.dismissedAt;
+      fadeMul = Math.max(0, 1.0 - fadeAge / FADE_OUT_DURATION);
+      if (fadeMul <= 0.01) continue; // fully faded — skip rendering
+    }
+
+    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, fadeMul);
+
+    // Draw dismiss button for non-fading effects
+    if (options?.showDismissButtons && !effect.dismissedAt) {
+      const hit = renderDismissButton(rc, effect);
+      dismissHits.push(hit);
+    }
   }
+  return dismissHits;
 }
 
 /**
@@ -94,6 +126,54 @@ export function renderPlacementPreview(
 }
 
 // ---------------------------------------------------------------------------
+// Dismiss button
+// ---------------------------------------------------------------------------
+
+function renderDismissButton(
+  rc: EffectRenderContext,
+  effect: PlacedEffect,
+): EffectDismissHit {
+  const { ctx } = rc;
+  const zoom = rc.zoom ?? 1;
+  // Button radius in world space so it stays constant screen size
+  const worldRadius = DISMISS_BUTTON_RADIUS / zoom;
+  // Position above the effect origin
+  const bx = effect.origin.x;
+  const by = effect.origin.y - (rc.gridSize * 0.6);
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+
+  // Circle background
+  ctx.beginPath();
+  ctx.arc(bx, by, worldRadius, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(220, 50, 50, 0.9)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.stroke();
+
+  // X icon
+  const cross = worldRadius * 0.5;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2 / zoom;
+  ctx.beginPath();
+  ctx.moveTo(bx - cross, by - cross);
+  ctx.lineTo(bx + cross, by + cross);
+  ctx.moveTo(bx + cross, by - cross);
+  ctx.lineTo(bx - cross, by + cross);
+  ctx.stroke();
+
+  ctx.restore();
+
+  return {
+    effectId: effect.id,
+    center: { x: bx, y: by },
+    radius: worldRadius,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Core render dispatch
 // ---------------------------------------------------------------------------
 
@@ -102,6 +182,7 @@ function renderEffect(
   template: EffectTemplate,
   origin: { x: number; y: number },
   direction: number,
+  fadeMul: number = 1.0,
 ): void {
   rc.ctx.save();
 
@@ -113,7 +194,7 @@ function renderEffect(
     template.id,
   );
 
-  const opacity = template.opacity * anim.opacityMod;
+  const opacity = template.opacity * anim.opacityMod * fadeMul;
   const scale = anim.scaleMod;
 
   if (opacity <= 0.01) {
