@@ -186,6 +186,36 @@ function ResolvePhase() {
 
         <Separator />
 
+        {/* Aggregate damage summary per token (visible when multiple entries exist) */}
+        {(() => {
+          const tokenTotals = new Map<string, { name: string; total: number; hits: number }>();
+          for (const t of currentAction.targets) {
+            const dmg = currentAction.damageResults[t.targetKey];
+            const res = currentAction.resolutions[t.targetKey];
+            const adjusted = dmg?.adjustedTotal ?? 0;
+            const isHit = res === 'hit' || res === 'critical_hit' || res === 'critical_threat';
+            const existing = tokenTotals.get(t.tokenId) || { name: t.tokenName, total: 0, hits: 0 };
+            existing.total += isHit ? adjusted : 0;
+            existing.hits += isHit ? 1 : 0;
+            tokenTotals.set(t.tokenId, existing);
+          }
+          const hasMultiHit = Array.from(tokenTotals.values()).some(v => v.hits > 1) || currentAction.targets.length > tokenTotals.size;
+          if (!hasMultiHit && tokenTotals.size <= 1) return null;
+          return (
+            <div className="space-y-1 rounded-md bg-muted/50 p-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Damage Summary</p>
+              {Array.from(tokenTotals.entries()).map(([tokenId, { name, total, hits }]) => (
+                <div key={tokenId} className="flex items-center justify-between text-sm">
+                  <span className="text-foreground">{name} {hits > 1 && <span className="text-muted-foreground">×{hits} hits</span>}</span>
+                  <span className="font-mono font-bold text-destructive">{total} dmg</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        <Separator />
+
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
             Cancel
