@@ -158,7 +158,10 @@ export const useEffectStore = create<EffectState>((set, get) => {
       if (!template) return;
 
       // Token-sourced: auto-lock origin to token and skip to direction step
+      // Unless the effect is ranged, in which case we need the user to pick an origin first
       const isTokenSourced = !!casterToken;
+      const isRanged = template.ranged === true;
+      const skipToDirection = isTokenSourced && !isRanged;
       const tokenOrigin = casterToken ? { x: casterToken.x, y: casterToken.y } : null;
 
       set({
@@ -167,8 +170,8 @@ export const useEffectStore = create<EffectState>((set, get) => {
           template,
           casterId,
           damageFormula,
-          step: isTokenSourced ? 'direction' : 'origin',
-          origin: tokenOrigin,
+          step: skipToDirection ? 'direction' : 'origin',
+          origin: skipToDirection ? tokenOrigin : null,
           previewOrigin: tokenOrigin,
           previewDirection: 0,
           casterToken,
