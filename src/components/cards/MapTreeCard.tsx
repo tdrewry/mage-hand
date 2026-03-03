@@ -1558,7 +1558,7 @@ export const MapTreeCardContent: React.FC = () => {
             structuredMaps.set(key, list);
           });
 
-          const renderMapNode = (map: typeof maps[0], index: number) => {
+          const renderMapNode = (map: typeof maps[0], index: number, structureContext?: { maps: typeof maps; structureId: string }) => {
           const isExpanded = expandedMapNodes.has(map.id);
           const isFocused = selectedMapId === map.id;
           const mapEntities = entitiesByMap.byMap[map.id] || [];
@@ -1636,22 +1636,63 @@ export const MapTreeCardContent: React.FC = () => {
 
                     {/* Reorder arrows */}
                     <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                      <button
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        disabled={index === 0}
-                        onClick={() => reorderMaps(index, index - 1)}
-                        title="Move map up"
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </button>
-                      <button
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        disabled={index >= maps.length - 1}
-                        onClick={() => reorderMaps(index, index + 1)}
-                        title="Move map down"
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </button>
+                      {structureContext ? (() => {
+                        const sMaps = structureContext.maps;
+                        const sIdx = sMaps.findIndex(m => m.id === map.id);
+                        return (
+                          <>
+                            <button
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                              disabled={sIdx <= 0}
+                              onClick={() => {
+                                const prev = sMaps[sIdx - 1];
+                                const curFloor = map.floorNumber ?? sIdx;
+                                const prevFloor = prev.floorNumber ?? (sIdx - 1);
+                                updateMap(map.id, { floorNumber: prevFloor });
+                                updateMap(prev.id, { floorNumber: curFloor });
+                                toast.success('Floor order updated');
+                              }}
+                              title="Move floor up"
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                              disabled={sIdx >= sMaps.length - 1}
+                              onClick={() => {
+                                const next = sMaps[sIdx + 1];
+                                const curFloor = map.floorNumber ?? sIdx;
+                                const nextFloor = next.floorNumber ?? (sIdx + 1);
+                                updateMap(map.id, { floorNumber: nextFloor });
+                                updateMap(next.id, { floorNumber: curFloor });
+                                toast.success('Floor order updated');
+                              }}
+                              title="Move floor down"
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </>
+                        );
+                      })() : (
+                        <>
+                          <button
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            disabled={index === 0}
+                            onClick={() => reorderMaps(index, index - 1)}
+                            title="Move map up"
+                          >
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            disabled={index >= maps.length - 1}
+                            onClick={() => reorderMaps(index, index + 1)}
+                            title="Move map down"
+                          >
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     {/* Focus button */}
@@ -1929,7 +1970,7 @@ export const MapTreeCardContent: React.FC = () => {
                     </div>
                     {structMaps.map((map) => {
                       const globalIdx = maps.findIndex(m => m.id === map.id);
-                      return renderMapNode(map, globalIdx);
+                      return renderMapNode(map, globalIdx, { maps: structMaps, structureId: structure.id });
                     })}
                   </div>
                 );
