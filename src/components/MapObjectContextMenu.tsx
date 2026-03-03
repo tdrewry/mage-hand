@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff, Copy } from 'lucide-react';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
@@ -306,6 +306,26 @@ export const MapObjectContextMenuWrapper = ({
                 Lock {isMultiSelection ? 'Objects' : 'Object'}
               </>
             )}
+          </DropdownMenuItem>
+
+          {/* Duplicate */}
+          <DropdownMenuItem onClick={() => {
+            const { addMapObject } = useMapObjectStore.getState();
+            targetObjects.forEach(obj => {
+              const { id, ...rest } = obj;
+              addMapObject({
+                ...rest,
+                position: { x: obj.position.x + 30, y: obj.position.y + 30 },
+                label: obj.label ? `${obj.label} (copy)` : undefined,
+                selected: false,
+                wallPoints: obj.wallPoints ? obj.wallPoints.map(p => ({ x: p.x + 30, y: p.y + 30 })) : undefined,
+              });
+            });
+            onUpdateCanvas?.();
+            toast.success(`Duplicated ${targetObjects.length} object${targetObjects.length > 1 ? 's' : ''}`);
+          }}>
+            <Copy className="mr-2 h-4 w-4" />
+            Duplicate {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
