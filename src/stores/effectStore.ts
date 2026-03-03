@@ -228,7 +228,20 @@ export const useEffectStore = create<EffectState>()(
       // Polyline shape: go directly to polyline step
       const isPolyline = template.shape === 'polyline';
 
-      const initialStep = isPolyline ? 'polyline' as const : (skipToDirection ? 'direction' as const : 'origin' as const);
+      // skipRotation: skip the direction step entirely (place at origin with direction=0)
+      const wantsSkipRotation = template.skipRotation === true;
+
+      let initialStep: 'origin' | 'direction' | 'polyline';
+      if (isPolyline) {
+        initialStep = 'polyline';
+      } else if (skipToDirection && !wantsSkipRotation) {
+        initialStep = 'direction';
+      } else if (skipToDirection && wantsSkipRotation) {
+        // Will auto-place immediately — still start at 'origin' but we handle it below
+        initialStep = 'origin';
+      } else {
+        initialStep = 'origin';
+      }
 
       set({
         placement: {

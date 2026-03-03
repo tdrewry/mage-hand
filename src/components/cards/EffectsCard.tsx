@@ -54,6 +54,7 @@ interface TemplateFormData {
   alignToGrid: boolean;
   targetCaster: boolean;
   ranged: boolean;
+  skipRotation: boolean;
   color: string;
   opacity: number;
   animation: EffectAnimationType;
@@ -80,6 +81,7 @@ const INITIAL_FORM: TemplateFormData = {
   alignToGrid: false,
   targetCaster: false,
   ranged: false,
+  skipRotation: false,
   color: '#FF4500',
   opacity: 0.55,
   animation: 'none',
@@ -107,6 +109,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     alignToGrid: t.alignToGrid ?? false,
     targetCaster: t.targetCaster ?? false,
     ranged: t.ranged ?? false,
+    skipRotation: t.skipRotation ?? false,
     color: t.color,
     opacity: t.opacity,
     animation: t.animation,
@@ -372,6 +375,17 @@ function TemplateFormFields({
           Ranged (place at distance)
         </span>
       </div>
+
+      <div className="flex items-center gap-1">
+        <Switch
+          checked={form.skipRotation}
+          onCheckedChange={(v) => update('skipRotation', v)}
+          className="scale-75"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          Skip rotation step
+        </span>
+      </div>
     </>
   );
 }
@@ -394,6 +408,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     alignToGrid: form.alignToGrid || undefined,
     targetCaster: form.targetCaster || undefined,
     ranged: form.ranged || undefined,
+    skipRotation: form.skipRotation || undefined,
     color: form.color,
     opacity: form.opacity,
     animation: form.animation,
