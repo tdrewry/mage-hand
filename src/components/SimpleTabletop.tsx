@@ -7313,10 +7313,9 @@ export const SimpleTabletop = () => {
         return; // Consume the click during targeting
       }
 
-      // ── EFFECT PLACEMENT: suppress all entity interactions ──
+      // ── EFFECT PLACEMENT: skip all entity interactions, go straight to click handler ──
       if (effectPlacementActive) {
-        // During effect placement, mousedown should not select/drag anything.
-        // The actual placement is handled in handleCanvasClick.
+        handleCanvasClick(e);
         return;
       }
 
