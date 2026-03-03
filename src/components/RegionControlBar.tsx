@@ -159,7 +159,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
       
       if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length >= 2) {
         // pathPoints are relative to region position; make them absolute
-        points = region.pathPoints.map(p => ({ x: region.x + p.x, y: region.y + p.y }));
+        points = region.pathPoints.map(p => ({ x: p.x, y: p.y }));
         // Close the polyline so the wall forms a closed shape
         const first = points[0];
         const last = points[points.length - 1];
