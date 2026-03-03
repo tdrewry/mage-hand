@@ -448,6 +448,12 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         </Badge>
       )}
 
+      {template.multiDrop && (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-accent-foreground border-accent">
+          ×{template.multiDrop.count}
+        </Badge>
+      )}
+
       {!template.isBuiltIn && onEdit && (
         <Button
           variant="ghost"
@@ -549,6 +555,11 @@ export function EffectsCardContent() {
               <span className="ml-1 font-mono text-muted-foreground">
                 ({placement.damageFormula})
               </span>
+            )}
+            {placement.multiDropTotal && placement.multiDropTotal > 1 && (
+              <div className="text-primary font-medium mt-0.5">
+                Drop {(placement.multiDropPlaced ?? 0) + 1} of {placement.multiDropTotal}
+              </div>
             )}
             <div className="text-muted-foreground mt-0.5">
               Click on map to place · ESC to cancel
