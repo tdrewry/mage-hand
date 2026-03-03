@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X } from 'lucide-react';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry } from '@/types/effectTypes';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const CATEGORY_META: Record<EffectCategory, { label: string; icon: React.ElementType }> = {
   spell: { label: 'Spells', icon: Wand2 },
@@ -58,7 +59,9 @@ interface TemplateFormData {
   animationSpeed: number;
   category: EffectCategory;
   damageType: string;
+  damageDice: DamageDiceEntry[];
   level: string;
+  multiDropCount: number;
 }
 
 const INITIAL_FORM: TemplateFormData = {
@@ -82,7 +85,9 @@ const INITIAL_FORM: TemplateFormData = {
   animationSpeed: 1,
   category: 'custom',
   damageType: '',
+  damageDice: [],
   level: '',
+  multiDropCount: 1,
 };
 
 function templateToForm(t: EffectTemplate): TemplateFormData {
@@ -107,8 +112,53 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     animationSpeed: t.animationSpeed,
     category: t.category,
     damageType: t.damageType ?? '',
+    damageDice: t.damageDice ?? [],
     level: t.level !== undefined ? String(t.level) : '',
+    multiDropCount: t.multiDrop?.count ?? 1,
   };
+}
+
+// --- Damage Dice Rows Component ---
+
+function DamageDiceRows({
+  rows,
+  onChange,
+}: {
+  rows: DamageDiceEntry[];
+  onChange: (rows: DamageDiceEntry[]) => void;
+}) {
+  const addRow = () => onChange([...rows, { formula: '', damageType: '' }]);
+  const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, field: keyof DamageDiceEntry, value: string) =>
+    onChange(rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-muted-foreground font-medium">Damage Dice</label>
+      {rows.map((row, i) => (
+        <div key={i} className="flex gap-1 items-center">
+          <Input
+            value={row.formula}
+            onChange={(e) => updateRow(i, 'formula', e.target.value)}
+            placeholder="e.g. 4d6"
+            className="h-6 text-xs font-mono flex-1"
+          />
+          <Input
+            value={row.damageType}
+            onChange={(e) => updateRow(i, 'damageType', e.target.value)}
+            placeholder="fire, radiant..."
+            className="h-6 text-xs flex-1"
+          />
+          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeRow(i)}>
+            <X className="w-3 h-3 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addRow}>
+        <Plus className="w-3 h-3 mr-1" /> Add Damage Row
+      </Button>
+    </div>
+  );
 }
 
 // --- Shared Form Fields Component ---
@@ -198,6 +248,24 @@ function TemplateFormFields({
         )}
       </div>
 
+      {/* Quantity (multi-drop) */}
+      <div className="flex gap-2 items-end">
+        <div className="w-20">
+          <label className="text-[10px] text-muted-foreground">Quantity</label>
+          <Input
+            type="number"
+            value={form.multiDropCount}
+            onChange={(e) => update('multiDropCount', Math.max(1, +e.target.value))}
+            className="h-7 text-xs"
+            min={1}
+            max={20}
+          />
+        </div>
+        <span className="text-[10px] text-muted-foreground pb-1.5">
+          {form.multiDropCount > 1 ? `${form.multiDropCount} drops (multi-target)` : 'single target'}
+        </span>
+      </div>
+
       <div className="flex gap-2 items-end">
         <div>
           <label className="text-[10px] text-muted-foreground">Color</label>
@@ -223,11 +291,17 @@ function TemplateFormFields({
         </div>
       </div>
 
+      {/* Multi-row damage dice */}
+      <DamageDiceRows
+        rows={form.damageDice}
+        onChange={(rows) => update('damageDice', rows)}
+      />
+
       <div className="flex gap-2">
         <Input
           value={form.damageType}
           onChange={(e) => update('damageType', e.target.value)}
-          placeholder="Damage type (fire, cold, etc.)"
+          placeholder="Primary damage type"
           className="h-7 text-xs flex-1"
         />
         <Input
@@ -304,6 +378,36 @@ function TemplateFormFields({
   );
 }
 
+function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' | 'isBuiltIn'> {
+  const cleanedDice = form.damageDice.filter(d => d.formula.trim());
+  return {
+    name: form.name.trim(),
+    shape: form.shape,
+    radius: form.radius,
+    length: form.length,
+    width: form.width,
+    angle: form.angle,
+    maxLength: form.shape === 'polyline' ? form.maxLength : undefined,
+    segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
+    placementMode: 'free',
+    persistence: form.persistence,
+    durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
+    recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+    alignToGrid: form.alignToGrid || undefined,
+    targetCaster: form.targetCaster || undefined,
+    ranged: form.ranged || undefined,
+    color: form.color,
+    opacity: form.opacity,
+    animation: form.animation,
+    animationSpeed: form.animationSpeed,
+    category: form.category,
+    damageType: form.damageType || undefined,
+    damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
+    level: form.level ? Number(form.level) : undefined,
+    multiDrop: form.multiDropCount > 1 ? { count: form.multiDropCount } : undefined,
+  };
+}
+
 // --- Create Template Form ---
 
 function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
@@ -315,30 +419,7 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
 
   const handleCreate = () => {
     if (!form.name.trim()) return;
-    addCustomTemplate({
-      name: form.name.trim(),
-      shape: form.shape,
-      radius: form.radius,
-      length: form.length,
-      width: form.width,
-      angle: form.angle,
-      maxLength: form.shape === 'polyline' ? form.maxLength : undefined,
-      segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
-      placementMode: 'free',
-      persistence: form.persistence,
-      durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
-      recurring: form.persistence === 'persistent' ? form.recurring : undefined,
-      alignToGrid: form.alignToGrid || undefined,
-      targetCaster: form.targetCaster || undefined,
-      ranged: form.ranged || undefined,
-      color: form.color,
-      opacity: form.opacity,
-      animation: form.animation,
-      animationSpeed: form.animationSpeed,
-      category: form.category,
-      damageType: form.damageType || undefined,
-      level: form.level ? Number(form.level) : undefined,
-    });
+    addCustomTemplate(formToTemplateData(form));
     setForm({ ...INITIAL_FORM });
     onCreated();
   };
@@ -364,29 +445,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
 
   const handleSave = () => {
     if (!form.name.trim()) return;
-    updateCustomTemplate(template.id, {
-      name: form.name.trim(),
-      shape: form.shape,
-      radius: form.radius,
-      length: form.length,
-      width: form.width,
-      angle: form.angle,
-      maxLength: form.shape === 'polyline' ? form.maxLength : undefined,
-      segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
-      persistence: form.persistence,
-      durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
-      recurring: form.persistence === 'persistent' ? form.recurring : undefined,
-      alignToGrid: form.alignToGrid || undefined,
-      targetCaster: form.targetCaster || undefined,
-      ranged: form.ranged || undefined,
-      color: form.color,
-      opacity: form.opacity,
-      animation: form.animation,
-      animationSpeed: form.animationSpeed,
-      category: form.category,
-      damageType: form.damageType || undefined,
-      level: form.level ? Number(form.level) : undefined,
-    });
+    updateCustomTemplate(template.id, formToTemplateData(form));
     onDone();
   };
 
@@ -410,8 +469,8 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
 interface EffectTemplateRowProps {
   template: EffectTemplate;
   onSelect: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onEdit?: (id: string) => void;
+  onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
 }
 
 function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTemplateRowProps) {
@@ -427,14 +486,22 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
       />
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{template.name}</div>
-        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
           <span className="capitalize">{template.shape}</span>
-          {template.damageType && (
+          {template.damageDice && template.damageDice.length > 0 ? (
+            template.damageDice.map((d, i) => (
+              <React.Fragment key={i}>
+                <span>·</span>
+                <span className="font-mono">{d.formula}</span>
+                <span className="capitalize">{d.damageType}</span>
+              </React.Fragment>
+            ))
+          ) : template.damageType ? (
             <>
               <span>·</span>
               <span className="capitalize">{template.damageType}</span>
             </>
-          )}
+          ) : null}
           {template.animation !== 'none' && (
             <>
               <span>·</span>
@@ -478,27 +545,23 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         </Badge>
       )}
 
-      {!template.isBuiltIn && onEdit && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 opacity-0 group-hover:opacity-100"
-          onClick={(e) => { e.stopPropagation(); onEdit(template.id); }}
-        >
-          <Pencil className="w-3 h-3 text-muted-foreground" />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-5 w-5 opacity-0 group-hover:opacity-100"
+        onClick={(e) => { e.stopPropagation(); onEdit(template.id); }}
+      >
+        <Pencil className="w-3 h-3 text-muted-foreground" />
+      </Button>
 
-      {!template.isBuiltIn && onDelete && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 opacity-0 group-hover:opacity-100"
-          onClick={(e) => { e.stopPropagation(); onDelete(template.id); }}
-        >
-          <Trash2 className="w-3 h-3 text-destructive" />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-5 w-5 opacity-0 group-hover:opacity-100"
+        onClick={(e) => { e.stopPropagation(); onDelete(template.id); }}
+      >
+        <Trash2 className="w-3 h-3 text-destructive" />
+      </Button>
     </div>
   );
 }
@@ -508,22 +571,34 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
 export function EffectsCardContent() {
   const allTemplates = useEffectStore((s) => s.allTemplates);
   const placedEffects = useEffectStore((s) => s.placedEffects);
+  const hiddenBuiltInIds = useEffectStore((s) => s.hiddenBuiltInIds);
   const startPlacement = useEffectStore((s) => s.startPlacement);
   const removeEffect = useEffectStore((s) => s.removeEffect);
   const resetTriggeredTokens = useEffectStore((s) => s.resetTriggeredTokens);
   const toggleRecurring = useEffectStore((s) => s.toggleRecurring);
-  const deleteCustomTemplate = useEffectStore((s) => s.deleteCustomTemplate);
+  const deleteTemplate = useEffectStore((s) => s.deleteTemplate);
+  const restoreBuiltInTemplates = useEffectStore((s) => s.restoreBuiltInTemplates);
   const placement = useEffectStore((s) => s.placement);
 
   const [damageFormula, setDamageFormula] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
 
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
   const handleSelect = (templateId: string) => {
-    if (editingTemplateId) return; // Don't place while editing
+    if (editingTemplateId) return;
     startPlacement(templateId, undefined, damageFormula || undefined);
   };
 
@@ -538,7 +613,7 @@ export function EffectsCardContent() {
         {/* Damage formula input */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Damage Dice
+            Damage Dice Override
           </label>
           <Input
             value={damageFormula}
@@ -547,7 +622,7 @@ export function EffectsCardContent() {
             className="h-7 text-xs font-mono"
           />
           <p className="text-[10px] text-muted-foreground">
-            Auto-rolls when effect hits tokens
+            Overrides template dice when placing
           </p>
         </div>
 
@@ -600,44 +675,63 @@ export function EffectsCardContent() {
           </div>
         )}
 
-        {/* Template library grouped by category */}
+        {/* Template library grouped by category — collapsible */}
         {categoryOrder.map((cat) => {
           const templates = groups[cat];
           if (!templates || templates.length === 0) return null;
           const meta = CATEGORY_META[cat];
           const Icon = meta.icon;
+          const isOpen = !collapsedCategories.has(cat);
           return (
             <div key={cat}>
-              <div className="flex items-center gap-1.5 mb-1">
+              <button
+                className="flex items-center gap-1.5 mb-1 w-full hover:text-foreground"
+                onClick={() => toggleCategory(cat)}
+              >
+                {isOpen ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
                 <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {meta.label}
                 </span>
                 <span className="text-[10px] text-muted-foreground">({templates.length})</span>
-              </div>
-              <div className="space-y-0.5">
-                {templates.map((t) => (
-                  editingTemplateId === t.id ? (
-                    <EditTemplateForm
-                      key={t.id}
-                      template={t}
-                      onDone={() => setEditingTemplateId(null)}
-                    />
-                  ) : (
-                    <EffectTemplateRow
-                      key={t.id}
-                      template={t}
-                      onSelect={handleSelect}
-                      onDelete={t.isBuiltIn ? undefined : deleteCustomTemplate}
-                      onEdit={t.isBuiltIn ? undefined : handleEdit}
-                    />
-                  )
-                ))}
-              </div>
+              </button>
+              {isOpen && (
+                <div className="space-y-0.5">
+                  {templates.map((t) => (
+                    editingTemplateId === t.id ? (
+                      <EditTemplateForm
+                        key={t.id}
+                        template={t}
+                        onDone={() => setEditingTemplateId(null)}
+                      />
+                    ) : (
+                      <EffectTemplateRow
+                        key={t.id}
+                        template={t}
+                        onSelect={handleSelect}
+                        onDelete={deleteTemplate}
+                        onEdit={handleEdit}
+                      />
+                    )
+                  ))}
+                </div>
+              )}
               <Separator className="mt-2" />
             </div>
           );
         })}
+
+        {/* Restore hidden built-ins */}
+        {hiddenBuiltInIds.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full h-7 text-xs text-muted-foreground"
+            onClick={restoreBuiltInTemplates}
+          >
+            <RotateCw className="w-3 h-3 mr-1" /> Restore {hiddenBuiltInIds.length} hidden template{hiddenBuiltInIds.length > 1 ? 's' : ''}
+          </Button>
+        )}
 
         {/* Active effects */}
         {placedEffects.length > 0 && (

@@ -13,9 +13,10 @@ import {
 } from '@/lib/effectTemplateLibrary';
 
 // ---------------------------------------------------------------------------
-// Local-storage helpers for custom templates
+// Local-storage helpers for custom templates & hidden built-ins
 // ---------------------------------------------------------------------------
 const CUSTOM_TEMPLATES_KEY = 'magehand-custom-effect-templates';
+const HIDDEN_BUILTINS_KEY = 'magehand-hidden-builtin-effects';
 
 function loadCustomTemplates(): EffectTemplate[] {
   try {
@@ -28,6 +29,27 @@ function loadCustomTemplates(): EffectTemplate[] {
 
 function saveCustomTemplates(templates: EffectTemplate[]): void {
   localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+}
+
+function loadHiddenBuiltIns(): string[] {
+  try {
+    const raw = localStorage.getItem(HIDDEN_BUILTINS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenBuiltIns(ids: string[]): void {
+  localStorage.setItem(HIDDEN_BUILTINS_KEY, JSON.stringify(ids));
+}
+
+function buildAllTemplates(customTemplates: EffectTemplate[], hiddenIds: string[]): EffectTemplate[] {
+  const customIds = new Set(customTemplates.map(t => t.id));
+  const hiddenSet = new Set(hiddenIds);
+  // Built-ins that aren't hidden and haven't been overridden by a custom copy
+  const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter(t => !hiddenSet.has(t.id) && !customIds.has(t.id));
+  return [...visibleBuiltIns, ...customTemplates];
 }
 
 // ---------------------------------------------------------------------------
@@ -45,10 +67,14 @@ interface EffectState {
   // Placement mode (null = not placing)
   placement: EffectPlacementState | null;
 
+  hiddenBuiltInIds: string[];
+
   // --- Template CRUD ---
   addCustomTemplate: (template: Omit<EffectTemplate, 'id' | 'isBuiltIn'>) => EffectTemplate;
   updateCustomTemplate: (id: string, updates: Partial<EffectTemplate>) => void;
-  deleteCustomTemplate: (id: string) => void;
+  deleteTemplate: (id: string) => void;
+  /** Restore all hidden built-in templates */
+  restoreBuiltInTemplates: () => void;
   getTemplate: (id: string) => EffectTemplate | undefined;
 
   // --- Placement mode ---
@@ -94,11 +120,13 @@ export const useEffectStore = create<EffectState>()(
   persist(
     (set, get) => {
   const customTemplates = loadCustomTemplates();
-  const allTemplates = [...BUILT_IN_EFFECT_TEMPLATES, ...customTemplates];
+  const hiddenBuiltInIds = loadHiddenBuiltIns();
+  const allTemplates = buildAllTemplates(customTemplates, hiddenBuiltInIds);
 
   return {
     customTemplates,
     allTemplates,
+    hiddenBuiltInIds,
     placedEffects: [],
     placement: null,
 
@@ -117,7 +145,7 @@ export const useEffectStore = create<EffectState>()(
         saveCustomTemplates(updated);
         return {
           customTemplates: updated,
-          allTemplates: [...BUILT_IN_EFFECT_TEMPLATES, ...updated],
+          allTemplates: buildAllTemplates(updated, s.hiddenBuiltInIds),
         };
       });
       return template;
@@ -125,27 +153,51 @@ export const useEffectStore = create<EffectState>()(
 
     updateCustomTemplate: (id, updates) => {
       set((s) => {
-        const updated = s.customTemplates.map((t) =>
-          t.id === id ? { ...t, ...updates, id, isBuiltIn: false } : t,
-        );
-        saveCustomTemplates(updated);
+        const isBuiltIn = BUILT_IN_EFFECT_TEMPLATES.some(t => t.id === id);
+        let newCustom: EffectTemplate[];
+        if (isBuiltIn) {
+          // Clone built-in as a custom override with same ID
+          const original = BUILT_IN_EFFECT_TEMPLATES.find(t => t.id === id)!;
+          const overridden = { ...original, ...updates, id, isBuiltIn: false };
+          newCustom = [...s.customTemplates.filter(t => t.id !== id), overridden];
+        } else {
+          newCustom = s.customTemplates.map((t) =>
+            t.id === id ? { ...t, ...updates, id, isBuiltIn: false } : t,
+          );
+        }
+        saveCustomTemplates(newCustom);
         return {
-          customTemplates: updated,
-          allTemplates: [...BUILT_IN_EFFECT_TEMPLATES, ...updated],
+          customTemplates: newCustom,
+          allTemplates: buildAllTemplates(newCustom, s.hiddenBuiltInIds),
         };
       });
     },
 
-    deleteCustomTemplate: (id) => {
+    deleteTemplate: (id) => {
       set((s) => {
-        const updated = s.customTemplates.filter((t) => t.id !== id);
-        saveCustomTemplates(updated);
+        const isBuiltIn = BUILT_IN_EFFECT_TEMPLATES.some(t => t.id === id);
+        const newCustom = s.customTemplates.filter((t) => t.id !== id);
+        const newHidden = isBuiltIn ? [...s.hiddenBuiltInIds, id] : s.hiddenBuiltInIds;
+        saveCustomTemplates(newCustom);
+        saveHiddenBuiltIns(newHidden);
         return {
-          customTemplates: updated,
-          allTemplates: [...BUILT_IN_EFFECT_TEMPLATES, ...updated],
+          customTemplates: newCustom,
+          hiddenBuiltInIds: newHidden,
+          allTemplates: buildAllTemplates(newCustom, newHidden),
         };
       });
     },
+
+    restoreBuiltInTemplates: () => {
+      set((s) => {
+        saveHiddenBuiltIns([]);
+        return {
+          hiddenBuiltInIds: [],
+          allTemplates: buildAllTemplates(s.customTemplates, []),
+        };
+      });
+    },
+
 
     getTemplate: (id) => {
       return (

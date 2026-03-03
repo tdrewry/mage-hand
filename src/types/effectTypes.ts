@@ -31,6 +31,12 @@ export type EffectPlacementMode = 'free' | 'caster' | 'both';
 export type EffectPersistence = 'instant' | 'persistent';
 export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'custom';
 
+// Damage dice entry (supports multiple damage types, e.g. Flame Strike)
+export interface DamageDiceEntry {
+  formula: string;     // e.g. "4d6", "2d10+4"
+  damageType: string;  // e.g. "fire", "radiant"
+}
+
 // Multi-drop configuration (e.g. Storm of Vengeance, Meteor Swarm)
 export interface MultiDropConfig {
   count: number;                // how many instances to place
@@ -77,7 +83,9 @@ export interface EffectTemplate {
   // Metadata
   category: EffectCategory;
   level?: number;          // spell level
-  damageType?: string;     // fire, cold, lightning, etc.
+  damageType?: string;     // fire, cold, lightning, etc. (legacy single type)
+  /** Multiple damage dice entries — e.g. Flame Strike: 4d6 fire + 4d6 radiant */
+  damageDice?: DamageDiceEntry[];
   description?: string;
 
   /** If true this is a built-in template that cannot be deleted */
