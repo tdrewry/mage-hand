@@ -7093,6 +7093,7 @@ export const SimpleTabletop = () => {
                   damageType: template.damageType,
                   damageFormula: placement.damageFormula,
                   placedEffectId: allGroupEffects[allGroupEffects.length - 1]?.id,
+                  groupId: placement.multiDropGroupId,
                   impacts: mergedImpacts,
                 });
               }
