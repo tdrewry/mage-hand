@@ -100,6 +100,9 @@ export interface PlacedEffect {
   /** When set (performance.now()), the effect is fading out and will be auto-removed */
   dismissedAt?: number;
 
+  /** When true, the effect's animation is paused (renders static) */
+  animationPaused?: boolean;
+
   // Hit-test results (computed on placement / trigger)
   impactedTargets: EffectImpact[];
 

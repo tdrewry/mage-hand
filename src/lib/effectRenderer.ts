@@ -20,7 +20,6 @@ import type {
 // ---------------------------------------------------------------------------
 
 const FADE_OUT_DURATION = 500; // ms
-const DISMISS_BUTTON_RADIUS = 12; // px (screen space)
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -37,25 +36,13 @@ export interface EffectRenderContext {
   zoom?: number;
 }
 
-/** Hit-test info for dismiss buttons rendered on the canvas */
-export interface EffectDismissHit {
-  effectId: string;
-  /** World-coordinate center of the dismiss button */
-  center: { x: number; y: number };
-  /** World-space radius of the button */
-  radius: number;
-}
-
 /**
  * Render all placed effects onto the canvas.
- * Returns hit-test data for dismiss buttons so the caller can handle clicks.
  */
 export function renderPlacedEffects(
   rc: EffectRenderContext,
   effects: PlacedEffect[],
-  options?: { showDismissButtons?: boolean },
-): EffectDismissHit[] {
-  const dismissHits: EffectDismissHit[] = [];
+): void {
   for (const effect of effects) {
     // Compute fade-out multiplier
     let fadeMul = 1.0;
@@ -65,15 +52,35 @@ export function renderPlacedEffects(
       if (fadeMul <= 0.01) continue; // fully faded — skip rendering
     }
 
-    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, fadeMul);
+    renderEffect(rc, effect.template, effect.origin, effect.direction ?? 0, fadeMul, effect.animationPaused);
+  }
+}
 
-    // Draw dismiss button for non-fading effects
-    if (options?.showDismissButtons && !effect.dismissedAt) {
-      const hit = renderDismissButton(rc, effect);
-      dismissHits.push(hit);
+/**
+ * Hit-test a world-coordinate point against placed effects.
+ * Returns the first (topmost) effect whose shape contains the point, or null.
+ */
+export function hitTestEffectAtPoint(
+  effects: PlacedEffect[],
+  worldX: number,
+  worldY: number,
+  gridSize: number,
+): PlacedEffect | null {
+  // Iterate in reverse so topmost (last rendered) is checked first
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const effect = effects[i];
+    if (effect.dismissedAt) continue; // skip fading effects
+    const path = buildPath(effect.template, effect.origin, effect.direction ?? 0, gridSize);
+    // Use an offscreen canvas to do isPointInPath
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 1;
+    testCanvas.height = 1;
+    const testCtx = testCanvas.getContext('2d');
+    if (testCtx && testCtx.isPointInPath(path, worldX, worldY)) {
+      return effect;
     }
   }
-  return dismissHits;
+  return null;
 }
 
 /**
@@ -126,52 +133,6 @@ export function renderPlacementPreview(
 }
 
 // ---------------------------------------------------------------------------
-// Dismiss button
-// ---------------------------------------------------------------------------
-
-function renderDismissButton(
-  rc: EffectRenderContext,
-  effect: PlacedEffect,
-): EffectDismissHit {
-  const { ctx } = rc;
-  const zoom = rc.zoom ?? 1;
-  // Button radius in world space so it stays constant screen size
-  const worldRadius = DISMISS_BUTTON_RADIUS / zoom;
-  // Position above the effect origin
-  const bx = effect.origin.x;
-  const by = effect.origin.y - (rc.gridSize * 0.6);
-
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-
-  // Circle background
-  ctx.beginPath();
-  ctx.arc(bx, by, worldRadius, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(220, 50, 50, 0.9)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.lineWidth = 1.5 / zoom;
-  ctx.stroke();
-
-  // X icon
-  const cross = worldRadius * 0.5;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2 / zoom;
-  ctx.beginPath();
-  ctx.moveTo(bx - cross, by - cross);
-  ctx.lineTo(bx + cross, by + cross);
-  ctx.moveTo(bx + cross, by - cross);
-  ctx.lineTo(bx - cross, by + cross);
-  ctx.stroke();
-
-  ctx.restore();
-
-  return {
-    effectId: effect.id,
-    center: { x: bx, y: by },
-    radius: worldRadius,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Core render dispatch
@@ -183,11 +144,14 @@ function renderEffect(
   origin: { x: number; y: number },
   direction: number,
   fadeMul: number = 1.0,
+  animationPaused?: boolean,
 ): void {
   rc.ctx.save();
 
   // Compute animation modifiers
-  const anim = computeAnimation(
+  const anim = animationPaused
+    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+    : computeAnimation(
     template.animation,
     template.animationSpeed,
     rc.time,
