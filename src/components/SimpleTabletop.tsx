@@ -3949,7 +3949,10 @@ export const SimpleTabletop = () => {
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
         if (mapEffects.length > 0) {
-          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
+          renderPlacedEffects({ ctx, time: performance.now(), gridSize: effectGridSize }, mapEffects, (expiredId) => {
+            // Clean up expired instant effects from the store
+            useEffectStore.getState().removeEffect(expiredId);
+          });
         }
         if (effectState.placement?.previewOrigin) {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
@@ -7236,8 +7239,11 @@ export const SimpleTabletop = () => {
     const mouseY = e.clientY - rect.top;
     const worldPos = screenToWorld(mouseX, mouseY);
 
+    // ── EFFECT PLACEMENT MODE: disable all entity selection/interaction ──
+    const effectPlacementActive = !!useEffectStore.getState().placement;
+
     if (e.button === 1) {
-      // Middle click — canvas pan
+      // Middle click — canvas pan (always allowed)
       e.preventDefault();
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
@@ -7305,6 +7311,13 @@ export const SimpleTabletop = () => {
           }
         }
         return; // Consume the click during targeting
+      }
+
+      // ── EFFECT PLACEMENT: suppress all entity interactions ──
+      if (effectPlacementActive) {
+        // During effect placement, mousedown should not select/drag anything.
+        // The actual placement is handled in handleCanvasClick.
+        return;
       }
 
       // Handle door drawing mode
