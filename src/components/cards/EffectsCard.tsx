@@ -56,6 +56,7 @@ interface TemplateFormData {
   animationSpeed: number;
   category: EffectCategory;
   damageType: string;
+  level: string;
 }
 
 const INITIAL_FORM: TemplateFormData = {
@@ -77,6 +78,7 @@ const INITIAL_FORM: TemplateFormData = {
   animationSpeed: 1,
   category: 'custom',
   damageType: '',
+  level: '',
 };
 
 function templateToForm(t: EffectTemplate): TemplateFormData {
@@ -99,6 +101,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     animationSpeed: t.animationSpeed,
     category: t.category,
     damageType: t.damageType ?? '',
+    level: t.level !== undefined ? String(t.level) : '',
   };
 }
 
@@ -200,12 +203,23 @@ function TemplateFormFields({
         </div>
       </div>
 
-      <Input
-        value={form.damageType}
-        onChange={(e) => update('damageType', e.target.value)}
-        placeholder="Damage type (fire, cold, etc.)"
-        className="h-7 text-xs"
-      />
+      <div className="flex gap-2">
+        <Input
+          value={form.damageType}
+          onChange={(e) => update('damageType', e.target.value)}
+          placeholder="Damage type (fire, cold, etc.)"
+          className="h-7 text-xs flex-1"
+        />
+        <Input
+          value={form.level}
+          onChange={(e) => update('level', e.target.value)}
+          placeholder="Spell level"
+          type="number"
+          min={0}
+          max={9}
+          className="h-7 text-xs w-20"
+        />
+      </div>
 
       <div className="flex gap-2 items-center">
         <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
@@ -301,6 +315,7 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
       animationSpeed: form.animationSpeed,
       category: form.category,
       damageType: form.damageType || undefined,
+      level: form.level ? Number(form.level) : undefined,
     });
     setForm({ ...INITIAL_FORM });
     onCreated();
@@ -346,6 +361,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
       animationSpeed: form.animationSpeed,
       category: form.category,
       damageType: form.damageType || undefined,
+      level: form.level ? Number(form.level) : undefined,
     });
     onDone();
   };
@@ -423,6 +439,12 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
       {template.level !== undefined && (
         <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
           L{template.level}
+        </Badge>
+      )}
+
+      {template.ranged && (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-accent-foreground border-accent">
+          Ranged
         </Badge>
       )}
 
