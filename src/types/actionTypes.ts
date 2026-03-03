@@ -49,17 +49,32 @@ export interface ActionRollResult {
   formula: string;
 }
 
-export interface DamageResult {
-  /** Base damage formula (e.g., "2d6+3") */
+export interface DamageBreakdownEntry {
+  /** Dice formula for this damage component (e.g. "4d6") */
   formula: string;
-  /** Rolled damage total */
+  /** Rolled total for this component */
   total: number;
   /** Individual die results */
   diceResults: number[];
-  /** Damage type (e.g., "slashing", "cold") */
+  /** Damage type (e.g. "fire", "radiant") */
   damageType: string;
-  /** DM-adjusted final damage */
+  /** DM-adjusted final damage for this component */
   adjustedTotal: number;
+}
+
+export interface DamageResult {
+  /** Base damage formula (e.g., "2d6+3") — legacy single formula */
+  formula: string;
+  /** Rolled damage total (sum of all components) */
+  total: number;
+  /** Individual die results (legacy — flat list from single formula) */
+  diceResults: number[];
+  /** Damage type (e.g., "slashing", "cold") — legacy single type */
+  damageType: string;
+  /** DM-adjusted final damage (sum of all adjusted components) */
+  adjustedTotal: number;
+  /** Multi-type damage breakdown (e.g. Flame Strike: fire + radiant) */
+  breakdown?: DamageBreakdownEntry[];
 }
 
 export interface ActionQueueEntry {

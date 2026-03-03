@@ -1191,6 +1191,7 @@ export const SimpleTabletop = () => {
         templateId: effect.templateId,
         templateName: effect.template.name,
         damageType: effect.template.damageType,
+        damageDice: effect.template.damageDice,
         damageFormula: undefined, // DM resolves damage manually for traps
         placedEffectId: effect.id,
         impacts: [tokenHit],
@@ -1538,6 +1539,7 @@ export const SimpleTabletop = () => {
                 templateName: pl.template.name,
                 damageType: pl.template.damageType,
                 damageFormula: pl.damageFormula,
+                damageDice: pl.template.damageDice,
                 placedEffectId: placed.id,
                 impacts,
               });
@@ -6941,6 +6943,7 @@ export const SimpleTabletop = () => {
             templateName: template.name,
             damageType: template.damageType,
             damageFormula: pl.damageFormula,
+            damageDice: template.damageDice,
             placedEffectId: placed.id,
             impacts,
           });
@@ -7092,6 +7095,7 @@ export const SimpleTabletop = () => {
                   templateName: template.name,
                   damageType: template.damageType,
                   damageFormula: placement.damageFormula,
+                  damageDice: template.damageDice,
                   placedEffectId: allGroupEffects[allGroupEffects.length - 1]?.id,
                   groupId: placement.multiDropGroupId,
                   impacts: mergedImpacts,
@@ -7195,6 +7199,7 @@ export const SimpleTabletop = () => {
             templateName: template.name,
             damageType: template.damageType,
             damageFormula: placement.damageFormula,
+            damageDice: template.damageDice,
             placedEffectId: placed.id,
             impacts,
           });
@@ -11189,6 +11194,7 @@ export const SimpleTabletop = () => {
                     templateName: pl.template.name,
                     damageType: pl.template.damageType,
                     damageFormula: pl.damageFormula,
+                    damageDice: pl.template.damageDice,
                     placedEffectId: placed.id,
                     impacts,
                   });
