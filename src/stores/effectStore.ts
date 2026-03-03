@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type {
   EffectTemplate,
   PlacedEffect,
@@ -89,7 +90,9 @@ interface EffectState {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useEffectStore = create<EffectState>((set, get) => {
+export const useEffectStore = create<EffectState>()(
+  persist(
+    (set, get) => {
   const customTemplates = loadCustomTemplates();
   const allTemplates = [...BUILT_IN_EFFECT_TEMPLATES, ...customTemplates];
 
@@ -343,4 +346,23 @@ export const useEffectStore = create<EffectState>((set, get) => {
 
     clearAll: () => set({ placedEffects: [], placement: null }),
   };
-});
+},
+    {
+      name: 'vtt-effect-store',
+      partialize: (state) => ({
+        placedEffects: state.placedEffects.filter(e => !e.dismissedAt), // Don't persist fading effects
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.placedEffects) {
+          // Reset animation timers to current time so animations restart cleanly
+          const now = performance.now();
+          state.placedEffects = state.placedEffects.map(e => ({
+            ...e,
+            placedAt: now,
+            dismissedAt: undefined,
+          }));
+        }
+      },
+    }
+  )
+);
