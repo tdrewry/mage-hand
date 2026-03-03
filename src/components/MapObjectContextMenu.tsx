@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -414,21 +415,19 @@ export const MapObjectContextMenuWrapper = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="width">Width</Label>
-                    <Input
+                    <NumericInput
                       id="width"
-                      type="number"
                       value={widthValue}
-                      onChange={(e) => setWidthValue(Number(e.target.value))}
+                      onChange={(v) => setWidthValue(v)}
                       min={1}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="height">Height</Label>
-                    <Input
+                    <NumericInput
                       id="height"
-                      type="number"
                       value={heightValue}
-                      onChange={(e) => setHeightValue(Number(e.target.value))}
+                      onChange={(v) => setHeightValue(v)}
                       min={1}
                     />
                   </div>
@@ -436,11 +435,10 @@ export const MapObjectContextMenuWrapper = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="rotation">Rotation (degrees)</Label>
-                  <Input
+                  <NumericInput
                     id="rotation"
-                    type="number"
                     value={rotationValue}
-                    onChange={(e) => setRotationValue(Number(e.target.value))}
+                    onChange={(v) => setRotationValue(v)}
                     min={0}
                     max={360}
                   />

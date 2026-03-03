@@ -5,6 +5,7 @@ import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -213,36 +214,36 @@ function TemplateFormFields({
         {needsRadius && (
           <div className="flex-1">
             <label className="text-[10px] text-muted-foreground">Radius</label>
-            <Input type="number" value={form.radius} onChange={(e) => update('radius', +e.target.value)} className="h-7 text-xs" min={1} />
+            <NumericInput value={form.radius ?? 1} onChange={(v) => update('radius', v)} className="h-7 text-xs" min={1} />
           </div>
         )}
         {needsLength && (
           <div className="flex-1">
             <label className="text-[10px] text-muted-foreground">Length</label>
-            <Input type="number" value={form.length} onChange={(e) => update('length', +e.target.value)} className="h-7 text-xs" min={1} />
+            <NumericInput value={form.length ?? 1} onChange={(v) => update('length', v)} className="h-7 text-xs" min={1} />
           </div>
         )}
         {needsWidth && (
           <div className="flex-1">
             <label className="text-[10px] text-muted-foreground">Width</label>
-            <Input type="number" value={form.width} onChange={(e) => update('width', +e.target.value)} className="h-7 text-xs" min={1} />
+            <NumericInput value={form.width ?? 1} onChange={(v) => update('width', v)} className="h-7 text-xs" min={1} />
           </div>
         )}
         {needsAngle && (
           <div className="flex-1">
             <label className="text-[10px] text-muted-foreground">Angle°</label>
-            <Input type="number" value={form.angle} onChange={(e) => update('angle', +e.target.value)} className="h-7 text-xs" min={1} max={360} />
+            <NumericInput value={form.angle ?? 1} onChange={(v) => update('angle', v)} className="h-7 text-xs" min={1} max={360} />
           </div>
         )}
         {needsPolyline && (
           <>
             <div className="flex-1">
               <label className="text-[10px] text-muted-foreground">Max Length</label>
-              <Input type="number" value={form.maxLength} onChange={(e) => update('maxLength', +e.target.value)} className="h-7 text-xs" min={1} />
+              <NumericInput value={form.maxLength ?? 1} onChange={(v) => update('maxLength', v)} className="h-7 text-xs" min={1} />
             </div>
             <div className="flex-1">
               <label className="text-[10px] text-muted-foreground">Thickness</label>
-              <Input type="number" value={form.segmentWidth} onChange={(e) => update('segmentWidth', +e.target.value)} className="h-7 text-xs" min={0.1} step={0.1} />
+              <NumericInput value={form.segmentWidth ?? 0.1} onChange={(v) => update('segmentWidth', v)} className="h-7 text-xs" min={0.1} step={0.1} float />
             </div>
           </>
         )}
@@ -252,10 +253,9 @@ function TemplateFormFields({
       <div className="flex gap-2 items-end">
         <div className="w-20">
           <label className="text-[10px] text-muted-foreground">Quantity</label>
-          <Input
-            type="number"
-            value={form.multiDropCount}
-            onChange={(e) => update('multiDropCount', Math.max(1, +e.target.value))}
+          <NumericInput
+            value={form.multiDropCount ?? 1}
+            onChange={(v) => update('multiDropCount', Math.max(1, v))}
             className="h-7 text-xs"
             min={1}
             max={20}
@@ -273,7 +273,7 @@ function TemplateFormFields({
         </div>
         <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Opacity</label>
-          <Input type="number" value={form.opacity} onChange={(e) => update('opacity', +e.target.value)} className="h-7 text-xs" min={0.1} max={1} step={0.05} />
+          <NumericInput value={form.opacity ?? 0.5} onChange={(v) => update('opacity', v)} className="h-7 text-xs" min={0.1} max={1} step={0.05} float />
         </div>
         <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Animation</label>
@@ -304,14 +304,12 @@ function TemplateFormFields({
           placeholder="Primary damage type"
           className="h-7 text-xs flex-1"
         />
-        <Input
-          value={form.level}
-          onChange={(e) => update('level', e.target.value)}
-          placeholder="Spell level"
-          type="number"
+        <NumericInput
+          value={form.level ? Number(form.level) : 0}
+          onChange={(v) => update('level', String(v))}
+          className="h-7 text-xs w-20"
           min={0}
           max={9}
-          className="h-7 text-xs w-20"
         />
       </div>
 
