@@ -51,7 +51,7 @@ interface EffectState {
   getTemplate: (id: string) => EffectTemplate | undefined;
 
   // --- Placement mode ---
-  startPlacement: (templateId: string, casterId?: string) => void;
+  startPlacement: (templateId: string, casterId?: string, damageFormula?: string) => void;
   updatePlacementPreview: (origin: { x: number; y: number }, direction: number) => void;
   cancelPlacement: () => void;
 
@@ -144,7 +144,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
     // Placement mode
     // ------------------------------------------------------------------
 
-    startPlacement: (templateId, casterId) => {
+    startPlacement: (templateId, casterId, damageFormula) => {
       const template = get().getTemplate(templateId);
       if (!template) return;
       set({
@@ -152,6 +152,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
           templateId,
           template,
           casterId,
+          damageFormula,
           previewOrigin: null,
           previewDirection: 0,
         },
