@@ -20,6 +20,9 @@ const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string
   critical_hit: { label: 'Critical Hit', color: 'bg-orange-900/50 text-orange-300 border-orange-700', icon: Swords },
 };
 
+/** Resolution types shown as buttons (excludes 'half' which is a damage modifier) */
+const RESOLUTION_BUTTON_KEYS: AttackResolution[] = ['critical_miss', 'miss', 'hit', 'critical_threat', 'critical_hit'];
+
 export function ActionCardContent() {
   const { currentAction, cancelAction, confirmTargets, setResolution, overrideDamage, commitAction } = useActionStore();
 
@@ -374,6 +377,19 @@ function TargetResolveCard({
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
+                  onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
+                >
+                  ½
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Save for Half</TooltipContent>
+            </Tooltip>
             <Input
               type="number"
               className="w-16 h-7 text-xs"
@@ -392,9 +408,9 @@ function TargetResolveCard({
       {/* Resolution buttons */}
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">Resolution {suggested !== 'miss' && `(suggested: ${RESOLUTION_CONFIG[suggested].label})`}</p>
-        <div className="grid grid-cols-6 gap-1">
-          {(Object.entries(RESOLUTION_CONFIG) as [AttackResolution, typeof RESOLUTION_CONFIG[AttackResolution]][]).map(
-            ([key, cfg]) => {
+        <div className="grid grid-cols-5 gap-1">
+          {RESOLUTION_BUTTON_KEYS.map(key => {
+              const cfg = RESOLUTION_CONFIG[key];
               const Icon = cfg.icon;
               const isActive = resolution === key;
               return (
