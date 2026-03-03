@@ -26,6 +26,9 @@ interface ActionState {
   /** Currently active action (null = no action in progress) */
   currentAction: ActionQueueEntry | null;
   
+  /** Queued actions waiting to be resolved (FIFO) */
+  pendingActions: ActionQueueEntry[];
+  
   /** Whether the canvas is in targeting mode */
   isTargeting: boolean;
   
@@ -90,6 +93,7 @@ type ActionStore = ActionState & ActionActions;
 
 export const useActionStore = create<ActionStore>((set, get) => ({
   currentAction: null,
+  pendingActions: [],
   isTargeting: false,
   targetingMousePos: null,
   actionHistory: [],
@@ -204,7 +208,13 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       },
     };
 
-    set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+    // If there's already an active action, queue this one
+    const { currentAction } = get();
+    if (currentAction) {
+      set({ pendingActions: [...get().pendingActions, entry] });
+    } else {
+      set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+    }
   },
 
   addTarget: (target) => {
@@ -390,9 +400,13 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       })),
     };
 
+    // Advance queue: pop next pending action if any
+    const [nextAction, ...remainingActions] = get().pendingActions;
+
     set({
-      currentAction: null,
-      isTargeting: false,
+      currentAction: nextAction || null,
+      pendingActions: remainingActions,
+      isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
       actionHistory: [historyEntry, ...actionHistory].slice(0, 100),
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
@@ -425,9 +439,13 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       }
     }
 
+    // Advance queue: pop next pending action if any
+    const [nextAction, ...remainingActions] = get().pendingActions;
+
     set({
-      currentAction: null,
-      isTargeting: false,
+      currentAction: nextAction || null,
+      pendingActions: remainingActions,
+      isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
     });
   },
