@@ -308,6 +308,8 @@ export const useActionStore = create<ActionStore>((set, get) => ({
       let adjustedTotal = existing.total;
       if (resolution === 'critical_miss' || resolution === 'miss') {
         adjustedTotal = 0;
+      } else if (resolution === 'half') {
+        adjustedTotal = Math.floor(existing.total / 2);
       } else if (resolution === 'critical_hit') {
         adjustedTotal = existing.total * 2;
       }
@@ -370,7 +372,7 @@ export const useActionStore = create<ActionStore>((set, get) => ({
     const flashes: ResolutionFlash[] = currentAction.targets.map(t => {
       const token = sessionTokens.find(tk => tk.id === t.tokenId);
       const resolution = currentAction.resolutions[t.targetKey] || 'miss';
-      const isHit = resolution === 'hit' || resolution === 'critical_hit' || resolution === 'critical_threat';
+      const isHit = resolution === 'hit' || resolution === 'half' || resolution === 'critical_hit' || resolution === 'critical_threat';
       return {
         tokenId: t.tokenId,
         x: token?.x ?? 0,
