@@ -75,6 +75,9 @@ export interface EffectTemplate {
 
   /** If true, the caster token is included in hit-testing (default false) */
   targetCaster?: boolean;
+
+  /** If true, effect can be placed at a distance from the source token (ranged spell) */
+  ranged?: boolean;
 }
 
 // ---------------------------------------------------------------------------

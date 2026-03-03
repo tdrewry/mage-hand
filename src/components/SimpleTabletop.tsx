@@ -6827,7 +6827,9 @@ export const SimpleTabletop = () => {
         const effectGridSize = filteredRegions[0]?.gridSize || 40;
 
         // Compute direction from the correct base point
-        const baseOrigin = placement.casterToken
+        // For ranged token-sourced, direction is from the locked origin (not token center)
+        const isRangedTokenSourced = placement.casterToken && template.ranged;
+        const baseOrigin = (placement.casterToken && !isRangedTokenSourced)
           ? { x: placement.casterToken.x, y: placement.casterToken.y }
           : placement.origin!;
         let direction = Math.atan2(worldPos.y - baseOrigin.y, worldPos.x - baseOrigin.x);
@@ -6838,8 +6840,8 @@ export const SimpleTabletop = () => {
           direction = Math.round(direction / snap) * snap;
         }
 
-        // For token-sourced placement, compute perimeter origin
-        const origin = placement.casterToken
+        // For non-ranged token-sourced placement, compute perimeter origin
+        const origin = (placement.casterToken && !isRangedTokenSourced)
           ? computeTokenSourcedOrigin(placement.casterToken, direction, effectGridSize, template.shape)
           : placement.origin!;
 
@@ -8094,7 +8096,9 @@ export const SimpleTabletop = () => {
         useEffectStore.getState().updatePlacementPreview(worldPos, 0);
       } else {
         // Step 2: origin is locked, compute direction from origin to mouse
-        const baseOrigin = effectPlacement.casterToken
+        // For ranged token-sourced, direction is from the locked origin (not token center)
+        const isRangedTokenSourced = effectPlacement.casterToken && effectPlacement.template.ranged;
+        const baseOrigin = (effectPlacement.casterToken && !isRangedTokenSourced)
           ? { x: effectPlacement.casterToken.x, y: effectPlacement.casterToken.y }
           : effectPlacement.origin!;
         let direction = Math.atan2(worldPos.y - baseOrigin.y, worldPos.x - baseOrigin.x);
@@ -8105,9 +8109,9 @@ export const SimpleTabletop = () => {
           direction = Math.round(direction / snap) * snap;
         }
 
-        // For token-sourced placement, compute perimeter origin
+        // For non-ranged token-sourced placement, compute perimeter origin
         const effectGridSize = filteredRegions[0]?.gridSize || 40;
-        if (effectPlacement.casterToken) {
+        if (effectPlacement.casterToken && !isRangedTokenSourced) {
           const perimeterOrigin = computeTokenSourcedOrigin(
             effectPlacement.casterToken,
             direction,

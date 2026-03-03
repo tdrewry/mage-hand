@@ -49,6 +49,7 @@ interface TemplateFormData {
   recurring: boolean;
   alignToGrid: boolean;
   targetCaster: boolean;
+  ranged: boolean;
   color: string;
   opacity: number;
   animation: EffectAnimationType;
@@ -69,6 +70,7 @@ const INITIAL_FORM: TemplateFormData = {
   recurring: true,
   alignToGrid: false,
   targetCaster: false,
+  ranged: false,
   color: '#FF4500',
   opacity: 0.55,
   animation: 'none',
@@ -90,6 +92,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     recurring: t.recurring !== false,
     alignToGrid: t.alignToGrid ?? false,
     targetCaster: t.targetCaster ?? false,
+    ranged: t.ranged ?? false,
     color: t.color,
     opacity: t.opacity,
     animation: t.animation,
@@ -252,6 +255,17 @@ function TemplateFormFields({
           Include caster in targets
         </span>
       </div>
+
+      <div className="flex items-center gap-1">
+        <Switch
+          checked={form.ranged}
+          onCheckedChange={(v) => update('ranged', v)}
+          className="scale-75"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          Ranged (place at distance)
+        </span>
+      </div>
     </>
   );
 }
@@ -280,6 +294,7 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
       alignToGrid: form.alignToGrid || undefined,
       targetCaster: form.targetCaster || undefined,
+      ranged: form.ranged || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,
@@ -324,6 +339,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
       recurring: form.persistence === 'persistent' ? form.recurring : undefined,
       alignToGrid: form.alignToGrid || undefined,
       targetCaster: form.targetCaster || undefined,
+      ranged: form.ranged || undefined,
       color: form.color,
       opacity: form.opacity,
       animation: form.animation,

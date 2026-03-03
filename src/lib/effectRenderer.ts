@@ -120,9 +120,10 @@ export function renderPlacementPreview(
 
   rc.ctx.save();
 
-  // For token-sourced placement, compute perimeter origin
+  // For token-sourced placement, compute perimeter origin (non-ranged only)
   let effectOrigin = previewOrigin;
-  if (placement.casterToken && placement.step === 'direction') {
+  const isRangedTokenSourced = placement.casterToken && template.ranged;
+  if (placement.casterToken && placement.step === 'direction' && !isRangedTokenSourced) {
     effectOrigin = computeTokenSourcedOrigin(
       placement.casterToken,
       previewDirection,
@@ -132,7 +133,11 @@ export function renderPlacementPreview(
   }
 
   // Draw spell intent line for token-sourced placements
-  if (placement.casterToken && placement.step === 'direction') {
+  // For non-ranged: only during direction step; for ranged: during both steps
+  if (placement.casterToken && (
+    (placement.step === 'direction' && !isRangedTokenSourced) ||
+    isRangedTokenSourced
+  )) {
     renderSpellIntentLine(rc, placement.casterToken, effectOrigin, template.color);
   }
 
