@@ -249,7 +249,7 @@ function TemplateFormFields({
         )}
       </div>
 
-      {/* Quantity (multi-drop) */}
+      {/* Quantity & Spell Level */}
       <div className="flex gap-2 items-end">
         <div className="w-20">
           <label className="text-[10px] text-muted-foreground">Quantity</label>
@@ -262,8 +262,18 @@ function TemplateFormFields({
           />
         </div>
         <span className="text-[10px] text-muted-foreground pb-1.5">
-          {form.multiDropCount > 1 ? `${form.multiDropCount} drops (multi-target)` : 'single target'}
+          {form.multiDropCount > 1 ? `${form.multiDropCount} drops` : 'single'}
         </span>
+        <div className="w-16">
+          <label className="text-[10px] text-muted-foreground">Spell Lvl</label>
+          <NumericInput
+            value={form.level ? Number(form.level) : 0}
+            onChange={(v) => update('level', String(v))}
+            className="h-7 text-xs"
+            min={0}
+            max={9}
+          />
+        </div>
       </div>
 
       <div className="flex gap-2 items-end">
@@ -296,19 +306,6 @@ function TemplateFormFields({
         rows={form.damageDice}
         onChange={(rows) => update('damageDice', rows)}
       />
-
-      <div className="flex gap-2 items-end">
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Spell Level</label>
-          <NumericInput
-            value={form.level ? Number(form.level) : 0}
-            onChange={(v) => update('level', String(v))}
-            className="h-7 text-xs"
-            min={0}
-            max={9}
-          />
-        </div>
-      </div>
 
       <div className="flex gap-2 items-center">
         <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
