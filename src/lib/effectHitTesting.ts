@@ -72,8 +72,10 @@ export function computeEffectImpacts(params: HitTestParams): EffectImpact[] {
   }
 
   for (const token of filteredTokens) {
-    // Burst exclusion: skip caster
+    // Burst exclusion: skip caster for burst shapes
     if (isBurst && casterId && token.id === casterId) continue;
+    // Token-sourced exclusion: skip caster unless targetCaster is true
+    if (!isBurst && casterId && token.id === casterId && !template.targetCaster) continue;
 
     const footprint = tokenFootprintRect(token, gridSize);
     const overlap = computeOverlap(effectGeom, footprint);

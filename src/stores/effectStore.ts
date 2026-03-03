@@ -51,7 +51,7 @@ interface EffectState {
   getTemplate: (id: string) => EffectTemplate | undefined;
 
   // --- Placement mode ---
-  startPlacement: (templateId: string, casterId?: string, damageFormula?: string) => void;
+  startPlacement: (templateId: string, casterId?: string, damageFormula?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }) => void;
   setPlacementOrigin: (origin: { x: number; y: number }) => void;
   updatePlacementPreview: (origin: { x: number; y: number }, direction: number) => void;
   cancelPlacement: () => void;
@@ -153,19 +153,25 @@ export const useEffectStore = create<EffectState>((set, get) => {
     // Placement mode
     // ------------------------------------------------------------------
 
-    startPlacement: (templateId, casterId, damageFormula) => {
+    startPlacement: (templateId, casterId, damageFormula, casterToken) => {
       const template = get().getTemplate(templateId);
       if (!template) return;
+
+      // Token-sourced: auto-lock origin to token and skip to direction step
+      const isTokenSourced = !!casterToken;
+      const tokenOrigin = casterToken ? { x: casterToken.x, y: casterToken.y } : null;
+
       set({
         placement: {
           templateId,
           template,
           casterId,
           damageFormula,
-          step: 'origin',
-          origin: null,
-          previewOrigin: null,
+          step: isTokenSourced ? 'direction' : 'origin',
+          origin: tokenOrigin,
+          previewOrigin: tokenOrigin,
           previewDirection: 0,
+          casterToken,
         },
       });
     },
