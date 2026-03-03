@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin } from 'lucide-react';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
@@ -57,6 +57,52 @@ import { useActionStore } from '@/stores/actionStore';
 import { parseAttacksFromJson } from '@/lib/attackParser';
 import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
 import type { AttackDefinition } from '@/types/actionTypes';
+import { useMapStore } from '@/stores/mapStore';
+
+/** Submenu for transferring tokens to a different map */
+const MoveToMapSubmenu = ({ targetTokens, canControl }: { targetTokens: { id: string; name?: string; mapId?: string }[]; canControl: boolean }) => {
+  const maps = useMapStore((s) => s.maps);
+  const { setTokens, tokens } = useSessionStore();
+
+  const handleMoveToMap = (mapId: string) => {
+    const tokenIds = new Set(targetTokens.map(t => t.id));
+    const updated = tokens.map(t => tokenIds.has(t.id) ? { ...t, mapId } : t);
+    setTokens(updated);
+    const mapName = maps.find(m => m.id === mapId)?.name || mapId;
+    toast.success(`Moved ${targetTokens.length} token${targetTokens.length > 1 ? 's' : ''} to ${mapName}`);
+  };
+
+  if (maps.length < 2) return null;
+
+  // Determine current map of tokens (if all on same map)
+  const currentMapId = targetTokens.length > 0 ? targetTokens[0].mapId : undefined;
+
+  return (
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={!canControl}>
+        <MapPin className="mr-2 h-4 w-4" />
+        <span>Move to Map</span>
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent className="w-48 bg-popover z-[1000]">
+        {maps.map((map) => {
+          const isCurrent = currentMapId === map.id;
+          return (
+            <ContextMenuItem
+              key={map.id}
+              onClick={() => handleMoveToMap(map.id)}
+              disabled={isCurrent}
+            >
+              {isCurrent && <span className="mr-2">✓</span>}
+              <span className="flex-1">{map.name}</span>
+              {!map.active && <span className="text-xs text-muted-foreground ml-2">inactive</span>}
+            </ContextMenuItem>
+          );
+        })}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  );
+};
+
 interface TokenContextMenuProps {
   children: React.ReactNode;
   tokenId: string;
@@ -1041,6 +1087,8 @@ export const TokenContextMenu = ({
             <Plus className="mr-2 h-4 w-4" />
             <span>Add to Initiative</span>
           </ContextMenuItem>
+          {/* Move to Map submenu */}
+          <MoveToMapSubmenu targetTokens={targetTokens} canControl={!!canControl} />
           <ContextMenuItem onClick={handleDeleteClick} className="text-destructive" disabled={!canDelete}>
             <Trash2 className="mr-2 h-4 w-4" />
             <span>Delete Token{isMultiSelection ? 's' : ''}</span>
