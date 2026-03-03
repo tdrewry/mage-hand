@@ -4009,6 +4009,20 @@ export const SimpleTabletop = () => {
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
 
+            // ── Placed spell/trap effects on overlay ──
+            {
+              const effectState = useEffectStore.getState();
+              const activeMapId = selectedMapId || 'default-map';
+              const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+              const effectGridSize = regions[0]?.gridSize || 40;
+              if (mapEffects.length > 0) {
+                renderPlacedEffects({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, mapEffects);
+              }
+              if (effectState.placement?.previewOrigin) {
+                renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
+              }
+            }
+
             overlayCtx.restore();
           }
         } else {
