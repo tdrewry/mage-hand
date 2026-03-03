@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -1479,21 +1480,23 @@ export const TokenContextMenu = ({
                 {/* Custom Size */}
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">Custom:</span>
-                  <Input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
+                  <NumericInput
+                    min={0.5}
+                    step={0.5}
                     value={gridWidthValue}
-                    onChange={(e) => setGridWidthValue(parseFloat(e.target.value) || 1)}
+                    onChange={(v) => setGridWidthValue(v)}
+                    float
+                    fallback={1}
                     className="w-16 h-8 text-center"
                   />
                   <span className="text-muted-foreground">×</span>
-                  <Input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
+                  <NumericInput
+                    min={0.5}
+                    step={0.5}
                     value={gridHeightValue}
-                    onChange={(e) => setGridHeightValue(parseFloat(e.target.value) || 1)}
+                    onChange={(v) => setGridHeightValue(v)}
+                    float
+                    fallback={1}
                     className="w-16 h-8 text-center"
                   />
                   <span className="text-xs text-muted-foreground">grid units</span>

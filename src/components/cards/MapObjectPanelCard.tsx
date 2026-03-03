@@ -3,6 +3,7 @@ import { Circle, Square, Move, Trash2, Eye, EyeOff, SunMedium, Moon, DoorOpen, D
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -263,20 +264,20 @@ export const MapObjectPanelCardContent = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Width</Label>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={singleSelected.width}
-                    onChange={(e) => updateMapObject(singleSelected.id, { width: Number(e.target.value) })}
+                    onChange={(v) => updateMapObject(singleSelected.id, { width: v })}
                     className="h-8 text-sm"
+                    min={1}
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Height</Label>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={singleSelected.height}
-                    onChange={(e) => updateMapObject(singleSelected.id, { height: Number(e.target.value) })}
+                    onChange={(v) => updateMapObject(singleSelected.id, { height: v })}
                     className="h-8 text-sm"
+                    min={1}
                   />
                 </div>
               </div>

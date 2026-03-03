@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Link2 } from 'lucide-react';
@@ -101,14 +102,15 @@ export const TokenPanelCardContent = ({ onAddToken }: TokenPanelCardContentProps
               <Label htmlFor="grid-width" className="text-xs text-muted-foreground">
                 Width (grid units)
               </Label>
-              <Input
+              <NumericInput
                 id="grid-width"
-                type="number"
-                min="0.5"
-                max="10"
-                step="0.5"
+                min={0.5}
+                max={10}
+                step={0.5}
                 value={gridWidth}
-                onChange={(e) => setGridWidth(parseFloat(e.target.value) || 1)}
+                onChange={(v) => setGridWidth(v)}
+                float
+                fallback={1}
                 className="mt-1 text-xs"
               />
             </div>
@@ -116,14 +118,15 @@ export const TokenPanelCardContent = ({ onAddToken }: TokenPanelCardContentProps
               <Label htmlFor="grid-height" className="text-xs text-muted-foreground">
                 Height (grid units)
               </Label>
-              <Input
+              <NumericInput
                 id="grid-height"
-                type="number"
-                min="0.5"
-                max="10"
-                step="0.5"
+                min={0.5}
+                max={10}
+                step={0.5}
                 value={gridHeight}
-                onChange={(e) => setGridHeight(parseFloat(e.target.value) || 1)}
+                onChange={(v) => setGridHeight(v)}
+                float
+                fallback={1}
                 className="mt-1 text-xs"
               />
             </div>
@@ -159,14 +162,15 @@ export const TokenPanelCardContent = ({ onAddToken }: TokenPanelCardContentProps
               <Label htmlFor="grid-width-url" className="text-xs text-muted-foreground">
                 Width (grid units)
               </Label>
-              <Input
+              <NumericInput
                 id="grid-width-url"
-                type="number"
-                min="0.5"
-                max="10"
-                step="0.5"
+                min={0.5}
+                max={10}
+                step={0.5}
                 value={gridWidth}
-                onChange={(e) => setGridWidth(parseFloat(e.target.value) || 1)}
+                onChange={(v) => setGridWidth(v)}
+                float
+                fallback={1}
                 className="mt-1 text-xs"
               />
             </div>
@@ -174,14 +178,15 @@ export const TokenPanelCardContent = ({ onAddToken }: TokenPanelCardContentProps
               <Label htmlFor="grid-height-url" className="text-xs text-muted-foreground">
                 Height (grid units)
               </Label>
-              <Input
+              <NumericInput
                 id="grid-height-url"
-                type="number"
-                min="0.5"
-                max="10"
-                step="0.5"
+                min={0.5}
+                max={10}
+                step={0.5}
                 value={gridHeight}
-                onChange={(e) => setGridHeight(parseFloat(e.target.value) || 1)}
+                onChange={(v) => setGridHeight(v)}
+                float
+                fallback={1}
                 className="mt-1 text-xs"
               />
             </div>
