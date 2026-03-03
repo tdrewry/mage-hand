@@ -1062,6 +1062,17 @@ export function findMapObjectAtPoint(
   isDMView: boolean = false,
   zoom: number = 1
 ): MapObject | null {
+  // In DM play view, prioritize doors so non-interactive objects
+  // (portals, walls, obstacles, furniture, water) don't block door interaction
+  if (isDMView) {
+    for (let i = mapObjects.length - 1; i >= 0; i--) {
+      const obj = mapObjects[i];
+      if (obj.category === 'door' && isPointInMapObject(x, y, obj, isDMView, zoom)) {
+        return obj;
+      }
+    }
+  }
+
   // Search in reverse order so top-most (selected) objects are found first
   for (let i = mapObjects.length - 1; i >= 0; i--) {
     if (isPointInMapObject(x, y, mapObjects[i], isDMView, zoom)) {
