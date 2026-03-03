@@ -30,6 +30,13 @@ export type EffectPlacementMode = 'free' | 'caster' | 'both';
 export type EffectPersistence = 'instant' | 'persistent';
 export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'custom';
 
+// Multi-drop configuration (e.g. Storm of Vengeance, Meteor Swarm)
+export interface MultiDropConfig {
+  count: number;                // how many instances to place
+  perDropShape?: EffectShape;   // override shape per drop (defaults to template shape)
+  perDropRadius?: number;       // override radius per drop
+}
+
 // ---------------------------------------------------------------------------
 // Template (library definition — reusable blueprint)
 // ---------------------------------------------------------------------------
@@ -78,6 +85,9 @@ export interface EffectTemplate {
 
   /** If true, effect can be placed at a distance from the source token (ranged spell) */
   ranged?: boolean;
+
+  /** Multi-drop configuration for effects that place multiple instances */
+  multiDrop?: MultiDropConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +124,9 @@ export interface PlacedEffect {
 
   /** Token IDs that have already triggered this effect (prevents re-triggering) */
   triggeredTokenIds: string[];
+
+  /** Links multi-drop instances for shared resolution */
+  groupId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +170,14 @@ export interface EffectPlacementState {
     gridWidth: number;
     gridHeight: number;
   };
+
+  // Multi-drop tracking
+  /** Shared group ID for all drops in this multi-drop placement */
+  multiDropGroupId?: string;
+  /** Total number of drops to place */
+  multiDropTotal?: number;
+  /** Number of drops already placed (0-indexed) */
+  multiDropPlaced?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -6812,12 +6812,116 @@ export const SimpleTabletop = () => {
       const worldPos = screenToWorld(clickX, clickY);
 
       // ── EFFECT PLACEMENT: two-step flow (1. origin, 2. direction) ──
+      // Multi-drop effects repeat the origin step `count` times.
       const effectState = useEffectStore.getState();
       if (effectState.placement) {
         const placement = effectState.placement;
+        const isMultiDrop = !!(placement.multiDropTotal && placement.multiDropTotal > 1);
 
         if (placement.step === 'origin') {
-          // Step 1: lock origin point
+          // For multi-drop: each click places one sub-effect immediately (no direction step)
+          if (isMultiDrop) {
+            const template = placement.template;
+            const activeMapId = selectedMapId || 'default-map';
+            const effectGridSize = filteredRegions[0]?.gridSize || 40;
+
+            // Use per-drop overrides if available
+            const dropTemplate = {
+              ...template,
+              ...(template.multiDrop?.perDropRadius !== undefined ? { radius: template.multiDrop.perDropRadius } : {}),
+              ...(template.multiDrop?.perDropShape !== undefined ? { shape: template.multiDrop.perDropShape } : {}),
+            };
+
+            // Compute hit-test impacts for this drop
+            const impacts = computeEffectImpacts({
+              template: dropTemplate,
+              origin: worldPos,
+              direction: 0,
+              gridSize: effectGridSize,
+              tokens: filteredTokens,
+              mapObjects: filteredMapObjects,
+              casterId: placement.casterId,
+              mapId: activeMapId,
+              activeMapIds,
+            });
+
+            // Place this drop
+            effectState.placeEffect(template.id, worldPos, activeMapId, {
+              direction: 0,
+              casterId: placement.casterId,
+              impactedTargets: impacts,
+              groupId: placement.multiDropGroupId,
+            });
+
+            const placedSoFar = (placement.multiDropPlaced ?? 0) + 1;
+
+            if (placedSoFar >= placement.multiDropTotal!) {
+              // All drops placed — finalize: collect all group impacts and open Action Card
+              const allGroupEffects = useEffectStore.getState().placedEffects.filter(
+                e => e.groupId === placement.multiDropGroupId
+              );
+              const allImpacts = allGroupEffects.flatMap(e => e.impactedTargets);
+
+              // Deduplicate by targetId (keep closest)
+              const impactMap = new Map<string, typeof allImpacts[0]>();
+              for (const imp of allImpacts) {
+                const existing = impactMap.get(imp.targetId);
+                if (!existing || imp.distanceFromOrigin < existing.distanceFromOrigin) {
+                  impactMap.set(imp.targetId, imp);
+                }
+              }
+              const mergedImpacts = Array.from(impactMap.values());
+
+              effectState.cancelPlacement();
+
+              // Open Action Card with merged impacts
+              const tokenImpacts = mergedImpacts.filter(i => i.targetType === 'token');
+              if (tokenImpacts.length > 0) {
+                const cardStore = useCardStore.getState();
+                const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+                if (actionCard) {
+                  cardStore.setVisibility(actionCard.id, true);
+                } else {
+                  cardStore.registerCard({
+                    type: CardType.ACTION_CARD,
+                    title: 'Action',
+                    defaultPosition: { x: window.innerWidth - 420, y: 80 },
+                    defaultSize: { width: 400, height: 500 },
+                    minSize: { width: 340, height: 400 },
+                    isResizable: true,
+                    isClosable: true,
+                    defaultVisible: true,
+                  });
+                }
+
+                useActionStore.getState().startEffectAction({
+                  sourceTokenId: placement.casterId,
+                  templateId: template.id,
+                  templateName: template.name,
+                  damageType: template.damageType,
+                  damageFormula: placement.damageFormula,
+                  placedEffectId: allGroupEffects[allGroupEffects.length - 1]?.id,
+                  impacts: mergedImpacts,
+                });
+              }
+            } else {
+              // More drops to place — reset for next click
+              useEffectStore.setState({
+                placement: {
+                  ...placement,
+                  step: 'origin',
+                  origin: null,
+                  previewOrigin: null,
+                  multiDropPlaced: placedSoFar,
+                },
+              });
+            }
+
+            redrawCanvas();
+            return;
+          }
+
+          // Standard single-drop: lock origin point
           effectState.setPlacementOrigin(worldPos);
           redrawCanvas();
           return;

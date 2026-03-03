@@ -263,6 +263,58 @@ export const POISON_GAS_CLOUD: EffectTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Multi-drop spell templates
+// ---------------------------------------------------------------------------
+
+export const STORM_OF_VENGEANCE_BOLTS: EffectTemplate = {
+  id: 'builtin-storm-vengeance-bolts',
+  name: 'Storm of Vengeance (Bolts)',
+  shape: 'circle',
+  radius: 1,               // 5 ft per bolt
+  placementMode: 'free',
+  persistence: 'instant',
+  color: '#FFD700',
+  secondaryColor: '#FFFFFF',
+  opacity: 0.7,
+  animation: 'crackle',
+  animationSpeed: 2.0,
+  category: 'spell',
+  level: 9,
+  damageType: 'lightning',
+  description: 'Six bolts of lightning strike six creatures of your choice under the storm cloud. Each bolt hits a 5-ft area.',
+  isBuiltIn: true,
+  ranged: true,
+  multiDrop: {
+    count: 6,
+    perDropRadius: 1,
+  },
+};
+
+export const METEOR_SWARM: EffectTemplate = {
+  id: 'builtin-meteor-swarm',
+  name: 'Meteor Swarm',
+  shape: 'circle',
+  radius: 8,               // 40 ft radius per meteor
+  placementMode: 'free',
+  persistence: 'instant',
+  color: '#FF4500',
+  secondaryColor: '#FF8C00',
+  opacity: 0.65,
+  animation: 'expand',
+  animationSpeed: 1.5,
+  category: 'spell',
+  level: 9,
+  damageType: 'fire',
+  description: 'Four blazing orbs crash to the ground at different points, each creating a 40-foot-radius sphere of fire.',
+  isBuiltIn: true,
+  ranged: true,
+  multiDrop: {
+    count: 4,
+    perDropRadius: 8,
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Aggregate collections
 // ---------------------------------------------------------------------------
 
@@ -279,6 +331,8 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
   THUNDERWAVE,
   PIT_TRAP,
   POISON_GAS_CLOUD,
+  STORM_OF_VENGEANCE_BOLTS,
+  METEOR_SWARM,
 ];
 
 /**

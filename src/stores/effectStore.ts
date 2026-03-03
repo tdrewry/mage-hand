@@ -65,6 +65,7 @@ interface EffectState {
       direction?: number;
       casterId?: string;
       impactedTargets?: EffectImpact[];
+      groupId?: string;
     },
   ) => PlacedEffect;
   removeEffect: (effectId: string) => void;
@@ -164,6 +165,10 @@ export const useEffectStore = create<EffectState>((set, get) => {
       const skipToDirection = isTokenSourced && !isRanged;
       const tokenOrigin = casterToken ? { x: casterToken.x, y: casterToken.y } : null;
 
+      // Multi-drop setup
+      const isMultiDrop = !!template.multiDrop;
+      const multiDropGroupId = isMultiDrop ? `group-${Date.now()}-${Math.random().toString(36).substr(2, 6)}` : undefined;
+
       set({
         placement: {
           templateId,
@@ -175,6 +180,9 @@ export const useEffectStore = create<EffectState>((set, get) => {
           previewOrigin: tokenOrigin,
           previewDirection: 0,
           casterToken,
+          multiDropGroupId,
+          multiDropTotal: template.multiDrop?.count,
+          multiDropPlaced: isMultiDrop ? 0 : undefined,
         },
       });
     },
@@ -225,6 +233,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
         mapId,
         impactedTargets: options.impactedTargets ?? [],
         triggeredTokenIds: [],
+        groupId: options.groupId,
       };
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
