@@ -10,6 +10,9 @@ import { useLightStore } from '@/stores/lightStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useIlluminationStore } from '@/stores/illuminationStore';
+import { useCreatureStore } from '@/stores/creatureStore';
+import { useHatchingStore } from '@/stores/hatchingStore';
 import { serializeProject, deserializeProject, ProjectData } from './projectSerializer';
 
 const AUTO_SAVE_KEY = 'magehand-autosave';
@@ -89,6 +92,10 @@ export class AutoSaveManager {
     useLightStore.subscribe(markChanges);
     useCardStore.subscribe(markChanges);
     useDungeonStore.subscribe(markChanges);
+    useMapObjectStore.subscribe(markChanges);
+    useIlluminationStore.subscribe(markChanges);
+    useCreatureStore.subscribe(markChanges);
+    useHatchingStore.subscribe(markChanges);
   }
 
   private debouncedSave(): void {
@@ -121,6 +128,9 @@ export class AutoSaveManager {
       const cardState = useCardStore.getState();
       const dungeonState = useDungeonStore.getState();
       const mapObjectState = useMapObjectStore.getState();
+      const illuminationState = useIlluminationStore.getState();
+      const creatureState = useCreatureStore.getState();
+      const hatchingState = useHatchingStore.getState();
 
       const projectData: ProjectData = {
         metadata: {
@@ -179,6 +189,19 @@ export class AutoSaveManager {
           shadowDistance: dungeonState.shadowDistance,
         },
         mapObjects: mapObjectState.mapObjects,
+        illumination: {
+          lights: illuminationState.lights,
+          globalAmbientLight: illuminationState.globalAmbientLight,
+        },
+        creatures: {
+          characters: creatureState.characters,
+          monsters: creatureState.monsters,
+        },
+        hatching: {
+          enabled: hatchingState.enabled,
+          hatchingOptions: hatchingState.hatchingOptions,
+        },
+        viewportTransforms: sessionState.viewportTransforms,
       };
 
       const serialized = serializeProject(projectData);
