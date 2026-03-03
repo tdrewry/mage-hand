@@ -69,6 +69,7 @@ interface EffectState {
   removeEffect: (effectId: string) => void;
   clearEffectsForMap: (mapId: string) => void;
   tickRound: () => void; // decrement roundsRemaining, remove expired
+  markTokenTriggered: (effectId: string, tokenId: string) => void;
 
   // --- Bulk ---
   clearAll: () => void;
@@ -194,6 +195,7 @@ export const useEffectStore = create<EffectState>((set, get) => {
             : undefined,
         mapId,
         impactedTargets: options.impactedTargets ?? [],
+        triggeredTokenIds: [],
       };
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
@@ -224,6 +226,16 @@ export const useEffectStore = create<EffectState>((set, get) => {
         // (they had roundsRemaining === 0 which means "until dismissed", so they stay)
         return { placedEffects: updated };
       });
+    },
+
+    markTokenTriggered: (effectId, tokenId) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId && !e.triggeredTokenIds.includes(tokenId)
+            ? { ...e, triggeredTokenIds: [...e.triggeredTokenIds, tokenId] }
+            : e
+        ),
+      }));
     },
 
     clearAll: () => set({ placedEffects: [], placement: null }),
