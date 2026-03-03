@@ -15,6 +15,7 @@ import {
   Palette,
   CloudFog,
   Swords,
+  Sparkles,
   
   Undo,
   Redo,
@@ -107,6 +108,24 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
   const stylesCard = cards.find((c) => c.type === CardType.STYLES);
   const historyCard = cards.find((c) => c.type === CardType.HISTORY);
+  const effectsCard = cards.find((c) => c.type === CardType.EFFECTS);
+
+  const handleToggleEffectsCard = () => {
+    if (effectsCard) {
+      setVisibility(effectsCard.id, !effectsCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.EFFECTS,
+        title: 'Effects',
+        defaultPosition: { x: 320, y: 80 },
+        defaultSize: { width: 320, height: 500 },
+        minSize: { width: 280, height: 350 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
 
   const handleToggleStylesCard = () => {
     if (stylesCard) {
@@ -509,6 +528,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label={`${isInCombat ? 'End' : 'Start'} Combat`}
             onClick={handleCombatToggle}
             isActive={isInCombat}
+            variant="ghost"
+            size="xs"
+          />
+
+          <ToolbarButton
+            icon={Sparkles}
+            label="Effects"
+            onClick={handleToggleEffectsCard}
+            isActive={effectsCard?.isVisible}
             variant="ghost"
             size="xs"
           />

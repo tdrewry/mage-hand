@@ -27,6 +27,7 @@ export enum CardType {
   DICE_BOX = 'dice_box',
   ACTION_CARD = 'action_card',
   NETWORK_DEMO = 'network_demo',
+  EFFECTS = 'effects',
 }
 
 export interface CardPosition {
