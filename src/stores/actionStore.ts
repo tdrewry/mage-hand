@@ -7,13 +7,14 @@ import type {
   AttackResolution,
   ActionRollResult,
   DamageResult,
+  DamageBreakdownEntry,
   ActionHistoryEntry,
   DEFAULT_SLAM_ATTACK,
 } from '@/types/actionTypes';
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useEffectStore } from '@/stores/effectStore';
-import type { EffectImpact } from '@/types/effectTypes';
+import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 
 /** Broadcast the current action queue state to other DM sessions */
@@ -68,6 +69,7 @@ interface ActionActions {
     templateName: string;
     damageType?: string;
     damageFormula?: string;
+    damageDice?: DamageDiceEntry[];
     placedEffectId: string;
     groupId?: string;
     impacts: EffectImpact[];
@@ -143,7 +145,7 @@ export const useActionStore = create<ActionStore>()(
     set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
   },
 
-  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, placedEffectId, groupId, impacts }) => {
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, impacts }) => {
     const sessionTokens = useSessionStore.getState().tokens;
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
@@ -167,13 +169,23 @@ export const useActionStore = create<ActionStore>()(
 
     if (targets.length === 0) return;
 
+    // Determine effective damage dice rows
+    const effectiveDamageDice: DamageDiceEntry[] = (damageDice && damageDice.length > 0)
+      ? damageDice
+      : (damageFormula && damageFormula !== '0')
+        ? [{ formula: damageFormula, damageType: damageType || 'untyped' }]
+        : [];
+
     // Build a synthetic attack definition from the effect template
+    const combinedFormula = effectiveDamageDice.map(d => d.formula).join(' + ') || '0';
+    const primaryType = effectiveDamageDice[0]?.damageType || damageType || 'untyped';
+
     const effectAttack: AttackDefinition = {
       id: `effect-${templateId}`,
       name: templateName,
       attackBonus: 0,
-      damageFormula: damageFormula || '0',
-      damageType: damageType || 'untyped',
+      damageFormula: combinedFormula,
+      damageType: primaryType,
       description: `Effect: ${templateName}`,
     };
 
@@ -189,15 +201,30 @@ export const useActionStore = create<ActionStore>()(
         formula: 'Save',
       };
 
-      if (damageFormula && damageFormula !== '0') {
-        const result = rollDice(damageFormula);
-        const diceResults = result.groups.flatMap(g => g.keptResults);
+      if (effectiveDamageDice.length > 0) {
+        // Roll each damage dice row independently
+        const breakdown: DamageBreakdownEntry[] = effectiveDamageDice.map(dd => {
+          const result = rollDice(dd.formula);
+          const diceResults = result.groups.flatMap(g => g.keptResults);
+          return {
+            formula: dd.formula,
+            total: result.total,
+            diceResults,
+            damageType: dd.damageType,
+            adjustedTotal: result.total,
+          };
+        });
+
+        const grandTotal = breakdown.reduce((sum, b) => sum + b.total, 0);
+        const allDice = breakdown.flatMap(b => b.diceResults);
+
         damageResults[target.targetKey] = {
-          formula: damageFormula,
-          total: result.total,
-          diceResults,
-          damageType: damageType || 'untyped',
-          adjustedTotal: result.total,
+          formula: combinedFormula,
+          total: grandTotal,
+          diceResults: allDice,
+          damageType: primaryType,
+          adjustedTotal: grandTotal,
+          breakdown: breakdown.length > 1 ? breakdown : undefined,
         };
       } else {
         damageResults[target.targetKey] = {
@@ -329,14 +356,31 @@ export const useActionStore = create<ActionStore>()(
     const existing = damageResults[targetKey];
     if (existing) {
       let adjustedTotal = existing.total;
+      let updatedBreakdown = existing.breakdown;
+
       if (resolution === 'critical_miss' || resolution === 'miss') {
         adjustedTotal = 0;
+        if (updatedBreakdown) {
+          updatedBreakdown = updatedBreakdown.map(b => ({ ...b, adjustedTotal: 0 }));
+        }
       } else if (resolution === 'half') {
         adjustedTotal = Math.floor(existing.total / 2);
+        if (updatedBreakdown) {
+          updatedBreakdown = updatedBreakdown.map(b => ({ ...b, adjustedTotal: Math.floor(b.total / 2) }));
+        }
       } else if (resolution === 'critical_hit') {
         adjustedTotal = existing.total * 2;
+        if (updatedBreakdown) {
+          updatedBreakdown = updatedBreakdown.map(b => ({ ...b, adjustedTotal: b.total * 2 }));
+        }
+      } else {
+        // hit or critical_threat — reset to base totals
+        if (updatedBreakdown) {
+          updatedBreakdown = updatedBreakdown.map(b => ({ ...b, adjustedTotal: b.total }));
+        }
       }
-      damageResults[targetKey] = { ...existing, adjustedTotal };
+
+      damageResults[targetKey] = { ...existing, adjustedTotal, breakdown: updatedBreakdown };
     }
 
     set({

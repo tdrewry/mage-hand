@@ -169,9 +169,25 @@ function ResolvePhase() {
               <p className="text-xs text-muted-foreground">{currentAction.attack.name}</p>
             </div>
           </div>
-          <Badge variant="outline" className="text-xs">
-            {currentAction.attack.damageType}
-          </Badge>
+          {/* Show all damage types from the first target's breakdown, or fallback to single type */}
+          {(() => {
+            const firstTarget = currentAction.targets[0];
+            const dmg = firstTarget ? currentAction.damageResults[firstTarget.targetKey] : null;
+            if (dmg?.breakdown && dmg.breakdown.length > 1) {
+              return (
+                <div className="flex gap-1">
+                  {dmg.breakdown.map((b, i) => (
+                    <Badge key={i} variant="outline" className="text-xs">{b.damageType}</Badge>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <Badge variant="outline" className="text-xs">
+                {currentAction.attack.damageType}
+              </Badge>
+            );
+          })()}
         </div>
 
         <Separator />
@@ -276,6 +292,8 @@ interface TargetResolveCardProps {
   onSetResolution: (r: AttackResolution) => void;
   onOverrideDamage: (v: number) => void;
   onDismiss: () => void;
+  /** Whether this is an effect-based action (shows breakdown if available) */
+  isEffect?: boolean;
 }
 
 function TargetResolveCard({
@@ -291,6 +309,7 @@ function TargetResolveCard({
   onSetResolution,
   onOverrideDamage,
   onDismiss,
+  isEffect,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
   const isHit = roll.totalRoll >= defenseValue;
@@ -364,45 +383,98 @@ function TargetResolveCard({
       </div>
 
       {/* Damage display */}
-      <div className="bg-muted/30 rounded p-2">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="bg-muted/30 rounded p-2 space-y-1">
+        {/* Show breakdown rows if multi-type damage */}
+        {damage.breakdown && damage.breakdown.length > 1 ? (
+          <>
             <p className="text-xs text-muted-foreground">Damage</p>
-            <p className="font-mono text-sm">
-              {damage.adjustedTotal}{' '}
-              <span className="text-xs text-muted-foreground">{damageType}</span>
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {damage.formula} → [{damage.diceResults.join(', ')}] = {damage.total}
-            </p>
-          </div>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
-                  onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
-                >
-                  ½
+            {damage.breakdown.map((row, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div>
+                  <p className="font-mono text-sm">
+                    {row.adjustedTotal}{' '}
+                    <span className="text-xs text-muted-foreground">{row.damageType}</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {row.formula} → [{row.diceResults.join(', ')}] = {row.total}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <div className="border-t border-border/50 pt-1 mt-1 flex items-center justify-between">
+              <p className="font-mono text-sm font-bold">
+                {damage.adjustedTotal}{' '}
+                <span className="text-xs text-muted-foreground">total</span>
+              </p>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
+                      onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
+                    >
+                      ½
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Save for Half</TooltipContent>
+                </Tooltip>
+                <Input
+                  type="number"
+                  className="w-16 h-7 text-xs"
+                  placeholder="Adj."
+                  value={damageOverride}
+                  onChange={(e) => setDamageOverride(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleDamageOverride()}
+                />
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleDamageOverride}>
+                  <Check className="w-3 h-3" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">Save for Half</TooltipContent>
-            </Tooltip>
-            <Input
-              type="number"
-              className="w-16 h-7 text-xs"
-              placeholder="Adj."
-              value={damageOverride}
-              onChange={(e) => setDamageOverride(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleDamageOverride()}
-            />
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleDamageOverride}>
-              <Check className="w-3 h-3" />
-            </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Single damage type (standard layout) */
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">Damage</p>
+              <p className="font-mono text-sm">
+                {damage.adjustedTotal}{' '}
+                <span className="text-xs text-muted-foreground">{damageType}</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {damage.formula} → [{damage.diceResults.join(', ')}] = {damage.total}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
+                    onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
+                  >
+                    ½
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Save for Half</TooltipContent>
+              </Tooltip>
+              <Input
+                type="number"
+                className="w-16 h-7 text-xs"
+                placeholder="Adj."
+                value={damageOverride}
+                onChange={(e) => setDamageOverride(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleDamageOverride()}
+              />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleDamageOverride}>
+                <Check className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Resolution buttons */}
