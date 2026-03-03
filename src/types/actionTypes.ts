@@ -24,6 +24,8 @@ export interface AttackDefinition {
 }
 
 export interface ActionTarget {
+  /** Unique key for this target entry (supports same token appearing multiple times) */
+  targetKey: string;
   tokenId: string;
   tokenName: string;
   /** Distance from attacker in grid units */

@@ -139,7 +139,7 @@ function ResolvePhase() {
   const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
-  const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.tokenId]);
+  const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
 
   return (
     <ScrollArea className="h-full">
@@ -162,13 +162,13 @@ function ResolvePhase() {
 
         {/* Per-target resolution */}
         {currentAction.targets.map(target => {
-          const roll = currentAction.rollResults[target.tokenId];
-          const damage = currentAction.damageResults[target.tokenId];
-          const resolution = currentAction.resolutions[target.tokenId];
+          const roll = currentAction.rollResults[target.targetKey];
+          const damage = currentAction.damageResults[target.targetKey];
+          const resolution = currentAction.resolutions[target.targetKey];
 
           return (
             <TargetResolveCard
-              key={target.tokenId}
+              key={target.targetKey}
               targetName={target.tokenName}
               distance={target.distance}
               defenseValue={target.defenseValue}
@@ -177,9 +177,9 @@ function ResolvePhase() {
               damage={damage}
               resolution={resolution}
               damageType={currentAction.attack!.damageType}
-              onSetResolution={(r) => setResolution(target.tokenId, r)}
-              onOverrideDamage={(v) => overrideDamage(target.tokenId, v)}
-              onDismiss={() => removeTarget(target.tokenId)}
+              onSetResolution={(r) => setResolution(target.targetKey, r)}
+              onOverrideDamage={(v) => overrideDamage(target.targetKey, v)}
+              onDismiss={() => removeTarget(target.targetKey)}
             />
           );
         })}
