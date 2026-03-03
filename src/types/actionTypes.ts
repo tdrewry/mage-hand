@@ -7,7 +7,7 @@
 
 export type ActionCategory = 'attack' | 'ability' | 'skill' | 'spell' | 'trap' | 'environment' | 'effect';
 
-export type AttackResolution = 'critical_miss' | 'miss' | 'hit' | 'critical_threat' | 'critical_hit';
+export type AttackResolution = 'critical_miss' | 'miss' | 'half' | 'hit' | 'critical_threat' | 'critical_hit';
 
 export type DefenseType = 'flat' | 'calculated' | 'opposed_roll';
 

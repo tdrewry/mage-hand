@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight } from 'lucide-react';
+import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution } from '@/types/actionTypes';
@@ -14,6 +14,7 @@ import type { AttackResolution } from '@/types/actionTypes';
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
   miss: { label: 'Miss', color: 'bg-muted text-muted-foreground border-border', icon: X },
+  half: { label: 'Half Damage', color: 'bg-blue-900/50 text-blue-300 border-blue-700', icon: Percent },
   hit: { label: 'Hit', color: 'bg-green-900/50 text-green-300 border-green-700', icon: Check },
   critical_threat: { label: 'Critical Threat', color: 'bg-yellow-900/50 text-yellow-300 border-yellow-700', icon: AlertTriangle },
   critical_hit: { label: 'Critical Hit', color: 'bg-orange-900/50 text-orange-300 border-orange-700', icon: Swords },
@@ -218,7 +219,7 @@ function ResolvePhase() {
             const dmg = currentAction.damageResults[t.targetKey];
             const res = currentAction.resolutions[t.targetKey];
             const adjusted = dmg?.adjustedTotal ?? 0;
-            const isHit = res === 'hit' || res === 'critical_hit' || res === 'critical_threat';
+            const isHit = res === 'hit' || res === 'half' || res === 'critical_hit' || res === 'critical_threat';
             const existing = tokenTotals.get(t.tokenId) || { name: t.tokenName, total: 0, hits: 0 };
             existing.total += isHit ? adjusted : 0;
             existing.hits += isHit ? 1 : 0;
@@ -386,7 +387,7 @@ function TargetResolveCard({
       {/* Resolution buttons */}
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">Resolution {suggested !== 'miss' && `(suggested: ${RESOLUTION_CONFIG[suggested].label})`}</p>
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-6 gap-1">
           {(Object.entries(RESOLUTION_CONFIG) as [AttackResolution, typeof RESOLUTION_CONFIG[AttackResolution]][]).map(
             ([key, cfg]) => {
               const Icon = cfg.icon;
