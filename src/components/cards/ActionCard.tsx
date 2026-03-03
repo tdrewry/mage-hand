@@ -137,14 +137,25 @@ function TargetingPhase() {
 }
 
 function ResolvePhase() {
-  const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
+  const { currentAction, pendingActions, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
+  const queueCount = pendingActions.length;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+        {/* Queue indicator */}
+        {queueCount > 0 && (
+          <div className="flex items-center gap-2 rounded-md bg-accent/50 px-3 py-1.5">
+            <ChevronRight className="w-3.5 h-3.5 text-accent-foreground" />
+            <span className="text-xs font-medium text-accent-foreground">
+              {queueCount} more action{queueCount > 1 ? 's' : ''} queued
+            </span>
+          </div>
+        )}
+
         {/* Action Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
