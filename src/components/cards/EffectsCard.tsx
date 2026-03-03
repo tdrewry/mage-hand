@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectTemplate, EffectCategory } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play } from 'lucide-react';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -102,6 +102,7 @@ export function EffectsCardContent() {
   const placedEffects = useEffectStore((s) => s.placedEffects);
   const startPlacement = useEffectStore((s) => s.startPlacement);
   const removeEffect = useEffectStore((s) => s.removeEffect);
+  const resetTriggeredTokens = useEffectStore((s) => s.resetTriggeredTokens);
   const deleteCustomTemplate = useEffectStore((s) => s.deleteCustomTemplate);
   const placement = useEffectStore((s) => s.placement);
 
@@ -199,9 +200,25 @@ export function EffectsCardContent() {
                       {e.roundsRemaining}r
                     </Badge>
                   )}
+                  {e.triggeredTokenIds.length > 0 && (
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+                      {e.triggeredTokenIds.length} trg
+                    </Badge>
+                  )}
                   <span className="text-[10px] text-muted-foreground">
                     {e.impactedTargets.length} hit
                   </span>
+                  {e.template.persistence === 'persistent' && e.triggeredTokenIds.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                      title="Reset triggers — tokens can trigger this effect again"
+                      onClick={() => resetTriggeredTokens(e.id)}
+                    >
+                      <RotateCcw className="w-3 h-3 text-primary" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"

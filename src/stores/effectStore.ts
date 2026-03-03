@@ -70,6 +70,7 @@ interface EffectState {
   clearEffectsForMap: (mapId: string) => void;
   tickRound: () => void; // decrement roundsRemaining, remove expired
   markTokenTriggered: (effectId: string, tokenId: string) => void;
+  resetTriggeredTokens: (effectId: string) => void;
 
   // --- Bulk ---
   clearAll: () => void;
@@ -234,6 +235,14 @@ export const useEffectStore = create<EffectState>((set, get) => {
           e.id === effectId && !e.triggeredTokenIds.includes(tokenId)
             ? { ...e, triggeredTokenIds: [...e.triggeredTokenIds, tokenId] }
             : e
+        ),
+      }));
+    },
+
+    resetTriggeredTokens: (effectId) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId ? { ...e, triggeredTokenIds: [] } : e
         ),
       }));
     },
