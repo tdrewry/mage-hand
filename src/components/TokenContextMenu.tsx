@@ -25,7 +25,7 @@ import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin, Copy } from 'lucide-react';
+import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin, Copy, BookOpen, Star, Zap, RotateCw } from 'lucide-react';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
@@ -55,7 +55,7 @@ import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useActionStore } from '@/stores/actionStore';
-import { parseAttacksFromJson } from '@/lib/attackParser';
+import { collectAllActions, parseAttacksFromJson, type TokenActionItem, type TokenActionCategory } from '@/lib/attackParser';
 import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
 import type { AttackDefinition } from '@/types/actionTypes';
 import { useMapStore } from '@/stores/mapStore';
@@ -416,15 +416,15 @@ export const TokenContextMenu = ({
     }
   };
 
-  // Get available attacks for the current token
-  const getAvailableAttacks = (): AttackDefinition[] => {
-    if (!currentToken) return [DEFAULT_SLAM_ATTACK];
+  // Get all available actions for the current token
+  const getAvailableActions = (): TokenActionItem[] => {
+    if (!currentToken) return [{ id: 'default-slam', name: 'Slam', category: 'attack', attackBonus: 0, damageFormula: '1d4', damageType: 'bludgeoning', range: '5 ft.', description: 'A basic melee attack.', asAttack: DEFAULT_SLAM_ATTACK }];
     
-    // Try to parse attacks from stat block JSON
+    // Try to parse from stat block JSON
     if (currentToken.statBlockJson) {
       try {
         const json = JSON.parse(currentToken.statBlockJson);
-        return parseAttacksFromJson(json);
+        return collectAllActions(json);
       } catch { /* fall through */ }
     }
 
@@ -432,16 +432,17 @@ export const TokenContextMenu = ({
     if (currentToken.entityRef?.entityId) {
       const creature = useCreatureStore.getState();
       const monster = creature.getMonsterById(currentToken.entityRef.entityId);
-      if (monster) {
-        return parseAttacksFromJson(monster);
-      }
+      if (monster) return collectAllActions(monster);
       const character = creature.getCharacterById(currentToken.entityRef.entityId);
-      if (character) {
-        return parseAttacksFromJson(character);
-      }
+      if (character) return collectAllActions(character);
     }
 
-    return [DEFAULT_SLAM_ATTACK];
+    return [{ id: 'default-slam', name: 'Slam', category: 'attack', attackBonus: 0, damageFormula: '1d4', damageType: 'bludgeoning', range: '5 ft.', description: 'A basic melee attack.', asAttack: DEFAULT_SLAM_ATTACK }];
+  };
+
+  // Legacy compat
+  const getAvailableAttacks = (): AttackDefinition[] => {
+    return getAvailableActions().filter(a => a.asAttack).map(a => a.asAttack!);
   };
 
   const handleStartAttack = (attack: AttackDefinition) => {
@@ -1062,25 +1063,77 @@ export const TokenContextMenu = ({
               <ContextMenuSeparator />
             </>
           )}
-          {/* Attack submenu */}
+          {/* Actions submenu — attacks, spells, skills, traits */}
           {!isMultiSelection && (
             <ContextMenuSub>
               <ContextMenuSubTrigger>
                 <Swords className="mr-2 h-4 w-4" />
-                <span>Attack</span>
+                <span>Actions</span>
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-56 bg-popover z-[1000]">
-                {getAvailableAttacks().map((attack) => (
-                  <ContextMenuItem
-                    key={attack.id}
-                    onClick={() => handleStartAttack(attack)}
-                  >
-                    <span className="flex-1">{attack.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      +{attack.attackBonus} | {attack.damageFormula} {attack.damageType}
-                    </span>
-                  </ContextMenuItem>
-                ))}
+              <ContextMenuSubContent className="w-64 bg-popover z-[1000] max-h-[400px] overflow-y-auto">
+                {(() => {
+                  const allActions = getAvailableActions();
+                  const grouped: Partial<Record<TokenActionCategory, TokenActionItem[]>> = {};
+                  for (const item of allActions) {
+                    if (!grouped[item.category]) grouped[item.category] = [];
+                    grouped[item.category]!.push(item);
+                  }
+
+                  const categoryConfig: { key: TokenActionCategory; label: string; icon: React.ReactNode }[] = [
+                    { key: 'attack', label: 'Attacks', icon: <Swords className="w-3 h-3" /> },
+                    { key: 'spell', label: 'Spells', icon: <Sparkles className="w-3 h-3" /> },
+                    { key: 'bonus', label: 'Bonus Actions', icon: <Zap className="w-3 h-3" /> },
+                    { key: 'reaction', label: 'Reactions', icon: <RotateCw className="w-3 h-3" /> },
+                    { key: 'legendary', label: 'Legendary', icon: <Star className="w-3 h-3" /> },
+                    { key: 'skill', label: 'Skills', icon: <Dices className="w-3 h-3" /> },
+                    { key: 'trait', label: 'Traits & Features', icon: <BookOpen className="w-3 h-3" /> },
+                  ];
+
+                  return categoryConfig.map(({ key, label, icon }) => {
+                    const items = grouped[key];
+                    if (!items || items.length === 0) return null;
+                    return (
+                      <ContextMenuSub key={key}>
+                        <ContextMenuSubTrigger className="text-xs">
+                          <span className="mr-2">{icon}</span>
+                          <span>{label}</span>
+                          <span className="ml-auto text-[10px] text-muted-foreground">{items.length}</span>
+                        </ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="w-60 bg-popover z-[1001] max-h-[300px] overflow-y-auto">
+                          {items.map(item => (
+                            <ContextMenuItem
+                              key={item.id}
+                              onClick={() => {
+                                if (item.asAttack) {
+                                  handleStartAttack(item.asAttack);
+                                } else if (item.category === 'skill' && item.modifier !== undefined) {
+                                  // Trigger a skill check roll via toast for now
+                                  toast.info(`${item.name}: d20${item.modifier >= 0 ? '+' : ''}${item.modifier}`);
+                                } else {
+                                  // Show trait/spell description
+                                  toast.info(`${item.name}: ${item.description || 'No description'}`);
+                                }
+                              }}
+                            >
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className="text-xs truncate">{item.name}</span>
+                                <span className="text-[10px] text-muted-foreground truncate">
+                                  {item.category === 'attack' && item.asAttack
+                                    ? `+${item.attackBonus} | ${item.damageFormula} ${item.damageType}`
+                                    : item.category === 'skill'
+                                    ? `${item.modifier != null && item.modifier >= 0 ? '+' : ''}${item.modifier ?? 0}${item.proficient ? ' (prof)' : ''}`
+                                    : item.category === 'spell'
+                                    ? item.description || ''
+                                    : item.description ? item.description.substring(0, 50) : ''}
+                                </span>
+                              </div>
+                            </ContextMenuItem>
+                          ))}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    );
+                  });
+                })()}
               </ContextMenuSubContent>
             </ContextMenuSub>
           )}
