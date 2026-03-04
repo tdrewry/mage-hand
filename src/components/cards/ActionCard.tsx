@@ -285,11 +285,10 @@ function SkillCheckResolvePhase() {
 }
 
 function ResolvePhase() {
-  const { currentAction, pendingActions, setResolution, overrideDamage, commitAction, cancelAction, cancelAllActions, removeTarget } = useActionStore();
+  const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
-  const queueCount = pendingActions.length;
 
   return (
     <ScrollArea className="h-full">
