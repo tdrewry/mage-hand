@@ -59,6 +59,7 @@ import { collectAllActions, parseAttacksFromJson, type TokenActionItem, type Tok
 import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
 import type { AttackDefinition } from '@/types/actionTypes';
 import { useMapStore } from '@/stores/mapStore';
+import { useEffectStore } from '@/stores/effectStore';
 
 /** Submenu for transferring tokens to a different map */
 const MoveToMapSubmenu = ({ targetTokens, canControl }: { targetTokens: { id: string; name?: string; mapId?: string }[]; canControl: boolean }) => {
@@ -1103,15 +1104,38 @@ export const TokenContextMenu = ({
                           {items.map(item => (
                             <ContextMenuItem
                               key={item.id}
-                              onClick={() => {
+                            onClick={() => {
                                 if (item.asAttack) {
                                   handleStartAttack(item.asAttack);
-                                } else if (item.category === 'skill' && item.modifier !== undefined) {
-                                  // Trigger a skill check roll via toast for now
-                                  toast.info(`${item.name}: d20${item.modifier >= 0 ? '+' : ''}${item.modifier}`);
                                 } else {
-                                  // Show trait/spell description
-                                  toast.info(`${item.name}: ${item.description || 'No description'}`);
+                                  // Try to match action name to an effect template
+                                  const effectStore = useEffectStore.getState();
+                                  const matchedTemplate = effectStore.allTemplates.find(
+                                    t => t.name.toLowerCase() === item.name.toLowerCase()
+                                  );
+                                  if (matchedTemplate && currentToken) {
+                                    // Derive character level for cast level (fall back to template baseLevel)
+                                    let castLevel = matchedTemplate.baseLevel;
+                                    if (currentToken.entityRef?.entityId) {
+                                      const character = useCreatureStore.getState().getCharacterById(currentToken.entityRef.entityId);
+                                      if (character?.level) {
+                                        castLevel = character.level;
+                                      }
+                                    }
+                                    const gridUnit = 50; // px per grid unit (standard default)
+                                    effectStore.startPlacement(
+                                      matchedTemplate.id,
+                                      currentToken.id,
+                                      undefined,
+                                      { x: currentToken.x, y: currentToken.y, gridWidth: (currentToken.gridWidth || 1) * gridUnit, gridHeight: (currentToken.gridHeight || 1) * gridUnit },
+                                      castLevel,
+                                    );
+                                    toast.info(`Placing ${matchedTemplate.name}${castLevel ? ` at level ${castLevel}` : ''}`);
+                                  } else if (item.category === 'skill' && item.modifier !== undefined) {
+                                    toast.info(`${item.name}: d20${item.modifier >= 0 ? '+' : ''}${item.modifier}`);
+                                  } else {
+                                    toast.info(`${item.name}: ${item.description || 'No description'}`);
+                                  }
                                 }
                               }}
                             >
