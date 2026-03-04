@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useCreatureStore } from '@/stores/creatureStore';
 import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride } from '@/types/effectTypes';
 import { computeScaledTemplate } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp } from 'lucide-react';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -12,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const CATEGORY_META: Record<EffectCategory, { label: string; icon: React.ElementType }> = {
   spell: { label: 'Spells', icon: Wand2 },
@@ -868,12 +871,40 @@ export function EffectsCardContent() {
   const restoreBuiltInTemplates = useEffectStore((s) => s.restoreBuiltInTemplates);
   const placement = useEffectStore((s) => s.placement);
 
+  const selectedTokenIds = useSessionStore((s) => s.selectedTokenIds);
+  const tokens = useSessionStore((s) => s.tokens);
+  const { getCharacterById } = useCreatureStore();
+
   const [damageFormula, setDamageFormula] = useState('');
   const [castLevelInput, setCastLevelInput] = useState<number | null>(null);
+  const [useTokenLevel, setUseTokenLevel] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const getTemplate = useEffectStore((s) => s.getTemplate);
+
+  // Derive selected token's level from linked character data
+  const selectedTokenLevel = useMemo(() => {
+    if (selectedTokenIds.length !== 1) return null;
+    const token = tokens.find(t => t.id === selectedTokenIds[0]);
+    if (!token?.entityRef?.entityId) return null;
+    const character = getCharacterById(token.entityRef.entityId);
+    return character?.level ?? null;
+  }, [selectedTokenIds, tokens, getCharacterById]);
+
+  const canUseTokenLevel = selectedTokenIds.length === 1 && selectedTokenLevel !== null;
+
+  // When toggle is on and we have a valid token level, override the cast level input
+  const effectiveCastLevel = (useTokenLevel && canUseTokenLevel && selectedTokenLevel)
+    ? selectedTokenLevel
+    : castLevelInput;
+
+  // Turn off toggle if token deselected or loses level
+  React.useEffect(() => {
+    if (useTokenLevel && !canUseTokenLevel) {
+      setUseTokenLevel(false);
+    }
+  }, [useTokenLevel, canUseTokenLevel]);
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
@@ -890,7 +921,7 @@ export function EffectsCardContent() {
   const handleSelect = (templateId: string) => {
     if (editingTemplateId) return;
     const tmpl = getTemplate(templateId);
-    const level = tmpl?.baseLevel && castLevelInput ? castLevelInput : undefined;
+    const level = tmpl?.baseLevel && effectiveCastLevel ? effectiveCastLevel : undefined;
     startPlacement(templateId, undefined, damageFormula || undefined, undefined, level);
   };
 
@@ -921,6 +952,48 @@ export function EffectsCardContent() {
 
         <Separator />
 
+        {/* Cast at Level selector */}
+        <div className="flex gap-2 items-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={useTokenLevel}
+                    onCheckedChange={setUseTokenLevel}
+                    disabled={!canUseTokenLevel}
+                    className="scale-75"
+                  />
+                  <User className={`w-3.5 h-3.5 ${canUseTokenLevel ? 'text-foreground' : 'text-muted-foreground/40'}`} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                {canUseTokenLevel
+                  ? `Use selected token's level (L${selectedTokenLevel})`
+                  : 'Select a token with a linked character to use its level'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="w-20">
+            <label className="text-[10px] text-muted-foreground">Cast at Level</label>
+            <NumericInput
+              value={(useTokenLevel && canUseTokenLevel ? selectedTokenLevel : castLevelInput) ?? 0}
+              onChange={(v) => {
+                if (!useTokenLevel) setCastLevelInput(v > 0 ? v : null);
+              }}
+              className="h-7 text-xs"
+              min={0}
+              max={9}
+              disabled={useTokenLevel && canUseTokenLevel}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground pb-1.5 self-end">
+            {useTokenLevel && canUseTokenLevel
+              ? `Token L${selectedTokenLevel}`
+              : effectiveCastLevel ? `Upcast to L${effectiveCastLevel}` : 'Base level (no scaling)'}
+          </span>
+        </div>
+
         {/* Damage formula input */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -935,23 +1008,6 @@ export function EffectsCardContent() {
           <p className="text-[10px] text-muted-foreground">
             Overrides template dice when placing
           </p>
-        </div>
-
-        {/* Cast Level selector */}
-        <div className="flex gap-2 items-end">
-          <div className="w-20">
-            <label className="text-[10px] text-muted-foreground">Cast Level</label>
-            <NumericInput
-              value={castLevelInput ?? 0}
-              onChange={(v) => setCastLevelInput(v > 0 ? v : null)}
-              className="h-7 text-xs"
-              min={0}
-              max={9}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground pb-1.5">
-            {castLevelInput ? `Upcast to L${castLevelInput}` : 'Base level (no scaling)'}
-          </span>
         </div>
 
         <Separator />
