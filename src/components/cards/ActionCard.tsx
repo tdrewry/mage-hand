@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
+
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
@@ -66,14 +66,7 @@ export function ActionCardContent() {
   }
 
   return (
-    <Tabs
-      value={currentAction.id}
-      onValueChange={(id) => {
-        const pendingIdx = pendingActions.findIndex(a => a.id === id);
-        if (pendingIdx >= 0) swapToAction(pendingIdx);
-      }}
-      className="h-full flex flex-col"
-    >
+    <div className="h-full flex flex-col">
       <div
         className="shrink-0 overflow-x-auto overflow-y-hidden"
         style={{ scrollbarWidth: 'none' }}
@@ -108,10 +101,10 @@ export function ActionCardContent() {
           })}
         </div>
       </div>
-      <TabsContent value={currentAction.id} className="flex-1 min-h-0 mt-0">
+      <div className="flex-1 min-h-0">
         <SingleActionView action={currentAction} />
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   );
 }
 
