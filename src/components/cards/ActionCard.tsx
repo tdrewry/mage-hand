@@ -198,7 +198,7 @@ function TargetingPhase() {
 }
 
 function SkillCheckResolvePhase() {
-  const { currentAction, pendingActions, setResolution, commitAction, cancelAction, cancelAllActions } = useActionStore();
+  const { currentAction, setResolution, commitAction, cancelAction } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const target = currentAction.targets[0];
