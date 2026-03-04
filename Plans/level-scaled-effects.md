@@ -20,7 +20,8 @@ Effects like Fireball scale damage/size/quantity based on cast level. This imple
 
 ## UI
 - Template editor: "Scaling" collapsible section with scaling rules rows
-- Template row: shows scaling indicator badge when template has scaling
+- Template editor: "Level Overrides" sub-section with per-level cards (dice, radius, width, length, qty)
+- Template row: shows scaling indicator badge when template has scaling/overrides
 - Placement status: cast level picker (baseLevel through 9) when placing a scalable template
 - Live preview of computed dice in placement status
 

@@ -253,6 +253,143 @@ function ScalingRulesEditor({
   );
 }
 
+// --- Level Overrides Editor ---
+
+function LevelOverridesEditor({
+  overrides,
+  onChange,
+  baseLevel,
+}: {
+  overrides: LevelOverride[];
+  onChange: (overrides: LevelOverride[]) => void;
+  baseLevel: number;
+}) {
+  const addOverride = () => {
+    // Find the next unused level
+    const usedLevels = new Set(overrides.map(o => o.level));
+    let nextLevel = baseLevel + 1;
+    while (usedLevels.has(nextLevel) && nextLevel <= 9) nextLevel++;
+    if (nextLevel > 9) return;
+    onChange([...overrides, { level: nextLevel }]);
+  };
+  const removeOverride = (i: number) => onChange(overrides.filter((_, idx) => idx !== i));
+  const updateOverride = (i: number, updates: Partial<LevelOverride>) =>
+    onChange(overrides.map((o, idx) => idx === i ? { ...o, ...updates } : o));
+
+  const updateOverrideDice = (i: number, diceIdx: number, field: keyof DamageDiceEntry, value: string) => {
+    const current = overrides[i].damageDice ?? [];
+    const updated = current.map((d, di) => di === diceIdx ? { ...d, [field]: value } : d);
+    updateOverride(i, { damageDice: updated });
+  };
+  const addOverrideDice = (i: number) => {
+    const current = overrides[i].damageDice ?? [];
+    updateOverride(i, { damageDice: [...current, { formula: '', damageType: '' }] });
+  };
+  const removeOverrideDice = (i: number, diceIdx: number) => {
+    const current = overrides[i].damageDice ?? [];
+    const updated = current.filter((_, di) => di !== diceIdx);
+    updateOverride(i, { damageDice: updated.length > 0 ? updated : undefined });
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] text-muted-foreground font-medium">Level Overrides (explicit per-level config)</label>
+      {overrides.map((ov, i) => (
+        <div key={i} className="border border-border rounded p-1.5 space-y-1">
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">L{ov.level}</Badge>
+            <div className="w-12">
+              <NumericInput
+                value={ov.level}
+                onChange={(v) => updateOverride(i, { level: Math.max(baseLevel + 1, v) })}
+                className="h-5 text-[10px]"
+                min={baseLevel + 1}
+                max={9}
+              />
+            </div>
+            <Button variant="ghost" size="icon" className="h-5 w-5 ml-auto flex-shrink-0" onClick={() => removeOverride(i)}>
+              <X className="w-3 h-3 text-destructive" />
+            </Button>
+          </div>
+          {/* Override damage dice */}
+          <div className="space-y-0.5">
+            <span className="text-[9px] text-muted-foreground">Damage Dice (leave empty to use scaling)</span>
+            {(ov.damageDice ?? []).map((d, di) => (
+              <div key={di} className="flex gap-1 items-center">
+                <Input
+                  value={d.formula}
+                  onChange={(e) => updateOverrideDice(i, di, 'formula', e.target.value)}
+                  placeholder="e.g. 12d6"
+                  className="h-5 text-[10px] font-mono flex-1"
+                />
+                <Input
+                  value={d.damageType}
+                  onChange={(e) => updateOverrideDice(i, di, 'damageType', e.target.value)}
+                  placeholder="fire"
+                  className="h-5 text-[10px] flex-1"
+                />
+                <Button variant="ghost" size="icon" className="h-4 w-4 flex-shrink-0" onClick={() => removeOverrideDice(i, di)}>
+                  <X className="w-2.5 h-2.5 text-destructive" />
+                </Button>
+              </div>
+            ))}
+            <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => addOverrideDice(i)}>
+              <Plus className="w-2.5 h-2.5 mr-0.5" /> Dice
+            </Button>
+          </div>
+          {/* Override dimensions */}
+          <div className="flex gap-1">
+            <div className="flex-1">
+              <label className="text-[9px] text-muted-foreground">Radius</label>
+              <NumericInput
+                value={ov.radius ?? 0}
+                onChange={(v) => updateOverride(i, { radius: v > 0 ? v : undefined })}
+                className="h-5 text-[10px]"
+                min={0}
+                fallback={0}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[9px] text-muted-foreground">Width</label>
+              <NumericInput
+                value={ov.width ?? 0}
+                onChange={(v) => updateOverride(i, { width: v > 0 ? v : undefined })}
+                className="h-5 text-[10px]"
+                min={0}
+                fallback={0}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[9px] text-muted-foreground">Length</label>
+              <NumericInput
+                value={ov.length ?? 0}
+                onChange={(v) => updateOverride(i, { length: v > 0 ? v : undefined })}
+                className="h-5 text-[10px]"
+                min={0}
+                fallback={0}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[9px] text-muted-foreground">Qty</label>
+              <NumericInput
+                value={ov.multiDropCount ?? 0}
+                onChange={(v) => updateOverride(i, { multiDropCount: v > 0 ? v : undefined })}
+                className="h-5 text-[10px]"
+                min={0}
+                fallback={0}
+              />
+            </div>
+          </div>
+          <span className="text-[8px] text-muted-foreground italic">0 = use computed/default value</span>
+        </div>
+      ))}
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addOverride} disabled={overrides.length >= (9 - baseLevel)}>
+        <Plus className="w-3 h-3 mr-1" /> Add Level Override
+      </Button>
+    </div>
+  );
+}
+
 // --- Shared Form Fields Component ---
 
 function TemplateFormFields({
@@ -406,6 +543,9 @@ function TemplateFormFields({
           {form.scaling.length > 0 && (
             <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 ml-1">{form.scaling.length} rule{form.scaling.length > 1 ? 's' : ''}</Badge>
           )}
+          {form.levelOverrides.length > 0 && (
+            <Badge variant="outline" className="text-[8px] px-1 py-0 h-3">{form.levelOverrides.length} override{form.levelOverrides.length > 1 ? 's' : ''}</Badge>
+          )}
           <ChevronRight className="w-3 h-3 ml-auto" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 mt-1">
@@ -425,11 +565,19 @@ function TemplateFormFields({
             </span>
           </div>
           {form.baseLevel && (
-            <ScalingRulesEditor
-              rules={form.scaling}
-              onChange={(rules) => update('scaling', rules)}
-              damageDiceCount={form.damageDice.length}
-            />
+            <>
+              <ScalingRulesEditor
+                rules={form.scaling}
+                onChange={(rules) => update('scaling', rules)}
+                damageDiceCount={form.damageDice.length}
+              />
+              <Separator className="my-1" />
+              <LevelOverridesEditor
+                overrides={form.levelOverrides}
+                onChange={(overrides) => update('levelOverrides', overrides)}
+                baseLevel={Number(form.baseLevel)}
+              />
+            </>
           )}
         </CollapsibleContent>
       </Collapsible>
