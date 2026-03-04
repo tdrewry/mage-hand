@@ -62,6 +62,9 @@ interface ActionActions {
   /** Start a new attack action from a source token */
   startAttack: (sourceTokenId: string, attack: AttackDefinition) => void;
   
+  /** Start a skill check action (rolls d20+modifier, goes straight to resolve) */
+  startSkillCheck: (sourceTokenId: string, skillName: string, modifier: number) => void;
+  
   /** Start an effect-based action with pre-populated targets (skips targeting phase) */
   startEffectAction: (params: {
     sourceTokenId?: string;
@@ -144,6 +147,71 @@ export const useActionStore = create<ActionStore>()(
     };
 
     set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
+  },
+
+  startSkillCheck: (sourceTokenId, skillName, modifier) => {
+    const token = useSessionStore.getState().tokens.find(t => t.id === sourceTokenId);
+    if (!token) return;
+
+    const formula = `1d20${modifier >= 0 ? '+' : ''}${modifier}`;
+    const result = rollDice(formula);
+    const naturalRoll = result.groups[0]?.keptResults[0] ?? 0;
+
+    const skillAttack: AttackDefinition = {
+      id: `skill-${skillName.toLowerCase().replace(/\s+/g, '-')}`,
+      name: skillName,
+      attackBonus: modifier,
+      damageFormula: '0',
+      damageType: 'none',
+      description: `Skill check: ${skillName}`,
+    };
+
+    const tokenName = token.name || token.label || 'Unknown';
+    const targetKey = `${sourceTokenId}-skill`;
+
+    const entry: ActionQueueEntry = {
+      id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      phase: 'resolve',
+      category: 'skill',
+      sourceTokenId,
+      sourceTokenName: tokenName,
+      attack: skillAttack,
+      targets: [{
+        targetKey,
+        tokenId: sourceTokenId,
+        tokenName: tokenName,
+        distance: 0,
+        defenseValue: 0,
+        defenseType: 'flat',
+        defenseLabel: 'DC',
+      }],
+      rollResults: {
+        [targetKey]: {
+          naturalRoll,
+          totalRoll: result.total,
+          attackBonus: modifier,
+          formula,
+        },
+      },
+      damageResults: {
+        [targetKey]: {
+          formula: '0',
+          total: 0,
+          diceResults: [],
+          damageType: 'none',
+          adjustedTotal: 0,
+        },
+      },
+      resolutions: {},
+      timestamp: Date.now(),
+    };
+
+    const { currentAction } = get();
+    if (currentAction) {
+      set({ pendingActions: [...get().pendingActions, entry] });
+    } else {
+      set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+    }
   },
 
   startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts }) => {
