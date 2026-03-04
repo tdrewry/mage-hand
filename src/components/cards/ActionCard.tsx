@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,13 +53,31 @@ function actionTabLabel(action: ActionQueueEntry, index: number, allActions: Act
 
 export function ActionCardContent() {
   const { currentAction, pendingActions, swapToAction } = useActionStore();
+  // Maintain stable tab ordering — new actions append, removed actions get pruned
+  const stableOrderRef = useRef<string[]>([]);
 
   if (!currentAction) {
+    stableOrderRef.current = [];
     return <EmptyState />;
   }
 
   const allActions = [currentAction, ...pendingActions];
-  const hasTabs = allActions.length > 1;
+  const actionMap = new Map(allActions.map(a => [a.id, a]));
+  const currentIds = new Set(allActions.map(a => a.id));
+
+  // Prune removed IDs, then append any new IDs
+  stableOrderRef.current = stableOrderRef.current.filter(id => currentIds.has(id));
+  for (const a of allActions) {
+    if (!stableOrderRef.current.includes(a.id)) {
+      stableOrderRef.current.push(a.id);
+    }
+  }
+
+  const orderedActions = stableOrderRef.current
+    .map(id => actionMap.get(id))
+    .filter(Boolean) as typeof allActions;
+
+  const hasTabs = orderedActions.length > 1;
 
   if (!hasTabs) {
     return <SingleActionView action={currentAction} />;
@@ -78,7 +96,7 @@ export function ActionCardContent() {
         }}
       >
         <div className="inline-flex w-max gap-0 flex-nowrap p-0 border-b border-border">
-          {allActions.map((action, idx) => {
+          {orderedActions.map((action, idx) => {
             const isActive = action.id === currentAction.id;
             return (
               <button
@@ -95,7 +113,7 @@ export function ActionCardContent() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {actionTabLabel(action, idx, allActions)}
+                {actionTabLabel(action, idx, orderedActions)}
               </button>
             );
           })}
