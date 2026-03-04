@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
@@ -84,17 +84,29 @@ export function ActionCardContent() {
           }
         }}
       >
-        <TabsList className="inline-flex w-max h-auto gap-0 flex-nowrap bg-transparent rounded-none p-0">
-          {allActions.map((action, idx) => (
-            <TabsTrigger
-              key={action.id}
-              value={action.id}
-              className="text-xs px-4 py-2 whitespace-nowrap shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none bg-transparent text-muted-foreground data-[state=active]:text-foreground"
-            >
-              {actionTabLabel(action, idx, allActions)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="inline-flex w-max h-auto gap-0 flex-nowrap p-0">
+          {allActions.map((action, idx) => {
+            const isActive = action.id === currentAction.id;
+            return (
+              <button
+                key={action.id}
+                onClick={() => {
+                  if (!isActive) {
+                    const pendingIdx = pendingActions.findIndex(a => a.id === action.id);
+                    if (pendingIdx >= 0) swapToAction(pendingIdx);
+                  }
+                }}
+                className={`text-xs px-4 py-2 whitespace-nowrap shrink-0 border-b-2 transition-colors ${
+                  isActive
+                    ? 'border-primary text-foreground font-medium'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {actionTabLabel(action, idx, allActions)}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <TabsContent value={currentAction.id} className="flex-1 min-h-0 mt-0">
         <SingleActionView action={currentAction} />
