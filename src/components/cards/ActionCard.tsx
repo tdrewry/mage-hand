@@ -74,13 +74,22 @@ export function ActionCardContent() {
       }}
       className="h-full flex flex-col"
     >
-      <div className="px-2 pt-2 shrink-0 overflow-x-auto scrollbar-thin">
-        <TabsList className="inline-flex w-max h-auto gap-1 flex-nowrap">
+      <div
+        className="shrink-0 border-b border-border overflow-x-auto overflow-y-hidden"
+        style={{ scrollbarWidth: 'none' }}
+        onWheel={(e) => {
+          if (e.deltaY !== 0) {
+            e.currentTarget.scrollLeft += e.deltaY;
+            e.preventDefault();
+          }
+        }}
+      >
+        <TabsList className="inline-flex w-max h-auto gap-0 flex-nowrap bg-transparent rounded-none p-0">
           {allActions.map((action, idx) => (
             <TabsTrigger
               key={action.id}
               value={action.id}
-              className="text-xs px-3 py-1.5 whitespace-nowrap shrink-0"
+              className="text-xs px-4 py-2 whitespace-nowrap shrink-0 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none bg-transparent text-muted-foreground data-[state=active]:text-foreground"
             >
               {actionTabLabel(action, idx, allActions)}
             </TabsTrigger>
