@@ -903,6 +903,24 @@ export function EffectsCardContent() {
     <div className="flex flex-col h-full">
       {/* Fixed header: always visible controls */}
       <div className="p-2 space-y-3 flex-shrink-0">
+        {/* Create custom template */}
+        <div>
+          <button
+            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full"
+            onClick={() => { setShowCreateForm((v) => !v); setEditingTemplateId(null); }}
+          >
+            {showCreateForm ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            Create Template
+          </button>
+          {showCreateForm && (
+            <div className="mt-1.5">
+              <CreateTemplateForm onCreated={() => setShowCreateForm(false)} />
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
         {/* Damage formula input */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -934,24 +952,6 @@ export function EffectsCardContent() {
           <span className="text-[10px] text-muted-foreground pb-1.5">
             {castLevelInput ? `Upcast to L${castLevelInput}` : 'Base level (no scaling)'}
           </span>
-        </div>
-
-        <Separator />
-
-        {/* Create custom template */}
-        <div>
-          <button
-            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground w-full"
-            onClick={() => { setShowCreateForm((v) => !v); setEditingTemplateId(null); }}
-          >
-            {showCreateForm ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Create Template
-          </button>
-          {showCreateForm && (
-            <div className="mt-1.5">
-              <CreateTemplateForm onCreated={() => setShowCreateForm(false)} />
-            </div>
-          )}
         </div>
 
         <Separator />
