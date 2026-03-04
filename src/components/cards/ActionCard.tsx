@@ -45,26 +45,30 @@ export function ActionCardContent() {
   }
 
   return (
-    <Tabs defaultValue="0" className="h-full flex flex-col">
+    <Tabs
+      value={currentAction.id}
+      onValueChange={(id) => {
+        const pendingIdx = pendingActions.findIndex(a => a.id === id);
+        if (pendingIdx >= 0) swapToAction(pendingIdx);
+      }}
+      className="h-full flex flex-col"
+    >
       <div className="px-2 pt-2 shrink-0">
         <TabsList className="w-full flex flex-wrap h-auto gap-1">
-          {allActions.map((action, i) => (
+          {allActions.map((action) => (
             <TabsTrigger
               key={action.id}
-              value={String(i)}
+              value={action.id}
               className="text-xs px-2 py-1 max-w-[120px] truncate"
-              onClick={() => { if (i > 0) swapToAction(i - 1); }}
             >
               {actionTabLabel(action)}
             </TabsTrigger>
           ))}
         </TabsList>
       </div>
-      {allActions.map((_, i) => (
-        <TabsContent key={i} value={String(i)} className="flex-1 min-h-0 mt-0">
-          <SingleActionView action={allActions[i]} />
-        </TabsContent>
-      ))}
+      <TabsContent value={currentAction.id} className="flex-1 min-h-0 mt-0">
+        <SingleActionView action={currentAction} />
+      </TabsContent>
     </Tabs>
   );
 }
