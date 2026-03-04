@@ -74,13 +74,13 @@ export function ActionCardContent() {
       }}
       className="h-full flex flex-col"
     >
-      <div className="px-2 pt-2 shrink-0">
-        <TabsList className="w-full flex flex-wrap h-auto gap-1">
+      <div className="px-2 pt-2 shrink-0 overflow-x-auto scrollbar-thin">
+        <TabsList className="inline-flex w-max h-auto gap-1 flex-nowrap">
           {allActions.map((action, idx) => (
             <TabsTrigger
               key={action.id}
               value={action.id}
-              className="text-xs px-2 py-1 max-w-[120px] truncate"
+              className="text-xs px-3 py-1.5 whitespace-nowrap shrink-0"
             >
               {actionTabLabel(action, idx, allActions)}
             </TabsTrigger>
