@@ -900,8 +900,9 @@ export function EffectsCardContent() {
   };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-2 space-y-3">
+    <div className="flex flex-col h-full">
+      {/* Fixed header: always visible controls */}
+      <div className="p-2 space-y-3 flex-shrink-0">
         {/* Damage formula input */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -954,169 +955,174 @@ export function EffectsCardContent() {
         </div>
 
         <Separator />
+      </div>
 
-        {/* Placement status */}
-        {placement && (
-          <div className="bg-primary/10 border border-primary/30 rounded p-2 text-xs">
-            <span className="font-medium">Placing:</span> {placement.template.name}
-            {placement.castLevel && (
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-1">
-                L{placement.castLevel}
-              </Badge>
-            )}
-            {placement.damageFormula && (
-              <span className="ml-1 font-mono text-muted-foreground">
-                ({placement.damageFormula})
-              </span>
-            )}
-            {placement.template.damageDice && placement.template.damageDice.length > 0 && !placement.damageFormula && (
-              <span className="ml-1 font-mono text-muted-foreground">
-                ({placement.template.damageDice.map(d => `${d.formula} ${d.damageType}`).join(' + ')})
-              </span>
-            )}
-            {placement.multiDropTotal && placement.multiDropTotal > 1 && (
-              <div className="text-primary font-medium mt-0.5">
-                Drop {(placement.multiDropPlaced ?? 0) + 1} of {placement.multiDropTotal}
-              </div>
-            )}
-            {placement.step === 'polyline' && (
-              <div className="text-primary font-medium mt-0.5">
-                {(placement.polylineWaypoints?.length ?? 0) === 0
-                  ? 'Click to start wall'
-                  : `${((placement.polylineWaypoints?.length ?? 1) - 1)} segments · Double-click or Enter to finish`}
-              </div>
-            )}
-            <div className="text-muted-foreground mt-0.5">
-              {placement.step === 'polyline'
-                ? 'Click waypoints to draw wall · Double-click/Enter to finish · ESC to cancel'
-                : 'Click on map to place · ESC to cancel'}
-            </div>
-          </div>
-        )}
-
-        {/* Template library grouped by category — collapsible */}
-        {categoryOrder.map((cat) => {
-          const templates = groups[cat];
-          if (!templates || templates.length === 0) return null;
-          const meta = CATEGORY_META[cat];
-          const Icon = meta.icon;
-          const isOpen = !collapsedCategories.has(cat);
-          return (
-            <div key={cat}>
-              <button
-                className="flex items-center gap-1.5 mb-1 w-full hover:text-foreground"
-                onClick={() => toggleCategory(cat)}
-              >
-                {isOpen ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
-                <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {meta.label}
+      {/* Scrollable content: placement status, template library, active effects */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-2 pb-2 space-y-3">
+          {/* Placement status */}
+          {placement && (
+            <div className="bg-primary/10 border border-primary/30 rounded p-2 text-xs">
+              <span className="font-medium">Placing:</span> {placement.template.name}
+              {placement.castLevel && (
+                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-1">
+                  L{placement.castLevel}
+                </Badge>
+              )}
+              {placement.damageFormula && (
+                <span className="ml-1 font-mono text-muted-foreground">
+                  ({placement.damageFormula})
                 </span>
-                <span className="text-[10px] text-muted-foreground">({templates.length})</span>
-              </button>
-              {isOpen && (
-                <div className="space-y-0.5">
-                  {templates.map((t) => (
-                    editingTemplateId === t.id ? (
-                      <EditTemplateForm
-                        key={t.id}
-                        template={t}
-                        onDone={() => setEditingTemplateId(null)}
-                      />
-                    ) : (
-                      <EffectTemplateRow
-                        key={t.id}
-                        template={t}
-                        onSelect={handleSelect}
-                        onDelete={deleteTemplate}
-                        onEdit={handleEdit}
-                      />
-                    )
-                  ))}
+              )}
+              {placement.template.damageDice && placement.template.damageDice.length > 0 && !placement.damageFormula && (
+                <span className="ml-1 font-mono text-muted-foreground">
+                  ({placement.template.damageDice.map(d => `${d.formula} ${d.damageType}`).join(' + ')})
+                </span>
+              )}
+              {placement.multiDropTotal && placement.multiDropTotal > 1 && (
+                <div className="text-primary font-medium mt-0.5">
+                  Drop {(placement.multiDropPlaced ?? 0) + 1} of {placement.multiDropTotal}
                 </div>
               )}
-              <Separator className="mt-2" />
+              {placement.step === 'polyline' && (
+                <div className="text-primary font-medium mt-0.5">
+                  {(placement.polylineWaypoints?.length ?? 0) === 0
+                    ? 'Click to start wall'
+                    : `${((placement.polylineWaypoints?.length ?? 1) - 1)} segments · Double-click or Enter to finish`}
+                </div>
+              )}
+              <div className="text-muted-foreground mt-0.5">
+                {placement.step === 'polyline'
+                  ? 'Click waypoints to draw wall · Double-click/Enter to finish · ESC to cancel'
+                  : 'Click on map to place · ESC to cancel'}
+              </div>
             </div>
-          );
-        })}
+          )}
 
-        {/* Restore hidden built-ins */}
-        {hiddenBuiltInIds.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full h-7 text-xs text-muted-foreground"
-            onClick={restoreBuiltInTemplates}
-          >
-            <RotateCw className="w-3 h-3 mr-1" /> Restore {hiddenBuiltInIds.length} hidden template{hiddenBuiltInIds.length > 1 ? 's' : ''}
-          </Button>
-        )}
-
-        {/* Active effects */}
-        {placedEffects.length > 0 && (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Active Effects ({placedEffects.length})
-            </div>
-            <div className="space-y-0.5">
-              {placedEffects.map((e) => (
-                <div key={e.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-accent/50 group text-xs">
-                  <div
-                    className="w-3 h-3 rounded-sm border border-border flex-shrink-0"
-                    style={{ backgroundColor: e.template.color }}
-                  />
-                  <span className="flex-1 truncate">{e.template.name}</span>
-                  {e.template.persistence === 'persistent' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      title={e.template.recurring === false ? 'One-shot (click to make recurring)' : 'Recurring each round (click to make one-shot)'}
-                      onClick={() => toggleRecurring(e.id)}
-                    >
-                      {e.template.recurring === false
-                        ? <Ban className="w-3 h-3 text-muted-foreground" />
-                        : <Repeat className="w-3 h-3 text-primary" />}
-                    </Button>
-                  )}
-                  {e.roundsRemaining !== undefined && e.roundsRemaining > 0 && (
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
-                      {e.roundsRemaining}r
-                    </Badge>
-                  )}
-                  {e.triggeredTokenIds.length > 0 && (
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
-                      {e.triggeredTokenIds.length} trg
-                    </Badge>
-                  )}
-                  <span className="text-[10px] text-muted-foreground">
-                    {e.impactedTargets.length} hit
+          {/* Template library grouped by category — collapsible */}
+          {categoryOrder.map((cat) => {
+            const templates = groups[cat];
+            if (!templates || templates.length === 0) return null;
+            const meta = CATEGORY_META[cat];
+            const Icon = meta.icon;
+            const isOpen = !collapsedCategories.has(cat);
+            return (
+              <div key={cat}>
+                <button
+                  className="flex items-center gap-1.5 mb-1 w-full hover:text-foreground"
+                  onClick={() => toggleCategory(cat)}
+                >
+                  {isOpen ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {meta.label}
                   </span>
-                  {e.template.persistence === 'persistent' && e.triggeredTokenIds.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground">({templates.length})</span>
+                </button>
+                {isOpen && (
+                  <div className="space-y-0.5">
+                    {templates.map((t) => (
+                      editingTemplateId === t.id ? (
+                        <EditTemplateForm
+                          key={t.id}
+                          template={t}
+                          onDone={() => setEditingTemplateId(null)}
+                        />
+                      ) : (
+                        <EffectTemplateRow
+                          key={t.id}
+                          template={t}
+                          onSelect={handleSelect}
+                          onDelete={deleteTemplate}
+                          onEdit={handleEdit}
+                        />
+                      )
+                    ))}
+                  </div>
+                )}
+                <Separator className="mt-2" />
+              </div>
+            );
+          })}
+
+          {/* Restore hidden built-ins */}
+          {hiddenBuiltInIds.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full h-7 text-xs text-muted-foreground"
+              onClick={restoreBuiltInTemplates}
+            >
+              <RotateCw className="w-3 h-3 mr-1" /> Restore {hiddenBuiltInIds.length} hidden template{hiddenBuiltInIds.length > 1 ? 's' : ''}
+            </Button>
+          )}
+
+          {/* Active effects */}
+          {placedEffects.length > 0 && (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Active Effects ({placedEffects.length})
+              </div>
+              <div className="space-y-0.5">
+                {placedEffects.map((e) => (
+                  <div key={e.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-accent/50 group text-xs">
+                    <div
+                      className="w-3 h-3 rounded-sm border border-border flex-shrink-0"
+                      style={{ backgroundColor: e.template.color }}
+                    />
+                    <span className="flex-1 truncate">{e.template.name}</span>
+                    {e.template.persistence === 'persistent' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        title={e.template.recurring === false ? 'One-shot (click to make recurring)' : 'Recurring each round (click to make one-shot)'}
+                        onClick={() => toggleRecurring(e.id)}
+                      >
+                        {e.template.recurring === false
+                          ? <Ban className="w-3 h-3 text-muted-foreground" />
+                          : <Repeat className="w-3 h-3 text-primary" />}
+                      </Button>
+                    )}
+                    {e.roundsRemaining !== undefined && e.roundsRemaining > 0 && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                        {e.roundsRemaining}r
+                      </Badge>
+                    )}
+                    {e.triggeredTokenIds.length > 0 && (
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+                        {e.triggeredTokenIds.length} trg
+                      </Badge>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {e.impactedTargets.length} hit
+                    </span>
+                    {e.template.persistence === 'persistent' && e.triggeredTokenIds.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                        title="Reset triggers — tokens can trigger this effect again"
+                        onClick={() => resetTriggeredTokens(e.id)}
+                      >
+                        <RotateCcw className="w-3 h-3 text-primary" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                      title="Reset triggers — tokens can trigger this effect again"
-                      onClick={() => resetTriggeredTokens(e.id)}
+                      onClick={() => removeEffect(e.id)}
                     >
-                      <RotateCcw className="w-3 h-3 text-primary" />
+                      <Trash2 className="w-3 h-3 text-destructive" />
                     </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                    onClick={() => removeEffect(e.id)}
-                  >
-                    <Trash2 className="w-3 h-3 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </ScrollArea>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
