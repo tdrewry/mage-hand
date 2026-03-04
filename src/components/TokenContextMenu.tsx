@@ -60,7 +60,7 @@ import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
 import type { AttackDefinition } from '@/types/actionTypes';
 import { useMapStore } from '@/stores/mapStore';
 import { useEffectStore } from '@/stores/effectStore';
-import { useDiceStore } from '@/stores/diceStore';
+
 
 /** Submenu for transferring tokens to a different map */
 const MoveToMapSubmenu = ({ targetTokens, canControl }: { targetTokens: { id: string; name?: string; mapId?: string }[]; canControl: boolean }) => {
@@ -1128,14 +1128,8 @@ export const TokenContextMenu = ({
                                       castLevel,
                                     );
                                     toast.info(`Placing ${matchedTemplate.name}${castLevel ? ` at level ${castLevel}` : ''}`);
-                                  } else if (item.category === 'skill' && item.modifier !== undefined) {
-                                    const mod = item.modifier;
-                                    const formula = `1d20${mod >= 0 ? '+' : ''}${mod}`;
-                                    const tokenName = currentToken?.name || currentToken?.label || 'Token';
-                                    useDiceStore.getState().roll(formula, `${tokenName} · ${item.name}`, {
-                                      source: tokenName,
-                                      reason: item.name,
-                                    });
+                                  } else if (item.category === 'skill' && item.modifier !== undefined && currentToken) {
+                                    useActionStore.getState().startSkillCheck(currentToken.id, item.name, item.modifier);
                                   } else {
                                     toast.info(`${item.name}: ${item.description || 'No description'}`);
                                   }

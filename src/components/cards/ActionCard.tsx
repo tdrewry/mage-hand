@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent } from 'lucide-react';
+import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution } from '@/types/actionTypes';
@@ -34,6 +34,7 @@ export function ActionCardContent() {
     case 'targeting':
       return <TargetingPhase />;
     case 'resolve':
+      if (currentAction.category === 'skill') return <SkillCheckResolvePhase />;
       return <ResolvePhase />;
     default:
       return <EmptyState />;
@@ -61,21 +62,33 @@ function EmptyState() {
                 {actionHistory.slice(0, 10).map(entry => (
                   <div key={entry.id} className="text-xs p-2 rounded bg-muted/30 border border-border/50">
                     <div className="flex items-center gap-1 font-medium">
-                      <Swords className="w-3 h-3" />
+                      {entry.attack.damageType === 'none' ? <Dices className="w-3 h-3" /> : <Swords className="w-3 h-3" />}
                       <span>{entry.sourceTokenName}</span>
                       <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                      <span>{entry.attack.name}</span>
+                      <span>{entry.attack.name}{entry.attack.damageType === 'none' ? ' Check' : ''}</span>
                     </div>
                     {entry.targets.map(t => {
                       const cfg = RESOLUTION_CONFIG[t.resolution];
+                      const isSkill = entry.attack.damageType === 'none';
                       return (
-                        <div key={t.tokenId} className="mt-1 flex items-center gap-2 text-muted-foreground">
-                          <span>→ {t.tokenName}</span>
-                          <Badge variant="outline" className={`text-[10px] px-1 py-0 ${cfg.color}`}>
-                            {cfg.label}
-                          </Badge>
-                          {(t.resolution === 'hit' || t.resolution === 'critical_hit') && (
-                            <span className="text-destructive">{t.damage.adjustedTotal} {t.damage.damageType}</span>
+                        <div key={`${t.tokenId}-${t.attackRoll?.totalRoll}`} className="mt-1 flex items-center gap-2 text-muted-foreground">
+                          {isSkill ? (
+                            <>
+                              <span className="font-mono font-bold text-foreground">{t.attackRoll?.totalRoll}</span>
+                              <Badge variant="outline" className={`text-[10px] px-1 py-0 ${cfg.color}`}>
+                                {t.resolution === 'hit' ? 'Pass' : 'Fail'}
+                              </Badge>
+                            </>
+                          ) : (
+                            <>
+                              <span>→ {t.tokenName}</span>
+                              <Badge variant="outline" className={`text-[10px] px-1 py-0 ${cfg.color}`}>
+                                {cfg.label}
+                              </Badge>
+                              {(t.resolution === 'hit' || t.resolution === 'critical_hit') && (
+                                <span className="text-destructive">{t.damage.adjustedTotal} {t.damage.damageType}</span>
+                              )}
+                            </>
                           )}
                         </div>
                       );
@@ -137,6 +150,106 @@ function TargetingPhase() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function SkillCheckResolvePhase() {
+  const { currentAction, pendingActions, setResolution, commitAction, cancelAction, cancelAllActions } = useActionStore();
+  if (!currentAction || !currentAction.attack) return null;
+
+  const target = currentAction.targets[0];
+  const roll = target ? currentAction.rollResults[target.targetKey] : null;
+  const resolution = target ? currentAction.resolutions[target.targetKey] : undefined;
+  const queueCount = pendingActions.length;
+  const isNat20 = roll?.naturalRoll === 20;
+  const isNat1 = roll?.naturalRoll === 1;
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
+        {queueCount > 0 && (
+          <div className="flex items-center gap-2 rounded-md bg-accent/50 px-3 py-1.5">
+            <ChevronRight className="w-3.5 h-3.5 text-accent-foreground" />
+            <span className="text-xs font-medium text-accent-foreground">
+              {queueCount} more action{queueCount > 1 ? 's' : ''} queued
+            </span>
+          </div>
+        )}
+
+        {/* Skill Check Header */}
+        <div className="flex items-center gap-2">
+          <Dices className="w-5 h-5 text-primary" />
+          <div>
+            <h3 className="font-semibold text-sm">{currentAction.sourceTokenName}</h3>
+            <p className="text-xs text-muted-foreground">{currentAction.attack.name} Check</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Roll result */}
+        {roll && (
+          <div className="bg-muted/30 rounded-lg p-4 text-center space-y-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Roll Result</p>
+            <p className={`text-4xl font-bold font-mono ${isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : 'text-foreground'}`}>
+              {roll.totalRoll}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              d20({roll.naturalRoll}) {roll.attackBonus >= 0 ? '+' : ''} {roll.attackBonus}
+            </p>
+            {isNat20 && <Badge variant="outline" className="bg-green-900/50 text-green-300 border-green-700 text-xs">Natural 20!</Badge>}
+            {isNat1 && <Badge variant="outline" className="bg-red-900/50 text-red-300 border-red-700 text-xs">Natural 1</Badge>}
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Pass / Fail resolution */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Outcome</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => target && setResolution(target.targetKey, 'miss')}
+              className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                resolution === 'miss'
+                  ? 'bg-red-900/50 text-red-300 border-red-700 border-2'
+                  : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
+              }`}
+            >
+              <X className="w-4 h-4" />
+              Fail
+            </button>
+            <button
+              onClick={() => target && setResolution(target.targetKey, 'hit')}
+              className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                resolution === 'hit'
+                  ? 'bg-green-900/50 text-green-300 border-green-700 border-2'
+                  : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              Pass
+            </button>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
+            Dismiss
+          </Button>
+          {queueCount > 0 && (
+            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={cancelAllActions}>
+              Skip All
+            </Button>
+          )}
+          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution}>
+            Record
+          </Button>
+        </div>
+      </div>
+    </ScrollArea>
   );
 }
 
