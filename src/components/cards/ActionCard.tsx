@@ -24,18 +24,57 @@ const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string
 /** Resolution types shown as buttons (excludes 'half' which is a damage modifier) */
 const RESOLUTION_BUTTON_KEYS: AttackResolution[] = ['critical_miss', 'miss', 'hit', 'critical_threat', 'critical_hit'];
 
+/** Short label for an action entry used in tabs */
+function actionTabLabel(action: ActionQueueEntry): string {
+  if (action.category === 'skill') return action.attack?.name || 'Skill';
+  return action.attack?.name || 'Action';
+}
+
 export function ActionCardContent() {
-  const { currentAction, cancelAction, confirmTargets, setResolution, overrideDamage, commitAction } = useActionStore();
+  const { currentAction, pendingActions, swapToAction } = useActionStore();
 
   if (!currentAction) {
     return <EmptyState />;
   }
 
-  switch (currentAction.phase) {
+  const allActions = [currentAction, ...pendingActions];
+  const hasTabs = allActions.length > 1;
+
+  if (!hasTabs) {
+    return <SingleActionView action={currentAction} />;
+  }
+
+  return (
+    <Tabs defaultValue="0" className="h-full flex flex-col">
+      <div className="px-2 pt-2 shrink-0">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1">
+          {allActions.map((action, i) => (
+            <TabsTrigger
+              key={action.id}
+              value={String(i)}
+              className="text-xs px-2 py-1 max-w-[120px] truncate"
+              onClick={() => { if (i > 0) swapToAction(i - 1); }}
+            >
+              {actionTabLabel(action)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+      {allActions.map((_, i) => (
+        <TabsContent key={i} value={String(i)} className="flex-1 min-h-0 mt-0">
+          <SingleActionView action={allActions[i]} />
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}
+
+function SingleActionView({ action }: { action: ActionQueueEntry }) {
+  switch (action.phase) {
     case 'targeting':
       return <TargetingPhase />;
     case 'resolve':
-      if (currentAction.category === 'skill') return <SkillCheckResolvePhase />;
+      if (action.category === 'skill') return <SkillCheckResolvePhase />;
       return <ResolvePhase />;
     default:
       return <EmptyState />;
