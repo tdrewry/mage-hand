@@ -207,14 +207,6 @@ function SkillCheckResolvePhase() {
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {queueCount > 0 && (
-          <div className="flex items-center gap-2 rounded-md bg-accent/50 px-3 py-1.5">
-            <ChevronRight className="w-3.5 h-3.5 text-accent-foreground" />
-            <span className="text-xs font-medium text-accent-foreground">
-              {queueCount} more action{queueCount > 1 ? 's' : ''} queued
-            </span>
-          </div>
-        )}
 
         {/* Skill Check Header */}
         <div className="flex items-center gap-2">
@@ -280,8 +272,6 @@ function SkillCheckResolvePhase() {
             Dismiss
           </Button>
           {queueCount > 0 && (
-            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={cancelAllActions}>
-              Skip All
             </Button>
           )}
           <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution}>
