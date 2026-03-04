@@ -1194,6 +1194,7 @@ export const SimpleTabletop = () => {
         damageDice: effect.template.damageDice,
         damageFormula: undefined, // DM resolves damage manually for traps
         placedEffectId: effect.id,
+        castLevel: effect.castLevel,
         impacts: [tokenHit],
       });
 
@@ -1541,6 +1542,7 @@ export const SimpleTabletop = () => {
                 damageFormula: pl.damageFormula,
                 damageDice: pl.template.damageDice,
                 placedEffectId: placed.id,
+                castLevel: pl.castLevel,
                 impacts,
               });
             }
@@ -1853,6 +1855,7 @@ export const SimpleTabletop = () => {
                 damageFormula: placement.damageFormula,
                 damageDice: placement.template.damageDice,
                 placedEffectId: placed.id,
+                castLevel: placement.castLevel,
                 impacts,
               });
             }
@@ -7006,6 +7009,7 @@ export const SimpleTabletop = () => {
             damageFormula: pl.damageFormula,
             damageDice: template.damageDice,
             placedEffectId: placed.id,
+            castLevel: pl.castLevel,
             impacts,
           });
         }
@@ -7159,6 +7163,7 @@ export const SimpleTabletop = () => {
                   damageDice: template.damageDice,
                   placedEffectId: allGroupEffects[allGroupEffects.length - 1]?.id,
                   groupId: placement.multiDropGroupId,
+                  castLevel: placement.castLevel,
                   impacts: mergedImpacts,
                 });
               }
@@ -7233,6 +7238,7 @@ export const SimpleTabletop = () => {
                 damageFormula: placement.damageFormula,
                 damageDice: template.damageDice,
                 placedEffectId: placed.id,
+                castLevel: placement.castLevel,
                 impacts,
               });
             }
@@ -7324,6 +7330,7 @@ export const SimpleTabletop = () => {
             damageFormula: placement.damageFormula,
             damageDice: template.damageDice,
             placedEffectId: placed.id,
+            castLevel: placement.castLevel,
             impacts,
           });
         }
@@ -11319,6 +11326,7 @@ export const SimpleTabletop = () => {
                     damageFormula: pl.damageFormula,
                     damageDice: pl.template.damageDice,
                     placedEffectId: placed.id,
+                    castLevel: pl.castLevel,
                     impacts,
                   });
                 }
