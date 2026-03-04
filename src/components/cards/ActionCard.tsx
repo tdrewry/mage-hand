@@ -204,7 +204,7 @@ function SkillCheckResolvePhase() {
   const target = currentAction.targets[0];
   const roll = target ? currentAction.rollResults[target.targetKey] : null;
   const resolution = target ? currentAction.resolutions[target.targetKey] : undefined;
-  const queueCount = pendingActions.length;
+  
   const isNat20 = roll?.naturalRoll === 20;
   const isNat1 = roll?.naturalRoll === 1;
 
