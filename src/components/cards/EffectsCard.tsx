@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw } from 'lucide-react';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride } from '@/types/effectTypes';
+import { computeScaledTemplate } from '@/types/effectTypes';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,10 @@ interface TemplateFormData {
   damageDice: DamageDiceEntry[];
   level: string;
   multiDropCount: number;
+  // Scaling
+  baseLevel: string;
+  scaling: ScalingRule[];
+  levelOverrides: LevelOverride[];
 }
 
 const INITIAL_FORM: TemplateFormData = {
@@ -89,6 +94,9 @@ const INITIAL_FORM: TemplateFormData = {
   damageDice: [],
   level: '',
   multiDropCount: 1,
+  baseLevel: '',
+  scaling: [],
+  levelOverrides: [],
 };
 
 function templateToForm(t: EffectTemplate): TemplateFormData {
@@ -116,6 +124,9 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     damageDice: t.damageDice ?? [],
     level: t.level !== undefined ? String(t.level) : '',
     multiDropCount: t.multiDrop?.count ?? 1,
+    baseLevel: t.baseLevel !== undefined ? String(t.baseLevel) : '',
+    scaling: t.scaling ?? [],
+    levelOverrides: t.levelOverrides ?? [],
   };
 }
 
@@ -157,6 +168,76 @@ function DamageDiceRows({
       ))}
       <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addRow}>
         <Plus className="w-3 h-3 mr-1" /> Add Damage Row
+      </Button>
+    </div>
+  );
+}
+
+// --- Scaling Rules Editor ---
+
+const SCALABLE_PROPERTIES: { value: ScalingRule['property']; label: string }[] = [
+  { value: 'damageDice', label: 'Damage Dice' },
+  { value: 'radius', label: 'Radius' },
+  { value: 'width', label: 'Width' },
+  { value: 'length', label: 'Length' },
+  { value: 'multiDropCount', label: 'Quantity' },
+];
+
+function ScalingRulesEditor({
+  rules,
+  onChange,
+  damageDiceCount,
+}: {
+  rules: ScalingRule[];
+  onChange: (rules: ScalingRule[]) => void;
+  damageDiceCount: number;
+}) {
+  const addRule = () => onChange([...rules, { property: 'damageDice', perLevel: 1 }]);
+  const removeRule = (i: number) => onChange(rules.filter((_, idx) => idx !== i));
+  const updateRule = (i: number, updates: Partial<ScalingRule>) =>
+    onChange(rules.map((r, idx) => idx === i ? { ...r, ...updates } : r));
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-muted-foreground font-medium">Scaling Rules (per upcast level)</label>
+      {rules.map((rule, i) => (
+        <div key={i} className="flex gap-1 items-center">
+          <Select value={rule.property} onValueChange={(v) => updateRule(i, { property: v as ScalingRule['property'] })}>
+            <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SCALABLE_PROPERTIES.map(p => (
+                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="w-14">
+            <NumericInput
+              value={rule.perLevel}
+              onChange={(v) => updateRule(i, { perLevel: v })}
+              className="h-6 text-[10px]"
+              min={1}
+              max={20}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground">/lvl</span>
+          {rule.property === 'damageDice' && damageDiceCount > 1 && (
+            <div className="w-10">
+              <NumericInput
+                value={rule.diceIndex ?? 0}
+                onChange={(v) => updateRule(i, { diceIndex: v })}
+                className="h-6 text-[10px]"
+                min={0}
+                max={damageDiceCount - 1}
+              />
+            </div>
+          )}
+          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeRule(i)}>
+            <X className="w-3 h-3 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addRule}>
+        <Plus className="w-3 h-3 mr-1" /> Add Scaling Rule
       </Button>
     </div>
   );
@@ -307,6 +388,41 @@ function TemplateFormFields({
         onChange={(rows) => update('damageDice', rows)}
       />
 
+      {/* Level Scaling Section */}
+      <Collapsible>
+        <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground w-full">
+          <TrendingUp className="w-3 h-3" />
+          <span>Level Scaling</span>
+          {form.scaling.length > 0 && (
+            <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 ml-1">{form.scaling.length} rule{form.scaling.length > 1 ? 's' : ''}</Badge>
+          )}
+          <ChevronRight className="w-3 h-3 ml-auto" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-2 mt-1">
+          <div className="flex gap-2 items-end">
+            <div className="w-20">
+              <label className="text-[10px] text-muted-foreground">Base Level</label>
+              <NumericInput
+                value={form.baseLevel ? Number(form.baseLevel) : 0}
+                onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
+                className="h-7 text-xs"
+                min={0}
+                max={9}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground pb-1.5">
+              {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
+            </span>
+          </div>
+          {form.baseLevel && (
+            <ScalingRulesEditor
+              rules={form.scaling}
+              onChange={(rules) => update('scaling', rules)}
+              damageDiceCount={form.damageDice.length}
+            />
+          )}
+        </CollapsibleContent>
+      </Collapsible>
       <div className="flex gap-2 items-center">
         <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
           <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
@@ -409,6 +525,9 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
     level: form.level ? Number(form.level) : undefined,
     multiDrop: form.multiDropCount > 1 ? { count: form.multiDropCount } : undefined,
+    baseLevel: form.baseLevel ? Number(form.baseLevel) : undefined,
+    scaling: form.scaling.length > 0 ? form.scaling : undefined,
+    levelOverrides: form.levelOverrides.length > 0 ? form.levelOverrides : undefined,
   };
 }
 
@@ -549,6 +668,13 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         </Badge>
       )}
 
+      {template.scaling && template.scaling.length > 0 && (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary/50 text-primary">
+          <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
+          Scale
+        </Badge>
+      )}
+
       <Button
         variant="ghost"
         size="icon"
@@ -585,9 +711,11 @@ export function EffectsCardContent() {
   const placement = useEffectStore((s) => s.placement);
 
   const [damageFormula, setDamageFormula] = useState('');
+  const [castLevelInput, setCastLevelInput] = useState<number | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const getTemplate = useEffectStore((s) => s.getTemplate);
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
@@ -603,7 +731,9 @@ export function EffectsCardContent() {
 
   const handleSelect = (templateId: string) => {
     if (editingTemplateId) return;
-    startPlacement(templateId, undefined, damageFormula || undefined);
+    const tmpl = getTemplate(templateId);
+    const level = tmpl?.baseLevel && castLevelInput ? castLevelInput : undefined;
+    startPlacement(templateId, undefined, damageFormula || undefined, undefined, level);
   };
 
   const handleEdit = (templateId: string) => {
@@ -630,6 +760,23 @@ export function EffectsCardContent() {
           </p>
         </div>
 
+        {/* Cast Level selector */}
+        <div className="flex gap-2 items-end">
+          <div className="w-20">
+            <label className="text-[10px] text-muted-foreground">Cast Level</label>
+            <NumericInput
+              value={castLevelInput ?? 0}
+              onChange={(v) => setCastLevelInput(v > 0 ? v : null)}
+              className="h-7 text-xs"
+              min={0}
+              max={9}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground pb-1.5">
+            {castLevelInput ? `Upcast to L${castLevelInput}` : 'Base level (no scaling)'}
+          </span>
+        </div>
+
         <Separator />
 
         {/* Create custom template */}
@@ -654,9 +801,19 @@ export function EffectsCardContent() {
         {placement && (
           <div className="bg-primary/10 border border-primary/30 rounded p-2 text-xs">
             <span className="font-medium">Placing:</span> {placement.template.name}
+            {placement.castLevel && (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-1">
+                L{placement.castLevel}
+              </Badge>
+            )}
             {placement.damageFormula && (
               <span className="ml-1 font-mono text-muted-foreground">
                 ({placement.damageFormula})
+              </span>
+            )}
+            {placement.template.damageDice && placement.template.damageDice.length > 0 && !placement.damageFormula && (
+              <span className="ml-1 font-mono text-muted-foreground">
+                ({placement.template.damageDice.map(d => `${d.formula} ${d.damageType}`).join(' + ')})
               </span>
             )}
             {placement.multiDropTotal && placement.multiDropTotal > 1 && (

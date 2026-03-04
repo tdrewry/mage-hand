@@ -6,7 +6,7 @@ import type {
   EffectImpact,
   EffectPlacementState,
 } from '@/types/effectTypes';
-import { createEffectId } from '@/types/effectTypes';
+import { createEffectId, computeScaledTemplate } from '@/types/effectTypes';
 import {
   BUILT_IN_EFFECT_TEMPLATES,
   getBuiltInTemplate,
@@ -78,7 +78,7 @@ interface EffectState {
   getTemplate: (id: string) => EffectTemplate | undefined;
 
   // --- Placement mode ---
-  startPlacement: (templateId: string, casterId?: string, damageFormula?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }) => void;
+  startPlacement: (templateId: string, casterId?: string, damageFormula?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }, castLevel?: number) => void;
   setPlacementOrigin: (origin: { x: number; y: number }) => void;
   updatePlacementPreview: (origin: { x: number; y: number }, direction: number) => void;
   cancelPlacement: () => void;
@@ -93,6 +93,7 @@ interface EffectState {
       casterId?: string;
       impactedTargets?: EffectImpact[];
       groupId?: string;
+      castLevel?: number;
       waypoints?: { x: number; y: number }[];
     },
   ) => PlacedEffect;
@@ -210,7 +211,7 @@ export const useEffectStore = create<EffectState>()(
     // Placement mode
     // ------------------------------------------------------------------
 
-    startPlacement: (templateId, casterId, damageFormula, casterToken) => {
+    startPlacement: (templateId, casterId, damageFormula, casterToken, castLevel) => {
       const template = get().getTemplate(templateId);
       if (!template) return;
 
@@ -243,19 +244,23 @@ export const useEffectStore = create<EffectState>()(
         initialStep = 'origin';
       }
 
+      // Compute the scaled template for the cast level
+      const scaledTemplate = computeScaledTemplate(template, castLevel);
+
       set({
         placement: {
           templateId,
-          template,
+          template: scaledTemplate,
           casterId,
           damageFormula,
+          castLevel,
           step: initialStep,
           origin: skipToDirection ? tokenOrigin : null,
           previewOrigin: tokenOrigin,
           previewDirection: 0,
           casterToken,
           multiDropGroupId,
-          multiDropTotal: template.multiDrop?.count,
+          multiDropTotal: scaledTemplate.multiDrop?.count,
           multiDropPlaced: isMultiDrop ? 0 : undefined,
           polylineWaypoints: isPolyline ? [] : undefined,
           polylineLengthUsed: isPolyline ? 0 : undefined,
@@ -294,22 +299,26 @@ export const useEffectStore = create<EffectState>()(
         throw new Error(`Effect template not found: ${templateId}`);
       }
 
+      // Apply level scaling if castLevel provided
+      const scaledTemplate = computeScaledTemplate(template, options.castLevel);
+
       const effect: PlacedEffect = {
         id: createEffectId(),
         templateId,
-        template: { ...template }, // snapshot
+        template: { ...scaledTemplate }, // snapshot with scaling applied
         origin,
         direction: options.direction,
         casterId: options.casterId,
         placedAt: performance.now(),
         roundsRemaining:
-          template.persistence === 'persistent'
-            ? template.durationRounds ?? 0
+          scaledTemplate.persistence === 'persistent'
+            ? scaledTemplate.durationRounds ?? 0
             : undefined,
         mapId,
         impactedTargets: options.impactedTargets ?? [],
         triggeredTokenIds: [],
         groupId: options.groupId,
+        castLevel: options.castLevel,
         waypoints: options.waypoints,
       };
 
