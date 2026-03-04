@@ -30,6 +30,8 @@ export const FIREBALL: EffectTemplate = {
   description: 'A bright streak flashes to a point and blossoms into a 20-foot-radius explosion of flame.',
   isBuiltIn: true,
   ranged: true,
+  baseLevel: 3,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 export const LIGHTNING_BOLT: EffectTemplate = {
@@ -51,6 +53,8 @@ export const LIGHTNING_BOLT: EffectTemplate = {
   damageDice: [{ formula: '8d6', damageType: 'lightning' }],
   description: 'A stroke of lightning forming a 100-foot line, 5 feet wide, blasts out from you.',
   isBuiltIn: true,
+  baseLevel: 3,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 export const CONE_OF_COLD: EffectTemplate = {
@@ -72,6 +76,8 @@ export const CONE_OF_COLD: EffectTemplate = {
   damageDice: [{ formula: '8d8', damageType: 'cold' }],
   description: 'A blast of cold air erupts in a 60-foot cone.',
   isBuiltIn: true,
+  baseLevel: 5,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 export const WALL_OF_FIRE: EffectTemplate = {
@@ -160,6 +166,8 @@ export const BURNING_HANDS: EffectTemplate = {
   damageDice: [{ formula: '3d6', damageType: 'fire' }],
   description: 'A thin sheet of flames shoots forth from your outstretched fingertips in a 15-foot cone.',
   isBuiltIn: true,
+  baseLevel: 1,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 export const DARKNESS: EffectTemplate = {
@@ -203,6 +211,8 @@ export const SPIRIT_GUARDIANS: EffectTemplate = {
   description: 'Spirits flit around you in a 15-foot radius. Enemies take damage when entering or starting their turn.',
   isBuiltIn: true,
   ranged: true,
+  baseLevel: 3,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 export const THUNDERWAVE: EffectTemplate = {
@@ -224,6 +234,8 @@ export const THUNDERWAVE: EffectTemplate = {
   damageDice: [{ formula: '2d8', damageType: 'thunder' }],
   description: 'A wave of thunderous force sweeps out from you in a 15-foot cube.',
   isBuiltIn: true,
+  baseLevel: 1,
+  scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
 // ---------------------------------------------------------------------------
@@ -352,6 +364,11 @@ export const FLAME_STRIKE: EffectTemplate = {
   description: 'A vertical column of divine fire roars down. Half fire, half radiant damage in a 10-foot-radius, 40-foot-high cylinder.',
   isBuiltIn: true,
   ranged: true,
+  baseLevel: 5,
+  scaling: [
+    { property: 'damageDice', perLevel: 1, diceIndex: 0 },
+    { property: 'damageDice', perLevel: 1, diceIndex: 1 },
+  ],
 };
 
 // ---------------------------------------------------------------------------

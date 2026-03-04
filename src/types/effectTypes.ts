@@ -45,6 +45,30 @@ export interface MultiDropConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Level-scaling types
+// ---------------------------------------------------------------------------
+
+/** Describes how a template property scales per upcast level above baseLevel. */
+export interface ScalingRule {
+  /** Which property to scale */
+  property: 'damageDice' | 'radius' | 'width' | 'length' | 'multiDropCount';
+  /** Amount added per level above baseLevel */
+  perLevel: number;
+  /** For damageDice scaling: which damageDice entry index to modify (default 0) */
+  diceIndex?: number;
+}
+
+/** Full override of template values at a specific cast level. Fields present replace computed values. */
+export interface LevelOverride {
+  level: number;
+  damageDice?: DamageDiceEntry[];
+  radius?: number;
+  width?: number;
+  length?: number;
+  multiDropCount?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Template (library definition — reusable blueprint)
 // ---------------------------------------------------------------------------
 
@@ -102,6 +126,14 @@ export interface EffectTemplate {
 
   /** Multi-drop configuration for effects that place multiple instances */
   multiDrop?: MultiDropConfig;
+
+  // Level-scaling
+  /** Lowest level this effect can be cast at (e.g. 3 for Fireball) */
+  baseLevel?: number;
+  /** Rules describing how properties scale per upcast level */
+  scaling?: ScalingRule[];
+  /** Explicit overrides for specific cast levels */
+  levelOverrides?: LevelOverride[];
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +161,9 @@ export interface PlacedEffect {
 
   /** When set (performance.now()), the effect is fading out and will be auto-removed */
   dismissedAt?: number;
+
+  /** The level this effect was cast at (for display/history) */
+  castLevel?: number;
 
   /** When true, the effect's animation is paused (renders static) */
   animationPaused?: boolean;
@@ -171,6 +206,8 @@ export interface EffectPlacementState {
   casterId?: string;
   /** Override damage formula for this placement (e.g. "8d6") */
   damageFormula?: string;
+  /** The level this effect is being cast at (for scaling) */
+  castLevel?: number;
   /** Current step in the two-step placement flow */
   step: EffectPlacementStep;
   /** Locked origin point (set after first click) */
@@ -230,4 +267,88 @@ export function isDirectionalShape(shape: EffectShape): boolean {
  */
 export function isPolylineShape(shape: EffectShape): boolean {
   return shape === 'polyline';
+}
+
+// ---------------------------------------------------------------------------
+// Level-scaling computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Scale a dice formula by adding `increment` to the dice count.
+ * e.g. scaleDiceFormula("8d6", 2) → "10d6"
+ *      scaleDiceFormula("2d10+4", 1) → "3d10+4"
+ */
+function scaleDiceFormula(formula: string, increment: number): string {
+  // Match the first NdX group
+  const match = formula.match(/^(\d+)(d\d+.*)$/);
+  if (!match) return formula; // can't parse, return as-is
+  const currentCount = parseInt(match[1]);
+  return `${currentCount + increment}${match[2]}`;
+}
+
+/**
+ * Compute a scaled version of a template for a given cast level.
+ * Returns a new EffectTemplate with adjusted values.
+ * If castLevel is undefined or equal to baseLevel, returns the template unchanged.
+ */
+export function computeScaledTemplate(template: EffectTemplate, castLevel?: number): EffectTemplate {
+  if (castLevel === undefined || !template.baseLevel || castLevel <= template.baseLevel) {
+    return template;
+  }
+
+  const delta = castLevel - template.baseLevel;
+  let scaled = { ...template };
+
+  // Deep-clone damageDice so we can mutate
+  if (scaled.damageDice) {
+    scaled.damageDice = scaled.damageDice.map(d => ({ ...d }));
+  }
+
+  // Apply scaling rules
+  if (template.scaling) {
+    for (const rule of template.scaling) {
+      switch (rule.property) {
+        case 'damageDice': {
+          const idx = rule.diceIndex ?? 0;
+          if (scaled.damageDice && scaled.damageDice[idx]) {
+            scaled.damageDice[idx] = {
+              ...scaled.damageDice[idx],
+              formula: scaleDiceFormula(scaled.damageDice[idx].formula, delta * rule.perLevel),
+            };
+          }
+          break;
+        }
+        case 'radius':
+          scaled.radius = (scaled.radius ?? 0) + delta * rule.perLevel;
+          break;
+        case 'width':
+          scaled.width = (scaled.width ?? 0) + delta * rule.perLevel;
+          break;
+        case 'length':
+          scaled.length = (scaled.length ?? 0) + delta * rule.perLevel;
+          break;
+        case 'multiDropCount':
+          if (scaled.multiDrop) {
+            scaled.multiDrop = { ...scaled.multiDrop, count: scaled.multiDrop.count + delta * rule.perLevel };
+          }
+          break;
+      }
+    }
+  }
+
+  // Apply level overrides (replace computed values)
+  if (template.levelOverrides) {
+    const override = template.levelOverrides.find(o => o.level === castLevel);
+    if (override) {
+      if (override.damageDice) scaled.damageDice = override.damageDice.map(d => ({ ...d }));
+      if (override.radius !== undefined) scaled.radius = override.radius;
+      if (override.width !== undefined) scaled.width = override.width;
+      if (override.length !== undefined) scaled.length = override.length;
+      if (override.multiDropCount !== undefined) {
+        scaled.multiDrop = { ...(scaled.multiDrop ?? { count: 1 }), count: override.multiDropCount };
+      }
+    }
+  }
+
+  return scaled;
 }
