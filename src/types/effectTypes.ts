@@ -52,8 +52,10 @@ export interface MultiDropConfig {
 export interface ScalingRule {
   /** Which property to scale */
   property: 'damageDice' | 'radius' | 'width' | 'length' | 'multiDropCount';
-  /** Amount added per level above baseLevel */
+  /** Amount added per scaling step */
   perLevel: number;
+  /** How many levels constitute one scaling step (default 1). E.g. 2 = scales every 2 levels. */
+  perLevels?: number;
   /** For damageDice scaling: which damageDice entry index to modify (default 0) */
   diceIndex?: number;
 }
@@ -296,7 +298,7 @@ export function computeScaledTemplate(template: EffectTemplate, castLevel?: numb
     return template;
   }
 
-  const delta = castLevel - template.baseLevel;
+  const rawDelta = castLevel - template.baseLevel;
   let scaled = { ...template };
 
   // Deep-clone damageDice so we can mutate
@@ -307,29 +309,33 @@ export function computeScaledTemplate(template: EffectTemplate, castLevel?: numb
   // Apply scaling rules
   if (template.scaling) {
     for (const rule of template.scaling) {
+      const step = rule.perLevels ?? 1;
+      const steps = Math.floor(rawDelta / step);
+      if (steps <= 0) continue;
+      const increment = steps * rule.perLevel;
       switch (rule.property) {
         case 'damageDice': {
           const idx = rule.diceIndex ?? 0;
           if (scaled.damageDice && scaled.damageDice[idx]) {
             scaled.damageDice[idx] = {
               ...scaled.damageDice[idx],
-              formula: scaleDiceFormula(scaled.damageDice[idx].formula, delta * rule.perLevel),
+              formula: scaleDiceFormula(scaled.damageDice[idx].formula, increment),
             };
           }
           break;
         }
         case 'radius':
-          scaled.radius = (scaled.radius ?? 0) + delta * rule.perLevel;
+          scaled.radius = (scaled.radius ?? 0) + increment;
           break;
         case 'width':
-          scaled.width = (scaled.width ?? 0) + delta * rule.perLevel;
+          scaled.width = (scaled.width ?? 0) + increment;
           break;
         case 'length':
-          scaled.length = (scaled.length ?? 0) + delta * rule.perLevel;
+          scaled.length = (scaled.length ?? 0) + increment;
           break;
         case 'multiDropCount':
           if (scaled.multiDrop) {
-            scaled.multiDrop = { ...scaled.multiDrop, count: scaled.multiDrop.count + delta * rule.perLevel };
+            scaled.multiDrop = { ...scaled.multiDrop, count: scaled.multiDrop.count + increment };
           }
           break;
       }

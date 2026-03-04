@@ -210,7 +210,7 @@ function ScalingRulesEditor({
               ))}
             </SelectContent>
           </Select>
-          <div className="w-14">
+          <div className="w-12">
             <NumericInput
               value={rule.perLevel}
               onChange={(v) => updateRule(i, { perLevel: v })}
@@ -219,7 +219,17 @@ function ScalingRulesEditor({
               max={20}
             />
           </div>
-          <span className="text-[10px] text-muted-foreground">/lvl</span>
+          <span className="text-[10px] text-muted-foreground">/</span>
+          <div className="w-10">
+            <NumericInput
+              value={rule.perLevels ?? 1}
+              onChange={(v) => updateRule(i, { perLevels: v <= 1 ? undefined : v })}
+              className="h-6 text-[10px]"
+              min={1}
+              max={9}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground">lvl</span>
           {rule.property === 'damageDice' && damageDiceCount > 1 && (
             <div className="w-10">
               <NumericInput
