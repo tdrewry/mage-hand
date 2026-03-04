@@ -1,102 +1,145 @@
 
 
-# Level-Scaled Effect Templates — Design Recommendation
+# Extended Effect Impact System — Plan
 
-## The Problem
-Effects like Fireball, Cure Wounds, and Spiritual Weapon change their dice count, area size, or drop quantity based on the spell level they're cast at. Currently, templates are static — one configuration per template.
+## Summary
 
-## Recommended Approach: Hybrid Scaling Rules + Level Overrides
+Extend the effect template system to support:
+1. **Optional attack rolls** on effects (with modifier sourced from caster token's character data)
+2. **Non-damage impact types** — modifiers to AC, ability scores, saves, attack bonus, HP, conditions, and granting temporary actions
+3. **Tabbed template editor UI** — organize the growing form into tabs: Shape, Damage, Modifiers, Conditions
 
-Neither pure formula variables (Option 1) nor per-level tabs (Option 2) alone is ideal. A hybrid gives you **automatic math for the 90% case** and **explicit overrides for oddballs**.
+## Current State
 
-### Core Concept
+- `EffectTemplate` has `damageDice`, `damageType`, and scaling but no attack roll or non-damage impacts
+- `ActionQueueEntry` supports attack rolls for weapon attacks but not for effect-based actions
+- Character data lives in `DndBeyondCharacter` (src/types/creatureTypes.ts) with well-structured fields for abilities, AC, saves, skills, HP, actions, conditions
+- The EffectsCard template form is a flat vertical layout (~200 lines of form fields)
 
-Each template gets:
-- **`baseLevel`** — the lowest level it can be cast at (e.g., 3 for Fireball)
-- **`scaling`** — an array of simple rules describing what changes per upcast level
-- **`levelOverrides`** (optional) — explicit full overrides for specific levels, for effects that don't follow simple math (e.g., Chromatic Orb element choices, or spells that gain entirely new behaviors at certain levels)
+## Technical Design
 
-### Data Model
+### 1. New Types (src/types/effectTypes.ts)
 
 ```typescript
-interface ScalingRule {
-  property: 'damageDice' | 'radius' | 'width' | 'length' | 'multiDropCount';
-  perLevel: number;        // added per level above baseLevel
-  diceIndex?: number;      // which damageDice entry to scale (default 0)
+// Attack roll config on an effect template
+interface EffectAttackRoll {
+  enabled: boolean;
+  /** Which ability mod to use: 'spellcasting' | 'str' | 'dex' | ... */
+  abilitySource: string;
+  /** Fixed bonus override (if not using token's data) */
+  fixedBonus?: number;
+  /** Whether to add proficiency bonus */
+  addProficiency?: boolean;
 }
 
-interface LevelOverride {
-  level: number;
-  damageDice?: DamageDiceEntry[];  // full replacement
-  radius?: number;
-  width?: number;
-  length?: number;
-  multiDropCount?: number;
+// A single modifier applied to a target
+interface EffectModifier {
+  id: string;
+  /** The character property path to modify */
+  target: EffectModifierTarget;
+  /** How to apply: 'add' | 'set' | 'multiply' */
+  operation: 'add' | 'set' | 'multiply';
+  /** The value (numeric for stats, string for conditions) */
+  value: number;
+  /** Human-readable label */
+  label?: string;
 }
 
-// Added to EffectTemplate:
-baseLevel?: number;
-scaling?: ScalingRule[];
-levelOverrides?: LevelOverride[];
+type EffectModifierTarget =
+  | 'armorClass'
+  | 'speed'
+  | 'hitPoints.temp'
+  | 'abilities.strength.score'
+  | 'abilities.dexterity.score'
+  | 'abilities.constitution.score'
+  | 'abilities.intelligence.score'
+  | 'abilities.wisdom.score'
+  | 'abilities.charisma.score'
+  | 'proficiencyBonus'
+  | 'initiative'
+  | string; // extensible for save mods, skill mods, etc.
+
+// Conditions to apply/remove
+interface EffectCondition {
+  condition: string; // 'blinded' | 'charmed' | 'frightened' | etc.
+  apply: boolean;    // true = add condition, false = remove
+}
+
+// Temporary action grant
+interface EffectGrantedAction {
+  name: string;
+  attackBonus?: number;
+  damageFormula?: string;
+  damageType?: string;
+  description?: string;
+}
 ```
 
-### How It Works at Cast Time
-
-1. DM selects a template and picks a **cast level** (≥ baseLevel)
-2. Engine computes effective values:
-   - Start from template defaults
-   - Apply each scaling rule: `value = base + (castLevel - baseLevel) * perLevel`
-   - If a `levelOverride` exists for this exact level, its fields replace the computed ones
-3. Roll damage using the computed dice, place effect with computed dimensions
-
-### Examples
-
-**Fireball** (simple scaling):
-```
-baseLevel: 3
-damageDice: [{ formula: "8d6", damageType: "fire" }]
-scaling: [{ property: "damageDice", perLevel: 1, diceIndex: 0 }]
-```
-→ At L5: formula becomes "10d6" (8 + 2×1 = 10 dice)
-
-**Spiritual Weapon** (damage + no area change):
-```
-baseLevel: 2
-damageDice: [{ formula: "1d8+3", damageType: "force" }]
-scaling: [{ property: "damageDice", perLevel: 1, diceIndex: 0 }]  // +1d8 per 2 levels (we'd need "perLevels: 2" or just per-level override)
+Add to `EffectTemplate`:
+```typescript
+attackRoll?: EffectAttackRoll;
+modifiers?: EffectModifier[];
+conditions?: EffectCondition[];
+grantedActions?: EffectGrantedAction[];
 ```
 
-**Meteor Swarm** (no scaling, L9 only):
+The `EffectModifierTarget` list will be derived by introspecting the `DndBeyondCharacter` interface keys — the UI will present a dropdown of known character properties.
+
+### 2. Attack Roll Integration (actionStore.ts)
+
+- When `startEffectAction` is called and the template has `attackRoll.enabled`, the action enters the standard `resolve` phase with attack rolls
+- The attack bonus is resolved at cast time: look up the caster token's linked character data, extract the relevant ability modifier + proficiency if configured, OR use `fixedBonus`
+- The resolved `attackBonus` is passed into the `effectInfo` on the `ActionQueueEntry`
+
+### 3. Modifier Application (new: src/lib/effectModifierEngine.ts)
+
+- `applyEffectModifiers(tokenId, modifiers, conditions)` — applies stat changes to the token's character data snapshot
+- `removeEffectModifiers(tokenId, effectId)` — reverts when effect is dismissed/expires
+- Modifiers are tracked per-effect so they can be cleanly removed
+- For persistent effects: modifiers apply on placement and revert on dismissal
+- For instant effects: modifiers apply and persist until manually removed or duration expires
+
+### 4. Tabbed Template Editor UI (EffectsCard.tsx)
+
+Replace the flat form with tabs using existing `Tabs` component:
+
+```text
+┌─────────┬────────┬───────────┬────────────┐
+│  Shape  │ Damage │ Modifiers │ Conditions │
+├─────────┴────────┴───────────┴────────────┤
+│                                           │
+│  (tab content area)                       │
+│                                           │
+└───────────────────────────────────────────┘
 ```
-baseLevel: 9, no scaling rules
-```
 
-### UI Changes
+- **Shape tab**: Name, shape type, dimensions, placement options, color/animation, persistence, level scaling (existing fields reorganized)
+- **Damage tab**: Damage dice rows, attack roll toggle + config, spell level, quantity/multi-drop
+- **Modifiers tab**: Add/remove rows — each row is a dropdown (target property) + operation + value. The dropdown options are generated from the `DndBeyondCharacter` interface fields
+- **Conditions tab**: Checklist of D&D 5e conditions to apply/remove, plus granted temporary actions
 
-1. **Template Editor**: Add a "Scaling" section below damage dice:
-   - `Base Level` numeric input (already have spell level — repurpose it)
-   - Scaling rules: small rows with dropdowns (property to scale) + numeric (per-level increment)
-   - Optional "Level Overrides" collapsible section for explicit per-level configs
+### 5. Files Changed
 
-2. **Cast-Time Level Picker**: When placing an effect with `baseLevel` defined, show a small level selector (baseLevel through 9). The preview updates live to show computed values.
+| File | Change |
+|------|--------|
+| `src/types/effectTypes.ts` | Add `EffectAttackRoll`, `EffectModifier`, `EffectCondition`, `EffectGrantedAction` types; extend `EffectTemplate` |
+| `src/components/cards/EffectsCard.tsx` | Refactor form into tabbed layout; add Modifiers and Conditions tab UIs |
+| `src/lib/effectModifierEngine.ts` | **New** — apply/revert modifier logic |
+| `src/stores/actionStore.ts` | Extend `startEffectAction` to support attack roll resolution from caster data |
+| `src/stores/effectStore.ts` | Wire modifier application on place/dismiss |
+| `src/lib/effectTemplateLibrary.ts` | Add example templates using modifiers (e.g., Shield of Faith: +2 AC, Haste: +2 AC + double speed) |
+| `src/lib/version.ts` | Bump to `0.6.33` |
+| `Plans/extended-effect-impacts.md` | Save this plan |
 
-### Addressing the Chromatic Orb Case
+### 6. Implementation Order
 
-Chromatic Orb doesn't change by *level* — it changes by *element choice*. That's better modeled as separate templates or a runtime "pick damage type" prompt at cast time. Level overrides could handle level-based changes (3d8 → 4d8 at L2), while element selection would be a future "variant" feature. This hybrid doesn't try to solve element-choice — it solves level-scaling cleanly.
-
-### Technical Details
-
-- **Dice formula scaling**: Parse the formula, extract the dice count from the first group, add `perLevel * delta`, reconstruct. Use existing `parseFormula` from `diceEngine.ts`.
-- **Placement state**: Add `castLevel?: number` to `EffectPlacementState` — the resolved template snapshot already captures computed values.
-- **Action store**: `startEffectAction` already receives `damageDice` — no changes needed there, just pass the computed dice.
-- **Persistence**: Scaling rules stored on the template; cast level stored on `PlacedEffect` for history/display.
-
-### Files to Change
-- `src/types/effectTypes.ts` — add `ScalingRule`, `LevelOverride`, new fields on `EffectTemplate` and `PlacedEffect`
-- `src/components/cards/EffectsCard.tsx` — scaling rules editor UI + level picker at cast time
-- `src/lib/effectTemplateLibrary.ts` — add scaling rules to built-in templates (Fireball, etc.)
-- `src/stores/effectStore.ts` — add `computeScaledTemplate(template, castLevel)` helper
-- `src/components/SimpleTabletop.tsx` — integrate level picker into placement flow
-- `src/lib/version.ts` — bump version
-- `Plans/level-scaled-effects.md` — save plan
+1. Define new types in `effectTypes.ts`
+2. Add `EffectAttackRoll` fields to `TemplateFormData` and wire into template save/load
+3. Refactor EffectsCard form into tabbed layout (Shape + Damage tabs first, just reorganizing)
+4. Add Modifiers tab UI with property dropdown + operation + value rows
+5. Add Conditions tab UI with condition checkboxes + granted actions
+6. Create `effectModifierEngine.ts` for apply/revert logic
+7. Wire attack roll into actionStore's effect action flow
+8. Add example built-in templates with modifiers
+9. Bump version
 
