@@ -49,17 +49,18 @@ export interface DndBeyondCharacter {
     damageType?: string;
     range?: string;
     description: string;
+    effectTemplateId?: string;
   }>;
   spells?: {
     spellcastingAbility?: string;
     spellSaveDC?: number;
     spellAttackBonus?: number;
-    cantrips: Array<{ name: string }>;
+    cantrips: Array<{ name: string; effectTemplateId?: string }>;
     spellsByLevel: Array<{
       level: number;
       slots: number;
       slotsUsed: number;
-      spells: Array<{ name: string; prepared: boolean }>;
+      spells: Array<{ name: string; prepared: boolean; effectTemplateId?: string }>;
     }>;
   };
   

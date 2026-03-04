@@ -30,6 +30,8 @@ export interface TokenActionItem {
   proficient?: boolean;
   /** Can be used as an AttackDefinition for the action system */
   asAttack?: AttackDefinition;
+  /** Explicitly assigned effect template ID */
+  effectTemplateId?: string;
 }
 
 // ─── Collect all actions from any data source ─────────────────────────────────
@@ -246,6 +248,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
         category: 'spell',
         spellLevel: 0,
         description: 'Cantrip',
+        effectTemplateId: cantrip.effectTemplateId,
       });
     }
     for (const lvl of character.spells.spellsByLevel) {
@@ -257,6 +260,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
           spellLevel: lvl.level,
           proficient: spell.prepared,
           description: `Level ${lvl.level}${spell.prepared ? ' (prepared)' : ''}`,
+          effectTemplateId: spell.effectTemplateId,
         });
       }
     }
