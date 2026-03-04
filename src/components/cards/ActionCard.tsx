@@ -75,7 +75,7 @@ export function ActionCardContent() {
       className="h-full flex flex-col"
     >
       <div
-        className="shrink-0 border-b border-border overflow-x-auto overflow-y-hidden"
+        className="shrink-0 overflow-x-auto overflow-y-hidden"
         style={{ scrollbarWidth: 'none' }}
         onWheel={(e) => {
           if (e.deltaY !== 0) {
@@ -84,7 +84,7 @@ export function ActionCardContent() {
           }
         }}
       >
-        <div className="inline-flex w-max h-auto gap-0 flex-nowrap p-0">
+        <div className="inline-flex w-max gap-0 flex-nowrap p-0 border-b border-border">
           {allActions.map((action, idx) => {
             const isActive = action.id === currentAction.id;
             return (
@@ -96,7 +96,7 @@ export function ActionCardContent() {
                     if (pendingIdx >= 0) swapToAction(pendingIdx);
                   }
                 }}
-                className={`text-xs px-4 py-2 whitespace-nowrap shrink-0 border-b-2 transition-colors ${
+                className={`text-xs px-4 py-2 whitespace-nowrap shrink-0 -mb-px border-b-2 transition-colors ${
                   isActive
                     ? 'border-primary text-foreground font-medium'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
