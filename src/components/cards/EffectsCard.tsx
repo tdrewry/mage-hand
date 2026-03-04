@@ -21,6 +21,7 @@ const CATEGORY_META: Record<EffectCategory, { label: string; icon: React.Element
   spell: { label: 'Spells', icon: Wand2 },
   trap: { label: 'Traps', icon: Skull },
   hazard: { label: 'Hazards', icon: Cloud },
+  trait: { label: 'Traits', icon: User },
   custom: { label: 'Custom', icon: Flame },
 };
 
@@ -668,6 +669,7 @@ function TemplateFormFields({
                 <SelectItem value="spell">Spell</SelectItem>
                 <SelectItem value="trap">Trap</SelectItem>
                 <SelectItem value="hazard">Hazard</SelectItem>
+                <SelectItem value="trait">Trait</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
@@ -1178,7 +1180,7 @@ export function EffectsCardContent() {
   }, [useTokenLevel, canUseTokenLevel]);
 
   const groups = groupByCategory(allTemplates);
-  const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'custom'];
+  const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'trait', 'custom'];
 
   const toggleCategory = (cat: string) => {
     setCollapsedCategories(prev => {

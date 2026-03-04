@@ -29,7 +29,7 @@ export type EffectAnimationType =
 
 export type EffectPlacementMode = 'free' | 'caster' | 'both';
 export type EffectPersistence = 'instant' | 'persistent';
-export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'custom';
+export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'trait' | 'custom';
 
 // Damage dice entry (supports multiple damage types, e.g. Flame Strike)
 export interface DamageDiceEntry {
