@@ -16,13 +16,13 @@ import {
 import { useSessionStore, type EntityRef } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { LinkedCreatureSection } from '@/components/LinkedCreatureSection';
+import { EditableCharacterSheet } from '@/components/EditableCharacterSheet';
+import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
+import type { DndBeyondCharacter } from '@/types/creatureTypes';
 import { toast } from 'sonner';
 
 // Lazy load Monaco to avoid bundle bloat
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
-
-// Reuse the stat block renderer from MonsterStatBlockCard
-import { StatBlockFromJson } from './MonsterStatBlockCard';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,32 @@ interface CharacterSheetCardContentProps {
   tokenId: string;
   /** Legacy: kept for backward compat when opened from creature library */
   characterId?: string;
+}
+
+// ─── Parse helpers ────────────────────────────────────────────────────────────
+
+/** Try to parse JSON as a DndBeyondCharacter, filling defaults */
+function parseAsCharacter(json: string): DndBeyondCharacter | null {
+  try {
+    const raw = JSON.parse(json);
+    if (!raw || typeof raw !== 'object') return null;
+    const base = generateBlankTemplate();
+    return {
+      ...base,
+      ...raw,
+      abilities: { ...base.abilities, ...(raw.abilities ?? {}) },
+      hitPoints: { ...base.hitPoints, ...(raw.hitPoints ?? {}) },
+      proficiencies: { ...base.proficiencies, ...(raw.proficiencies ?? {}) },
+      skills: raw.skills ?? base.skills,
+      savingThrows: raw.savingThrows ?? base.savingThrows,
+      actions: raw.actions ?? base.actions,
+      features: raw.features ?? base.features,
+      conditions: raw.conditions ?? base.conditions,
+      classes: raw.classes ?? base.classes,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -65,16 +91,20 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
   const [jsonValue, setJsonValue] = useState(initialJson);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
-  // ── Parse JSON for stat block rendering ──────────────────────────────────
-  const parsedMonster = useMemo(() => {
+  // ── Parse JSON for editable character ────────────────────────────────────
+  const parsedCharacter = useMemo(() => {
     if (!jsonValue.trim()) return null;
+    return parseAsCharacter(jsonValue);
+  }, [jsonValue]);
+
+  // Validate JSON separately
+  useMemo(() => {
+    if (!jsonValue.trim()) { setJsonError(null); return; }
     try {
-      const parsed = JSON.parse(jsonValue);
+      JSON.parse(jsonValue);
       setJsonError(null);
-      return parsed;
     } catch (e: any) {
       setJsonError(e.message);
-      return null;
     }
   }, [jsonValue]);
 
@@ -89,6 +119,13 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     }
   }, []);
 
+  // When character tab edits happen, sync back to JSON
+  const handleCharacterChange = useCallback((updated: DndBeyondCharacter) => {
+    const json = JSON.stringify(updated, null, 2);
+    setJsonValue(json);
+    setJsonError(null);
+  }, []);
+
   const handleSaveJson = () => {
     if (!token) return;
     if (jsonError) {
@@ -96,8 +133,18 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
       return;
     }
     updateTokenStatBlockJson(token.id, jsonValue);
-    toast.success('Stat block JSON saved');
+    toast.success('Character data saved');
   };
+
+  // Stub a blank character if no data exists
+  const handleCreateBlank = useCallback(() => {
+    const blank = generateBlankTemplate();
+    blank.name = token?.name || 'Character Name';
+    const json = JSON.stringify(blank, null, 2);
+    setJsonValue(json);
+    setJsonError(null);
+    setActiveTab('character');
+  }, [token]);
 
   // ── Details tab state ────────────────────────────────────────────────────
   const [notes, setNotes] = useState(token?.notes ?? '');
@@ -204,22 +251,32 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Character (Stat Block) tab ────────────────────────────────── */}
-        <TabsContent value="character" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            {parsedMonster ? (
-              <StatBlockFromJson data={parsedMonster} />
+        {/* ── Character (Editable Sheet) tab ────────────────────────────── */}
+        <TabsContent value="character" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1">
+            {parsedCharacter ? (
+              <>
+                <EditableCharacterSheet character={parsedCharacter} onChange={handleCharacterChange} />
+                <div className="px-3 pb-3">
+                  <Button size="sm" className="w-full" onClick={handleSaveJson} disabled={!!jsonError}>
+                    <Save className="w-3.5 h-3.5 mr-1.5" /> Save Character
+                  </Button>
+                </div>
+              </>
             ) : (
-              <div className="p-6 text-center text-muted-foreground text-sm space-y-2">
+              <div className="p-6 text-center text-muted-foreground text-sm space-y-3">
                 {jsonError ? (
                   <>
                     <AlertCircle className="w-8 h-8 mx-auto text-destructive/50" />
-                    <p>Fix the JSON errors to preview the stat block.</p>
+                    <p>Fix the JSON errors to edit the character sheet.</p>
                   </>
                 ) : (
                   <>
                     <User className="w-8 h-8 mx-auto opacity-30" />
-                    <p>Paste 5e.tools-compatible JSON in the <strong>JSON</strong> tab to render the character here.</p>
+                    <p>No character data yet.</p>
+                    <Button size="sm" variant="outline" onClick={handleCreateBlank}>
+                      Create Blank Character Sheet
+                    </Button>
                   </>
                 )}
               </div>
