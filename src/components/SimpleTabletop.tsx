@@ -7154,18 +7154,23 @@ export const SimpleTabletop = () => {
                   });
                 }
 
-                useActionStore.getState().startEffectAction({
-                  sourceTokenId: placement.casterId,
-                  templateId: template.id,
-                  templateName: template.name,
-                  damageType: template.damageType,
-                  damageFormula: placement.damageFormula,
-                  damageDice: template.damageDice,
-                  placedEffectId: allGroupEffects[allGroupEffects.length - 1]?.id,
-                  groupId: placement.multiDropGroupId,
-                  castLevel: placement.castLevel,
-                  impacts: mergedImpacts,
-                });
+                // Create separate action entries per drop for independent resolution
+                for (const groupEffect of allGroupEffects) {
+                  const dropImpacts = groupEffect.impactedTargets.filter(i => i.targetType === 'token');
+                  if (dropImpacts.length === 0) continue;
+                  useActionStore.getState().startEffectAction({
+                    sourceTokenId: placement.casterId,
+                    templateId: template.id,
+                    templateName: template.name,
+                    damageType: template.damageType,
+                    damageFormula: placement.damageFormula,
+                    damageDice: template.damageDice,
+                    placedEffectId: groupEffect.id,
+                    groupId: placement.multiDropGroupId,
+                    castLevel: placement.castLevel,
+                    impacts: dropImpacts,
+                  });
+                }
               }
             } else {
               // More drops to place — reset for next click

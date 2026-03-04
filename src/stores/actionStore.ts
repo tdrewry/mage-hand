@@ -149,7 +149,12 @@ export const useActionStore = create<ActionStore>()(
       timestamp: Date.now(),
     };
 
-    set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
+    const { currentAction } = get();
+    if (currentAction) {
+      set({ pendingActions: [...get().pendingActions, entry] });
+    } else {
+      set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
+    }
   },
 
   startSkillCheck: (sourceTokenId, skillName, modifier) => {

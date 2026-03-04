@@ -25,9 +25,30 @@ const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string
 const RESOLUTION_BUTTON_KEYS: AttackResolution[] = ['critical_miss', 'miss', 'hit', 'critical_threat', 'critical_hit'];
 
 /** Short label for an action entry used in tabs */
-function actionTabLabel(action: ActionQueueEntry): string {
-  if (action.category === 'skill') return action.attack?.name || 'Skill';
-  return action.attack?.name || 'Action';
+function actionTabLabel(action: ActionQueueEntry, index: number, allActions: ActionQueueEntry[]): string {
+  const baseName = action.category === 'skill'
+    ? (action.attack?.name || 'Skill')
+    : (action.attack?.name || 'Action');
+  
+  // Count how many actions share this base name
+  const duplicateCount = allActions.filter(a => {
+    const n = a.category === 'skill' ? (a.attack?.name || 'Skill') : (a.attack?.name || 'Action');
+    return n === baseName;
+  }).length;
+  
+  if (duplicateCount > 1) {
+    // Find ordinal among duplicates
+    let ordinal = 0;
+    for (let i = 0; i <= index; i++) {
+      const n = allActions[i].category === 'skill'
+        ? (allActions[i].attack?.name || 'Skill')
+        : (allActions[i].attack?.name || 'Action');
+      if (n === baseName) ordinal++;
+    }
+    return `${baseName} #${ordinal}`;
+  }
+  
+  return baseName;
 }
 
 export function ActionCardContent() {
@@ -55,13 +76,13 @@ export function ActionCardContent() {
     >
       <div className="px-2 pt-2 shrink-0">
         <TabsList className="w-full flex flex-wrap h-auto gap-1">
-          {allActions.map((action) => (
+          {allActions.map((action, idx) => (
             <TabsTrigger
               key={action.id}
               value={action.id}
               className="text-xs px-2 py-1 max-w-[120px] truncate"
             >
-              {actionTabLabel(action)}
+              {actionTabLabel(action, idx, allActions)}
             </TabsTrigger>
           ))}
         </TabsList>
