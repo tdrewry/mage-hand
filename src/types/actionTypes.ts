@@ -113,6 +113,8 @@ export interface ActionQueueEntry {
     placedEffectId: string;
     /** Group ID linking multi-drop effect instances */
     groupId?: string;
+    /** The level this effect was cast at */
+    castLevel?: number;
   };
 }
 

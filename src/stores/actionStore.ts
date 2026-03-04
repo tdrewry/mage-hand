@@ -72,6 +72,7 @@ interface ActionActions {
     damageDice?: DamageDiceEntry[];
     placedEffectId: string;
     groupId?: string;
+    castLevel?: number;
     impacts: EffectImpact[];
   }) => void;
   
@@ -145,7 +146,7 @@ export const useActionStore = create<ActionStore>()(
     set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
   },
 
-  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, impacts }) => {
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts }) => {
     const sessionTokens = useSessionStore.getState().tokens;
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
@@ -255,6 +256,7 @@ export const useActionStore = create<ActionStore>()(
         damageType,
         placedEffectId,
         groupId,
+        castLevel,
       },
     };
 

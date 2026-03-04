@@ -166,7 +166,14 @@ function ResolvePhase() {
             <Swords className="w-5 h-5 text-primary" />
             <div>
               <h3 className="font-semibold text-sm">{currentAction.sourceTokenName}</h3>
-              <p className="text-xs text-muted-foreground">{currentAction.attack.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {currentAction.attack.name}
+                {currentAction.effectInfo?.castLevel && (
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-1">
+                    L{currentAction.effectInfo.castLevel}
+                  </Badge>
+                )}
+              </p>
             </div>
           </div>
           {/* Show all damage types from the first target's breakdown, or fallback to single type */}
