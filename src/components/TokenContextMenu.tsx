@@ -1116,13 +1116,8 @@ export const TokenContextMenu = ({
                                         t => t.name.toLowerCase() === item.name.toLowerCase()
                                       );
                                   if (matchedTemplate && currentToken) {
-                                    let castLevel = matchedTemplate.baseLevel;
-                                    if (currentToken.entityRef?.entityId) {
-                                      const character = useCreatureStore.getState().getCharacterById(currentToken.entityRef.entityId);
-                                      if (character?.level) {
-                                        castLevel = character.level;
-                                      }
-                                    }
+                                    // Use the spell's level (from the action item), fall back to template baseLevel
+                                    const castLevel = item.spellLevel ?? matchedTemplate.baseLevel;
                                     const gridUnit = 50;
                                     effectStore.startPlacement(
                                       matchedTemplate.id,
