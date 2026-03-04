@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { DndBeyondCharacter } from '@/types/creatureTypes';
 import { formatModifier, getAbilityModifier } from '@/types/creatureTypes';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,10 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Shield, Star, Dices } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Shield, Star, Dices, Link2 } from 'lucide-react';
+import { useEffectStore } from '@/stores/effectStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +32,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 
 export function EditableCharacterSheet({ character, onChange }: EditableCharacterSheetProps) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['core', 'abilities', 'actions']));
+  const allTemplates = useEffectStore(s => s.allTemplates);
 
   const toggle = (key: string) => {
     setOpenSections(prev => {
@@ -415,10 +419,19 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                     value={cantrip.name}
                     onChange={e => {
                       const cantrips = [...character.spells!.cantrips];
-                      cantrips[i] = { name: e.target.value };
+                      cantrips[i] = { ...cantrips[i], name: e.target.value };
                       update({ spells: { ...character.spells!, cantrips } });
                     }}
                     className="h-6 text-[10px] flex-1"
+                  />
+                  <EffectTemplatePicker
+                    value={cantrip.effectTemplateId}
+                    templates={allTemplates}
+                    onChange={templateId => {
+                      const cantrips = [...character.spells!.cantrips];
+                      cantrips[i] = { ...cantrips[i], effectTemplateId: templateId };
+                      update({ spells: { ...character.spells!, cantrips } });
+                    }}
                   />
                   <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => {
                     const cantrips = character.spells!.cantrips.filter((_, j) => j !== i);
@@ -489,6 +502,17 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                         update({ spells: { ...character.spells!, spellsByLevel } });
                       }}
                       className="h-5 text-[10px] flex-1"
+                    />
+                    <EffectTemplatePicker
+                      value={spell.effectTemplateId}
+                      templates={allTemplates}
+                      onChange={templateId => {
+                        const spellsByLevel = [...character.spells!.spellsByLevel];
+                        const spells = [...lvl.spells];
+                        spells[si] = { ...spell, effectTemplateId: templateId };
+                        spellsByLevel[li] = { ...lvl, spells };
+                        update({ spells: { ...character.spells!, spellsByLevel } });
+                      }}
                     />
                     <Badge variant={spell.prepared ? 'default' : 'outline'} className="text-[8px] px-1 h-4 shrink-0">
                       {spell.prepared ? 'P' : '—'}
@@ -609,5 +633,45 @@ function Field({ label, children, compact }: { label: string; children: React.Re
       <label className="text-[9px] text-muted-foreground uppercase">{label}</label>
       {children}
     </div>
+  );
+}
+
+// ─── Effect Template Picker (inline) ──────────────────────────────────────────
+
+import type { EffectTemplate } from '@/types/effectTypes';
+
+function EffectTemplatePicker({ value, templates, onChange }: {
+  value?: string;
+  templates: EffectTemplate[];
+  onChange: (templateId: string | undefined) => void;
+}) {
+  const matched = value ? templates.find(t => t.id === value) : null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="shrink-0">
+          <Select
+            value={value || '__none__'}
+            onValueChange={v => onChange(v === '__none__' ? undefined : v)}
+          >
+            <SelectTrigger className={`h-5 w-5 p-0 border-0 bg-transparent [&>svg]:hidden ${matched ? 'text-primary' : 'text-muted-foreground/40'}`}>
+              <Link2 className="w-3 h-3" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[200px]">
+              <SelectItem value="__none__" className="text-xs">No effect</SelectItem>
+              {templates.map(t => (
+                <SelectItem key={t.id} value={t.id} className="text-xs">
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        {matched ? `Linked: ${matched.name}` : 'Assign effect template'}
+      </TooltipContent>
+    </Tooltip>
   );
 }

@@ -1108,13 +1108,14 @@ export const TokenContextMenu = ({
                                 if (item.asAttack) {
                                   handleStartAttack(item.asAttack);
                                 } else {
-                                  // Try to match action name to an effect template
+                                  // Try explicit effectTemplateId first, then name match
                                   const effectStore = useEffectStore.getState();
-                                  const matchedTemplate = effectStore.allTemplates.find(
-                                    t => t.name.toLowerCase() === item.name.toLowerCase()
-                                  );
+                                  const matchedTemplate = item.effectTemplateId
+                                    ? effectStore.getTemplate(item.effectTemplateId)
+                                    : effectStore.allTemplates.find(
+                                        t => t.name.toLowerCase() === item.name.toLowerCase()
+                                      );
                                   if (matchedTemplate && currentToken) {
-                                    // Derive character level for cast level (fall back to template baseLevel)
                                     let castLevel = matchedTemplate.baseLevel;
                                     if (currentToken.entityRef?.entityId) {
                                       const character = useCreatureStore.getState().getCharacterById(currentToken.entityRef.entityId);
@@ -1122,7 +1123,7 @@ export const TokenContextMenu = ({
                                         castLevel = character.level;
                                       }
                                     }
-                                    const gridUnit = 50; // px per grid unit (standard default)
+                                    const gridUnit = 50;
                                     effectStore.startPlacement(
                                       matchedTemplate.id,
                                       currentToken.id,
