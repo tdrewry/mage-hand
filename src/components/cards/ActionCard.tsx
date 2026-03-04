@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import type { AttackResolution } from '@/types/actionTypes';
+import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
