@@ -112,6 +112,9 @@ interface ActionActions {
   /** Clear expired flashes */
   clearFlashes: () => void;
 
+  /** Swap currentAction with a pending action by index, allowing any-order resolution */
+  swapToAction: (pendingIndex: number) => void;
+
   /** Hydrate the full action queue from an external source (ephemeral sync) */
   hydrateQueue: (currentAction: ActionQueueEntry | null, pendingActions: ActionQueueEntry[], actionHistory: ActionHistoryEntry[]) => void;
 }
@@ -631,6 +634,20 @@ export const useActionStore = create<ActionStore>()(
   clearFlashes: () => {
     const now = Date.now();
     set({ resolutionFlashes: get().resolutionFlashes.filter(f => now - f.startTime < 1500) });
+  },
+
+  swapToAction: (pendingIndex) => {
+    const { currentAction, pendingActions } = get();
+    if (!currentAction || pendingIndex < 0 || pendingIndex >= pendingActions.length) return;
+    const target = pendingActions[pendingIndex];
+    const newPending = [...pendingActions];
+    newPending[pendingIndex] = currentAction;
+    set({
+      currentAction: target,
+      pendingActions: newPending,
+      isTargeting: target.phase === 'targeting',
+      targetingMousePos: null,
+    });
   },
 
   hydrateQueue: (currentAction, pendingActions, actionHistory) => {

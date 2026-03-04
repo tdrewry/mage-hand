@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
 import { useActionStore } from '@/stores/actionStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import type { AttackResolution } from '@/types/actionTypes';
+import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
@@ -23,18 +24,61 @@ const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string
 /** Resolution types shown as buttons (excludes 'half' which is a damage modifier) */
 const RESOLUTION_BUTTON_KEYS: AttackResolution[] = ['critical_miss', 'miss', 'hit', 'critical_threat', 'critical_hit'];
 
+/** Short label for an action entry used in tabs */
+function actionTabLabel(action: ActionQueueEntry): string {
+  if (action.category === 'skill') return action.attack?.name || 'Skill';
+  return action.attack?.name || 'Action';
+}
+
 export function ActionCardContent() {
-  const { currentAction, cancelAction, confirmTargets, setResolution, overrideDamage, commitAction } = useActionStore();
+  const { currentAction, pendingActions, swapToAction } = useActionStore();
 
   if (!currentAction) {
     return <EmptyState />;
   }
 
-  switch (currentAction.phase) {
+  const allActions = [currentAction, ...pendingActions];
+  const hasTabs = allActions.length > 1;
+
+  if (!hasTabs) {
+    return <SingleActionView action={currentAction} />;
+  }
+
+  return (
+    <Tabs
+      value={currentAction.id}
+      onValueChange={(id) => {
+        const pendingIdx = pendingActions.findIndex(a => a.id === id);
+        if (pendingIdx >= 0) swapToAction(pendingIdx);
+      }}
+      className="h-full flex flex-col"
+    >
+      <div className="px-2 pt-2 shrink-0">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1">
+          {allActions.map((action) => (
+            <TabsTrigger
+              key={action.id}
+              value={action.id}
+              className="text-xs px-2 py-1 max-w-[120px] truncate"
+            >
+              {actionTabLabel(action)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+      <TabsContent value={currentAction.id} className="flex-1 min-h-0 mt-0">
+        <SingleActionView action={currentAction} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function SingleActionView({ action }: { action: ActionQueueEntry }) {
+  switch (action.phase) {
     case 'targeting':
       return <TargetingPhase />;
     case 'resolve':
-      if (currentAction.category === 'skill') return <SkillCheckResolvePhase />;
+      if (action.category === 'skill') return <SkillCheckResolvePhase />;
       return <ResolvePhase />;
     default:
       return <EmptyState />;
@@ -154,27 +198,19 @@ function TargetingPhase() {
 }
 
 function SkillCheckResolvePhase() {
-  const { currentAction, pendingActions, setResolution, commitAction, cancelAction, cancelAllActions } = useActionStore();
+  const { currentAction, setResolution, commitAction, cancelAction } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const target = currentAction.targets[0];
   const roll = target ? currentAction.rollResults[target.targetKey] : null;
   const resolution = target ? currentAction.resolutions[target.targetKey] : undefined;
-  const queueCount = pendingActions.length;
+  
   const isNat20 = roll?.naturalRoll === 20;
   const isNat1 = roll?.naturalRoll === 1;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {queueCount > 0 && (
-          <div className="flex items-center gap-2 rounded-md bg-accent/50 px-3 py-1.5">
-            <ChevronRight className="w-3.5 h-3.5 text-accent-foreground" />
-            <span className="text-xs font-medium text-accent-foreground">
-              {queueCount} more action{queueCount > 1 ? 's' : ''} queued
-            </span>
-          </div>
-        )}
 
         {/* Skill Check Header */}
         <div className="flex items-center gap-2">
@@ -239,11 +275,6 @@ function SkillCheckResolvePhase() {
           <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
             Dismiss
           </Button>
-          {queueCount > 0 && (
-            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={cancelAllActions}>
-              Skip All
-            </Button>
-          )}
           <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution}>
             Record
           </Button>
@@ -254,24 +285,14 @@ function SkillCheckResolvePhase() {
 }
 
 function ResolvePhase() {
-  const { currentAction, pendingActions, setResolution, overrideDamage, commitAction, cancelAction, cancelAllActions, removeTarget } = useActionStore();
+  const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
   if (!currentAction || !currentAction.attack) return null;
 
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
-  const queueCount = pendingActions.length;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {/* Queue indicator */}
-        {queueCount > 0 && (
-          <div className="flex items-center gap-2 rounded-md bg-accent/50 px-3 py-1.5">
-            <ChevronRight className="w-3.5 h-3.5 text-accent-foreground" />
-            <span className="text-xs font-medium text-accent-foreground">
-              {queueCount} more action{queueCount > 1 ? 's' : ''} queued
-            </span>
-          </div>
-        )}
 
         {/* Action Header */}
         <div className="flex items-center justify-between">
@@ -385,11 +406,6 @@ function ResolvePhase() {
           <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
             Cancel
           </Button>
-          {queueCount > 0 && (
-            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={cancelAllActions}>
-              Skip All
-            </Button>
-          )}
           <Button size="sm" className="flex-1" onClick={commitAction} disabled={!allResolved}>
             Commit Results
           </Button>
