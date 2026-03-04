@@ -420,6 +420,131 @@ export const WALL_OF_THORNS: EffectTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Buff / modifier spell templates
+// ---------------------------------------------------------------------------
+
+export const SHIELD_OF_FAITH: EffectTemplate = {
+  id: 'builtin-shield-of-faith',
+  name: 'Shield of Faith',
+  shape: 'circle',
+  radius: 0.5,
+  placementMode: 'caster',
+  persistence: 'persistent',
+  durationRounds: 100, // 10 minutes concentration
+  color: '#FFD700',
+  secondaryColor: '#FFFACD',
+  opacity: 0.25,
+  animation: 'pulse',
+  animationSpeed: 0.6,
+  category: 'spell',
+  level: 1,
+  description: 'A shimmering field appears around a creature, granting +2 bonus to AC.',
+  isBuiltIn: true,
+  skipRotation: true,
+  modifiers: [
+    { id: 'sof-ac', target: 'armorClass', operation: 'add', value: 2, label: '+2 AC' },
+  ],
+};
+
+export const HASTE: EffectTemplate = {
+  id: 'builtin-haste',
+  name: 'Haste',
+  shape: 'circle',
+  radius: 0.5,
+  placementMode: 'caster',
+  persistence: 'persistent',
+  durationRounds: 100,
+  color: '#00FF88',
+  secondaryColor: '#88FFCC',
+  opacity: 0.2,
+  animation: 'pulse',
+  animationSpeed: 1.5,
+  category: 'spell',
+  level: 3,
+  description: 'A willing creature gains +2 AC, doubled speed, advantage on Dex saves, and an additional action.',
+  isBuiltIn: true,
+  skipRotation: true,
+  modifiers: [
+    { id: 'haste-ac', target: 'armorClass', operation: 'add', value: 2, label: '+2 AC' },
+    { id: 'haste-spd', target: 'speed', operation: 'multiply', value: 2, label: '×2 Speed' },
+  ],
+};
+
+export const BLESS: EffectTemplate = {
+  id: 'builtin-bless',
+  name: 'Bless',
+  shape: 'circle',
+  radius: 0.5,
+  placementMode: 'caster',
+  persistence: 'persistent',
+  durationRounds: 100,
+  color: '#FFFACD',
+  secondaryColor: '#FFD700',
+  opacity: 0.2,
+  animation: 'pulse',
+  animationSpeed: 0.5,
+  category: 'spell',
+  level: 1,
+  description: 'Up to three creatures gain a d4 bonus to attack rolls and saving throws.',
+  isBuiltIn: true,
+  skipRotation: true,
+  multiDrop: { count: 3 },
+};
+
+export const HOLD_PERSON: EffectTemplate = {
+  id: 'builtin-hold-person',
+  name: 'Hold Person',
+  shape: 'circle',
+  radius: 0.5,
+  placementMode: 'free',
+  persistence: 'persistent',
+  durationRounds: 10,
+  color: '#8B008B',
+  secondaryColor: '#DA70D6',
+  opacity: 0.35,
+  animation: 'pulse',
+  animationSpeed: 0.4,
+  category: 'spell',
+  level: 2,
+  description: 'A humanoid must succeed on a Wisdom save or be paralyzed.',
+  isBuiltIn: true,
+  skipRotation: true,
+  ranged: true,
+  conditions: [
+    { condition: 'paralyzed', apply: true },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Attack-roll spell templates
+// ---------------------------------------------------------------------------
+
+export const MAGIC_MISSILE: EffectTemplate = {
+  id: 'builtin-magic-missile',
+  name: 'Magic Missile',
+  shape: 'circle',
+  radius: 0.5,
+  placementMode: 'free',
+  persistence: 'instant',
+  color: '#9370DB',
+  secondaryColor: '#E6E6FA',
+  opacity: 0.5,
+  animation: 'crackle',
+  animationSpeed: 2.0,
+  category: 'spell',
+  level: 1,
+  damageType: 'force',
+  damageDice: [{ formula: '1d4+1', damageType: 'force' }],
+  description: 'Three glowing darts of magical force each hit a creature automatically.',
+  isBuiltIn: true,
+  ranged: true,
+  skipRotation: true,
+  multiDrop: { count: 3 },
+  baseLevel: 1,
+  scaling: [{ property: 'multiDropCount', perLevel: 1 }],
+};
+
+// ---------------------------------------------------------------------------
 // Aggregate collections
 // ---------------------------------------------------------------------------
 
@@ -437,6 +562,11 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
   DARKNESS,
   SPIRIT_GUARDIANS,
   THUNDERWAVE,
+  SHIELD_OF_FAITH,
+  HASTE,
+  BLESS,
+  HOLD_PERSON,
+  MAGIC_MISSILE,
   PIT_TRAP,
   POISON_GAS_CLOUD,
   STORM_OF_VENGEANCE_BOLTS,

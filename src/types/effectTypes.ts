@@ -136,6 +136,16 @@ export interface EffectTemplate {
   scaling?: ScalingRule[];
   /** Explicit overrides for specific cast levels */
   levelOverrides?: LevelOverride[];
+
+  // Extended impact types
+  /** Attack roll configuration (e.g. spell attack) */
+  attackRoll?: EffectAttackRoll;
+  /** Stat modifiers to apply to targets */
+  modifiers?: EffectModifier[];
+  /** Conditions to apply/remove on targets */
+  conditions?: EffectCondition[];
+  /** Temporary actions granted to targets */
+  grantedActions?: EffectGrantedAction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +250,95 @@ export interface EffectPlacementState {
   polylineWaypoints?: { x: number; y: number }[];
   /** Total polyline length used so far (in grid units) */
   polylineLengthUsed?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Attack roll configuration
+// ---------------------------------------------------------------------------
+
+export interface EffectAttackRoll {
+  enabled: boolean;
+  /** Which ability mod to use: 'spellcasting' | 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' */
+  abilitySource: string;
+  /** Fixed bonus override (if not using token's data) */
+  fixedBonus?: number;
+  /** Whether to add proficiency bonus */
+  addProficiency?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Effect modifiers (non-damage impacts)
+// ---------------------------------------------------------------------------
+
+export type EffectModifierTarget =
+  | 'armorClass'
+  | 'speed'
+  | 'hitPoints.temp'
+  | 'abilities.strength.score'
+  | 'abilities.dexterity.score'
+  | 'abilities.constitution.score'
+  | 'abilities.intelligence.score'
+  | 'abilities.wisdom.score'
+  | 'abilities.charisma.score'
+  | 'proficiencyBonus'
+  | 'initiative'
+  | string;
+
+/** Known modifier targets with human-readable labels */
+export const EFFECT_MODIFIER_TARGETS: { value: EffectModifierTarget; label: string; group: string }[] = [
+  { value: 'armorClass', label: 'Armor Class', group: 'Combat' },
+  { value: 'speed', label: 'Speed', group: 'Combat' },
+  { value: 'initiative', label: 'Initiative', group: 'Combat' },
+  { value: 'proficiencyBonus', label: 'Proficiency Bonus', group: 'Combat' },
+  { value: 'hitPoints.temp', label: 'Temp HP', group: 'Hit Points' },
+  { value: 'abilities.strength.score', label: 'Strength', group: 'Ability Scores' },
+  { value: 'abilities.dexterity.score', label: 'Dexterity', group: 'Ability Scores' },
+  { value: 'abilities.constitution.score', label: 'Constitution', group: 'Ability Scores' },
+  { value: 'abilities.intelligence.score', label: 'Intelligence', group: 'Ability Scores' },
+  { value: 'abilities.wisdom.score', label: 'Wisdom', group: 'Ability Scores' },
+  { value: 'abilities.charisma.score', label: 'Charisma', group: 'Ability Scores' },
+];
+
+export type EffectModifierOperation = 'add' | 'set' | 'multiply';
+
+export interface EffectModifier {
+  id: string;
+  /** The character property path to modify */
+  target: EffectModifierTarget;
+  /** How to apply */
+  operation: EffectModifierOperation;
+  /** The numeric value */
+  value: number;
+  /** Human-readable label */
+  label?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Conditions
+// ---------------------------------------------------------------------------
+
+/** Standard D&D 5e conditions */
+export const DND_5E_CONDITIONS = [
+  'blinded', 'charmed', 'deafened', 'frightened', 'grappled',
+  'incapacitated', 'invisible', 'paralyzed', 'petrified', 'poisoned',
+  'prone', 'restrained', 'stunned', 'unconscious', 'exhaustion',
+] as const;
+
+export interface EffectCondition {
+  condition: string;
+  apply: boolean; // true = add, false = remove
+}
+
+// ---------------------------------------------------------------------------
+// Granted temporary actions
+// ---------------------------------------------------------------------------
+
+export interface EffectGrantedAction {
+  name: string;
+  attackBonus?: number;
+  damageFormula?: string;
+  damageType?: string;
+  description?: string;
 }
 
 // ---------------------------------------------------------------------------
