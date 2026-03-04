@@ -77,6 +77,7 @@ interface ActionActions {
     groupId?: string;
     castLevel?: number;
     impacts: EffectImpact[];
+    attackRoll?: { enabled: boolean; abilitySource: string; fixedBonus?: number; addProficiency?: boolean };
   }) => void;
   
   /** Add a target to the current action */
@@ -222,7 +223,7 @@ export const useActionStore = create<ActionStore>()(
     }
   },
 
-  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts }) => {
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts, attackRoll }) => {
     const sessionTokens = useSessionStore.getState().tokens;
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
@@ -240,11 +241,24 @@ export const useActionStore = create<ActionStore>()(
           distance: i.distanceFromOrigin,
           defenseValue: 10, // Default — DM can adjust
           defenseType: 'flat' as const,
-          defenseLabel: 'Save DC',
+          defenseLabel: attackRoll?.enabled ? 'AC' : 'Save DC',
         };
       });
 
     if (targets.length === 0) return;
+
+    // Resolve attack bonus from caster data or fixed bonus
+    let resolvedAttackBonus = 0;
+    if (attackRoll?.enabled) {
+      if (attackRoll.fixedBonus !== undefined) {
+        resolvedAttackBonus = attackRoll.fixedBonus;
+      }
+      // Note: Character-based ability resolution would happen here
+      // when the caster has linked character data
+      if (attackRoll.addProficiency !== false) {
+        // Default: add proficiency if available (would come from character data)
+      }
+    }
 
     // Determine effective damage dice rows
     const effectiveDamageDice: DamageDiceEntry[] = (damageDice && damageDice.length > 0)
@@ -260,7 +274,7 @@ export const useActionStore = create<ActionStore>()(
     const effectAttack: AttackDefinition = {
       id: `effect-${templateId}`,
       name: templateName,
-      attackBonus: 0,
+      attackBonus: attackRoll?.enabled ? resolvedAttackBonus : 0,
       damageFormula: combinedFormula,
       damageType: primaryType,
       description: `Effect: ${templateName}`,
@@ -271,12 +285,25 @@ export const useActionStore = create<ActionStore>()(
     const damageResults: Record<string, DamageResult> = {};
 
     for (const target of targets) {
-      rollResults[target.targetKey] = {
-        naturalRoll: 0,
-        totalRoll: 0,
-        attackBonus: 0,
-        formula: 'Save',
-      };
+      if (attackRoll?.enabled) {
+        // Roll attack for effect (spell attack)
+        const attackFormula = `1d20+${resolvedAttackBonus}`;
+        const attackResult = rollDice(attackFormula);
+        const naturalRoll = attackResult.groups[0]?.keptResults[0] ?? 0;
+        rollResults[target.targetKey] = {
+          naturalRoll,
+          totalRoll: attackResult.total,
+          attackBonus: resolvedAttackBonus,
+          formula: attackFormula,
+        };
+      } else {
+        rollResults[target.targetKey] = {
+          naturalRoll: 0,
+          totalRoll: 0,
+          attackBonus: 0,
+          formula: 'Save',
+        };
+      }
 
       if (effectiveDamageDice.length > 0) {
         // Roll each damage dice row independently

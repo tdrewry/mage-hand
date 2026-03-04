@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride } from '@/types/effectTypes';
-import { computeScaledTemplate } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User } from 'lucide-react';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll } from '@/types/effectTypes';
+import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const CATEGORY_META: Record<EffectCategory, { label: string; icon: React.ElementType }> = {
   spell: { label: 'Spells', icon: Wand2 },
@@ -71,6 +72,14 @@ interface TemplateFormData {
   baseLevel: string;
   scaling: ScalingRule[];
   levelOverrides: LevelOverride[];
+  // Attack roll
+  attackRoll: EffectAttackRoll;
+  // Modifiers
+  modifiers: EffectModifier[];
+  // Conditions
+  conditions: EffectCondition[];
+  // Granted actions
+  grantedActions: EffectGrantedAction[];
 }
 
 const INITIAL_FORM: TemplateFormData = {
@@ -100,6 +109,10 @@ const INITIAL_FORM: TemplateFormData = {
   baseLevel: '',
   scaling: [],
   levelOverrides: [],
+  attackRoll: { enabled: false, abilitySource: 'spellcasting' },
+  modifiers: [],
+  conditions: [],
+  grantedActions: [],
 };
 
 function templateToForm(t: EffectTemplate): TemplateFormData {
@@ -130,6 +143,10 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     baseLevel: t.baseLevel !== undefined ? String(t.baseLevel) : '',
     scaling: t.scaling ?? [],
     levelOverrides: t.levelOverrides ?? [],
+    attackRoll: t.attackRoll ?? { enabled: false, abilitySource: 'spellcasting' },
+    modifiers: t.modifiers ?? [],
+    conditions: t.conditions ?? [],
+    grantedActions: t.grantedActions ?? [],
   };
 }
 
@@ -395,6 +412,186 @@ function LevelOverridesEditor({
 
 // --- Shared Form Fields Component ---
 
+// --- Tab types ---
+type FormTab = 'shape' | 'damage' | 'modifiers' | 'conditions';
+
+const FORM_TABS: { value: FormTab; label: string; icon: React.ElementType }[] = [
+  { value: 'shape', label: 'Shape', icon: Wand2 },
+  { value: 'damage', label: 'Damage', icon: Swords },
+  { value: 'modifiers', label: 'Mods', icon: Shield },
+  { value: 'conditions', label: 'Conds', icon: AlertCircle },
+];
+
+// --- Modifiers Editor ---
+
+function ModifiersEditor({
+  modifiers,
+  onChange,
+}: {
+  modifiers: EffectModifier[];
+  onChange: (mods: EffectModifier[]) => void;
+}) {
+  const addMod = () => onChange([...modifiers, {
+    id: `mod-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    target: 'armorClass',
+    operation: 'add',
+    value: 0,
+  }]);
+  const removeMod = (i: number) => onChange(modifiers.filter((_, idx) => idx !== i));
+  const updateMod = (i: number, updates: Partial<EffectModifier>) =>
+    onChange(modifiers.map((m, idx) => idx === i ? { ...m, ...updates } : m));
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-muted-foreground font-medium">Stat Modifiers</label>
+      {modifiers.map((mod, i) => (
+        <div key={mod.id} className="flex gap-1 items-center">
+          <Select value={mod.target} onValueChange={(v) => updateMod(i, { target: v })}>
+            <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {EFFECT_MODIFIER_TARGETS.map(t => (
+                <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={mod.operation} onValueChange={(v) => updateMod(i, { operation: v as EffectModifierOperation })}>
+            <SelectTrigger className="h-6 text-[10px] w-14"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="add">+</SelectItem>
+              <SelectItem value="set">=</SelectItem>
+              <SelectItem value="multiply">×</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="w-14">
+            <NumericInput
+              value={mod.value}
+              onChange={(v) => updateMod(i, { value: v })}
+              className="h-6 text-[10px]"
+              float={mod.operation === 'multiply'}
+              step={mod.operation === 'multiply' ? 0.5 : 1}
+            />
+          </div>
+          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeMod(i)}>
+            <X className="w-3 h-3 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addMod}>
+        <Plus className="w-3 h-3 mr-1" /> Add Modifier
+      </Button>
+    </div>
+  );
+}
+
+// --- Conditions Editor ---
+
+function ConditionsEditor({
+  conditions,
+  onChange,
+}: {
+  conditions: EffectCondition[];
+  onChange: (conds: EffectCondition[]) => void;
+}) {
+  const toggleCondition = (condition: string) => {
+    const existing = conditions.find(c => c.condition === condition);
+    if (existing) {
+      onChange(conditions.filter(c => c.condition !== condition));
+    } else {
+      onChange([...conditions, { condition, apply: true }]);
+    }
+  };
+
+  const toggleApply = (condition: string) => {
+    onChange(conditions.map(c => c.condition === condition ? { ...c, apply: !c.apply } : c));
+  };
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-muted-foreground font-medium">Conditions</label>
+      <div className="grid grid-cols-2 gap-1">
+        {DND_5E_CONDITIONS.map(cond => {
+          const active = conditions.find(c => c.condition === cond);
+          return (
+            <div key={cond} className="flex items-center gap-1">
+              <Checkbox
+                checked={!!active}
+                onCheckedChange={() => toggleCondition(cond)}
+                className="h-3.5 w-3.5"
+              />
+              <span className={`text-[10px] capitalize ${active ? 'text-foreground' : 'text-muted-foreground'}`}>
+                {cond}
+              </span>
+              {active && (
+                <button
+                  className={`text-[8px] px-1 rounded ${active.apply ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}
+                  onClick={() => toggleApply(cond)}
+                >
+                  {active.apply ? 'Apply' : 'Remove'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --- Granted Actions Editor ---
+
+function GrantedActionsEditor({
+  actions,
+  onChange,
+}: {
+  actions: EffectGrantedAction[];
+  onChange: (actions: EffectGrantedAction[]) => void;
+}) {
+  const addAction = () => onChange([...actions, { name: '', description: '' }]);
+  const removeAction = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
+  const updateAction = (i: number, updates: Partial<EffectGrantedAction>) =>
+    onChange(actions.map((a, idx) => idx === i ? { ...a, ...updates } : a));
+
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-muted-foreground font-medium">Granted Actions</label>
+      {actions.map((action, i) => (
+        <div key={i} className="border border-border rounded p-1.5 space-y-1">
+          <div className="flex gap-1 items-center">
+            <Input
+              value={action.name}
+              onChange={(e) => updateAction(i, { name: e.target.value })}
+              placeholder="Action name"
+              className="h-5 text-[10px] flex-1"
+            />
+            <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeAction(i)}>
+              <X className="w-3 h-3 text-destructive" />
+            </Button>
+          </div>
+          <div className="flex gap-1">
+            <Input
+              value={action.damageFormula ?? ''}
+              onChange={(e) => updateAction(i, { damageFormula: e.target.value || undefined })}
+              placeholder="Damage"
+              className="h-5 text-[10px] font-mono flex-1"
+            />
+            <Input
+              value={action.damageType ?? ''}
+              onChange={(e) => updateAction(i, { damageType: e.target.value || undefined })}
+              placeholder="Type"
+              className="h-5 text-[10px] flex-1"
+            />
+          </div>
+        </div>
+      ))}
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addAction}>
+        <Plus className="w-3 h-3 mr-1" /> Add Granted Action
+      </Button>
+    </div>
+  );
+}
+
+// --- Shared Form Fields Component (tabbed) ---
+
 function TemplateFormFields({
   form,
   update,
@@ -402,14 +599,22 @@ function TemplateFormFields({
   form: TemplateFormData;
   update: <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<FormTab>('shape');
+
   const needsRadius = form.shape === 'circle' || form.shape === 'circle-burst';
   const needsLength = form.shape === 'line' || form.shape === 'cone';
   const needsWidth = form.shape === 'line' || form.shape === 'rectangle' || form.shape === 'rectangle-burst';
   const needsAngle = form.shape === 'cone';
   const needsPolyline = form.shape === 'polyline';
 
+  // Count items on each tab for badges
+  const modCount = form.modifiers.length;
+  const condCount = form.conditions.length + form.grantedActions.length;
+  const dmgCount = form.damageDice.length + (form.attackRoll.enabled ? 1 : 0);
+
   return (
     <>
+      {/* Name — always visible */}
       <Input
         value={form.name}
         onChange={(e) => update('name', e.target.value)}
@@ -417,243 +622,305 @@ function TemplateFormFields({
         className="h-7 text-xs"
       />
 
-      <div className="flex gap-2">
-        <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="circle">Circle</SelectItem>
-            <SelectItem value="line">Line</SelectItem>
-            <SelectItem value="cone">Cone</SelectItem>
-            <SelectItem value="rectangle">Rectangle</SelectItem>
-            <SelectItem value="circle-burst">Circle Burst</SelectItem>
-            <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
-            <SelectItem value="polyline">Polyline (Wall)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="spell">Spell</SelectItem>
-            <SelectItem value="trap">Trap</SelectItem>
-            <SelectItem value="hazard">Hazard</SelectItem>
-            <SelectItem value="custom">Custom</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Tab bar */}
+      <div className="flex border-b border-border -mx-2 px-2">
+        {FORM_TABS.map(tab => {
+          const isActive = activeTab === tab.value;
+          const Icon = tab.icon;
+          const count = tab.value === 'modifiers' ? modCount : tab.value === 'conditions' ? condCount : tab.value === 'damage' ? dmgCount : 0;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium border-b-2 -mb-px transition-colors ${
+                isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="w-3 h-3" />
+              {tab.label}
+              {count > 0 && (
+                <Badge variant="secondary" className="text-[7px] px-1 py-0 h-3 ml-0.5">{count}</Badge>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex gap-2">
-        {needsRadius && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Radius</label>
-            <NumericInput value={form.radius ?? 1} onChange={(v) => update('radius', v)} className="h-7 text-xs" min={1} />
+      {/* --- Shape Tab --- */}
+      {activeTab === 'shape' && (
+        <>
+          <div className="flex gap-2">
+            <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
+              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="circle">Circle</SelectItem>
+                <SelectItem value="line">Line</SelectItem>
+                <SelectItem value="cone">Cone</SelectItem>
+                <SelectItem value="rectangle">Rectangle</SelectItem>
+                <SelectItem value="circle-burst">Circle Burst</SelectItem>
+                <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
+                <SelectItem value="polyline">Polyline (Wall)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
+              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="spell">Spell</SelectItem>
+                <SelectItem value="trap">Trap</SelectItem>
+                <SelectItem value="hazard">Hazard</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )}
-        {needsLength && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Length</label>
-            <NumericInput value={form.length ?? 1} onChange={(v) => update('length', v)} className="h-7 text-xs" min={1} />
+
+          <div className="flex gap-2">
+            {needsRadius && (
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Radius</label>
+                <NumericInput value={form.radius ?? 1} onChange={(v) => update('radius', v)} className="h-7 text-xs" min={1} />
+              </div>
+            )}
+            {needsLength && (
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Length</label>
+                <NumericInput value={form.length ?? 1} onChange={(v) => update('length', v)} className="h-7 text-xs" min={1} />
+              </div>
+            )}
+            {needsWidth && (
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Width</label>
+                <NumericInput value={form.width ?? 1} onChange={(v) => update('width', v)} className="h-7 text-xs" min={1} />
+              </div>
+            )}
+            {needsAngle && (
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Angle°</label>
+                <NumericInput value={form.angle ?? 1} onChange={(v) => update('angle', v)} className="h-7 text-xs" min={1} max={360} />
+              </div>
+            )}
+            {needsPolyline && (
+              <>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground">Max Length</label>
+                  <NumericInput value={form.maxLength ?? 1} onChange={(v) => update('maxLength', v)} className="h-7 text-xs" min={1} />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground">Thickness</label>
+                  <NumericInput value={form.segmentWidth ?? 0.1} onChange={(v) => update('segmentWidth', v)} className="h-7 text-xs" min={0.1} step={0.1} float />
+                </div>
+              </>
+            )}
           </div>
-        )}
-        {needsWidth && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Width</label>
-            <NumericInput value={form.width ?? 1} onChange={(v) => update('width', v)} className="h-7 text-xs" min={1} />
-          </div>
-        )}
-        {needsAngle && (
-          <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground">Angle°</label>
-            <NumericInput value={form.angle ?? 1} onChange={(v) => update('angle', v)} className="h-7 text-xs" min={1} max={360} />
-          </div>
-        )}
-        {needsPolyline && (
-          <>
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground">Max Length</label>
-              <NumericInput value={form.maxLength ?? 1} onChange={(v) => update('maxLength', v)} className="h-7 text-xs" min={1} />
+
+          <div className="flex gap-2 items-end">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Color</label>
+              <input type="color" value={form.color} onChange={(e) => update('color', e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer" />
             </div>
             <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground">Thickness</label>
-              <NumericInput value={form.segmentWidth ?? 0.1} onChange={(v) => update('segmentWidth', v)} className="h-7 text-xs" min={0.1} step={0.1} float />
+              <label className="text-[10px] text-muted-foreground">Opacity</label>
+              <NumericInput value={form.opacity ?? 0.5} onChange={(v) => update('opacity', v)} className="h-7 text-xs" min={0.1} max={1} step={0.05} float />
             </div>
-          </>
-        )}
-      </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">Animation</label>
+              <Select value={form.animation} onValueChange={(v) => update('animation', v as EffectAnimationType)}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="flicker">Flicker</SelectItem>
+                  <SelectItem value="crackle">Crackle</SelectItem>
+                  <SelectItem value="pulse">Pulse</SelectItem>
+                  <SelectItem value="expand">Expand</SelectItem>
+                  <SelectItem value="swirl">Swirl</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-      {/* Quantity & Spell Level */}
-      <div className="flex gap-2 items-end">
-        <div className="w-20">
-          <label className="text-[10px] text-muted-foreground">Quantity</label>
-          <NumericInput
-            value={form.multiDropCount ?? 1}
-            onChange={(v) => update('multiDropCount', Math.max(1, v))}
-            className="h-7 text-xs"
-            min={1}
-            max={20}
+          <div className="flex gap-2 items-center">
+            <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
+              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="instant">Instant</SelectItem>
+                <SelectItem value="persistent">Persistent</SelectItem>
+              </SelectContent>
+            </Select>
+            {form.persistence === 'persistent' && (
+              <>
+                <div className="flex-1">
+                  <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Switch checked={form.recurring} onCheckedChange={(v) => update('recurring', v)} className="scale-75" />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {form.recurring ? 'Recurring' : 'One-shot'}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            {[
+              { key: 'alignToGrid' as const, label: 'Align to grid (45° snap)' },
+              { key: 'targetCaster' as const, label: 'Include caster in targets' },
+              { key: 'ranged' as const, label: 'Ranged (place at distance)' },
+              { key: 'skipRotation' as const, label: 'Skip rotation step' },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-1">
+                <Switch checked={form[key]} onCheckedChange={(v) => update(key, v)} className="scale-75" />
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{label}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* --- Damage Tab --- */}
+      {activeTab === 'damage' && (
+        <>
+          <DamageDiceRows
+            rows={form.damageDice}
+            onChange={(rows) => update('damageDice', rows)}
           />
-        </div>
-        <span className="text-[10px] text-muted-foreground pb-1.5">
-          {form.multiDropCount > 1 ? `${form.multiDropCount} drops` : 'single'}
-        </span>
-        <div className="w-16">
-          <label className="text-[10px] text-muted-foreground">Spell Lvl</label>
-          <NumericInput
-            value={form.level ? Number(form.level) : 0}
-            onChange={(v) => update('level', String(v))}
-            className="h-7 text-xs"
-            min={0}
-            max={9}
-          />
-        </div>
-      </div>
 
-      <div className="flex gap-2 items-end">
-        <div>
-          <label className="text-[10px] text-muted-foreground">Color</label>
-          <input type="color" value={form.color} onChange={(e) => update('color', e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer" />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Opacity</label>
-          <NumericInput value={form.opacity ?? 0.5} onChange={(v) => update('opacity', v)} className="h-7 text-xs" min={0.1} max={1} step={0.05} float />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Animation</label>
-          <Select value={form.animation} onValueChange={(v) => update('animation', v as EffectAnimationType)}>
-            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="flicker">Flicker</SelectItem>
-              <SelectItem value="crackle">Crackle</SelectItem>
-              <SelectItem value="pulse">Pulse</SelectItem>
-              <SelectItem value="expand">Expand</SelectItem>
-              <SelectItem value="swirl">Swirl</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+          {/* Attack Roll */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Switch
+                checked={form.attackRoll.enabled}
+                onCheckedChange={(v) => update('attackRoll', { ...form.attackRoll, enabled: v })}
+                className="scale-75"
+              />
+              <span className="text-[10px] text-muted-foreground font-medium">Requires Attack Roll</span>
+            </div>
+            {form.attackRoll.enabled && (
+              <div className="flex gap-1 items-center pl-4">
+                <Select
+                  value={form.attackRoll.abilitySource}
+                  onValueChange={(v) => update('attackRoll', { ...form.attackRoll, abilitySource: v })}
+                >
+                  <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spellcasting">Spellcasting</SelectItem>
+                    <SelectItem value="str">Strength</SelectItem>
+                    <SelectItem value="dex">Dexterity</SelectItem>
+                    <SelectItem value="con">Constitution</SelectItem>
+                    <SelectItem value="int">Intelligence</SelectItem>
+                    <SelectItem value="wis">Wisdom</SelectItem>
+                    <SelectItem value="cha">Charisma</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="w-14">
+                  <NumericInput
+                    value={form.attackRoll.fixedBonus ?? 0}
+                    onChange={(v) => update('attackRoll', { ...form.attackRoll, fixedBonus: v })}
+                    className="h-6 text-[10px]"
+                  />
+                </div>
+                <span className="text-[9px] text-muted-foreground">bonus</span>
+              </div>
+            )}
+          </div>
 
-      {/* Multi-row damage dice */}
-      <DamageDiceRows
-        rows={form.damageDice}
-        onChange={(rows) => update('damageDice', rows)}
-      />
-
-      {/* Level Scaling Section */}
-      <Collapsible>
-        <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground w-full">
-          <TrendingUp className="w-3 h-3" />
-          <span>Level Scaling</span>
-          {form.scaling.length > 0 && (
-            <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 ml-1">{form.scaling.length} rule{form.scaling.length > 1 ? 's' : ''}</Badge>
-          )}
-          {form.levelOverrides.length > 0 && (
-            <Badge variant="outline" className="text-[8px] px-1 py-0 h-3">{form.levelOverrides.length} override{form.levelOverrides.length > 1 ? 's' : ''}</Badge>
-          )}
-          <ChevronRight className="w-3 h-3 ml-auto" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2 mt-1">
+          {/* Quantity & Spell Level */}
           <div className="flex gap-2 items-end">
             <div className="w-20">
-              <label className="text-[10px] text-muted-foreground">Base Level</label>
+              <label className="text-[10px] text-muted-foreground">Quantity</label>
               <NumericInput
-                value={form.baseLevel ? Number(form.baseLevel) : 0}
-                onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
+                value={form.multiDropCount ?? 1}
+                onChange={(v) => update('multiDropCount', Math.max(1, v))}
+                className="h-7 text-xs"
+                min={1}
+                max={20}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground pb-1.5">
+              {form.multiDropCount > 1 ? `${form.multiDropCount} drops` : 'single'}
+            </span>
+            <div className="w-16">
+              <label className="text-[10px] text-muted-foreground">Spell Lvl</label>
+              <NumericInput
+                value={form.level ? Number(form.level) : 0}
+                onChange={(v) => update('level', String(v))}
                 className="h-7 text-xs"
                 min={0}
                 max={9}
               />
             </div>
-            <span className="text-[10px] text-muted-foreground pb-1.5">
-              {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
-            </span>
           </div>
-          {form.baseLevel && (
-            <>
-              <ScalingRulesEditor
-                rules={form.scaling}
-                onChange={(rules) => update('scaling', rules)}
-                damageDiceCount={form.damageDice.length}
-              />
-              <Separator className="my-1" />
-              <LevelOverridesEditor
-                overrides={form.levelOverrides}
-                onChange={(overrides) => update('levelOverrides', overrides)}
-                baseLevel={Number(form.baseLevel)}
-              />
-            </>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
-      <div className="flex gap-2 items-center">
-        <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
-          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="instant">Instant</SelectItem>
-            <SelectItem value="persistent">Persistent</SelectItem>
-          </SelectContent>
-        </Select>
-        {form.persistence === 'persistent' && (
-          <>
-            <div className="flex-1">
-              <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
-            </div>
-            <div className="flex items-center gap-1">
-              <Switch
-                checked={form.recurring}
-                onCheckedChange={(v) => update('recurring', v)}
-                className="scale-75"
-              />
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                {form.recurring ? 'Recurring' : 'One-shot'}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
 
-      <div className="flex items-center gap-1">
-        <Switch
-          checked={form.alignToGrid}
-          onCheckedChange={(v) => update('alignToGrid', v)}
-          className="scale-75"
-        />
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          Align to grid (45° snap)
-        </span>
-      </div>
+          {/* Level Scaling Section */}
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground w-full">
+              <TrendingUp className="w-3 h-3" />
+              <span>Level Scaling</span>
+              {form.scaling.length > 0 && (
+                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 ml-1">{form.scaling.length} rule{form.scaling.length > 1 ? 's' : ''}</Badge>
+              )}
+              {form.levelOverrides.length > 0 && (
+                <Badge variant="outline" className="text-[8px] px-1 py-0 h-3">{form.levelOverrides.length} override{form.levelOverrides.length > 1 ? 's' : ''}</Badge>
+              )}
+              <ChevronRight className="w-3 h-3 ml-auto" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 mt-1">
+              <div className="flex gap-2 items-end">
+                <div className="w-20">
+                  <label className="text-[10px] text-muted-foreground">Base Level</label>
+                  <NumericInput
+                    value={form.baseLevel ? Number(form.baseLevel) : 0}
+                    onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
+                    className="h-7 text-xs"
+                    min={0}
+                    max={9}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground pb-1.5">
+                  {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
+                </span>
+              </div>
+              {form.baseLevel && (
+                <>
+                  <ScalingRulesEditor
+                    rules={form.scaling}
+                    onChange={(rules) => update('scaling', rules)}
+                    damageDiceCount={form.damageDice.length}
+                  />
+                  <Separator className="my-1" />
+                  <LevelOverridesEditor
+                    overrides={form.levelOverrides}
+                    onChange={(overrides) => update('levelOverrides', overrides)}
+                    baseLevel={Number(form.baseLevel)}
+                  />
+                </>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </>
+      )}
 
-      <div className="flex items-center gap-1">
-        <Switch
-          checked={form.targetCaster}
-          onCheckedChange={(v) => update('targetCaster', v)}
-          className="scale-75"
+      {/* --- Modifiers Tab --- */}
+      {activeTab === 'modifiers' && (
+        <ModifiersEditor
+          modifiers={form.modifiers}
+          onChange={(mods) => update('modifiers', mods)}
         />
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          Include caster in targets
-        </span>
-      </div>
+      )}
 
-      <div className="flex items-center gap-1">
-        <Switch
-          checked={form.ranged}
-          onCheckedChange={(v) => update('ranged', v)}
-          className="scale-75"
-        />
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          Ranged (place at distance)
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1">
-        <Switch
-          checked={form.skipRotation}
-          onCheckedChange={(v) => update('skipRotation', v)}
-          className="scale-75"
-        />
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-          Skip rotation step
-        </span>
-      </div>
+      {/* --- Conditions Tab --- */}
+      {activeTab === 'conditions' && (
+        <>
+          <ConditionsEditor
+            conditions={form.conditions}
+            onChange={(conds) => update('conditions', conds)}
+          />
+          <Separator className="my-1" />
+          <GrantedActionsEditor
+            actions={form.grantedActions}
+            onChange={(acts) => update('grantedActions', acts)}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -689,6 +956,10 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     baseLevel: form.baseLevel ? Number(form.baseLevel) : undefined,
     scaling: form.scaling.length > 0 ? form.scaling : undefined,
     levelOverrides: form.levelOverrides.length > 0 ? form.levelOverrides : undefined,
+    attackRoll: form.attackRoll.enabled ? form.attackRoll : undefined,
+    modifiers: form.modifiers.length > 0 ? form.modifiers : undefined,
+    conditions: form.conditions.length > 0 ? form.conditions : undefined,
+    grantedActions: form.grantedActions.length > 0 ? form.grantedActions : undefined,
   };
 }
 
