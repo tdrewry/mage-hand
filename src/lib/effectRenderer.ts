@@ -293,7 +293,7 @@ function renderEffect(
   rc.ctx.save();
 
   const anim = animationPaused
-    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
     : computeAnimation(template.animation, template.animationSpeed, rc.time, template.id);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
@@ -306,12 +306,15 @@ function renderEffect(
 
   rc.ctx.globalAlpha = Math.min(1, Math.max(0, opacity));
 
-  if (Math.abs(scale - 1.0) > 0.001) {
+  // Apply scale and/or rotation transforms around origin
+  const needsScale = Math.abs(scale - 1.0) > 0.001;
+  const needsRotation = Math.abs(anim.rotationAngle) > 0.001;
+  if (needsScale || needsRotation) {
     rc.ctx.translate(origin.x, origin.y);
-    rc.ctx.scale(scale, scale);
+    if (needsScale) rc.ctx.scale(scale, scale);
+    if (needsRotation) rc.ctx.rotate(anim.rotationAngle);
     rc.ctx.translate(-origin.x, -origin.y);
   }
-
 
   drawShape(rc, template, origin, direction, anim.colorShift);
 
@@ -590,10 +593,12 @@ interface AnimationMods {
   scaleMod: number;
   colorShift: number;
   glowMod: number;
+  /** Rotation angle in radians (used by 'rotate' animation) */
+  rotationAngle: number;
 }
 
 function computeAnimation(type: EffectAnimationType, speed: number, time: number, id: string): AnimationMods {
-  const base: AnimationMods = { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 };
+  const base: AnimationMods = { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 };
   if (type === 'none') return base;
 
   const phase = hashId(id) * Math.PI * 2;
@@ -610,6 +615,7 @@ function computeAnimation(type: EffectAnimationType, speed: number, time: number
         scaleMod: 1.0 + combined * 0.02,
         colorShift: clamp(0.5 + combined, 0, 1),
         glowMod: clamp(0.5 + combined * 0.5, 0.2, 1),
+        rotationAngle: 0,
       };
     }
     case 'crackle': {
@@ -622,20 +628,26 @@ function computeAnimation(type: EffectAnimationType, speed: number, time: number
         scaleMod: 1.0 + flash * 0.03,
         colorShift: flash > 0.5 ? 1 : 0,
         glowMod: flash,
+        rotationAngle: 0,
       };
     }
     case 'pulse': {
       const p = (Math.sin(t * 2 + phase) + 1) * 0.5;
-      return { opacityMod: 0.7 + p * 0.3, scaleMod: 0.97 + p * 0.06, colorShift: p, glowMod: p };
+      return { opacityMod: 0.7 + p * 0.3, scaleMod: 0.97 + p * 0.06, colorShift: p, glowMod: p, rotationAngle: 0 };
     }
     case 'expand': {
       const e = (Math.sin(t * 1.5 + phase) + 1) * 0.5;
-      return { opacityMod: 0.8 + e * 0.2, scaleMod: 0.95 + e * 0.1, colorShift: e * 0.5, glowMod: e };
+      return { opacityMod: 0.8 + e * 0.2, scaleMod: 0.95 + e * 0.1, colorShift: e * 0.5, glowMod: e, rotationAngle: 0 };
     }
     case 'swirl': {
       const s1 = (Math.sin(t * 1.2 + phase) + 1) * 0.5;
       const s2 = (Math.sin(t * 0.7 + phase * 2.1) + 1) * 0.5;
-      return { opacityMod: 0.75 + s1 * 0.25, scaleMod: 0.98 + s2 * 0.04, colorShift: s1 * 0.7, glowMod: s2 * 0.8 };
+      return { opacityMod: 0.75 + s1 * 0.25, scaleMod: 0.98 + s2 * 0.04, colorShift: s1 * 0.7, glowMod: s2 * 0.8, rotationAngle: 0 };
+    }
+    case 'rotate': {
+      // Continuous rotation: full revolution based on speed (speed=1 → ~6s per revolution)
+      const angle = t * 1.0; // radians, continuous
+      return { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: angle };
     }
     default:
       return base;
@@ -676,7 +688,7 @@ function renderPolylineEffect(
   const widthPx = (template.segmentWidth ?? 0.2) * gridSize;
 
   const anim = effect.animationPaused
-    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+    ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
     : computeAnimation(template.animation, template.animationSpeed, time, effect.id);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
@@ -863,7 +875,7 @@ export function renderAuraEffects(
 
     // Animation
     const anim = effect.animationPaused
-      ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+      ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
       : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id);
 
     const opacity = effect.template.opacity * anim.opacityMod * fadeMul;
