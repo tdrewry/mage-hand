@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll } from '@/types/effectTypes';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,11 @@ interface TemplateFormData {
   conditions: EffectCondition[];
   // Granted actions
   grantedActions: EffectGrantedAction[];
+  // Aura
+  isAura: boolean;
+  auraRadius: number;
+  auraAffectSelf: boolean;
+  auraWallBlocked: boolean;
 }
 
 const INITIAL_FORM: TemplateFormData = {
@@ -120,6 +125,10 @@ const INITIAL_FORM: TemplateFormData = {
   modifiers: [],
   conditions: [],
   grantedActions: [],
+  isAura: false,
+  auraRadius: 2,
+  auraAffectSelf: false,
+  auraWallBlocked: true,
 };
 
 function templateToForm(t: EffectTemplate): TemplateFormData {
@@ -157,6 +166,10 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     modifiers: t.modifiers ?? [],
     conditions: t.conditions ?? [],
     grantedActions: t.grantedActions ?? [],
+    isAura: !!t.aura,
+    auraRadius: t.aura?.radius ?? 2,
+    auraAffectSelf: t.aura?.affectSelf ?? false,
+    auraWallBlocked: t.aura?.wallBlocked !== false,
   };
 }
 
@@ -845,6 +858,41 @@ function TemplateFormFields({
               </div>
             ))}
           </div>
+
+          <Separator className="my-1" />
+
+          {/* Aura Configuration */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Switch checked={form.isAura} onCheckedChange={(v) => update('isAura', v)} className="scale-75" />
+              <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">Aura (locks to token)</span>
+            </div>
+            {form.isAura && (
+              <div className="pl-4 space-y-1">
+                <div className="flex gap-2 items-end">
+                  <div className="w-20">
+                    <label className="text-[10px] text-muted-foreground">Radius</label>
+                    <NumericInput
+                      value={form.auraRadius}
+                      onChange={(v) => update('auraRadius', Math.max(1, v))}
+                      className="h-6 text-[10px]"
+                      min={1}
+                      max={24}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground pb-1">grid units</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Switch checked={form.auraAffectSelf} onCheckedChange={(v) => update('auraAffectSelf', v)} className="scale-75" />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">Affect self</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Switch checked={form.auraWallBlocked} onCheckedChange={(v) => update('auraWallBlocked', v)} className="scale-75" />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">Blocked by walls</span>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -1083,6 +1131,11 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     modifiers: form.modifiers.length > 0 ? form.modifiers : undefined,
     conditions: form.conditions.length > 0 ? form.conditions : undefined,
     grantedActions: form.grantedActions.length > 0 ? form.grantedActions : undefined,
+    aura: form.isAura ? {
+      radius: form.auraRadius,
+      affectSelf: form.auraAffectSelf || undefined,
+      wallBlocked: form.auraWallBlocked === false ? false : undefined,
+    } : undefined,
   };
 }
 
