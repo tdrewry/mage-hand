@@ -359,6 +359,35 @@
 
 ---
 
+## 12. Effects & Auras
+
+*Primary stores: `effectStore`, `auraEngine`*
+
+### Ephemeral
+
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| Effect placement preview (ghost) | planned | `effect.placement.preview` | templateId + origin + direction, 15 Hz throttle, 300 ms TTL |
+| Aura tokensInsideArea update | planned | `effect.aura.state` | effectId + insideIds + impacts, 5 Hz throttle, 500 ms TTL. DM/owner authority only. |
+
+### Durable
+
+| Action | Status | Op Kind | Notes |
+|--------|--------|---------|-------|
+| Effect placed | planned | `effect.place` | Template snapshot + origin + direction + casterId + mapId + aura fields |
+| Effect dismissed (fade-out) | planned | `effect.dismiss` | effectId |
+| Effect cancelled (revert modifiers) | planned | `effect.cancel` | effectId |
+| Effect round tick (duration countdown) | planned | `effect.tick` | effectId + roundsRemaining. DM authority only. |
+
+### Potential New Features
+
+| Action | Layer | Description |
+|--------|-------|-------------|
+| Effect modifier sync | Durable | Sync stat modifiers applied by effects (deferred until character state networking) |
+| Effect template library sync | Durable | Share custom effect templates across clients |
+
+---
+
 ## Already Implemented Summary
 
 | Op Kind | Layer | Store | Notes |
