@@ -26,6 +26,15 @@ import {
 } from '@/lib/durableObjects';
 import { toast } from 'sonner';
 
+/** Build a map of kind -> current summary string from registered summarizers */
+function getCurrentSummaries(): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const reg of DurableObjectRegistry.getAll()) {
+    result[reg.kind] = reg.summarizer ? reg.summarizer() : '';
+  }
+  return result;
+}
+
 interface DurableObjectImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,11 +49,14 @@ export const DurableObjectImportModal: React.FC<DurableObjectImportModalProps> =
   const [selectedKinds, setSelectedKinds] = useState<Set<string>>(new Set());
   const [importResult, setImportResult] = useState<{ imported: string[]; errors: string[] } | null>(null);
 
-  // Reset selection when archive changes
+  const [currentSummaries, setCurrentSummaries] = useState<Record<string, string>>({});
+
+  // Reset selection and snapshot current state when archive changes
   React.useEffect(() => {
     if (archive) {
       setSelectedKinds(new Set(archive.manifest.map(e => e.kind)));
       setImportResult(null);
+      setCurrentSummaries(getCurrentSummaries());
     }
   }, [archive]);
 
@@ -148,7 +160,13 @@ export const DurableObjectImportModal: React.FC<DurableObjectImportModalProps> =
             <ScrollArea className="h-[320px] w-full pr-2">
               <div className="space-y-1">
                 {archive.manifest.map((entry: DurableObjectManifestEntry) => {
-                  const isRegistered = !!DurableObjectRegistry.get(entry.kind);
+                  const reg = DurableObjectRegistry.get(entry.kind);
+                  const isRegistered = !!reg;
+                  const currentSummary = currentSummaries[entry.kind];
+                  // Extract incoming summary from the label (format: "Label (summary)")
+                  const incomingMatch = entry.label.match(/\((.+)\)$/);
+                  const incomingSummary = incomingMatch ? incomingMatch[1] : '';
+
                   return (
                     <label
                       key={entry.kind}
@@ -167,7 +185,7 @@ export const DurableObjectImportModal: React.FC<DurableObjectImportModalProps> =
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{entry.label}</span>
+                          <span className="text-sm font-medium truncate">{reg?.label || entry.kind}</span>
                           {!isRegistered && (
                             <Badge variant="outline" className="text-xs shrink-0">
                               <AlertTriangle className="w-3 h-3 mr-1" />
@@ -179,6 +197,14 @@ export const DurableObjectImportModal: React.FC<DurableObjectImportModalProps> =
                           <span>{formatBytes(entry.byteSize)}</span>
                           <span>v{entry.version}</span>
                         </div>
+                        {isRegistered && selectedKinds.has(entry.kind) && (incomingSummary || currentSummary) && (
+                          <div className="text-xs mt-1 flex items-center gap-1 text-amber-500 dark:text-amber-400">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <span>
+                              {incomingSummary || 'incoming'} → replaces {currentSummary || 'existing'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </label>
                   );
