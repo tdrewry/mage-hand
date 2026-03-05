@@ -443,7 +443,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         5,
         (map) => {
           const { regions, ...mapData } = map;
-          mapStore.addMap({ ...mapData, regions: [] });
+          mapStore.restoreMap({ ...mapData, regions: regions || [] });
         },
         (processed, total) => setLoadingProgress(`Loading maps (${processed}/${total})...`)
       );
@@ -706,7 +706,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     existingMaps.forEach(map => mapStore.removeMap(map.id));
     (projectData.maps || []).forEach(map => {
       const { regions, ...mapData } = map;
-      mapStore.addMap({ ...mapData, regions: [] });
+      mapStore.restoreMap({ ...mapData, regions: regions || [] });
     });
 
     // Regions

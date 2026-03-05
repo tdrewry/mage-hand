@@ -67,8 +67,7 @@ DurableObjectRegistry.register({
     const store = useMapStore.getState();
     store.maps.forEach(m => store.removeMap(m.id));
     (state || []).forEach((m: any) => {
-      const { regions, ...mapData } = m;
-      store.addMap({ ...mapData, regions: [] });
+      store.restoreMap({ ...m, regions: m.regions || [] });
     });
   },
   summarizer: () => `${useMapStore.getState().maps.length} maps`,
