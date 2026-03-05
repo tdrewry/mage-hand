@@ -275,11 +275,14 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         initStore.setRestrictMovement(data.initiative.restrictMovement ?? false);
       }
 
-      // Fog of war
+      // Fog of war — use initMapFogSettings + setMapFogSettings for proper reactivity
       if (data.fogData) {
         const fs = useFogStore.getState();
         if (data.fogData.fogSettingsPerMap) {
+          // Clear stale entries first
+          useFogStore.setState({ fogSettingsPerMap: {} });
           Object.entries(data.fogData.fogSettingsPerMap).forEach(([mapId, settings]) => {
+            fs.initMapFogSettings(mapId);
             fs.setMapFogSettings(mapId, settings);
           });
         }
