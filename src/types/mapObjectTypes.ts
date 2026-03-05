@@ -27,6 +27,9 @@ export interface MapObject {
   // Texture/image support
   imageUrl?: string;
   imageHash?: string; // For texture sync
+  textureScale?: number;     // Scale multiplier for texture (default 1)
+  textureOffsetX?: number;   // Horizontal offset in pixels
+  textureOffsetY?: number;   // Vertical offset in pixels
   
   // Behavior flags
   castsShadow: boolean; // Like negative regions

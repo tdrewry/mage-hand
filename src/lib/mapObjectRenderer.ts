@@ -6,6 +6,23 @@ import { MapObject } from '@/types/mapObjectTypes';
 import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 import { computeInsetPath } from '@/utils/pathUtils';
 
+// ---------------------------------------------------------------------------
+// Texture image cache for map objects
+// ---------------------------------------------------------------------------
+
+const mapObjectTextureCache = new Map<string, HTMLImageElement | null>();
+
+function getMapObjectTextureImage(url: string): HTMLImageElement | null {
+  if (mapObjectTextureCache.has(url)) return mapObjectTextureCache.get(url)!;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  mapObjectTextureCache.set(url, null);
+  img.onload = () => mapObjectTextureCache.set(url, img);
+  img.onerror = () => mapObjectTextureCache.set(url, null);
+  img.src = url;
+  return null;
+}
+
 /**
  * Calculate distance from a point to a line segment.
  */
@@ -696,8 +713,37 @@ export function renderMapObject(
         }
         break;
     }
-
+    
     ctx.fill();
+    
+    // Draw texture if present
+    if (mapObject.imageUrl) {
+      const img = getMapObjectTextureImage(mapObject.imageUrl);
+      if (img) {
+        ctx.save();
+        // Clip to the current shape path
+        ctx.clip();
+        const scale = mapObject.textureScale ?? 1;
+        const offX = mapObject.textureOffsetX ?? 0;
+        const offY = mapObject.textureOffsetY ?? 0;
+        // Size image to cover the object bounds, then apply user scale
+        const imgAspect = img.width / img.height;
+        const objAspect = width / height;
+        let drawW: number, drawH: number;
+        if (imgAspect > objAspect) {
+          drawH = height;
+          drawW = height * imgAspect;
+        } else {
+          drawW = width;
+          drawH = width / imgAspect;
+        }
+        drawW *= scale;
+        drawH *= scale;
+        ctx.drawImage(img, -drawW / 2 + offX, -drawH / 2 + offY, drawW, drawH);
+        ctx.restore();
+      }
+    }
+
     ctx.stroke();
 
     // Category-specific overlays drawn after base fill/stroke
