@@ -153,7 +153,7 @@ import {
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
 import { useEffectStore } from "../stores/effectStore";
-import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint, computeTokenSourcedOrigin } from "../lib/effectRenderer";
+import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/effectRenderer";
 import { EffectContextMenu } from "./EffectContextMenu";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
 
@@ -4131,6 +4131,16 @@ export const SimpleTabletop = () => {
           // Clean up fully-faded dismissed effects
           effectState.cleanupDismissedEffects();
         }
+        // Render aura effects (visibility-clipped circles)
+        const auraEffects = mapEffects.filter(e => e.isAura);
+        if (auraEffects.length > 0) {
+          const tokenPosMap = new Map<string, { x: number; y: number }>();
+          for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
+          renderAuraEffects(
+            { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+            auraEffects,
+          );
+        }
         if (effectState.placement?.previewOrigin) {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
         }
@@ -4189,7 +4199,7 @@ export const SimpleTabletop = () => {
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
 
-            // ── Placed spell/trap effects on overlay ──
+             // ── Placed spell/trap effects on overlay ──
             {
               const effectState = useEffectStore.getState();
               const activeMapId = selectedMapId || 'default-map';
@@ -4201,6 +4211,16 @@ export const SimpleTabletop = () => {
                   mapEffects,
                 );
                 effectState.cleanupDismissedEffects();
+              }
+              // Render aura effects on overlay
+              const auraEffects = mapEffects.filter(e => e.isAura);
+              if (auraEffects.length > 0) {
+                const tokenPosMap = new Map<string, { x: number; y: number }>();
+                for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
+                renderAuraEffects(
+                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+                  auraEffects,
+                );
               }
               if (effectState.placement?.previewOrigin) {
                 renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);

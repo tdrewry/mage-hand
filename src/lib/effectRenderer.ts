@@ -15,6 +15,8 @@ import type {
   EffectPlacementState,
 } from '@/types/effectTypes';
 import { isBurstShape } from '@/types/effectTypes';
+import type { LineSegment, Point } from '@/lib/visibilityEngine';
+import { computeVisibilityFromSegments } from '@/lib/visibilityEngine';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -668,5 +670,106 @@ function renderPolylinePlacementPreview(
     ctx.font = `bold ${Math.max(10, gridSize * 0.3)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(`${remainFt}ft left`, (last.x + endX) / 2, (last.y + endY) / 2 - widthPx - 4);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Aura rendering — visibility-clipped translucent circle
+// ---------------------------------------------------------------------------
+
+export interface AuraRenderContext extends EffectRenderContext {
+  /** Wall/obstacle segments for visibility clipping */
+  wallSegments: LineSegment[];
+  /** Token positions keyed by ID — used to find the anchor token */
+  tokenPositions: Map<string, { x: number; y: number }>;
+}
+
+/**
+ * Render all aura effects. Auras are drawn as visibility-clipped translucent
+ * circles centered on their anchor token. The visibility engine clips the
+ * circle by walls, so the aura doesn't bleed through walls.
+ */
+export function renderAuraEffects(
+  rc: AuraRenderContext,
+  effects: PlacedEffect[],
+): void {
+  const auraEffects = effects.filter(e => e.isAura && e.anchorTokenId && e.template.aura);
+  if (auraEffects.length === 0) return;
+
+  for (const effect of auraEffects) {
+    // Compute fade-out multiplier
+    let fadeMul = 1.0;
+    if (effect.dismissedAt) {
+      const fadeAge = rc.time - effect.dismissedAt;
+      fadeMul = Math.max(0, 1.0 - fadeAge / FADE_OUT_DURATION);
+      if (fadeMul <= 0.01) continue;
+    }
+
+    const anchorPos = rc.tokenPositions.get(effect.anchorTokenId!);
+    if (!anchorPos) continue;
+
+    const aura = effect.template.aura!;
+    const radiusPx = aura.radius * rc.gridSize;
+    const center: Point = { x: anchorPos.x, y: anchorPos.y };
+
+    // Animation
+    const anim = effect.animationPaused
+      ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5 }
+      : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id);
+
+    const opacity = effect.template.opacity * anim.opacityMod * fadeMul;
+    if (opacity <= 0.01) continue;
+
+    const { ctx } = rc;
+    ctx.save();
+
+    // If wall-blocked (default true), clip to visibility polygon
+    const wallBlocked = aura.wallBlocked !== false;
+    if (wallBlocked && rc.wallSegments.length > 0) {
+      const vis = computeVisibilityFromSegments(center, rc.wallSegments, radiusPx);
+      if (vis.polygon.length >= 3) {
+        // Build clipping path from visibility polygon
+        const clipPath = new Path2D();
+        clipPath.moveTo(vis.polygon[0].x, vis.polygon[0].y);
+        for (let i = 1; i < vis.polygon.length; i++) {
+          clipPath.lineTo(vis.polygon[i].x, vis.polygon[i].y);
+        }
+        clipPath.closePath();
+        ctx.clip(clipPath);
+      }
+    }
+
+    // Draw filled aura circle (will be clipped by visibility polygon)
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = effect.template.color;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radiusPx * anim.scaleMod, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Radial gradient edge fade
+    ctx.globalAlpha = opacity * 0.6;
+    const grad = ctx.createRadialGradient(
+      center.x, center.y, radiusPx * 0.3,
+      center.x, center.y, radiusPx * anim.scaleMod,
+    );
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.7, 'transparent');
+    grad.addColorStop(1, effect.template.color);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radiusPx * anim.scaleMod, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outline ring
+    ctx.globalAlpha = Math.min(1, opacity * 1.5);
+    ctx.strokeStyle = effect.template.color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radiusPx * anim.scaleMod, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
   }
 }
