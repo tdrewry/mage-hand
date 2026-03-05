@@ -846,11 +846,23 @@ export function renderAuraEffects(
     }
 
     // Draw filled aura circle (will be clipped by visibility polygon)
+    const auraRadius = radiusPx * anim.scaleMod;
     ctx.globalAlpha = opacity;
     ctx.fillStyle = effect.template.color;
     ctx.beginPath();
-    ctx.arc(center.x, center.y, radiusPx * anim.scaleMod, 0, Math.PI * 2);
+    ctx.arc(center.x, center.y, auraRadius, 0, Math.PI * 2);
     ctx.fill();
+
+    // Draw texture if present (clipped by both visibility polygon and circle)
+    if (effect.template.texture) {
+      const img = getTextureImage(effect.template.texture);
+      if (img) {
+        const circlePath = new Path2D();
+        circlePath.arc(center.x, center.y, auraRadius, 0, Math.PI * 2);
+        circlePath.closePath();
+        drawTextureInPath(ctx, img, circlePath, effect.template, center, 0, rc.gridSize);
+      }
+    }
 
     // Radial gradient edge fade
     ctx.globalAlpha = opacity * 0.6;
