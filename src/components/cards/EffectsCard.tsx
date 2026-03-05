@@ -5,6 +5,7 @@ import { useCreatureStore } from '@/stores/creatureStore';
 import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
+import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,9 @@ interface TemplateFormData {
   skipRotation: boolean;
   color: string;
   texture: string;
+  textureScale: number;
+  textureOffsetX: number;
+  textureOffsetY: number;
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
@@ -110,6 +114,9 @@ const INITIAL_FORM: TemplateFormData = {
   skipRotation: false,
   color: '#FF4500',
   texture: '',
+  textureScale: 1,
+  textureOffsetX: 0,
+  textureOffsetY: 0,
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
@@ -150,6 +157,9 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     skipRotation: t.skipRotation ?? false,
     color: t.color,
     texture: t.texture ?? '',
+    textureScale: t.textureScale ?? 1,
+    textureOffsetX: t.textureOffsetX ?? 0,
+    textureOffsetY: t.textureOffsetY ?? 0,
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
@@ -660,6 +670,7 @@ function TemplateFormFields({
   update: <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) => void;
 }) {
   const [activeTab, setActiveTab] = useState<FormTab>('shape');
+  const [textureModalOpen, setTextureModalOpen] = useState(false);
 
   const needsRadius = form.shape === 'circle' || form.shape === 'circle-burst';
   const needsLength = form.shape === 'line' || form.shape === 'cone';
@@ -789,18 +800,49 @@ function TemplateFormFields({
             <div className="flex-1">
               <label className="text-[10px] text-muted-foreground">Texture</label>
               <div className="flex gap-1 items-center">
-                <Input
-                  value={form.texture}
-                  onChange={(e) => update('texture', e.target.value)}
-                  placeholder="URL or asset key"
-                  className="h-7 text-xs flex-1"
-                />
-                {form.texture && (
-                  <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => update('texture', '')}>
-                    <X className="w-3 h-3 text-destructive" />
+                {form.texture ? (
+                  <>
+                    <div className="h-7 w-7 rounded border border-border overflow-hidden flex-shrink-0">
+                      <img src={form.texture} alt="texture" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground truncate flex-1">Texture set</span>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => { update('texture', ''); update('textureScale', 1); update('textureOffsetX', 0); update('textureOffsetY', 0); }}>
+                      <X className="w-3 h-3 text-destructive" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => setTextureModalOpen(true)}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outline" size="sm" className="h-7 text-xs w-full" onClick={() => setTextureModalOpen(true)}>
+                    <Image className="w-3 h-3 mr-1" /> Import Image
                   </Button>
                 )}
               </div>
+              <ImageImportModal
+                open={textureModalOpen}
+                onOpenChange={setTextureModalOpen}
+                title="Select Effect Texture"
+                description="Position the image as a texture for the effect shape."
+                shape={{
+                  type: (form.shape === 'circle' || form.shape === 'circle-burst') ? 'circle' : 'rectangle',
+                  width: (form.radius ?? 4) * 2 * 40,
+                  height: (form.shape === 'rectangle' || form.shape === 'rectangle-burst')
+                    ? (form.width ?? 1) * 40
+                    : (form.radius ?? 4) * 2 * 40,
+                }}
+                initialImageUrl={form.texture}
+                initialScale={form.textureScale}
+                initialOffsetX={form.textureOffsetX}
+                initialOffsetY={form.textureOffsetY}
+                onConfirm={(result: ImageImportResult) => {
+                  update('texture', result.imageUrl);
+                  update('textureScale', result.scale);
+                  update('textureOffsetX', result.offsetX);
+                  update('textureOffsetY', result.offsetY);
+                  setTextureModalOpen(false);
+                }}
+              />
             </div>
           </div>
 
@@ -1100,6 +1142,9 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     skipRotation: form.skipRotation || undefined,
     color: form.color,
     texture: form.texture || undefined,
+    textureScale: form.texture ? (form.textureScale !== 1 ? form.textureScale : undefined) : undefined,
+    textureOffsetX: form.texture ? (form.textureOffsetX !== 0 ? form.textureOffsetX : undefined) : undefined,
+    textureOffsetY: form.texture ? (form.textureOffsetY !== 0 ? form.textureOffsetY : undefined) : undefined,
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
