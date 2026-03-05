@@ -70,6 +70,7 @@ interface TemplateFormData {
   textureScale: number;
   textureOffsetX: number;
   textureOffsetY: number;
+  textureRepeat: boolean;
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
@@ -119,6 +120,7 @@ const INITIAL_FORM: TemplateFormData = {
   textureScale: 1,
   textureOffsetX: 0,
   textureOffsetY: 0,
+  textureRepeat: false,
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
@@ -163,6 +165,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     textureScale: t.textureScale ?? 1,
     textureOffsetX: t.textureOffsetX ?? 0,
     textureOffsetY: t.textureOffsetY ?? 0,
+    textureRepeat: t.textureRepeat ?? false,
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
@@ -809,7 +812,7 @@ function TemplateFormFields({
                       <img src={form.texture} alt="texture" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate flex-1">Texture set</span>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => { update('texture', ''); update('textureScale', 1); update('textureOffsetX', 0); update('textureOffsetY', 0); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => { update('texture', ''); update('textureScale', 1); update('textureOffsetX', 0); update('textureOffsetY', 0); update('textureRepeat', false); }}>
                       <X className="w-3 h-3 text-destructive" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => setTextureModalOpen(true)}>
