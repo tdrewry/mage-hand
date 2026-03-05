@@ -780,6 +780,36 @@ export const MapObjectContextMenuWrapper = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Texture Import Modal */}
+      {currentObject && (
+        <ImageImportModal
+          open={showTextureModal}
+          onOpenChange={(open) => handleDialogClose(open, setShowTextureModal)}
+          onConfirm={(result: ImageImportResult) => {
+            updateMapObject(currentObject.id, {
+              imageUrl: result.imageUrl,
+              textureScale: result.scale,
+              textureOffsetX: result.offsetX,
+              textureOffsetY: result.offsetY,
+            });
+            onUpdateCanvas?.();
+            toast.success('Texture applied');
+          }}
+          shape={(() => {
+            const obj = currentObject;
+            if (obj.shape === 'circle') {
+              return { type: 'circle' as const, diameter: Math.min(obj.width, obj.height) };
+            }
+            return { type: 'rectangle' as const, width: obj.width, height: obj.height };
+          })()}
+          title="Map Object Texture"
+          description="Import an image to use as a texture for this map object"
+          initialScale={currentObject.textureScale}
+          initialOffsetX={currentObject.textureOffsetX}
+          initialOffsetY={currentObject.textureOffsetY}
+        />
+      )}
     </>
   );
 };
