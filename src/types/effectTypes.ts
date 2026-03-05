@@ -137,6 +137,7 @@ export interface EffectTemplate {
   textureScale?: number;   // scale multiplier for texture (default 1)
   textureOffsetX?: number; // horizontal offset in pixels
   textureOffsetY?: number; // vertical offset in pixels
+  animation: EffectAnimationType;
   animationSpeed: number;  // multiplier (0.5-3)
 
   // Metadata
