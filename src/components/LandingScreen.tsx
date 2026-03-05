@@ -42,6 +42,8 @@ import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
+import { useEffectStore } from '@/stores/effectStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
 import {
   createProjectMetadata,
   exportProjectToFile,
@@ -79,6 +81,8 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const illuminationStore = useIlluminationStore();
   const creatureStore = useCreatureStore();
   const hatchingStore = useHatchingStore();
+  const effectStore = useEffectStore();
+  const uiModeStore = useUiModeStore();
 
   // --- Session helpers ---
   const createCurrentProjectData = (): ProjectData => ({
@@ -145,6 +149,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       hatchingOptions: hatchingStore.hatchingOptions,
     },
     viewportTransforms: sessionStore.viewportTransforms,
+    effects: {
+      placedEffects: effectStore.placedEffects,
+      customTemplates: effectStore.customTemplates,
+    },
+    uiMode: uiModeStore.currentMode === 'dm' ? 'dm' : 'play',
   });
 
   const clearAllStores = () => {
@@ -155,6 +164,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     groupStore.clearAllGroups();
     initiativeStore.endCombat();
     lightStore.clearAllLights();
+    // Clear fog to defaults so imported settings take effect cleanly
+    fogStore.resetFog();
+    // Clear effects
+    const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
+    effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
   };
 
   // --- New Session ---
@@ -261,11 +275,14 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         initStore.setRestrictMovement(data.initiative.restrictMovement ?? false);
       }
 
-      // Fog of war
+      // Fog of war — use initMapFogSettings + setMapFogSettings for proper reactivity
       if (data.fogData) {
         const fs = useFogStore.getState();
         if (data.fogData.fogSettingsPerMap) {
+          // Clear stale entries first
+          useFogStore.setState({ fogSettingsPerMap: {} });
           Object.entries(data.fogData.fogSettingsPerMap).forEach(([mapId, settings]) => {
+            fs.initMapFogSettings(mapId);
             fs.setMapFogSettings(mapId, settings);
           });
         }
@@ -334,6 +351,29 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         Object.entries(data.viewportTransforms).forEach(([mapId, transform]) => {
           useSessionStore.getState().setViewportTransform(mapId, transform);
         });
+      }
+
+      // Effects (placed effects + custom templates)
+      if (data.effects) {
+        const es = useEffectStore.getState();
+        (data.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
+        if (data.effects.placedEffects?.length) {
+          const now = performance.now();
+          const restored = data.effects.placedEffects
+            .filter((e: any) => !e.dismissedAt)
+            .map((e: any) => ({
+              ...e,
+              placedAt: now,
+              dismissedAt: undefined,
+              ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+            }));
+          useEffectStore.setState({ placedEffects: restored });
+        }
+      }
+
+      // UI mode (play/edit)
+      if (data.uiMode) {
+        useUiModeStore.getState().setMode(data.uiMode === 'play' ? 'play' : 'dm');
       }
 
       // Settings
