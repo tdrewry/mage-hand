@@ -62,6 +62,7 @@ export const MapObjectContextMenuWrapper = ({
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showTextureModal, setShowTextureModal] = useState(false);
 
   // Edit modal state
   const [labelValue, setLabelValue] = useState('');
