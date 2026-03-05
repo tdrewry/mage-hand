@@ -134,7 +134,9 @@ export interface EffectTemplate {
   secondaryColor?: string; // gradient/accent colour
   opacity: number;         // 0-1
   texture?: string;        // data URL or asset key
-  animation: EffectAnimationType;
+  textureScale?: number;   // scale multiplier for texture (default 1)
+  textureOffsetX?: number; // horizontal offset in pixels
+  textureOffsetY?: number; // vertical offset in pixels
   animationSpeed: number;  // multiplier (0.5-3)
 
   // Metadata

@@ -65,6 +65,9 @@ interface TemplateFormData {
   skipRotation: boolean;
   color: string;
   texture: string;
+  textureScale: number;
+  textureOffsetX: number;
+  textureOffsetY: number;
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
@@ -110,6 +113,9 @@ const INITIAL_FORM: TemplateFormData = {
   skipRotation: false,
   color: '#FF4500',
   texture: '',
+  textureScale: 1,
+  textureOffsetX: 0,
+  textureOffsetY: 0,
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
@@ -150,6 +156,9 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     skipRotation: t.skipRotation ?? false,
     color: t.color,
     texture: t.texture ?? '',
+    textureScale: t.textureScale ?? 1,
+    textureOffsetX: t.textureOffsetX ?? 0,
+    textureOffsetY: t.textureOffsetY ?? 0,
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
@@ -1100,6 +1109,9 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     skipRotation: form.skipRotation || undefined,
     color: form.color,
     texture: form.texture || undefined,
+    textureScale: form.texture ? (form.textureScale !== 1 ? form.textureScale : undefined) : undefined,
+    textureOffsetX: form.texture ? (form.textureOffsetX !== 0 ? form.textureOffsetX : undefined) : undefined,
+    textureOffsetY: form.texture ? (form.textureOffsetY !== 0 ? form.textureOffsetY : undefined) : undefined,
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
