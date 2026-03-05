@@ -889,6 +889,39 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
+  // ── Durable Object handlers ──────────────────────────────────────────────
+  const handleExportDOs = () => {
+    try {
+      const archive = DurableObjectRegistry.exportAll(
+        sessionStore.sessionId,
+        projectName || `Session ${sessionStore.sessionId.slice(-6)}`
+      );
+      const filename = `${(projectName || 'session').replace(/[^a-zA-Z0-9]/g, '_')}-DOs.mhdo`;
+      exportArchiveToFile(archive, filename);
+      toast.success(`Exported ${archive.manifest.length} durable objects`);
+    } catch (error) {
+      toast.error(`Failed to export DOs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleImportDOFile = () => {
+    doFileInputRef.current?.click();
+  };
+
+  const handleDOFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const archive = await parseArchiveFile(file);
+      setDoArchive(archive);
+      setShowDoImport(true);
+    } catch (error) {
+      toast.error(`Failed to read .mhdo file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      if (doFileInputRef.current) doFileInputRef.current.value = '';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
