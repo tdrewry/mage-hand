@@ -325,16 +325,24 @@ function renderEffect(
 // Texture image cache
 // ---------------------------------------------------------------------------
 
-const textureImageCache = new Map<string, HTMLImageElement | null>();
+const textureImageCache = new Map<string, HTMLImageElement | 'loading' | 'error'>();
 
 function getTextureImage(url: string): HTMLImageElement | null {
-  if (textureImageCache.has(url)) return textureImageCache.get(url)!;
+  const cached = textureImageCache.get(url);
+  if (cached instanceof HTMLImageElement) return cached;
+  if (cached === 'loading' || cached === 'error') return null;
   // Start loading
   const img = new Image();
-  img.crossOrigin = 'anonymous';
-  textureImageCache.set(url, null); // mark as loading
+  // Only set crossOrigin for non-data URLs (data: URIs don't need CORS and it can cause issues)
+  if (!url.startsWith('data:')) {
+    img.crossOrigin = 'anonymous';
+  }
+  textureImageCache.set(url, 'loading');
   img.onload = () => textureImageCache.set(url, img);
-  img.onerror = () => textureImageCache.set(url, null);
+  img.onerror = (e) => {
+    console.warn('[effectRenderer] Failed to load texture:', url.substring(0, 80), e);
+    textureImageCache.set(url, 'error');
+  };
   img.src = url;
   return null;
 }
