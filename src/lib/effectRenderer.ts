@@ -322,7 +322,7 @@ function renderEffect(
   rc.ctx.restore();
 }
 
-const _renderEffectDebugLogged = new Set<string>();
+
 
 // ---------------------------------------------------------------------------
 // Texture image cache
