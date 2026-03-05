@@ -12,12 +12,60 @@ import {
   BUILT_IN_EFFECT_TEMPLATES,
   getBuiltInTemplate,
 } from '@/lib/effectTemplateLibrary';
+import {
+  hashImageData,
+  saveTextureByHash,
+  loadTextureByHash,
+} from '@/lib/textureStorage';
 
 // ---------------------------------------------------------------------------
 // Local-storage helpers for custom templates & hidden built-ins
 // ---------------------------------------------------------------------------
 const CUSTOM_TEMPLATES_KEY = 'magehand-custom-effect-templates';
 const HIDDEN_BUILTINS_KEY = 'magehand-hidden-builtin-effects';
+
+/**
+ * Strip large texture data URIs from a template, keeping only the textureHash.
+ * This prevents blowing the ~5MB localStorage quota.
+ */
+function stripTextureData(template: EffectTemplate): EffectTemplate {
+  if (!template.texture) return template;
+  return { ...template, texture: '' };
+}
+
+/**
+ * Persist a template's texture to IndexedDB (fire-and-forget).
+ * Sets textureHash on the template so it can be reloaded later.
+ */
+async function persistTemplateTexture(template: EffectTemplate): Promise<void> {
+  if (!template.texture || template.texture.length < 200) return; // skip empty / tiny
+  try {
+    const hash = await hashImageData(template.texture);
+    await saveTextureByHash(hash, template.texture);
+    // Store hash on template for recovery
+    (template as any).textureHash = hash;
+  } catch (e) {
+    console.warn('[effectStore] Failed to persist texture to IndexedDB:', e);
+  }
+}
+
+/**
+ * Reload a template's texture from IndexedDB using its textureHash.
+ */
+async function rehydrateTemplateTexture(template: EffectTemplate): Promise<EffectTemplate> {
+  const hash = (template as any).textureHash;
+  if (!hash) return template;
+  if (template.texture && template.texture.length > 200) return template; // already loaded
+  try {
+    const dataUrl = await loadTextureByHash(hash);
+    if (dataUrl) {
+      return { ...template, texture: dataUrl };
+    }
+  } catch (e) {
+    console.warn('[effectStore] Failed to rehydrate texture from IndexedDB:', e);
+  }
+  return template;
+}
 
 function loadCustomTemplates(): EffectTemplate[] {
   try {
@@ -29,7 +77,9 @@ function loadCustomTemplates(): EffectTemplate[] {
 }
 
 function saveCustomTemplates(templates: EffectTemplate[]): void {
-  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+  // Strip texture data URIs before writing to localStorage
+  const stripped = templates.map(t => stripTextureData(t));
+  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(stripped));
 }
 
 function loadHiddenBuiltIns(): string[] {
