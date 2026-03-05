@@ -562,7 +562,12 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         const fogData = projectData.fogData as any;
         // Import per-map fog settings if present
         if (fogData.fogSettingsPerMap) {
-          useFogStore.setState({ fogSettingsPerMap: fogData.fogSettingsPerMap });
+          useFogStore.setState({ fogSettingsPerMap: {} });
+          const store = useFogStore.getState();
+          for (const [mapId, settings] of Object.entries(fogData.fogSettingsPerMap)) {
+            store.initMapFogSettings(mapId);
+            store.setMapFogSettings(mapId, settings as any);
+          }
         } else {
           // Legacy: import flat fields into default-map
           const { DEFAULT_MAP_FOG_SETTINGS } = await import('@/stores/defaultFogEffectSettings');
@@ -577,6 +582,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         }
         if (fogData.serializedExploredAreas) {
           fogStore.setSerializedExploredAreas(fogData.serializedExploredAreas);
+        }
+        if (fogData.serializedExploredAreasPerMap) {
+          for (const [mapId, data] of Object.entries(fogData.serializedExploredAreasPerMap)) {
+            fogStore.setSerializedExploredAreasForMap(mapId, data as string);
+          }
         }
       }
       await new Promise(resolve => setTimeout(resolve, 0));
@@ -736,7 +746,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       const fogData = projectData.fogData as any;
       if (fogData?.fogSettingsPerMap) {
         fogStore.resetFog();
-        useFogStore.setState({ fogSettingsPerMap: fogData.fogSettingsPerMap });
+        useFogStore.setState({ fogSettingsPerMap: {} });
+        for (const [mapId, settings] of Object.entries(fogData.fogSettingsPerMap)) {
+          fogStore.initMapFogSettings(mapId);
+          fogStore.setMapFogSettings(mapId, settings as any);
+        }
       } else if (fogData) {
         fogStore.getMapFogSettings('default-map'); // ensure init
         fogStore.setMapFogSettings('default-map', {
@@ -750,6 +764,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       }
       if (fogData?.serializedExploredAreas) {
         fogStore.setSerializedExploredAreas(fogData.serializedExploredAreas);
+      }
+      if (fogData?.serializedExploredAreasPerMap) {
+        for (const [mapId, data] of Object.entries(fogData.serializedExploredAreasPerMap)) {
+          fogStore.setSerializedExploredAreasForMap(mapId, data as string);
+        }
       }
     }
 
