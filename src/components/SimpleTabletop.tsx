@@ -4162,13 +4162,14 @@ export const SimpleTabletop = () => {
             }
           }
         }
-        // Render aura effects (visibility-clipped circles)
-        if (auraEffects.length > 0) {
+        // Render below-token aura effects (visibility-clipped circles)
+        const belowAuras = auraEffects.filter(e => !e.template?.renderAboveTokens);
+        if (belowAuras.length > 0) {
           const tokenPosMap = new Map<string, { x: number; y: number }>();
           for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
           renderAuraEffects(
             { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
-            auraEffects,
+            belowAuras,
           );
         }
         if (effectState.placement?.previewOrigin) {
@@ -4182,6 +4183,30 @@ export const SimpleTabletop = () => {
       }
       
       drawTokensToContext(ctx);
+
+      // ── Pinned above-token effects ──
+      {
+        const effectState = useEffectStore.getState();
+        const activeMapId = selectedMapId || 'default-map';
+        const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+        const effectGridSize = regions[0]?.gridSize || 40;
+        const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
+        if (aboveTokenEffects.length > 0) {
+          renderPlacedEffects(
+            { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+            aboveTokenEffects,
+          );
+          const aboveAuras = aboveTokenEffects.filter(e => e.isAura);
+          if (aboveAuras.length > 0) {
+            const tokenPosMap = new Map<string, { x: number; y: number }>();
+            for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
+            renderAuraEffects(
+              { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+              aboveAuras,
+            );
+          }
+        }
+      }
       
       // Draw drag ghost on top of tokens (only for non-overlay mode)
       if (isDraggingToken && draggedTokenId) {
