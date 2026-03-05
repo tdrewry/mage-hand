@@ -443,7 +443,7 @@ function drawTextureInPath(
   ctx.restore();
 }
 
-
+function strokeShape(
   rc: EffectRenderContext,
   template: EffectTemplate,
   origin: { x: number; y: number },
