@@ -903,6 +903,15 @@ export function renderAuraEffects(
 
     // Draw filled aura circle (will be clipped by visibility polygon)
     const auraRadius = radiusPx * anim.scaleMod;
+    const needsRotation = anim.rotationAngle !== 0;
+
+    // Apply rotation around center if needed
+    if (needsRotation) {
+      ctx.translate(center.x, center.y);
+      ctx.rotate(anim.rotationAngle);
+      ctx.translate(-center.x, -center.y);
+    }
+
     ctx.globalAlpha = opacity;
     ctx.fillStyle = effect.template.color;
     ctx.beginPath();
