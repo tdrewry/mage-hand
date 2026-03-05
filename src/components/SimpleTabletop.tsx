@@ -127,6 +127,8 @@ import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
 import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
+import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
+import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
@@ -167,6 +169,7 @@ export const SimpleTabletop = () => {
     registerTokenHandlers();
     registerMapHandlers();
     registerMiscHandlers();
+    registerEffectHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -4141,13 +4144,33 @@ export const SimpleTabletop = () => {
         const now = performance.now();
         if (auraEffects.length > 0 && now - lastAuraTickRef.current >= AURA_TICK_INTERVAL) {
           lastAuraTickRef.current = now;
-          tickAuras(
+          const auraEvents = tickAuras(
             auraEffects,
             filteredTokens,
             combinedSegmentsRef.current,
             effectGridSize,
             effectState.updateAuraState,
           );
+          // Broadcast aura state changes to connected players
+          for (const ev of auraEvents) {
+            const effect = auraEffects.find(e => e.id === ev.effectId);
+            if (effect) {
+              const anchor = filteredTokens.find(t => t.id === effect.anchorTokenId);
+              if (anchor) {
+                emitAuraState(
+                  ev.effectId,
+                  { x: anchor.x, y: anchor.y },
+                  effect.tokensInsideArea ?? [],
+                  (effect.impactedTargets ?? []).map(t => ({
+                    targetId: t.targetId,
+                    targetType: t.targetType,
+                    distanceFromOrigin: t.distanceFromOrigin,
+                    overlapPercent: t.overlapPercent,
+                  })),
+                );
+              }
+            }
+          }
         }
         // Render aura effects (visibility-clipped circles)
         if (auraEffects.length > 0) {
