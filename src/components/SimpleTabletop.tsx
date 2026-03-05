@@ -4106,26 +4106,7 @@ export const SimpleTabletop = () => {
     // Draw visible tokens AFTER fog - but only if NOT using overlay canvas
     // When post-processing is enabled with fog, tokens are drawn to overlay canvas to appear above PixiJS
     if (!useOverlayForTokens) {
-      // Draw drag path BEFORE tokens so footprints appear below token art
-      if (isDraggingToken && draggedTokenId) {
-        drawDragPathOnly(ctx);
-      }
-      
-      drawTokensToContext(ctx);
-      
-      // Draw drag ghost on top of tokens (only for non-overlay mode)
-      if (isDraggingToken && draggedTokenId) {
-        drawDragGhostAndPath(ctx);
-      }
-
-      // ── Remote ephemeral overlays ──
-      drawRemoteDragPreviews(ctx);
-      drawRemoteTokenHovers(ctx);
-      drawRemoteSelectionPreviews(ctx);
-      drawRemoteActionTargets(ctx);
-      drawMapPings(ctx);
-
-      // ── Placed spell/trap effects ──
+      // ── Placed spell/trap effects BELOW tokens (so tokens are always visible, and fog hides uncountered effects) ──
       {
         const effectState = useEffectStore.getState();
         const activeMapId = selectedMapId || 'default-map';
@@ -4185,6 +4166,25 @@ export const SimpleTabletop = () => {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
         }
       }
+
+      // Draw drag path BEFORE tokens so footprints appear below token art
+      if (isDraggingToken && draggedTokenId) {
+        drawDragPathOnly(ctx);
+      }
+      
+      drawTokensToContext(ctx);
+      
+      // Draw drag ghost on top of tokens (only for non-overlay mode)
+      if (isDraggingToken && draggedTokenId) {
+        drawDragGhostAndPath(ctx);
+      }
+
+      // ── Remote ephemeral overlays ──
+      drawRemoteDragPreviews(ctx);
+      drawRemoteTokenHovers(ctx);
+      drawRemoteSelectionPreviews(ctx);
+      drawRemoteActionTargets(ctx);
+      drawMapPings(ctx);
     }
 
     // ── Fog Reveal Brush: ghost circle is now drawn on the overlay canvas (see below)
@@ -4221,25 +4221,7 @@ export const SimpleTabletop = () => {
             // Draw annotations first (below tokens)
             drawAnnotationsToContext(overlayCtx);
             
-            // Draw drag path BEFORE tokens so footprints appear below token art
-            if (isDraggingToken && draggedTokenId) {
-              drawDragPathOnly(overlayCtx);
-            }
-            
-            // Draw tokens on top
-            drawTokensToContext(overlayCtx);
-            
-            // Draw drag ghost on overlay so it appears above tokens
-            if (isDraggingToken && draggedTokenId) {
-              drawDragGhostAndPath(overlayCtx);
-            }
-            // ── Remote ephemeral overlays on overlay ──
-            drawRemoteDragPreviews(overlayCtx);
-            drawRemoteTokenHovers(overlayCtx);
-            drawRemoteSelectionPreviews(overlayCtx);
-            drawRemoteActionTargets(overlayCtx);
-
-             // ── Placed spell/trap effects on overlay ──
+            // ── Placed spell/trap effects BELOW tokens on overlay ──
             {
               const effectState = useEffectStore.getState();
               const activeMapId = selectedMapId || 'default-map';
@@ -4266,6 +4248,24 @@ export const SimpleTabletop = () => {
                 renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
               }
             }
+
+            // Draw drag path BEFORE tokens so footprints appear below token art
+            if (isDraggingToken && draggedTokenId) {
+              drawDragPathOnly(overlayCtx);
+            }
+            
+            // Draw tokens on top of effects
+            drawTokensToContext(overlayCtx);
+            
+            // Draw drag ghost on overlay so it appears above tokens
+            if (isDraggingToken && draggedTokenId) {
+              drawDragGhostAndPath(overlayCtx);
+            }
+            // ── Remote ephemeral overlays on overlay ──
+            drawRemoteDragPreviews(overlayCtx);
+            drawRemoteTokenHovers(overlayCtx);
+            drawRemoteSelectionPreviews(overlayCtx);
+            drawRemoteActionTargets(overlayCtx);
 
             overlayCtx.restore();
           }
