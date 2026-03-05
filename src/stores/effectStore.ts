@@ -74,7 +74,7 @@ function persistTemplateTexture(template: EffectTemplate): void {
  * Reload a template's texture from IndexedDB using its textureHash.
  */
 async function rehydrateTemplateTexture(template: EffectTemplate): Promise<EffectTemplate> {
-  const hash = (template as any).textureHash;
+  const hash = template.textureHash;
   if (!hash) return template;
   if (template.texture && template.texture.length > 200) return template; // already loaded
   try {
