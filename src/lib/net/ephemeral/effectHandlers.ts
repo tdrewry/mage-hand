@@ -3,6 +3,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useEffectStore } from "@/stores/effectStore";
+import type { EffectImpact } from "@/types/effectTypes";
 import type {
   EffectAuraStatePayload,
   EffectPlacementPreviewPayload,
@@ -19,7 +20,7 @@ export function registerEffectHandlers(): void {
     useEffectStore.getState().updateAuraState(
       data.effectId,
       data.origin,
-      data.impacts,
+      data.impacts as EffectImpact[],
       data.insideIds,
     );
   });
