@@ -42,4 +42,5 @@ Token-locked effects with wall-blocked continuous hit-testing and dynamic modifi
 - [x] Integration into SimpleTabletop render loop (continuous update call)
 - [x] Aura visual rendering (visibility-clipped circle)
 - [x] Built-in aura templates (Aura of Protection, Frightful Presence)
-- [ ] Network sync for aura state
+- [x] Network sync for aura state (ephemeral bus)
+- [x] DO export/import round-trip (placedAt reset, tokensInsideArea init)
