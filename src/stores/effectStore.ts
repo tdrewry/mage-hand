@@ -12,12 +12,81 @@ import {
   BUILT_IN_EFFECT_TEMPLATES,
   getBuiltInTemplate,
 } from '@/lib/effectTemplateLibrary';
+import {
+  hashImageData,
+  saveTextureByHash,
+  loadTextureByHash,
+} from '@/lib/textureStorage';
 
 // ---------------------------------------------------------------------------
 // Local-storage helpers for custom templates & hidden built-ins
 // ---------------------------------------------------------------------------
 const CUSTOM_TEMPLATES_KEY = 'magehand-custom-effect-templates';
 const HIDDEN_BUILTINS_KEY = 'magehand-hidden-builtin-effects';
+
+/**
+ * Compute a fast synchronous hash for immediate use (FNV-1a 32-bit).
+ * Used to set textureHash immediately before async IndexedDB persistence.
+ */
+function fastHash(str: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
+ * Strip large texture data URIs from a template, keeping only the textureHash.
+ * This prevents blowing the ~5MB localStorage quota.
+ */
+function stripTextureData(template: EffectTemplate): EffectTemplate {
+  if (!template.texture || template.texture.length < 200) return template;
+  // Ensure textureHash is set before stripping
+  const hash = template.textureHash || fastHash(template.texture);
+  return { ...template, texture: '', textureHash: hash };
+}
+
+/**
+ * Persist a template's texture to IndexedDB and set textureHash synchronously.
+ * The IndexedDB write is fire-and-forget; the hash is set immediately.
+ */
+function persistTemplateTexture(template: EffectTemplate): void {
+  if (!template.texture || template.texture.length < 200) return;
+  // Set hash synchronously so it's available for localStorage
+  const syncHash = fastHash(template.texture);
+  template.textureHash = syncHash;
+  // Also do the async SHA-256 hash + IndexedDB save
+  const textureData = template.texture;
+  hashImageData(textureData).then(async (sha) => {
+    await saveTextureByHash(sha, textureData);
+    // Update to the stronger hash
+    template.textureHash = sha;
+  }).catch(e => {
+    console.warn('[effectStore] Failed to persist texture to IndexedDB:', e);
+    // Fallback: save with sync hash
+    saveTextureByHash(syncHash, textureData).catch(() => {});
+  });
+}
+
+/**
+ * Reload a template's texture from IndexedDB using its textureHash.
+ */
+async function rehydrateTemplateTexture(template: EffectTemplate): Promise<EffectTemplate> {
+  const hash = template.textureHash;
+  if (!hash) return template;
+  if (template.texture && template.texture.length > 200) return template; // already loaded
+  try {
+    const dataUrl = await loadTextureByHash(hash);
+    if (dataUrl) {
+      return { ...template, texture: dataUrl };
+    }
+  } catch (e) {
+    console.warn('[effectStore] Failed to rehydrate texture from IndexedDB:', e);
+  }
+  return template;
+}
 
 function loadCustomTemplates(): EffectTemplate[] {
   try {
@@ -29,7 +98,9 @@ function loadCustomTemplates(): EffectTemplate[] {
 }
 
 function saveCustomTemplates(templates: EffectTemplate[]): void {
-  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+  // Strip texture data URIs before writing to localStorage
+  const stripped = templates.map(t => stripTextureData(t));
+  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(stripped));
 }
 
 function loadHiddenBuiltIns(): string[] {
@@ -147,6 +218,8 @@ export const useEffectStore = create<EffectState>()(
         id: `custom-fx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         isBuiltIn: false,
       };
+      // Persist texture to IndexedDB before stripping from localStorage
+      persistTemplateTexture(template);
       set((s) => {
         const updated = [...s.customTemplates, template];
         saveCustomTemplates(updated);
@@ -163,14 +236,19 @@ export const useEffectStore = create<EffectState>()(
         const isBuiltIn = BUILT_IN_EFFECT_TEMPLATES.some(t => t.id === id);
         let newCustom: EffectTemplate[];
         if (isBuiltIn) {
-          // Clone built-in as a custom override with same ID
           const original = BUILT_IN_EFFECT_TEMPLATES.find(t => t.id === id)!;
           const overridden = { ...original, ...updates, id, isBuiltIn: false };
+          persistTemplateTexture(overridden);
           newCustom = [...s.customTemplates.filter(t => t.id !== id), overridden];
         } else {
-          newCustom = s.customTemplates.map((t) =>
-            t.id === id ? { ...t, ...updates, id, isBuiltIn: false } : t,
-          );
+          newCustom = s.customTemplates.map((t) => {
+            if (t.id === id) {
+              const updated = { ...t, ...updates, id, isBuiltIn: false };
+              persistTemplateTexture(updated);
+              return updated;
+            }
+            return t;
+          });
         }
         saveCustomTemplates(newCustom);
         return {
@@ -334,6 +412,9 @@ export const useEffectStore = create<EffectState>()(
         ...(isAura ? { isAura: true, anchorTokenId, tokensInsideArea: [] } : {}),
       };
 
+      // Persist template texture to IndexedDB so it survives localStorage stripping
+      persistTemplateTexture(effect.template);
+
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
       return effect;
     },
@@ -466,7 +547,14 @@ export const useEffectStore = create<EffectState>()(
     {
       name: 'vtt-effect-store',
       partialize: (state) => ({
-        placedEffects: state.placedEffects.filter(e => !e.dismissedAt), // Don't persist fading effects
+        // Strip texture data URIs from placed effects to avoid localStorage quota issues
+        // Textures are persisted in IndexedDB and reloaded via textureHash
+        placedEffects: state.placedEffects
+          .filter(e => !e.dismissedAt)
+          .map(e => ({
+            ...e,
+            template: stripTextureData(e.template),
+          })),
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.placedEffects) {
@@ -477,6 +565,31 @@ export const useEffectStore = create<EffectState>()(
             placedAt: now,
             dismissedAt: undefined,
           }));
+
+          // Rehydrate textures from IndexedDB asynchronously
+          Promise.all(
+            state.placedEffects.map(async (e, i) => {
+              const rehydrated = await rehydrateTemplateTexture(e.template);
+              if (rehydrated !== e.template) {
+                state.placedEffects[i] = { ...e, template: rehydrated };
+              }
+            })
+          ).then(() => {
+            // Trigger a re-render by setting state
+            useEffectStore.setState({ placedEffects: [...state.placedEffects] });
+          });
+        }
+
+        // Rehydrate custom template textures from IndexedDB
+        const customTemplates = loadCustomTemplates();
+        if (customTemplates.length > 0) {
+          Promise.all(customTemplates.map(t => rehydrateTemplateTexture(t))).then(rehydrated => {
+            const hiddenIds = loadHiddenBuiltIns();
+            useEffectStore.setState({
+              customTemplates: rehydrated,
+              allTemplates: buildAllTemplates(rehydrated, hiddenIds),
+            });
+          });
         }
       },
     }
