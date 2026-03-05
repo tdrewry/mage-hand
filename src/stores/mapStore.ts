@@ -63,6 +63,8 @@ interface MapStore {
   autoFocusFollowsToken: boolean;
   
   addMap: (map: CreateMapData) => void;
+  /** Restore a map with its original ID intact (for import/hydration) */
+  restoreMap: (map: GameMap) => void;
 
   /**
    * Updates an existing map.
@@ -184,6 +186,12 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
     
     set((state) => ({ maps: [...state.maps, newMap] }));
     useFogStore.getState().initMapFogSettings(newMap.id);
+  },
+
+  /** Restore a map with its original ID intact (for import/hydration) */
+  restoreMap: (map: GameMap) => {
+    set((state) => ({ maps: [...state.maps, map] }));
+    useFogStore.getState().initMapFogSettings(map.id);
   },
 
   updateMap: (id, updates) => {
