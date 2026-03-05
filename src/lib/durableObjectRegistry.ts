@@ -188,12 +188,14 @@ DurableObjectRegistry.register({
   },
   hydrator: (state: any) => {
     if (!state) return;
-    if (state.fogSettingsPerMap) {
-      useFogStore.setState({ fogSettingsPerMap: state.fogSettingsPerMap });
-    }
-    if (state.serializedExploredAreas) {
-      useFogStore.getState().setSerializedExploredAreas(state.serializedExploredAreas);
-    }
+    const patch: Partial<Record<string, unknown>> = {};
+    if (state.fogSettingsPerMap) patch.fogSettingsPerMap = state.fogSettingsPerMap;
+    if (state.serializedExploredAreas) patch.serializedExploredAreas = state.serializedExploredAreas;
+    if (state.serializedExploredAreasPerMap) patch.serializedExploredAreasPerMap = state.serializedExploredAreasPerMap;
+    if (state.fogVersion !== undefined) patch.fogVersion = state.fogVersion;
+    if (state.realtimeVisionDuringDrag !== undefined) patch.realtimeVisionDuringDrag = state.realtimeVisionDuringDrag;
+    if (state.realtimeVisionThrottleMs !== undefined) patch.realtimeVisionThrottleMs = state.realtimeVisionThrottleMs;
+    useFogStore.setState(patch);
   },
   summarizer: () => {
     const maps = Object.keys(useFogStore.getState().fogSettingsPerMap);
@@ -404,6 +406,10 @@ DurableObjectRegistry.register({
     (state?.customTemplates || []).forEach((t: any) => {
       store.addCustomTemplate(t);
     });
+    // Restore placed effects (including auras)
+    if (state?.placedEffects?.length) {
+      useEffectStore.setState({ placedEffects: state.placedEffects });
+    }
   },
   summarizer: () => {
     const s = useEffectStore.getState();
