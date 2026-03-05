@@ -49,7 +49,10 @@ export type EphemeralOpKind =
   | "action.inProgress"
   | "action.queue.sync"
   // Assets
-  | "asset.uploadProgress";
+  | "asset.uploadProgress"
+  // Effects & Auras
+  | "effect.aura.state"
+  | "effect.placement.preview";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
