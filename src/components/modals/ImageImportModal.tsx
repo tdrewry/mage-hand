@@ -19,6 +19,7 @@ export interface ImageImportResult {
   scale: number;
   offsetX: number;
   offsetY: number;
+  repeat?: boolean;
 }
 
 export type ShapeType = 'circle' | 'rectangle' | 'path';
@@ -45,6 +46,9 @@ interface ImageImportModalProps {
   initialScale?: number;
   initialOffsetX?: number;
   initialOffsetY?: number;
+  initialRepeat?: boolean;
+  /** Show repeat/tile toggle in the modal */
+  showRepeatToggle?: boolean;
 }
 
 export const ImageImportModal: React.FC<ImageImportModalProps> = ({
