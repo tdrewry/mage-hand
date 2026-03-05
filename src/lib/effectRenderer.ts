@@ -294,7 +294,7 @@ function renderEffect(
 
   const anim = animationPaused
     ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-    : computeAnimation(template.animation, template.animationSpeed, rc.time, template.id);
+    : computeAnimation(template.animation, template.animationSpeed, rc.time, template.id, template.rotateDirection);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
   const scale = anim.scaleMod;
@@ -597,7 +597,7 @@ interface AnimationMods {
   rotationAngle: number;
 }
 
-function computeAnimation(type: EffectAnimationType, speed: number, time: number, id: string): AnimationMods {
+function computeAnimation(type: EffectAnimationType, speed: number, time: number, id: string, rotateDirection?: string): AnimationMods {
   const base: AnimationMods = { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 };
   if (type === 'none') return base;
 
@@ -646,7 +646,8 @@ function computeAnimation(type: EffectAnimationType, speed: number, time: number
     }
     case 'rotate': {
       // Continuous rotation: full revolution based on speed (speed=1 → ~6s per revolution)
-      const angle = t * 1.0; // radians, continuous
+      const dir = rotateDirection === 'ccw' ? -1 : 1;
+      const angle = t * 1.0 * dir; // radians, continuous
       return { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: angle };
     }
     default:
@@ -689,7 +690,7 @@ function renderPolylineEffect(
 
   const anim = effect.animationPaused
     ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-    : computeAnimation(template.animation, template.animationSpeed, time, effect.id);
+    : computeAnimation(template.animation, template.animationSpeed, time, effect.id, template.rotateDirection);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
   if (opacity <= 0.01) return;
@@ -876,7 +877,7 @@ export function renderAuraEffects(
     // Animation
     const anim = effect.animationPaused
       ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-      : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id);
+      : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id, effect.template.rotateDirection);
 
     const opacity = effect.template.opacity * anim.opacityMod * fadeMul;
     if (opacity <= 0.01) continue;

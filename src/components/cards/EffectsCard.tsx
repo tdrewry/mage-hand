@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -75,6 +76,7 @@ interface TemplateFormData {
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
+  rotateDirection: EffectRotateDirection;
   category: EffectCategory;
   damageDice: DamageDiceEntry[];
   level: string;
@@ -125,6 +127,7 @@ const INITIAL_FORM: TemplateFormData = {
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
+  rotateDirection: 'cw',
   category: 'custom',
   damageDice: [],
   level: '',
@@ -170,6 +173,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
+    rotateDirection: t.rotateDirection ?? 'cw',
     category: t.category,
     damageDice: t.damageDice ?? [],
     level: t.level !== undefined ? String(t.level) : '',
@@ -878,6 +882,35 @@ function TemplateFormFields({
             </div>
           </div>
 
+          {/* Animation speed + rotate direction (shown when animation !== 'none') */}
+          {form.animation !== 'none' && (
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Speed ({form.animationSpeed.toFixed(1)}x)</label>
+                <Slider
+                  value={[form.animationSpeed]}
+                  onValueChange={([v]) => update('animationSpeed', v)}
+                  min={0.1}
+                  max={3}
+                  step={0.1}
+                  className="mt-1"
+                />
+              </div>
+              {form.animation === 'rotate' && (
+                <div className="w-24">
+                  <label className="text-[10px] text-muted-foreground">Direction</label>
+                  <Select value={form.rotateDirection} onValueChange={(v) => update('rotateDirection', v as EffectRotateDirection)}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cw">Clockwise</SelectItem>
+                      <SelectItem value="ccw">Counter-CW</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quantity (multi-drop) */}
           <div className="flex gap-2 items-end">
             <div className="w-20">
@@ -1162,6 +1195,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
+    rotateDirection: form.animation === 'rotate' && form.rotateDirection !== 'cw' ? form.rotateDirection : undefined,
     category: form.category,
     damageType: cleanedDice.length > 0 ? cleanedDice[0].damageType : undefined,
     damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
