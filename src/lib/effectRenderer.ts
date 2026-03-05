@@ -370,6 +370,13 @@ function drawShape(
   // Draw texture if present and loaded (skip for colorOverride glow passes)
   if (template.texture && !colorOverride) {
     const img = getTextureImage(template.texture);
+    if (!img) {
+      // Log once per texture URL to help debug loading issues
+      const cacheState = textureImageCache.get(template.texture);
+      if (cacheState === 'error') {
+        console.warn('[effectRenderer] Texture failed to load for effect:', template.name);
+      }
+    }
     if (img) {
       drawTextureInPath(ctx, img, path, template, origin, direction, gridSize);
     }
