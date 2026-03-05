@@ -335,6 +335,7 @@ export interface EffectCondition {
 
 export interface EffectGrantedAction {
   name: string;
+  type?: 'attack' | 'spell' | 'trait' | 'feature';
   attackBonus?: number;
   damageFormula?: string;
   damageType?: string;

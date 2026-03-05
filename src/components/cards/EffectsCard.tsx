@@ -4,7 +4,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
-import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle } from 'lucide-react';
+import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,7 @@ interface TemplateFormData {
   ranged: boolean;
   skipRotation: boolean;
   color: string;
+  texture: string;
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
@@ -100,6 +101,7 @@ const INITIAL_FORM: TemplateFormData = {
   ranged: false,
   skipRotation: false,
   color: '#FF4500',
+  texture: '',
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
@@ -134,6 +136,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     ranged: t.ranged ?? false,
     skipRotation: t.skipRotation ?? false,
     color: t.color,
+    texture: t.texture ?? '',
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
@@ -414,13 +417,16 @@ function LevelOverridesEditor({
 // --- Shared Form Fields Component ---
 
 // --- Tab types ---
-type FormTab = 'shape' | 'damage' | 'modifiers' | 'conditions';
+type FormTab = 'shape' | 'damage' | 'level' | 'modifiers' | 'conditions' | 'grants' | 'duration';
 
 const FORM_TABS: { value: FormTab; label: string; icon: React.ElementType }[] = [
   { value: 'shape', label: 'Shape', icon: Wand2 },
-  { value: 'damage', label: 'Damage', icon: Swords },
+  { value: 'damage', label: 'Dmg', icon: Swords },
+  { value: 'level', label: 'Level', icon: TrendingUp },
   { value: 'modifiers', label: 'Mods', icon: Shield },
   { value: 'conditions', label: 'Conds', icon: AlertCircle },
+  { value: 'grants', label: 'Grants', icon: Gift },
+  { value: 'duration', label: 'Dur', icon: Timer },
 ];
 
 // --- Modifiers Editor ---
@@ -547,7 +553,7 @@ function GrantedActionsEditor({
   actions: EffectGrantedAction[];
   onChange: (actions: EffectGrantedAction[]) => void;
 }) {
-  const addAction = () => onChange([...actions, { name: '', description: '' }]);
+  const addAction = () => onChange([...actions, { name: '', type: 'attack', description: '' }]);
   const removeAction = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
   const updateAction = (i: number, updates: Partial<EffectGrantedAction>) =>
     onChange(actions.map((a, idx) => idx === i ? { ...a, ...updates } : a));
@@ -558,6 +564,15 @@ function GrantedActionsEditor({
       {actions.map((action, i) => (
         <div key={i} className="border border-border rounded p-1.5 space-y-1">
           <div className="flex gap-1 items-center">
+            <Select value={action.type ?? 'attack'} onValueChange={(v) => updateAction(i, { type: v as EffectGrantedAction['type'] })}>
+              <SelectTrigger className="h-5 text-[10px] w-20"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="attack">Attack</SelectItem>
+                <SelectItem value="spell">Spell</SelectItem>
+                <SelectItem value="trait">Trait</SelectItem>
+                <SelectItem value="feature">Feature</SelectItem>
+              </SelectContent>
+            </Select>
             <Input
               value={action.name}
               onChange={(e) => updateAction(i, { name: e.target.value })}
@@ -610,8 +625,10 @@ function TemplateFormFields({
 
   // Count items on each tab for badges
   const modCount = form.modifiers.length;
-  const condCount = form.conditions.length + form.grantedActions.length;
+  const condCount = form.conditions.length;
   const dmgCount = form.damageDice.length + (form.attackRoll.enabled ? 1 : 0);
+  const levelCount = form.scaling.length + form.levelOverrides.length;
+  const grantsCount = form.grantedActions.length;
 
   return (
     <>
@@ -623,17 +640,35 @@ function TemplateFormFields({
         className="h-7 text-xs"
       />
 
+      {/* Category — outside tabs */}
+      <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
+        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="spell">Spell</SelectItem>
+          <SelectItem value="trap">Trap</SelectItem>
+          <SelectItem value="hazard">Hazard</SelectItem>
+          <SelectItem value="trait">Trait</SelectItem>
+          <SelectItem value="custom">Custom</SelectItem>
+        </SelectContent>
+      </Select>
+
       {/* Tab bar */}
-      <div className="flex border-b border-border -mx-2 px-2">
+      <div className="flex border-b border-border -mx-2 px-2 overflow-x-auto">
         {FORM_TABS.map(tab => {
           const isActive = activeTab === tab.value;
           const Icon = tab.icon;
-          const count = tab.value === 'modifiers' ? modCount : tab.value === 'conditions' ? condCount : tab.value === 'damage' ? dmgCount : 0;
+          const count =
+            tab.value === 'modifiers' ? modCount :
+            tab.value === 'conditions' ? condCount :
+            tab.value === 'damage' ? dmgCount :
+            tab.value === 'level' ? levelCount :
+            tab.value === 'grants' ? grantsCount :
+            0;
           return (
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium border-b-2 -mb-px transition-colors ${
+              className={`flex items-center gap-0.5 px-1.5 py-1.5 text-[10px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -650,30 +685,18 @@ function TemplateFormFields({
       {/* --- Shape Tab --- */}
       {activeTab === 'shape' && (
         <>
-          <div className="flex gap-2">
-            <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
-              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="circle">Circle</SelectItem>
-                <SelectItem value="line">Line</SelectItem>
-                <SelectItem value="cone">Cone</SelectItem>
-                <SelectItem value="rectangle">Rectangle</SelectItem>
-                <SelectItem value="circle-burst">Circle Burst</SelectItem>
-                <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
-                <SelectItem value="polyline">Polyline (Wall)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={form.category} onValueChange={(v) => update('category', v as EffectCategory)}>
-              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="spell">Spell</SelectItem>
-                <SelectItem value="trap">Trap</SelectItem>
-                <SelectItem value="hazard">Hazard</SelectItem>
-                <SelectItem value="trait">Trait</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={form.shape} onValueChange={(v) => update('shape', v as EffectShape)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="circle">Circle</SelectItem>
+              <SelectItem value="line">Line</SelectItem>
+              <SelectItem value="cone">Cone</SelectItem>
+              <SelectItem value="rectangle">Rectangle</SelectItem>
+              <SelectItem value="circle-burst">Circle Burst</SelectItem>
+              <SelectItem value="rectangle-burst">Rect Burst</SelectItem>
+              <SelectItem value="polyline">Polyline (Wall)</SelectItem>
+            </SelectContent>
+          </Select>
 
           <div className="flex gap-2">
             {needsRadius && (
@@ -720,6 +743,25 @@ function TemplateFormFields({
               <input type="color" value={form.color} onChange={(e) => update('color', e.target.value)} className="w-7 h-7 rounded border border-border cursor-pointer" />
             </div>
             <div className="flex-1">
+              <label className="text-[10px] text-muted-foreground">Texture</label>
+              <div className="flex gap-1 items-center">
+                <Input
+                  value={form.texture}
+                  onChange={(e) => update('texture', e.target.value)}
+                  placeholder="URL or asset key"
+                  className="h-7 text-xs flex-1"
+                />
+                {form.texture && (
+                  <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => update('texture', '')}>
+                    <X className="w-3 h-3 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
               <label className="text-[10px] text-muted-foreground">Opacity</label>
               <NumericInput value={form.opacity ?? 0.5} onChange={(v) => update('opacity', v)} className="h-7 text-xs" min={0.1} max={1} step={0.05} float />
             </div>
@@ -739,27 +781,21 @@ function TemplateFormFields({
             </div>
           </div>
 
-          <div className="flex gap-2 items-center">
-            <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
-              <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="instant">Instant</SelectItem>
-                <SelectItem value="persistent">Persistent</SelectItem>
-              </SelectContent>
-            </Select>
-            {form.persistence === 'persistent' && (
-              <>
-                <div className="flex-1">
-                  <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <Switch checked={form.recurring} onCheckedChange={(v) => update('recurring', v)} className="scale-75" />
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                    {form.recurring ? 'Recurring' : 'One-shot'}
-                  </span>
-                </div>
-              </>
-            )}
+          {/* Quantity (multi-drop) */}
+          <div className="flex gap-2 items-end">
+            <div className="w-20">
+              <label className="text-[10px] text-muted-foreground">Quantity</label>
+              <NumericInput
+                value={form.multiDropCount ?? 1}
+                onChange={(v) => update('multiDropCount', Math.max(1, v))}
+                className="h-7 text-xs"
+                min={1}
+                max={20}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground pb-1.5">
+              {form.multiDropCount > 1 ? `${form.multiDropCount} drops` : 'single'}
+            </span>
           </div>
 
           <div className="space-y-1">
@@ -824,24 +860,15 @@ function TemplateFormFields({
               </div>
             )}
           </div>
+        </>
+      )}
 
-          {/* Quantity & Spell Level */}
+      {/* --- Level Tab --- */}
+      {activeTab === 'level' && (
+        <>
           <div className="flex gap-2 items-end">
             <div className="w-20">
-              <label className="text-[10px] text-muted-foreground">Quantity</label>
-              <NumericInput
-                value={form.multiDropCount ?? 1}
-                onChange={(v) => update('multiDropCount', Math.max(1, v))}
-                className="h-7 text-xs"
-                min={1}
-                max={20}
-              />
-            </div>
-            <span className="text-[10px] text-muted-foreground pb-1.5">
-              {form.multiDropCount > 1 ? `${form.multiDropCount} drops` : 'single'}
-            </span>
-            <div className="w-16">
-              <label className="text-[10px] text-muted-foreground">Spell Lvl</label>
+              <label className="text-[10px] text-muted-foreground">Spell Level</label>
               <NumericInput
                 value={form.level ? Number(form.level) : 0}
                 onChange={(v) => update('level', String(v))}
@@ -850,54 +877,35 @@ function TemplateFormFields({
                 max={9}
               />
             </div>
+            <div className="w-20">
+              <label className="text-[10px] text-muted-foreground">Base Level</label>
+              <NumericInput
+                value={form.baseLevel ? Number(form.baseLevel) : 0}
+                onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
+                className="h-7 text-xs"
+                min={0}
+                max={9}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground pb-1.5">
+              {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
+            </span>
           </div>
-
-          {/* Level Scaling Section */}
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground w-full">
-              <TrendingUp className="w-3 h-3" />
-              <span>Level Scaling</span>
-              {form.scaling.length > 0 && (
-                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 ml-1">{form.scaling.length} rule{form.scaling.length > 1 ? 's' : ''}</Badge>
-              )}
-              {form.levelOverrides.length > 0 && (
-                <Badge variant="outline" className="text-[8px] px-1 py-0 h-3">{form.levelOverrides.length} override{form.levelOverrides.length > 1 ? 's' : ''}</Badge>
-              )}
-              <ChevronRight className="w-3 h-3 ml-auto" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 mt-1">
-              <div className="flex gap-2 items-end">
-                <div className="w-20">
-                  <label className="text-[10px] text-muted-foreground">Base Level</label>
-                  <NumericInput
-                    value={form.baseLevel ? Number(form.baseLevel) : 0}
-                    onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
-                    className="h-7 text-xs"
-                    min={0}
-                    max={9}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground pb-1.5">
-                  {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
-                </span>
-              </div>
-              {form.baseLevel && (
-                <>
-                  <ScalingRulesEditor
-                    rules={form.scaling}
-                    onChange={(rules) => update('scaling', rules)}
-                    damageDiceCount={form.damageDice.length}
-                  />
-                  <Separator className="my-1" />
-                  <LevelOverridesEditor
-                    overrides={form.levelOverrides}
-                    onChange={(overrides) => update('levelOverrides', overrides)}
-                    baseLevel={Number(form.baseLevel)}
-                  />
-                </>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
+          {form.baseLevel && (
+            <>
+              <ScalingRulesEditor
+                rules={form.scaling}
+                onChange={(rules) => update('scaling', rules)}
+                damageDiceCount={form.damageDice.length}
+              />
+              <Separator className="my-1" />
+              <LevelOverridesEditor
+                overrides={form.levelOverrides}
+                onChange={(overrides) => update('levelOverrides', overrides)}
+                baseLevel={Number(form.baseLevel)}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -911,16 +919,44 @@ function TemplateFormFields({
 
       {/* --- Conditions Tab --- */}
       {activeTab === 'conditions' && (
+        <ConditionsEditor
+          conditions={form.conditions}
+          onChange={(conds) => update('conditions', conds)}
+        />
+      )}
+
+      {/* --- Grants Tab --- */}
+      {activeTab === 'grants' && (
+        <GrantedActionsEditor
+          actions={form.grantedActions}
+          onChange={(acts) => update('grantedActions', acts)}
+        />
+      )}
+
+      {/* --- Duration Tab --- */}
+      {activeTab === 'duration' && (
         <>
-          <ConditionsEditor
-            conditions={form.conditions}
-            onChange={(conds) => update('conditions', conds)}
-          />
-          <Separator className="my-1" />
-          <GrantedActionsEditor
-            actions={form.grantedActions}
-            onChange={(acts) => update('grantedActions', acts)}
-          />
+          <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="instant">Instantaneous</SelectItem>
+              <SelectItem value="persistent">Persistent</SelectItem>
+            </SelectContent>
+          </Select>
+          {form.persistence === 'persistent' && (
+            <>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Duration (rounds, 0 = until dismissed)</label>
+                <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
+              </div>
+              <div className="flex items-center gap-1">
+                <Switch checked={form.recurring} onCheckedChange={(v) => update('recurring', v)} className="scale-75" />
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  {form.recurring ? 'Recurring (re-triggers each round)' : 'One-shot (triggers once)'}
+                </span>
+              </div>
+            </>
+          )}
         </>
       )}
     </>
@@ -947,6 +983,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     ranged: form.ranged || undefined,
     skipRotation: form.skipRotation || undefined,
     color: form.color,
+    texture: form.texture || undefined,
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
