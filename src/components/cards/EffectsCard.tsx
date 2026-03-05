@@ -1156,6 +1156,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     textureScale: form.texture ? (form.textureScale !== 1 ? form.textureScale : undefined) : undefined,
     textureOffsetX: form.texture ? (form.textureOffsetX !== 0 ? form.textureOffsetX : undefined) : undefined,
     textureOffsetY: form.texture ? (form.textureOffsetY !== 0 ? form.textureOffsetY : undefined) : undefined,
+    textureRepeat: form.texture ? (form.textureRepeat || undefined) : undefined,
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
