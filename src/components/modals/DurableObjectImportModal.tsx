@@ -198,7 +198,7 @@ export const DurableObjectImportModal: React.FC<DurableObjectImportModalProps> =
                           <span>v{entry.version}</span>
                         </div>
                         {isRegistered && selectedKinds.has(entry.kind) && (incomingSummary || currentSummary) && (
-                          <div className="text-xs mt-1 flex items-center gap-1 text-amber-500 dark:text-amber-400">
+                          <div className="text-xs mt-1 flex items-center gap-1 text-destructive/80">
                             <AlertTriangle className="w-3 h-3 shrink-0" />
                             <span>
                               {incomingSummary || 'incoming'} → replaces {currentSummary || 'existing'}
