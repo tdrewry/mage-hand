@@ -4114,11 +4114,6 @@ export const SimpleTabletop = () => {
         const effectGridSize = regions[0]?.gridSize || 40;
         // Split effects: below-token (default) vs above-token (pinned)
         const belowTokenEffects = mapEffects.filter(e => !e.template?.renderAboveTokens);
-        const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
-        // Store for after-token rendering
-        (window as any).__mh_aboveTokenEffects = aboveTokenEffects;
-        (window as any).__mh_effectGridSize = effectGridSize;
-        (window as any).__mh_mapEffects = mapEffects;
         if (belowTokenEffects.length > 0) {
           renderPlacedEffects(
             { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
