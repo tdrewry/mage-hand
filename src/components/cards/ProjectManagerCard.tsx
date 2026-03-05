@@ -1463,6 +1463,46 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                 />
               </CardContent>
             </Card>
+
+            {/* Durable Objects Section */}
+            <Card className="border-dashed border-accent/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Durable Objects
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Export/import individual state stores as discrete objects (.mhdo)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  onClick={handleExportDOs}
+                  className="w-full text-xs"
+                  size="sm"
+                  variant="outline"
+                >
+                  <Download className="w-3 h-3 mr-2" />
+                  Export Durable Objects (.mhdo)
+                </Button>
+                <Button
+                  onClick={handleImportDOFile}
+                  className="w-full text-xs"
+                  size="sm"
+                  variant="outline"
+                >
+                  <Upload className="w-3 h-3 mr-2" />
+                  Import Durable Objects (.mhdo)
+                </Button>
+                <input
+                  ref={doFileInputRef}
+                  type="file"
+                  accept=".mhdo,.json"
+                  onChange={handleDOFileSelected}
+                  style={{ display: 'none' }}
+                />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
