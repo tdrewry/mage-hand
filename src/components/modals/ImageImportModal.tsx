@@ -142,6 +142,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     setScale(1);
     setOffsetX(0);
     setOffsetY(0);
+    setRepeat(false);
   };
 
   // Mouse/touch handlers for panning
