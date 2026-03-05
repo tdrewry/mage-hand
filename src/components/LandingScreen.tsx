@@ -353,6 +353,29 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         });
       }
 
+      // Effects (placed effects + custom templates)
+      if (data.effects) {
+        const es = useEffectStore.getState();
+        (data.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
+        if (data.effects.placedEffects?.length) {
+          const now = performance.now();
+          const restored = data.effects.placedEffects
+            .filter((e: any) => !e.dismissedAt)
+            .map((e: any) => ({
+              ...e,
+              placedAt: now,
+              dismissedAt: undefined,
+              ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+            }));
+          useEffectStore.setState({ placedEffects: restored });
+        }
+      }
+
+      // UI mode (play/edit)
+      if (data.uiMode) {
+        useUiModeStore.getState().setMode(data.uiMode === 'play' ? 'play' : 'dm');
+      }
+
       // Settings
       if (data.settings) {
         if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
