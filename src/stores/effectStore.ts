@@ -308,6 +308,10 @@ export const useEffectStore = create<EffectState>()(
       // Apply level scaling if castLevel provided
       const scaledTemplate = computeScaledTemplate(template, options.castLevel);
 
+      // Auto-detect aura: link to caster token when template has aura config
+      const isAura = !!scaledTemplate.aura;
+      const anchorTokenId = isAura ? options.casterId : undefined;
+
       const effect: PlacedEffect = {
         id: createEffectId(),
         templateId,
@@ -326,6 +330,7 @@ export const useEffectStore = create<EffectState>()(
         groupId: options.groupId,
         castLevel: options.castLevel,
         waypoints: options.waypoints,
+        ...(isAura ? { isAura: true, anchorTokenId, tokensInsideArea: [] } : {}),
       };
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
