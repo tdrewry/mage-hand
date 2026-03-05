@@ -32,6 +32,7 @@ const ANIMATION_ICONS: Record<string, React.ElementType> = {
   pulse: Cloud,
   expand: Play,
   swirl: Cloud,
+  rotate: RotateCw,
 };
 
 function groupByCategory(templates: EffectTemplate[]): Record<string, EffectTemplate[]> {
@@ -871,6 +872,7 @@ function TemplateFormFields({
                   <SelectItem value="pulse">Pulse</SelectItem>
                   <SelectItem value="expand">Expand</SelectItem>
                   <SelectItem value="swirl">Swirl</SelectItem>
+                  <SelectItem value="rotate">Rotate</SelectItem>
                 </SelectContent>
               </Select>
             </div>
