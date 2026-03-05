@@ -63,6 +63,8 @@ interface MapStore {
   autoFocusFollowsToken: boolean;
   
   addMap: (map: CreateMapData) => void;
+  /** Restore a map with its original ID intact (for import/hydration) */
+  restoreMap: (map: GameMap) => void;
 
   /**
    * Updates an existing map.
