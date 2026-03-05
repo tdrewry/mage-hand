@@ -135,7 +135,7 @@ export function updateAura(
     return { entered: [], exited: [], inside: [], impacts: [] };
   }
 
-  const radiusPx = auraConfig.radius * gridSize;
+  const radiusPx = (effect.template.radius ?? 1) * gridSize;
   const center: Point = { x: anchorToken.x, y: anchorToken.y };
 
   // Determine whether to exclude the aura source from hit-testing
@@ -234,7 +234,7 @@ export function tickAuras(
     if (!anchorToken) continue;
 
     const aura = effect.template.aura;
-    const radiusPx = aura.radius * gridSize;
+    const radiusPx = (effect.template.radius ?? 1) * gridSize;
     const center: Point = { x: anchorToken.x, y: anchorToken.y };
     const excludeId = aura.affectSelf ? undefined : effect.anchorTokenId;
 

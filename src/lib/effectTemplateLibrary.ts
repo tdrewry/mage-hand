@@ -566,7 +566,6 @@ export const AURA_OF_PROTECTION: EffectTemplate = {
   isBuiltIn: true,
   skipRotation: true,
   aura: {
-    radius: 2,
     affectSelf: true,
     wallBlocked: true,
   },
@@ -593,7 +592,6 @@ export const FRIGHTFUL_PRESENCE: EffectTemplate = {
   isBuiltIn: true,
   skipRotation: true,
   aura: {
-    radius: 6,
     affectSelf: false,
     wallBlocked: false,
   },

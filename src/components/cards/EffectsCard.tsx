@@ -86,7 +86,6 @@ interface TemplateFormData {
   grantedActions: EffectGrantedAction[];
   // Aura
   isAura: boolean;
-  auraRadius: number;
   auraAffectSelf: boolean;
   auraWallBlocked: boolean;
 }
@@ -126,7 +125,6 @@ const INITIAL_FORM: TemplateFormData = {
   conditions: [],
   grantedActions: [],
   isAura: false,
-  auraRadius: 2,
   auraAffectSelf: false,
   auraWallBlocked: true,
 };
@@ -167,7 +165,6 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     conditions: t.conditions ?? [],
     grantedActions: t.grantedActions ?? [],
     isAura: !!t.aura,
-    auraRadius: t.aura?.radius ?? 2,
     auraAffectSelf: t.aura?.affectSelf ?? false,
     auraWallBlocked: t.aura?.wallBlocked !== false,
   };
@@ -869,19 +866,6 @@ function TemplateFormFields({
             </div>
             {form.isAura && (
               <div className="pl-4 space-y-1">
-                <div className="flex gap-2 items-end">
-                  <div className="w-20">
-                    <label className="text-[10px] text-muted-foreground">Radius</label>
-                    <NumericInput
-                      value={form.auraRadius}
-                      onChange={(v) => update('auraRadius', Math.max(1, v))}
-                      className="h-6 text-[10px]"
-                      min={1}
-                      max={24}
-                    />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground pb-1">grid units</span>
-                </div>
                 <div className="flex items-center gap-1">
                   <Switch checked={form.auraAffectSelf} onCheckedChange={(v) => update('auraAffectSelf', v)} className="scale-75" />
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">Affect self</span>
@@ -1132,7 +1116,6 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     conditions: form.conditions.length > 0 ? form.conditions : undefined,
     grantedActions: form.grantedActions.length > 0 ? form.grantedActions : undefined,
     aura: form.isAura ? {
-      radius: form.auraRadius,
       affectSelf: form.auraAffectSelf || undefined,
       wallBlocked: form.auraWallBlocked === false ? false : undefined,
     } : undefined,
