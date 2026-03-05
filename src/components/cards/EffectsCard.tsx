@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll } from '@/types/effectTypes';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,8 @@ interface TemplateFormData {
   maxLength: number;
   segmentWidth: number;
   persistence: EffectPersistence;
+  durationType: EffectDurationType;
+  templateMode: EffectTemplateMode;
   durationRounds: number;
   recurring: boolean;
   alignToGrid: boolean;
@@ -94,6 +96,8 @@ const INITIAL_FORM: TemplateFormData = {
   maxLength: 12,
   segmentWidth: 0.2,
   persistence: 'instant',
+  durationType: 'instantaneous',
+  templateMode: 'persistent',
   durationRounds: 0,
   recurring: true,
   alignToGrid: false,
@@ -129,6 +133,8 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     maxLength: t.maxLength ?? 12,
     segmentWidth: t.segmentWidth ?? 0.2,
     persistence: t.persistence,
+    durationType: t.durationType ?? (t.persistence === 'instant' ? 'instantaneous' : (t.durationRounds && t.durationRounds > 0 ? 'timed' : 'infinite')),
+    templateMode: t.templateMode ?? 'persistent',
     durationRounds: t.durationRounds ?? 0,
     recurring: t.recurring !== false,
     alignToGrid: t.alignToGrid ?? false,
@@ -452,35 +458,45 @@ function ModifiersEditor({
     <div className="space-y-1">
       <label className="text-[10px] text-muted-foreground font-medium">Stat Modifiers</label>
       {modifiers.map((mod, i) => (
-        <div key={mod.id} className="flex gap-1 items-center">
-          <Select value={mod.target} onValueChange={(v) => updateMod(i, { target: v })}>
-            <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {EFFECT_MODIFIER_TARGETS.map(t => (
-                <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={mod.operation} onValueChange={(v) => updateMod(i, { operation: v as EffectModifierOperation })}>
-            <SelectTrigger className="h-6 text-[10px] w-14"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="add">+</SelectItem>
-              <SelectItem value="set">=</SelectItem>
-              <SelectItem value="multiply">×</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="w-14">
-            <NumericInput
-              value={mod.value}
-              onChange={(v) => updateMod(i, { value: v })}
-              className="h-6 text-[10px]"
-              float={mod.operation === 'multiply'}
-              step={mod.operation === 'multiply' ? 0.5 : 1}
-            />
+        <div key={mod.id} className="space-y-0.5">
+          <div className="flex gap-1 items-center">
+            <Select value={mod.target} onValueChange={(v) => updateMod(i, { target: v })}>
+              <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {EFFECT_MODIFIER_TARGETS.map(t => (
+                  <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={mod.operation} onValueChange={(v) => updateMod(i, { operation: v as EffectModifierOperation })}>
+              <SelectTrigger className="h-6 text-[10px] w-14"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="add">+</SelectItem>
+                <SelectItem value="set">=</SelectItem>
+                <SelectItem value="multiply">×</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="w-14">
+              <NumericInput
+                value={mod.value}
+                onChange={(v) => updateMod(i, { value: v })}
+                className="h-6 text-[10px]"
+                float={mod.operation === 'multiply'}
+                step={mod.operation === 'multiply' ? 0.5 : 1}
+              />
+            </div>
+            <Select value={mod.timing ?? 'on-enter'} onValueChange={(v) => updateMod(i, { timing: v as EffectTriggerTiming })}>
+              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="on-enter">Enter</SelectItem>
+                <SelectItem value="on-exit">Exit</SelectItem>
+                <SelectItem value="on-stay">Stay</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeMod(i)}>
+              <X className="w-3 h-3 text-destructive" />
+            </Button>
           </div>
-          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeMod(i)}>
-            <X className="w-3 h-3 text-destructive" />
-          </Button>
         </div>
       ))}
       <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addMod}>
@@ -504,12 +520,22 @@ function ConditionsEditor({
     if (existing) {
       onChange(conditions.filter(c => c.condition !== condition));
     } else {
-      onChange([...conditions, { condition, apply: true }]);
+      onChange([...conditions, { condition, apply: true, timing: 'on-enter' }]);
     }
   };
 
   const toggleApply = (condition: string) => {
     onChange(conditions.map(c => c.condition === condition ? { ...c, apply: !c.apply } : c));
+  };
+
+  const cycleTiming = (condition: string) => {
+    const timings: EffectTriggerTiming[] = ['on-enter', 'on-exit', 'on-stay'];
+    onChange(conditions.map(c => {
+      if (c.condition !== condition) return c;
+      const current = c.timing ?? 'on-enter';
+      const next = timings[(timings.indexOf(current) + 1) % timings.length];
+      return { ...c, timing: next };
+    }));
   };
 
   return (
@@ -529,12 +555,20 @@ function ConditionsEditor({
                 {cond}
               </span>
               {active && (
-                <button
-                  className={`text-[8px] px-1 rounded ${active.apply ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}
-                  onClick={() => toggleApply(cond)}
-                >
-                  {active.apply ? 'Apply' : 'Remove'}
-                </button>
+                <>
+                  <button
+                    className={`text-[8px] px-1 rounded ${active.apply ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}
+                    onClick={() => toggleApply(cond)}
+                  >
+                    {active.apply ? 'Apply' : 'Remove'}
+                  </button>
+                  <button
+                    className="text-[8px] px-1 rounded bg-muted text-muted-foreground hover:text-foreground"
+                    onClick={() => cycleTiming(cond)}
+                  >
+                    {(active.timing ?? 'on-enter').replace('on-', '')}
+                  </button>
+                </>
               )}
             </div>
           );
@@ -936,19 +970,58 @@ function TemplateFormFields({
       {/* --- Duration Tab --- */}
       {activeTab === 'duration' && (
         <>
-          <Select value={form.persistence} onValueChange={(v) => update('persistence', v as EffectPersistence)}>
-            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="instant">Instantaneous</SelectItem>
-              <SelectItem value="persistent">Persistent</SelectItem>
-            </SelectContent>
-          </Select>
-          {form.persistence === 'persistent' && (
+          {/* Duration Type */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-medium">Duration Type</label>
+            <Select
+              value={form.durationType}
+              onValueChange={(v) => {
+                const dt = v as EffectDurationType;
+                update('durationType', dt);
+                // Sync legacy persistence field
+                update('persistence', dt === 'instantaneous' ? 'instant' : 'persistent');
+                if (dt === 'instantaneous') update('durationRounds', 0);
+                if (dt === 'infinite') update('durationRounds', 0);
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="instantaneous">Instantaneous</SelectItem>
+                <SelectItem value="timed">Timed (N rounds)</SelectItem>
+                <SelectItem value="infinite">Infinite (until dismissed/cancelled)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Duration rounds — only for timed */}
+          {form.durationType === 'timed' && (
+            <div>
+              <label className="text-[10px] text-muted-foreground">Duration (rounds)</label>
+              <NumericInput
+                value={form.durationRounds}
+                onChange={(v) => update('durationRounds', Math.max(1, v))}
+                className="h-7 text-xs"
+                min={1}
+                max={999}
+              />
+            </div>
+          )}
+
+          {/* Template mode — for timed/infinite */}
+          {form.durationType !== 'instantaneous' && (
             <>
               <div>
-                <label className="text-[10px] text-muted-foreground">Duration (rounds, 0 = until dismissed)</label>
-                <Input type="number" value={form.durationRounds} onChange={(e) => update('durationRounds', +e.target.value)} className="h-7 text-xs" min={0} placeholder="Rounds (0=∞)" />
+                <label className="text-[10px] text-muted-foreground font-medium">Template Mode</label>
+                <Select value={form.templateMode} onValueChange={(v) => update('templateMode', v as EffectTemplateMode)}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="persistent">Persistent (shape stays on map)</SelectItem>
+                    <SelectItem value="targeting-only">Targeting-only (removed after targeting)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Recurring toggle */}
               <div className="flex items-center gap-1">
                 <Switch checked={form.recurring} onCheckedChange={(v) => update('recurring', v)} className="scale-75" />
                 <span className="text-[10px] text-muted-foreground whitespace-nowrap">
@@ -957,6 +1030,15 @@ function TemplateFormFields({
               </div>
             </>
           )}
+
+          {/* Timing summary */}
+          <div className="text-[9px] text-muted-foreground border border-border rounded p-1.5 space-y-0.5">
+            <span className="font-medium">Trigger Timing:</span>
+            <p>Set per modifier/condition in their respective tabs.</p>
+            <p><strong>Enter</strong> — when a token enters the area</p>
+            <p><strong>Exit</strong> — when a token leaves the area</p>
+            <p><strong>Stay</strong> — each round a token starts its turn inside</p>
+          </div>
         </>
       )}
     </>
@@ -976,8 +1058,10 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     segmentWidth: form.shape === 'polyline' ? form.segmentWidth : undefined,
     placementMode: 'free',
     persistence: form.persistence,
-    durationRounds: form.persistence === 'persistent' ? form.durationRounds : undefined,
-    recurring: form.persistence === 'persistent' ? form.recurring : undefined,
+    durationType: form.durationType,
+    templateMode: form.durationType !== 'instantaneous' ? form.templateMode : undefined,
+    durationRounds: form.durationType === 'timed' ? form.durationRounds : (form.durationType === 'instantaneous' ? undefined : 0),
+    recurring: form.durationType !== 'instantaneous' ? form.recurring : undefined,
     alignToGrid: form.alignToGrid || undefined,
     targetCaster: form.targetCaster || undefined,
     ranged: form.ranged || undefined,
