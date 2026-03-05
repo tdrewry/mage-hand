@@ -459,6 +459,9 @@ function drawTextureInPath(
   // Translate to effect origin, rotate to direction, then draw centered image
   ctx.translate(origin.x, origin.y);
   ctx.rotate(direction);
+  
+  // Ensure full opacity for the texture draw (parent already set globalAlpha)
+  ctx.globalAlpha = 1;
   ctx.drawImage(
     img,
     -drawW / 2 + offsetX,
