@@ -1591,6 +1591,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         onDelete={handleDeleteVersion}
         onCompare={historyHook.compare}
       />
+
+      {/* Durable Object Import Modal */}
+      <DurableObjectImportModal
+        open={showDoImport}
+        onOpenChange={setShowDoImport}
+        archive={doArchive}
+      />
     </div>
   );
 };
