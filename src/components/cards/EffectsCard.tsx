@@ -700,7 +700,7 @@ function TemplateFormFields({
       </Select>
 
       {/* Tab bar */}
-      <div className="flex border-b border-border -mx-2 px-2 overflow-x-auto">
+      <div className="flex border-b border-border -mx-2 px-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {FORM_TABS.map(tab => {
           const isActive = activeTab === tab.value;
           const Icon = tab.icon;
