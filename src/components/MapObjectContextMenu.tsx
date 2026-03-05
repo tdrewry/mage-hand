@@ -796,13 +796,11 @@ export const MapObjectContextMenuWrapper = ({
             onUpdateCanvas?.();
             toast.success('Texture applied');
           }}
-          shape={(() => {
-            const obj = currentObject;
-            if (obj.shape === 'circle') {
-              return { type: 'circle' as const, diameter: Math.min(obj.width, obj.height) };
-            }
-            return { type: 'rectangle' as const, width: obj.width, height: obj.height };
-          })()}
+          shape={{
+            type: currentObject.shape === 'circle' ? 'circle' : 'rectangle',
+            width: currentObject.width,
+            height: currentObject.height,
+          }}
           title="Map Object Texture"
           description="Import an image to use as a texture for this map object"
           initialScale={currentObject.textureScale}
