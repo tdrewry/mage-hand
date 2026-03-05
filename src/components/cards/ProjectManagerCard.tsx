@@ -65,7 +65,8 @@ import { useLightStore } from '../../stores/lightStore';
 import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
 import { useMapObjectStore } from '../../stores/mapObjectStore';
-import { useAutoSave } from '../../hooks/useAutoSave';
+import { useEffectStore } from '../../stores/effectStore';
+import { useUiModeStore } from '../../stores/uiModeStore';
 import { useSessionTemplates } from '../../hooks/useSessionTemplates';
 import { useSessionHistory } from '../../hooks/useSessionHistory';
 import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
@@ -319,6 +320,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       shadowDistance: dungeonStore.shadowDistance,
     },
     mapObjects: mapObjectStore.mapObjects,
+    effects: {
+      placedEffects: useEffectStore.getState().placedEffects,
+      customTemplates: useEffectStore.getState().customTemplates,
+    },
+    uiMode: useUiModeStore.getState().currentMode === 'dm' ? 'dm' : 'play',
   });
 
   const handleSaveToStorage = async () => {
@@ -676,6 +682,32 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
+      // Step 17: Apply effects
+      setLoadingProgress('Loading effects...');
+      if (projectData.effects) {
+        const es = useEffectStore.getState();
+        const existingMapIds = new Set(es.placedEffects.map(e => e.mapId));
+        existingMapIds.forEach(id => es.clearEffectsForMap(id));
+        (projectData.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
+        if (projectData.effects.placedEffects?.length) {
+          const now = performance.now();
+          const restored = projectData.effects.placedEffects
+            .filter((e: any) => !e.dismissedAt)
+            .map((e: any) => ({
+              ...e,
+              placedAt: now,
+              dismissedAt: undefined,
+              ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+            }));
+          useEffectStore.setState({ placedEffects: restored });
+        }
+      }
+
+      // Step 18: Apply UI mode
+      if (projectData.uiMode) {
+        useUiModeStore.getState().setMode(projectData.uiMode === 'play' ? 'play' : 'dm');
+      }
+
       setLoadingProgress('Import complete!');
       await new Promise(resolve => setTimeout(resolve, 300));
       
@@ -787,6 +819,31 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     // Map objects — always clear to avoid stale objects
     mapObjectStore.clearMapObjects();
     (projectData.mapObjects || []).forEach(obj => mapObjectStore.addMapObject(obj));
+
+    // Effects
+    if (projectData.effects) {
+      const es = useEffectStore.getState();
+      const existingMapIds = new Set(es.placedEffects.map(e => e.mapId));
+      existingMapIds.forEach(id => es.clearEffectsForMap(id));
+      (projectData.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
+      if (projectData.effects.placedEffects?.length) {
+        const now = performance.now();
+        const restored = projectData.effects.placedEffects
+          .filter((e: any) => !e.dismissedAt)
+          .map((e: any) => ({
+            ...e,
+            placedAt: now,
+            dismissedAt: undefined,
+            ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+          }));
+        useEffectStore.setState({ placedEffects: restored });
+      }
+    }
+
+    // UI mode
+    if (projectData.uiMode) {
+      useUiModeStore.getState().setMode(projectData.uiMode === 'play' ? 'play' : 'dm');
+    }
   };
 
   const handleLoadFromStorage = async (projectId: string) => {
