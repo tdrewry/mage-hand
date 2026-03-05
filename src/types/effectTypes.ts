@@ -25,7 +25,8 @@ export type EffectAnimationType =
   | 'crackle'
   | 'pulse'
   | 'expand'
-  | 'swirl';
+  | 'swirl'
+  | 'rotate';
 
 export type EffectPlacementMode = 'free' | 'caster' | 'both';
 export type EffectPersistence = 'instant' | 'persistent';
