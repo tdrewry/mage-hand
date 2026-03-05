@@ -313,7 +313,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       ctx.fillRect(shapeX - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
       ctx.fillRect(shapeX + shapeW - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
     }
-  }, [shape, imageSize, scale, offsetX, offsetY]);
+  }, [shape, imageSize, scale, offsetX, offsetY, repeat]);
 
   // Store loaded image reference for redrawing
   const loadedImageRef = useRef<HTMLImageElement | null>(null);
@@ -360,7 +360,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     if (loadedImageRef.current && imageLoaded) {
       drawCanvas(loadedImageRef.current);
     }
-  }, [scale, offsetX, offsetY, imageLoaded, drawCanvas]);
+  }, [scale, offsetX, offsetY, repeat, imageLoaded, drawCanvas]);
 
   const handleConfirm = () => {
     if (!imageUrl) {
@@ -373,6 +373,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       scale,
       offsetX,
       offsetY,
+      repeat: repeat || undefined,
     });
     onOpenChange(false);
   };
@@ -498,6 +499,15 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               <p className="text-xs text-muted-foreground">
                 Offset: ({offsetX.toFixed(0)}, {offsetY.toFixed(0)})
               </p>
+              {showRepeatToggle && (
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <Repeat className="h-3.5 w-3.5" />
+                    Tile / Repeat
+                  </Label>
+                  <Switch checked={repeat} onCheckedChange={setRepeat} />
+                </div>
+              )}
             </div>
           )}
         </div>
