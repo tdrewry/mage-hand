@@ -445,8 +445,7 @@ function drawTextureInPath(
   ctx.translate(origin.x, origin.y);
   ctx.rotate(direction);
   
-  // Ensure full opacity for the texture draw (parent already set globalAlpha)
-  ctx.globalAlpha = 1;
+  // Preserve the parent's globalAlpha (which encodes template opacity)
   ctx.drawImage(
     img,
     -drawW / 2 + offsetX,
