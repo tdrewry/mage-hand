@@ -326,8 +326,6 @@ function renderEffect(
 // ---------------------------------------------------------------------------
 
 const textureImageCache = new Map<string, HTMLImageElement | 'loading' | 'error'>();
-const _textureErrorLogged = new Set<string>();
-const _textureLoadingLogged = new Set<string>();
 
 function getTextureImage(url: string): HTMLImageElement | null {
   const cached = textureImageCache.get(url);
