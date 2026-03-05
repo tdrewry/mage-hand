@@ -545,6 +545,64 @@ export const MAGIC_MISSILE: EffectTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Aura templates
+// ---------------------------------------------------------------------------
+
+export const AURA_OF_PROTECTION: EffectTemplate = {
+  id: 'builtin-aura-of-protection',
+  name: 'Aura of Protection',
+  shape: 'circle',
+  radius: 2,               // 10 ft radius (2 grid units)
+  placementMode: 'caster',
+  persistence: 'persistent',
+  durationRounds: 0,        // until dismissed
+  color: '#FFD700',
+  secondaryColor: '#FFFACD',
+  opacity: 0.2,
+  animation: 'pulse',
+  animationSpeed: 0.4,
+  category: 'trait',
+  description: 'Each creature of your choice within 10 feet gains a bonus to saving throws equal to your Charisma modifier (minimum +1).',
+  isBuiltIn: true,
+  skipRotation: true,
+  aura: {
+    radius: 2,
+    affectSelf: true,
+    wallBlocked: true,
+  },
+  modifiers: [
+    { id: 'aop-saves', target: 'savingThrows', operation: 'add', value: 3, label: '+CHA to saves' },
+  ],
+};
+
+export const FRIGHTFUL_PRESENCE: EffectTemplate = {
+  id: 'builtin-frightful-presence',
+  name: 'Frightful Presence',
+  shape: 'circle',
+  radius: 6,               // 30 ft radius (6 grid units)
+  placementMode: 'caster',
+  persistence: 'persistent',
+  durationRounds: 10,       // 1 minute
+  color: '#4B0082',
+  secondaryColor: '#800080',
+  opacity: 0.25,
+  animation: 'swirl',
+  animationSpeed: 0.6,
+  category: 'trait',
+  description: 'Each creature of your choice within 30 feet must succeed on a Wisdom saving throw or become frightened for 1 minute.',
+  isBuiltIn: true,
+  skipRotation: true,
+  aura: {
+    radius: 6,
+    affectSelf: false,
+    wallBlocked: false,
+  },
+  conditions: [
+    { condition: 'frightened', apply: true, timing: 'on-enter' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // Aggregate collections
 // ---------------------------------------------------------------------------
 
@@ -571,6 +629,8 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
   POISON_GAS_CLOUD,
   STORM_OF_VENGEANCE_BOLTS,
   METEOR_SWARM,
+  AURA_OF_PROTECTION,
+  FRIGHTFUL_PRESENCE,
 ];
 
 /**
