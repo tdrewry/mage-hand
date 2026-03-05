@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw } from 'lucide-react';
+import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw, Repeat } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 export interface ImageImportResult {
@@ -62,6 +63,8 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   initialScale = 1,
   initialOffsetX = 0,
   initialOffsetY = 0,
+  initialRepeat = false,
+  showRepeatToggle = false,
 }) => {
   const [inputMode, setInputMode] = useState<'file' | 'url'>('file');
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
@@ -69,6 +72,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   const [scale, setScale] = useState(initialScale);
   const [offsetX, setOffsetX] = useState(initialOffsetX);
   const [offsetY, setOffsetY] = useState(initialOffsetY);
+  const [repeat, setRepeat] = useState(initialRepeat);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -89,9 +93,10 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       setScale(initialScale);
       setOffsetX(initialOffsetX);
       setOffsetY(initialOffsetY);
+      setRepeat(initialRepeat);
       setImageLoaded(false);
     }
-  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY]);
+  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY, initialRepeat]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
