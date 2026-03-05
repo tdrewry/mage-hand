@@ -31,6 +31,19 @@ export type EffectPlacementMode = 'free' | 'caster' | 'both';
 export type EffectPersistence = 'instant' | 'persistent';
 export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'trait' | 'custom';
 
+// ---------------------------------------------------------------------------
+// Duration & timing enums (v0.6.36)
+// ---------------------------------------------------------------------------
+
+/** Unified duration model */
+export type EffectDurationType = 'instantaneous' | 'timed' | 'infinite';
+
+/** Whether the template shape persists on the map or is removed after targeting */
+export type EffectTemplateMode = 'persistent' | 'targeting-only';
+
+/** When an impact (modifier/condition) triggers relative to a token's position in the effect area */
+export type EffectTriggerTiming = 'on-enter' | 'on-exit' | 'on-stay';
+
 // Damage dice entry (supports multiple damage types, e.g. Flame Strike)
 export interface DamageDiceEntry {
   formula: string;     // e.g. "4d6", "2d10+4"
@@ -92,11 +105,17 @@ export interface EffectTemplate {
   /** If true, effect rotation snaps to the nearest 45° grid axis */
   alignToGrid?: boolean;
 
-  // Persistence
+  // Persistence (legacy)
   persistence: EffectPersistence;
   durationRounds?: number; // persistent effects: 0 = until dismissed
   /** If true, triggeredTokenIds reset each round so tokens re-trigger. Default: true for persistent effects. */
   recurring?: boolean;
+
+  // Duration model (v0.6.36 — unified replacement for persistence + durationRounds)
+  /** Unified duration type: instantaneous (one-shot), timed (N rounds), infinite (until dismissed/cancelled) */
+  durationType?: EffectDurationType;
+  /** Whether the visual template stays on the map or is removed after initial targeting */
+  templateMode?: EffectTemplateMode;
 
   // Visual
   color: string;           // primary colour (hex)
@@ -174,6 +193,9 @@ export interface PlacedEffect {
   /** When set (performance.now()), the effect is fading out and will be auto-removed */
   dismissedAt?: number;
 
+  /** When set, the effect has been cancelled — all non-damage impacts reverted */
+  cancelledAt?: number;
+
   /** The level this effect was cast at (for display/history) */
   castLevel?: number;
 
@@ -185,6 +207,9 @@ export interface PlacedEffect {
 
   /** Token IDs that have already triggered this effect (prevents re-triggering) */
   triggeredTokenIds: string[];
+
+  /** Token IDs currently inside the effect area (for on-exit tracking) */
+  tokensInsideArea?: string[];
 
   /** Links multi-drop instances for shared resolution */
   groupId?: string;
@@ -311,6 +336,8 @@ export interface EffectModifier {
   value: number;
   /** Human-readable label */
   label?: string;
+  /** When this modifier triggers relative to token position in the effect area */
+  timing?: EffectTriggerTiming;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +354,8 @@ export const DND_5E_CONDITIONS = [
 export interface EffectCondition {
   condition: string;
   apply: boolean; // true = add, false = remove
+  /** When this condition triggers relative to token position in the effect area */
+  timing?: EffectTriggerTiming;
 }
 
 // ---------------------------------------------------------------------------
