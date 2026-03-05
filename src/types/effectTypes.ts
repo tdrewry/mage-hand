@@ -44,6 +44,20 @@ export type EffectTemplateMode = 'persistent' | 'targeting-only';
 /** When an impact (modifier/condition) triggers relative to a token's position in the effect area */
 export type EffectTriggerTiming = 'on-enter' | 'on-exit' | 'on-stay';
 
+// ---------------------------------------------------------------------------
+// Aura configuration
+// ---------------------------------------------------------------------------
+
+/** Configuration for aura-type effects that lock to a token */
+export interface AuraConfig {
+  /** Aura radius in grid units */
+  radius: number;
+  /** Whether the aura affects the source token itself (default false) */
+  affectSelf?: boolean;
+  /** Whether the aura is blocked by walls (default true) */
+  wallBlocked?: boolean;
+}
+
 // Damage dice entry (supports multiple damage types, e.g. Flame Strike)
 export interface DamageDiceEntry {
   formula: string;     // e.g. "4d6", "2d10+4"
@@ -165,6 +179,10 @@ export interface EffectTemplate {
   conditions?: EffectCondition[];
   /** Temporary actions granted to targets */
   grantedActions?: EffectGrantedAction[];
+
+  // Aura
+  /** If set, this effect is an aura: it locks to a token and continuously hit-tests with wall-blocking */
+  aura?: AuraConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +234,12 @@ export interface PlacedEffect {
 
   /** Polyline waypoints (world coords) — for polyline shape */
   waypoints?: { x: number; y: number }[];
+
+  // Aura tracking
+  /** Token ID this aura is anchored to (moves with the token) */
+  anchorTokenId?: string;
+  /** Whether this placed effect is an aura */
+  isAura?: boolean;
 }
 
 // ---------------------------------------------------------------------------
