@@ -374,22 +374,6 @@ function drawShape(
     const img = getTextureImage(template.texture);
     if (img) {
       drawTextureInPath(ctx, img, path, template, origin, direction, gridSize);
-    } else {
-      // Debug: draw a small indicator that texture is pending/failed
-      const cacheState = textureImageCache.get(template.texture);
-      if (cacheState === 'error') {
-        if (!_textureErrorLogged.has(template.id)) {
-          _textureErrorLogged.add(template.id);
-          console.warn('[effectRenderer] Texture load failed for:', template.name, template.texture.substring(0, 60));
-        }
-      } else if (cacheState === 'loading') {
-        if (!_textureLoadingLogged.has(template.texture)) {
-          _textureLoadingLogged.add(template.texture);
-          console.log('[effectRenderer] Texture loading for:', template.name);
-        }
-      } else {
-        console.log('[effectRenderer] Texture not in cache yet, starting load for:', template.name, 'url length:', template.texture.length);
-      }
     }
   }
 }
