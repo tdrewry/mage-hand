@@ -110,6 +110,8 @@ interface EffectState {
   markTokenTriggered: (effectId: string, tokenId: string) => void;
   resetTriggeredTokens: (effectId: string) => void;
   updateTokensInsideArea: (effectId: string, tokenIds: string[]) => void;
+  /** Update an aura effect's origin, impacts, and tokensInsideArea atomically */
+  updateAuraState: (effectId: string, origin: { x: number; y: number }, impacts: EffectImpact[], insideIds: string[]) => void;
   toggleRecurring: (effectId: string) => void;
   toggleAnimationPaused: (effectId: string) => void;
 
@@ -418,6 +420,16 @@ export const useEffectStore = create<EffectState>()(
       set((s) => ({
         placedEffects: s.placedEffects.map((e) =>
           e.id === effectId ? { ...e, tokensInsideArea: tokenIds } : e
+        ),
+      }));
+    },
+
+    updateAuraState: (effectId, origin, impacts, insideIds) => {
+      set((s) => ({
+        placedEffects: s.placedEffects.map((e) =>
+          e.id === effectId
+            ? { ...e, origin, impactedTargets: impacts, tokensInsideArea: insideIds }
+            : e
         ),
       }));
     },

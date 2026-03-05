@@ -156,6 +156,7 @@ import { useEffectStore } from "../stores/effectStore";
 import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/effectRenderer";
 import { EffectContextMenu } from "./EffectContextMenu";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
+import { tickAuras } from "../lib/auraEngine";
 
 
 export const SimpleTabletop = () => {
@@ -389,6 +390,10 @@ export const SimpleTabletop = () => {
   
   // Combined visibility-blocking segments (walls + map objects)
   const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
+  
+  // Aura tick throttle — recompute aura targets at ~5Hz (200ms)
+  const lastAuraTickRef = useRef<number>(0);
+  const AURA_TICK_INTERVAL = 200;
   
   // Track previous map objects blocking state to detect changes (e.g., door toggle)
   const prevMapObjectsBlockingRef = useRef<string>('');
@@ -4131,8 +4136,20 @@ export const SimpleTabletop = () => {
           // Clean up fully-faded dismissed effects
           effectState.cleanupDismissedEffects();
         }
-        // Render aura effects (visibility-clipped circles)
+        // Tick aura hit-testing (throttled to ~5Hz)
         const auraEffects = mapEffects.filter(e => e.isAura);
+        const now = performance.now();
+        if (auraEffects.length > 0 && now - lastAuraTickRef.current >= AURA_TICK_INTERVAL) {
+          lastAuraTickRef.current = now;
+          tickAuras(
+            auraEffects,
+            filteredTokens,
+            combinedSegmentsRef.current,
+            effectGridSize,
+            effectState.updateAuraState,
+          );
+        }
+        // Render aura effects (visibility-clipped circles)
         if (auraEffects.length > 0) {
           const tokenPosMap = new Map<string, { x: number; y: number }>();
           for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
