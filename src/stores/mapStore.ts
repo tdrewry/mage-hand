@@ -186,6 +186,12 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
     useFogStore.getState().initMapFogSettings(newMap.id);
   },
 
+  /** Restore a map with its original ID intact (for import/hydration) */
+  restoreMap: (map: GameMap) => {
+    set((state) => ({ maps: [...state.maps, map] }));
+    useFogStore.getState().initMapFogSettings(map.id);
+  },
+
   updateMap: (id, updates) => {
     set((state) => ({
       maps: state.maps.map((map) =>
