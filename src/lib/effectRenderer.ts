@@ -597,7 +597,7 @@ interface AnimationMods {
   rotationAngle: number;
 }
 
-function computeAnimation(type: EffectAnimationType, speed: number, time: number, id: string): AnimationMods {
+function computeAnimation(type: EffectAnimationType, speed: number, time: number, id: string, rotateDirection?: string): AnimationMods {
   const base: AnimationMods = { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 };
   if (type === 'none') return base;
 

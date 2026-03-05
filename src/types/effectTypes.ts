@@ -29,6 +29,8 @@ export type EffectAnimationType =
   | 'rotate';
 
 export type EffectPlacementMode = 'free' | 'caster' | 'both';
+/** Rotation direction for 'rotate' animation */
+export type EffectRotateDirection = 'cw' | 'ccw';
 export type EffectPersistence = 'instant' | 'persistent';
 export type EffectCategory = 'spell' | 'trap' | 'hazard' | 'trait' | 'custom';
 
@@ -143,6 +145,8 @@ export interface EffectTemplate {
   textureRepeat?: boolean; // if true, tile texture instead of cover-fit
   animation: EffectAnimationType;
   animationSpeed: number;  // multiplier (0.5-3)
+  /** Rotation direction for 'rotate' animation: 'cw' (clockwise, default) or 'ccw' */
+  rotateDirection?: EffectRotateDirection;
 
   // Metadata
   category: EffectCategory;
