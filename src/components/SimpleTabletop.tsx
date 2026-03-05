@@ -6893,6 +6893,11 @@ export const SimpleTabletop = () => {
       token.illuminationSources?.some((source) => source.animation && source.animation !== 'none')
     );
     
+    // Check for active effect animations or placement preview
+    const effectState = useEffectStore.getState();
+    const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant' || !!e.dismissedAt);
+    const hasEffectPlacement = !!effectState.placement;
+
     // Check if there are any animated textures (GIFs) on tokens, regions, or effects
     const hasAnimatedTextures = tokens.some((token) => 
       token.imageUrl && animatedTextureManager.isAnimated(token.imageUrl)
@@ -6901,11 +6906,6 @@ export const SimpleTabletop = () => {
     ) || effectState.placedEffects.some(e =>
       e.template.texture && animatedTextureManager.isAnimated(e.template.texture)
     );
-
-    // Check for active effect animations or placement preview
-    const effectState = useEffectStore.getState();
-    const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant' || !!e.dismissedAt);
-    const hasEffectPlacement = !!effectState.placement;
 
     // Only run animation loop if there's something to animate
     if (!hasHostileTokens && !hoveredTokenId && !hasAnimatedIllumination && !hasAnimatedTextures && !hasAnimatedEffects && !hasEffectPlacement) return;
