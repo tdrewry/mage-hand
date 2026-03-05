@@ -103,6 +103,13 @@ export interface ProjectData {
   };
   // Per-map viewport transforms
   viewportTransforms?: Record<string, { x: number; y: number; zoom: number }>;
+  // Effects (placed effects + custom templates)
+  effects?: {
+    placedEffects: any[];
+    customTemplates: any[];
+  };
+  // UI mode (play/edit)
+  uiMode?: 'dm' | 'play';
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }

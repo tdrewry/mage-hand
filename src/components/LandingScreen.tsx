@@ -42,6 +42,8 @@ import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
+import { useEffectStore } from '@/stores/effectStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
 import {
   createProjectMetadata,
   exportProjectToFile,
