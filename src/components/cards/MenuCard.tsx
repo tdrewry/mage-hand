@@ -421,25 +421,15 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
       {/* Project Controls */}
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">Project</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleSave}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleLoad}
-          >
-            <FolderOpen className="h-4 w-4 mr-2" />
-            Load
-          </Button>
-        </div>
+        <Button 
+          variant={projectManagerCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={handleSave}
+          className="w-full"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          Project Manager
+        </Button>
         
         <Button 
           variant={mapControlsCard?.isVisible ? "default" : "outline"}
