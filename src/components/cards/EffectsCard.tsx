@@ -64,6 +64,7 @@ interface TemplateFormData {
   targetCaster: boolean;
   ranged: boolean;
   skipRotation: boolean;
+  renderAboveTokens: boolean;
   color: string;
   texture: string;
   textureScale: number;
@@ -112,6 +113,7 @@ const INITIAL_FORM: TemplateFormData = {
   targetCaster: false,
   ranged: false,
   skipRotation: false,
+  renderAboveTokens: false,
   color: '#FF4500',
   texture: '',
   textureScale: 1,
@@ -155,6 +157,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     targetCaster: t.targetCaster ?? false,
     ranged: t.ranged ?? false,
     skipRotation: t.skipRotation ?? false,
+    renderAboveTokens: t.renderAboveTokens ?? false,
     color: t.color,
     texture: t.texture ?? '',
     textureScale: t.textureScale ?? 1,
@@ -890,6 +893,7 @@ function TemplateFormFields({
               { key: 'targetCaster' as const, label: 'Include caster in targets' },
               { key: 'ranged' as const, label: 'Ranged (place at distance)' },
               { key: 'skipRotation' as const, label: 'Skip rotation step' },
+              { key: 'renderAboveTokens' as const, label: 'Render above tokens' },
             ].map(({ key, label }) => (
               <div key={key} className="flex items-center gap-1">
                 <Switch checked={form[key]} onCheckedChange={(v) => update(key, v)} className="scale-75" />
@@ -1140,6 +1144,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     targetCaster: form.targetCaster || undefined,
     ranged: form.ranged || undefined,
     skipRotation: form.skipRotation || undefined,
+    renderAboveTokens: form.renderAboveTokens || undefined,
     color: form.color,
     texture: form.texture || undefined,
     textureScale: form.texture ? (form.textureScale !== 1 ? form.textureScale : undefined) : undefined,

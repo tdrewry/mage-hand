@@ -160,6 +160,9 @@ export interface EffectTemplate {
   /** If true, skip the rotation/direction step during placement (e.g. circles that don't need aiming) */
   skipRotation?: boolean;
 
+  /** If true, render this effect above tokens instead of below (e.g. visual spell overlays) */
+  renderAboveTokens?: boolean;
+
   /** Multi-drop configuration for effects that place multiple instances */
   multiDrop?: MultiDropConfig;
 
