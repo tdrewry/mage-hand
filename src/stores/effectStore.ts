@@ -25,28 +25,49 @@ const CUSTOM_TEMPLATES_KEY = 'magehand-custom-effect-templates';
 const HIDDEN_BUILTINS_KEY = 'magehand-hidden-builtin-effects';
 
 /**
+ * Compute a fast synchronous hash for immediate use (FNV-1a 32-bit).
+ * Used to set textureHash immediately before async IndexedDB persistence.
+ */
+function fastHash(str: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
  * Strip large texture data URIs from a template, keeping only the textureHash.
  * This prevents blowing the ~5MB localStorage quota.
  */
 function stripTextureData(template: EffectTemplate): EffectTemplate {
-  if (!template.texture) return template;
-  return { ...template, texture: '' };
+  if (!template.texture || template.texture.length < 200) return template;
+  // Ensure textureHash is set before stripping
+  const hash = template.textureHash || fastHash(template.texture);
+  return { ...template, texture: '', textureHash: hash };
 }
 
 /**
- * Persist a template's texture to IndexedDB (fire-and-forget).
- * Sets textureHash on the template so it can be reloaded later.
+ * Persist a template's texture to IndexedDB and set textureHash synchronously.
+ * The IndexedDB write is fire-and-forget; the hash is set immediately.
  */
-async function persistTemplateTexture(template: EffectTemplate): Promise<void> {
-  if (!template.texture || template.texture.length < 200) return; // skip empty / tiny
-  try {
-    const hash = await hashImageData(template.texture);
-    await saveTextureByHash(hash, template.texture);
-    // Store hash on template for recovery
-    (template as any).textureHash = hash;
-  } catch (e) {
+function persistTemplateTexture(template: EffectTemplate): void {
+  if (!template.texture || template.texture.length < 200) return;
+  // Set hash synchronously so it's available for localStorage
+  const syncHash = fastHash(template.texture);
+  template.textureHash = syncHash;
+  // Also do the async SHA-256 hash + IndexedDB save
+  const textureData = template.texture;
+  hashImageData(textureData).then(async (sha) => {
+    await saveTextureByHash(sha, textureData);
+    // Update to the stronger hash
+    template.textureHash = sha;
+  }).catch(e => {
     console.warn('[effectStore] Failed to persist texture to IndexedDB:', e);
-  }
+    // Fallback: save with sync hash
+    saveTextureByHash(syncHash, textureData).catch(() => {});
+  });
 }
 
 /**
