@@ -243,24 +243,39 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       
       ctx.clip();
 
-      // Calculate scaled image size
-      const scaledW = imageSize.width * scale * 0.5; // Scale relative to preview
-      const scaledH = imageSize.height * scale * 0.5;
-      
-      // Calculate pattern offset
-      const patternOffsetX = offsetX % scaledW;
-      const patternOffsetY = offsetY % scaledH;
-      
-      // Draw repeating pattern
-      const startX = shapeX + patternOffsetX - scaledW;
-      const startY = shapeY + patternOffsetY - scaledH;
-      
-      for (let py = startY; py < shapeY + shapeH + scaledH; py += scaledH) {
-        for (let px = startX; px < shapeX + shapeW + scaledW; px += scaledW) {
-          ctx.drawImage(img, px, py, scaledW, scaledH);
+      if (repeat) {
+        // Tile/repeat mode: draw repeating pattern
+        const scaledW = imageSize.width * scale * 0.5;
+        const scaledH = imageSize.height * scale * 0.5;
+        const patternOffsetX = offsetX % scaledW;
+        const patternOffsetY = offsetY % scaledH;
+        const startX = shapeX + patternOffsetX - scaledW;
+        const startY = shapeY + patternOffsetY - scaledH;
+        
+        for (let py = startY; py < shapeY + shapeH + scaledH; py += scaledH) {
+          for (let px = startX; px < shapeX + shapeW + scaledW; px += scaledW) {
+            ctx.drawImage(img, px, py, scaledW, scaledH);
+          }
         }
+      } else {
+        // Cover-fit mode: scale image to cover the shape, centered, with user scale & offset
+        const imgAspect = imageSize.width / imageSize.height;
+        const shapeAspectRatio = shapeW / shapeH;
+        let drawW: number, drawH: number;
+        if (imgAspect > shapeAspectRatio) {
+          drawH = shapeH;
+          drawW = shapeH * imgAspect;
+        } else {
+          drawW = shapeW;
+          drawH = shapeW / imgAspect;
+        }
+        drawW *= scale;
+        drawH *= scale;
+        
+        const cx = shapeX + shapeW / 2;
+        const cy = shapeY + shapeH / 2;
+        ctx.drawImage(img, cx - drawW / 2 + offsetX, cy - drawH / 2 + offsetY, drawW, drawH);
       }
-      
       ctx.restore();
     }
 
