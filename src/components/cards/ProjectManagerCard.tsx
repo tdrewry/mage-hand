@@ -37,6 +37,7 @@ import {
   User,
   AlertTriangle,
   RefreshCw,
+  Package,
 } from 'lucide-react';
 
 import {
@@ -69,6 +70,9 @@ import { useSessionTemplates } from '../../hooks/useSessionTemplates';
 import { useSessionHistory } from '../../hooks/useSessionHistory';
 import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
 import { SessionHistoryModal } from '../SessionHistoryModal';
+import { DurableObjectRegistry, exportArchiveToFile, parseArchiveFile, DurableObjectArchive } from '../../lib/durableObjects';
+import '../../lib/durableObjectRegistry'; // Side-effect: registers all DOs
+import { DurableObjectImportModal } from '../modals/DurableObjectImportModal';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
@@ -89,7 +93,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const doFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Durable Object import state
+  const [doArchive, setDoArchive] = useState<DurableObjectArchive | null>(null);
+  const [showDoImport, setShowDoImport] = useState(false);
   // Auto-save hook
   const autoSave = useAutoSave();
   const [timeSinceLastSave, setTimeSinceLastSave] = useState('Never');
@@ -881,6 +889,39 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
+  // ── Durable Object handlers ──────────────────────────────────────────────
+  const handleExportDOs = () => {
+    try {
+      const archive = DurableObjectRegistry.exportAll(
+        sessionStore.sessionId,
+        projectName || `Session ${sessionStore.sessionId.slice(-6)}`
+      );
+      const filename = `${(projectName || 'session').replace(/[^a-zA-Z0-9]/g, '_')}-DOs.mhdo`;
+      exportArchiveToFile(archive, filename);
+      toast.success(`Exported ${archive.manifest.length} durable objects`);
+    } catch (error) {
+      toast.error(`Failed to export DOs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleImportDOFile = () => {
+    doFileInputRef.current?.click();
+  };
+
+  const handleDOFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const archive = await parseArchiveFile(file);
+      setDoArchive(archive);
+      setShowDoImport(true);
+    } catch (error) {
+      toast.error(`Failed to read .mhdo file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      if (doFileInputRef.current) doFileInputRef.current.value = '';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -1422,6 +1463,46 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                 />
               </CardContent>
             </Card>
+
+            {/* Durable Objects Section */}
+            <Card className="border-dashed border-accent/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Durable Objects
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Export/import individual state stores as discrete objects (.mhdo)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  onClick={handleExportDOs}
+                  className="w-full text-xs"
+                  size="sm"
+                  variant="outline"
+                >
+                  <Download className="w-3 h-3 mr-2" />
+                  Export Durable Objects (.mhdo)
+                </Button>
+                <Button
+                  onClick={handleImportDOFile}
+                  className="w-full text-xs"
+                  size="sm"
+                  variant="outline"
+                >
+                  <Upload className="w-3 h-3 mr-2" />
+                  Import Durable Objects (.mhdo)
+                </Button>
+                <input
+                  ref={doFileInputRef}
+                  type="file"
+                  accept=".mhdo,.json"
+                  onChange={handleDOFileSelected}
+                  style={{ display: 'none' }}
+                />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
@@ -1509,6 +1590,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         onRestore={handleRestoreVersion}
         onDelete={handleDeleteVersion}
         onCompare={historyHook.compare}
+      />
+
+      {/* Durable Object Import Modal */}
+      <DurableObjectImportModal
+        open={showDoImport}
+        onOpenChange={setShowDoImport}
+        archive={doArchive}
       />
     </div>
   );
