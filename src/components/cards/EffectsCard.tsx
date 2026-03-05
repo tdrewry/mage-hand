@@ -881,6 +881,35 @@ function TemplateFormFields({
             </div>
           </div>
 
+          {/* Animation speed + rotate direction (shown when animation !== 'none') */}
+          {form.animation !== 'none' && (
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground">Speed ({form.animationSpeed.toFixed(1)}x)</label>
+                <Slider
+                  value={[form.animationSpeed]}
+                  onValueChange={([v]) => update('animationSpeed', v)}
+                  min={0.1}
+                  max={3}
+                  step={0.1}
+                  className="mt-1"
+                />
+              </div>
+              {form.animation === 'rotate' && (
+                <div className="w-24">
+                  <label className="text-[10px] text-muted-foreground">Direction</label>
+                  <Select value={form.rotateDirection} onValueChange={(v) => update('rotateDirection', v as EffectRotateDirection)}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cw">Clockwise</SelectItem>
+                      <SelectItem value="ccw">Counter-CW</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quantity (multi-drop) */}
           <div className="flex gap-2 items-end">
             <div className="w-20">
@@ -1165,6 +1194,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,
+    rotateDirection: form.animation === 'rotate' && form.rotateDirection !== 'cw' ? form.rotateDirection : undefined,
     category: form.category,
     damageType: cleanedDice.length > 0 ? cleanedDice[0].damageType : undefined,
     damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
