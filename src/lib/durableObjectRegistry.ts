@@ -188,14 +188,32 @@ DurableObjectRegistry.register({
   },
   hydrator: (state: any) => {
     if (!state) return;
-    const patch: Partial<Record<string, unknown>> = {};
-    if (state.fogSettingsPerMap) patch.fogSettingsPerMap = state.fogSettingsPerMap;
-    if (state.serializedExploredAreas) patch.serializedExploredAreas = state.serializedExploredAreas;
-    if (state.serializedExploredAreasPerMap) patch.serializedExploredAreasPerMap = state.serializedExploredAreasPerMap;
-    if (state.fogVersion !== undefined) patch.fogVersion = state.fogVersion;
-    if (state.realtimeVisionDuringDrag !== undefined) patch.realtimeVisionDuringDrag = state.realtimeVisionDuringDrag;
-    if (state.realtimeVisionThrottleMs !== undefined) patch.realtimeVisionThrottleMs = state.realtimeVisionThrottleMs;
-    useFogStore.setState(patch);
+    const store = useFogStore.getState();
+
+    // Restore per-map fog settings using store actions for proper reactivity
+    if (state.fogSettingsPerMap && typeof state.fogSettingsPerMap === 'object') {
+      // First, replace the entire fogSettingsPerMap to clear stale entries
+      useFogStore.setState({ fogSettingsPerMap: {} });
+      for (const [mapId, settings] of Object.entries(state.fogSettingsPerMap)) {
+        store.initMapFogSettings(mapId);
+        store.setMapFogSettings(mapId, settings as any);
+      }
+    }
+
+    // Restore explored geometry
+    if (state.serializedExploredAreas) {
+      store.setSerializedExploredAreas(state.serializedExploredAreas);
+    }
+    if (state.serializedExploredAreasPerMap) {
+      for (const [mapId, data] of Object.entries(state.serializedExploredAreasPerMap)) {
+        store.setSerializedExploredAreasForMap(mapId, data as string);
+      }
+    }
+
+    // Restore global fog fields
+    if (state.fogVersion !== undefined) useFogStore.setState({ fogVersion: state.fogVersion });
+    if (state.realtimeVisionDuringDrag !== undefined) store.setRealtimeVisionDuringDrag(state.realtimeVisionDuringDrag);
+    if (state.realtimeVisionThrottleMs !== undefined) store.setRealtimeVisionThrottleMs(state.realtimeVisionThrottleMs);
   },
   summarizer: () => {
     const maps = Object.keys(useFogStore.getState().fogSettingsPerMap);
@@ -408,7 +426,17 @@ DurableObjectRegistry.register({
     });
     // Restore placed effects (including auras)
     if (state?.placedEffects?.length) {
-      useEffectStore.setState({ placedEffects: state.placedEffects });
+      const now = performance.now();
+      const restored = state.placedEffects
+        .filter((e: any) => !e.dismissedAt) // Skip dismissed effects
+        .map((e: any) => ({
+          ...e,
+          placedAt: now, // Reset to current time so animations work
+          dismissedAt: undefined,
+          // Ensure aura fields are initialized
+          ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+        }));
+      useEffectStore.setState({ placedEffects: restored });
     }
   },
   summarizer: () => {
