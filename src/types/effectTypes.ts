@@ -50,8 +50,6 @@ export type EffectTriggerTiming = 'on-enter' | 'on-exit' | 'on-stay';
 
 /** Configuration for aura-type effects that lock to a token */
 export interface AuraConfig {
-  /** Aura radius in grid units */
-  radius: number;
   /** Whether the aura affects the source token itself (default false) */
   affectSelf?: boolean;
   /** Whether the aura is blocked by walls (default true) */

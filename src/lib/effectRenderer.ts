@@ -709,7 +709,7 @@ export function renderAuraEffects(
     if (!anchorPos) continue;
 
     const aura = effect.template.aura!;
-    const radiusPx = aura.radius * rc.gridSize;
+    const radiusPx = (effect.template.radius ?? 1) * rc.gridSize;
     const center: Point = { x: anchorPos.x, y: anchorPos.y };
 
     // Animation
