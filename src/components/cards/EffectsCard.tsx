@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
 import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
@@ -75,6 +75,7 @@ interface TemplateFormData {
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
+  rotateDirection: EffectRotateDirection;
   category: EffectCategory;
   damageDice: DamageDiceEntry[];
   level: string;
@@ -125,6 +126,7 @@ const INITIAL_FORM: TemplateFormData = {
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
+  rotateDirection: 'cw',
   category: 'custom',
   damageDice: [],
   level: '',
@@ -170,6 +172,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
+    rotateDirection: t.rotateDirection ?? 'cw',
     category: t.category,
     damageDice: t.damageDice ?? [],
     level: t.level !== undefined ? String(t.level) : '',
