@@ -391,6 +391,9 @@ export const useEffectStore = create<EffectState>()(
         ...(isAura ? { isAura: true, anchorTokenId, tokensInsideArea: [] } : {}),
       };
 
+      // Persist template texture to IndexedDB so it survives localStorage stripping
+      persistTemplateTexture(effect.template);
+
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
       return effect;
     },
@@ -523,7 +526,14 @@ export const useEffectStore = create<EffectState>()(
     {
       name: 'vtt-effect-store',
       partialize: (state) => ({
-        placedEffects: state.placedEffects.filter(e => !e.dismissedAt), // Don't persist fading effects
+        // Strip texture data URIs from placed effects to avoid localStorage quota issues
+        // Textures are persisted in IndexedDB and reloaded via textureHash
+        placedEffects: state.placedEffects
+          .filter(e => !e.dismissedAt)
+          .map(e => ({
+            ...e,
+            template: stripTextureData(e.template),
+          })),
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.placedEffects) {
@@ -534,6 +544,31 @@ export const useEffectStore = create<EffectState>()(
             placedAt: now,
             dismissedAt: undefined,
           }));
+
+          // Rehydrate textures from IndexedDB asynchronously
+          Promise.all(
+            state.placedEffects.map(async (e, i) => {
+              const rehydrated = await rehydrateTemplateTexture(e.template);
+              if (rehydrated !== e.template) {
+                state.placedEffects[i] = { ...e, template: rehydrated };
+              }
+            })
+          ).then(() => {
+            // Trigger a re-render by setting state
+            useEffectStore.setState({ placedEffects: [...state.placedEffects] });
+          });
+        }
+
+        // Rehydrate custom template textures from IndexedDB
+        const customTemplates = loadCustomTemplates();
+        if (customTemplates.length > 0) {
+          Promise.all(customTemplates.map(t => rehydrateTemplateTexture(t))).then(rehydrated => {
+            const hiddenIds = loadHiddenBuiltIns();
+            useEffectStore.setState({
+              customTemplates: rehydrated,
+              allTemplates: buildAllTemplates(rehydrated, hiddenIds),
+            });
+          });
         }
       },
     }
