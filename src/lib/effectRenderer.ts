@@ -407,6 +407,7 @@ function drawTextureInPath(
   const scale = (template.textureScale ?? 1);
   const offsetX = (template.textureOffsetX ?? 0);
   const offsetY = (template.textureOffsetY ?? 0);
+  const repeat = template.textureRepeat ?? false;
 
   // Compute bounding size of the effect in pixels for image sizing
   let boundW: number;
@@ -436,37 +437,52 @@ function drawTextureInPath(
       boundW = boundH = gridSize * 4;
   }
 
-  // Scale the image to cover the bounding box, then apply user scale
   const imgWidth = img instanceof HTMLImageElement ? img.width : img.width;
   const imgHeight = img instanceof HTMLImageElement ? img.height : img.height;
-  const imgAspect = imgWidth / imgHeight;
-  const boundAspect = boundW / boundH;
-  let drawW: number, drawH: number;
-  if (imgAspect > boundAspect) {
-    drawH = boundH;
-    drawW = boundH * imgAspect;
-  } else {
-    drawW = boundW;
-    drawH = boundW / imgAspect;
-  }
-  drawW *= scale;
-  drawH *= scale;
 
   ctx.save();
   ctx.clip(path);
-
-  // Translate to effect origin, rotate to direction, then draw centered image
   ctx.translate(origin.x, origin.y);
   ctx.rotate(direction);
-  
-  // Preserve the parent's globalAlpha (which encodes template opacity)
-  ctx.drawImage(
-    img,
-    -drawW / 2 + offsetX,
-    -drawH / 2 + offsetY,
-    drawW,
-    drawH,
-  );
+
+  if (repeat) {
+    // Tile/repeat mode: draw repeating tiles at user scale
+    const tileW = imgWidth * scale;
+    const tileH = imgHeight * scale;
+    if (tileW > 0 && tileH > 0) {
+      const halfW = boundW / 2;
+      const halfH = boundH / 2;
+      const ox = ((offsetX % tileW) + tileW) % tileW;
+      const oy = ((offsetY % tileH) + tileH) % tileH;
+      for (let py = -halfH - tileH + oy; py < halfH + tileH; py += tileH) {
+        for (let px = -halfW - tileW + ox; px < halfW + tileW; px += tileW) {
+          ctx.drawImage(img, px, py, tileW, tileH);
+        }
+      }
+    }
+  } else {
+    // Cover-fit mode: scale image to cover the bounding box, centered, with user scale & offset
+    const imgAspect = imgWidth / imgHeight;
+    const boundAspect = boundW / boundH;
+    let drawW: number, drawH: number;
+    if (imgAspect > boundAspect) {
+      drawH = boundH;
+      drawW = boundH * imgAspect;
+    } else {
+      drawW = boundW;
+      drawH = boundW / imgAspect;
+    }
+    drawW *= scale;
+    drawH *= scale;
+
+    ctx.drawImage(
+      img,
+      -drawW / 2 + offsetX,
+      -drawH / 2 + offsetY,
+      drawW,
+      drawH,
+    );
+  }
   ctx.restore();
 }
 

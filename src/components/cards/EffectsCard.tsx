@@ -70,6 +70,7 @@ interface TemplateFormData {
   textureScale: number;
   textureOffsetX: number;
   textureOffsetY: number;
+  textureRepeat: boolean;
   opacity: number;
   animation: EffectAnimationType;
   animationSpeed: number;
@@ -119,6 +120,7 @@ const INITIAL_FORM: TemplateFormData = {
   textureScale: 1,
   textureOffsetX: 0,
   textureOffsetY: 0,
+  textureRepeat: false,
   opacity: 0.55,
   animation: 'none',
   animationSpeed: 1,
@@ -163,6 +165,7 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     textureScale: t.textureScale ?? 1,
     textureOffsetX: t.textureOffsetX ?? 0,
     textureOffsetY: t.textureOffsetY ?? 0,
+    textureRepeat: t.textureRepeat ?? false,
     opacity: t.opacity,
     animation: t.animation,
     animationSpeed: t.animationSpeed,
@@ -809,7 +812,7 @@ function TemplateFormFields({
                       <img src={form.texture} alt="texture" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-[10px] text-muted-foreground truncate flex-1">Texture set</span>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => { update('texture', ''); update('textureScale', 1); update('textureOffsetX', 0); update('textureOffsetY', 0); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => { update('texture', ''); update('textureScale', 1); update('textureOffsetX', 0); update('textureOffsetY', 0); update('textureRepeat', false); }}>
                       <X className="w-3 h-3 text-destructive" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => setTextureModalOpen(true)}>
@@ -838,11 +841,14 @@ function TemplateFormFields({
                 initialScale={form.textureScale}
                 initialOffsetX={form.textureOffsetX}
                 initialOffsetY={form.textureOffsetY}
+                initialRepeat={form.textureRepeat}
+                showRepeatToggle
                 onConfirm={(result: ImageImportResult) => {
                   update('texture', result.imageUrl);
                   update('textureScale', result.scale);
                   update('textureOffsetX', result.offsetX);
                   update('textureOffsetY', result.offsetY);
+                  update('textureRepeat', result.repeat ?? false);
                   setTextureModalOpen(false);
                 }}
               />
@@ -1150,6 +1156,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     textureScale: form.texture ? (form.textureScale !== 1 ? form.textureScale : undefined) : undefined,
     textureOffsetX: form.texture ? (form.textureOffsetX !== 0 ? form.textureOffsetX : undefined) : undefined,
     textureOffsetY: form.texture ? (form.textureOffsetY !== 0 ? form.textureOffsetY : undefined) : undefined,
+    textureRepeat: form.texture ? (form.textureRepeat || undefined) : undefined,
     opacity: form.opacity,
     animation: form.animation,
     animationSpeed: form.animationSpeed,

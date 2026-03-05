@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw } from 'lucide-react';
+import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw, Repeat } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 export interface ImageImportResult {
@@ -19,6 +20,7 @@ export interface ImageImportResult {
   scale: number;
   offsetX: number;
   offsetY: number;
+  repeat?: boolean;
 }
 
 export type ShapeType = 'circle' | 'rectangle' | 'path';
@@ -45,6 +47,9 @@ interface ImageImportModalProps {
   initialScale?: number;
   initialOffsetX?: number;
   initialOffsetY?: number;
+  initialRepeat?: boolean;
+  /** Show repeat/tile toggle in the modal */
+  showRepeatToggle?: boolean;
 }
 
 export const ImageImportModal: React.FC<ImageImportModalProps> = ({
@@ -58,6 +63,8 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   initialScale = 1,
   initialOffsetX = 0,
   initialOffsetY = 0,
+  initialRepeat = false,
+  showRepeatToggle = false,
 }) => {
   const [inputMode, setInputMode] = useState<'file' | 'url'>('file');
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
@@ -65,6 +72,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   const [scale, setScale] = useState(initialScale);
   const [offsetX, setOffsetX] = useState(initialOffsetX);
   const [offsetY, setOffsetY] = useState(initialOffsetY);
+  const [repeat, setRepeat] = useState(initialRepeat);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -85,9 +93,10 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       setScale(initialScale);
       setOffsetX(initialOffsetX);
       setOffsetY(initialOffsetY);
+      setRepeat(initialRepeat);
       setImageLoaded(false);
     }
-  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY]);
+  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY, initialRepeat]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,6 +142,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     setScale(1);
     setOffsetX(0);
     setOffsetY(0);
+    setRepeat(false);
   };
 
   // Mouse/touch handlers for panning
@@ -233,24 +243,39 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       
       ctx.clip();
 
-      // Calculate scaled image size
-      const scaledW = imageSize.width * scale * 0.5; // Scale relative to preview
-      const scaledH = imageSize.height * scale * 0.5;
-      
-      // Calculate pattern offset
-      const patternOffsetX = offsetX % scaledW;
-      const patternOffsetY = offsetY % scaledH;
-      
-      // Draw repeating pattern
-      const startX = shapeX + patternOffsetX - scaledW;
-      const startY = shapeY + patternOffsetY - scaledH;
-      
-      for (let py = startY; py < shapeY + shapeH + scaledH; py += scaledH) {
-        for (let px = startX; px < shapeX + shapeW + scaledW; px += scaledW) {
-          ctx.drawImage(img, px, py, scaledW, scaledH);
+      if (repeat) {
+        // Tile/repeat mode: draw repeating pattern
+        const scaledW = imageSize.width * scale * 0.5;
+        const scaledH = imageSize.height * scale * 0.5;
+        const patternOffsetX = offsetX % scaledW;
+        const patternOffsetY = offsetY % scaledH;
+        const startX = shapeX + patternOffsetX - scaledW;
+        const startY = shapeY + patternOffsetY - scaledH;
+        
+        for (let py = startY; py < shapeY + shapeH + scaledH; py += scaledH) {
+          for (let px = startX; px < shapeX + shapeW + scaledW; px += scaledW) {
+            ctx.drawImage(img, px, py, scaledW, scaledH);
+          }
         }
+      } else {
+        // Cover-fit mode: scale image to cover the shape, centered, with user scale & offset
+        const imgAspect = imageSize.width / imageSize.height;
+        const shapeAspectRatio = shapeW / shapeH;
+        let drawW: number, drawH: number;
+        if (imgAspect > shapeAspectRatio) {
+          drawH = shapeH;
+          drawW = shapeH * imgAspect;
+        } else {
+          drawW = shapeW;
+          drawH = shapeW / imgAspect;
+        }
+        drawW *= scale;
+        drawH *= scale;
+        
+        const cx = shapeX + shapeW / 2;
+        const cy = shapeY + shapeH / 2;
+        ctx.drawImage(img, cx - drawW / 2 + offsetX, cy - drawH / 2 + offsetY, drawW, drawH);
       }
-      
       ctx.restore();
     }
 
@@ -288,7 +313,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       ctx.fillRect(shapeX - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
       ctx.fillRect(shapeX + shapeW - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
     }
-  }, [shape, imageSize, scale, offsetX, offsetY]);
+  }, [shape, imageSize, scale, offsetX, offsetY, repeat]);
 
   // Store loaded image reference for redrawing
   const loadedImageRef = useRef<HTMLImageElement | null>(null);
@@ -335,7 +360,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     if (loadedImageRef.current && imageLoaded) {
       drawCanvas(loadedImageRef.current);
     }
-  }, [scale, offsetX, offsetY, imageLoaded, drawCanvas]);
+  }, [scale, offsetX, offsetY, repeat, imageLoaded, drawCanvas]);
 
   const handleConfirm = () => {
     if (!imageUrl) {
@@ -348,6 +373,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       scale,
       offsetX,
       offsetY,
+      repeat: repeat || undefined,
     });
     onOpenChange(false);
   };
@@ -473,6 +499,15 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               <p className="text-xs text-muted-foreground">
                 Offset: ({offsetX.toFixed(0)}, {offsetY.toFixed(0)})
               </p>
+              {showRepeatToggle && (
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <Repeat className="h-3.5 w-3.5" />
+                    Tile / Repeat
+                  </Label>
+                  <Switch checked={repeat} onCheckedChange={setRepeat} />
+                </div>
+              )}
             </div>
           )}
         </div>
