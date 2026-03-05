@@ -1390,11 +1390,12 @@ export const SimpleTabletop = () => {
     }
   }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets]);
 
+  // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
-    // Skip during drag - updateGridHighlights handles the dragged token specifically
-    if (isDraggingToken || isDraggingRegion) return;
-    updateAllTokenHighlights();
-  }, [tokens, regions, isDraggingToken, isDraggingRegion]); // Re-run when tokens positions change or regions change
+    if (!isDraggingToken) {
+      setHighlightedGrids([]);
+    }
+  }, [isDraggingToken]);
 
   // Listen for center on token events
   useEffect(() => {
@@ -2869,78 +2870,6 @@ export const SimpleTabletop = () => {
           }
         }
       }
-    });
-
-    setHighlightedGrids(newHighlights);
-  };
-
-  // Update highlights for all tokens in regions with visible grids
-  const updateAllTokenHighlights = () => {
-    const newHighlights: {
-      regionId: string;
-      hexes: { hexX: number; hexY: number; radius: number }[];
-      squares: { gridX: number; gridY: number; size: number }[];
-    }[] = [];
-
-    // Determine if we're in play mode with fog active
-    const isPlayMode = renderingMode === "play";
-
-    // Check each token against each region
-    tokens.forEach((token) => {
-      // Skip tokens that aren't visible to the current player (same logic as token rendering)
-      if (isPlayMode && fogEnabled && !fogRevealAll) {
-        const tokenPoint = { x: token.x, y: token.y };
-        
-        // Use stable visibility snapshot during drag to prevent flashing
-        const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
-          ? stableVisibilityRef.current
-          : currentVisibilityRef.current;
-        
-        const isCurrentlyIlluminated = isPointInVisibleArea(tokenPoint, visibilityToCheck);
-        
-        // Check token ownership - friendly tokens always visible to their owner
-        const tokenPlayer = players.find((p) => p.id === currentPlayerId);
-        const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roles) : 'neutral';
-        const isFriendlyToken = relationship === 'friendly';
-        
-        if (!isCurrentlyIlluminated) {
-          if (!isDM) {
-            // Players don't see grid highlights for hidden non-friendly tokens
-            if (!isFriendlyToken) {
-              return; // Skip this token
-            }
-          } else {
-            // DM visibility modes
-            if (dmFogVisibility === 'hidden') {
-              return; // Skip this token
-            }
-            // 'semi-transparent' and 'full' modes: continue to show highlight
-          }
-        }
-      }
-
-      regions.forEach((region) => {
-        if (region.gridType === "hex" || region.gridType === "square") {
-          // Always calculate token highlights for grid regions
-          // Check if token is within this region (use proper shape detection)
-          if (isPointInRegion(token.x, token.y, region)) {
-            const occupiedHexes = region.gridType === "hex" ? calculateTokenHexOccupancy(token.x, token.y, region) : [];
-            const occupiedSquares =
-              region.gridType === "square" ? calculateTokenSquareOccupancy(token.x, token.y, region) : [];
-
-            if (occupiedHexes.length > 0 || occupiedSquares.length > 0) {
-              // Check if this region already has highlights
-              const existingRegionHighlight = newHighlights.find((h) => h.regionId === region.id);
-              if (existingRegionHighlight) {
-                existingRegionHighlight.hexes.push(...occupiedHexes);
-                existingRegionHighlight.squares.push(...occupiedSquares);
-              } else {
-                newHighlights.push({ regionId: region.id, hexes: occupiedHexes, squares: occupiedSquares });
-              }
-            }
-          }
-        }
-      });
     });
 
     setHighlightedGrids(newHighlights);
@@ -8806,8 +8735,14 @@ export const SimpleTabletop = () => {
       const tokenGridWidth = draggedToken?.gridWidth || 1;
       const tokenGridHeight = draggedToken?.gridHeight || 1;
 
-      // Update grid highlights based on token position and size
-      updateGridHighlights(newX, newY, tokenGridWidth, tokenGridHeight);
+      // Update grid highlights only when snapping is active (region or global)
+      const dragRegion = regions.find((r) => isPointInRegion(newX, newY, r) && r.gridType !== "free");
+      const snappingActive = (dragRegion && dragRegion.gridSnapping) || (isGridSnappingEnabled && !dragRegion);
+      if (snappingActive) {
+        updateGridHighlights(newX, newY, tokenGridWidth, tokenGridHeight);
+      } else {
+        setHighlightedGrids([]);
+      }
 
       // Add point to drag path (sample every few pixels for smoother path)
       const lastPoint = dragPath[dragPath.length - 1];
@@ -9694,13 +9629,16 @@ export const SimpleTabletop = () => {
       }
 
       // Show grid highlights for potential token placement
-      // Only show highlights if Shift key is held (indicating token placement mode)
+      // Only show highlights if Shift key is held AND snapping is active
       if (e.shiftKey) {
-        // Use default 1x1 size for new token placement, or get size from active token in toolbar
-        // For now, use 1x1 as default
-        updateGridHighlights(worldPos.x, worldPos.y, 1, 1);
+        const hoverRegion = regions.find((r) => isPointInRegion(worldPos.x, worldPos.y, r) && r.gridType !== "free");
+        const snappingActive = (hoverRegion && hoverRegion.gridSnapping) || (isGridSnappingEnabled && !hoverRegion);
+        if (snappingActive) {
+          updateGridHighlights(worldPos.x, worldPos.y, 1, 1);
+        } else {
+          setHighlightedGrids([]);
+        }
       } else {
-        // Clear highlights when not in placement mode
         setHighlightedGrids([]);
       }
 
@@ -10116,8 +10054,8 @@ export const SimpleTabletop = () => {
         stableVisibilityRef.current = null;
       }
 
-      // Update highlights for all tokens after drag ends
-      updateAllTokenHighlights();
+      // Clear highlights after drag ends (only shown during active drag)
+      setHighlightedGrids([]);
 
       // Handle wall vertex drag completion
       if (isDraggingVertex && draggedVertexInfo) {
@@ -10750,7 +10688,6 @@ export const SimpleTabletop = () => {
 
         // Update token position
         updateTokenPosition(draggedTokenId, newX, newY);
-        updateAllTokenHighlights();
         requestAnimationFrame(() => redrawCanvas());
       } else if (isDraggingRegion && draggedRegionId) {
         const region = regions.find(r => r.id === draggedRegionId);
@@ -10912,7 +10849,7 @@ export const SimpleTabletop = () => {
           stableVisibilityRef.current = null;
         }
 
-        updateAllTokenHighlights();
+        setHighlightedGrids([]);
       }
 
       // Region drag end
