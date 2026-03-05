@@ -81,6 +81,8 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const illuminationStore = useIlluminationStore();
   const creatureStore = useCreatureStore();
   const hatchingStore = useHatchingStore();
+  const effectStore = useEffectStore();
+  const uiModeStore = useUiModeStore();
 
   // --- Session helpers ---
   const createCurrentProjectData = (): ProjectData => ({
@@ -147,6 +149,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       hatchingOptions: hatchingStore.hatchingOptions,
     },
     viewportTransforms: sessionStore.viewportTransforms,
+    effects: {
+      placedEffects: effectStore.placedEffects,
+      customTemplates: effectStore.customTemplates,
+    },
+    uiMode: uiModeStore.currentMode === 'dm' ? 'dm' : 'play',
   });
 
   const clearAllStores = () => {
@@ -157,6 +164,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     groupStore.clearAllGroups();
     initiativeStore.endCombat();
     lightStore.clearAllLights();
+    // Clear fog to defaults so imported settings take effect cleanly
+    fogStore.resetFog();
+    // Clear effects
+    const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
+    effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
   };
 
   // --- New Session ---
