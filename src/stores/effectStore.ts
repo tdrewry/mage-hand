@@ -215,14 +215,19 @@ export const useEffectStore = create<EffectState>()(
         const isBuiltIn = BUILT_IN_EFFECT_TEMPLATES.some(t => t.id === id);
         let newCustom: EffectTemplate[];
         if (isBuiltIn) {
-          // Clone built-in as a custom override with same ID
           const original = BUILT_IN_EFFECT_TEMPLATES.find(t => t.id === id)!;
           const overridden = { ...original, ...updates, id, isBuiltIn: false };
+          persistTemplateTexture(overridden);
           newCustom = [...s.customTemplates.filter(t => t.id !== id), overridden];
         } else {
-          newCustom = s.customTemplates.map((t) =>
-            t.id === id ? { ...t, ...updates, id, isBuiltIn: false } : t,
-          );
+          newCustom = s.customTemplates.map((t) => {
+            if (t.id === id) {
+              const updated = { ...t, ...updates, id, isBuiltIn: false };
+              persistTemplateTexture(updated);
+              return updated;
+            }
+            return t;
+          });
         }
         saveCustomTemplates(newCustom);
         return {
