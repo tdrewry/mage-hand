@@ -322,6 +322,24 @@ function renderEffect(
 }
 
 // ---------------------------------------------------------------------------
+// Texture image cache
+// ---------------------------------------------------------------------------
+
+const textureImageCache = new Map<string, HTMLImageElement | null>();
+
+function getTextureImage(url: string): HTMLImageElement | null {
+  if (textureImageCache.has(url)) return textureImageCache.get(url)!;
+  // Start loading
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  textureImageCache.set(url, null); // mark as loading
+  img.onload = () => textureImageCache.set(url, img);
+  img.onerror = () => textureImageCache.set(url, null);
+  img.src = url;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Shape drawing
 // ---------------------------------------------------------------------------
 
@@ -335,9 +353,19 @@ function drawShape(
 ): void {
   const { ctx, gridSize } = rc;
   const color = colorOverride ?? template.color;
-  ctx.fillStyle = color;
   const path = buildPath(template, origin, direction, gridSize);
+
+  // Draw color fill first (acts as fallback / tint under texture)
+  ctx.fillStyle = color;
   ctx.fill(path);
+
+  // Draw texture if present and loaded (skip for colorOverride glow passes)
+  if (template.texture && !colorOverride) {
+    const img = getTextureImage(template.texture);
+    if (img) {
+      drawTextureInPath(ctx, img, path, template, origin, direction, gridSize);
+    }
+  }
 }
 
 function strokeShape(
