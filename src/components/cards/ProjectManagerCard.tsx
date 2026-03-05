@@ -37,6 +37,7 @@ import {
   User,
   AlertTriangle,
   RefreshCw,
+  Package,
 } from 'lucide-react';
 
 import {
@@ -69,6 +70,9 @@ import { useSessionTemplates } from '../../hooks/useSessionTemplates';
 import { useSessionHistory } from '../../hooks/useSessionHistory';
 import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
 import { SessionHistoryModal } from '../SessionHistoryModal';
+import { DurableObjectRegistry, exportArchiveToFile, parseArchiveFile, DurableObjectArchive } from '../../lib/durableObjects';
+import '../../lib/durableObjectRegistry'; // Side-effect: registers all DOs
+import { DurableObjectImportModal } from '../modals/DurableObjectImportModal';
 
 interface ProjectManagerCardContentProps {
   viewport: { x: number; y: number; zoom: number };
