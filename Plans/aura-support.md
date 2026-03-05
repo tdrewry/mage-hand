@@ -39,6 +39,7 @@ Token-locked effects with wall-blocked continuous hit-testing and dynamic modifi
 - [x] Dynamic modifier apply/remove on enter/exit
 - [x] Aura UI in Shape tab
 - [x] Form serialization (formToTemplateData / templateToForm)
-- [ ] Integration into SimpleTabletop render loop (continuous update call)
-- [ ] Aura visual rendering (visibility-clipped circle)
+- [x] Integration into SimpleTabletop render loop (continuous update call)
+- [x] Aura visual rendering (visibility-clipped circle)
+- [x] Built-in aura templates (Aura of Protection, Frightful Presence)
 - [ ] Network sync for aura state
