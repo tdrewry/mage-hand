@@ -4112,12 +4112,16 @@ export const SimpleTabletop = () => {
         const activeMapId = selectedMapId || 'default-map';
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
-        if (mapEffects.length > 0) {
-          const hits = renderPlacedEffects(
+        // Split effects: below-token (default) vs above-token (pinned)
+        const belowTokenEffects = mapEffects.filter(e => !e.template?.renderAboveTokens);
+        if (belowTokenEffects.length > 0) {
+          renderPlacedEffects(
             { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
-            mapEffects,
+            belowTokenEffects,
           );
-          // Clean up fully-faded dismissed effects
+        }
+        // Clean up fully-faded dismissed effects
+        if (mapEffects.length > 0) {
           effectState.cleanupDismissedEffects();
         }
         // Tick aura hit-testing (throttled to ~5Hz)
@@ -4153,13 +4157,14 @@ export const SimpleTabletop = () => {
             }
           }
         }
-        // Render aura effects (visibility-clipped circles)
-        if (auraEffects.length > 0) {
+        // Render below-token aura effects (visibility-clipped circles)
+        const belowAuras = auraEffects.filter(e => !e.template?.renderAboveTokens);
+        if (belowAuras.length > 0) {
           const tokenPosMap = new Map<string, { x: number; y: number }>();
           for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
           renderAuraEffects(
             { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
-            auraEffects,
+            belowAuras,
           );
         }
         if (effectState.placement?.previewOrigin) {
@@ -4173,6 +4178,30 @@ export const SimpleTabletop = () => {
       }
       
       drawTokensToContext(ctx);
+
+      // ── Pinned above-token effects ──
+      {
+        const effectState = useEffectStore.getState();
+        const activeMapId = selectedMapId || 'default-map';
+        const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+        const effectGridSize = regions[0]?.gridSize || 40;
+        const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
+        if (aboveTokenEffects.length > 0) {
+          renderPlacedEffects(
+            { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+            aboveTokenEffects,
+          );
+          const aboveAuras = aboveTokenEffects.filter(e => e.isAura);
+          if (aboveAuras.length > 0) {
+            const tokenPosMap = new Map<string, { x: number; y: number }>();
+            for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
+            renderAuraEffects(
+              { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+              aboveAuras,
+            );
+          }
+        }
+      }
       
       // Draw drag ghost on top of tokens (only for non-overlay mode)
       if (isDraggingToken && draggedTokenId) {
@@ -4227,21 +4256,25 @@ export const SimpleTabletop = () => {
               const activeMapId = selectedMapId || 'default-map';
               const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
               const effectGridSize = regions[0]?.gridSize || 40;
-              if (mapEffects.length > 0) {
+              const belowTokenEffects = mapEffects.filter(e => !e.template?.renderAboveTokens);
+              if (belowTokenEffects.length > 0) {
                 renderPlacedEffects(
                   { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
-                  mapEffects,
+                  belowTokenEffects,
                 );
+              }
+              if (mapEffects.length > 0) {
                 effectState.cleanupDismissedEffects();
               }
-              // Render aura effects on overlay
+              // Render below-token aura effects on overlay
               const auraEffects = mapEffects.filter(e => e.isAura);
-              if (auraEffects.length > 0) {
+              const belowAuras = auraEffects.filter(e => !e.template?.renderAboveTokens);
+              if (belowAuras.length > 0) {
                 const tokenPosMap = new Map<string, { x: number; y: number }>();
                 for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
                 renderAuraEffects(
                   { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
-                  auraEffects,
+                  belowAuras,
                 );
               }
               if (effectState.placement?.previewOrigin) {
@@ -4256,6 +4289,30 @@ export const SimpleTabletop = () => {
             
             // Draw tokens on top of effects
             drawTokensToContext(overlayCtx);
+
+            // ── Pinned above-token effects on overlay ──
+            {
+              const effectState = useEffectStore.getState();
+              const activeMapId = selectedMapId || 'default-map';
+              const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+              const effectGridSize = regions[0]?.gridSize || 40;
+              const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
+              if (aboveTokenEffects.length > 0) {
+                renderPlacedEffects(
+                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+                  aboveTokenEffects,
+                );
+                const aboveAuras = aboveTokenEffects.filter(e => e.isAura);
+                if (aboveAuras.length > 0) {
+                  const tokenPosMap = new Map<string, { x: number; y: number }>();
+                  for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
+                  renderAuraEffects(
+                    { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+                    aboveAuras,
+                  );
+                }
+              }
+            }
             
             // Draw drag ghost on overlay so it appears above tokens
             if (isDraggingToken && draggedTokenId) {
