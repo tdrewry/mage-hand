@@ -1390,11 +1390,12 @@ export const SimpleTabletop = () => {
     }
   }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets]);
 
+  // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
-    // Skip during drag - updateGridHighlights handles the dragged token specifically
-    if (isDraggingToken || isDraggingRegion) return;
-    updateAllTokenHighlights();
-  }, [tokens, regions, isDraggingToken, isDraggingRegion]); // Re-run when tokens positions change or regions change
+    if (!isDraggingToken) {
+      setHighlightedGrids([]);
+    }
+  }, [isDraggingToken]);
 
   // Listen for center on token events
   useEffect(() => {
@@ -8806,8 +8807,14 @@ export const SimpleTabletop = () => {
       const tokenGridWidth = draggedToken?.gridWidth || 1;
       const tokenGridHeight = draggedToken?.gridHeight || 1;
 
-      // Update grid highlights based on token position and size
-      updateGridHighlights(newX, newY, tokenGridWidth, tokenGridHeight);
+      // Update grid highlights only when snapping is active (region or global)
+      const dragRegion = regions.find((r) => isPointInRegion(newX, newY, r) && r.gridType !== "free");
+      const snappingActive = (dragRegion && dragRegion.gridSnapping) || (isGridSnappingEnabled && !dragRegion);
+      if (snappingActive) {
+        updateGridHighlights(newX, newY, tokenGridWidth, tokenGridHeight);
+      } else {
+        setHighlightedGrids([]);
+      }
 
       // Add point to drag path (sample every few pixels for smoother path)
       const lastPoint = dragPath[dragPath.length - 1];
@@ -9694,13 +9701,16 @@ export const SimpleTabletop = () => {
       }
 
       // Show grid highlights for potential token placement
-      // Only show highlights if Shift key is held (indicating token placement mode)
+      // Only show highlights if Shift key is held AND snapping is active
       if (e.shiftKey) {
-        // Use default 1x1 size for new token placement, or get size from active token in toolbar
-        // For now, use 1x1 as default
-        updateGridHighlights(worldPos.x, worldPos.y, 1, 1);
+        const hoverRegion = regions.find((r) => isPointInRegion(worldPos.x, worldPos.y, r) && r.gridType !== "free");
+        const snappingActive = (hoverRegion && hoverRegion.gridSnapping) || (isGridSnappingEnabled && !hoverRegion);
+        if (snappingActive) {
+          updateGridHighlights(worldPos.x, worldPos.y, 1, 1);
+        } else {
+          setHighlightedGrids([]);
+        }
       } else {
-        // Clear highlights when not in placement mode
         setHighlightedGrids([]);
       }
 
@@ -10116,8 +10126,8 @@ export const SimpleTabletop = () => {
         stableVisibilityRef.current = null;
       }
 
-      // Update highlights for all tokens after drag ends
-      updateAllTokenHighlights();
+      // Clear highlights after drag ends (only shown during active drag)
+      setHighlightedGrids([]);
 
       // Handle wall vertex drag completion
       if (isDraggingVertex && draggedVertexInfo) {
@@ -10750,7 +10760,6 @@ export const SimpleTabletop = () => {
 
         // Update token position
         updateTokenPosition(draggedTokenId, newX, newY);
-        updateAllTokenHighlights();
         requestAnimationFrame(() => redrawCanvas());
       } else if (isDraggingRegion && draggedRegionId) {
         const region = regions.find(r => r.id === draggedRegionId);
@@ -10912,7 +10921,7 @@ export const SimpleTabletop = () => {
           stableVisibilityRef.current = null;
         }
 
-        updateAllTokenHighlights();
+        setHighlightedGrids([]);
       }
 
       // Region drag end
