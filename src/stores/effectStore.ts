@@ -207,9 +207,10 @@ export const useEffectStore = create<EffectState>()(
 
 
     getTemplate: (id) => {
+      // Custom overrides take priority over built-ins (user may have added texture etc.)
       return (
-        getBuiltInTemplate(id) ??
-        get().customTemplates.find((t) => t.id === id)
+        get().customTemplates.find((t) => t.id === id) ??
+        getBuiltInTemplate(id)
       );
     },
 

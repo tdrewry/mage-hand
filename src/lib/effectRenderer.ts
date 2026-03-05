@@ -311,11 +311,6 @@ function renderEffect(
     rc.ctx.translate(-origin.x, -origin.y);
   }
 
-  // Debug: log texture state once per template
-  if (template.texture && !_renderEffectDebugLogged.has(template.id)) {
-    _renderEffectDebugLogged.add(template.id);
-    console.log('[effectRenderer] renderEffect has texture:', template.name, 'url length:', template.texture.length, 'starts with:', template.texture.substring(0, 30));
-  }
 
   drawShape(rc, template, origin, direction, anim.colorShift);
 
