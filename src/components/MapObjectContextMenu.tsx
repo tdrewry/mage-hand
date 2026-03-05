@@ -109,7 +109,7 @@ export const MapObjectContextMenuWrapper = ({
   // Handle open state change - close calls parent onClose
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (!open && !showEditModal && !showDeleteModal) {
+    if (!open && !showEditModal && !showDeleteModal && !showTextureModal) {
       onClose();
     }
   };
@@ -330,6 +330,27 @@ export const MapObjectContextMenuWrapper = ({
             <Copy className="mr-2 h-4 w-4" />
             Duplicate {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
           </DropdownMenuItem>
+
+          {/* Set Texture (single non-wall/light/annotation objects) */}
+          {!isMultiSelection && currentObject && 
+            !['wall', 'light', 'annotation'].includes(currentObject.shape) && (
+            <>
+              <DropdownMenuItem onClick={() => setShowTextureModal(true)}>
+                <Image className="mr-2 h-4 w-4" />
+                {currentObject.imageUrl ? 'Change Texture' : 'Set Texture'}
+              </DropdownMenuItem>
+              {currentObject.imageUrl && (
+                <DropdownMenuItem onClick={() => {
+                  updateMapObject(currentObject.id, { imageUrl: undefined, textureScale: undefined, textureOffsetX: undefined, textureOffsetY: undefined });
+                  onUpdateCanvas?.();
+                  toast.success('Texture removed');
+                }}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove Texture
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
 
           <DropdownMenuSeparator />
 
