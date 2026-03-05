@@ -4112,12 +4112,21 @@ export const SimpleTabletop = () => {
         const activeMapId = selectedMapId || 'default-map';
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
-        if (mapEffects.length > 0) {
-          const hits = renderPlacedEffects(
+        // Split effects: below-token (default) vs above-token (pinned)
+        const belowTokenEffects = mapEffects.filter(e => !e.template?.renderAboveTokens);
+        const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
+        // Store for after-token rendering
+        (window as any).__mh_aboveTokenEffects = aboveTokenEffects;
+        (window as any).__mh_effectGridSize = effectGridSize;
+        (window as any).__mh_mapEffects = mapEffects;
+        if (belowTokenEffects.length > 0) {
+          renderPlacedEffects(
             { ctx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
-            mapEffects,
+            belowTokenEffects,
           );
-          // Clean up fully-faded dismissed effects
+        }
+        // Clean up fully-faded dismissed effects
+        if (mapEffects.length > 0) {
           effectState.cleanupDismissedEffects();
         }
         // Tick aura hit-testing (throttled to ~5Hz)
