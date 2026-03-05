@@ -28,7 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff, Copy } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff, Copy, Image } from 'lucide-react';
+import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
@@ -61,6 +62,7 @@ export const MapObjectContextMenuWrapper = ({
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showTextureModal, setShowTextureModal] = useState(false);
 
   // Edit modal state
   const [labelValue, setLabelValue] = useState('');
@@ -107,7 +109,7 @@ export const MapObjectContextMenuWrapper = ({
   // Handle open state change - close calls parent onClose
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (!open && !showEditModal && !showDeleteModal) {
+    if (!open && !showEditModal && !showDeleteModal && !showTextureModal) {
       onClose();
     }
   };
@@ -328,6 +330,27 @@ export const MapObjectContextMenuWrapper = ({
             <Copy className="mr-2 h-4 w-4" />
             Duplicate {isMultiSelection ? `${targetObjects.length} Objects` : 'Object'}
           </DropdownMenuItem>
+
+          {/* Set Texture (single non-wall/light/annotation objects) */}
+          {!isMultiSelection && currentObject && 
+            !['wall', 'light', 'annotation'].includes(currentObject.shape) && (
+            <>
+              <DropdownMenuItem onClick={() => setShowTextureModal(true)}>
+                <Image className="mr-2 h-4 w-4" />
+                {currentObject.imageUrl ? 'Change Texture' : 'Set Texture'}
+              </DropdownMenuItem>
+              {currentObject.imageUrl && (
+                <DropdownMenuItem onClick={() => {
+                  updateMapObject(currentObject.id, { imageUrl: undefined, textureScale: undefined, textureOffsetX: undefined, textureOffsetY: undefined });
+                  onUpdateCanvas?.();
+                  toast.success('Texture removed');
+                }}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove Texture
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
 
           <DropdownMenuSeparator />
 
@@ -757,6 +780,34 @@ export const MapObjectContextMenuWrapper = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Texture Import Modal */}
+      {currentObject && (
+        <ImageImportModal
+          open={showTextureModal}
+          onOpenChange={(open) => handleDialogClose(open, setShowTextureModal)}
+          onConfirm={(result: ImageImportResult) => {
+            updateMapObject(currentObject.id, {
+              imageUrl: result.imageUrl,
+              textureScale: result.scale,
+              textureOffsetX: result.offsetX,
+              textureOffsetY: result.offsetY,
+            });
+            onUpdateCanvas?.();
+            toast.success('Texture applied');
+          }}
+          shape={{
+            type: currentObject.shape === 'circle' ? 'circle' : 'rectangle',
+            width: currentObject.width,
+            height: currentObject.height,
+          }}
+          title="Map Object Texture"
+          description="Import an image to use as a texture for this map object"
+          initialScale={currentObject.textureScale}
+          initialOffsetX={currentObject.textureOffsetX}
+          initialOffsetY={currentObject.textureOffsetY}
+        />
+      )}
     </>
   );
 };

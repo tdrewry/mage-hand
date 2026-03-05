@@ -11,8 +11,8 @@ Extend the existing reusable `ImageImportModal` component to support texture imp
 | Region backgrounds | ✅ Done | `ImageImportModal` | rectangle / path |
 | Token images | ✅ Done | `ImageImportModal` | circle |
 | Map images | ✅ Done | `MapImageImportModal` (specialized) | rectangle + grid overlay |
-| **Effect templates** | ❌ Planned | `ImageImportModal` | matches effect shape |
-| **Map objects** | ❌ Planned | `ImageImportModal` | rectangle |
+| **Effect templates** | ✅ Done (v0.6.48) | `ImageImportModal` | matches effect shape |
+| **Map objects** | ✅ Done (v0.6.50) | `ImageImportModal` | rectangle / circle |
 | **Portals** | ❌ Planned | `ImageImportModal` | circle or rectangle |
 
 ## Reusable Component
