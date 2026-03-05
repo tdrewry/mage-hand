@@ -197,6 +197,8 @@ export const useEffectStore = create<EffectState>()(
         id: `custom-fx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         isBuiltIn: false,
       };
+      // Persist texture to IndexedDB before stripping from localStorage
+      persistTemplateTexture(template);
       set((s) => {
         const updated = [...s.customTemplates, template];
         saveCustomTemplates(updated);
