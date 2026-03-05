@@ -17,6 +17,7 @@ import type {
 import { isBurstShape } from '@/types/effectTypes';
 import type { LineSegment, Point } from '@/lib/visibilityEngine';
 import { computeVisibilityFromSegments } from '@/lib/visibilityEngine';
+import { animatedTextureManager } from '@/lib/animatedTextureManager';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -330,7 +331,18 @@ function renderEffect(
 
 const textureImageCache = new Map<string, HTMLImageElement | 'loading' | 'error'>();
 
-function getTextureImage(url: string): HTMLImageElement | null {
+type TextureSource = HTMLImageElement | ImageBitmap;
+
+function getTextureImage(url: string): TextureSource | null {
+  // Check for animated frame first (GIFs decoded via ImageDecoder)
+  const animatedFrame = animatedTextureManager.getCurrentFrame(url);
+  if (animatedFrame) return animatedFrame;
+
+  // Preload animated textures if not yet decoded
+  if (animatedTextureManager.mightBeAnimated(url)) {
+    animatedTextureManager.preload(url);
+  }
+
   const cached = textureImageCache.get(url);
   if (cached instanceof HTMLImageElement) return cached;
   if (cached === 'loading' || cached === 'error') return null;
@@ -372,9 +384,9 @@ function drawShape(
 
   // Draw texture if present and loaded (skip for colorOverride glow passes)
   if (template.texture && !colorOverride) {
-    const img = getTextureImage(template.texture);
-    if (img) {
-      drawTextureInPath(ctx, img, path, template, origin, direction, gridSize);
+    const src = getTextureImage(template.texture);
+    if (src) {
+      drawTextureInPath(ctx, src, path, template, origin, direction, gridSize);
     }
   }
 }
@@ -385,7 +397,7 @@ function drawShape(
  */
 function drawTextureInPath(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: TextureSource,
   path: Path2D,
   template: EffectTemplate,
   origin: { x: number; y: number },
@@ -425,7 +437,9 @@ function drawTextureInPath(
   }
 
   // Scale the image to cover the bounding box, then apply user scale
-  const imgAspect = img.width / img.height;
+  const imgWidth = img instanceof HTMLImageElement ? img.width : img.width;
+  const imgHeight = img instanceof HTMLImageElement ? img.height : img.height;
+  const imgAspect = imgWidth / imgHeight;
   const boundAspect = boundW / boundH;
   let drawW: number, drawH: number;
   if (imgAspect > boundAspect) {
@@ -868,12 +882,12 @@ export function renderAuraEffects(
 
     // Draw texture if present (clipped by both visibility polygon and circle)
     if (effect.template.texture) {
-      const img = getTextureImage(effect.template.texture);
-      if (img) {
+      const src = getTextureImage(effect.template.texture);
+      if (src) {
         const circlePath = new Path2D();
         circlePath.arc(center.x, center.y, auraRadius, 0, Math.PI * 2);
         circlePath.closePath();
-        drawTextureInPath(ctx, img, circlePath, effect.template, center, 0, rc.gridSize);
+        drawTextureInPath(ctx, src, circlePath, effect.template, center, 0, rc.gridSize);
       }
     }
 

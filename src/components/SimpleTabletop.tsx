@@ -6893,11 +6893,13 @@ export const SimpleTabletop = () => {
       token.illuminationSources?.some((source) => source.animation && source.animation !== 'none')
     );
     
-    // Check if there are any animated textures (GIFs) on tokens or regions
+    // Check if there are any animated textures (GIFs) on tokens, regions, or effects
     const hasAnimatedTextures = tokens.some((token) => 
       token.imageUrl && animatedTextureManager.isAnimated(token.imageUrl)
     ) || regions.some((region) => 
       region.backgroundImage && animatedTextureManager.isAnimated(region.backgroundImage)
+    ) || effectState.placedEffects.some(e =>
+      e.template.texture && animatedTextureManager.isAnimated(e.template.texture)
     );
 
     // Check for active effect animations or placement preview
