@@ -28,5 +28,8 @@ export type {
   ChatTypingPayload,
   DiceRollingPayload,
   ActionTargetPreviewPayload,
+  EffectAuraStatePayload,
+  EffectPlacementPreviewPayload,
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
+export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
