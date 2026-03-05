@@ -294,7 +294,7 @@ function renderEffect(
 
   const anim = animationPaused
     ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-    : computeAnimation(template.animation, template.animationSpeed, rc.time, template.id);
+    : computeAnimation(template.animation, template.animationSpeed, rc.time, template.id, template.rotateDirection);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
   const scale = anim.scaleMod;
@@ -690,7 +690,7 @@ function renderPolylineEffect(
 
   const anim = effect.animationPaused
     ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-    : computeAnimation(template.animation, template.animationSpeed, time, effect.id);
+    : computeAnimation(template.animation, template.animationSpeed, time, effect.id, template.rotateDirection);
 
   const opacity = template.opacity * anim.opacityMod * fadeMul;
   if (opacity <= 0.01) return;
@@ -877,7 +877,7 @@ export function renderAuraEffects(
     // Animation
     const anim = effect.animationPaused
       ? { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: 0 }
-      : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id);
+      : computeAnimation(effect.template.animation, effect.template.animationSpeed, rc.time, effect.id, effect.template.rotateDirection);
 
     const opacity = effect.template.opacity * anim.opacityMod * fadeMul;
     if (opacity <= 0.01) continue;
