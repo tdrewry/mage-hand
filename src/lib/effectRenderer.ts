@@ -646,7 +646,8 @@ function computeAnimation(type: EffectAnimationType, speed: number, time: number
     }
     case 'rotate': {
       // Continuous rotation: full revolution based on speed (speed=1 → ~6s per revolution)
-      const angle = t * 1.0; // radians, continuous
+      const dir = rotateDirection === 'ccw' ? -1 : 1;
+      const angle = t * 1.0 * dir; // radians, continuous
       return { opacityMod: 1, scaleMod: 1, colorShift: 0, glowMod: 0.5, rotationAngle: angle };
     }
     default:
