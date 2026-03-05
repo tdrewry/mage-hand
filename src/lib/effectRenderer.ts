@@ -322,6 +322,24 @@ function renderEffect(
 }
 
 // ---------------------------------------------------------------------------
+// Texture image cache
+// ---------------------------------------------------------------------------
+
+const textureImageCache = new Map<string, HTMLImageElement | null>();
+
+function getTextureImage(url: string): HTMLImageElement | null {
+  if (textureImageCache.has(url)) return textureImageCache.get(url)!;
+  // Start loading
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  textureImageCache.set(url, null); // mark as loading
+  img.onload = () => textureImageCache.set(url, img);
+  img.onerror = () => textureImageCache.set(url, null);
+  img.src = url;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Shape drawing
 // ---------------------------------------------------------------------------
 
@@ -335,9 +353,94 @@ function drawShape(
 ): void {
   const { ctx, gridSize } = rc;
   const color = colorOverride ?? template.color;
-  ctx.fillStyle = color;
   const path = buildPath(template, origin, direction, gridSize);
+
+  // Draw color fill first (acts as fallback / tint under texture)
+  ctx.fillStyle = color;
   ctx.fill(path);
+
+  // Draw texture if present and loaded (skip for colorOverride glow passes)
+  if (template.texture && !colorOverride) {
+    const img = getTextureImage(template.texture);
+    if (img) {
+      drawTextureInPath(ctx, img, path, template, origin, direction, gridSize);
+    }
+  }
+}
+
+/**
+ * Draw a texture image clipped to the effect's Path2D shape.
+ * Uses textureScale and offset fields for positioning.
+ */
+function drawTextureInPath(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  path: Path2D,
+  template: EffectTemplate,
+  origin: { x: number; y: number },
+  direction: number,
+  gridSize: number,
+): void {
+  const scale = (template.textureScale ?? 1);
+  const offsetX = (template.textureOffsetX ?? 0);
+  const offsetY = (template.textureOffsetY ?? 0);
+
+  // Compute bounding size of the effect in pixels for image sizing
+  let boundW: number;
+  let boundH: number;
+  switch (template.shape) {
+    case 'circle':
+    case 'circle-burst': {
+      const r = (template.radius ?? 4) * gridSize;
+      boundW = boundH = r * 2;
+      break;
+    }
+    case 'cone': {
+      const len = (template.length ?? 6) * gridSize;
+      boundW = boundH = len * 2;
+      break;
+    }
+    case 'rectangle':
+    case 'rectangle-burst':
+      boundW = (template.width ?? 2) * gridSize;
+      boundH = (template.length ?? 2) * gridSize;
+      break;
+    case 'line':
+      boundW = (template.length ?? 12) * gridSize;
+      boundH = (template.width ?? 1) * gridSize;
+      break;
+    default:
+      boundW = boundH = gridSize * 4;
+  }
+
+  // Scale the image to cover the bounding box, then apply user scale
+  const imgAspect = img.width / img.height;
+  const boundAspect = boundW / boundH;
+  let drawW: number, drawH: number;
+  if (imgAspect > boundAspect) {
+    drawH = boundH;
+    drawW = boundH * imgAspect;
+  } else {
+    drawW = boundW;
+    drawH = boundW / imgAspect;
+  }
+  drawW *= scale;
+  drawH *= scale;
+
+  ctx.save();
+  ctx.clip(path);
+
+  // Translate to effect origin, rotate to direction, then draw centered image
+  ctx.translate(origin.x, origin.y);
+  ctx.rotate(direction);
+  ctx.drawImage(
+    img,
+    -drawW / 2 + offsetX,
+    -drawH / 2 + offsetY,
+    drawW,
+    drawH,
+  );
+  ctx.restore();
 }
 
 function strokeShape(
