@@ -46,6 +46,9 @@ export function renderPlacedEffects(
   effects: PlacedEffect[],
 ): void {
   for (const effect of effects) {
+    // Skip aura effects — they are rendered separately by renderAuraEffects
+    if (effect.isAura) continue;
+
     // Compute fade-out multiplier
     let fadeMul = 1.0;
     if (effect.dismissedAt) {
