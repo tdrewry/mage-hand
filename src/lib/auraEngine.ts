@@ -206,6 +206,64 @@ export function applyAuraStayEffects(
 }
 
 // ---------------------------------------------------------------------------
+// Lightweight tick — position tracking + impact updates (no character data)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tick all aura effects: update their origin to follow the anchor token,
+ * recompute wall-blocked targets, and detect enter/exit events.
+ * Returns enter/exit events for optional downstream processing.
+ *
+ * This is the primary integration point for the render loop.
+ * It does NOT apply/remove modifiers (those require character data).
+ */
+export function tickAuras(
+  auraEffects: PlacedEffect[],
+  tokens: Token[],
+  wallSegments: LineSegment[],
+  gridSize: number,
+  updateAuraState: (effectId: string, origin: { x: number; y: number }, impacts: EffectImpact[], insideIds: string[]) => void,
+): { effectId: string; entered: string[]; exited: string[] }[] {
+  const events: { effectId: string; entered: string[]; exited: string[] }[] = [];
+
+  for (const effect of auraEffects) {
+    if (!effect.anchorTokenId || !effect.template.aura) continue;
+    if (effect.dismissedAt || effect.cancelledAt) continue;
+
+    const anchorToken = tokens.find(t => t.id === effect.anchorTokenId);
+    if (!anchorToken) continue;
+
+    const aura = effect.template.aura;
+    const radiusPx = aura.radius * gridSize;
+    const center: Point = { x: anchorToken.x, y: anchorToken.y };
+    const excludeId = aura.affectSelf ? undefined : effect.anchorTokenId;
+
+    // Only recompute if anchor moved or we need fresh data
+    const { impacts, insideIds } = computeAuraTargets(
+      center,
+      radiusPx,
+      tokens,
+      aura.wallBlocked !== false ? wallSegments : [],
+      gridSize,
+      excludeId,
+    );
+
+    // Diff for enter/exit
+    const previousIds = effect.tokensInsideArea ?? [];
+    const { entered, exited } = diffAuraTokens(previousIds, insideIds);
+
+    // Update store atomically
+    updateAuraState(effect.id, center, impacts, insideIds);
+
+    if (entered.length > 0 || exited.length > 0) {
+      events.push({ effectId: effect.id, entered, exited });
+    }
+  }
+
+  return events;
+}
+
+// ---------------------------------------------------------------------------
 // Point-in-polygon (ray-casting for general polygons)
 // ---------------------------------------------------------------------------
 
