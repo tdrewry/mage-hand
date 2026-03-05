@@ -841,11 +841,14 @@ function TemplateFormFields({
                 initialScale={form.textureScale}
                 initialOffsetX={form.textureOffsetX}
                 initialOffsetY={form.textureOffsetY}
+                initialRepeat={form.textureRepeat}
+                showRepeatToggle
                 onConfirm={(result: ImageImportResult) => {
                   update('texture', result.imageUrl);
                   update('textureScale', result.scale);
                   update('textureOffsetX', result.offsetX);
                   update('textureOffsetY', result.offsetY);
+                  update('textureRepeat', result.repeat ?? false);
                   setTextureModalOpen(false);
                 }}
               />
