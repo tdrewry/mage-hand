@@ -237,6 +237,26 @@ export interface AssetUploadProgressPayload {
   percent: number; // 0-100
 }
 
+// -- Effects & Auras --
+
+export interface EffectAuraStatePayload {
+  effectId: string;
+  origin: Vec2;
+  insideIds: string[];
+  impacts: Array<{
+    targetId: string;
+    targetType: string;
+    distanceFromOrigin: number;
+    overlapPercent: number;
+  }>;
+}
+
+export interface EffectPlacementPreviewPayload {
+  templateId: string;
+  origin: Vec2;
+  direction?: number;
+}
+
 // ── Payload Map (opKind → payload type) ─────────────────────────
 
 export interface EphemeralPayloadMap {
@@ -272,6 +292,8 @@ export interface EphemeralPayloadMap {
   "action.inProgress": ActionInProgressPayload;
   "action.queue.sync": ActionQueueSyncPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
+  "effect.aura.state": EffectAuraStatePayload;
+  "effect.placement.preview": EffectPlacementPreviewPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -347,4 +369,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
+
+  // Effects & Auras
+  "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
+  "effect.placement.preview": { throttleMs: 67, ttlMs: 300,  keyStrategy: "userId" },
 };
