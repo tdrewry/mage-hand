@@ -67,6 +67,7 @@ import { useDungeonStore } from '../../stores/dungeonStore';
 import { useMapObjectStore } from '../../stores/mapObjectStore';
 import { useEffectStore } from '../../stores/effectStore';
 import { useUiModeStore } from '../../stores/uiModeStore';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import { useSessionTemplates } from '../../hooks/useSessionTemplates';
 import { useSessionHistory } from '../../hooks/useSessionHistory';
 import { createTemplateFromSession, applyTemplate, SessionTemplate } from '../../lib/sessionTemplates';
