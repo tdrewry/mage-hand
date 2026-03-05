@@ -28,7 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff, Copy } from 'lucide-react';
+import { Edit3, Trash2, Eye, DoorOpen, DoorClosed, Lock, Unlock, Waypoints, Link2, Link2Off, EyeOff, Copy, Image } from 'lucide-react';
+import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS } from '@/types/mapObjectTypes';
