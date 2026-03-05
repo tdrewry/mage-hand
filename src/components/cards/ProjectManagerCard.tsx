@@ -93,7 +93,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const doFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Durable Object import state
+  const [doArchive, setDoArchive] = useState<DurableObjectArchive | null>(null);
+  const [showDoImport, setShowDoImport] = useState(false);
   // Auto-save hook
   const autoSave = useAutoSave();
   const [timeSinceLastSave, setTimeSinceLastSave] = useState('Never');
