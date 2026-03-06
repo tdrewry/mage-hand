@@ -11431,6 +11431,8 @@ export const SimpleTabletop = () => {
         />
         {/* Remote cursor overlay */}
         <CursorOverlay transform={transform} />
+        {/* Player-facing action pending / resolved overlay */}
+        <ActionPendingOverlay />
         {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
             Position/size is driven directly via ref to avoid React re-renders and flicker. */}
         <div
