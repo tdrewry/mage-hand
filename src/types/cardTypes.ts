@@ -30,6 +30,13 @@ export enum CardType {
   EFFECTS = 'effects',
 }
 
+/** Card types that require DM role — players cannot open or see these */
+export const DM_ONLY_CARD_TYPES: ReadonlySet<CardType> = new Set([
+  CardType.FOG,
+  CardType.MAP_CONTROLS,
+  CardType.REGION_CONTROL,
+]);
+
 export interface CardPosition {
   x: number;
   y: number;
