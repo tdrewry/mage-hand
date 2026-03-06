@@ -253,14 +253,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   };
 
   const doNewSession = () => {
-    try {
-      clearAllStores();
-      toast.success('New session started');
-      onLaunch();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to start new session');
-    }
+    commitIdentityAndLaunch(() => {
+      try {
+        clearAllStores();
+        toast.success('New session started');
+        onLaunch();
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to start new session');
+      }
+    });
   };
 
   // --- Save Session ---
