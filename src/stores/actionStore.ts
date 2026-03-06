@@ -650,7 +650,7 @@ export const useActionStore = create<ActionStore>()(
 
     // Broadcast action flashes to all peers
     try {
-      const { ephemeralBus } = require("@/lib/net");
+      const { ephemeralBus } = await import("@/lib/net");
       for (const flash of flashes) {
         const result = flash.color === 'hit' ? 'hit' : 'miss';
         ephemeralBus.emit("action.flash", {

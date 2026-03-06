@@ -374,14 +374,13 @@ export const useEffectStore = create<EffectState>()(
 
       // Broadcast placement preview to peers
       if (placement) {
-        try {
-          const { ephemeralBus } = require("@/lib/net");
+        import("@/lib/net").then(({ ephemeralBus }) => {
           ephemeralBus.emit("effect.placement.preview", {
             templateId: placement.templateId,
             origin,
             direction,
           });
-        } catch (_) { /* net not available */ }
+        }).catch(() => { /* net not available */ });
       }
     },
 

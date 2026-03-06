@@ -515,10 +515,9 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
       }),
     }));
     // Broadcast to peers
-    try {
-      const { emitDoorPreview } = require('@/lib/net/ephemeral/mapHandlers');
+    import('@/lib/net/ephemeral/mapHandlers').then(({ emitDoorPreview }) => {
       emitDoorPreview(id, newIsOpen);
-    } catch { /* net may not be available */ }
+    }).catch(() => { /* net may not be available */ });
   },
 
   setDoorState: (id, isOpen) => {
