@@ -2051,6 +2051,7 @@ export const SimpleTabletop = () => {
         redrawCanvas();
         // Bump fog refresh tick to re-trigger the fog computation useEffect
         setFogRefreshTick(t => t + 1);
+      }
     };
 
     window.addEventListener('fog:force-refresh', handleForceFogRefresh);
