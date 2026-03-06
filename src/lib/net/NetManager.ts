@@ -310,10 +310,8 @@ export class NetManager {
 
     const off7 = this.session.on("ephemeral", ({ kind, data, userId }) => {
       // Route inbound ephemeral messages directly to EphemeralBus
-      const { ephemeralBus } = require("./index") as { ephemeralBus: import("./ephemeral").EphemeralBus };
-      const { isEphemeralOp } = require("./ephemeral") as { isEphemeralOp: (k: string) => boolean };
-      if (isEphemeralOp(kind)) {
-        ephemeralBus.receive(kind as any, data, userId);
+      if (isEphemeralOp(kind) && _ephemeralBus) {
+        _ephemeralBus.receive(kind as EphemeralOpKind, data, userId);
       }
     });
 
