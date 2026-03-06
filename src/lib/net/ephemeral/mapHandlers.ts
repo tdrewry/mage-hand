@@ -3,12 +3,17 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
+import { useMapObjectStore } from "@/stores/mapObjectStore";
 import type {
   DmViewportPayload,
   MapPingPayload,
   MapFocusPayload,
   RegionDragUpdatePayload,
   MapObjectDragUpdatePayload,
+  MapObjectDoorPreviewPayload,
+  RegionHandlePreviewPayload,
+  MapObjectHandlePreviewPayload,
+  TokenHandlePreviewPayload,
 } from "./types";
 
 let registered = false;
@@ -53,6 +58,11 @@ export function registerMapHandlers(): void {
     });
   });
 
+  // Door toggle preview — remote peer toggled a door
+  ephemeralBus.on("mapObject.door.preview", (data: MapObjectDoorPreviewPayload, _userId) => {
+    useMapObjectStore.getState().setDoorState(data.objectId, data.open);
+  });
+
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -72,4 +82,36 @@ export function registerMapHandlers(): void {
       store.getState().removeMapObjectDrag(entityId);
     }
   });
+}
+
+// ── Outbound helpers ──
+
+/** Broadcast a door toggle to peers. */
+export function emitDoorPreview(objectId: string, open: boolean): void {
+  ephemeralBus.emit("mapObject.door.preview", { objectId, open });
+}
+
+/** Broadcast a region handle (rotate/scale) preview to peers. */
+export function emitRegionHandlePreview(regionId: string, handleType: "rotate" | "scale", pos: { x: number; y: number }, value?: number): void {
+  ephemeralBus.emit("region.handle.preview", { regionId, handleType, pos, value });
+}
+
+/** Broadcast a map object handle (rotate/scale) preview to peers. */
+export function emitMapObjectHandlePreview(objectId: string, handleType: "rotate" | "scale", pos: { x: number; y: number }, value?: number): void {
+  ephemeralBus.emit("mapObject.handle.preview", { objectId, handleType, pos, value });
+}
+
+/** Broadcast a token handle (rotate/scale) preview to peers. */
+export function emitTokenHandlePreview(tokenId: string, handleType: "rotate" | "scale", pos: { x: number; y: number }, value?: number): void {
+  ephemeralBus.emit("token.handle.preview", { tokenId, handleType, pos, value });
+}
+
+/** Broadcast group selection preview to peers. */
+export function emitGroupSelectPreview(groupId: string | null): void {
+  ephemeralBus.emit("group.select.preview", { groupId });
+}
+
+/** Broadcast group drag preview to peers. */
+export function emitGroupDragPreview(groupId: string, delta: { x: number; y: number }): void {
+  ephemeralBus.emit("group.drag.preview", { groupId, delta });
 }

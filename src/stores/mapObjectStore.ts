@@ -499,20 +499,26 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
   },
 
   toggleDoor: (id) => {
+    const obj = get().mapObjects.find(o => o.id === id && o.category === 'door');
+    if (!obj) return;
+    const newIsOpen = !obj.isOpen;
     set((state) => ({
-      mapObjects: state.mapObjects.map((obj) => {
-        if (obj.id === id && obj.category === 'door') {
-          const newIsOpen = !obj.isOpen;
+      mapObjects: state.mapObjects.map((o) => {
+        if (o.id === id && o.category === 'door') {
           return {
-            ...obj,
+            ...o,
             isOpen: newIsOpen,
-            // When open, don't block vision; when closed, block vision
             blocksVision: !newIsOpen,
           };
         }
-        return obj;
+        return o;
       }),
     }));
+    // Broadcast to peers
+    try {
+      const { emitDoorPreview } = require('@/lib/net/ephemeral/mapHandlers');
+      emitDoorPreview(id, newIsOpen);
+    } catch { /* net may not be available */ }
   },
 
   setDoorState: (id, isOpen) => {
