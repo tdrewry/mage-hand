@@ -1,19 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { netManager } from '@/lib/net';
-import { isJazzCode } from '@/lib/sessionCodeResolver';
+import { isJazzCode, decodeJazzCode } from '@/lib/sessionCodeResolver';
+import { joinJazzSession } from '@/lib/jazz';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
  * if the user was previously connected to a session.
  * Waits for persist rehydration before attempting reconnection.
+ *
+ * Supports both WebSocket (OpBridge) and Jazz (CRDT) transports.
  */
 export function useAutoReconnect() {
   const hasAttemptedReconnect = useRef(false);
 
   useEffect(() => {
-    // Subscribe to store changes so we can react once rehydration completes
-    const unsub = useMultiplayerStore.subscribe((state) => {
+    function tryReconnect(state: ReturnType<typeof useMultiplayerStore.getState>) {
       if (hasAttemptedReconnect.current) return;
       if (!state._rehydrated) return;
 
@@ -21,54 +23,67 @@ export function useAutoReconnect() {
       if (state.isConnected || state.connectionStatus === 'connecting' || state.connectionStatus === 'reconnecting') return;
 
       // Need session details to reconnect
-      if (!state.currentSession?.sessionCode || !state.currentUsername || !state.serverUrl) return;
-
-      // Jazz sessions use their own CRDT sync — don't attempt WebSocket reconnect
-      if (isJazzCode(state.currentSession.sessionCode)) return;
+      const code = state.currentSession?.sessionCode;
+      const username = state.currentUsername;
+      if (!code || !username) return;
 
       hasAttemptedReconnect.current = true;
-      unsub(); // Stop listening
 
-      console.log('🔄 [AutoReconnect] Reconnecting to session', state.currentSession.sessionCode);
+      // ── Jazz reconnect ──────────────────────────────────────────────
+      if (isJazzCode(code)) {
+        const coValueId = decodeJazzCode(code);
+        if (!coValueId) {
+          console.warn('⚠️ [AutoReconnect] Invalid Jazz code, clearing session');
+          useMultiplayerStore.getState().reset();
+          return;
+        }
+
+        console.log('🔄 [AutoReconnect] Reconnecting Jazz session', code);
+        useMultiplayerStore.getState().setConnectionStatus('reconnecting');
+
+        joinJazzSession(coValueId)
+          .then((info) => {
+            const store = useMultiplayerStore.getState();
+            store.setConnectionStatus('connected');
+            store.setActiveTransport('jazz');
+            console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
+          })
+          .catch((err) => {
+            console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
+            useMultiplayerStore.getState().reset();
+          });
+
+        return;
+      }
+
+      // ── OpBridge / WebSocket reconnect ──────────────────────────────
+      if (!state.serverUrl) return;
+
+      console.log('🔄 [AutoReconnect] Reconnecting to session', code);
 
       netManager.connect({
         serverUrl: state.serverUrl,
-        sessionCode: state.currentSession.sessionCode,
-        username: state.currentUsername,
+        sessionCode: code,
+        username,
         roles: state.roles.length > 0 ? state.roles : undefined,
       }).then(() => {
         console.log('✅ [AutoReconnect] Reconnected successfully');
       }).catch((err) => {
         console.warn('⚠️ [AutoReconnect] Failed to reconnect:', err);
-        // Clear stale session so user can start fresh
         useMultiplayerStore.getState().reset();
       });
+    }
+
+    // Subscribe to store changes so we can react once rehydration completes
+    const unsub = useMultiplayerStore.subscribe((state) => {
+      if (hasAttemptedReconnect.current) { unsub(); return; }
+      tryReconnect(state);
+      if (hasAttemptedReconnect.current) unsub();
     });
 
     // Also check immediately in case rehydration already happened
-    const state = useMultiplayerStore.getState();
-    if (state._rehydrated && !hasAttemptedReconnect.current) {
-      if (!state.isConnected && state.connectionStatus !== 'connecting' && state.connectionStatus !== 'reconnecting') {
-        if (state.currentSession?.sessionCode && state.currentUsername && state.serverUrl && !isJazzCode(state.currentSession.sessionCode)) {
-          hasAttemptedReconnect.current = true;
-          unsub();
-
-          console.log('🔄 [AutoReconnect] Reconnecting to session (immediate)', state.currentSession.sessionCode);
-
-          netManager.connect({
-            serverUrl: state.serverUrl,
-            sessionCode: state.currentSession.sessionCode,
-            username: state.currentUsername,
-            roles: state.roles.length > 0 ? state.roles : undefined,
-          }).then(() => {
-            console.log('✅ [AutoReconnect] Reconnected successfully');
-          }).catch((err) => {
-            console.warn('⚠️ [AutoReconnect] Failed to reconnect:', err);
-            useMultiplayerStore.getState().reset();
-          });
-        }
-      }
-    }
+    tryReconnect(useMultiplayerStore.getState());
+    if (hasAttemptedReconnect.current) unsub();
 
     return () => unsub();
   }, []);
