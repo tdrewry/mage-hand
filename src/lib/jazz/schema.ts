@@ -5,80 +5,76 @@
  * Phase 1 defines the session root + token schema (proof-of-concept).
  * Additional stores are added incrementally per the migration plan.
  *
- * IMPORTANT: CoMap fields must be JSON-serializable primitives or nested CoValues.
- * Complex nested objects (geometry, arrays of points) use co.json<T>() for now;
- * they can be promoted to proper CoList/CoMap schemas later for finer-grained CRDT merge.
+ * Uses the new co.map() / co.list() function-call API (jazz-tools ≥0.15).
  */
 
-import { co, CoMap, CoList, z } from "jazz-tools";
+import { co, z } from "jazz-tools";
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
-export class JazzToken extends CoMap {
-  tokenId = co.string;
-  x = co.number;
-  y = co.number;
-  color = co.string;
-  label = co.string;
-  gridWidth = co.number;
-  gridHeight = co.number;
-  hp = co.optional.number;
-  maxHp = co.optional.number;
-  ac = co.optional.number;
-  hostility = co.optional.string;
-  mapId = co.optional.string;
-  conditions = co.optional.json<string[]>();
-  /** Serialized extra fields as JSON blob for forward-compat */
-  extras = co.optional.json<Record<string, unknown>>();
-}
+export const JazzToken = co.map({
+  tokenId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  color: z.string(),
+  label: z.string(),
+  gridWidth: z.number(),
+  gridHeight: z.number(),
+  hp: co.optional(z.number()),
+  maxHp: co.optional(z.number()),
+  ac: co.optional(z.number()),
+  hostility: co.optional(z.string()),
+  mapId: co.optional(z.string()),
+  /** Serialized extra fields as JSON string for forward-compat */
+  extras: co.optional(z.string()),
+});
+export type JazzToken = co.loaded<typeof JazzToken>;
 
-export class JazzTokenList extends CoList {
-  [co.items] = co.ref(JazzToken);
-}
+export const JazzTokenList = co.list(JazzToken);
+export type JazzTokenList = co.loaded<typeof JazzTokenList>;
 
 // ── Map Metadata ───────────────────────────────────────────────────────────
 
-export class JazzMapEntry extends CoMap {
-  mapId = co.string;
-  name = co.string;
-  gridSize = co.number;
-  gridType = co.optional.string;
-  width = co.optional.number;
-  height = co.optional.number;
-  /** Additional map fields stored as JSON blob */
-  extras = co.optional.json<Record<string, unknown>>();
-}
+export const JazzMapEntry = co.map({
+  mapId: z.string(),
+  name: z.string(),
+  gridSize: z.number(),
+  gridType: co.optional(z.string()),
+  width: co.optional(z.number()),
+  height: co.optional(z.number()),
+  /** Additional map fields stored as JSON string */
+  extras: co.optional(z.string()),
+});
+export type JazzMapEntry = co.loaded<typeof JazzMapEntry>;
 
-export class JazzMapList extends CoList {
-  [co.items] = co.ref(JazzMapEntry);
-}
+export const JazzMapList = co.list(JazzMapEntry);
+export type JazzMapList = co.loaded<typeof JazzMapList>;
 
 // ── Generic DO State Blob ──────────────────────────────────────────────────
 // For stores that don't yet have a fine-grained schema, we store the entire
-// extracted state as a JSON blob. This lets us migrate stores incrementally
-// without blocking on schema design for every store.
+// extracted state as a JSON string. This lets us migrate stores incrementally.
 
-export class JazzDOBlob extends CoMap {
-  kind = co.string;
-  version = co.number;
-  state = co.json<unknown>();
-  updatedAt = co.string;
-}
+export const JazzDOBlob = co.map({
+  kind: z.string(),
+  version: z.number(),
+  /** JSON.stringify'd state from the DO extractor */
+  state: z.string(),
+  updatedAt: z.string(),
+});
+export type JazzDOBlob = co.loaded<typeof JazzDOBlob>;
 
-export class JazzDOBlobList extends CoList {
-  [co.items] = co.ref(JazzDOBlob);
-}
+export const JazzDOBlobList = co.list(JazzDOBlob);
+export type JazzDOBlobList = co.loaded<typeof JazzDOBlobList>;
 
 // ── Session Root ───────────────────────────────────────────────────────────
-// Top-level CoMap that holds all durable state for a session.
-// Each field corresponds to a DO kind (or group of kinds).
 
-export class JazzSessionRoot extends CoMap {
-  name = co.string;
+export const JazzSessionRoot = co.map({
+  name: z.string(),
   /** Fine-grained token sync (Phase 2) */
-  tokens = co.ref(JazzTokenList);
+  tokens: JazzTokenList,
   /** Fine-grained map sync (Phase 2+) */
-  maps = co.ref(JazzMapList);
+  maps: JazzMapList,
   /** Blob storage for stores not yet given fine-grained schemas */
-  blobs = co.ref(JazzDOBlobList);
-}
+  blobs: JazzDOBlobList,
+});
+export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;

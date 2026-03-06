@@ -13,8 +13,8 @@
  * store subscriptions don't re-push the same change back to Jazz.
  */
 
-import { DurableObjectRegistry, type DORegistration } from "../durableObjects";
-import type { JazzSessionRoot, JazzDOBlob, JazzDOBlobList } from "./schema";
+import { DurableObjectRegistry } from "../durableObjects";
+import type { JazzSessionRoot, JazzDOBlob } from "./schema";
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 
@@ -63,12 +63,10 @@ export function pushAllToJazz(sessionRoot: JazzSessionRoot): void {
     const existing = findBlob(blobs, reg.kind);
 
     if (existing) {
-      // Update existing blob
-      existing.state = state;
+      existing.state = JSON.stringify(state);
       existing.version = reg.version;
       existing.updatedAt = new Date().toISOString();
     } else {
-      // Create new blob — Phase 2 will use proper CoValue creation
       console.log(`[jazz-bridge] Would create blob for "${reg.kind}" — skipping until Phase 2 wiring`);
     }
   }
@@ -86,7 +84,8 @@ export function pullAllFromJazz(sessionRoot: JazzSessionRoot): void {
   }
 
   runFromJazz(() => {
-    for (const blob of blobs) {
+    for (let i = 0; i < blobs.length; i++) {
+      const blob = blobs[i];
       if (!blob) continue;
       const reg = DurableObjectRegistry.get(blob.kind);
       if (!reg) {
@@ -94,7 +93,8 @@ export function pullAllFromJazz(sessionRoot: JazzSessionRoot): void {
         continue;
       }
       try {
-        reg.hydrator(blob.state);
+        const parsed = typeof blob.state === 'string' ? JSON.parse(blob.state) : blob.state;
+        reg.hydrator(parsed);
       } catch (e) {
         console.error(`[jazz-bridge] Failed to hydrate "${blob.kind}":`, e);
       }
@@ -111,8 +111,6 @@ export function pullAllFromJazz(sessionRoot: JazzSessionRoot): void {
  */
 export function startBridge(_sessionRoot: JazzSessionRoot): void {
   console.log("[jazz-bridge] Bridge started (Phase 1 — structural only)");
-  // Phase 2 will add per-store zustand subscriptions here:
-  // e.g., useSessionStore.subscribe((state) => { if (!isFromJazz()) pushTokensToJazz(state); })
 }
 
 /**
@@ -128,7 +126,7 @@ export function stopBridge(): void {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function findBlob(blobs: JazzDOBlobList, kind: string): JazzDOBlob | undefined {
+function findBlob(blobs: JazzDOBlob[], kind: string): JazzDOBlob | undefined {
   for (const blob of blobs) {
     if (blob && blob.kind === kind) return blob;
   }
