@@ -43,8 +43,14 @@ import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerSto
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
-import { createJazzSession } from '@/lib/jazz/session';
+import { createJazzSession, joinJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
+import {
+  resolveSessionCode,
+  generateSessionCode,
+  encodeJazzCode,
+  isJazzCode,
+} from '@/lib/sessionCodeResolver';
 
 export { type TransportType } from '@/stores/multiplayerStore';
 
