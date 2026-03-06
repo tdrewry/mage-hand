@@ -153,6 +153,14 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         const shortCode = encodeJazzCode(info.sessionCoId);
         setActiveTransport('jazz');
 
+        // Propagate landing-screen role selection to multiplayerStore
+        // so dmOnly ephemeral gates (cursor.visibility etc.) work
+        const currentPlayer = useSessionStore.getState().players.find(
+          p => p.id === useSessionStore.getState().currentPlayerId
+        );
+        const playerRoles = currentPlayer?.roleIds ?? ['dm']; // creator defaults to DM
+        useMultiplayerStore.getState().setRoles(playerRoles);
+
         // Store the short code as the session code so players can copy it
         useMultiplayerStore.getState().setCurrentSession({
           sessionCode: shortCode,
@@ -207,6 +215,13 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         setCurrentUsername(username.trim());
         const info = await joinJazzSession(resolved.connectionId);
         setActiveTransport('jazz');
+
+        // Propagate landing-screen role selection to multiplayerStore
+        const currentPlayer = useSessionStore.getState().players.find(
+          p => p.id === useSessionStore.getState().currentPlayerId
+        );
+        const playerRoles = currentPlayer?.roleIds ?? ['player'];
+        useMultiplayerStore.getState().setRoles(playerRoles);
 
         useMultiplayerStore.getState().setCurrentSession({
           sessionCode: resolved.displayCode,
