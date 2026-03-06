@@ -254,7 +254,12 @@ function TargetingPhase() {
 
 function SkillCheckResolvePhase() {
   const { currentAction, setResolution, commitAction, cancelAction } = useActionStore();
+  const claims = useActionPendingStore((s) => s.claims);
+  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
   if (!currentAction || !currentAction.attack) return null;
+
+  const claim = claims[currentAction.id];
+  const claimedByOther = claim && claim.claimedBy !== currentUserId;
 
   const target = currentAction.targets[0];
   const roll = target ? currentAction.rollResults[target.targetKey] : null;
@@ -263,9 +268,26 @@ function SkillCheckResolvePhase() {
   const isNat20 = roll?.naturalRoll === 20;
   const isNat1 = roll?.naturalRoll === 1;
 
+  const handleSetResolution = useCallback((targetKey: string, r: AttackResolution) => {
+    // Claim the action when we start resolving
+    const username = useMultiplayerStore.getState().connectedUsers.find(
+      u => u.userId === useMultiplayerStore.getState().currentUserId
+    )?.username ?? 'DM';
+    broadcastResolutionClaim(currentAction!.id, currentUserId!, username);
+    setResolution(targetKey, r);
+  }, [currentAction?.id, currentUserId, setResolution]);
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+
+        {/* Claimed by another DM banner */}
+        {claimedByOther && (
+          <div className="flex items-center gap-2 p-2.5 rounded-md bg-accent/50 border border-accent text-accent-foreground text-xs">
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>Being resolved by <strong>{claim.claimedByName}</strong></span>
+          </div>
+        )}
 
         {/* Skill Check Header */}
         <div className="flex items-center gap-2">
@@ -300,8 +322,10 @@ function SkillCheckResolvePhase() {
           <p className="text-xs text-muted-foreground">Outcome</p>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => target && setResolution(target.targetKey, 'miss')}
+              onClick={() => target && handleSetResolution(target.targetKey, 'miss')}
+              disabled={claimedByOther}
               className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                claimedByOther ? 'opacity-50 cursor-not-allowed' :
                 resolution === 'miss'
                   ? 'bg-red-900/50 text-red-300 border-red-700 border-2'
                   : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
@@ -311,8 +335,10 @@ function SkillCheckResolvePhase() {
               Fail
             </button>
             <button
-              onClick={() => target && setResolution(target.targetKey, 'hit')}
+              onClick={() => target && handleSetResolution(target.targetKey, 'hit')}
+              disabled={claimedByOther}
               className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                claimedByOther ? 'opacity-50 cursor-not-allowed' :
                 resolution === 'hit'
                   ? 'bg-green-900/50 text-green-300 border-green-700 border-2'
                   : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
@@ -327,10 +353,10 @@ function SkillCheckResolvePhase() {
         <Separator />
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
+          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction} disabled={claimedByOther}>
             Dismiss
           </Button>
-          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution}>
+          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution || claimedByOther}>
             Record
           </Button>
         </div>
