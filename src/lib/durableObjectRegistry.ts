@@ -66,9 +66,14 @@ DurableObjectRegistry.register({
   hydrator: (state: any) => {
     const store = useMapStore.getState();
     store.maps.forEach(m => store.removeMap(m.id));
-    (state || []).forEach((m: any) => {
+    const mapsArr = state || [];
+    mapsArr.forEach((m: any) => {
       store.restoreMap({ ...m, regions: m.regions || [] });
     });
+    // Select the first restored map so the canvas renders effects correctly
+    if (mapsArr.length > 0) {
+      store.setSelectedMap(mapsArr[0].id);
+    }
   },
   summarizer: () => `${useMapStore.getState().maps.length} maps`,
 });
