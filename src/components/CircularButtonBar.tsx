@@ -111,10 +111,12 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         <ToolbarButton
           icon={Play}
           label="Play Mode"
+          onClick={() => {}}
           isActive
           variant="active"
           size="xs"
           className="bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+        />
         />
       )}
 
