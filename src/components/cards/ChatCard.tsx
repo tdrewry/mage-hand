@@ -246,14 +246,15 @@ export const ChatCardContent: React.FC = () => {
   const currentUsername = useMultiplayerStore((s) => s.currentUsername);
   const [draft, setDraft] = useState('');
   const [whisperTargets, setWhisperTargets] = useState<string[]>([]);
+  const [acIndex, setAcIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Filter entries: only show messages intended for this user
   const visibleEntries = useMemo(() => {
     return entries.filter((entry) => {
-      if (entry.type !== 'message') return true; // action entries always visible
-      if (!entry.whisperTo || entry.whisperTo.length === 0) return true; // public
-      // Whisper: show if sender or recipient
+      if (entry.type !== 'message') return true;
+      if (!entry.whisperTo || entry.whisperTo.length === 0) return true;
       return entry.senderId === currentUserId || (currentUserId && entry.whisperTo.includes(currentUserId));
     });
   }, [entries, currentUserId]);
@@ -268,6 +269,32 @@ export const ChatCardContent: React.FC = () => {
 
   const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
 
+  // Autocomplete: parse partial /w input and match player names
+  const acSuggestions = useMemo(() => {
+    const match = draft.match(/^\/(?:w|whisper)\s+(\S*)$/i);
+    if (!match) return [];
+    const partial = match[1].toLowerCase();
+    if (!partial) {
+      // Show all other users when just "/w "
+      return connectedUsers.filter((u) => u.userId !== currentUserId);
+    }
+    return connectedUsers.filter(
+      (u) => u.userId !== currentUserId && u.username.toLowerCase().startsWith(partial)
+    );
+  }, [draft, connectedUsers, currentUserId]);
+
+  // Reset autocomplete index when suggestions change
+  useEffect(() => {
+    setAcIndex(0);
+  }, [acSuggestions.length]);
+
+  const applyAutocomplete = useCallback((username: string) => {
+    // Replace partial name with full name, add trailing space for message
+    const replaced = draft.replace(/^(\/(?:w|whisper)\s+)\S*$/i, `$1${username} `);
+    setDraft(replaced);
+    inputRef.current?.focus();
+  }, [draft]);
+
   const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
@@ -279,12 +306,10 @@ export const ChatCardContent: React.FC = () => {
       const messageText = slashMatch[2].trim();
       if (!messageText) return;
 
-      // Find matching users by case-insensitive prefix
       const matched = connectedUsers.filter(
         (u) => u.userId !== currentUserId && u.username.toLowerCase().startsWith(targetName)
       );
       if (matched.length === 0) {
-        // No match — send as regular message with error hint
         addMessage(
           currentUserId || 'local',
           currentUsername || 'You',
@@ -313,6 +338,30 @@ export const ChatCardContent: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Autocomplete navigation
+      if (acSuggestions.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setAcIndex((i) => (i + 1) % acSuggestions.length);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setAcIndex((i) => (i - 1 + acSuggestions.length) % acSuggestions.length);
+          return;
+        }
+        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          applyAutocomplete(acSuggestions[acIndex].username);
+          return;
+        }
+        if (e.key === 'Escape') {
+          // Clear draft to dismiss autocomplete
+          setDraft('');
+          return;
+        }
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
@@ -320,7 +369,7 @@ export const ChatCardContent: React.FC = () => {
         try { emitChatTyping(); } catch { /* net may be off */ }
       }
     },
-    [handleSend]
+    [handleSend, acSuggestions, acIndex, applyAutocomplete]
   );
 
   return (
@@ -368,10 +417,33 @@ export const ChatCardContent: React.FC = () => {
         </div>
       )}
 
+      {/* Autocomplete dropdown for /w */}
+      {acSuggestions.length > 0 && (
+        <div className="px-2 pb-1">
+          <div className="rounded-md border border-border bg-popover p-1 space-y-0.5">
+            <p className="text-[9px] text-muted-foreground px-2 py-0.5">Whisper to…</p>
+            {acSuggestions.map((user, i) => (
+              <button
+                key={user.userId}
+                className={`w-full text-left rounded px-2 py-1 text-xs flex items-center gap-1.5 ${
+                  i === acIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-muted'
+                }`}
+                onMouseDown={(e) => { e.preventDefault(); applyAutocomplete(user.username); }}
+                onMouseEnter={() => setAcIndex(i)}
+              >
+                <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
+                {user.username}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-2 flex gap-1.5">
         <WhisperPicker whisperTargets={whisperTargets} setWhisperTargets={setWhisperTargets} />
         <Input
+          ref={inputRef}
           placeholder={isWhisperMode ? 'Whisper...' : 'Type a message...'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
