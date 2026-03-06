@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
+import { hasPermission } from '@/lib/rolePermissions';
 import {
   Dialog,
   DialogContent,
@@ -43,12 +44,12 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
   );
   const [open, setOpen] = useState(false);
 
-  // Check if current user is DM
-  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+  // Use permission system instead of hardcoded DM check
+  const canAssignPlayerRoles = currentPlayer ? hasPermission(currentPlayer, roles, 'canAssignRoles') : false;
 
   const handleRoleToggle = (userId: string, roleId: string, currentlyHas: boolean) => {
-    if (!isDM) {
-      toast.error('Only the DM can manage user roles');
+    if (!canAssignPlayerRoles) {
+      toast.error('You do not have permission to manage user roles');
       return;
     }
 
