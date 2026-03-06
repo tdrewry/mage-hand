@@ -53,7 +53,7 @@ export function emitAuraState(
   ephemeralBus.emit("effect.aura.state", {
     effectId,
     origin,
-    insideIds,
+    insideIds,  
     impacts,
   });
 }

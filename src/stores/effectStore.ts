@@ -364,12 +364,25 @@ export const useEffectStore = create<EffectState>()(
     },
 
     updatePlacementPreview: (origin, direction) => {
+      const placement = get().placement;
       set((s) => {
         if (!s.placement) return s;
         return {
           placement: { ...s.placement, previewOrigin: origin, previewDirection: direction },
         };
       });
+
+      // Broadcast placement preview to peers
+      if (placement) {
+        try {
+          const { ephemeralBus } = require("@/lib/net");
+          ephemeralBus.emit("effect.placement.preview", {
+            templateId: placement.templateId,
+            origin,
+            direction,
+          });
+        } catch (_) { /* net not available */ }
+      }
     },
 
     cancelPlacement: () => set({ placement: null }),

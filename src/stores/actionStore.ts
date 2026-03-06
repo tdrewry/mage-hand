@@ -637,6 +637,18 @@ export const useActionStore = create<ActionStore>()(
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
 
+    // Broadcast action flashes to all peers
+    try {
+      const { ephemeralBus } = require("@/lib/net");
+      for (const flash of flashes) {
+        const result = flash.color === 'hit' ? 'hit' : 'miss';
+        ephemeralBus.emit("action.flash", {
+          targetTokenId: flash.tokenId,
+          result,
+        });
+      }
+    } catch (_) { /* net not available */ }
+
     // Broadcast resolved outcome to all peers (players see summary)
     broadcastActionResolved(currentAction);
     // Release any resolution claim
