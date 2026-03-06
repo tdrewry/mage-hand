@@ -348,6 +348,7 @@ export const SimpleTabletop = () => {
   // Token interaction state
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
+  const [fogRefreshTick, setFogRefreshTick] = useState(0);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
