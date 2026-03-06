@@ -407,15 +407,37 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             <Button 
               variant="outline"
               size="sm"
-              onClick={() => {
+              onClick={async () => {
                 if (canControlUiMode) {
-                  // DM: Broadcast full state to all players
-                  // TODO: implement rpcBroadcastFullState via netManager
-                  toast.success('Broadcasting game state to all players');
+                  // DM: Re-push all durable state via Jazz bridge
+                  try {
+                    const { getBridgedSessionRoot, pushAllToJazz } = await import('@/lib/jazz/bridge');
+                    const root = getBridgedSessionRoot();
+                    if (root) {
+                      pushAllToJazz(root);
+                      toast.success('Game state synced to all players');
+                    } else {
+                      toast.error('No active Jazz session — cannot sync');
+                    }
+                  } catch (err) {
+                    console.error('[MenuCard] Sync failed:', err);
+                    toast.error('Sync failed — see console for details');
+                  }
                 } else {
-                  // Player: Request sync from DM
-                  // TODO: implement rpcRequestFullState via netManager
-                  toast.info('Requesting game state from DM');
+                  // Player: Re-pull all state from Jazz
+                  try {
+                    const { getBridgedSessionRoot, pullAllFromJazz } = await import('@/lib/jazz/bridge');
+                    const root = getBridgedSessionRoot();
+                    if (root) {
+                      pullAllFromJazz(root);
+                      toast.success('Game state refreshed from host');
+                    } else {
+                      toast.error('No active Jazz session — cannot sync');
+                    }
+                  } catch (err) {
+                    console.error('[MenuCard] Sync failed:', err);
+                    toast.error('Sync failed — see console for details');
+                  }
                 }
               }}
               className="w-full"

@@ -170,10 +170,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         });
 
         // Also open ephemeral WebSocket in tandem (non-blocking)
+        // Pass roles so the WS server knows our role for presence
         netManager.connectEphemeralOnly({
           serverUrl: localServerUrl,
           sessionCode: shortCode,
           username: username.trim(),
+          roles: playerRoles,
         }).then(() => {
           console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
         }).catch((err) => {
@@ -231,10 +233,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         });
 
         // Also open ephemeral WebSocket in tandem (non-blocking)
+        // Pass roles so the WS server knows our role for presence
         netManager.connectEphemeralOnly({
           serverUrl: localServerUrl,
           sessionCode: resolved.displayCode,
           username: username.trim(),
+          roles: playerRoles,
         }).then(() => {
           console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
         }).catch((err) => {
