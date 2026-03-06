@@ -4634,6 +4634,138 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
+  // ── Draw remote handle previews (rotation/scale arcs + labels) ──
+  const drawRemoteHandlePreviews = (ctx: CanvasRenderingContext2D) => {
+    // Combine token + region/mapObject handle previews
+    const tokenHandles = Object.values(remoteTokenHandlePreviews);
+    const mapHandles = Object.values(remoteMapHandlePreviews);
+    if (tokenHandles.length === 0 && mapHandles.length === 0) return;
+
+    ctx.save();
+
+    // Helper to draw a single handle preview
+    const drawHandle = (
+      userId: string,
+      entityId: string,
+      handleType: "rotate" | "scale",
+      pos: { x: number; y: number },
+      value?: number,
+      entityCenter?: { x: number; y: number }
+    ) => {
+      const cursorState = useCursorStore.getState().cursors[userId];
+      const color = cursorState?.color || "#fbbf24";
+      const r = 16 / transform.zoom;
+
+      if (handleType === "rotate") {
+        // Draw a rotation arc indicator at the handle position
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5 / transform.zoom;
+
+        // Arc around entity center if available, else around handle pos
+        const cx = entityCenter?.x ?? pos.x;
+        const cy = entityCenter?.y ?? pos.y;
+        const arcR = 24 / transform.zoom;
+
+        // Draw partial arc to indicate rotation
+        ctx.setLineDash([4 / transform.zoom, 2 / transform.zoom]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, arcR, 0, Math.PI * 1.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Arrow head at end of arc
+        const endAngle = Math.PI * 1.5;
+        const arrowX = cx + arcR * Math.cos(endAngle);
+        const arrowY = cy + arcR * Math.sin(endAngle);
+        const arrowSize = 5 / transform.zoom;
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(arrowX, arrowY);
+        ctx.lineTo(arrowX - arrowSize, arrowY - arrowSize);
+        ctx.lineTo(arrowX + arrowSize, arrowY - arrowSize);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rotation handle dot
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 4 / transform.zoom, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Degree label if value available
+        if (value != null) {
+          ctx.globalAlpha = 0.8;
+          ctx.fillStyle = color;
+          ctx.font = `bold ${10 / transform.zoom}px system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(`${Math.round(value)}°`, cx, cy - arcR - 4 / transform.zoom);
+        }
+      } else {
+        // Scale: draw corner brackets at handle position
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2 / transform.zoom;
+
+        const s = 8 / transform.zoom;
+        // Top-left bracket
+        ctx.beginPath();
+        ctx.moveTo(pos.x - s, pos.y - s * 0.3);
+        ctx.lineTo(pos.x - s, pos.y - s);
+        ctx.lineTo(pos.x - s * 0.3, pos.y - s);
+        ctx.stroke();
+        // Bottom-right bracket
+        ctx.beginPath();
+        ctx.moveTo(pos.x + s, pos.y + s * 0.3);
+        ctx.lineTo(pos.x + s, pos.y + s);
+        ctx.lineTo(pos.x + s * 0.3, pos.y + s);
+        ctx.stroke();
+
+        // Scale dot
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 3 / transform.zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // User label
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.font = `${8 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      const labelY = handleType === "rotate" ? pos.y + 6 / transform.zoom : pos.y + 12 / transform.zoom;
+      const label = handleType === "rotate" ? "↻" : "⤡";
+      ctx.fillText(`${userId.slice(0, 6)} ${label}`, pos.x, labelY);
+    };
+
+    // Draw token handle previews
+    for (const h of tokenHandles) {
+      const token = tokens.find((t) => t.id === h.tokenId);
+      const center = token ? { x: token.x, y: token.y } : undefined;
+      drawHandle(h.userId, h.tokenId, h.handleType, h.pos, h.value, center);
+    }
+
+    // Draw region/mapObject handle previews
+    for (const h of mapHandles) {
+      let center: { x: number; y: number } | undefined;
+      if (h.entityType === "region") {
+        const region = regions.find((r) => r.id === h.entityId);
+        if (region) center = { x: region.x + region.width / 2, y: region.y + region.height / 2 };
+      } else {
+        const obj = mapObjects.find((o) => o.id === h.entityId);
+        if (obj) center = obj.position;
+      }
+      drawHandle(h.userId, h.entityId, h.handleType, h.pos, h.value, center);
+    }
+
+    ctx.restore();
+  };
+
   // ── Draw map pings (expanding + fading circles) ──
   const drawMapPings = (ctx: CanvasRenderingContext2D) => {
     if (activePings.length === 0) return;
