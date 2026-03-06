@@ -71,7 +71,21 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   } = useMultiplayerStore();
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
-  const [username, setUsername] = useState(currentUsername || '');
+  const sessionPlayers = useSessionStore((s) => s.players);
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const landingUsername = React.useMemo(() => {
+    const p = sessionPlayers.find(p => p.id === currentPlayerId);
+    return p?.name?.trim() || '';
+  }, [sessionPlayers, currentPlayerId]);
+
+  const [username, setUsername] = useState(currentUsername || landingUsername || '');
+
+  // Sync username when dialog opens and a landing identity exists
+  React.useEffect(() => {
+    if (open && !username && (landingUsername || currentUsername)) {
+      setUsername(landingUsername || currentUsername || '');
+    }
+  }, [open]);
   const [sessionCode, setSessionCode] = useState('');
   const [password, setPassword] = useState('');
   const [inviteToken, setInviteToken] = useState('');
