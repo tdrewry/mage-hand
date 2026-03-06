@@ -35,6 +35,7 @@ import {
   WifiOff,
   Users,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
@@ -60,6 +61,7 @@ interface LandingScreenProps {
 export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSession }) => {
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -281,6 +283,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       disabled: !hasSession || isSaving || !isIdentityReady,
       active: false,
       onClick: handleSaveSession,
+    },
+    {
+      id: 'delete-all',
+      label: 'Delete All Data',
+      description: 'Clear all session data and stored state',
+      icon: Trash2,
+      disabled: false,
+      active: false,
+      onClick: () => setShowDeleteAllConfirm(true),
+      destructive: true,
     },
     {
       id: 'about',
