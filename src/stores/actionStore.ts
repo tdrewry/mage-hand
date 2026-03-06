@@ -30,6 +30,50 @@ function broadcastActionQueue() {
     // ephemeralBus may not be connected — silently ignore
   }
 }
+
+/** Broadcast action.pending to all peers (players see toast) */
+function broadcastActionPending(action: ActionQueueEntry) {
+  if (!action.attack) return;
+  try {
+    ephemeralBus.emit('action.pending', {
+      actionId: action.id,
+      sourceName: action.sourceTokenName,
+      attackName: action.attack.name,
+      targetNames: action.targets.map(t => t.tokenName),
+      category: action.category,
+    });
+  } catch { /* ignore */ }
+}
+
+/** Broadcast action.resolved to all peers (players see outcome) */
+function broadcastActionResolved(action: ActionQueueEntry) {
+  if (!action.attack) return;
+  try {
+    ephemeralBus.emit('action.resolved', {
+      actionId: action.id,
+      sourceName: action.sourceTokenName,
+      attackName: action.attack.name,
+      category: action.category,
+      targets: action.targets.map(t => ({
+        tokenName: t.tokenName,
+        resolution: action.resolutions[t.targetKey] || 'miss',
+        totalDamage: action.damageResults[t.targetKey]?.adjustedTotal ?? 0,
+        damageType: action.damageResults[t.targetKey]?.damageType ?? 'untyped',
+      })),
+    });
+  } catch { /* ignore */ }
+}
+
+/** Broadcast resolution claim / release for multi-DM coordination */
+export function broadcastResolutionClaim(actionId: string, claimedBy: string | null, claimedByName: string | null) {
+  try {
+    ephemeralBus.emit('action.resolution.claim', {
+      actionId,
+      claimedBy,
+      claimedByName,
+    });
+  } catch { /* ignore */ }
+}
 export interface ResolutionFlash {
   tokenId: string;
   x: number;
