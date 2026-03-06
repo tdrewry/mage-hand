@@ -40,7 +40,7 @@ All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–5 have
 | `token.handle.preview` | ✅ | ✅ | ❌ | Emitter in mapHandlers (v0.6.92) |
 | `region.handle.preview` | ✅ | ✅ | ❌ | Emitter wired in SimpleTabletop rotation (v0.6.92) |
 | `mapObject.handle.preview` | ✅ | ✅ | ❌ | Emitter wired in SimpleTabletop rotation+scale (v0.6.92) |
-| `map.focus` | ✅ | ✅ | ❌ | ❌ |
+| `map.focus` | ✅ | ✅ | ✅ | **DM Ctrl+Shift+Click → player viewport pan (v0.6.95)** |
 | `chat.typing` | ✅ | ✅ | ✅ | **Wired in ChatCard input (P5 ✅ v0.6.86)** |
 | `chat.message` | ✅ | ✅ | ✅ | **Wired in chatStore (v0.6.88)** |
 | `initiative.drag.preview` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
