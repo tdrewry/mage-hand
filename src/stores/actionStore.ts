@@ -637,6 +637,11 @@ export const useActionStore = create<ActionStore>()(
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
 
+    // Broadcast resolved outcome to all peers (players see summary)
+    broadcastActionResolved(currentAction);
+    // Release any resolution claim
+    broadcastResolutionClaim(currentAction.id, null, null);
+
     // Auto-clear flashes after 1.5s
     setTimeout(() => {
       get().clearFlashes();
@@ -662,6 +667,11 @@ export const useActionStore = create<ActionStore>()(
           effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
         }
       }
+    }
+
+    // Clear pending notification for cancelled action
+    if (currentAction) {
+      broadcastResolutionClaim(currentAction.id, null, null);
     }
 
     // Advance queue: pop next pending action if any
