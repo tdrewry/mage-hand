@@ -141,3 +141,13 @@ export function registerMiscHandlers(): void {
     }
   });
 }
+
+// ── Outbound helpers ──
+
+/**
+ * Emit a chat.typing indicator to peers.
+ * Call on keypress in chat input; throttled at 200ms by EphemeralBus config.
+ */
+export function emitChatTyping(): void {
+  ephemeralBus.emit("chat.typing", {});
+}
