@@ -107,7 +107,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
           </DialogTitle>
           <DialogDescription>
             Manage players and their roles in this session
-            {!isDM && ' (View only - DM controls required)'}
+            {!canAssignPlayerRoles && ' (View only - role assignment permission required)'}
           </DialogDescription>
         </DialogHeader>
 
@@ -204,7 +204,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                         );
                       })()}
 
-                      {isDM && !isCurrentUser && (
+                      {canAssignPlayerRoles && !isCurrentUser && (
                         <div className="space-y-2">
                           <Separator className="my-2" />
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -258,10 +258,10 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
         {/* Footer info */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
           <span>{connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} connected</span>
-          {isDM && (
+          {canAssignPlayerRoles && (
             <div className="flex items-center gap-1">
               <Settings className="h-3 w-3" />
-              <span>DM controls enabled</span>
+              <span>Role management enabled</span>
             </div>
           )}
         </div>
