@@ -1,15 +1,18 @@
 // src/lib/net/ephemeral/tokenHandlers.ts
 // Registers ephemeral handlers for token.hover, token.handle.preview,
-// selection.preview, and action.target.preview.
+// selection.preview, action.target.preview, token.drag.*, and token.position.sync.
 
 import { ephemeralBus } from "@/lib/net";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useDragPreviewStore } from "@/stores/dragPreviewStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import type {
   TokenHoverPayload,
   TokenHandlePreviewPayload,
   SelectionPreviewPayload,
   ActionTargetPreviewPayload,
+  TokenPositionSyncPayload,
 } from "./types";
 
 let registered = false;
@@ -63,6 +66,18 @@ export function registerTokenHandlers(): void {
   ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
     useDragPreviewStore.getState().endDrag(data.tokenId);
   });
+
+  // ── Token position sync (10Hz delta broadcast) ──
+  ephemeralBus.on("token.position.sync", (data: TokenPositionSyncPayload, userId) => {
+    // Skip our own echoed position syncs
+    if (userId === useMultiplayerStore.getState().currentUserId) return;
+    const store = useSessionStore.getState();
+    for (const p of data.positions) {
+      store.updateTokenPosition(p.tokenId, p.x, p.y);
+    }
+  });
+
+  // Wire TTL cache expiry to clean up stale entries
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return; // only care about removals
 
