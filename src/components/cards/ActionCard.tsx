@@ -558,6 +558,7 @@ function TargetResolveCard({
   onSetResolution,
   onOverrideDamage,
   onDismiss,
+  disabled,
   isEffect,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
