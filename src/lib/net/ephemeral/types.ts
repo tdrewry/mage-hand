@@ -55,6 +55,9 @@ export type EphemeralOpKind =
   | "action.resolution.claim"
   // Assets
   | "asset.uploadProgress"
+  | "asset.submission"
+  | "asset.accepted"
+  | "asset.rejected"
   // Effects & Auras
   | "effect.aura.state"
   | "effect.placement.preview";
@@ -282,6 +285,30 @@ export interface AssetUploadProgressPayload {
   percent: number; // 0-100
 }
 
+export interface AssetSubmissionPayload {
+  submissionId: string;
+  targetType: 'token' | 'region' | 'mapObject' | 'effectTemplate';
+  targetId: string;
+  targetName: string;
+  playerName: string;
+  textureHash: string;
+  /** Compressed base64 data URL */
+  textureDataUrl: string;
+}
+
+export interface AssetAcceptedPayload {
+  submissionId: string;
+  targetType: 'token' | 'region' | 'mapObject' | 'effectTemplate';
+  targetId: string;
+  textureHash: string;
+  textureDataUrl: string;
+}
+
+export interface AssetRejectedPayload {
+  submissionId: string;
+  reason?: string;
+}
+
 // -- Effects & Auras --
 
 export interface EffectAuraStatePayload {
@@ -348,6 +375,9 @@ export interface EphemeralPayloadMap {
   "action.resolved": ActionResolvedPayload;
   "action.resolution.claim": ActionResolutionClaimPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
+  "asset.submission": AssetSubmissionPayload;
+  "asset.accepted": AssetAcceptedPayload;
+  "asset.rejected": AssetRejectedPayload;
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
 }
@@ -430,6 +460,9 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
+  "asset.submission":       { throttleMs: 0,   ttlMs: 60000, keyStrategy: "none" },
+  "asset.accepted":         { throttleMs: 0,   ttlMs: 10000, keyStrategy: "none", dmOnly: true },
+  "asset.rejected":         { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "none", dmOnly: true },
 
   // Effects & Auras
   "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },

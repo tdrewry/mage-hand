@@ -355,6 +355,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.ART_APPROVAL]: {
+    title: 'Art Approval',
+    defaultPosition: { x: 360, y: 120 },
+    defaultSize: { width: 340, height: 420 },
+    minSize: { width: 280, height: 300 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

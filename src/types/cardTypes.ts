@@ -29,6 +29,7 @@ export enum CardType {
   NETWORK_DEMO = 'network_demo',
   EFFECTS = 'effects',
   CHAT = 'chat',
+  ART_APPROVAL = 'art_approval',
 }
 
 /** Card types that require DM role — players cannot open or see these */
@@ -37,6 +38,7 @@ export const DM_ONLY_CARD_TYPES: ReadonlySet<CardType> = new Set([
   CardType.MAP_CONTROLS,
   CardType.REGION_CONTROL,
   CardType.ACTION_CARD,
+  CardType.ART_APPROVAL,
 ]);
 
 export interface CardPosition {
