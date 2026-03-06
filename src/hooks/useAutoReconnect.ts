@@ -10,6 +10,8 @@ import { joinJazzSession } from '@/lib/jazz';
  * Waits for persist rehydration before attempting reconnection.
  *
  * Supports both WebSocket (OpBridge) and Jazz (CRDT) transports.
+ * For Jazz sessions, reconnects both the CRDT bridge AND the
+ * ephemeral WebSocket in tandem mode.
  */
 export function useAutoReconnect() {
   const hasAttemptedReconnect = useRef(false);
@@ -29,7 +31,7 @@ export function useAutoReconnect() {
 
       hasAttemptedReconnect.current = true;
 
-      // ── Jazz reconnect ──────────────────────────────────────────────
+      // ── Jazz reconnect (tandem: CRDT + ephemeral WS) ─────────────
       if (isJazzCode(code)) {
         const coValueId = decodeJazzCode(code);
         if (!coValueId) {
@@ -41,6 +43,7 @@ export function useAutoReconnect() {
         console.log('🔄 [AutoReconnect] Reconnecting Jazz session', code);
         useMultiplayerStore.getState().setConnectionStatus('reconnecting');
 
+        // 1. Reconnect Jazz CRDT bridge
         joinJazzSession(coValueId)
           .then((info) => {
             const store = useMultiplayerStore.getState();
@@ -52,6 +55,20 @@ export function useAutoReconnect() {
             console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
             useMultiplayerStore.getState().reset();
           });
+
+        // 2. Also reconnect ephemeral WebSocket in tandem (non-blocking)
+        if (state.serverUrl) {
+          netManager.connectEphemeralOnly({
+            serverUrl: state.serverUrl,
+            sessionCode: code,
+            username,
+            roles: state.roles.length > 0 ? state.roles : undefined,
+          }).then(() => {
+            console.log('✅ [AutoReconnect] Ephemeral WS reconnected in tandem');
+          }).catch((err) => {
+            console.warn('⚠️ [AutoReconnect] Ephemeral WS reconnect failed (non-fatal):', err);
+          });
+        }
 
         return;
       }
