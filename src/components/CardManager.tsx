@@ -26,7 +26,7 @@ import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
-import { CardType, CardState } from '@/types/cardTypes';
+import { CardType, CardState, DM_ONLY_CARD_TYPES } from '@/types/cardTypes';
 
 const LazyMapTreeCardContent = React.lazy(() =>
   import('@/components/cards/MapTreeCard').then(m => ({ default: m.MapTreeCardContent }))
@@ -50,8 +50,12 @@ export function CardManager({
 }: CardManagerProps) {
   const cards = useCardStore((state) => state.cards);
   const loadLayout = useCardStore((state) => state.loadLayout);
-  const { addToken } = useSessionStore();
+  const { addToken, players, currentPlayerId } = useSessionStore();
   const { renderingMode } = useDungeonStore();
+
+  // Determine if current user is DM for card gating
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
 
   // Load saved layout on mount
   useEffect(() => {
@@ -90,7 +94,7 @@ export function CardManager({
       {children}
       
       {/* Render all registered cards */}
-      {cards.map((card) => {
+      {cards.filter(card => isDM || !DM_ONLY_CARD_TYPES.has(card.type)).map((card) => {
         const content = renderCardContent(
           card,
           handleAddToken, 

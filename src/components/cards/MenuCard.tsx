@@ -431,15 +431,17 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           Project Manager
         </Button>
         
-        <Button 
-          variant={mapControlsCard?.isVisible ? "default" : "outline"}
-          size="sm"
-          onClick={handleToggleMapControlsCard}
-          className="w-full"
-        >
-          <Map className="h-4 w-4 mr-2" />
-          Map Controls
-        </Button>
+        {canControlUiMode && (
+          <Button 
+            variant={mapControlsCard?.isVisible ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleMapControlsCard}
+            className="w-full"
+          >
+            <Map className="h-4 w-4 mr-2" />
+            Map Controls
+          </Button>
+        )}
 
         <Button 
           variant={mapManagerCard?.isVisible ? "default" : "outline"}

@@ -472,14 +472,16 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             size="xs"
           />
 
-          <ToolbarButton
-            icon={CloudFog}
-            label={`Fog of War ${fogEnabled ? 'On' : 'Off'}`}
-            onClick={handleToggleFogCard}
-            isActive={fogCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
+          {isDM && (
+            <ToolbarButton
+              icon={CloudFog}
+              label={`Fog of War ${fogEnabled ? 'On' : 'Off'}`}
+              onClick={handleToggleFogCard}
+              isActive={fogCard?.isVisible}
+              variant="ghost"
+              size="xs"
+            />
+          )}
 
           {isDM && fogEnabled && onToggleFogRevealBrush && (
             <ToolbarButton
