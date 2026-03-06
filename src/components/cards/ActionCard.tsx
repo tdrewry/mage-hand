@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
-import { useActionStore } from '@/stores/actionStore';
+import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices, Lock } from 'lucide-react';
+import { useActionStore, broadcastResolutionClaim } from '@/stores/actionStore';
+import { useActionPendingStore } from '@/stores/actionPendingStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 
