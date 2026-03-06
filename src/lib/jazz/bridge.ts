@@ -40,6 +40,9 @@ import { useDiceStore } from "@/stores/diceStore";
 
 let _fromJazz = false;
 
+/** Whether the local client created this session (source of truth for initial state) */
+let _isCreator = false;
+
 /** Returns true when the current store mutation originated from Jazz (inbound sync). */
 export function isFromJazz(): boolean {
   return _fromJazz;
@@ -256,6 +259,20 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   try {
     const state = JSON.parse(stateJson);
     const hash = quickHash(stateJson);
+
+    // ── Guard against destructive hydration ──
+    // If inbound state looks empty but local store has data, skip the hydration.
+    // This prevents Jazz propagation delays from wiping the DM's populated stores.
+    const inboundEmpty = isEmptyState(state);
+    if (inboundEmpty) {
+      const localState = reg.extractor();
+      const localEmpty = isEmptyState(localState);
+      if (!localEmpty) {
+        console.warn(`[jazz-bridge] ✋ Blocked destructive hydration for "${kind}" — inbound is empty but local has data`);
+        return;
+      }
+    }
+
     _lastPushedHash.set(kind, hash); // prevent echo
 
     runFromJazz(() => {
@@ -265,6 +282,24 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   } catch (err) {
     console.error(`[jazz-bridge] Blob pull error for ${kind}:`, err);
   }
+}
+
+/** Heuristic: check if a state object is "empty" (null, empty array, or object with only empty arrays/nulls) */
+function isEmptyState(state: unknown): boolean {
+  if (state == null) return true;
+  if (Array.isArray(state)) return state.length === 0;
+  if (typeof state === 'object') {
+    const values = Object.values(state as Record<string, unknown>);
+    if (values.length === 0) return true;
+    // Consider it empty if all values are null, undefined, empty arrays, or empty objects
+    return values.every(v => 
+      v == null || 
+      (Array.isArray(v) && v.length === 0) ||
+      (typeof v === 'object' && !Array.isArray(v) && v !== null && Object.keys(v).length === 0) ||
+      v === false || v === 0 || v === ''
+    );
+  }
+  return false;
 }
 
 // ── Push: Zustand → Jazz ───────────────────────────────────────────────────
