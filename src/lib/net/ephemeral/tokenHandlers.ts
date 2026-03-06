@@ -4,6 +4,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
+import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import type {
   TokenHoverPayload,
   TokenHandlePreviewPayload,
@@ -49,7 +50,19 @@ export function registerTokenHandlers(): void {
     });
   });
 
-  // Wire TTL cache expiry to clean up stale entries
+  // ── Token drag preview ops (migrated from durable OpBridge) ──
+
+  ephemeralBus.on("token.drag.begin", (data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, userId) => {
+    useDragPreviewStore.getState().beginDrag(data.tokenId, userId, data.startPos, data.mode ?? "freehand");
+  });
+
+  ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
+    useDragPreviewStore.getState().updateDrag(data.tokenId, data.pos, data.path);
+  });
+
+  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
+    useDragPreviewStore.getState().endDrag(data.tokenId);
+  });
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return; // only care about removals
 
