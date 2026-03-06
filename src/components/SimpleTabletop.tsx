@@ -2499,6 +2499,7 @@ export const SimpleTabletop = () => {
     roles, // Re-compute when roles change (permissions affect which tokens get vision)
     selectedMapId, // Re-compute fog when switching maps (per-map explored areas)
     isEntityVisible, // Re-compute when active map set changes
+    fogRefreshTick, // Re-compute when force-refresh is triggered (e.g., initial wall geometry ready)
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
