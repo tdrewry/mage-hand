@@ -18,6 +18,7 @@
 import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { JazzToken as JazzTokenSchema, JazzDOBlob as JazzDOBlobSchema } from "./schema";
 import { DurableObjectRegistry } from "@/lib/durableObjects";
+import "@/lib/durableObjectRegistry"; // Side-effect: registers all DO kinds
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 

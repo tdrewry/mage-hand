@@ -1,6 +1,6 @@
 # Jazz.tools — Durable Object Sync Integration Plan
 
-## Status: Phase 1 Complete (v0.7.0)
+## Status: Phase 3 Complete (v0.7.20) — All DO Kinds Synced
 
 ## Context
 
@@ -148,37 +148,57 @@ The bridge:
 
 ---
 
-## Phase 3: Expand to All DO Stores
+## Phase 3: Expand to All DO Stores ✅ COMPLETE (v0.7.20)
 
-### Migration Order (by complexity)
-| Priority | Store | Complexity | Notes |
-|----------|-------|-----------|-------|
-| 1 | tokens | Low | ✅ Done (Phase 2) |
-| 2 | maps | Low | Metadata + image refs |
-| 3 | initiative | Low | Ordered list |
-| 4 | roles | Low | Simple assignments |
-| 5 | groups | Medium | Member references cross-store |
-| 6 | regions | Medium | Geometry (wall points, paths) |
-| 7 | mapObjects | Medium | Position + shape + category |
-| 8 | effects | Medium | Templates + active placements |
-| 9 | fog | High | Binary reveal bitmap + explored areas |
-| 10 | lights | Medium | Position + parameters |
-| 11 | creatures | Low | Library data |
-| 12 | cards | Low | UI layout state |
-| 13 | dungeon | Medium | Nested structure |
-| 14 | illumination | Low | Settings |
-| 15 | hatching | Low | Settings |
-| 16 | dice | Low | Roll history |
-| 17 | actions | Medium | Action queue |
-| 18 | visionProfiles | Low | Profile definitions |
+### Implementation: Blob Sync Strategy
 
-### Per-Store Migration Pattern
-1. Define CoMap schema in `src/lib/jazz/schema.ts`
-2. Add field to `JazzSessionRoot`
-3. Wire bridge: zustand action → CoValue mutation
-4. Wire bridge: CoValue subscription → zustand hydrator
-5. **Do NOT remove** corresponding ops from `OpBridge` — both transports coexist
-6. Test two-peer sync
+Rather than creating fine-grained CoMap schemas for all 16+ DO kinds (which the original plan suggested), we adopted a **blob sync** approach using the existing `JazzDOBlob` schema:
+
+- **Tokens**: Keep fine-grained per-field CoValue sync (low-latency movement)
+- **All other DO kinds**: Serialized as JSON blobs using `DurableObjectRegistry` extractors/hydrators
+- **Excluded from sync**: `cards` (UI layout, per-user), `viewportTransforms` (per-user viewport)
+
+### Blob Sync Architecture
+
+Each non-token DO kind is stored as a `JazzDOBlob` entry in `sessionRoot.blobs[]`:
+```
+JazzDOBlob { kind: "maps", version: 1, state: "{...json...}", updatedAt: "..." }
+```
+
+**Push (Zustand → Jazz):**
+1. Subscribe to each store backing a DO kind
+2. On change, extract via `DurableObjectRegistry.get(kind).extractor()`
+3. Serialize to JSON, upsert into `sessionRoot.blobs`
+4. Throttled to 1Hz max per kind
+
+**Pull (Jazz → Zustand):**
+1. On join, iterate `sessionRoot.blobs` and hydrate each kind
+2. Subscribe to blob list changes; on update, re-hydrate affected kind
+3. Hash-based echo prevention avoids re-pushing what we just pulled
+
+### DO Kinds Synced via Blob
+
+| Priority | Store | Status | Notes |
+|----------|-------|--------|-------|
+| 1 | tokens | ✅ Fine-grained | Per-field CoValue sync |
+| 2 | maps | ✅ Blob | Metadata + image refs |
+| 3 | regions | ✅ Blob | Geometry (wall points, paths) |
+| 4 | groups | ✅ Blob | Member references |
+| 5 | initiative | ✅ Blob | Combat state |
+| 6 | roles | ✅ Blob | Role assignments |
+| 7 | visionProfiles | ✅ Blob | Profile definitions |
+| 8 | fog | ✅ Blob | Per-map settings + explored areas |
+| 9 | lights | ✅ Blob | Legacy light sources |
+| 10 | illumination | ✅ Blob | Unified illumination |
+| 11 | dungeon | ✅ Blob | Doors, walls, styles |
+| 12 | mapObjects | ✅ Blob | Position + shape + category |
+| 13 | creatures | ✅ Blob | Character & monster library |
+| 14 | hatching | ✅ Blob | Edge hatching settings |
+| 15 | effects | ✅ Blob | Templates + active placements |
+| 16 | actions | ✅ Blob | Action queue history |
+| 17 | dice | ✅ Blob | Pinned formulas + history |
+| — | cards | ❌ Skipped | UI layout (per-user) |
+| — | viewportTransforms | ❌ Skipped | Per-user viewport |
 
 ---
 
@@ -245,16 +265,18 @@ src/lib/jazz/
 
 1. **Authentication**: Jazz requires an account system. For local dev, anonymous/guest accounts work. Production will need a proper auth adapter.
 2. **Permissions**: Jazz uses `Group` for access control. Maps to our existing role system (DM = admin, players = writers/readers).
-3. **Large binary data**: Fog bitmaps and textures may need `FileStream` CoValues rather than inline CoMap fields.
+3. **Large binary data**: Fog geometry serialized as a JSON blob could be large. Consider `FileStream` CoValues or chunked blobs for production.
 4. **Migration path**: Existing `.mhsession` files need an import path into Jazz CoValues.
-5. **Ephemeral bus transport**: Currently shares the same WebSocket as durable ops. Once Jazz takes over durable, the ephemeral bus needs its own connection or a Jazz sideband.
+5. ~~**Ephemeral bus transport**~~: ✅ Resolved — Jazz + WebSocket tandem mode (v0.7.18). Ephemeral ops flow via a parallel WebSocket connection using the same `J-` session code.
 
 ---
 
 ## Success Criteria
 
-- [ ] Two peers can join a session via Jazz sync server
-- [ ] Token CRUD syncs in real-time without OpBridge
-- [ ] Existing `.mhdo` export/import still works (extractors pull from zustand, which is fed by Jazz)
-- [ ] Ephemeral overlays (cursors, drags, pings) continue working independently
-- [ ] No regression in single-player mode (Jazz works offline-first)
+- [x] Two peers can join a session via Jazz sync server
+- [x] Token CRUD syncs in real-time without OpBridge
+- [x] All DO kinds sync via blob bridge (maps, regions, effects, fog, initiative, etc.)
+- [x] Existing `.mhdo` export/import still works (extractors pull from zustand, which is fed by Jazz)
+- [x] Ephemeral overlays (cursors, drags, pings) work via tandem WebSocket
+- [ ] No regression in single-player mode (Jazz works offline-first) — needs testing
+- [ ] Large fog geometry performance validated under blob sync
