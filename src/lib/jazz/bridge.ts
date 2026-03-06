@@ -462,10 +462,10 @@ export function startBridge(sessionRoot: any): void {
     const tokens = state.tokens;
     if (tokens === prevTokens) return;
     if (_fromJazz) { prevTokens = tokens; return; }
-    if (!_sessionRoot?.tokens) { prevTokens = tokens; return; }
+    const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
+    if (!jazzTokens) { prevTokens = tokens; return; }
 
-    const jazzTokens = _sessionRoot.tokens;
-    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
 
       // Detect added tokens
       const prevIds = new Set(prevTokens.map((t: Token) => t.id));
