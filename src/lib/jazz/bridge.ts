@@ -3,19 +3,21 @@
  *
  * Bidirectional sync between Jazz CoValues and the existing Zustand stores.
  *
+ * Two sync strategies:
+ *   1. Fine-grained: Tokens use per-field CoValue sync for low-latency movement
+ *   2. Blob sync: All other DO kinds use JazzDOBlob (JSON serialized state)
+ *      via the DurableObjectRegistry extractors/hydrators
+ *
  * Echo prevention: a `_fromJazz` flag is set during hydration so that
  * store subscriptions don't re-push the same change back to Jazz.
  *
  * IMPORTANT: This module does NOT import from src/lib/net/ — it's a standalone
  * transport that feeds into the same Zustand stores.
- *
- * NOTE: Jazz types use MaybeLoaded wrappers which make direct property access
- * tricky at compile time. We use `as any` casts in the bridge layer since we
- * only call these functions with fully-loaded CoValues.
  */
 
 import { useSessionStore, type Token } from "@/stores/sessionStore";
-import { JazzToken as JazzTokenSchema } from "./schema";
+import { JazzToken as JazzTokenSchema, JazzDOBlob as JazzDOBlobSchema } from "./schema";
+import { DurableObjectRegistry } from "@/lib/durableObjects";
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 
@@ -56,6 +58,19 @@ let _sessionRoot: any = null;
 export function getBridgedSessionRoot(): any {
   return _sessionRoot;
 }
+
+// ── DO kinds to sync via blob (excludes tokens — fine-grained, and UI-only kinds) ──
+
+const BLOB_SYNC_KINDS = [
+  'maps', 'regions', 'groups', 'initiative', 'roles', 'visionProfiles',
+  'fog', 'lights', 'illumination', 'dungeon', 'mapObjects', 'creatures',
+  'hatching', 'effects', 'actions', 'dice',
+];
+
+// Kinds excluded from blob sync:
+// - 'tokens': fine-grained CoValue sync
+// - 'cards': UI layout, per-user
+// - 'viewportTransforms': per-user viewport
 
 // ── Token bridge helpers ───────────────────────────────────────────────────
 
@@ -122,6 +137,103 @@ function jazzToZustandToken(jt: any): Token {
   };
 }
 
+// ── Blob sync helpers ──────────────────────────────────────────────────────
+
+/** Throttle state: last push hash per kind to avoid redundant writes */
+const _lastPushedHash = new Map<string, string>();
+
+/** Simple hash for change detection */
+function quickHash(str: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+/** Find blob index in session root by kind */
+function findBlobIndex(kind: string): number {
+  if (!_sessionRoot?.blobs) return -1;
+  const len = _sessionRoot.blobs.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const b = _sessionRoot.blobs[i];
+    if (b && b.kind === kind) return i;
+  }
+  return -1;
+}
+
+/** Push a single DO kind's state to Jazz as a blob */
+function pushBlobToJazz(kind: string): void {
+  if (!_sessionRoot?.blobs) return;
+  const reg = DurableObjectRegistry.get(kind);
+  if (!reg) return;
+
+  try {
+    const state = reg.extractor();
+    const json = JSON.stringify(state);
+    const hash = quickHash(json);
+
+    // Skip if unchanged
+    if (_lastPushedHash.get(kind) === hash) return;
+    _lastPushedHash.set(kind, hash);
+
+    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const idx = findBlobIndex(kind);
+
+    if (idx >= 0) {
+      // Update existing blob
+      const blob = _sessionRoot.blobs[idx];
+      try {
+        blob.$jazz.set("state", json);
+        blob.$jazz.set("version", reg.version);
+        blob.$jazz.set("updatedAt", new Date().toISOString());
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to update blob ${kind}:`, err);
+      }
+    } else {
+      // Create new blob
+      try {
+        const blob = JazzDOBlobSchema.create({
+          kind,
+          version: reg.version,
+          state: json,
+          updatedAt: new Date().toISOString(),
+        } as any, group);
+        _sessionRoot.blobs.$jazz.push(blob);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to create blob ${kind}:`, err);
+      }
+    }
+
+    console.log(`[jazz-bridge] → Jazz blob: ${kind}`);
+  } catch (err) {
+    console.error(`[jazz-bridge] Blob push error for ${kind}:`, err);
+  }
+}
+
+/** Pull a single blob from Jazz into Zustand via the DO hydrator */
+function pullBlobFromJazz(kind: string, stateJson: string): void {
+  const reg = DurableObjectRegistry.get(kind);
+  if (!reg) {
+    console.warn(`[jazz-bridge] Unknown DO kind in blob: ${kind}`);
+    return;
+  }
+
+  try {
+    const state = JSON.parse(stateJson);
+    const hash = quickHash(stateJson);
+    _lastPushedHash.set(kind, hash); // prevent echo
+
+    runFromJazz(() => {
+      reg.hydrator(state);
+    });
+    console.log(`[jazz-bridge] ← Jazz blob: ${kind}`);
+  } catch (err) {
+    console.error(`[jazz-bridge] Blob pull error for ${kind}:`, err);
+  }
+}
+
 // ── Push: Zustand → Jazz ───────────────────────────────────────────────────
 
 /**
@@ -147,10 +259,45 @@ export function pushTokensToJazz(sessionRoot: any): void {
 }
 
 /**
+ * Push all DO blob states to Jazz.
+ */
+export function pushBlobsToJazz(sessionRoot: any): void {
+  const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  if (!sessionRoot.blobs) {
+    console.warn("[jazz-bridge] No blobs list on session root");
+    return;
+  }
+
+  for (const kind of BLOB_SYNC_KINDS) {
+    const reg = DurableObjectRegistry.get(kind);
+    if (!reg) continue;
+
+    try {
+      const state = reg.extractor();
+      const json = JSON.stringify(state);
+      _lastPushedHash.set(kind, quickHash(json));
+
+      const blob = JazzDOBlobSchema.create({
+        kind,
+        version: reg.version,
+        state: json,
+        updatedAt: new Date().toISOString(),
+      } as any, group);
+      sessionRoot.blobs.$jazz.push(blob);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push blob ${kind}:`, err);
+    }
+  }
+
+  console.log(`[jazz-bridge] Pushed ${BLOB_SYNC_KINDS.length} DO blobs to Jazz`);
+}
+
+/**
  * Push all current Zustand state into Jazz CoValues.
  */
 export function pushAllToJazz(sessionRoot: any): void {
   pushTokensToJazz(sessionRoot);
+  pushBlobsToJazz(sessionRoot);
 }
 
 // ── Pull: Jazz → Zustand ──────────────────────────────────────────────────
@@ -181,22 +328,76 @@ export function pullTokensFromJazz(sessionRoot: any): void {
 }
 
 /**
+ * Pull all DO blobs from Jazz into Zustand.
+ */
+export function pullBlobsFromJazz(sessionRoot: any): void {
+  if (!sessionRoot.blobs) {
+    console.warn("[jazz-bridge] No blobs list on session root");
+    return;
+  }
+
+  const len = sessionRoot.blobs.length ?? 0;
+  console.log(`[jazz-bridge] Pulling ${len} DO blobs from Jazz`);
+
+  for (let i = 0; i < len; i++) {
+    const blob = sessionRoot.blobs[i];
+    if (!blob || !blob.kind || !blob.state) continue;
+    pullBlobFromJazz(blob.kind, blob.state);
+  }
+}
+
+/**
  * Pull all Jazz CoValue state into Zustand stores.
  */
 export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
+  pullBlobsFromJazz(sessionRoot);
+}
+
+// ── Blob store subscriptions ──────────────────────────────────────────────
+
+/** Map of DO kind → the Zustand store to subscribe to */
+const STORE_FOR_KIND: Record<string, () => any> = {
+  maps: () => require("@/stores/mapStore").useMapStore,
+  regions: () => require("@/stores/regionStore").useRegionStore,
+  groups: () => require("@/stores/groupStore").useGroupStore,
+  initiative: () => require("@/stores/initiativeStore").useInitiativeStore,
+  roles: () => require("@/stores/roleStore").useRoleStore,
+  visionProfiles: () => require("@/stores/visionProfileStore").useVisionProfileStore,
+  fog: () => require("@/stores/fogStore").useFogStore,
+  lights: () => require("@/stores/lightStore").useLightStore,
+  illumination: () => require("@/stores/illuminationStore").useIlluminationStore,
+  dungeon: () => require("@/stores/dungeonStore").useDungeonStore,
+  mapObjects: () => require("@/stores/mapObjectStore").useMapObjectStore,
+  creatures: () => require("@/stores/creatureStore").useCreatureStore,
+  hatching: () => require("@/stores/hatchingStore").useHatchingStore,
+  effects: () => require("@/stores/effectStore").useEffectStore,
+  actions: () => require("@/stores/actionStore").useActionStore,
+  dice: () => require("@/stores/diceStore").useDiceStore,
+};
+
+/** Throttle timers per kind */
+const _throttleTimers = new Map<string, number>();
+const BLOB_THROTTLE_MS = 1000; // 1Hz max per kind
+
+function throttledPushBlob(kind: string): void {
+  if (_throttleTimers.has(kind)) return; // already scheduled
+  _throttleTimers.set(kind, window.setTimeout(() => {
+    _throttleTimers.delete(kind);
+    pushBlobToJazz(kind);
+  }, BLOB_THROTTLE_MS));
 }
 
 // ── Live bridge: subscribe to both directions ─────────────────────────────
 
 /**
- * Start the bidirectional bridge for tokens.
+ * Start the bidirectional bridge for tokens + all DO blob kinds.
  */
 export function startBridge(sessionRoot: any): void {
   _sessionRoot = sessionRoot;
   console.log("[jazz-bridge] Starting bridge");
 
-  // ── Direction 1: Zustand → Jazz ──
+  // ── Token sync: Direction 1 (Zustand → Jazz) ──
   let prevTokens = useSessionStore.getState().tokens;
   const unsubZustand = useSessionStore.subscribe((state) => {
     const tokens = state.tokens;
@@ -271,7 +472,7 @@ export function startBridge(sessionRoot: any): void {
     });
   activeSubscriptions.push(unsubZustand);
 
-  // ── Direction 2: Jazz → Zustand ──
+  // ── Token sync: Direction 2 (Jazz → Zustand) ──
   if (sessionRoot.tokens?.$jazz?.subscribe) {
     try {
       const unsubJazz = sessionRoot.tokens.$jazz.subscribe(
@@ -318,7 +519,50 @@ export function startBridge(sessionRoot: any): void {
     console.warn("[jazz-bridge] Jazz tokens list does not support subscribe — inbound sync disabled");
   }
 
-  console.log("[jazz-bridge] Bridge started with token sync");
+  // ── Blob sync: Zustand → Jazz (all DO kinds) ──
+  for (const kind of BLOB_SYNC_KINDS) {
+    const getStore = STORE_FOR_KIND[kind];
+    if (!getStore) continue;
+
+    try {
+      const store = getStore();
+      const unsub = store.subscribe(() => {
+        if (_fromJazz) return;
+        throttledPushBlob(kind);
+      });
+      activeSubscriptions.push(unsub);
+    } catch (err) {
+      console.warn(`[jazz-bridge] Could not subscribe to store for ${kind}:`, err);
+    }
+  }
+
+  // ── Blob sync: Jazz → Zustand (inbound blob changes) ──
+  if (sessionRoot.blobs?.$jazz?.subscribe) {
+    try {
+      const unsubBlobs = sessionRoot.blobs.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (blobs: any) => {
+          if (!blobs) return;
+          const len = blobs.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const blob = blobs[i];
+            if (!blob || !blob.kind || !blob.state) continue;
+
+            // Check if this is newer than what we last pushed
+            const hash = quickHash(blob.state);
+            if (_lastPushedHash.get(blob.kind) === hash) continue;
+
+            pullBlobFromJazz(blob.kind, blob.state);
+          }
+        },
+      );
+      activeSubscriptions.push(unsubBlobs);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz blobs:", err);
+    }
+  }
+
+  console.log(`[jazz-bridge] Bridge started with token sync + ${BLOB_SYNC_KINDS.length} DO blob kinds`);
 }
 
 /**
@@ -329,6 +573,14 @@ export function stopBridge(): void {
     unsub();
   }
   activeSubscriptions.length = 0;
+
+  // Clear throttle timers
+  for (const timer of _throttleTimers.values()) {
+    clearTimeout(timer);
+  }
+  _throttleTimers.clear();
+  _lastPushedHash.clear();
+
   _sessionRoot = null;
   console.log("[jazz-bridge] Bridge stopped");
 }
