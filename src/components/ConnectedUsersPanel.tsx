@@ -6,6 +6,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { usePresenceStore } from '@/stores/presenceStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
+import { hasPermission } from '@/lib/rolePermissions';
 import {
   Dialog,
   DialogContent,
@@ -43,12 +44,12 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
   );
   const [open, setOpen] = useState(false);
 
-  // Check if current user is DM
-  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+  // Use permission system instead of hardcoded DM check
+  const canAssignPlayerRoles = currentPlayer ? hasPermission(currentPlayer, roles, 'canAssignRoles') : false;
 
   const handleRoleToggle = (userId: string, roleId: string, currentlyHas: boolean) => {
-    if (!isDM) {
-      toast.error('Only the DM can manage user roles');
+    if (!canAssignPlayerRoles) {
+      toast.error('You do not have permission to manage user roles');
       return;
     }
 
@@ -106,7 +107,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
           </DialogTitle>
           <DialogDescription>
             Manage players and their roles in this session
-            {!isDM && ' (View only - DM controls required)'}
+            {!canAssignPlayerRoles && ' (View only - role assignment permission required)'}
           </DialogDescription>
         </DialogHeader>
 
@@ -203,7 +204,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
                         );
                       })()}
 
-                      {isDM && !isCurrentUser && (
+                      {canAssignPlayerRoles && !isCurrentUser && (
                         <div className="space-y-2">
                           <Separator className="my-2" />
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -257,10 +258,10 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
         {/* Footer info */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
           <span>{connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} connected</span>
-          {isDM && (
+          {canAssignPlayerRoles && (
             <div className="flex items-center gap-1">
               <Settings className="h-3 w-3" />
-              <span>DM controls enabled</span>
+              <span>Role management enabled</span>
             </div>
           )}
         </div>
