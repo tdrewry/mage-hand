@@ -55,6 +55,9 @@ export type EphemeralOpKind =
   | "action.resolution.claim"
   // Assets
   | "asset.uploadProgress"
+  | "asset.submission"
+  | "asset.accepted"
+  | "asset.rejected"
   // Effects & Auras
   | "effect.aura.state"
   | "effect.placement.preview";
@@ -280,6 +283,30 @@ export interface ActionResolutionClaimPayload {
 export interface AssetUploadProgressPayload {
   assetId: string;
   percent: number; // 0-100
+}
+
+export interface AssetSubmissionPayload {
+  submissionId: string;
+  targetType: 'token' | 'region' | 'mapObject' | 'effectTemplate';
+  targetId: string;
+  targetName: string;
+  playerName: string;
+  textureHash: string;
+  /** Compressed base64 data URL */
+  textureDataUrl: string;
+}
+
+export interface AssetAcceptedPayload {
+  submissionId: string;
+  targetType: 'token' | 'region' | 'mapObject' | 'effectTemplate';
+  targetId: string;
+  textureHash: string;
+  textureDataUrl: string;
+}
+
+export interface AssetRejectedPayload {
+  submissionId: string;
+  reason?: string;
 }
 
 // -- Effects & Auras --
