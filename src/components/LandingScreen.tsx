@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { APP_VERSION } from '@/lib/version';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
@@ -21,6 +20,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   Play,
@@ -30,30 +30,26 @@ import {
   Info,
   ChevronRight,
   UserCircle,
+  Network,
+  Wifi,
+  WifiOff,
+  Users,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
-import { useMapStore } from '@/stores/mapStore';
-import { useRegionStore } from '@/stores/regionStore';
-import { useGroupStore } from '@/stores/groupStore';
-import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
-import { useVisionProfileStore } from '@/stores/visionProfileStore';
-import { useFogStore } from '@/stores/fogStore';
-import { useLightStore } from '@/stores/lightStore';
-import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
-import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { useIlluminationStore } from '@/stores/illuminationStore';
-import { useCreatureStore } from '@/stores/creatureStore';
-import { useHatchingStore } from '@/stores/hatchingStore';
-import { useEffectStore } from '@/stores/effectStore';
-import { useUiModeStore } from '@/stores/uiModeStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { SessionManager } from '@/components/SessionManager';
 import {
-  createProjectMetadata,
   exportProjectToFile,
   importProjectFromFile,
   ProjectData,
 } from '@/lib/projectSerializer';
+import {
+  createCurrentProjectData,
+  clearAllStores,
+  applyProjectData,
+} from '@/lib/sessionIO';
 
 interface LandingScreenProps {
   onLaunch: () => void;
