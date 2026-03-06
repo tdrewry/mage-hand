@@ -69,11 +69,25 @@ const activeSubscriptions: Unsubscribe[] = [];
 /** The current Jazz session root being bridged (typed as any to avoid MaybeLoaded issues) */
 let _sessionRoot: any = null;
 
+/** Cached child CoValue references — Jazz proxies can go stale when accessed later */
+let _cachedTokens: any = null;
+let _cachedBlobs: any = null;
+let _cachedGroup: any = null;
+
 /**
  * Get the currently bridged session root (if any).
+ * Returns a wrapper that uses cached child refs to avoid stale proxy issues.
  */
 export function getBridgedSessionRoot(): any {
-  return _sessionRoot;
+  if (!_sessionRoot) return null;
+  // Return a facade that uses cached refs
+  return {
+    ...(_sessionRoot),
+    tokens: _cachedTokens ?? _sessionRoot.tokens,
+    blobs: _cachedBlobs ?? _sessionRoot.blobs,
+    _owner: _cachedGroup ?? _sessionRoot._owner,
+    get $jazz() { return _sessionRoot.$jazz; },
+  };
 }
 
 // ── DO kinds to sync via blob (excludes tokens — fine-grained, and UI-only kinds) ──
@@ -430,7 +444,15 @@ function throttledPushBlob(kind: string): void {
  */
 export function startBridge(sessionRoot: any): void {
   _sessionRoot = sessionRoot;
-  console.log("[jazz-bridge] Starting bridge");
+  // Cache child refs immediately while the proxy is still live
+  _cachedTokens = sessionRoot.tokens ?? null;
+  _cachedBlobs = sessionRoot.blobs ?? null;
+  _cachedGroup = sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
+  console.log("[jazz-bridge] Starting bridge, cached refs:", {
+    tokens: !!_cachedTokens,
+    blobs: !!_cachedBlobs,
+    group: !!_cachedGroup,
+  });
 
   // ── Token sync: Direction 1 (Zustand → Jazz) ──
   let prevTokens = useSessionStore.getState().tokens;
@@ -617,5 +639,8 @@ export function stopBridge(): void {
   _lastPushedHash.clear();
 
   _sessionRoot = null;
+  _cachedTokens = null;
+  _cachedBlobs = null;
+  _cachedGroup = null;
   console.log("[jazz-bridge] Bridge stopped");
 }
