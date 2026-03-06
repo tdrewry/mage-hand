@@ -2,11 +2,11 @@
 
 ## Current State Summary
 
-All 7 phases of the ephemeral implementation are marked **DONE**. The infrastructure (EphemeralBus, TTLCache, ThrottleManager), handler registration, stores, and tests are complete. However, there's a significant gap between "handler registered" and "fully wired end-to-end."
+All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–4 have been implemented. The remaining work (P5) consists of stub emitters that should be wired as their corresponding UI features mature.
 
 ---
 
-## What's Actually Wired (emitters + handlers + rendering)
+## What's Fully Wired (emitters + handlers + rendering)
 
 | Op Kind | Emit | Receive | Render | Notes |
 |---------|------|---------|--------|-------|
@@ -25,7 +25,13 @@ All 7 phases of the ephemeral implementation are marked **DONE**. The infrastruc
 | `fog.reveal.preview` | ✅ | ✅ | ✅ (committed geometry) | |
 | `role.handRaise` | ✅ | ✅ | ✅ (ConnectedUsersPanel) | |
 | `dice.rolling` | ✅ | ✅ | ✅ | |
-| `token.drag.begin/update/end` | ✅ | ✅ | ✅ (ghost token) | **Uses durable pipeline — needs migration** |
+| `token.drag.begin/update/end` | ✅ | ✅ | ✅ (ghost token) | **Migrated to ephemeral pipeline (P1 ✅)** |
+| `token.position.sync` | ✅ | ✅ | ✅ (sessionStore) | **10Hz delta sync (P2 ✅)** |
+| `effect.aura.state` | ✅ | ✅ | ✅ | **Wired from tickAuras (P3 ✅)** |
+| `action.queue.sync` | ✅ | ✅ | ✅ | DM queue hydration |
+| `action.pending` | ✅ | ✅ | ✅ (ActionPendingOverlay) | **Player toast (P4b ✅)** |
+| `action.resolved` | ✅ | ✅ | ✅ (ActionPendingOverlay) | **Player outcome feed (P4d ✅)** |
+| `action.resolution.claim` | ✅ | ✅ | ✅ (actionPendingStore) | **Multi-DM lock (P4c ✅)** |
 
 ## Handlers Registered But NO Emitters ("emit TBD")
 
@@ -42,101 +48,64 @@ All 7 phases of the ephemeral implementation are marked **DONE**. The infrastruc
 | `group.drag.preview` | ✅ | ✅ | ❌ | ❌ |
 | `asset.uploadProgress` | ✅ | ✅ | ❌ | ❌ |
 | `effect.placement.preview` | ✅ | stub | ❌ | ❌ |
-| `effect.aura.state` | ✅ | ✅ | Has helper fn | Not called from tickAuras |
 | `action.flash` | ✅ | ✅ | ❌ | ❌ |
 | `action.inProgress` | ✅ | ✅ | ❌ | ❌ |
-| `action.queue.sync` | ✅ | ✅ | ❌ | ❌ |
 | `mapObject.door.preview` | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
-## Critical Issue: Token Drag Uses Durable Pipeline
+## Completed Priorities
 
-`dragOps.ts` calls `emitLocalOp()` which goes through the **durable** op pipeline (sequenced, acknowledged, logged). This is wrong for ephemeral drag previews. It should use `ephemeralBus.emit()` like all other ephemeral ops.
+### ✅ Priority 1 — Token Drag Migration to Ephemeral (v0.6.80)
 
-**Impact:** Token drags are persisted in op-log, inflate sequence numbers, and add unnecessary server load. On reconnect, stale drag ops may replay.
+Migrated `token.drag.begin/update/end` from durable `emitLocalOp` to `ephemeralBus.emit`. Removed OpBridge drag handlers and moved them to `tokenHandlers.ts`.
 
-**Fix:** Rewrite `dragOps.ts` to use `ephemeralBus.emit()` and move the OpBridge handlers to `tokenHandlers.ts` ephemeral handlers.
+**Files changed:**
+- `src/lib/net/dragOps.ts` — now uses `ephemeralBus.emit`
+- `src/lib/net/OpBridge.ts` — drag handlers removed
+- `src/lib/net/ephemeral/tokenHandlers.ts` — drag handlers added
 
----
+### ✅ Priority 2 — Frequency-Based Token Position Sync (v0.6.81)
 
-## Priority 1 — Token Drag Migration to Ephemeral (Critical)
+Added `token.position.sync` ephemeral op at 10Hz (100ms interval). Emitter diffs current token positions against a snapshot and broadcasts only changed deltas. Handler applies remote positions to sessionStore with echo guard.
 
-Migrate `token.drag.begin/update/end` from the durable `emitLocalOp` pipeline to `ephemeralBus.emit`. This fixes log pollution and aligns with the architecture.
+**Files created:**
+- `src/lib/net/tokenPositionSync.ts` — `startPositionSync()` / `stopPositionSync()`
 
-**Files:**
-- `src/lib/net/dragOps.ts` — replace `emitLocalOp` with `ephemeralBus.emit`
-- `src/lib/net/OpBridge.ts` — remove the 3 drag handlers (they'll move to tokenHandlers)
-- `src/lib/net/ephemeral/tokenHandlers.ts` — add inbound handlers for `token.drag.*` → `dragPreviewStore`
+**Files changed:**
+- `src/lib/net/ephemeral/types.ts` — new op kind, payload, config
+- `src/lib/net/ephemeral/tokenHandlers.ts` — inbound handler
+- `src/lib/net/ephemeral/index.ts` — re-export
 
----
+### ✅ Priority 3 — Effect Aura State Emission (pre-existing)
 
-## Priority 2 — Frequency-Based Token Movement Sync (New Feature)
+`emitAuraState()` was already wired in `SimpleTabletop.tsx` after `tickAuras()` returns events. No changes needed.
 
-Add a **periodic position sync** so remote clients see token positions update in near-realtime even without explicit drag events. This covers cases like:
-- Programmatic token movement (teleport, snap-to-grid adjustments)
-- Multi-token group moves
-- Any position change that bypasses the drag system
+### ✅ Priority 4 — Action Resolution Coordination & Player Visibility (v0.6.82)
 
-**Approach:** A new ephemeral op `token.position.sync` emitted at ~10 Hz that broadcasts changed token positions (delta-only — only tokens whose positions changed since last emit).
+**Phase A (v0.6.79):** `ACTION_CARD` added to `DM_ONLY_CARD_TYPES`.
 
-**New op kind:** `token.position.sync`
-**Payload:** `{ positions: Array<{ tokenId: string; x: number; y: number }> }`
-**Throttle:** 100ms (10 Hz)
-**TTL:** 500ms
+**Phase B (v0.6.82):** `action.pending` ephemeral op. DM auto-broadcasts when entering resolve phase. Players see a floating overlay (`ActionPendingOverlay`) with caster/spell/target info.
 
-**Files:**
-- `src/lib/net/ephemeral/types.ts` — add op kind and payload
-- `src/lib/net/ephemeral/tokenHandlers.ts` — add handler that updates sessionStore positions (with echo guard)
-- `src/components/SimpleTabletop.tsx` — add useEffect with interval that diffs token positions and emits changes
+**Phase C (v0.6.82):** `action.resolution.claim` ephemeral op. Optimistic lock for multi-DM coordination. Claims stored in `actionPendingStore`, auto-released on commit/cancel.
 
----
+**Phase D (v0.6.82):** `action.resolved` ephemeral op. Players see resolved action outcomes (hit/miss, damage, type) in `ActionPendingOverlay` for 15 seconds.
 
-## Priority 3 — Effect Aura State Emission
+**Files created:**
+- `src/stores/actionPendingStore.ts` — pending, resolved, claim state
+- `src/components/ActionPendingOverlay.tsx` — player-facing floating notifications
 
-Wire `emitAuraState()` (already exists in `effectHandlers.ts`) to be called from the aura tick loop in SimpleTabletop so remote clients receive aura updates.
-
-**Files:**
-- `src/components/SimpleTabletop.tsx` — call `emitAuraState()` after `tickAuras()` returns events
-
----
-
-## Priority 4 — Action Resolution Coordination & Player Visibility
-
-### Problem
-
-Action Card resolution (attack rolls, damage, pass/fail, impact application) is **DM-only** work. Currently:
-- The Action Card is visible to all roles — players could see and interact with resolution controls.
-- No coordination exists to prevent multiple DMs from resolving the same action simultaneously.
-- Players have no visual cue that a DM action resolution is pending.
-
-### Requirements
-
-1. **Action Card is DM-only.** Players MUST NOT see the resolution UI (impact buttons, hit/miss/half toggles, damage overrides, commit/cancel). The `ACTION_CARD` type must be added to `DM_ONLY_CARD_TYPES`.
-
-2. **DM coordination for resolution.** When multiple DM sessions exist:
-   - The action queue already syncs via `action.queue.sync` ephemeral op.
-   - Only one DM should resolve at a time. Approach: **optimistic lock** — when a DM starts resolving a target (clicks hit/miss), broadcast a `action.resolution.claim` ephemeral op with the action ID and DM peer ID. Other DMs see a "Being resolved by [DM name]" indicator and their resolution controls are disabled for that action.
-   - On commit/cancel, the claim is released and the updated queue syncs to all DMs.
-
-3. **Player-facing visual cues for pending resolutions.** Players need to know something is happening without seeing DM-only data. Options (implement one or more):
-   - **Line of intent / effect template overlay:** Already drawn for targeting — keep it visible during the resolve phase until commit/dismiss. The animated arcane line from caster to target or the effect shape stays rendered on the canvas.
-   - **Toast / log entry:** A non-interactive toast or log line: *"[Caster] is resolving [Attack/Spell Name] against [Target(s)]..."* that auto-dismisses on commit.
-   - **Token pulse effect:** Target tokens get a subtle pulsing ring (similar to hover rings) in a distinct color (amber/orange) indicating "pending resolution."
-   - **Action history feed:** Players see committed (resolved) action results in a read-only history log — they see outcomes but not the resolution controls.
-
-### Recommended Approach
-
-- **Phase A:** Gate `ACTION_CARD` as DM-only (immediate, simple).
-- **Phase B:** Add a lightweight `action.pending` ephemeral op that broadcasts `{ actionId, sourceName, attackName, targetNames[] }` to all peers. Player UI renders a toast or canvas overlay showing pending resolution. Auto-clears on commit/cancel.
-- **Phase C:** Add `action.resolution.claim` ephemeral op for multi-DM coordination (only needed when multi-DM sessions are common).
-- **Phase D:** Player-facing resolved action history — a read-only feed of committed action outcomes.
+**Files changed:**
+- `src/lib/net/ephemeral/types.ts` — 3 new op kinds + payloads + configs
+- `src/lib/net/ephemeral/miscHandlers.ts` — inbound handlers
+- `src/stores/actionStore.ts` — emission on confirmTargets, startEffectAction, commitAction, cancelAction
+- `src/components/SimpleTabletop.tsx` — mounts ActionPendingOverlay
 
 ---
 
 ## Priority 5 — Remaining Stub Emitters (Lower Priority)
 
-These have handlers+stores but no emitters. Wire them as the UI features mature:
+These have handlers + stores but no emitters. Wire them as the UI features mature:
 
 - `chat.typing` — emit from chat input in NetworkDemoCard or future chat UI
 - `action.flash` / `action.inProgress` — emit from action resolution system
@@ -151,12 +120,12 @@ These have handlers+stores but no emitters. Wire them as the UI features mature:
 ## Implementation Order
 
 ```
-P1: Token Drag → Ephemeral Migration
-P2: Token Position Sync (10Hz)
-P3: Aura State Emission
-P4a: Gate ACTION_CARD as DM-only         ← done in this commit
-P4b: action.pending ephemeral op + player toast/overlay
-P4c: action.resolution.claim for multi-DM coordination
-P4d: Player-facing resolved action history feed
-P5: Remaining stub emitters (as needed)
+P1: Token Drag → Ephemeral Migration       ✅ v0.6.80
+P2: Token Position Sync (10Hz)             ✅ v0.6.81
+P3: Aura State Emission                    ✅ (pre-existing)
+P4a: Gate ACTION_CARD as DM-only           ✅ v0.6.79
+P4b: action.pending ephemeral op           ✅ v0.6.82
+P4c: action.resolution.claim               ✅ v0.6.82
+P4d: Player-facing resolved history feed   ✅ v0.6.82
+P5: Remaining stub emitters                🔲 (as needed)
 ```
