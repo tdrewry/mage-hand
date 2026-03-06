@@ -205,6 +205,13 @@ export interface RoleHandRaisePayload {
   /** empty = hand raised; receiver uses userId from envelope */
 }
 
+export interface RoleAssignPayload {
+  /** The userId of the target user whose roles are being changed */
+  targetUserId: string;
+  /** The new set of roleIds for the target user */
+  roleIds: string[];
+}
+
 export interface PresenceActivityPayload {
   activity: string; // e.g. "editing map", "viewing tokens"
 }
