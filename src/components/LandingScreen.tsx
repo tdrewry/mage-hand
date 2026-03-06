@@ -465,6 +465,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
       }
 
+      // Set rendering mode based on selected role (Players always get play)
+      if (!isDMSelected) {
+        useDungeonStore.getState().setRenderingMode('play');
+      }
+
       toast.success('Session loaded');
       onLaunch();
     } catch (err) {
@@ -492,7 +497,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       icon: Play,
       disabled: !hasSession,
       active: hasSession,
-      onClick: onLaunch,
+      onClick: () => commitIdentityAndLaunch(onLaunch),
     },
     {
       id: 'new',
