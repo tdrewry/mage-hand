@@ -335,7 +335,24 @@ export const SimpleTabletop = () => {
     if (!followDM || !dmViewport) return;
     setTransformState({ x: dmViewport.x, y: dmViewport.y, zoom: dmViewport.zoom });
   }, [followDM, dmViewport]);
-  
+
+  // ── Map Focus: DM one-shot pan command — non-DM players auto-pan to focus target ──
+  const mapFocusCommand = useMapEphemeralStore((s) => s.focus);
+  useEffect(() => {
+    if (!mapFocusCommand || isDM) return; // Only players respond to focus commands
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const canvasWidth = canvasEl.width;
+    const canvasHeight = canvasEl.height;
+    const zoom = mapFocusCommand.zoom ?? transform.zoom;
+    // Center the viewport on the focus position
+    const newX = canvasWidth / 2 - mapFocusCommand.pos.x * zoom;
+    const newY = canvasHeight / 2 - mapFocusCommand.pos.y * zoom;
+    setTransformState({ x: newX, y: newY, zoom });
+    // Clear after consuming
+    useMapEphemeralStore.getState().setFocus(null);
+  }, [mapFocusCommand, isDM]);
+
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
   const transformRef = useRef(transform);
