@@ -27,6 +27,7 @@ export type {
   CursorVisibilityPayload,
   FogCursorPreviewPayload,
   ChatTypingPayload,
+  ChatMessagePayload,
   DiceRollingPayload,
   ActionTargetPreviewPayload,
   ActionPendingPayload,
@@ -37,4 +38,4 @@ export type {
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
 export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
-export { emitChatTyping } from "./miscHandlers";
+export { emitChatTyping, emitChatMessage } from "./miscHandlers";
