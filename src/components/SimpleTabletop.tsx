@@ -120,6 +120,7 @@ import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
 import { CursorOverlay } from "./CursorOverlay";
+import { ActionPendingOverlay } from "./ActionPendingOverlay";
 import { useCursorStore } from "@/stores/cursorStore";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
