@@ -4166,6 +4166,7 @@ export const SimpleTabletop = () => {
       drawRemoteTokenHovers(ctx);
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
+      drawRemoteHandlePreviews(ctx);
       drawMapPings(ctx);
     }
 
@@ -4276,6 +4277,7 @@ export const SimpleTabletop = () => {
             drawRemoteTokenHovers(overlayCtx);
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
+            drawRemoteHandlePreviews(overlayCtx);
 
             overlayCtx.restore();
           }
