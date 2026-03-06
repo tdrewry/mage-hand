@@ -1,6 +1,7 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense } from 'react';
 import { LandingScreen } from '@/components/LandingScreen';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useLaunchStore } from '@/stores/launchStore';
 
 const SimpleTabletop = React.lazy(() => import('../components/SimpleTabletop'));
 
@@ -14,7 +15,8 @@ const LoadingScreen = () => (
 );
 
 const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
-  const [launched, setLaunched] = useState(false);
+  const launched = useLaunchStore((s) => s.launched);
+  const setLaunched = useLaunchStore((s) => s.setLaunched);
   const players = useSessionStore((state) => state.players);
 
   // A session exists if at least one player has been assigned a name
