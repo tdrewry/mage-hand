@@ -5,6 +5,7 @@ import { ephemeralBus } from "@/lib/net";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useFogStore } from "@/stores/fogStore";
 import { useActionStore } from "@/stores/actionStore";
+import { useActionPendingStore } from "@/stores/actionPendingStore";
 import type {
   FogCursorPreviewPayload,
   FogRevealPreviewPayload,
@@ -17,6 +18,9 @@ import type {
   RoleHandRaisePayload,
   AssetUploadProgressPayload,
   ActionQueueSyncPayload,
+  ActionPendingPayload,
+  ActionResolvedPayload,
+  ActionResolutionClaimPayload,
 } from "./types";
 
 let registered = false;
@@ -75,6 +79,36 @@ export function registerMiscHandlers(): void {
   // ── Actions (DM queue sync) ──
   ephemeralBus.on("action.queue.sync", (data: ActionQueueSyncPayload, _userId) => {
     useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory);
+  });
+
+  // ── Action Pending (broadcast to all — players see toast) ──
+  ephemeralBus.on("action.pending", (data: ActionPendingPayload, _userId) => {
+    useActionPendingStore.getState().setPending({
+      ...data,
+      receivedAt: Date.now(),
+    });
+  });
+
+  // ── Action Resolved (broadcast to all — players see outcome summary) ──
+  ephemeralBus.on("action.resolved", (data: ActionResolvedPayload, _userId) => {
+    useActionPendingStore.getState().addResolved({
+      ...data,
+      receivedAt: Date.now(),
+    });
+  });
+
+  // ── Action Resolution Claim (multi-DM coordination) ──
+  ephemeralBus.on("action.resolution.claim", (data: ActionResolutionClaimPayload, _userId) => {
+    if (data.claimedBy) {
+      useActionPendingStore.getState().setClaim(data.actionId, {
+        actionId: data.actionId,
+        claimedBy: data.claimedBy,
+        claimedByName: data.claimedByName || "Unknown DM",
+        receivedAt: Date.now(),
+      });
+    } else {
+      useActionPendingStore.getState().setClaim(data.actionId, null);
+    }
   });
 
   // ── Assets ──
