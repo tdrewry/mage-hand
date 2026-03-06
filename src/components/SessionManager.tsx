@@ -64,8 +64,10 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     roles,
     permissions,
     lastError,
+    activeTransport,
     setServerUrl,
     setCurrentUsername,
+    setActiveTransport,
   } = useMultiplayerStore();
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
