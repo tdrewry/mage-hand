@@ -160,8 +160,59 @@ export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentP
         </TabsContent>
       </Tabs>
       
+      {/* DM Focus button */}
+      {(() => {
+        const players = useSessionStore((s) => s.players);
+        const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+        const currentPlayer = players.find((p) => p.id === currentPlayerId);
+        const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+
+        if (!isDM) return null;
+
+        const handleFocusPlayers = () => {
+          // Get the active map's viewport transform to compute world-space center
+          const maps = useMapStore.getState().maps;
+          const activeMap = maps.find((m: any) => m.isActive) || maps[0];
+          const mapId = activeMap?.id || 'default-map';
+          const vt = useSessionStore.getState().getViewportTransform(mapId);
+          
+          // Approximate viewport center in world coords
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const centerX = (-vt.x + vw / 2) / vt.zoom;
+          const centerY = (-vt.y + vh / 2) / vt.zoom;
+          
+          emitMapFocus({ x: centerX, y: centerY }, vt.zoom);
+          toast.success('Focus command sent to all players');
+        };
+
+        return (
+          <Button
+            onClick={handleFocusPlayers}
+            size="sm"
+            variant="outline"
+            className="w-full text-xs mt-2"
+          >
+            <Crosshair className="h-3 w-3 mr-1" />
+            Focus Players Here
+          </Button>
+        );
+      })()}
+
       <div className="text-xs text-muted-foreground mt-4">
         Maps will be placed at the origin and can be moved/resized after placement.
+        {(() => {
+          const players = useSessionStore((s) => s.players);
+          const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+          const currentPlayer = players.find((p) => p.id === currentPlayerId);
+          const isDM = currentPlayer?.roleIds?.includes('dm') || false;
+          if (!isDM) return null;
+          return (
+            <span className="block mt-1 text-muted-foreground/60">
+              Tip: You can also Ctrl+Shift+Click on the map to focus players on a specific spot.
+            </span>
+          );
+        })()}
       </div>
     </div>
   );
