@@ -40,6 +40,9 @@ import { useDiceStore } from "@/stores/diceStore";
 
 let _fromJazz = false;
 
+/** Whether the local client created this session (source of truth for initial state) */
+let _isCreator = false;
+
 /** Returns true when the current store mutation originated from Jazz (inbound sync). */
 export function isFromJazz(): boolean {
   return _fromJazz;
@@ -256,6 +259,20 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   try {
     const state = JSON.parse(stateJson);
     const hash = quickHash(stateJson);
+
+    // ── Guard against destructive hydration ──
+    // If inbound state looks empty but local store has data, skip the hydration.
+    // This prevents Jazz propagation delays from wiping the DM's populated stores.
+    const inboundEmpty = isEmptyState(state);
+    if (inboundEmpty) {
+      const localState = reg.extractor();
+      const localEmpty = isEmptyState(localState);
+      if (!localEmpty) {
+        console.warn(`[jazz-bridge] ✋ Blocked destructive hydration for "${kind}" — inbound is empty but local has data`);
+        return;
+      }
+    }
+
     _lastPushedHash.set(kind, hash); // prevent echo
 
     runFromJazz(() => {
@@ -265,6 +282,24 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   } catch (err) {
     console.error(`[jazz-bridge] Blob pull error for ${kind}:`, err);
   }
+}
+
+/** Heuristic: check if a state object is "empty" (null, empty array, or object with only empty arrays/nulls) */
+function isEmptyState(state: unknown): boolean {
+  if (state == null) return true;
+  if (Array.isArray(state)) return state.length === 0;
+  if (typeof state === 'object') {
+    const values = Object.values(state as Record<string, unknown>);
+    if (values.length === 0) return true;
+    // Consider it empty if all values are null, undefined, empty arrays, or empty objects
+    return values.every(v => 
+      v == null || 
+      (Array.isArray(v) && v.length === 0) ||
+      (typeof v === 'object' && !Array.isArray(v) && v !== null && Object.keys(v).length === 0) ||
+      v === false || v === 0 || v === ''
+    );
+  }
+  return false;
 }
 
 // ── Push: Zustand → Jazz ───────────────────────────────────────────────────
@@ -364,7 +399,15 @@ export function pullTokensFromJazz(sessionRoot: any): void {
   }
 
   const len = jazzTokens.length ?? 0;
-  console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz`);
+  const localTokenCount = useSessionStore.getState().tokens.length;
+
+  // Guard: don't wipe populated local tokens with empty Jazz tokens
+  if (len === 0 && localTokenCount > 0) {
+    console.warn(`[jazz-bridge] ✋ Blocked token pull — Jazz has 0 tokens but local has ${localTokenCount}`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz (local had ${localTokenCount})`);
 
   runFromJazz(() => {
     const store = useSessionStore.getState();
@@ -443,9 +486,11 @@ function throttledPushBlob(kind: string): void {
 
 /**
  * Start the bidirectional bridge for tokens + all DO blob kinds.
+ * @param isCreator — true if this client created the session (authority for initial state)
  */
-export function startBridge(sessionRoot: any): void {
+export function startBridge(sessionRoot: any, isCreator = false): void {
   _sessionRoot = sessionRoot;
+  _isCreator = isCreator;
   // Cache child refs immediately while the proxy is still live
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
@@ -454,6 +499,7 @@ export function startBridge(sessionRoot: any): void {
     tokens: !!_cachedTokens,
     blobs: !!_cachedBlobs,
     group: !!_cachedGroup,
+    isCreator,
   });
 
   // ── Token sync: Direction 1 (Zustand → Jazz) ──
@@ -539,11 +585,19 @@ export function startBridge(sessionRoot: any): void {
         (tokens: any) => {
           if (!tokens) return;
 
+          const len = tokens.length ?? 0;
+          const localTokens = useSessionStore.getState().tokens;
+
+          // Guard: don't wipe populated local tokens with empty Jazz echo
+          if (len === 0 && localTokens.length > 0) {
+            console.warn(`[jazz-bridge] ✋ Blocked inbound token sync — Jazz has 0 but local has ${localTokens.length}`);
+            return;
+          }
+
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const currentIds = new Set(store.tokens.map((t) => t.id));
             const jazzIds = new Set<string>();
-            const len = tokens.length ?? 0;
 
             for (let i = 0; i < len; i++) {
               const jt = tokens[i];
@@ -561,10 +615,14 @@ export function startBridge(sessionRoot: any): void {
               }
             }
 
-            for (const t of store.tokens) {
-              if (!jazzIds.has(t.id)) {
-                store.removeToken(t.id);
-                console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+            // Only remove local tokens that Jazz doesn't have if we're NOT the creator
+            // The creator is the authority — Jazz may not have propagated yet
+            if (!_isCreator) {
+              for (const t of store.tokens) {
+                if (!jazzIds.has(t.id)) {
+                  store.removeToken(t.id);
+                  console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+                }
               }
             }
           });
@@ -644,5 +702,6 @@ export function stopBridge(): void {
   _cachedTokens = null;
   _cachedBlobs = null;
   _cachedGroup = null;
+  _isCreator = false;
   console.log("[jazz-bridge] Bridge stopped");
 }

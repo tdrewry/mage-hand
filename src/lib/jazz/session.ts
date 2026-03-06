@@ -73,8 +73,8 @@ export function createJazzSession(name: string): JazzSessionInfo {
   // Push current Zustand state into the new Jazz session
   pushAllToJazz(root);
   
-  // Start the bidirectional bridge
-  startBridge(root);
+  // Start the bidirectional bridge (creator = source of truth)
+  startBridge(root, true);
 
   // Host is always sync-ready (they own the data)
   useMultiplayerStore.getState().setSyncReady(true);
@@ -157,8 +157,8 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   useMultiplayerStore.getState().setSyncReady(false);
   pullAllFromJazz(root);
   
-  // Start the bidirectional bridge
-  startBridge(root);
+  // Start the bidirectional bridge (joiner = NOT the authority)
+  startBridge(root, false);
 
   // Check if initial pull got meaningful data
   const hasData = !!(root.tokens?.length || root.blobs?.length);
