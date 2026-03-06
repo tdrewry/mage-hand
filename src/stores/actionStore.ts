@@ -649,8 +649,7 @@ export const useActionStore = create<ActionStore>()(
     });
 
     // Broadcast action flashes to all peers
-    try {
-      const { ephemeralBus } = await import("@/lib/net");
+    import("@/lib/net").then(({ ephemeralBus }) => {
       for (const flash of flashes) {
         const result = flash.color === 'hit' ? 'hit' : 'miss';
         ephemeralBus.emit("action.flash", {
@@ -658,7 +657,7 @@ export const useActionStore = create<ActionStore>()(
           result,
         });
       }
-    } catch (_) { /* net not available */ }
+    }).catch(() => { /* net not available */ });
 
     // Broadcast resolved outcome to all peers (players see summary)
     broadcastActionResolved(currentAction);
