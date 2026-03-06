@@ -375,6 +375,9 @@ export interface EphemeralPayloadMap {
   "action.resolved": ActionResolvedPayload;
   "action.resolution.claim": ActionResolutionClaimPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
+  "asset.submission": AssetSubmissionPayload;
+  "asset.accepted": AssetAcceptedPayload;
+  "asset.rejected": AssetRejectedPayload;
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
 }
@@ -457,6 +460,9 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
+  "asset.submission":       { throttleMs: 0,   ttlMs: 60000, keyStrategy: "none" },
+  "asset.accepted":         { throttleMs: 0,   ttlMs: 10000, keyStrategy: "none", dmOnly: true },
+  "asset.rejected":         { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "none", dmOnly: true },
 
   // Effects & Auras
   "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
