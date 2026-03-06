@@ -24,6 +24,7 @@ import type {
   GroupSelectPreviewPayload,
   GroupDragPreviewPayload,
   RoleHandRaisePayload,
+  RoleAssignPayload,
   AssetUploadProgressPayload,
   AssetSubmissionPayload,
   AssetAcceptedPayload,
@@ -94,6 +95,19 @@ export function registerMiscHandlers(): void {
   // ── Roles ──
   ephemeralBus.on("role.handRaise", (_data: RoleHandRaisePayload, userId) => {
     store.getState().setHandRaise(userId);
+  });
+
+  // ── Role Assignment (DM → all) ──
+  ephemeralBus.on("role.assign", (data: RoleAssignPayload, _userId) => {
+    const myUserId = useMultiplayerStore.getState().currentUserId;
+    // Update the connected user's roles in the multiplayer store
+    useMultiplayerStore.getState().updateUserRoles(data.targetUserId, data.roleIds);
+    
+    // If this change targets us, update our own roles
+    if (data.targetUserId === myUserId) {
+      useMultiplayerStore.getState().setRoles(data.roleIds);
+      toast.info(`Your roles have been updated to: ${data.roleIds.join(', ')}`, { duration: 5000 });
+    }
   });
 
   // ── Actions (DM queue sync) ──
