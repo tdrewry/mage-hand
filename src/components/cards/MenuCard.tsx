@@ -448,7 +448,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           Network Demo
         </Button>
 
-        {isDM && (
+        {canControlUiMode && (
           <Button
             variant={artApprovalCard?.isVisible ? "default" : "outline"}
             size="sm"
@@ -470,7 +470,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             }}
             className="w-full"
           >
-            <ImageIcon className="h-4 w-4 mr-2" />
+            <Radio className="h-4 w-4 mr-2" />
             Art Approval
           </Button>
         )}
