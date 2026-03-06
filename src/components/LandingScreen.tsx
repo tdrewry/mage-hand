@@ -298,11 +298,8 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       isConnected: true,
     });
 
-    if (hasSession) {
-      setShowLoadConfirm(true);
-    } else {
-      fileInputRef.current?.click();
-    }
+    // Always open file picker directly from landing page — no confirmation needed
+    fileInputRef.current?.click();
   };
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -313,12 +310,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     setIsLoading(true);
     try {
       const data = await importProjectFromFile(file);
-      setPendingLoadData(data);
-      if (!hasSession) {
-        // No existing session — apply immediately
-        await applyAndLaunch(data);
-      }
-      // If hasSession, we already confirmed above; apply now
+      await applyAndLaunch(data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load session file');
