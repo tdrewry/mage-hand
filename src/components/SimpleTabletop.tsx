@@ -126,7 +126,7 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
@@ -976,6 +976,9 @@ export const SimpleTabletop = () => {
     if (lightIds.length > 0) {
       selectMultipleLights(lightIds);
     }
+
+    // ── EPHEMERAL: broadcast group selection preview ──
+    emitGroupSelectPreview(group.id);
 
     return true;
   }, [clearSelection, selectRegion, selectMultipleLights]);
@@ -8952,6 +8955,10 @@ export const SimpleTabletop = () => {
         width: newW,
         height: newH,
       });
+
+      // ── EPHEMERAL: broadcast mapObject scale handle preview ──
+      emitMapObjectHandlePreview(snap.id, "scale", { x: worldPos.x, y: worldPos.y });
+
       redrawCanvas();
     } else if (isRotatingMapObject && rotatingMapObjectId) {
       // MapObject rotation drag — uses SNAPSHOT positions to prevent compounding delta.
@@ -8962,6 +8969,9 @@ export const SimpleTabletop = () => {
       const pivotY = pivot.y;
       const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
       const rotationDelta = currentAngle - mapObjectRotationStartAngle;
+
+      // ── EPHEMERAL: broadcast mapObject rotation handle preview ──
+      emitMapObjectHandlePreview(rotatingMapObjectId, "rotate", { x: worldPos.x, y: worldPos.y }, rotationDelta);
       const rad = (rotationDelta * Math.PI) / 180;
       const cos = Math.cos(rad); const sin = Math.sin(rad);
 
@@ -9181,6 +9191,8 @@ export const SimpleTabletop = () => {
         // already-moved position from the previous frame.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group && (deltaX !== 0 || deltaY !== 0)) {
+          // ── EPHEMERAL: broadcast group drag preview ──
+          emitGroupDragPreview(group.id, { x: deltaX, y: deltaY });
           // Collect all region IDs in the group (including primary) for annotation/terrain propagation
           const groupRegionIds = new Set<string>();
           groupRegionIds.add(draggedRegionId);
@@ -9295,6 +9307,9 @@ export const SimpleTabletop = () => {
         // Read from the ref (not React state) to avoid stale-closure issues on the first mousemove.
         const currentAngle = calculateAngle(pivotX, pivotY, worldPos.x, worldPos.y);
         const rotationDelta = currentAngle - rotationStartAngleRef.current;
+
+        // ── EPHEMERAL: broadcast region rotation handle preview ──
+        emitRegionHandlePreview(draggedRegionId, "rotate", { x: worldPos.x, y: worldPos.y }, rotationDelta);
 
         // Commit the rotation of the PRIMARY dragged region to the store every frame so
         // that on mouseup the store has the correct final value (prevents snap-back).

@@ -37,21 +37,21 @@ All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–5 have
 
 | Op Kind | Handler | Store | Emitter | Rendering |
 |---------|---------|-------|---------|-----------|
-| `token.handle.preview` | ✅ | ✅ | ❌ | ❌ |
-| `region.handle.preview` | ✅ | ✅ | ❌ | ❌ |
-| `mapObject.handle.preview` | ✅ | ✅ | ❌ | ❌ |
+| `token.handle.preview` | ✅ | ✅ | ❌ | Emitter in mapHandlers (v0.6.92) |
+| `region.handle.preview` | ✅ | ✅ | ❌ | Emitter wired in SimpleTabletop rotation (v0.6.92) |
+| `mapObject.handle.preview` | ✅ | ✅ | ❌ | Emitter wired in SimpleTabletop rotation+scale (v0.6.92) |
 | `map.focus` | ✅ | ✅ | ❌ | ❌ |
 | `chat.typing` | ✅ | ✅ | ✅ | **Wired in ChatCard input (P5 ✅ v0.6.86)** |
 | `chat.message` | ✅ | ✅ | ✅ | **Wired in chatStore (v0.6.88)** |
 | `initiative.drag.preview` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
 | `initiative.hover` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
-| `group.select.preview` | ✅ | ✅ | ❌ | ❌ |
-| `group.drag.preview` | ✅ | ✅ | ❌ | ❌ |
+| `group.select.preview` | ✅ | ✅ | ❌ | Emitter wired in propagateGroupSelection (v0.6.92) |
+| `group.drag.preview` | ✅ | ✅ | ❌ | Emitter wired in region group drag (v0.6.92) |
 | `asset.uploadProgress` | ✅ | ✅ | ❌ | ❌ |
 | `effect.placement.preview` | ✅ | ✅ | ✅ | **Wired in effectStore (P5 ✅ v0.6.86)** |
 | `action.flash` | ✅ | ✅ | ✅ | **Wired in commitAction (P5 ✅ v0.6.86)** |
 | `action.inProgress` | ✅ | ✅ | ✅ | **Wired in actionStore phases (P6 ✅ v0.6.90)** |
-| `mapObject.door.preview` | ✅ | ✅ | ❌ | ❌ |
+| `mapObject.door.preview` | ✅ | ✅ | ✅ | **Emitter wired in mapObjectStore.toggleDoor (v0.6.92)** |
 
 ---
 
@@ -129,10 +129,9 @@ The three core P5 stub emitters are now wired:
 
 These still have handlers + stores but no emitters. Wire as UI features mature:
 
-- `mapObject.door.preview` — emit when toggling door open/close
-- Handle previews (`token/region/mapObject.handle.preview`) — emit when rotate/scale handles are dragged
-- Group ops — emit from group selection/drag
+- `map.focus` — emit when DM triggers a focus command
 - `asset.uploadProgress` — emit during asset upload flows
+- Handle preview rendering — the emitters are wired but no remote ghost overlays are rendered yet for handle previews
 
 ---
 
@@ -150,5 +149,5 @@ P5: Core stub emitters (chat/flash/effect) ✅ v0.6.86
 P5+: Chat UI + menu buttons               ✅ v0.6.87
 P6a: action.inProgress emitter             ✅ v0.6.90
 P6b: initiative.drag/hover emitters        ✅ v0.6.90
-P7: Remaining stub emitters                🔲 (as needed)
+P7: Remaining stub emitters                ✅ v0.6.92 (door, handles, groups)
 ```
