@@ -211,7 +211,7 @@ function pushBlobToJazz(kind: string): void {
     if (_lastPushedHash.get(kind) === hash) return;
     _lastPushedHash.set(kind, hash);
 
-    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
     const idx = findBlobIndex(kind);
 
     if (idx >= 0) {
@@ -282,7 +282,7 @@ export function pushTokensToJazz(sessionRoot: any): void {
 
   console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz`);
 
-  const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
   console.log("[jazz-bridge] Token push group:", group ? "found" : "MISSING", typeof group);
 
   for (const t of tokens) {
@@ -301,7 +301,7 @@ export function pushTokensToJazz(sessionRoot: any): void {
  * Push all DO blob states to Jazz.
  */
 export function pushBlobsToJazz(sessionRoot: any): void {
-  const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
   console.log("[jazz-bridge] Blob push group:", group ? "found" : "MISSING", typeof group);
 
   if (!sessionRoot.blobs) {
@@ -449,7 +449,7 @@ export function startBridge(sessionRoot: any): void {
   // Cache child refs immediately while the proxy is still live
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
-  _cachedGroup = sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
+  _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
     blobs: !!_cachedBlobs,
@@ -465,7 +465,7 @@ export function startBridge(sessionRoot: any): void {
     const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
     if (!jazzTokens) { prevTokens = tokens; return; }
 
-    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
 
       // Detect added tokens
       const prevIds = new Set(prevTokens.map((t: Token) => t.id));
