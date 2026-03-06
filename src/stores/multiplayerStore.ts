@@ -36,6 +36,9 @@ export interface MultiplayerState {
   lastSyncTimestamp: number;
   syncErrors: string[];
   
+  /** True once initial durable state pull (Jazz blobs) has completed after joining a session */
+  syncReady: boolean;
+  
   /** True once persist middleware has finished rehydrating from localStorage. */
   _rehydrated: boolean;
   
@@ -54,6 +57,7 @@ export interface MultiplayerState {
   setLastError: (error: string | null) => void;
   setActiveTransport: (transport: TransportType | null) => void;
   setSyncing: (syncing: boolean) => void;
+  setSyncReady: (ready: boolean) => void;
   updateLastSyncTimestamp: () => void;
   addSyncError: (error: string) => void;
   clearSyncErrors: () => void;
@@ -80,6 +84,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
+      syncReady: false,
       _rehydrated: false,
       
       // Actions
@@ -116,6 +121,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setActiveTransport: (transport) => set({ activeTransport: transport }),
       
       setSyncing: (syncing) => set({ isSyncing: syncing }),
+      setSyncReady: (ready) => set({ syncReady: ready }),
       updateLastSyncTimestamp: () => set({ lastSyncTimestamp: Date.now() }),
       
       addSyncError: (error) => set((state) => ({
@@ -136,7 +142,8 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         activeTransport: null,
         isSyncing: false,
         lastSyncTimestamp: 0,
-        syncErrors: []
+        syncErrors: [],
+        syncReady: false
       })
     }),
     {
@@ -159,6 +166,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
             state.lastError = null;
             state.isSyncing = false;
             state.syncErrors = [];
+            state.syncReady = false;
             state._rehydrated = true;
           }
         };

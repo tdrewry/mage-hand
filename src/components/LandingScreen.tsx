@@ -134,7 +134,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   };
 
   // Multiplayer state
-  const { isConnected, connectionStatus, currentSession, connectedUsers } = useMultiplayerStore();
+  const { isConnected, connectionStatus, currentSession, connectedUsers, syncReady } = useMultiplayerStore();
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
 
   // --- New Session ---
@@ -246,10 +246,12 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     {
       id: 'continue',
       label: 'Continue',
-      description: hasSession ? 'Resume your current session' : 'No active session in memory',
+      description: isConnected && !syncReady
+        ? 'Syncing session data…'
+        : hasSession ? 'Resume your current session' : 'No active session in memory',
       icon: Play,
-      disabled: !hasSession || !isIdentityReady,
-      active: hasSession && isIdentityReady,
+      disabled: !hasSession || !isIdentityReady || (isConnected && !syncReady),
+      active: hasSession && isIdentityReady && (!isConnected || syncReady),
       onClick: () => commitIdentityAndLaunch(onLaunch),
     },
     {
