@@ -71,6 +71,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const networkDemoCard = cards.find((c) => c.type === CardType.NETWORK_DEMO);
   const chatCard = cards.find((c) => c.type === CardType.CHAT);
   const actionCard = cards.find((c) => c.type === CardType.ACTION_CARD);
+  const artApprovalCard = cards.find((c) => c.type === CardType.ART_APPROVAL);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -446,6 +447,33 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Radio className="h-4 w-4 mr-2" />
           Network Demo
         </Button>
+
+        {isDM && (
+          <Button
+            variant={artApprovalCard?.isVisible ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (artApprovalCard) {
+                setVisibility(artApprovalCard.id, !artApprovalCard.isVisible);
+              } else {
+                registerCard({
+                  type: CardType.ART_APPROVAL,
+                  title: 'Art Approval',
+                  defaultPosition: { x: 360, y: 120 },
+                  defaultSize: { width: 340, height: 420 },
+                  minSize: { width: 280, height: 300 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+            }}
+            className="w-full"
+          >
+            <ImageIcon className="h-4 w-4 mr-2" />
+            Art Approval
+          </Button>
+        )}
       </div>
 
       <Separator />
