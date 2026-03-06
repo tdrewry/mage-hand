@@ -7,6 +7,7 @@ import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
 import { isEphemeralOp } from "./ephemeral";
 import type { EphemeralOpKind } from "./ephemeral";
+import { stopPositionSync } from "./tokenPositionSync";
 import { toast } from "sonner";
 
 export type NetConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -232,7 +233,6 @@ export class NetManager {
       console.log("🔌 [NetManager] Disconnected:", code, reason);
 
       // Stop 10Hz token position sync loop
-      const { stopPositionSync } = require("./tokenPositionSync") as typeof import("./tokenPositionSync");
       stopPositionSync();
 
       if (!this._intentionalDisconnect && this._autoReconnect && this._lastConnectParams) {
