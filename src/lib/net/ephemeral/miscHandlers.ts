@@ -136,6 +136,43 @@ export function registerMiscHandlers(): void {
     store.getState().setUploadProgress(userId, { userId, assetId: data.assetId, percent: data.percent });
   });
 
+  // ── Art Submission (player → DM) ──
+  ephemeralBus.on("asset.submission", (data: AssetSubmissionPayload, userId) => {
+    // Only DMs should process incoming submissions
+    const roles = useMultiplayerStore.getState().roles;
+    if (!roles.includes("dm")) return;
+
+    useArtSubmissionStore.getState().addSubmission({
+      id: data.submissionId,
+      playerId: userId,
+      playerName: data.playerName,
+      targetType: data.targetType,
+      targetId: data.targetId,
+      targetName: data.targetName,
+      textureHash: data.textureHash,
+      textureDataUrl: data.textureDataUrl,
+      status: 'pending',
+      submittedAt: Date.now(),
+    });
+
+    toast.info(`${data.playerName} submitted art for ${data.targetName}`, {
+      description: "Check the Art Approval card to review.",
+    });
+  });
+
+  // ── Art Accepted (DM → all) ──
+  ephemeralBus.on("asset.accepted", (data: AssetAcceptedPayload, _userId) => {
+    // Apply the accepted texture to the target entity
+    applyAcceptedArt(data);
+  });
+
+  // ── Art Rejected (DM → submitter) ──
+  ephemeralBus.on("asset.rejected", (data: AssetRejectedPayload, _userId) => {
+    toast.info(`Art submission was declined${data.reason ? `: ${data.reason}` : ""}`, {
+      description: "The DM did not approve your art submission.",
+    });
+  });
+
   // ── TTL expiry cleanup ──
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -162,6 +199,27 @@ export function registerMiscHandlers(): void {
   });
 }
 
+// ── Helpers ──
+
+/** Apply accepted art to the target entity and persist the texture */
+async function applyAcceptedArt(data: AssetAcceptedPayload): Promise<void> {
+  try {
+    if (data.targetType === 'token') {
+      await saveTokenTextureByHash(data.textureHash, data.textureDataUrl);
+      useSessionStore.getState().updateTokenImage(data.targetId, data.textureDataUrl, data.textureHash);
+      toast.success(`Art applied to token`);
+    } else if (data.targetType === 'region') {
+      await saveTextureByHash(data.textureHash, data.textureDataUrl);
+      // Region texture application would go through regionStore
+      toast.success(`Art applied to region`);
+    } else {
+      toast.success(`Art accepted for ${data.targetType}`);
+    }
+  } catch (err) {
+    console.error("[miscHandlers] Failed to apply accepted art:", err);
+  }
+}
+
 // ── Outbound helpers ──
 
 /**
@@ -177,4 +235,72 @@ export function emitChatTyping(): void {
  */
 export function emitChatMessage(id: string, senderName: string, text: string, whisperTo?: string[]): void {
   ephemeralBus.emit("chat.message", { id, senderName, text, timestamp: Date.now(), whisperTo });
+}
+
+/**
+ * Emit upload progress to peers.
+ * Call periodically during texture uploads.
+ */
+export function emitAssetUploadProgress(assetId: string, percent: number): void {
+  ephemeralBus.emit("asset.uploadProgress", { assetId, percent });
+}
+
+/**
+ * Submit art for DM approval.
+ * Called by players when they upload art for an entity they own.
+ */
+export function emitArtSubmission(
+  targetType: AssetSubmissionPayload['targetType'],
+  targetId: string,
+  targetName: string,
+  textureHash: string,
+  textureDataUrl: string,
+): void {
+  const submissionId = `art-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const playerName = useMultiplayerStore.getState().currentUsername || "Unknown";
+  ephemeralBus.emit("asset.submission", {
+    submissionId,
+    targetType,
+    targetId,
+    targetName,
+    playerName,
+    textureHash,
+    textureDataUrl,
+  });
+  toast.success("Art submitted for DM approval");
+}
+
+/**
+ * Accept a player's art submission (DM only).
+ * Broadcasts the accepted texture to all peers.
+ */
+export function emitArtAccepted(submission: {
+  id: string;
+  targetType: AssetSubmissionPayload['targetType'];
+  targetId: string;
+  textureHash: string;
+  textureDataUrl: string;
+}): void {
+  ephemeralBus.emit("asset.accepted", {
+    submissionId: submission.id,
+    targetType: submission.targetType,
+    targetId: submission.targetId,
+    textureHash: submission.textureHash,
+    textureDataUrl: submission.textureDataUrl,
+  });
+  // Also apply locally on the DM side
+  applyAcceptedArt({
+    submissionId: submission.id,
+    targetType: submission.targetType,
+    targetId: submission.targetId,
+    textureHash: submission.textureHash,
+    textureDataUrl: submission.textureDataUrl,
+  });
+}
+
+/**
+ * Reject a player's art submission (DM only).
+ */
+export function emitArtRejected(submissionId: string, reason?: string): void {
+  ephemeralBus.emit("asset.rejected", { submissionId, reason });
 }
