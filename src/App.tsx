@@ -10,14 +10,15 @@ import { useAutoReconnect } from "./hooks/useAutoReconnect";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { useCardStore } from "./stores/cardStore";
 import { startDiceRollNotifier, stopDiceRollNotifier } from "./lib/diceRollNotifier";
+import { JazzSessionProvider } from "./lib/jazz/provider";
 
 const queryClient = new QueryClient();
 
 /**
- * Main application component that sets up providers, routing, and global hooks.
- * @returns The rendered application.
+ * Inner app component — contains all hooks and routing.
+ * Separated so it can be wrapped by optional providers.
  */
-const App = () => {
+const AppInner = () => {
   // Set dark mode by default for gaming
   React.useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -51,8 +52,7 @@ const App = () => {
   }, []);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+    <>
       <Toaster />
       <ConnectionIndicator />
       <BrowserRouter>
@@ -62,8 +62,26 @@ const App = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    </>
+  );
+};
+
+/**
+ * Main application component that sets up providers, routing, and global hooks.
+ * 
+ * The JazzSessionProvider wraps the entire app to make Jazz CoValues available.
+ * It operates in anonymous auth mode — no login required.
+ * Jazz is an OPTIONAL transport; the app works without a sync server running.
+ */
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <JazzSessionProvider>
+          <AppInner />
+        </JazzSessionProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
