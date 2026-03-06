@@ -28,7 +28,6 @@ import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { toast } from 'sonner';
 import { useLaunchStore } from '@/stores/launchStore';
-import { netManager } from '@/lib/net';
 
 interface MenuCardContentProps {
   sessionId?: string;
