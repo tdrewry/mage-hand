@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords, Home } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -27,6 +27,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { toast } from 'sonner';
+import { useLaunchStore } from '@/stores/launchStore';
 
 interface MenuCardContentProps {
   sessionId?: string;
@@ -42,6 +43,8 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
   const [storageManagerOpen, setStorageManagerOpen] = useState(false);
+  const [returnMenuDialogOpen, setReturnMenuDialogOpen] = useState(false);
+  const setLaunched = useLaunchStore((s) => s.setLaunched);
 
   // Get current player's roles
   const currentPlayer = players.find(p => p.id === currentUserId || p.id === currentPlayerId);
@@ -647,6 +650,27 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
 
       <Separator />
 
+      {/* Return to Menu */}
+      <div className="space-y-2">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => {
+            if (isConnected) {
+              setReturnMenuDialogOpen(true);
+            } else {
+              setLaunched(false);
+            }
+          }}
+          className="w-full"
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Return to Menu
+        </Button>
+      </div>
+
+      <Separator />
+
       {/* Danger Zone */}
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">Danger Zone</p>
@@ -678,6 +702,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Return to Menu Confirmation (multiplayer active) */}
+      <AlertDialog open={returnMenuDialogOpen} onOpenChange={setReturnMenuDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return to Menu?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are currently connected to a multiplayer session ({currentSession?.sessionCode}).
+              Returning to the menu will disconnect you from the session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay Connected</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                netManager.disconnect();
+                setReturnMenuDialogOpen(false);
+                setLaunched(false);
+              }}
+            >
+              Disconnect &amp; Return
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
