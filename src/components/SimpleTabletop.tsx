@@ -358,8 +358,10 @@ export const SimpleTabletop = () => {
   // Remote drag previews — subscribe to store for canvas redraws
   const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
   const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
+  const remoteTokenHandlePreviews = useTokenEphemeralStore((s) => s.handlePreviews);
   const remoteSelections = useTokenEphemeralStore((s) => s.selectionPreviews);
   const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
+  const remoteMapHandlePreviews = useMapEphemeralStore((s) => s.handlePreviews);
   const remotePings = useMapEphemeralStore((s) => s.pings);
   // Local pings (own + remote) for animated rendering — each has a birth timestamp
   const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
