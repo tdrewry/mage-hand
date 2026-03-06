@@ -10,6 +10,7 @@
 
 import { JazzSessionRoot as JazzSessionRootSchema, createSessionRoot } from "./schema";
 import { pushAllToJazz, pullAllFromJazz, startBridge, stopBridge } from "./bridge";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 export interface JazzSessionInfo {
   /** The CoValue ID of the session root */
@@ -38,6 +39,9 @@ export function createJazzSession(name: string): JazzSessionInfo {
   
   // Start the bidirectional bridge
   startBridge(root);
+
+  // Host is always sync-ready (they own the data)
+  useMultiplayerStore.getState().setSyncReady(true);
 
   const info: JazzSessionInfo = {
     sessionCoId: root.id ?? `session-${Date.now()}`,
@@ -72,10 +76,15 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   }
 
   // Pull remote state into Zustand
+  useMultiplayerStore.getState().setSyncReady(false);
   pullAllFromJazz(root);
   
   // Start the bidirectional bridge
   startBridge(root);
+
+  // Mark sync as ready — initial pull is complete
+  useMultiplayerStore.getState().setSyncReady(true);
+  console.log('[jazz-session] Sync ready — all durable state pulled');
 
   const info: JazzSessionInfo = {
     sessionCoId: root.id ?? sessionCoId,
@@ -95,6 +104,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
 export function leaveJazzSession(): void {
   if (!currentSession) return;
   stopBridge();
+  useMultiplayerStore.getState().setSyncReady(false);
   console.log(`[jazz-session] Left session "${currentSession.sessionCoId}"`);
   currentSession = null;
 }
