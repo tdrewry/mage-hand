@@ -779,6 +779,7 @@ export const useActionStore = create<ActionStore>()(
 
 // Auto-broadcast action queue changes to other DM sessions via ephemeral bus
 let _lastBroadcastJson = '';
+let _lastHistoryLength = 0;
 useActionStore.subscribe((state) => {
   // Only broadcast meaningful queue state changes (skip flashes, mouse pos)
   const snapshot = JSON.stringify({
@@ -790,4 +791,16 @@ useActionStore.subscribe((state) => {
     _lastBroadcastJson = snapshot;
     broadcastActionQueue();
   }
+
+  // Feed new history entries into the chat log
+  if (state.actionHistory.length > _lastHistoryLength && _lastHistoryLength > 0) {
+    const newEntries = state.actionHistory.slice(0, state.actionHistory.length - _lastHistoryLength);
+    try {
+      const { useChatStore } = require("@/stores/chatStore");
+      for (const entry of newEntries) {
+        useChatStore.getState().addActionEntry(entry);
+      }
+    } catch { /* chatStore may not be loaded yet */ }
+  }
+  _lastHistoryLength = state.actionHistory.length;
 });

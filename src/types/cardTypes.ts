@@ -28,6 +28,7 @@ export enum CardType {
   ACTION_CARD = 'action_card',
   NETWORK_DEMO = 'network_demo',
   EFFECTS = 'effects',
+  CHAT = 'chat',
 }
 
 /** Card types that require DM role — players cannot open or see these */

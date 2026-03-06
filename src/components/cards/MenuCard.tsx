@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -69,6 +69,8 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
   const diceBoxCard = cards.find((c) => c.type === CardType.DICE_BOX);
   const networkDemoCard = cards.find((c) => c.type === CardType.NETWORK_DEMO);
+  const chatCard = cards.find((c) => c.type === CardType.CHAT);
+  const actionCard = cards.find((c) => c.type === CardType.ACTION_CARD);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -245,6 +247,66 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
 
   return (
     <div className="p-3 space-y-3">
+      {/* Quick Access — Chat & Actions */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Quick Access</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={chatCard?.isVisible ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (chatCard) {
+                setVisibility(chatCard.id, !chatCard.isVisible);
+              } else {
+                registerCard({
+                  type: CardType.CHAT,
+                  title: 'Chat',
+                  defaultPosition: { x: window.innerWidth - 400, y: 80 },
+                  defaultSize: { width: 360, height: 500 },
+                  minSize: { width: 300, height: 350 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+            }}
+            className="w-full"
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Chat
+          </Button>
+
+          {canControlUiMode && (
+            <Button
+              variant={actionCard?.isVisible ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                if (actionCard) {
+                  setVisibility(actionCard.id, !actionCard.isVisible);
+                } else {
+                  registerCard({
+                    type: CardType.ACTION_CARD,
+                    title: 'Action',
+                    defaultPosition: { x: window.innerWidth / 2 - 200, y: 80 },
+                    defaultSize: { width: 420, height: 600 },
+                    minSize: { width: 380, height: 450 },
+                    isResizable: true,
+                    isClosable: true,
+                    defaultVisible: true,
+                  });
+                }
+              }}
+              className="w-full"
+            >
+              <Swords className="h-4 w-4 mr-2" />
+              Actions
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Separator />
+
       {/* Session Info */}
       <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="outline" className="text-xs">
