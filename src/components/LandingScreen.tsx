@@ -310,12 +310,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     setIsLoading(true);
     try {
       const data = await importProjectFromFile(file);
-      setPendingLoadData(data);
-      if (!hasSession) {
-        // No existing session — apply immediately
-        await applyAndLaunch(data);
-      }
-      // If hasSession, we already confirmed above; apply now
+      await applyAndLaunch(data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load session file');
