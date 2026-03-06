@@ -69,11 +69,25 @@ const activeSubscriptions: Unsubscribe[] = [];
 /** The current Jazz session root being bridged (typed as any to avoid MaybeLoaded issues) */
 let _sessionRoot: any = null;
 
+/** Cached child CoValue references — Jazz proxies can go stale when accessed later */
+let _cachedTokens: any = null;
+let _cachedBlobs: any = null;
+let _cachedGroup: any = null;
+
 /**
  * Get the currently bridged session root (if any).
+ * Returns a wrapper that uses cached child refs to avoid stale proxy issues.
  */
 export function getBridgedSessionRoot(): any {
-  return _sessionRoot;
+  if (!_sessionRoot) return null;
+  // Return a facade that uses cached refs
+  return {
+    ...(_sessionRoot),
+    tokens: _cachedTokens ?? _sessionRoot.tokens,
+    blobs: _cachedBlobs ?? _sessionRoot.blobs,
+    _owner: _cachedGroup ?? _sessionRoot._owner,
+    get $jazz() { return _sessionRoot.$jazz; },
+  };
 }
 
 // ── DO kinds to sync via blob (excludes tokens — fine-grained, and UI-only kinds) ──
@@ -171,10 +185,11 @@ function quickHash(str: string): string {
 
 /** Find blob index in session root by kind */
 function findBlobIndex(kind: string): number {
-  if (!_sessionRoot?.blobs) return -1;
-  const len = _sessionRoot.blobs.length ?? 0;
+  const blobs = _cachedBlobs ?? _sessionRoot?.blobs;
+  if (!blobs) return -1;
+  const len = blobs.length ?? 0;
   for (let i = 0; i < len; i++) {
-    const b = _sessionRoot.blobs[i];
+    const b = blobs[i];
     if (b && b.kind === kind) return i;
   }
   return -1;
@@ -182,7 +197,8 @@ function findBlobIndex(kind: string): number {
 
 /** Push a single DO kind's state to Jazz as a blob */
 function pushBlobToJazz(kind: string): void {
-  if (!_sessionRoot?.blobs) return;
+  const blobs = _cachedBlobs ?? _sessionRoot?.blobs;
+  if (!blobs) return;
   const reg = DurableObjectRegistry.get(kind);
   if (!reg) return;
 
@@ -195,12 +211,12 @@ function pushBlobToJazz(kind: string): void {
     if (_lastPushedHash.get(kind) === hash) return;
     _lastPushedHash.set(kind, hash);
 
-    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
     const idx = findBlobIndex(kind);
 
     if (idx >= 0) {
       // Update existing blob
-      const blob = _sessionRoot.blobs[idx];
+      const blob = blobs[idx];
       try {
         blob.$jazz.set("state", json);
         blob.$jazz.set("version", reg.version);
@@ -217,7 +233,7 @@ function pushBlobToJazz(kind: string): void {
           state: json,
           updatedAt: new Date().toISOString(),
         } as any, group);
-        _sessionRoot.blobs.$jazz.push(blob);
+        blobs.$jazz.push(blob);
       } catch (err) {
         console.error(`[jazz-bridge] Failed to create blob ${kind}:`, err);
       }
@@ -430,7 +446,15 @@ function throttledPushBlob(kind: string): void {
  */
 export function startBridge(sessionRoot: any): void {
   _sessionRoot = sessionRoot;
-  console.log("[jazz-bridge] Starting bridge");
+  // Cache child refs immediately while the proxy is still live
+  _cachedTokens = sessionRoot.tokens ?? null;
+  _cachedBlobs = sessionRoot.blobs ?? null;
+  _cachedGroup = sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
+  console.log("[jazz-bridge] Starting bridge, cached refs:", {
+    tokens: !!_cachedTokens,
+    blobs: !!_cachedBlobs,
+    group: !!_cachedGroup,
+  });
 
   // ── Token sync: Direction 1 (Zustand → Jazz) ──
   let prevTokens = useSessionStore.getState().tokens;
@@ -438,10 +462,10 @@ export function startBridge(sessionRoot: any): void {
     const tokens = state.tokens;
     if (tokens === prevTokens) return;
     if (_fromJazz) { prevTokens = tokens; return; }
-    if (!_sessionRoot?.tokens) { prevTokens = tokens; return; }
+    const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
+    if (!jazzTokens) { prevTokens = tokens; return; }
 
-    const jazzTokens = _sessionRoot.tokens;
-    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
 
       // Detect added tokens
       const prevIds = new Set(prevTokens.map((t: Token) => t.id));
@@ -617,5 +641,8 @@ export function stopBridge(): void {
   _lastPushedHash.clear();
 
   _sessionRoot = null;
+  _cachedTokens = null;
+  _cachedBlobs = null;
+  _cachedGroup = null;
   console.log("[jazz-bridge] Bridge stopped");
 }
