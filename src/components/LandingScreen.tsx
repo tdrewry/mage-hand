@@ -286,8 +286,19 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
 
   // --- Load Session ---
   const handleLoadSession = () => {
+    if (!isIdentityReady) {
+      toast.error('Please enter a username and select a role before continuing.');
+      return;
+    }
+    // Commit identity now so it's ready when applyAndLaunch fires
+    addPlayer({
+      id: currentPlayerId,
+      name: username.trim(),
+      roleIds: selectedRoleIds,
+      isConnected: true,
+    });
+
     if (hasSession) {
-      // Show confirm first, then open file picker after confirm
       setShowLoadConfirm(true);
     } else {
       fileInputRef.current?.click();
