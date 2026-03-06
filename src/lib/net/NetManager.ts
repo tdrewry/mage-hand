@@ -38,6 +38,9 @@ export class NetManager {
   private cleanups: Array<() => void> = [];
   private _sessionCode?: string;
 
+  /** When true, inbound durable ops are ignored (Jazz handles them). */
+  private _ephemeralOnly = false;
+
   // Reconnection state
   private _lastConnectParams?: {
     serverUrl: string;
@@ -104,9 +107,30 @@ export class NetManager {
     }
   }
 
+  /**
+   * Connect in ephemeral-only mode — WebSocket opens normally but
+   * inbound durable ops are ignored (Jazz handles durable state).
+   * Presence and ephemeral messages still flow.
+   */
+  async connectEphemeralOnly(params: {
+    serverUrl: string;
+    sessionCode: string;
+    username: string;
+    roles?: string[];
+  }): Promise<NetworkSessionInfo> {
+    this._ephemeralOnly = true;
+    return this.connect(params);
+  }
+
+  /** Whether this connection is in ephemeral-only mode (tandem with Jazz). */
+  get ephemeralOnly(): boolean {
+    return this._ephemeralOnly;
+  }
+
   /** Disconnect from the current session. */
   disconnect(): void {
     this._intentionalDisconnect = true;
+    this._ephemeralOnly = false;
     this.clearReconnectTimer();
     this.session.disconnect(1000, "user_disconnect");
   }
@@ -209,8 +233,9 @@ export class NetManager {
         }
       }
 
-      // Forward only durable ops to OpBridge
-      if (durableOps.length > 0) {
+      // Forward durable ops to OpBridge ONLY if not in ephemeral-only mode
+      // (in tandem mode Jazz handles durable state)
+      if (durableOps.length > 0 && !this._ephemeralOnly) {
         opBridge.applyRemoteOps(durableOps);
       }
     });
