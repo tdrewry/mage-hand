@@ -4792,6 +4792,95 @@ export const SimpleTabletop = () => {
     ctx.restore();
   };
 
+  // ── Draw remote group select/drag previews (ghost bounding box + user label) ──
+  const drawRemoteGroupPreviews = (ctx: CanvasRenderingContext2D) => {
+    const selects = Object.values(remoteGroupSelects);
+    const drags = Object.values(remoteGroupDrags);
+    if (selects.length === 0 && drags.length === 0) return;
+
+    const allGroups = useGroupStore.getState().groups;
+    ctx.save();
+
+    // Helper: draw a group bounding box ghost
+    const drawGroupGhost = (
+      groupId: string,
+      userId: string,
+      delta?: { x: number; y: number },
+      isDrag?: boolean
+    ) => {
+      const group = allGroups.find((g) => g.id === groupId);
+      if (!group || !group.bounds) return;
+
+      const cursorState = useCursorStore.getState().cursors[userId];
+      const color = cursorState?.color || "#60a5fa";
+      const b = group.bounds;
+      const dx = delta?.x ?? 0;
+      const dy = delta?.y ?? 0;
+
+      // Dashed bounding box outline
+      ctx.globalAlpha = isDrag ? 0.5 : 0.35;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+      ctx.strokeRect(b.x + dx, b.y + dy, b.width, b.height);
+      ctx.setLineDash([]);
+
+      // Semi-transparent fill
+      ctx.globalAlpha = isDrag ? 0.08 : 0.05;
+      ctx.fillStyle = color;
+      ctx.fillRect(b.x + dx, b.y + dy, b.width, b.height);
+
+      // If dragging, draw ghost at original position too
+      if (isDrag && (dx !== 0 || dy !== 0)) {
+        ctx.globalAlpha = 0.15;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([4 / transform.zoom, 3 / transform.zoom]);
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+        ctx.setLineDash([]);
+
+        // Arrow from original center to new center
+        const cx1 = b.x + b.width / 2;
+        const cy1 = b.y + b.height / 2;
+        const cx2 = cx1 + dx;
+        const cy2 = cy1 + dy;
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([3 / transform.zoom, 3 / transform.zoom]);
+        ctx.beginPath();
+        ctx.moveTo(cx1, cy1);
+        ctx.lineTo(cx2, cy2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // User label at top of bounding box
+      const labelX = b.x + dx + b.width / 2;
+      const labelY = b.y + dy - 6 / transform.zoom;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      const icon = isDrag ? "⇄" : "☐";
+      ctx.fillText(`${userId.slice(0, 6)} ${icon}`, labelX, labelY);
+    };
+
+    // Draw group selection previews (no delta)
+    for (const s of selects) {
+      if (!s.groupId) continue;
+      drawGroupGhost(s.groupId, s.userId);
+    }
+
+    // Draw group drag previews (with delta offset)
+    for (const d of drags) {
+      drawGroupGhost(d.groupId, d.userId, d.delta, true);
+    }
+
+    ctx.restore();
+  };
+
   // ── Draw map pings (expanding + fading circles) ──
   const drawMapPings = (ctx: CanvasRenderingContext2D) => {
     if (activePings.length === 0) return;
