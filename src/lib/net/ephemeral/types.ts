@@ -165,6 +165,8 @@ export interface ChatMessagePayload {
   senderName: string;
   text: string;
   timestamp: number;
+  /** If set, this is a whisper visible only to these user IDs */
+  whisperTo?: string[];
 }
 
 export interface DiceRollingPayload {

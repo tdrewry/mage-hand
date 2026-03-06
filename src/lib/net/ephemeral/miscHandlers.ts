@@ -52,7 +52,13 @@ export function registerMiscHandlers(): void {
   });
 
   ephemeralBus.on("chat.message", (data: ChatMessagePayload, userId) => {
-    useChatStore.getState().addRemoteMessage(data.id, userId, data.senderName, data.text, data.timestamp);
+    // If whisper, only show to intended recipients
+    if (data.whisperTo && data.whisperTo.length > 0) {
+      const { useMultiplayerStore } = require("@/stores/multiplayerStore");
+      const myId = useMultiplayerStore.getState().currentUserId;
+      if (myId && !data.whisperTo.includes(myId)) return; // Not for us
+    }
+    useChatStore.getState().addRemoteMessage(data.id, userId, data.senderName, data.text, data.timestamp, data.whisperTo);
   });
 
   ephemeralBus.on("dice.rolling", (data: DiceRollingPayload, userId) => {
@@ -161,6 +167,6 @@ export function emitChatTyping(): void {
 /**
  * Broadcast a chat message to all peers.
  */
-export function emitChatMessage(id: string, senderName: string, text: string): void {
-  ephemeralBus.emit("chat.message", { id, senderName, text, timestamp: Date.now() });
+export function emitChatMessage(id: string, senderName: string, text: string, whisperTo?: string[]): void {
+  ephemeralBus.emit("chat.message", { id, senderName, text, timestamp: Date.now(), whisperTo });
 }
