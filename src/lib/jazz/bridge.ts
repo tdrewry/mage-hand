@@ -486,9 +486,11 @@ function throttledPushBlob(kind: string): void {
 
 /**
  * Start the bidirectional bridge for tokens + all DO blob kinds.
+ * @param isCreator — true if this client created the session (authority for initial state)
  */
-export function startBridge(sessionRoot: any): void {
+export function startBridge(sessionRoot: any, isCreator = false): void {
   _sessionRoot = sessionRoot;
+  _isCreator = isCreator;
   // Cache child refs immediately while the proxy is still live
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
@@ -497,6 +499,7 @@ export function startBridge(sessionRoot: any): void {
     tokens: !!_cachedTokens,
     blobs: !!_cachedBlobs,
     group: !!_cachedGroup,
+    isCreator,
   });
 
   // ── Token sync: Direction 1 (Zustand → Jazz) ──
@@ -582,11 +585,19 @@ export function startBridge(sessionRoot: any): void {
         (tokens: any) => {
           if (!tokens) return;
 
+          const len = tokens.length ?? 0;
+          const localTokens = useSessionStore.getState().tokens;
+
+          // Guard: don't wipe populated local tokens with empty Jazz echo
+          if (len === 0 && localTokens.length > 0) {
+            console.warn(`[jazz-bridge] ✋ Blocked inbound token sync — Jazz has 0 but local has ${localTokens.length}`);
+            return;
+          }
+
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const currentIds = new Set(store.tokens.map((t) => t.id));
             const jazzIds = new Set<string>();
-            const len = tokens.length ?? 0;
 
             for (let i = 0; i < len; i++) {
               const jt = tokens[i];
@@ -604,10 +615,14 @@ export function startBridge(sessionRoot: any): void {
               }
             }
 
-            for (const t of store.tokens) {
-              if (!jazzIds.has(t.id)) {
-                store.removeToken(t.id);
-                console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+            // Only remove local tokens that Jazz doesn't have if we're NOT the creator
+            // The creator is the authority — Jazz may not have propagated yet
+            if (!_isCreator) {
+              for (const t of store.tokens) {
+                if (!jazzIds.has(t.id)) {
+                  store.removeToken(t.id);
+                  console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+                }
               }
             }
           });
@@ -687,5 +702,6 @@ export function stopBridge(): void {
   _cachedTokens = null;
   _cachedBlobs = null;
   _cachedGroup = null;
+  _isCreator = false;
   console.log("[jazz-bridge] Bridge stopped");
 }
