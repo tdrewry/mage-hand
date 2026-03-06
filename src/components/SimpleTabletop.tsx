@@ -390,6 +390,7 @@ export const SimpleTabletop = () => {
 
   // Store wall geometry separately for fog computation
   const wallGeometryRef = useRef<any>(null);
+  const wallGeometryInitializedRef = useRef(false);
   
   // Combined visibility-blocking segments (walls + map objects)
   const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
