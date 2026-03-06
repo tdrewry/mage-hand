@@ -3,9 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Link2, Trash2 } from 'lucide-react';
+import { Link2, Trash2, Crosshair } from 'lucide-react';
 import { Canvas as FabricCanvas, FabricImage } from 'fabric';
 import { toast } from 'sonner';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useMapStore } from '@/stores/mapStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { emitMapFocus } from '@/lib/net/ephemeral/mapHandlers';
 
 interface MapControlsCardContentProps {
   fabricCanvas: FabricCanvas | null;
