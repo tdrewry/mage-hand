@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { netManager } from '@/lib/net';
+import { ephemeralBus } from '@/lib/net';
 
 interface ConnectedUsersPanelProps {
   trigger?: React.ReactNode;
@@ -72,10 +72,8 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
     // Update locally
     useMultiplayerStore.getState().updateUserRoles(userId, newRoleIds);
 
-    // Sync to server (TODO: implement via netManager)
-    if (netManager.isConnected) {
-      console.log('[ConnectedUsers] Role change sync not yet implemented', userId, newRoleIds);
-    }
+    // Broadcast role change to all connected peers
+    ephemeralBus.emit('role.assign', { targetUserId: userId, roleIds: newRoleIds });
 
     const role = getRoleById(roleId);
     toast.success(

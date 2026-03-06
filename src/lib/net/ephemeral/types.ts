@@ -40,6 +40,7 @@ export type EphemeralOpKind =
   | "group.drag.preview"
   // Roles & Presence
   | "role.handRaise"
+  | "role.assign"
   | "presence.activity"
   // UI / Cursors
   | "cursor.update"
@@ -204,6 +205,13 @@ export interface RoleHandRaisePayload {
   /** empty = hand raised; receiver uses userId from envelope */
 }
 
+export interface RoleAssignPayload {
+  /** The userId of the target user whose roles are being changed */
+  targetUserId: string;
+  /** The new set of roleIds for the target user */
+  roleIds: string[];
+}
+
 export interface PresenceActivityPayload {
   activity: string; // e.g. "editing map", "viewing tokens"
 }
@@ -363,6 +371,7 @@ export interface EphemeralPayloadMap {
   "group.select.preview": GroupSelectPreviewPayload;
   "group.drag.preview": GroupDragPreviewPayload;
   "role.handRaise": RoleHandRaisePayload;
+  "role.assign": RoleAssignPayload;
   "presence.activity": PresenceActivityPayload;
   "cursor.update": CursorUpdatePayload;
   "cursor.visibility": CursorVisibilityPayload;
@@ -442,6 +451,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Roles & Presence
   "role.handRaise":         { throttleMs: 0,   ttlMs: 30000, keyStrategy: "userId" },
+  "role.assign":            { throttleMs: 0,   ttlMs: 0,     keyStrategy: "none", dmOnly: true },
   "presence.activity":      { throttleMs: 200, ttlMs: 5000,  keyStrategy: "userId" },
 
   // UI / Cursors
