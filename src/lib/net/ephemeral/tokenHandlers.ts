@@ -78,6 +78,7 @@ export function registerTokenHandlers(): void {
   });
 
   // Wire TTL cache expiry to clean up stale entries
+  ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return; // only care about removals
 
     if (key.startsWith("token.hover::")) {
