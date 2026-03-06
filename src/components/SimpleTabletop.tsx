@@ -339,19 +339,19 @@ export const SimpleTabletop = () => {
   // ── Map Focus: DM one-shot pan command — non-DM players auto-pan to focus target ──
   const mapFocusCommand = useMapEphemeralStore((s) => s.focus);
   useEffect(() => {
-    if (!mapFocusCommand || isDM) return; // Only players respond to focus commands
+    if (!mapFocusCommand) return;
+    // Only non-DM players respond to focus commands
+    const player = players.find((p) => p.id === currentPlayerId);
+    const isCurrentDM = player?.roleIds?.includes('dm') || false;
+    if (isCurrentDM) return;
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
-    const canvasWidth = canvasEl.width;
-    const canvasHeight = canvasEl.height;
     const zoom = mapFocusCommand.zoom ?? transform.zoom;
-    // Center the viewport on the focus position
-    const newX = canvasWidth / 2 - mapFocusCommand.pos.x * zoom;
-    const newY = canvasHeight / 2 - mapFocusCommand.pos.y * zoom;
+    const newX = canvasEl.width / 2 - mapFocusCommand.pos.x * zoom;
+    const newY = canvasEl.height / 2 - mapFocusCommand.pos.y * zoom;
     setTransformState({ x: newX, y: newY, zoom });
-    // Clear after consuming
     useMapEphemeralStore.getState().setFocus(null);
-  }, [mapFocusCommand, isDM]);
+  }, [mapFocusCommand, players, currentPlayerId]);
 
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
