@@ -49,6 +49,9 @@ export type EphemeralOpKind =
   | "action.flash"
   | "action.inProgress"
   | "action.queue.sync"
+  | "action.pending"
+  | "action.resolved"
+  | "action.resolution.claim"
   // Assets
   | "asset.uploadProgress"
   // Effects & Auras
