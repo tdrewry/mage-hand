@@ -37,7 +37,7 @@ export const useChatStore = create<ChatState>((set) => ({
         ...s.entries,
         {
           id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          type: 'message',
+          type: 'message' as const,
           senderId,
           senderName,
           text,
@@ -52,7 +52,7 @@ export const useChatStore = create<ChatState>((set) => ({
         ...s.entries,
         {
           id: `chat-action-${action.id}`,
-          type: 'action',
+          type: 'action' as const,
           action,
           timestamp: action.timestamp,
         },
