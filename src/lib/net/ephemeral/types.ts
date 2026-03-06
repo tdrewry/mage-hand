@@ -30,6 +30,7 @@ export type EphemeralOpKind =
   | "fog.reveal.preview"
   // Chat & Dice
   | "chat.typing"
+  | "chat.message"
   | "dice.rolling"
   // Initiative
   | "initiative.drag.preview"
@@ -157,6 +158,13 @@ export interface FogRevealPreviewPayload {
 
 export interface ChatTypingPayload {
   /** empty = cleared typing indicator */
+}
+
+export interface ChatMessagePayload {
+  id: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
 }
 
 export interface DiceRollingPayload {
@@ -319,6 +327,7 @@ export interface EphemeralPayloadMap {
   "fog.cursor.preview": FogCursorPreviewPayload;
   "fog.reveal.preview": FogRevealPreviewPayload;
   "chat.typing": ChatTypingPayload;
+  "chat.message": ChatMessagePayload;
   "dice.rolling": DiceRollingPayload;
   "initiative.drag.preview": InitiativeDragPreviewPayload;
   "initiative.hover": InitiativeHoverPayload;
@@ -388,6 +397,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Chat & Dice
   "chat.typing":            { throttleMs: 200, ttlMs: 2000, keyStrategy: "userId" },
+  "chat.message":           { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none" },
   "dice.rolling":           { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
 
   // Initiative
