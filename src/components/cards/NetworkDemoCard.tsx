@@ -119,7 +119,7 @@ export const NetworkDemoCardContent: React.FC = () => {
         {jazzSession ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="text-xs bg-green-700">
+              <Badge variant="default" className="text-xs bg-primary">
                 Connected
               </Badge>
               <span className="text-[10px] text-muted-foreground truncate flex-1">
