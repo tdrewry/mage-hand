@@ -35,6 +35,7 @@ export const DM_ONLY_CARD_TYPES: ReadonlySet<CardType> = new Set([
   CardType.FOG,
   CardType.MAP_CONTROLS,
   CardType.REGION_CONTROL,
+  CardType.ACTION_CARD,
 ]);
 
 export interface CardPosition {
