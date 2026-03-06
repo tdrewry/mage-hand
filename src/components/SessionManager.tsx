@@ -568,60 +568,71 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 <Label htmlFor="join-code">Session Code</Label>
                 <Input
                   id="join-code"
-                  placeholder="Enter 6-character code"
+                  placeholder="e.g. A3BK7Z or J-a8F2c9Xk"
                   value={sessionCode}
-                  onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
-                  maxLength={6}
-                  disabled={isConnecting}
-                  className="bg-input border-border text-foreground font-mono text-lg tracking-wider uppercase"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="join-password">Password (If Required)</Label>
-                <Input
-                  id="join-password"
-                  type="password"
-                  placeholder="Enter session password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // Don't force uppercase for Jazz codes (they're case-sensitive)
+                    setSessionCode(isJazzCode(val) ? val : val.toUpperCase());
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
+                  maxLength={12}
                   disabled={isConnecting}
-                  className="bg-input border-border text-foreground"
+                  className="bg-input border-border text-foreground font-mono text-lg tracking-wider"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Paste the code shared by your host — the connection type is detected automatically.
+                </p>
               </div>
 
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-full">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Advanced Settings
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <Label htmlFor="join-server-url">Server URL</Label>
+              {/* Only show password for non-Jazz codes */}
+              {!isJazzCode(sessionCode) && (
+                <div className="space-y-2">
+                  <Label htmlFor="join-password">Password (If Required)</Label>
                   <Input
-                    id="join-server-url"
-                    placeholder="ws://localhost:3001"
-                    value={localServerUrl}
-                    onChange={(e) => setLocalServerUrl(e.target.value)}
+                    id="join-password"
+                    type="password"
+                    placeholder="Enter session password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
                     disabled={isConnecting}
-                    className="bg-input border-border text-foreground font-mono text-sm"
+                    className="bg-input border-border text-foreground"
                   />
-                  <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
-                  <Input
-                    id="join-invite-token"
-                    placeholder="Enter invite token"
-                    value={inviteToken}
-                    onChange={(e) => setInviteToken(e.target.value)}
-                    disabled={isConnecting}
-                    className="bg-input border-border text-foreground text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Change server URL to connect to a remote server
-                  </p>
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+              )}
+
+              {/* Only show advanced settings for non-Jazz codes */}
+              {!isJazzCode(sessionCode) && (
+                <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Advanced Settings
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    <Label htmlFor="join-server-url">Server URL</Label>
+                    <Input
+                      id="join-server-url"
+                      placeholder="ws://localhost:3001"
+                      value={localServerUrl}
+                      onChange={(e) => setLocalServerUrl(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-input border-border text-foreground font-mono text-sm"
+                    />
+                    <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
+                    <Input
+                      id="join-invite-token"
+                      placeholder="Enter invite token"
+                      value={inviteToken}
+                      onChange={(e) => setInviteToken(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-input border-border text-foreground text-sm"
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
               <Button
                 onClick={handleJoinSession}
