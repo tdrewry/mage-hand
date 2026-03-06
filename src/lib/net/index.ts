@@ -1,7 +1,7 @@
 // src/lib/net/index.ts
 // Public API surface for the networking module.
 
-import { NetManager } from "./NetManager";
+import { NetManager, setEphemeralBusRef } from "./NetManager";
 import { opBridge } from "./OpBridge";
 import { EphemeralBus } from "./ephemeral";
 import type { EngineOp } from "../../../networking/contract/v1";
@@ -9,6 +9,9 @@ import type { EngineOp } from "../../../networking/contract/v1";
 // Create singletons and wire circular references
 export const netManager = new NetManager();
 export const ephemeralBus = new EphemeralBus();
+
+// Wire ephemeralBus into NetManager (breaks circular import)
+setEphemeralBusRef(ephemeralBus);
 
 opBridge.setProposeOp((op, id) => netManager.proposeOp(op, id));
 ephemeralBus.setSendFn((op) => netManager.sendEphemeral(op.kind, op.data));
