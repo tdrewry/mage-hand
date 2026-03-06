@@ -63,6 +63,30 @@ export function registerMapHandlers(): void {
     useMapObjectStore.getState().setDoorState(data.objectId, data.open);
   });
 
+  // Region handle preview (rotate/scale)
+  ephemeralBus.on("region.handle.preview", (data: RegionHandlePreviewPayload, userId) => {
+    store.getState().setHandlePreview(data.regionId, {
+      userId,
+      entityId: data.regionId,
+      entityType: "region",
+      handleType: data.handleType,
+      pos: data.pos,
+      value: data.value,
+    });
+  });
+
+  // MapObject handle preview (rotate/scale)
+  ephemeralBus.on("mapObject.handle.preview", (data: MapObjectHandlePreviewPayload, userId) => {
+    store.getState().setHandlePreview(data.objectId, {
+      userId,
+      entityId: data.objectId,
+      entityType: "mapObject",
+      handleType: data.handleType,
+      pos: data.pos,
+      value: data.value,
+    });
+  });
+
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -80,6 +104,12 @@ export function registerMapHandlers(): void {
     } else if (key.startsWith("mapObject.drag.update::")) {
       const entityId = key.replace("mapObject.drag.update::", "");
       store.getState().removeMapObjectDrag(entityId);
+    } else if (key.startsWith("region.handle.preview::")) {
+      const entityId = key.replace("region.handle.preview::", "");
+      store.getState().removeHandlePreview(entityId);
+    } else if (key.startsWith("mapObject.handle.preview::")) {
+      const entityId = key.replace("mapObject.handle.preview::", "");
+      store.getState().removeHandlePreview(entityId);
     }
   });
 }
