@@ -23,6 +23,7 @@ import { ActionCardContent } from '@/components/cards/ActionCard';
 import { NetworkDemoCardContent } from '@/components/cards/NetworkDemoCard';
 import { EffectsCardContent } from '@/components/cards/EffectsCard';
 import { ChatCardContent } from '@/components/cards/ChatCard';
+import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -150,6 +151,7 @@ function getCardTitle(type: CardType): string {
     [CardType.NETWORK_DEMO]: 'Network Demo',
     [CardType.EFFECTS]: 'Effects',
     [CardType.CHAT]: 'Chat',
+    [CardType.ART_APPROVAL]: 'Art Approval',
   };
   
   return titles[type] || type;
@@ -236,6 +238,8 @@ function renderCardContent(
       return <EffectsCardContent />;
     case CardType.CHAT:
       return <ChatCardContent />;
+    case CardType.ART_APPROVAL:
+      return <ArtApprovalCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
