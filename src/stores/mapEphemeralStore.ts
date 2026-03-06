@@ -29,6 +29,20 @@ export interface RemoteEntityDrag {
   pos: { x: number; y: number };
 }
 
+export interface RemoteHandlePreview {
+  userId: string;
+  entityId: string;
+  entityType: "region" | "mapObject";
+  handleType: "rotate" | "scale";
+  pos: { x: number; y: number };
+  value?: number;
+}
+
+const removeKey = <T extends Record<string, any>>(obj: T, key: string): T => {
+  const { [key]: _, ...rest } = obj;
+  return rest as T;
+};
+
 interface MapEphemeralState {
   /** Latest DM viewport broadcast */
   dmViewport: RemoteDmViewport | null;
@@ -40,6 +54,8 @@ interface MapEphemeralState {
   regionDrags: Record<string, RemoteEntityDrag>;
   /** Remote map object drag previews keyed by objectId */
   mapObjectDrags: Record<string, RemoteEntityDrag>;
+  /** Remote region/mapObject handle previews keyed by entityId */
+  handlePreviews: Record<string, RemoteHandlePreview>;
 
   setDmViewport: (vp: RemoteDmViewport | null) => void;
   addPing: (userId: string, ping: RemoteMapPing) => void;
@@ -49,6 +65,8 @@ interface MapEphemeralState {
   removeRegionDrag: (entityId: string) => void;
   setMapObjectDrag: (entityId: string, drag: RemoteEntityDrag) => void;
   removeMapObjectDrag: (entityId: string) => void;
+  setHandlePreview: (entityId: string, preview: RemoteHandlePreview) => void;
+  removeHandlePreview: (entityId: string) => void;
 
   /** Follow DM viewport toggle (player-side) */
   followDM: boolean;
@@ -61,6 +79,7 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
   focus: null,
   regionDrags: {},
   mapObjectDrags: {},
+  handlePreviews: {},
   followDM: false,
   setFollowDM: (v) => set({ followDM: v }),
 
@@ -68,23 +87,18 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
   addPing: (userId, ping) =>
     set((s) => ({ pings: { ...s.pings, [userId]: ping } })),
   removePing: (userId) =>
-    set((s) => {
-      const { [userId]: _, ...rest } = s.pings;
-      return { pings: rest };
-    }),
+    set((s) => ({ pings: removeKey(s.pings, userId) })),
   setFocus: (f) => set({ focus: f }),
   setRegionDrag: (entityId, drag) =>
     set((s) => ({ regionDrags: { ...s.regionDrags, [entityId]: drag } })),
   removeRegionDrag: (entityId) =>
-    set((s) => {
-      const { [entityId]: _, ...rest } = s.regionDrags;
-      return { regionDrags: rest };
-    }),
+    set((s) => ({ regionDrags: removeKey(s.regionDrags, entityId) })),
   setMapObjectDrag: (entityId, drag) =>
     set((s) => ({ mapObjectDrags: { ...s.mapObjectDrags, [entityId]: drag } })),
   removeMapObjectDrag: (entityId) =>
-    set((s) => {
-      const { [entityId]: _, ...rest } = s.mapObjectDrags;
-      return { mapObjectDrags: rest };
-    }),
+    set((s) => ({ mapObjectDrags: removeKey(s.mapObjectDrags, entityId) })),
+  setHandlePreview: (entityId, preview) =>
+    set((s) => ({ handlePreviews: { ...s.handlePreviews, [entityId]: preview } })),
+  removeHandlePreview: (entityId) =>
+    set((s) => ({ handlePreviews: removeKey(s.handlePreviews, entityId) })),
 }));
