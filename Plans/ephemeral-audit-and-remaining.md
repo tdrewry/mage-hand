@@ -2,7 +2,7 @@
 
 ## Current State Summary
 
-All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–4 have been implemented. The remaining work (P5) consists of stub emitters that should be wired as their corresponding UI features mature.
+All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–5 have been implemented. The P5 stub emitters for `chat.typing`, `action.flash`, and `effect.placement.preview` were wired in v0.6.86. A full Chat UI was added in v0.6.87.
 
 ---
 
@@ -41,14 +41,14 @@ All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–4 have
 | `region.handle.preview` | ✅ | ✅ | ❌ | ❌ |
 | `mapObject.handle.preview` | ✅ | ✅ | ❌ | ❌ |
 | `map.focus` | ✅ | ✅ | ❌ | ❌ |
-| `chat.typing` | ✅ | ✅ | ❌ | ❌ |
+| `chat.typing` | ✅ | ✅ | ✅ | **Wired in ChatCard input (P5 ✅ v0.6.86)** |
 | `initiative.drag.preview` | ✅ | ✅ | ❌ | ❌ |
 | `initiative.hover` | ✅ | ✅ | ❌ | ❌ |
 | `group.select.preview` | ✅ | ✅ | ❌ | ❌ |
 | `group.drag.preview` | ✅ | ✅ | ❌ | ❌ |
 | `asset.uploadProgress` | ✅ | ✅ | ❌ | ❌ |
-| `effect.placement.preview` | ✅ | stub | ❌ | ❌ |
-| `action.flash` | ✅ | ✅ | ❌ | ❌ |
+| `effect.placement.preview` | ✅ | ✅ | ✅ | **Wired in effectStore (P5 ✅ v0.6.86)** |
+| `action.flash` | ✅ | ✅ | ✅ | **Wired in commitAction (P5 ✅ v0.6.86)** |
 | `action.inProgress` | ✅ | ✅ | ❌ | ❌ |
 | `mapObject.door.preview` | ✅ | ✅ | ❌ | ❌ |
 
@@ -103,17 +103,37 @@ Added `token.position.sync` ephemeral op at 10Hz (100ms interval). Emitter diffs
 
 ---
 
-## Priority 5 — Remaining Stub Emitters (Lower Priority)
+## ✅ Priority 5 — Stub Emitters (v0.6.86–v0.6.87)
 
-These have handlers + stores but no emitters. Wire them as the UI features mature:
+The three core P5 stub emitters are now wired:
 
-- `chat.typing` — emit from chat input in NetworkDemoCard or future chat UI
-- `action.flash` / `action.inProgress` — emit from action resolution system
-- `effect.placement.preview` — emit during effect placement mode
+- **`chat.typing`** — emitted from `emitChatTyping()` helper, called on keypress in `ChatCardContent` input (v0.6.86). Full Chat UI with typing indicators added in v0.6.87.
+- **`action.flash`** — emitted from `commitAction()` in `actionStore.ts` for each resolution flash (v0.6.86).
+- **`effect.placement.preview`** — emitted from `updatePlacementPreview()` in `effectStore.ts` with templateId, origin, direction (v0.6.86).
+
+**Files changed (v0.6.86):**
+- `src/stores/actionStore.ts` — action.flash emission in commitAction
+- `src/stores/effectStore.ts` — effect.placement.preview emission
+- `src/lib/net/ephemeral/miscHandlers.ts` — emitChatTyping() helper
+- `src/lib/net/ephemeral/effectHandlers.ts` — effect.placement.preview handler
+- `src/lib/net/ephemeral/index.ts` — re-exports
+
+**Files created (v0.6.87):**
+- `src/stores/chatStore.ts` — Chat message + action entry store
+- `src/components/cards/ChatCard.tsx` — Full chat UI with typing indicators
+
+---
+
+## Remaining Stub Emitters (Lower Priority)
+
+These still have handlers + stores but no emitters. Wire as UI features mature:
+
+- `action.inProgress` — emit when action enters targeting/resolve phase
 - `mapObject.door.preview` — emit when toggling door open/close
 - Handle previews (`token/region/mapObject.handle.preview`) — emit when rotate/scale handles are dragged
 - Initiative ops — emit from InitiativePanel drag/hover
 - Group ops — emit from group selection/drag
+- `asset.uploadProgress` — emit during asset upload flows
 
 ---
 
@@ -127,5 +147,7 @@ P4a: Gate ACTION_CARD as DM-only           ✅ v0.6.79
 P4b: action.pending ephemeral op           ✅ v0.6.82
 P4c: action.resolution.claim               ✅ v0.6.82
 P4d: Player-facing resolved history feed   ✅ v0.6.82
-P5: Remaining stub emitters                🔲 (as needed)
+P5: Core stub emitters (chat/flash/effect) ✅ v0.6.86
+P5+: Chat UI + menu buttons               ✅ v0.6.87
+P6: Remaining stub emitters                🔲 (as needed)
 ```
