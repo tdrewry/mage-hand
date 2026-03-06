@@ -29,6 +29,9 @@ export type {
   ChatTypingPayload,
   DiceRollingPayload,
   ActionTargetPreviewPayload,
+  ActionPendingPayload,
+  ActionResolvedPayload,
+  ActionResolutionClaimPayload,
   EffectAuraStatePayload,
   EffectPlacementPreviewPayload,
 } from "./types";
