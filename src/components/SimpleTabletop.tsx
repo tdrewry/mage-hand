@@ -341,9 +341,9 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     if (!mapFocusCommand) return;
     // Only non-DM players respond to focus commands
-    const player = players.find((p) => p.id === currentPlayerId);
-    const isCurrentDM = player?.roleIds?.includes('dm') || false;
-    if (isCurrentDM) return;
+    const { currentPlayerId: cpId, players: pls } = useSessionStore.getState();
+    const pl = pls.find((p) => p.id === cpId);
+    if (pl?.roleIds?.includes('dm')) return;
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
     const zoom = mapFocusCommand.zoom ?? transform.zoom;
@@ -351,7 +351,7 @@ export const SimpleTabletop = () => {
     const newY = canvasEl.height / 2 - mapFocusCommand.pos.y * zoom;
     setTransformState({ x: newX, y: newY, zoom });
     useMapEphemeralStore.getState().setFocus(null);
-  }, [mapFocusCommand, players, currentPlayerId]);
+  }, [mapFocusCommand]);
 
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
