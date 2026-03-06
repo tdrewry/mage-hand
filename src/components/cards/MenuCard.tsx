@@ -43,6 +43,8 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
   const [storageManagerOpen, setStorageManagerOpen] = useState(false);
+  const [returnMenuDialogOpen, setReturnMenuDialogOpen] = useState(false);
+  const setLaunched = useLaunchStore((s) => s.setLaunched);
 
   // Get current player's roles
   const currentPlayer = players.find(p => p.id === currentUserId || p.id === currentPlayerId);
@@ -643,6 +645,27 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <Dices className="h-4 w-4 mr-2" />
           Dice Box
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* Return to Menu */}
+      <div className="space-y-2">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => {
+            if (isConnected) {
+              setReturnMenuDialogOpen(true);
+            } else {
+              setLaunched(false);
+            }
+          }}
+          className="w-full"
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Return to Menu
         </Button>
       </div>
 
