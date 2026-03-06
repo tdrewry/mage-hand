@@ -7567,6 +7567,24 @@ export const SimpleTabletop = () => {
         return;
       }
 
+      // ── CTRL+SHIFT+CLICK: DM broadcasts map focus to all players ──
+      if (e.ctrlKey && e.shiftKey && !e.metaKey && isDM) {
+        emitMapFocus({ x: worldPos.x, y: worldPos.y }, transform.zoom);
+        // Visual feedback: also ping so DM sees confirmation
+        const cursorColor = useCursorStore.getState().cursors[useSessionStore.getState().currentPlayerId || ""]?.color || "#fbbf24";
+        const pingTs = Date.now();
+        ephemeralBus.emit("map.ping", { pos: { x: worldPos.x, y: worldPos.y }, color: cursorColor, label: "Focus" });
+        setActivePings((prev) => [...prev, {
+          id: `focus-${pingTs}`,
+          pos: { x: worldPos.x, y: worldPos.y },
+          color: cursorColor,
+          label: "Focus",
+          ts: pingTs,
+        }]);
+        toast.success("Focused all players here", { duration: 1500 });
+        return;
+      }
+
       // ── CTRL+CLICK: Emit map ping ──
       if (e.ctrlKey && !e.shiftKey && !e.metaKey) {
         const cursorColor = useCursorStore.getState().cursors[useSessionStore.getState().currentPlayerId || ""]?.color || "#fbbf24";
