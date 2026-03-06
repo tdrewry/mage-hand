@@ -728,7 +728,7 @@ function TargetResolveCard({
       </div>
 
       {/* Resolution buttons */}
-      <div className="space-y-1">
+      <div className={`space-y-1 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <p className="text-xs text-muted-foreground">Resolution {suggested !== 'miss' && `(suggested: ${RESOLUTION_CONFIG[suggested].label})`}</p>
         <div className="grid grid-cols-5 gap-1">
           {RESOLUTION_BUTTON_KEYS.map(key => {
@@ -740,6 +740,7 @@ function TargetResolveCard({
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => onSetResolution(key)}
+                      disabled={disabled}
                       className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
                         isActive
                           ? cfg.color + ' border-2'
