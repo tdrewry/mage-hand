@@ -8,6 +8,11 @@ import { useActionStore } from "@/stores/actionStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useActionPendingStore } from "@/stores/actionPendingStore";
+import { useArtSubmissionStore } from "@/stores/artSubmissionStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { saveTextureByHash } from "@/lib/textureStorage";
+import { saveTextureByHash as saveTokenTextureByHash } from "@/lib/tokenTextureStorage";
+import { toast } from "sonner";
 import type {
   FogCursorPreviewPayload,
   FogRevealPreviewPayload,
@@ -20,6 +25,9 @@ import type {
   GroupDragPreviewPayload,
   RoleHandRaisePayload,
   AssetUploadProgressPayload,
+  AssetSubmissionPayload,
+  AssetAcceptedPayload,
+  AssetRejectedPayload,
   ActionQueueSyncPayload,
   ActionPendingPayload,
   ActionResolvedPayload,
