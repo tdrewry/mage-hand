@@ -259,7 +259,7 @@ export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: Initiati
                   toast.success('Initiative updated');
                 }}
                 onDragStart={(e) => handleDragStart(e, actualIndex)}
-                onDragOver={handleDragOver}
+                onDragOver={(e) => handleDragOver(e, actualIndex)}
                 onDrop={(e) => handleDrop(e, actualIndex)}
                 isCompact={true}
                 size={cardSize}

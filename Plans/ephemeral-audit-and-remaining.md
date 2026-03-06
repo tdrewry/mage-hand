@@ -42,14 +42,15 @@ All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–5 have
 | `mapObject.handle.preview` | ✅ | ✅ | ❌ | ❌ |
 | `map.focus` | ✅ | ✅ | ❌ | ❌ |
 | `chat.typing` | ✅ | ✅ | ✅ | **Wired in ChatCard input (P5 ✅ v0.6.86)** |
-| `initiative.drag.preview` | ✅ | ✅ | ❌ | ❌ |
-| `initiative.hover` | ✅ | ✅ | ❌ | ❌ |
+| `chat.message` | ✅ | ✅ | ✅ | **Wired in chatStore (v0.6.88)** |
+| `initiative.drag.preview` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
+| `initiative.hover` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
 | `group.select.preview` | ✅ | ✅ | ❌ | ❌ |
 | `group.drag.preview` | ✅ | ✅ | ❌ | ❌ |
 | `asset.uploadProgress` | ✅ | ✅ | ❌ | ❌ |
 | `effect.placement.preview` | ✅ | ✅ | ✅ | **Wired in effectStore (P5 ✅ v0.6.86)** |
 | `action.flash` | ✅ | ✅ | ✅ | **Wired in commitAction (P5 ✅ v0.6.86)** |
-| `action.inProgress` | ✅ | ✅ | ❌ | ❌ |
+| `action.inProgress` | ✅ | ✅ | ✅ | **Wired in actionStore phases (P6 ✅ v0.6.90)** |
 | `mapObject.door.preview` | ✅ | ✅ | ❌ | ❌ |
 
 ---
