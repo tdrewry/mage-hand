@@ -133,6 +133,7 @@ import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
+import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 
 import { Z_INDEX } from "../lib/zIndex";
@@ -380,6 +381,8 @@ export const SimpleTabletop = () => {
   const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
   const remoteMapHandlePreviews = useMapEphemeralStore((s) => s.handlePreviews);
   const remotePings = useMapEphemeralStore((s) => s.pings);
+  const remoteGroupSelects = useMiscEphemeralStore((s) => s.groupSelects);
+  const remoteGroupDrags = useMiscEphemeralStore((s) => s.groupDrags);
   // Local pings (own + remote) for animated rendering — each has a birth timestamp
   const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
@@ -1412,10 +1415,12 @@ export const SimpleTabletop = () => {
         Object.keys(remoteSelections).length > 0 ||
         Object.keys(remoteActionTargets).length > 0 ||
         Object.keys(remoteTokenHandlePreviews).length > 0 ||
-        Object.keys(remoteMapHandlePreviews).length > 0) {
+        Object.keys(remoteMapHandlePreviews).length > 0 ||
+        Object.keys(remoteGroupSelects).length > 0 ||
+        Object.keys(remoteGroupDrags).length > 0) {
       redrawCanvas();
     }
-  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews]);
+  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
@@ -4184,6 +4189,7 @@ export const SimpleTabletop = () => {
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
       drawRemoteHandlePreviews(ctx);
+      drawRemoteGroupPreviews(ctx);
       drawMapPings(ctx);
     }
 
@@ -4295,6 +4301,7 @@ export const SimpleTabletop = () => {
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
             drawRemoteHandlePreviews(overlayCtx);
+            drawRemoteGroupPreviews(overlayCtx);
 
             overlayCtx.restore();
           }
@@ -4780,6 +4787,95 @@ export const SimpleTabletop = () => {
         if (obj) center = obj.position;
       }
       drawHandle(h.userId, h.entityId, h.handleType, h.pos, h.value, center);
+    }
+
+    ctx.restore();
+  };
+
+  // ── Draw remote group select/drag previews (ghost bounding box + user label) ──
+  const drawRemoteGroupPreviews = (ctx: CanvasRenderingContext2D) => {
+    const selects = Object.values(remoteGroupSelects);
+    const drags = Object.values(remoteGroupDrags);
+    if (selects.length === 0 && drags.length === 0) return;
+
+    const allGroups = useGroupStore.getState().groups;
+    ctx.save();
+
+    // Helper: draw a group bounding box ghost
+    const drawGroupGhost = (
+      groupId: string,
+      userId: string,
+      delta?: { x: number; y: number },
+      isDrag?: boolean
+    ) => {
+      const group = allGroups.find((g) => g.id === groupId);
+      if (!group || !group.bounds) return;
+
+      const cursorState = useCursorStore.getState().cursors[userId];
+      const color = cursorState?.color || "#60a5fa";
+      const b = group.bounds;
+      const dx = delta?.x ?? 0;
+      const dy = delta?.y ?? 0;
+
+      // Dashed bounding box outline
+      ctx.globalAlpha = isDrag ? 0.5 : 0.35;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / transform.zoom;
+      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
+      ctx.strokeRect(b.x + dx, b.y + dy, b.width, b.height);
+      ctx.setLineDash([]);
+
+      // Semi-transparent fill
+      ctx.globalAlpha = isDrag ? 0.08 : 0.05;
+      ctx.fillStyle = color;
+      ctx.fillRect(b.x + dx, b.y + dy, b.width, b.height);
+
+      // If dragging, draw ghost at original position too
+      if (isDrag && (dx !== 0 || dy !== 0)) {
+        ctx.globalAlpha = 0.15;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([4 / transform.zoom, 3 / transform.zoom]);
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+        ctx.setLineDash([]);
+
+        // Arrow from original center to new center
+        const cx1 = b.x + b.width / 2;
+        const cy1 = b.y + b.height / 2;
+        const cx2 = cx1 + dx;
+        const cy2 = cy1 + dy;
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5 / transform.zoom;
+        ctx.setLineDash([3 / transform.zoom, 3 / transform.zoom]);
+        ctx.beginPath();
+        ctx.moveTo(cx1, cy1);
+        ctx.lineTo(cx2, cy2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // User label at top of bounding box
+      const labelX = b.x + dx + b.width / 2;
+      const labelY = b.y + dy - 6 / transform.zoom;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = color;
+      ctx.font = `${9 / transform.zoom}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      const icon = isDrag ? "⇄" : "☐";
+      ctx.fillText(`${userId.slice(0, 6)} ${icon}`, labelX, labelY);
+    };
+
+    // Draw group selection previews (no delta)
+    for (const s of selects) {
+      if (!s.groupId) continue;
+      drawGroupGhost(s.groupId, s.userId);
+    }
+
+    // Draw group drag previews (with delta offset)
+    for (const d of drags) {
+      drawGroupGhost(d.groupId, d.userId, d.delta, true);
     }
 
     ctx.restore();
