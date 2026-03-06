@@ -1,19 +1,53 @@
 
 
-## Fix: Jazz CoList Mutation API
+# UX Restructure: Effect Template Editor Tabs & Fields
 
-**Problem**: Jazz CoLists are Proxy objects that don't allow direct `.push()` or `.splice()`. The correct API is `.$jazz.push()` and `.$jazz.splice()`.
+## Changes Requested
 
-**Root cause**: Three locations in `bridge.ts` use native array methods on Jazz CoLists:
-1. Line 145: `jazzTokens.push(jt)` in `pushTokensToJazz`
-2. Line 217: `jazzTokens.push(jt)` in `startBridge` (add detection)
-3. Line 259: `jazzTokens.splice(i, 1)` in `startBridge` (remove detection)
+1. **Move Category (type) outside tabs** — below Template Name, above the tab bar
+2. **Move Quantity to Shape tab** (from Damage tab)
+3. **Level & Scaling fields become their own tab** (extracted from Damage tab)
+4. **Granted Actions become their own tab** (extracted from Conditions tab)
+5. **Support texture/image on templates** — add optional texture field to Shape tab alongside color
+6. **Add Duration tab** — persistence, rounds, recurring extracted from Shape tab
 
-**Fix**: Replace all three with the Jazz Proxy API:
-- `jazzTokens.push(jt)` → `jazzTokens.$jazz.push(jt)`
-- `jazzTokens.splice(i, 1)` → `jazzTokens.$jazz.splice(i, 1)`
+## New Tab Structure
 
-**Files to edit**:
-- `src/lib/jazz/bridge.ts` — 3 line changes
-- `src/lib/version.ts` — bump to next patch
+```text
+[Name input]
+[Category selector]  ← moved outside tabs
+┌───────┬────────┬───────┬──────────┬──────────┬───────────┬──────────┐
+│ Shape │ Damage │ Level │ Mods     │ Conds    │ Grants    │ Duration │
+└───────┴────────┴───────┴──────────┴──────────┴───────────┴──────────┘
+```
+
+## Field Redistribution
+
+| Tab | Contents |
+|-----|----------|
+| **Shape** | Shape type, dimensions, color, texture/image, opacity, animation, quantity (multi-drop), placement toggles (align, caster, ranged, skip rotation) |
+| **Damage** | Damage dice rows, attack roll toggle + config |
+| **Level** | Spell level, base level, scaling rules, level overrides |
+| **Mods** | Modifier rows (target property + operation + value) |
+| **Conds** | D&D 5e condition checkboxes |
+| **Grants** | Granted actions with type field (attack/spell/trait/feature) |
+| **Duration** | Persistence type (instant/persistent), duration rounds, recurring toggle |
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/components/cards/EffectsCard.tsx` | Restructure tabs: add `level`, `grants`, `duration` tabs; move category above tabs; move quantity to Shape; move level/scaling out of Damage; split granted actions from Conditions; add texture input to Shape tab |
+| `src/types/effectTypes.ts` | Add `texture?: string` to `EffectTemplate` (already exists — just ensure form wires it) |
+| `src/lib/version.ts` | Bump to `0.6.35` |
+| `Plans/extended-effect-impacts.md` | Update with tab restructure |
+
+## Implementation Details
+
+- `FormTab` union becomes: `'shape' | 'damage' | 'level' | 'modifiers' | 'conditions' | 'grants' | 'duration'`
+- `FORM_TABS` array updated with 7 entries (short labels to fit: Shape, Dmg, Level, Mods, Conds, Grants, Dur)
+- Category selector rendered between Name input and tab bar in `TemplateFormFields`
+- Texture field on Shape tab: text input for data URL / asset key (reuses existing `texture` property on `EffectTemplate`)
+- Granted actions get a `type` dropdown per row: attack, spell, trait, feature
+- Badge counts updated: Level tab shows scaling rule count, Grants tab shows action count, Duration tab shows no badge
 

@@ -142,7 +142,7 @@ export function pushTokensToJazz(sessionRoot: any): void {
   for (const t of tokens) {
     const init = tokenToJazzInit(t);
     const jt = JazzTokenSchema.create(init as any, group);
-    jazzTokens.push(jt);
+    jazzTokens.$jazz.push(jt);
   }
 }
 
@@ -214,7 +214,7 @@ export function startBridge(sessionRoot: any): void {
           const init = tokenToJazzInit(t);
           try {
             const jt = JazzTokenSchema.create(init as any, group);
-            jazzTokens.push(jt);
+            jazzTokens.$jazz.push(jt);
             console.log(`[jazz-bridge] → Jazz: added token ${t.id}`);
           } catch (err) {
             console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
@@ -256,7 +256,7 @@ export function startBridge(sessionRoot: any): void {
             const jt = jazzTokens[i];
             if (jt && jt.tokenId === prev.id) {
               try {
-                jazzTokens.splice(i, 1);
+                jazzTokens.$jazz.splice(i, 1);
               } catch (err) {
                 console.error(`[jazz-bridge] Failed to remove JazzToken:`, err);
               }
