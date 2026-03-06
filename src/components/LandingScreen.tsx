@@ -305,7 +305,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       />
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-sm mx-auto px-6 space-y-8">
+      <div className="relative z-10 w-full max-w-2xl mx-auto px-6 space-y-6">
         {/* Title block */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Magehand</h1>
@@ -313,62 +313,111 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
           <p className="text-xs text-muted-foreground/50 font-mono">v{APP_VERSION}</p>
         </div>
 
-        {/* Identity Selection */}
-        <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <UserCircle className="w-4 h-4 text-muted-foreground" />
-            <span>Player Identity</span>
-            {hasValidIdentity && (
-              <span className="ml-auto text-xs text-primary font-normal">✓ {currentPlayer?.name}</span>
+        {/* Side-by-side: Identity + Multiplayer */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Identity Selection */}
+          <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <UserCircle className="w-4 h-4 text-muted-foreground" />
+              <span>Player Identity</span>
+              {hasValidIdentity && (
+                <span className="ml-auto text-xs text-primary font-normal">✓ {currentPlayer?.name}</span>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Input
+                type="text"
+                placeholder="Enter your name"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                maxLength={50}
+                className="bg-background text-sm h-8"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              {roles.map((role) => (
+                <div
+                  key={role.id}
+                  className="flex items-center space-x-2.5 p-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => toggleRole(role.id)}
+                >
+                  <Checkbox
+                    id={`landing-role-${role.id}`}
+                    checked={selectedRoleIds.includes(role.id)}
+                    onCheckedChange={() => toggleRole(role.id)}
+                  />
+                  <label
+                    htmlFor={`landing-role-${role.id}`}
+                    className="flex items-center gap-2 flex-1 cursor-pointer text-sm"
+                  >
+                    <div
+                      className="w-2.5 h-2.5 rounded-full border border-border"
+                      style={{ backgroundColor: role.color }}
+                    />
+                    <span className="font-medium">{role.name}</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            {!isIdentityReady && (
+              <p className="text-xs text-muted-foreground/70">
+                Select a name and role to enable session actions
+              </p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Input
-              type="text"
-              placeholder="Enter your name"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              maxLength={50}
-              className="bg-background text-sm h-8"
-            />
-          </div>
+          {/* Multiplayer */}
+          <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Network className="w-4 h-4 text-muted-foreground" />
+              <span>Multiplayer</span>
+              {isConnected && (
+                <Badge variant="default" className="ml-auto text-xs py-0 px-1.5">
+                  <Wifi className="w-3 h-3 mr-1" />
+                  Connected
+                </Badge>
+              )}
+              {!isConnected && connectionStatus === 'disconnected' && (
+                <Badge variant="secondary" className="ml-auto text-xs py-0 px-1.5">
+                  <WifiOff className="w-3 h-3 mr-1" />
+                  Offline
+                </Badge>
+              )}
+            </div>
 
-          <div className="space-y-1.5">
-            {roles.map((role) => (
-              <div
-                key={role.id}
-                className="flex items-center space-x-2.5 p-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => toggleRole(role.id)}
-              >
-                <Checkbox
-                  id={`landing-role-${role.id}`}
-                  checked={selectedRoleIds.includes(role.id)}
-                  onCheckedChange={() => toggleRole(role.id)}
-                />
-                <label
-                  htmlFor={`landing-role-${role.id}`}
-                  className="flex items-center gap-2 flex-1 cursor-pointer text-sm"
-                >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full border border-border"
-                    style={{ backgroundColor: role.color }}
-                  />
-                  <span className="font-medium">{role.name}</span>
-                </label>
+            {isConnected && currentSession && (
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>Session: <span className="font-mono text-foreground">{currentSession.sessionCode}</span></div>
+                <div className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
+                </div>
               </div>
-            ))}
-          </div>
+            )}
 
-          {!isIdentityReady && (
-            <p className="text-xs text-muted-foreground/70">
-              Select a name and role to enable session actions
-            </p>
-          )}
+            <Button
+              variant={isConnected ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSessionManagerOpen(true)}
+              className="w-full"
+            >
+              <Network className="h-4 w-4 mr-2" />
+              {isConnected ? 'Session Details' : 'Host / Join'}
+            </Button>
+
+            {!isConnected && (
+              <p className="text-xs text-muted-foreground/70">
+                Host a new session or join an existing one
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Menu */}
-        <nav className="space-y-1">
+        <nav className="space-y-1 max-w-sm mx-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -412,46 +461,6 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
             );
           })}
         </nav>
-
-        {/* Multiplayer */}
-        <div className="space-y-2 border border-border rounded-lg p-4 bg-muted/10">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Network className="w-4 h-4 text-muted-foreground" />
-            <span>Multiplayer</span>
-            {isConnected && (
-              <Badge variant="default" className="ml-auto text-xs py-0 px-1.5">
-                <Wifi className="w-3 h-3 mr-1" />
-                Connected
-              </Badge>
-            )}
-            {!isConnected && connectionStatus === 'disconnected' && (
-              <Badge variant="secondary" className="ml-auto text-xs py-0 px-1.5">
-                <WifiOff className="w-3 h-3 mr-1" />
-                Offline
-              </Badge>
-            )}
-          </div>
-
-          {isConnected && currentSession && (
-            <div className="text-xs text-muted-foreground space-y-1">
-              <div>Session: <span className="font-mono text-foreground">{currentSession.sessionCode}</span></div>
-              <div className="flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
-              </div>
-            </div>
-          )}
-
-          <Button
-            variant={isConnected ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSessionManagerOpen(true)}
-            className="w-full"
-          >
-            <Network className="h-4 w-4 mr-2" />
-            {isConnected ? 'Session Details' : 'Host / Join'}
-          </Button>
-        </div>
       </div>
 
       {/* Session Manager Dialog */}
