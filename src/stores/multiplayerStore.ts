@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectedUser } from '@/types/multiplayerEvents';
 
+export type TransportType = 'opbridge' | 'jazz';
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
 
 export interface SessionInfo {
@@ -27,6 +29,7 @@ export interface MultiplayerState {
   roles: string[];
   permissions: string[];
   lastError: string | null;
+  activeTransport: TransportType | null;
   
   // Sync state
   isSyncing: boolean;
@@ -49,6 +52,7 @@ export interface MultiplayerState {
   setRoles: (roles: string[]) => void;
   setPermissions: (permissions: string[]) => void;
   setLastError: (error: string | null) => void;
+  setActiveTransport: (transport: TransportType | null) => void;
   setSyncing: (syncing: boolean) => void;
   updateLastSyncTimestamp: () => void;
   addSyncError: (error: string) => void;
@@ -72,6 +76,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       roles: [],
       permissions: [],
       lastError: null,
+      activeTransport: null,
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
@@ -108,6 +113,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setRoles: (roles) => set({ roles }),
       setPermissions: (permissions) => set({ permissions }),
       setLastError: (error) => set({ lastError: error }),
+      setActiveTransport: (transport) => set({ activeTransport: transport }),
       
       setSyncing: (syncing) => set({ isSyncing: syncing }),
       updateLastSyncTimestamp: () => set({ lastSyncTimestamp: Date.now() }),
@@ -127,6 +133,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         roles: [],
         permissions: [],
         lastError: null,
+        activeTransport: null,
         isSyncing: false,
         lastSyncTimestamp: 0,
         syncErrors: []

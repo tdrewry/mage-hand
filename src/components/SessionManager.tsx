@@ -39,14 +39,14 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
 import { createJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
 
-export type TransportType = 'opbridge' | 'jazz';
+export { type TransportType } from '@/stores/multiplayerStore';
 
 interface SessionManagerProps {
   open: boolean;
@@ -64,8 +64,10 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     roles,
     permissions,
     lastError,
+    activeTransport,
     setServerUrl,
     setCurrentUsername,
+    setActiveTransport,
   } = useMultiplayerStore();
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
@@ -117,6 +119,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         roles: localRoles,
       });
       setCurrentUsername(username.trim());
+      setActiveTransport('opbridge');
       toast.success(`Connected to session ${code.toUpperCase()}`);
     } catch (error) {
       console.error('Failed to connect:', error);
@@ -136,6 +139,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       try {
         setCurrentUsername(username.trim());
         const info = createJazzSession(username.trim());
+        setActiveTransport('jazz');
         toast.success(`Jazz session created: ${info.sessionCoId.slice(0, 12)}…`);
       } catch (error) {
         console.error('Failed to create Jazz session:', error);
@@ -271,6 +275,16 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Your Username</span>
                   <span className="font-medium text-foreground">{currentUsername}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Transport</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {activeTransport === 'jazz' ? (
+                      <><Database className="h-3 w-3 mr-1" /> Jazz (CRDT)</>
+                    ) : (
+                      <><Radio className="h-3 w-3 mr-1" /> OpBridge (WS)</>
+                    )}
+                  </Badge>
                 </div>
                 {roles.length > 0 && (
                   <div className="flex items-center justify-between text-sm">
