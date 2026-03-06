@@ -38,4 +38,4 @@ export type {
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
 export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
-export { emitChatTyping, emitChatMessage } from "./miscHandlers";
+export { emitChatTyping, emitChatMessage, emitAssetUploadProgress, emitArtSubmission, emitArtAccepted, emitArtRejected } from "./miscHandlers";
