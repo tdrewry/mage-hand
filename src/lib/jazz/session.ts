@@ -247,6 +247,10 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
  * Leave the current Jazz session and tear down the bridge.
  */
 export function leaveJazzSession(): void {
+  if (_retryTimer) {
+    clearTimeout(_retryTimer);
+    _retryTimer = null;
+  }
   if (!currentSession) return;
   stopBridge();
   useMultiplayerStore.getState().setSyncReady(false);
