@@ -185,10 +185,11 @@ function quickHash(str: string): string {
 
 /** Find blob index in session root by kind */
 function findBlobIndex(kind: string): number {
-  if (!_sessionRoot?.blobs) return -1;
-  const len = _sessionRoot.blobs.length ?? 0;
+  const blobs = _cachedBlobs ?? _sessionRoot?.blobs;
+  if (!blobs) return -1;
+  const len = blobs.length ?? 0;
   for (let i = 0; i < len; i++) {
-    const b = _sessionRoot.blobs[i];
+    const b = blobs[i];
     if (b && b.kind === kind) return i;
   }
   return -1;
@@ -196,7 +197,8 @@ function findBlobIndex(kind: string): number {
 
 /** Push a single DO kind's state to Jazz as a blob */
 function pushBlobToJazz(kind: string): void {
-  if (!_sessionRoot?.blobs) return;
+  const blobs = _cachedBlobs ?? _sessionRoot?.blobs;
+  if (!blobs) return;
   const reg = DurableObjectRegistry.get(kind);
   if (!reg) return;
 
