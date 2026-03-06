@@ -117,7 +117,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
           size="xs"
           className="bg-primary text-primary-foreground border-primary hover:bg-primary/90"
         />
-        />
       )}
 
       <ToolbarSeparator />
