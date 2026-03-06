@@ -454,6 +454,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         },
         (processed, total) => setLoadingProgress(`Loading maps (${processed}/${total})...`)
       );
+      // Select the first restored map so the canvas renders effects correctly
+      if (maps.length > 0) {
+        mapStore.setSelectedMap(maps[0].id);
+      }
       if (cancelRequested) throw new Error('Import cancelled by user');
       
       // Step 7: Clear and add regions
@@ -751,6 +755,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       const { regions, ...mapData } = map;
       mapStore.restoreMap({ ...mapData, regions: regions || [] });
     });
+    // Select the first restored map so the canvas renders effects correctly
+    if ((projectData.maps || []).length > 0) {
+      mapStore.setSelectedMap(projectData.maps![0].id);
+    }
 
     // Regions
     regionStore.clearRegions();

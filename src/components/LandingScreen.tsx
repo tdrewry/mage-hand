@@ -248,7 +248,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
 
       // Core entities
       if (data.tokens) sessionStore.setTokens(data.tokens);
-      if (data.maps) data.maps.forEach(m => mapStore.addMap(m));
+      if (data.maps) {
+        data.maps.forEach(m => {
+          const { regions, ...mapData } = m;
+          mapStore.restoreMap({ ...mapData, regions: regions || [] });
+        });
+        // Select first restored map so the canvas renders entities correctly
+        if (data.maps.length > 0) {
+          mapStore.setSelectedMap(data.maps[0].id);
+        }
+      }
       if (data.regions) data.regions.forEach(r => regionStore.addRegion(r));
       if (data.groups) data.groups.forEach(g => useGroupStore.getState().restoreGroup(g));
       if (data.mapObjects) useMapObjectStore.getState().setMapObjects(data.mapObjects);
