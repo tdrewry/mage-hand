@@ -122,22 +122,29 @@ The bridge:
 
 ---
 
-## Phase 2: Token Store Migration (Proof of Concept)
+## Phase 2: Token Store Bridge (Proof of Concept) ✅ COMPLETE (v0.7.4)
 
-### Why Tokens First
-- Simplest schema (flat object, no nested geometry)
-- High-frequency mutations (position updates)  
-- Already has extractor/hydrator in DO registry
-- Validates the full round-trip: local edit → Jazz → peer → zustand
+### What Was Done
+1. **MageHandAccount** — defined `co.account()` with root containing `activeSession`
+2. **createSessionRoot()** — helper creates `JazzSessionRoot` with empty lists and public group
+3. **JazzSessionProvider** wired into `App.tsx` wrapping the entire app (anonymous auth)
+4. **bridge.ts** — full bidirectional token sync:
+   - Zustand → Jazz: token add/move/update/remove via `$jazz.set()`
+   - Jazz → Zustand: subscription-based inbound with `runFromJazz()` echo prevention
+5. **session.ts** — `createJazzSession()` / `joinJazzSession()` / `leaveJazzSession()`
+6. **NetworkDemoCard** — Jazz Transport section with Create/Join/Leave/Copy ID controls
 
-### Steps
-1. Create `JazzToken` CoMap and `JazzTokenList` CoList
-2. On session join, load or create `JazzSession` CoValue
-3. Bridge `sessionStore.addToken()` → `jazzSession.tokens.push(...)`
-4. Bridge `sessionStore.updateToken()` → `jazzToken.x = newX` etc.
-5. Subscribe to CoValue changes → call token hydrator
-6. Remove token-related ops from `OpBridge` (`token.move`, `token.sync`)
-7. Validate: two peers see token creation, movement, deletion in real-time
+### How to Test Two-Peer Sync
+1. Run sync server: `npm run dev:jazz`
+2. Run app: `npm run dev`
+3. Open two browser tabs
+4. Tab 1: Network Demo → Create Jazz session → copy session ID
+5. Tab 2: Network Demo → paste session ID → Join
+6. Create tokens in either tab — they appear in both via CRDT bridge
+
+### Steps Deferred
+- Step 6 from original plan (remove token ops from OpBridge) — **NOT done** per architectural rule: OpBridge stays as default transport
+- Both transports can coexist; Jazz bridge only activates when a Jazz session is created/joined
 
 ---
 
@@ -146,7 +153,7 @@ The bridge:
 ### Migration Order (by complexity)
 | Priority | Store | Complexity | Notes |
 |----------|-------|-----------|-------|
-| 1 | tokens | Low | Flat objects, high-frequency |
+| 1 | tokens | Low | ✅ Done (Phase 2) |
 | 2 | maps | Low | Metadata + image refs |
 | 3 | initiative | Low | Ordered list |
 | 4 | roles | Low | Simple assignments |
@@ -167,22 +174,22 @@ The bridge:
 
 ### Per-Store Migration Pattern
 1. Define CoMap schema in `src/lib/jazz/schema.ts`
-2. Add field to `JazzSession` root
+2. Add field to `JazzSessionRoot`
 3. Wire bridge: zustand action → CoValue mutation
 4. Wire bridge: CoValue subscription → zustand hydrator
-5. Remove corresponding ops from `OpBridge`
+5. **Do NOT remove** corresponding ops from `OpBridge` — both transports coexist
 6. Test two-peer sync
 
 ---
 
-## Phase 4: Retire OpBridge
+## Phase 4: Transport Selection UI
 
-Once all 18 DOs are on Jazz:
-- Remove `OpBridge` class
-- Remove `proposeOp()` / `opBatch` handling from `NetManager`
-- Remove `lastSeenSeq` tracking
-- `NetManager` becomes ephemeral-only (just `EphemeralBus` lifecycle)
-- `.mhdo` export can use `JazzSession.toJSON()` or keep existing extractors
+> **OpBridge is NEVER retired.** Jazz is an alternative transport.
+
+- Add a transport selection UI to the session creation flow
+- Allow hosting user to choose: "WebSocket (OpBridge)" or "Jazz (CRDT)"
+- Store transport preference in session config
+- Future: Cloudflare Durable Objects as a third option
 
 ---
 
