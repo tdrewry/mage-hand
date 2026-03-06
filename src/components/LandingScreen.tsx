@@ -137,7 +137,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
     launchFn();
   };
 
-  // Store hooks
+  // Store hooks (for save/load operations)
   const sessionStore = useSessionStore();
   const mapStore = useMapStore();
   const regionStore = useRegionStore();
