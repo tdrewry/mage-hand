@@ -212,6 +212,14 @@ function pushBlobToJazz(kind: string): void {
 
     // Skip if unchanged
     if (_lastPushedHash.get(kind) === hash) return;
+
+    // Guard: Jazz has a 1MB transaction limit
+    const JAZZ_MAX_BYTES = 1_000_000;
+    if (json.length > JAZZ_MAX_BYTES) {
+      console.warn(`[jazz-bridge] ⚠️ Blob "${kind}" too large for Jazz sync (${(json.length / 1024 / 1024).toFixed(1)}MB > 1MB) — skipping`);
+      return;
+    }
+
     _lastPushedHash.set(kind, hash);
 
     const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
