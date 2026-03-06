@@ -977,6 +977,9 @@ export const SimpleTabletop = () => {
       selectMultipleLights(lightIds);
     }
 
+    // ── EPHEMERAL: broadcast group selection preview ──
+    emitGroupSelectPreview(group.id);
+
     return true;
   }, [clearSelection, selectRegion, selectMultipleLights]);
 
