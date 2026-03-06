@@ -266,8 +266,9 @@ export function startBridge(sessionRoot: any): void {
           }
         }
       }
-    },
-  );
+
+      prevTokens = tokens;
+    });
   activeSubscriptions.push(unsubZustand);
 
   // ── Direction 2: Jazz → Zustand ──
