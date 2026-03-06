@@ -9188,6 +9188,8 @@ export const SimpleTabletop = () => {
         // already-moved position from the previous frame.
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
         if (group && (deltaX !== 0 || deltaY !== 0)) {
+          // ── EPHEMERAL: broadcast group drag preview ──
+          emitGroupDragPreview(group.id, { x: deltaX, y: deltaY });
           // Collect all region IDs in the group (including primary) for annotation/terrain propagation
           const groupRegionIds = new Set<string>();
           groupRegionIds.add(draggedRegionId);
