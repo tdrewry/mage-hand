@@ -145,3 +145,8 @@ export function emitGroupSelectPreview(groupId: string | null): void {
 export function emitGroupDragPreview(groupId: string, delta: { x: number; y: number }): void {
   ephemeralBus.emit("group.drag.preview", { groupId, delta });
 }
+
+/** Broadcast a map focus command to all connected players (DM only). */
+export function emitMapFocus(pos: { x: number; y: number }, zoom?: number): void {
+  ephemeralBus.emit("map.focus", { pos, zoom });
+}
