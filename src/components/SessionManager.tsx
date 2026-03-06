@@ -102,16 +102,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   const [chatText, setChatText] = useState('');
   const [transport, setTransport] = useState<TransportType>('opbridge');
 
-  // Generate random session code
-  const generateSessionCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
   const handleConnect = async (code: string) => {
     if (!username.trim()) {
       toast.error('Please enter a username');
@@ -150,17 +140,28 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   };
 
   const handleCreateSession = async () => {
+    if (!username.trim()) {
+      toast.error('Please enter a username');
+      return;
+    }
+
     if (transport === 'jazz') {
-      if (!username.trim()) {
-        toast.error('Please enter a username');
-        return;
-      }
       setIsConnecting(true);
       try {
         setCurrentUsername(username.trim());
         const info = createJazzSession(username.trim());
+        const shortCode = encodeJazzCode(info.sessionCoId);
         setActiveTransport('jazz');
-        toast.success(`Jazz session created: ${info.sessionCoId.slice(0, 12)}…`);
+
+        // Store the short code as the session code so players can copy it
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: shortCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+
+        toast.success(`Jazz session created — code: ${shortCode}`);
       } catch (error) {
         console.error('Failed to create Jazz session:', error);
         toast.error('Failed to create Jazz session');
@@ -176,8 +177,44 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     handleConnect(code);
   };
 
-  const handleJoinSession = () => {
-    handleConnect(sessionCode);
+  /** Unified join — auto-detects transport from the code format. */
+  const handleJoinSession = async () => {
+    if (!username.trim()) {
+      toast.error('Please enter a username');
+      return;
+    }
+    if (!sessionCode.trim()) {
+      toast.error('Please enter a session code');
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      const resolved = resolveSessionCode(sessionCode);
+
+      if (resolved.transport === 'jazz') {
+        setCurrentUsername(username.trim());
+        const info = await joinJazzSession(resolved.connectionId);
+        setActiveTransport('jazz');
+
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: resolved.displayCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+
+        toast.success(`Joined Jazz session: ${resolved.displayCode}`);
+      } else {
+        // OpBridge join
+        await handleConnect(resolved.connectionId);
+      }
+    } catch (error) {
+      console.error('Failed to join session:', error);
+      toast.error('Invalid or expired session code');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleLeaveSession = () => {
