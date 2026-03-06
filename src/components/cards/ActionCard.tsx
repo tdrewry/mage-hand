@@ -277,14 +277,8 @@ function SkillCheckResolvePhase() {
   const isNat20 = roll?.naturalRoll === 20;
   const isNat1 = roll?.naturalRoll === 1;
 
-  const handleSetResolution = useCallback((targetKey: string, r: AttackResolution) => {
-    // Claim the action when we start resolving
-    const username = useMultiplayerStore.getState().connectedUsers.find(
-      u => u.userId === useMultiplayerStore.getState().currentUserId
-    )?.username ?? 'DM';
-    broadcastResolutionClaim(currentAction!.id, currentUserId!, username);
-    setResolution(targetKey, r);
-  }, [currentAction?.id, currentUserId, setResolution]);
+
+
 
   return (
     <ScrollArea className="h-full">
