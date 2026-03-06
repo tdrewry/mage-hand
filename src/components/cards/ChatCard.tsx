@@ -417,10 +417,33 @@ export const ChatCardContent: React.FC = () => {
         </div>
       )}
 
+      {/* Autocomplete dropdown for /w */}
+      {acSuggestions.length > 0 && (
+        <div className="px-2 pb-1">
+          <div className="rounded-md border border-border bg-popover p-1 space-y-0.5">
+            <p className="text-[9px] text-muted-foreground px-2 py-0.5">Whisper to…</p>
+            {acSuggestions.map((user, i) => (
+              <button
+                key={user.userId}
+                className={`w-full text-left rounded px-2 py-1 text-xs flex items-center gap-1.5 ${
+                  i === acIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-muted'
+                }`}
+                onMouseDown={(e) => { e.preventDefault(); applyAutocomplete(user.username); }}
+                onMouseEnter={() => setAcIndex(i)}
+              >
+                <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
+                {user.username}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-2 flex gap-1.5">
         <WhisperPicker whisperTargets={whisperTargets} setWhisperTargets={setWhisperTargets} />
         <Input
+          ref={inputRef}
           placeholder={isWhisperMode ? 'Whisper...' : 'Type a message...'}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
