@@ -353,18 +353,22 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           // Active Session View
           <div className="space-y-4">
             <div className="p-4 bg-secondary/50 rounded-lg border border-border space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-1 min-w-0 flex-1">
                   <Label className="text-xs text-muted-foreground">Session Code</Label>
                   <div className="flex items-center gap-2">
-                    <code className="text-2xl font-bold tracking-wider text-primary">
+                    <code className={`font-bold tracking-wider text-primary break-all ${
+                      (currentSession.sessionCode?.length ?? 0) > 12 
+                        ? 'text-xs leading-tight' 
+                        : 'text-2xl'
+                    }`}>
                       {currentSession.sessionCode}
                     </code>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={handleCopySessionCode}
-                      className="h-8 w-8"
+                      className="h-8 w-8 shrink-0"
                     >
                       {copiedCode ? (
                         <Check className="h-4 w-4 text-success" />
