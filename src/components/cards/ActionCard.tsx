@@ -256,10 +256,19 @@ function SkillCheckResolvePhase() {
   const { currentAction, setResolution, commitAction, cancelAction } = useActionStore();
   const claims = useActionPendingStore((s) => s.claims);
   const currentUserId = useMultiplayerStore((s) => s.currentUserId);
+  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+
+  const handleSetResolution = useCallback((targetKey: string, r: AttackResolution) => {
+    if (!currentAction) return;
+    const username = connectedUsers.find(u => u.userId === currentUserId)?.username ?? 'DM';
+    broadcastResolutionClaim(currentAction.id, currentUserId!, username);
+    setResolution(targetKey, r);
+  }, [currentAction?.id, currentUserId, connectedUsers, setResolution]);
+
   if (!currentAction || !currentAction.attack) return null;
 
   const claim = claims[currentAction.id];
-  const claimedByOther = claim && claim.claimedBy !== currentUserId;
+  const claimedByOther = !!(claim && claim.claimedBy !== currentUserId);
 
   const target = currentAction.targets[0];
   const roll = target ? currentAction.rollResults[target.targetKey] : null;
