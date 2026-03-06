@@ -211,12 +211,12 @@ function pushBlobToJazz(kind: string): void {
     if (_lastPushedHash.get(kind) === hash) return;
     _lastPushedHash.set(kind, hash);
 
-    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const group = _cachedGroup ?? _sessionRoot?._owner ?? _sessionRoot?.$jazz?.group;
     const idx = findBlobIndex(kind);
 
     if (idx >= 0) {
       // Update existing blob
-      const blob = _sessionRoot.blobs[idx];
+      const blob = blobs[idx];
       try {
         blob.$jazz.set("state", json);
         blob.$jazz.set("version", reg.version);
@@ -233,7 +233,7 @@ function pushBlobToJazz(kind: string): void {
           state: json,
           updatedAt: new Date().toISOString(),
         } as any, group);
-        _sessionRoot.blobs.$jazz.push(blob);
+        blobs.$jazz.push(blob);
       } catch (err) {
         console.error(`[jazz-bridge] Failed to create blob ${kind}:`, err);
       }
