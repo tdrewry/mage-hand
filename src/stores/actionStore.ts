@@ -30,6 +30,50 @@ function broadcastActionQueue() {
     // ephemeralBus may not be connected — silently ignore
   }
 }
+
+/** Broadcast action.pending to all peers (players see toast) */
+function broadcastActionPending(action: ActionQueueEntry) {
+  if (!action.attack) return;
+  try {
+    ephemeralBus.emit('action.pending', {
+      actionId: action.id,
+      sourceName: action.sourceTokenName,
+      attackName: action.attack.name,
+      targetNames: action.targets.map(t => t.tokenName),
+      category: action.category,
+    });
+  } catch { /* ignore */ }
+}
+
+/** Broadcast action.resolved to all peers (players see outcome) */
+function broadcastActionResolved(action: ActionQueueEntry) {
+  if (!action.attack) return;
+  try {
+    ephemeralBus.emit('action.resolved', {
+      actionId: action.id,
+      sourceName: action.sourceTokenName,
+      attackName: action.attack.name,
+      category: action.category,
+      targets: action.targets.map(t => ({
+        tokenName: t.tokenName,
+        resolution: action.resolutions[t.targetKey] || 'miss',
+        totalDamage: action.damageResults[t.targetKey]?.adjustedTotal ?? 0,
+        damageType: action.damageResults[t.targetKey]?.damageType ?? 'untyped',
+      })),
+    });
+  } catch { /* ignore */ }
+}
+
+/** Broadcast resolution claim / release for multi-DM coordination */
+export function broadcastResolutionClaim(actionId: string, claimedBy: string | null, claimedByName: string | null) {
+  try {
+    ephemeralBus.emit('action.resolution.claim', {
+      actionId,
+      claimedBy,
+      claimedByName,
+    });
+  } catch { /* ignore */ }
+}
 export interface ResolutionFlash {
   tokenId: string;
   x: number;
@@ -369,6 +413,8 @@ export const useActionStore = create<ActionStore>()(
       set({ pendingActions: [...get().pendingActions, entry] });
     } else {
       set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+      // Effect actions go straight to resolve — broadcast pending
+      broadcastActionPending(entry);
     }
   },
 
@@ -441,16 +487,21 @@ export const useActionStore = create<ActionStore>()(
       };
     }
 
+    const updatedAction = {
+      ...currentAction,
+      phase: 'resolve' as const,
+      rollResults,
+      damageResults,
+    };
+
     set({
-      currentAction: {
-        ...currentAction,
-        phase: 'resolve',
-        rollResults,
-        damageResults,
-      },
+      currentAction: updatedAction,
       isTargeting: false,
       targetingMousePos: null,
     });
+
+    // Broadcast to players that resolution is pending
+    broadcastActionPending(updatedAction);
   },
 
   setResolution: (targetKey, resolution) => {
@@ -586,6 +637,11 @@ export const useActionStore = create<ActionStore>()(
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
 
+    // Broadcast resolved outcome to all peers (players see summary)
+    broadcastActionResolved(currentAction);
+    // Release any resolution claim
+    broadcastResolutionClaim(currentAction.id, null, null);
+
     // Auto-clear flashes after 1.5s
     setTimeout(() => {
       get().clearFlashes();
@@ -611,6 +667,11 @@ export const useActionStore = create<ActionStore>()(
           effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
         }
       }
+    }
+
+    // Clear pending notification for cancelled action
+    if (currentAction) {
+      broadcastResolutionClaim(currentAction.id, null, null);
     }
 
     // Advance queue: pop next pending action if any

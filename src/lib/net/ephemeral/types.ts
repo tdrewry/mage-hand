@@ -49,6 +49,9 @@ export type EphemeralOpKind =
   | "action.flash"
   | "action.inProgress"
   | "action.queue.sync"
+  | "action.pending"
+  | "action.resolved"
+  | "action.resolution.claim"
   // Assets
   | "asset.uploadProgress"
   // Effects & Auras
@@ -231,6 +234,37 @@ export interface ActionQueueSyncPayload {
   actionHistory: any[];
 }
 
+/** Broadcast by DM when an action enters resolve phase — visible to all players. */
+export interface ActionPendingPayload {
+  actionId: string;
+  sourceName: string;
+  attackName: string;
+  targetNames: string[];
+  category: string;
+}
+
+/** Broadcast by DM when an action is committed — players see outcome summary. */
+export interface ActionResolvedPayload {
+  actionId: string;
+  sourceName: string;
+  attackName: string;
+  category: string;
+  targets: Array<{
+    tokenName: string;
+    resolution: string;     // hit/miss/half/critical_hit etc.
+    totalDamage: number;
+    damageType: string;
+  }>;
+}
+
+/** Optimistic lock: DM claims exclusive resolution of an action. */
+export interface ActionResolutionClaimPayload {
+  actionId: string;
+  /** null = release claim */
+  claimedBy: string | null;
+  claimedByName: string | null;
+}
+
 // -- Assets --
 
 export interface AssetUploadProgressPayload {
@@ -299,6 +333,9 @@ export interface EphemeralPayloadMap {
   "action.flash": ActionFlashPayload;
   "action.inProgress": ActionInProgressPayload;
   "action.queue.sync": ActionQueueSyncPayload;
+  "action.pending": ActionPendingPayload;
+  "action.resolved": ActionResolvedPayload;
+  "action.resolution.claim": ActionResolutionClaimPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
@@ -375,6 +412,9 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "action.flash":           { throttleMs: 0,   ttlMs: 1000, keyStrategy: "entityId" },
   "action.inProgress":      { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
   "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session", dmOnly: true },
+  "action.pending":         { throttleMs: 0,   ttlMs: 15000, keyStrategy: "entityId", dmOnly: true },
+  "action.resolved":        { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "entityId", dmOnly: true },
+  "action.resolution.claim": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "entityId", dmOnly: true },
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },

@@ -120,6 +120,7 @@ import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
 import { CursorOverlay } from "./CursorOverlay";
+import { ActionPendingOverlay } from "./ActionPendingOverlay";
 import { useCursorStore } from "@/stores/cursorStore";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
@@ -11431,6 +11432,8 @@ export const SimpleTabletop = () => {
         />
         {/* Remote cursor overlay */}
         <CursorOverlay transform={transform} />
+        {/* Player-facing action pending / resolved overlay */}
+        <ActionPendingOverlay />
         {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
             Position/size is driven directly via ref to avoid React re-renders and flicker. */}
         <div
