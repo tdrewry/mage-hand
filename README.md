@@ -140,3 +140,53 @@ SETUP INSTRUCTIONS
    serverUrl: 'http://localhost:3001'
 
 6. For production, deploy to Railway, Render, or Fly.io
+
+---
+
+## Jazz CRDT Transport (Dev Setup)
+
+Jazz is an **optional** alternative transport for durable state sync (tokens, maps, etc.) using CRDTs. The default WebSocket/OpBridge transport always works without it.
+
+### Prerequisites
+
+Jazz uses a self-hosted sync server for local development — no cloud account needed.
+
+### Running
+
+Open **two terminals**:
+
+```bash
+# Terminal 1 — Jazz sync server
+npm run dev:jazz
+# Starts sync server on ws://localhost:4200
+
+# Terminal 2 — Vite dev server
+npm run dev
+```
+
+### Two-Peer Token Sync
+
+1. Open two browser tabs at `http://localhost:5173`
+2. In **Tab 1**: Open the **Menu → Network Demo** card → scroll to **Jazz Transport (CRDT)** → click **Create Session** → copy the session ID
+3. In **Tab 2**: Open **Network Demo** → paste the session ID → click **Join**
+4. Create, move, or delete tokens in either tab — changes sync in real-time via CRDT
+
+### How It Works
+
+```
+Tab A (Zustand store) ←→ Jazz Bridge ←→ Jazz CoValues ←→ Sync Server ←→ Jazz CoValues ←→ Jazz Bridge ←→ Tab B (Zustand store)
+```
+
+- The bridge in `src/lib/jazz/bridge.ts` watches Zustand for local changes and pushes to Jazz CoValues
+- It also subscribes to CoValue updates from the sync server and hydrates Zustand
+- Echo prevention (`_fromJazz` flag) stops infinite loops
+- EphemeralBus (cursors, drags, pings) runs independently on the existing WebSocket — unaffected by transport choice
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/jazz/schema.ts` | CoMap/CoList definitions |
+| `src/lib/jazz/provider.tsx` | JazzReactProvider wrapper |
+| `src/lib/jazz/bridge.ts` | Bidirectional Zustand ↔ Jazz sync |
+| `src/lib/jazz/session.ts` | Create/join/leave session helpers |
