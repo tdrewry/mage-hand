@@ -19,6 +19,22 @@ import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { JazzToken as JazzTokenSchema, JazzDOBlob as JazzDOBlobSchema } from "./schema";
 import { DurableObjectRegistry } from "@/lib/durableObjects";
 import "@/lib/durableObjectRegistry"; // Side-effect: registers all DO kinds
+import { useMapStore } from "@/stores/mapStore";
+import { useRegionStore } from "@/stores/regionStore";
+import { useGroupStore } from "@/stores/groupStore";
+import { useInitiativeStore } from "@/stores/initiativeStore";
+import { useRoleStore } from "@/stores/roleStore";
+import { useVisionProfileStore } from "@/stores/visionProfileStore";
+import { useFogStore } from "@/stores/fogStore";
+import { useLightStore } from "@/stores/lightStore";
+import { useIlluminationStore } from "@/stores/illuminationStore";
+import { useDungeonStore } from "@/stores/dungeonStore";
+import { useMapObjectStore } from "@/stores/mapObjectStore";
+import { useCreatureStore } from "@/stores/creatureStore";
+import { useHatchingStore } from "@/stores/hatchingStore";
+import { useEffectStore } from "@/stores/effectStore";
+import { useActionStore } from "@/stores/actionStore";
+import { useDiceStore } from "@/stores/diceStore";
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 
@@ -359,22 +375,22 @@ export function pullAllFromJazz(sessionRoot: any): void {
 
 /** Map of DO kind → the Zustand store to subscribe to */
 const STORE_FOR_KIND: Record<string, () => any> = {
-  maps: () => require("@/stores/mapStore").useMapStore,
-  regions: () => require("@/stores/regionStore").useRegionStore,
-  groups: () => require("@/stores/groupStore").useGroupStore,
-  initiative: () => require("@/stores/initiativeStore").useInitiativeStore,
-  roles: () => require("@/stores/roleStore").useRoleStore,
-  visionProfiles: () => require("@/stores/visionProfileStore").useVisionProfileStore,
-  fog: () => require("@/stores/fogStore").useFogStore,
-  lights: () => require("@/stores/lightStore").useLightStore,
-  illumination: () => require("@/stores/illuminationStore").useIlluminationStore,
-  dungeon: () => require("@/stores/dungeonStore").useDungeonStore,
-  mapObjects: () => require("@/stores/mapObjectStore").useMapObjectStore,
-  creatures: () => require("@/stores/creatureStore").useCreatureStore,
-  hatching: () => require("@/stores/hatchingStore").useHatchingStore,
-  effects: () => require("@/stores/effectStore").useEffectStore,
-  actions: () => require("@/stores/actionStore").useActionStore,
-  dice: () => require("@/stores/diceStore").useDiceStore,
+  maps: () => useMapStore,
+  regions: () => useRegionStore,
+  groups: () => useGroupStore,
+  initiative: () => useInitiativeStore,
+  roles: () => useRoleStore,
+  visionProfiles: () => useVisionProfileStore,
+  fog: () => useFogStore,
+  lights: () => useLightStore,
+  illumination: () => useIlluminationStore,
+  dungeon: () => useDungeonStore,
+  mapObjects: () => useMapObjectStore,
+  creatures: () => useCreatureStore,
+  hatching: () => useHatchingStore,
+  effects: () => useEffectStore,
+  actions: () => useActionStore,
+  dice: () => useDiceStore,
 };
 
 /** Throttle timers per kind */

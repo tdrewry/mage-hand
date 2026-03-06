@@ -13,6 +13,7 @@ import type {
 } from '@/types/actionTypes';
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useChatStore } from '@/stores/chatStore';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
@@ -648,8 +649,7 @@ export const useActionStore = create<ActionStore>()(
     });
 
     // Broadcast action flashes to all peers
-    try {
-      const { ephemeralBus } = require("@/lib/net");
+    import("@/lib/net").then(({ ephemeralBus }) => {
       for (const flash of flashes) {
         const result = flash.color === 'hit' ? 'hit' : 'miss';
         ephemeralBus.emit("action.flash", {
@@ -657,7 +657,7 @@ export const useActionStore = create<ActionStore>()(
           result,
         });
       }
-    } catch (_) { /* net not available */ }
+    }).catch(() => { /* net not available */ });
 
     // Broadcast resolved outcome to all peers (players see summary)
     broadcastActionResolved(currentAction);
@@ -806,7 +806,6 @@ useActionStore.subscribe((state) => {
   if (state.actionHistory.length > _lastHistoryLength && _lastHistoryLength > 0) {
     const newEntries = state.actionHistory.slice(0, state.actionHistory.length - _lastHistoryLength);
     try {
-      const { useChatStore } = require("@/stores/chatStore");
       for (const entry of newEntries) {
         useChatStore.getState().addActionEntry(entry);
       }

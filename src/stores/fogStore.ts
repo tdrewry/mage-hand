@@ -2,6 +2,7 @@ import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
 import { DEFAULT_MAP_FOG_SETTINGS } from './defaultFogEffectSettings';
+import { useMapStore } from './mapStore';
 
 export type EffectQuality = 'performance' | 'balanced' | 'cinematic';
 
@@ -133,7 +134,6 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
   setStructureFogSettings: (structureId, updates) => {
     // Read mapStore to find maps in this structure
     try {
-      const { useMapStore } = require('./mapStore');
       const maps = useMapStore.getState().maps;
       const memberMapIds = maps
         .filter((m: any) => m.structureId === structureId)

@@ -7,8 +7,16 @@ import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
 import { isEphemeralOp } from "./ephemeral";
 import type { EphemeralOpKind } from "./ephemeral";
-import { stopPositionSync } from "./tokenPositionSync";
+import { startPositionSync, stopPositionSync } from "./tokenPositionSync";
 import { toast } from "sonner";
+
+// Lazy reference to ephemeralBus to break circular dependency with ./index
+let _ephemeralBus: import("./ephemeral").EphemeralBus | null = null;
+
+/** Called by index.ts after singleton creation to wire the circular ref */
+export function setEphemeralBusRef(bus: import("./ephemeral").EphemeralBus): void {
+  _ephemeralBus = bus;
+}
 
 export type NetConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -211,7 +219,6 @@ export class NetManager {
       console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", info.roles, "peers:", peerUsers.length);
 
       // Start 10Hz token position sync loop
-      const { startPositionSync } = require("./tokenPositionSync") as typeof import("./tokenPositionSync");
       startPositionSync();
     });
 
@@ -225,9 +232,8 @@ export class NetManager {
       const durableOps = [];
       for (const entry of batch.ops) {
         if (isEphemeralOp(entry.op.kind)) {
-          // Route ephemeral ops directly to EphemeralBus — lazy import to avoid circular ref
-          const { ephemeralBus } = require("./index") as { ephemeralBus: import("./ephemeral").EphemeralBus };
-          ephemeralBus.receive(entry.op.kind as EphemeralOpKind, entry.op.data, entry.userId);
+          // Route ephemeral ops directly to EphemeralBus
+          _ephemeralBus?.receive(entry.op.kind as EphemeralOpKind, entry.op.data, entry.userId);
         } else {
           durableOps.push(entry);
         }
@@ -304,10 +310,8 @@ export class NetManager {
 
     const off7 = this.session.on("ephemeral", ({ kind, data, userId }) => {
       // Route inbound ephemeral messages directly to EphemeralBus
-      const { ephemeralBus } = require("./index") as { ephemeralBus: import("./ephemeral").EphemeralBus };
-      const { isEphemeralOp } = require("./ephemeral") as { isEphemeralOp: (k: string) => boolean };
-      if (isEphemeralOp(kind)) {
-        ephemeralBus.receive(kind as any, data, userId);
+      if (isEphemeralOp(kind) && _ephemeralBus) {
+        _ephemeralBus.receive(kind as EphemeralOpKind, data, userId);
       }
     });
 
