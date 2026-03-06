@@ -571,6 +571,60 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
           <p className="text-xs text-muted-foreground/50 font-mono">v{APP_VERSION}</p>
         </div>
 
+        {/* Identity Selection */}
+        <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <UserCircle className="w-4 h-4 text-muted-foreground" />
+            <span>Player Identity</span>
+            {hasValidIdentity && (
+              <span className="ml-auto text-xs text-green-400 font-normal">✓ {currentPlayer?.name}</span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Input
+              type="text"
+              placeholder="Enter your name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              maxLength={50}
+              className="bg-background text-sm h-8"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            {roles.map((role) => (
+              <div
+                key={role.id}
+                className="flex items-center space-x-2.5 p-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => toggleRole(role.id)}
+              >
+                <Checkbox
+                  id={`landing-role-${role.id}`}
+                  checked={selectedRoleIds.includes(role.id)}
+                  onCheckedChange={() => toggleRole(role.id)}
+                />
+                <label
+                  htmlFor={`landing-role-${role.id}`}
+                  className="flex items-center gap-2 flex-1 cursor-pointer text-sm"
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full border border-border"
+                    style={{ backgroundColor: role.color }}
+                  />
+                  <span className="font-medium">{role.name}</span>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          {!isIdentityReady && (
+            <p className="text-xs text-muted-foreground/70">
+              Select a name and role to enable session actions
+            </p>
+          )}
+        </div>
+
         {/* Menu */}
         <nav className="space-y-1">
           {menuItems.map((item) => {
