@@ -100,7 +100,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [chatText, setChatText] = useState('');
-  const [transport, setTransport] = useState<TransportType>('opbridge');
+  const [transport, setTransport] = useState<TransportType>('jazz');
 
   const handleConnect = async (code: string) => {
     if (!username.trim()) {
