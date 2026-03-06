@@ -371,6 +371,7 @@ export interface EphemeralPayloadMap {
   "group.select.preview": GroupSelectPreviewPayload;
   "group.drag.preview": GroupDragPreviewPayload;
   "role.handRaise": RoleHandRaisePayload;
+  "role.assign": RoleAssignPayload;
   "presence.activity": PresenceActivityPayload;
   "cursor.update": CursorUpdatePayload;
   "cursor.visibility": CursorVisibilityPayload;
@@ -450,6 +451,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Roles & Presence
   "role.handRaise":         { throttleMs: 0,   ttlMs: 30000, keyStrategy: "userId" },
+  "role.assign":            { throttleMs: 0,   ttlMs: 0,     keyStrategy: "none", dmOnly: true },
   "presence.activity":      { throttleMs: 200, ttlMs: 5000,  keyStrategy: "userId" },
 
   // UI / Cursors
