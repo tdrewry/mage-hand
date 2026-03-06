@@ -190,22 +190,28 @@ export class NetManager {
     const off1 = this.session.on("connected", (info) => {
       const store = useMultiplayerStore.getState();
       store.setConnectionStatus("connected");
-      store.setCurrentSession({
-        sessionCode: this._sessionCode ?? "",
-        sessionId: info.sessionId,
-        createdAt: Date.now(),
-        hasPassword: false,
-      });
+
+      // In ephemeral-only mode (Jazz tandem), don't overwrite session/roles
+      // that were already set by the Jazz session manager.
+      if (!this._ephemeralOnly) {
+        store.setCurrentSession({
+          sessionCode: this._sessionCode ?? "",
+          sessionId: info.sessionId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+        store.setRoles(info.roles);
+        store.setPermissions(info.permissions);
+      }
+
       store.setCurrentUserId(info.userId);
-      store.setRoles(info.roles);
-      store.setPermissions(info.permissions);
       store.setLastError(null);
 
       // Populate connected users from welcome peers list
       const selfUser = {
         userId: info.userId,
         username: info.username,
-        roleIds: info.roles,
+        roleIds: this._ephemeralOnly ? (store.roles.length > 0 ? store.roles : info.roles) : info.roles,
         connectedAt: Date.now(),
       };
       const peerUsers = (info.peers ?? []).map((p) => ({
@@ -216,7 +222,7 @@ export class NetManager {
       }));
       store.setConnectedUsers([selfUser, ...peerUsers]);
 
-      console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", info.roles, "peers:", peerUsers.length);
+      console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", store.roles, "ephemeralOnly:", this._ephemeralOnly, "peers:", peerUsers.length);
 
       // Start 10Hz token position sync loop
       startPositionSync();
