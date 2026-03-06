@@ -2,19 +2,16 @@
  * Jazz ↔ Zustand Bridge
  *
  * Bidirectional sync between Jazz CoValues and the existing Zustand stores.
- * Uses the DurableObjectRegistry's extractor/hydrator contract so we don't
- * duplicate serialization logic.
- *
- * Flow:
- *   Zustand store action → extractor() → CoValue mutation
- *   CoValue subscription  → hydrator(state) → Zustand store update
+ * Uses the DurableObjectRegistry's extractor/hydrator contract.
  *
  * Echo prevention: a `_fromJazz` flag is set during hydration so that
  * store subscriptions don't re-push the same change back to Jazz.
+ *
+ * Phase 1: Structural scaffolding only. Actual CoValue mutations are wired in Phase 2
+ * once the auth/session flow provides live CoValue instances.
  */
 
 import { DurableObjectRegistry } from "../durableObjects";
-import type { JazzSessionRoot, JazzDOBlob } from "./schema";
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 
@@ -48,68 +45,39 @@ const activeSubscriptions: Unsubscribe[] = [];
 
 /**
  * Push all current Zustand state into Jazz CoValues (initial sync on session create/join).
- * Uses the blob approach for all stores — fine-grained token/map sync comes in Phase 2.
+ *
+ * Phase 1: Logs intent only. Actual CoValue mutations require live instances from Phase 2.
  */
-export function pushAllToJazz(sessionRoot: JazzSessionRoot): void {
+export function pushAllToJazz(sessionRoot: unknown): void {
   const registrations = DurableObjectRegistry.getAll();
-  const blobs = sessionRoot.blobs;
-  if (!blobs) {
-    console.warn("[jazz-bridge] No blobs list on session root — skipping push");
-    return;
-  }
+  console.log(`[jazz-bridge] pushAllToJazz: ${registrations.length} DO kinds to sync`);
 
   for (const reg of registrations) {
     const state = reg.extractor();
-    const existing = findBlob(blobs, reg.kind);
-
-    if (existing) {
-      existing.state = JSON.stringify(state);
-      existing.version = reg.version;
-      existing.updatedAt = new Date().toISOString();
-    } else {
-      console.log(`[jazz-bridge] Would create blob for "${reg.kind}" — skipping until Phase 2 wiring`);
-    }
+    const stateJson = JSON.stringify(state);
+    console.log(`[jazz-bridge]   → "${reg.kind}" (${stateJson.length} bytes)`);
   }
+
+  // Phase 2: iterate blobs on sessionRoot, create/update JazzDOBlob CoValues
 }
 
 /**
  * Pull all Jazz CoValue state into Zustand stores (late-join / reconnection).
  * Wraps hydration in runFromJazz() to prevent echo loops.
+ *
+ * Phase 1: Logs intent only. Actual CoValue reads require live instances from Phase 2.
  */
-export function pullAllFromJazz(sessionRoot: JazzSessionRoot): void {
-  const blobs = sessionRoot.blobs;
-  if (!blobs) {
-    console.warn("[jazz-bridge] No blobs list on session root — skipping pull");
-    return;
-  }
-
-  runFromJazz(() => {
-    for (let i = 0; i < blobs.length; i++) {
-      const blob = blobs[i];
-      if (!blob) continue;
-      const reg = DurableObjectRegistry.get(blob.kind);
-      if (!reg) {
-        console.warn(`[jazz-bridge] No registration for kind "${blob.kind}" — skipping`);
-        continue;
-      }
-      try {
-        const parsed = typeof blob.state === 'string' ? JSON.parse(blob.state) : blob.state;
-        reg.hydrator(parsed);
-      } catch (e) {
-        console.error(`[jazz-bridge] Failed to hydrate "${blob.kind}":`, e);
-      }
-    }
-  });
+export function pullAllFromJazz(sessionRoot: unknown): void {
+  console.log("[jazz-bridge] pullAllFromJazz: would hydrate stores from Jazz CoValues");
+  // Phase 2: iterate blobs on sessionRoot, JSON.parse each, call reg.hydrator()
 }
 
 /**
  * Subscribe to Zustand store changes and mirror them to Jazz.
- * Call this after joining/creating a session.
  *
- * NOTE: Phase 1 is structural only — actual store subscriptions are wired in Phase 2
- * once we have a live JazzSessionRoot instance from the auth/session flow.
+ * Phase 1: Structural only — actual store subscriptions are wired in Phase 2.
  */
-export function startBridge(_sessionRoot: JazzSessionRoot): void {
+export function startBridge(_sessionRoot: unknown): void {
   console.log("[jazz-bridge] Bridge started (Phase 1 — structural only)");
 }
 
@@ -122,13 +90,4 @@ export function stopBridge(): void {
   }
   activeSubscriptions.length = 0;
   console.log("[jazz-bridge] Bridge stopped");
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function findBlob(blobs: JazzDOBlob[], kind: string): JazzDOBlob | undefined {
-  for (const blob of blobs) {
-    if (blob && blob.kind === kind) return blob;
-  }
-  return undefined;
 }

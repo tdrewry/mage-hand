@@ -1,11 +1,8 @@
 /**
  * Jazz CoValue Schema — mirrors the DurableObjectRegistry kinds.
  *
- * Each DO kind maps to a CoMap stored under a top-level JazzSessionRoot.
- * Phase 1 defines the session root + token schema (proof-of-concept).
- * Additional stores are added incrementally per the migration plan.
- *
- * Uses the new co.map() / co.list() function-call API (jazz-tools ≥0.15).
+ * Uses co.map() / co.list() function-call API (jazz-tools ≥0.15).
+ * Optional primitives use z.optional(). Optional CoValue refs use co.optional().
  */
 
 import { co, z } from "jazz-tools";
@@ -20,13 +17,13 @@ export const JazzToken = co.map({
   label: z.string(),
   gridWidth: z.number(),
   gridHeight: z.number(),
-  hp: co.optional(z.number()),
-  maxHp: co.optional(z.number()),
-  ac: co.optional(z.number()),
-  hostility: co.optional(z.string()),
-  mapId: co.optional(z.string()),
+  hp: z.optional(z.number()),
+  maxHp: z.optional(z.number()),
+  ac: z.optional(z.number()),
+  hostility: z.optional(z.string()),
+  mapId: z.optional(z.string()),
   /** Serialized extra fields as JSON string for forward-compat */
-  extras: co.optional(z.string()),
+  extras: z.optional(z.string()),
 });
 export type JazzToken = co.loaded<typeof JazzToken>;
 
@@ -39,11 +36,10 @@ export const JazzMapEntry = co.map({
   mapId: z.string(),
   name: z.string(),
   gridSize: z.number(),
-  gridType: co.optional(z.string()),
-  width: co.optional(z.number()),
-  height: co.optional(z.number()),
-  /** Additional map fields stored as JSON string */
-  extras: co.optional(z.string()),
+  gridType: z.optional(z.string()),
+  width: z.optional(z.number()),
+  height: z.optional(z.number()),
+  extras: z.optional(z.string()),
 });
 export type JazzMapEntry = co.loaded<typeof JazzMapEntry>;
 
@@ -51,8 +47,6 @@ export const JazzMapList = co.list(JazzMapEntry);
 export type JazzMapList = co.loaded<typeof JazzMapList>;
 
 // ── Generic DO State Blob ──────────────────────────────────────────────────
-// For stores that don't yet have a fine-grained schema, we store the entire
-// extracted state as a JSON string. This lets us migrate stores incrementally.
 
 export const JazzDOBlob = co.map({
   kind: z.string(),
@@ -70,11 +64,8 @@ export type JazzDOBlobList = co.loaded<typeof JazzDOBlobList>;
 
 export const JazzSessionRoot = co.map({
   name: z.string(),
-  /** Fine-grained token sync (Phase 2) */
   tokens: JazzTokenList,
-  /** Fine-grained map sync (Phase 2+) */
   maps: JazzMapList,
-  /** Blob storage for stores not yet given fine-grained schemas */
   blobs: JazzDOBlobList,
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
