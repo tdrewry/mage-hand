@@ -399,7 +399,15 @@ export function pullTokensFromJazz(sessionRoot: any): void {
   }
 
   const len = jazzTokens.length ?? 0;
-  console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz`);
+  const localTokenCount = useSessionStore.getState().tokens.length;
+
+  // Guard: don't wipe populated local tokens with empty Jazz tokens
+  if (len === 0 && localTokenCount > 0) {
+    console.warn(`[jazz-bridge] ✋ Blocked token pull — Jazz has 0 tokens but local has ${localTokenCount}`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz (local had ${localTokenCount})`);
 
   runFromJazz(() => {
     const store = useSessionStore.getState();
