@@ -8,9 +8,10 @@
  * It only activates when the user explicitly selects Jazz as their transport.
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { JazzReactProvider } from "jazz-tools/react";
 import { MageHandAccount } from "./schema";
+import { toast } from "sonner";
 
 /** Default self-hosted sync server URL */
 const DEFAULT_SYNC_URL: `ws://${string}` = "ws://localhost:4200";
@@ -22,20 +23,105 @@ interface JazzProviderProps {
 }
 
 /**
+ * Error boundary that catches Jazz provider crashes (e.g. handshake failures)
+ * and shows a toast instead of a blank screen.
+ */
+class JazzErrorBoundary extends React.Component<
+  { children: React.ReactNode; syncUrl: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; syncUrl: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[jazz-provider] Provider error:", error);
+    toast.error(`Jazz sync error: ${error.message}`, {
+      description: `Could not connect to sync server at ${this.props.syncUrl}. The app will continue in offline mode.`,
+      duration: 8000,
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Render children without Jazz — app degrades gracefully
+      return this.props.children;
+    }
+    return this.props.children;
+  }
+}
+
+/**
+ * Monitors the WebSocket connection to the Jazz sync server
+ * and shows toasts on connection failures or unhandled protocol messages.
+ */
+function useJazzConnectionMonitor(syncUrl: string) {
+  useEffect(() => {
+    // Intercept console warnings from Jazz about unhandled messages
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    let hasShownHandshakeWarning = false;
+
+    console.warn = (...args: unknown[]) => {
+      const msg = args.map(String).join(" ");
+      if (msg.includes("Unhandled") && msg.includes("hello") && !hasShownHandshakeWarning) {
+        hasShownHandshakeWarning = true;
+        toast.warning("Jazz sync handshake issue", {
+          description: `The sync server at ${syncUrl} sent an unrecognized "hello" message. This usually means a version mismatch between the client and server. Check that your Jazz sync server version matches jazz-tools.`,
+          duration: 12000,
+        });
+      }
+      originalWarn.apply(console, args);
+    };
+
+    console.error = (...args: unknown[]) => {
+      const msg = args.map(String).join(" ");
+      if (
+        (msg.includes("WebSocket") || msg.includes("ws://") || msg.includes("wss://")) &&
+        (msg.includes("failed") || msg.includes("error") || msg.includes("ECONNREFUSED"))
+      ) {
+        toast.error("Jazz sync server unreachable", {
+          description: `Could not connect to ${syncUrl}. Jazz will operate in offline-first mode — changes will sync when the server is available.`,
+          duration: 8000,
+        });
+      }
+      originalError.apply(console, args);
+    };
+
+    return () => {
+      console.warn = originalWarn;
+      console.error = originalError;
+    };
+  }, [syncUrl]);
+}
+
+/**
  * Wraps children in the Jazz sync context with anonymous auth.
  * When the sync server is unreachable, Jazz operates in offline-first mode —
  * local mutations are queued and replayed once the connection is established.
+ *
+ * Includes error boundary and connection monitoring for user-friendly
+ * feedback on sync failures.
  */
 export function JazzSessionProvider({ children, syncUrl }: JazzProviderProps) {
   const peer = syncUrl || DEFAULT_SYNC_URL;
 
+  useJazzConnectionMonitor(peer);
+
   return (
-    <JazzReactProvider
-      sync={{ peer }}
-      AccountSchema={MageHandAccount}
-    >
-      {children}
-    </JazzReactProvider>
+    <JazzErrorBoundary syncUrl={peer}>
+      <JazzReactProvider
+        sync={{ peer }}
+        AccountSchema={MageHandAccount}
+      >
+        {children}
+      </JazzReactProvider>
+    </JazzErrorBoundary>
   );
 }
 
