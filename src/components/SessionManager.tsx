@@ -161,6 +161,17 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           hasPassword: false,
         });
 
+        // Also open ephemeral WebSocket in tandem (non-blocking)
+        netManager.connectEphemeralOnly({
+          serverUrl: localServerUrl,
+          sessionCode: shortCode,
+          username: username.trim(),
+        }).then(() => {
+          console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
+        }).catch((err) => {
+          console.warn('⚠️ [SessionManager] Ephemeral WS failed (non-fatal):', err);
+        });
+
         toast.success(`Jazz session created — code: ${shortCode}`);
       } catch (error) {
         console.error('Failed to create Jazz session:', error);
@@ -204,6 +215,17 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           hasPassword: false,
         });
 
+        // Also open ephemeral WebSocket in tandem (non-blocking)
+        netManager.connectEphemeralOnly({
+          serverUrl: localServerUrl,
+          sessionCode: resolved.displayCode,
+          username: username.trim(),
+        }).then(() => {
+          console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
+        }).catch((err) => {
+          console.warn('⚠️ [SessionManager] Ephemeral WS failed (non-fatal):', err);
+        });
+
         toast.success(`Joined Jazz session: ${resolved.displayCode}`);
       } else {
         // OpBridge join
@@ -218,7 +240,16 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   };
 
   const handleLeaveSession = () => {
+    // Tear down WebSocket (handles both standalone and tandem modes)
     netManager.disconnect();
+
+    // If Jazz was active, also tear down the Jazz bridge
+    if (activeTransport === 'jazz') {
+      import('@/lib/jazz/session').then(({ leaveJazzSession }) => {
+        leaveJazzSession();
+      }).catch(() => {});
+    }
+
     setSessionCode('');
     setPassword('');
     toast.info('Left session');
