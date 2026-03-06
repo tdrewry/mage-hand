@@ -299,6 +299,17 @@ export class NetManager {
           // Don't toast for our own join
           if (p.user.userId !== store.currentUserId) {
             toast.info(`${p.user.username} joined the session`, { duration: 3000 });
+            
+            // Auto-push durable state when a player joins in Jazz tandem mode
+            if (this._ephemeralOnly && store.roles.includes('dm')) {
+              import('@/lib/jazz/bridge').then(({ getBridgedSessionRoot, pushAllToJazz }) => {
+                const root = getBridgedSessionRoot();
+                if (root) {
+                  console.log(`[NetManager] Auto-pushing durable state for new player: ${p.user.username}`);
+                  pushAllToJazz(root);
+                }
+              }).catch(() => {});
+            }
           }
           console.log(`👤 [NetManager] User joined: ${p.user.username}`);
           break;

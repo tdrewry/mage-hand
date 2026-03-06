@@ -160,9 +160,18 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   // Start the bidirectional bridge
   startBridge(root);
 
-  // Mark sync as ready — initial pull is complete
+  // Check if initial pull got meaningful data
+  const hasData = !!(root.tokens?.length || root.blobs?.length);
+  
+  if (!hasData) {
+    // Schedule retries — the host may not have pushed yet or Jazz sync is still propagating
+    console.log('[jazz-session] Initial pull found empty state — scheduling retries');
+    scheduleRetryPull(root, sessionCoId);
+  }
+
+  // Mark sync as ready — initial pull is complete (retries happen in background)
   useMultiplayerStore.getState().setSyncReady(true);
-  console.log('[jazz-session] Sync ready — all durable state pulled');
+  console.log(`[jazz-session] Sync ready — initial pull ${hasData ? 'has data' : 'empty, retries scheduled'}`);
 
   const info: JazzSessionInfo = {
     sessionCoId: loadedId ?? sessionCoId,
@@ -176,10 +185,72 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   return info;
 }
 
+/** Retry pull with exponential backoff for late-arriving Jazz state */
+let _retryTimer: number | null = null;
+
+function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
+  const MAX_RETRIES = 5;
+  if (attempt > MAX_RETRIES) {
+    console.warn(`[jazz-session] Gave up retrying pull after ${MAX_RETRIES} attempts for ${sessionCoId}`);
+    return;
+  }
+
+  const delay = Math.min(1000 * Math.pow(1.5, attempt - 1), 5000); // 1s, 1.5s, 2.25s, 3.4s, 5s
+  console.log(`[jazz-session] Retry pull #${attempt} in ${Math.round(delay)}ms`);
+
+  _retryTimer = window.setTimeout(async () => {
+    _retryTimer = null;
+    
+    // Re-load the root to get fresh resolved data
+    try {
+      const freshRoot = await (JazzSessionRootSchema as any).load(sessionCoId, {
+        resolve: {
+          tokens: { $each: true },
+          maps: { $each: true },
+          blobs: { $each: true },
+        },
+      });
+
+      if (!freshRoot) {
+        console.warn(`[jazz-session] Retry #${attempt}: root still null`);
+        scheduleRetryPull(root, sessionCoId, attempt + 1);
+        return;
+      }
+
+      const hasTokens = !!(freshRoot.tokens?.length);
+      const hasBlobs = !!(freshRoot.blobs?.length);
+
+      if (hasTokens || hasBlobs) {
+        console.log(`[jazz-session] Retry #${attempt}: found data! tokens=${freshRoot.tokens?.length ?? 0} blobs=${freshRoot.blobs?.length ?? 0}`);
+        pullAllFromJazz(freshRoot);
+        // Update the bridge with the fresh root
+        stopBridge();
+        startBridge(freshRoot);
+        // Update currentSession root ref
+        if (currentSession) {
+          currentSession.root = freshRoot;
+        }
+        const { toast } = await import('sonner');
+        toast.success('Game state synced from host');
+      } else {
+        console.log(`[jazz-session] Retry #${attempt}: still empty`);
+        scheduleRetryPull(root, sessionCoId, attempt + 1);
+      }
+    } catch (err) {
+      console.warn(`[jazz-session] Retry #${attempt} failed:`, err);
+      scheduleRetryPull(root, sessionCoId, attempt + 1);
+    }
+  }, delay);
+}
+
 /**
  * Leave the current Jazz session and tear down the bridge.
  */
 export function leaveJazzSession(): void {
+  if (_retryTimer) {
+    clearTimeout(_retryTimer);
+    _retryTimer = null;
+  }
   if (!currentSession) return;
   stopBridge();
   useMultiplayerStore.getState().setSyncReady(false);
