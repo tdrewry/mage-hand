@@ -576,7 +576,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                     setSessionCode(isJazzCode(val) ? val : val.toUpperCase());
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
-                  maxLength={12}
+                  maxLength={64}
                   disabled={isConnecting}
                   className="bg-input border-border text-foreground font-mono text-lg tracking-wider"
                 />
