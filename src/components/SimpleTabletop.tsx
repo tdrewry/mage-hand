@@ -101,7 +101,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Settings, Grid3X3, Eye, Pen, Square, Settings2, X, Lightbulb, CloudFog, MousePointer2 } from "lucide-react";
 import { RegionBackgroundModal } from "./modals/RegionBackgroundModal";
-import { RoleSelectionModal } from "./modals/RoleSelectionModal";
+// RoleSelectionModal moved to LandingScreen
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11684,8 +11684,6 @@ export const SimpleTabletop = () => {
         onUpdateRegion={updateRegion}
       />
 
-      {/* Role Selection Modal - Shows on session entry */}
-      <RoleSelectionModal open={true} />
 
       {/* Portal Teleport DM Confirmation Dialog */}
       <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) setPendingTeleport(null); }}>

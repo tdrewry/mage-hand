@@ -1,6 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { APP_VERSION } from '@/lib/version';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +29,7 @@ import {
   Save,
   Info,
   ChevronRight,
+  UserCircle,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -65,7 +69,75 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Store hooks
+  // Role/username selection state
+  const [username, setUsername] = useState('');
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const roles = useRoleStore((s) => s.roles);
+  const initializeDefaultRoles = useRoleStore((s) => s.initializeDefaultRoles);
+  const players = useSessionStore((s) => s.players);
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const addPlayer = useSessionStore((s) => s.addPlayer);
+  const initializeSession = useSessionStore((s) => s.initializeSession);
+
+  // Ensure roles and session are initialized
+  useEffect(() => {
+    initializeDefaultRoles();
+    initializeSession();
+  }, []);
+
+  // Check if current player already has valid identity
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const hasValidIdentity = currentPlayer && currentPlayer.name && currentPlayer.name.trim().length > 0;
+
+  // Pre-fill from existing player if returning
+  useEffect(() => {
+    if (hasValidIdentity && currentPlayer) {
+      setUsername(currentPlayer.name);
+      setSelectedRoleIds(currentPlayer.roleIds || []);
+    } else if (roles.length > 0 && selectedRoleIds.length === 0) {
+      // Auto-select DM for first user, Player for subsequent
+      const isFirstUser = players.length === 0 || !players.some(p => p.name?.trim());
+      const defaultRole = isFirstUser ? 'dm' : 'player';
+      const role = roles.find(r => r.id === defaultRole);
+      if (role) setSelectedRoleIds([role.id]);
+    }
+  }, [roles, hasValidIdentity]);
+
+  const toggleRole = (roleId: string) => {
+    setSelectedRoleIds(prev =>
+      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  const isIdentityReady = username.trim().length > 0 && selectedRoleIds.length > 0;
+  const isDMSelected = selectedRoleIds.includes('dm');
+
+  /** Commit the player identity and set rendering mode based on role */
+  const commitIdentityAndLaunch = (launchFn: () => void) => {
+    if (!isIdentityReady) {
+      toast.error('Please enter a username and select a role before continuing.');
+      return;
+    }
+
+    // Commit player identity
+    addPlayer({
+      id: currentPlayerId,
+      name: username.trim(),
+      roleIds: selectedRoleIds,
+      isConnected: true,
+    });
+
+    // Set rendering mode based on role: DMs get edit, Players get play
+    const dungeonStore = useDungeonStore.getState();
+    if (!isDMSelected) {
+      dungeonStore.setRenderingMode('play');
+    }
+    // DMs keep whatever mode was previously set (or default 'edit')
+
+    launchFn();
+  };
+
+  // Store hooks (for save/load operations)
   const sessionStore = useSessionStore();
   const mapStore = useMapStore();
   const regionStore = useRegionStore();
@@ -181,14 +253,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   };
 
   const doNewSession = () => {
-    try {
-      clearAllStores();
-      toast.success('New session started');
-      onLaunch();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to start new session');
-    }
+    commitIdentityAndLaunch(() => {
+      try {
+        clearAllStores();
+        toast.success('New session started');
+        onLaunch();
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to start new session');
+      }
+    });
   };
 
   // --- Save Session ---
@@ -212,8 +286,19 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
 
   // --- Load Session ---
   const handleLoadSession = () => {
+    if (!isIdentityReady) {
+      toast.error('Please enter a username and select a role before continuing.');
+      return;
+    }
+    // Commit identity now so it's ready when applyAndLaunch fires
+    addPlayer({
+      id: currentPlayerId,
+      name: username.trim(),
+      roleIds: selectedRoleIds,
+      isConnected: true,
+    });
+
     if (hasSession) {
-      // Show confirm first, then open file picker after confirm
       setShowLoadConfirm(true);
     } else {
       fileInputRef.current?.click();
@@ -391,6 +476,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
       }
 
+      // Set rendering mode based on selected role (Players always get play)
+      if (!isDMSelected) {
+        useDungeonStore.getState().setRenderingMode('play');
+      }
+
       toast.success('Session loaded');
       onLaunch();
     } catch (err) {
@@ -416,16 +506,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       label: 'Continue',
       description: hasSession ? 'Resume your current session' : 'No active session in memory',
       icon: Play,
-      disabled: !hasSession,
-      active: hasSession,
-      onClick: onLaunch,
+      disabled: !hasSession || !isIdentityReady,
+      active: hasSession && isIdentityReady,
+      onClick: () => commitIdentityAndLaunch(onLaunch),
     },
     {
       id: 'new',
       label: 'New Session',
       description: 'Start a fresh tabletop session',
       icon: FilePlus,
-      disabled: false,
+      disabled: !isIdentityReady,
       active: false,
       onClick: handleNewSession,
     },
@@ -434,7 +524,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       label: 'Load Session',
       description: 'Load a session from a .mhsession file',
       icon: FolderOpen,
-      disabled: isLoading,
+      disabled: isLoading || !isIdentityReady,
       active: false,
       onClick: handleLoadSession,
     },
@@ -443,7 +533,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       label: 'Save Session',
       description: hasSession ? 'Save current session to disk' : 'No active session to save',
       icon: Save,
-      disabled: !hasSession || isSaving,
+      disabled: !hasSession || isSaving || !isIdentityReady,
       active: false,
       onClick: handleSaveSession,
     },
@@ -479,6 +569,60 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Magehand</h1>
           <p className="text-sm text-muted-foreground">The application is paused.</p>
           <p className="text-xs text-muted-foreground/50 font-mono">v{APP_VERSION}</p>
+        </div>
+
+        {/* Identity Selection */}
+        <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <UserCircle className="w-4 h-4 text-muted-foreground" />
+            <span>Player Identity</span>
+            {hasValidIdentity && (
+              <span className="ml-auto text-xs text-primary font-normal">✓ {currentPlayer?.name}</span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Input
+              type="text"
+              placeholder="Enter your name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              maxLength={50}
+              className="bg-background text-sm h-8"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            {roles.map((role) => (
+              <div
+                key={role.id}
+                className="flex items-center space-x-2.5 p-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => toggleRole(role.id)}
+              >
+                <Checkbox
+                  id={`landing-role-${role.id}`}
+                  checked={selectedRoleIds.includes(role.id)}
+                  onCheckedChange={() => toggleRole(role.id)}
+                />
+                <label
+                  htmlFor={`landing-role-${role.id}`}
+                  className="flex items-center gap-2 flex-1 cursor-pointer text-sm"
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full border border-border"
+                    style={{ backgroundColor: role.color }}
+                  />
+                  <span className="font-medium">{role.name}</span>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          {!isIdentityReady && (
+            <p className="text-xs text-muted-foreground/70">
+              Select a name and role to enable session actions
+            </p>
+          )}
         </div>
 
         {/* Menu */}
