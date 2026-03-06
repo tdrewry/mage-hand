@@ -16,10 +16,12 @@ Jazz CRDT propagation is async. After `pushAllToJazz()` + `startBridge()`, the i
 - Creator = session host (DM), who is the source of truth for initial state
 - The creator's local tokens are never removed by inbound Jazz sync (Jazz may not have propagated yet)
 
-### 2. Empty-state hydration guards
-- `pullTokensFromJazz`: Skips if Jazz has 0 tokens but local has >0
-- `pullBlobFromJazz`: Skips if inbound blob state is empty but local extractor returns non-empty state
+### 2. Empty-state hydration guards (creator-only, v0.7.43)
+- Guards now **only apply to the creator/DM** — joiners always accept Jazz inbound data
+- `pullTokensFromJazz`: Skips if Jazz has 0 tokens but local has >0 (creator only)
+- `pullBlobFromJazz`: Skips if inbound blob state is empty but local has data (creator only)
 - Live token subscription: Same empty guard + creator won't have tokens removed
+- **Joiners**: Jazz is the source of truth; stale localStorage data is correctly overwritten
 
 ### 3. `isEmptyState()` heuristic
 Checks if a state value is null, empty array, or an object with only empty/falsy values — used to detect destructive hydration attempts.
