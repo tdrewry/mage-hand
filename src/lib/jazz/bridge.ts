@@ -197,14 +197,15 @@ export function startBridge(sessionRoot: any): void {
   console.log("[jazz-bridge] Starting bridge");
 
   // ── Direction 1: Zustand → Jazz ──
-  const unsubZustand = useSessionStore.subscribe(
-    (state) => state.tokens,
-    (tokens, prevTokens) => {
-      if (_fromJazz) return;
-      if (!_sessionRoot?.tokens) return;
+  let prevTokens = useSessionStore.getState().tokens;
+  const unsubZustand = useSessionStore.subscribe((state) => {
+    const tokens = state.tokens;
+    if (tokens === prevTokens) return;
+    if (_fromJazz) { prevTokens = tokens; return; }
+    if (!_sessionRoot?.tokens) { prevTokens = tokens; return; }
 
-      const jazzTokens = _sessionRoot.tokens;
-      const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
+    const jazzTokens = _sessionRoot.tokens;
+    const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
 
       // Detect added tokens
       const prevIds = new Set(prevTokens.map((t: Token) => t.id));
