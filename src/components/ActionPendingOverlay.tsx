@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react';
 import { useActionPendingStore } from '@/stores/actionPendingStore';
-import { useRoleStore } from '@/stores/roleStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { Swords, Check, X, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -23,8 +23,9 @@ function resolutionLabel(resolution: string): { text: string; color: string } {
 
 export function ActionPendingOverlay() {
   const { pendingActions, resolvedActions, clearOldResolved } = useActionPendingStore();
-  const currentRole = useRoleStore((s) => s.currentRole);
-  const isDM = currentRole?.name?.toLowerCase() === 'dm' || currentRole?.name?.toLowerCase() === 'dungeon master';
+  const { players, currentPlayerId } = useSessionStore();
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
 
   // Auto-clear old resolved actions every 30s
   useEffect(() => {
