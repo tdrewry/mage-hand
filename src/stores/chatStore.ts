@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ActionHistoryEntry } from '@/types/actionTypes';
+import { emitChatMessage } from '@/lib/net/ephemeral/miscHandlers';
 
 export type ChatEntryType = 'message' | 'action';
 
@@ -49,7 +50,6 @@ export const useChatStore = create<ChatState>((set) => ({
 
     // Broadcast to peers
     try {
-      const { emitChatMessage } = require('@/lib/net/ephemeral/miscHandlers');
       emitChatMessage(id, senderName, text, whisperTo);
     } catch { /* net may not be available */ }
   },

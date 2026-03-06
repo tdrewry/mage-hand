@@ -6,6 +6,7 @@ import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useFogStore } from "@/stores/fogStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useActionPendingStore } from "@/stores/actionPendingStore";
 import type {
   FogCursorPreviewPayload,
@@ -54,7 +55,6 @@ export function registerMiscHandlers(): void {
   ephemeralBus.on("chat.message", (data: ChatMessagePayload, userId) => {
     // If whisper, only show to intended recipients
     if (data.whisperTo && data.whisperTo.length > 0) {
-      const { useMultiplayerStore } = require("@/stores/multiplayerStore");
       const myId = useMultiplayerStore.getState().currentUserId;
       if (myId && !data.whisperTo.includes(myId)) return; // Not for us
     }
