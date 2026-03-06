@@ -266,9 +266,42 @@ export const ChatCardContent: React.FC = () => {
 
   const isWhisperMode = whisperTargets.length > 0;
 
+  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+
   const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+
+    // Parse /w or /whisper slash command: /w username message
+    const slashMatch = text.match(/^\/(?:w|whisper)\s+(\S+)\s+([\s\S]+)/i);
+    if (slashMatch) {
+      const targetName = slashMatch[1].toLowerCase();
+      const messageText = slashMatch[2].trim();
+      if (!messageText) return;
+
+      // Find matching users by case-insensitive prefix
+      const matched = connectedUsers.filter(
+        (u) => u.userId !== currentUserId && u.username.toLowerCase().startsWith(targetName)
+      );
+      if (matched.length === 0) {
+        // No match — send as regular message with error hint
+        addMessage(
+          currentUserId || 'local',
+          currentUsername || 'You',
+          `[No player matching "${slashMatch[1]}" found] ${messageText}`
+        );
+      } else {
+        addMessage(
+          currentUserId || 'local',
+          currentUsername || 'You',
+          messageText,
+          matched.map((u) => u.userId)
+        );
+      }
+      setDraft('');
+      return;
+    }
+
     addMessage(
       currentUserId || 'local',
       currentUsername || 'You',
@@ -276,7 +309,7 @@ export const ChatCardContent: React.FC = () => {
       isWhisperMode ? whisperTargets : undefined
     );
     setDraft('');
-  }, [draft, addMessage, currentUserId, currentUsername, isWhisperMode, whisperTargets]);
+  }, [draft, addMessage, currentUserId, currentUsername, isWhisperMode, whisperTargets, connectedUsers]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
