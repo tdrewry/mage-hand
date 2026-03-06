@@ -1,9 +1,8 @@
 // src/lib/net/dragOps.ts
 // Emit helpers for token drag preview ops.
-// Throttled at 20 Hz (50ms) for drag updates.
+// Uses the ephemeral pipeline (not durable op-log) for low-latency, lossy previews.
 
-import { emitLocalOp } from "./index";
-import { throttle } from "@/lib/throttle";
+import { ephemeralBus } from "@/lib/net";
 
 export interface DragBeginPayload {
   tokenId: string;
@@ -22,17 +21,27 @@ export interface DragEndPayload {
   finalPos: { x: number; y: number };
 }
 
-/** Emit drag begin (unthrottled — fires once). */
+/** Emit drag begin via ephemeral bus (unthrottled — fires once). */
 export function emitDragBegin(payload: DragBeginPayload): void {
-  emitLocalOp({ kind: "token.drag.begin", data: payload });
+  ephemeralBus.emit("token.drag.begin", {
+    tokenId: payload.tokenId,
+    startPos: payload.startPos,
+    mode: payload.mode,
+  });
 }
 
-/** Emit drag update (throttled at 20 Hz / 50ms). */
-export const emitDragUpdate = throttle((payload: DragUpdatePayload): void => {
-  emitLocalOp({ kind: "token.drag.update", data: payload });
-}, 50);
+/** Emit drag update via ephemeral bus (throttled by EphemeralBus config at 50ms). */
+export function emitDragUpdate(payload: DragUpdatePayload): void {
+  ephemeralBus.emit("token.drag.update", {
+    tokenId: payload.tokenId,
+    pos: payload.pos,
+    path: payload.path,
+  });
+}
 
-/** Emit drag end (unthrottled — fires once, also flushes last position). */
+/** Emit drag end via ephemeral bus (unthrottled — fires once). */
 export function emitDragEnd(payload: DragEndPayload): void {
-  emitLocalOp({ kind: "token.drag.end", data: payload });
+  ephemeralBus.emit("token.drag.end", {
+    tokenId: payload.tokenId,
+  });
 }

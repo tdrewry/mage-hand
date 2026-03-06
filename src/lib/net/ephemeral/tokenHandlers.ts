@@ -4,6 +4,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
+import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import type {
   TokenHoverPayload,
   TokenHandlePreviewPayload,
