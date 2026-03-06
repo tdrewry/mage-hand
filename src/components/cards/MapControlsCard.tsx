@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Link2, Trash2 } from 'lucide-react';
+import { Link2, Trash2, Crosshair } from 'lucide-react';
 import { Canvas as FabricCanvas, FabricImage } from 'fabric';
 import { toast } from 'sonner';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useMapStore } from '@/stores/mapStore';
+import { emitMapFocus } from '@/lib/net/ephemeral/mapHandlers';
 
 interface MapControlsCardContentProps {
   fabricCanvas: FabricCanvas | null;
@@ -13,6 +16,10 @@ interface MapControlsCardContentProps {
 
 export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentProps) => {
   const [mapUrl, setMapUrl] = useState('');
+  const players = useSessionStore((s) => s.players);
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
+  const isDM = currentPlayer?.roleIds?.includes('dm') || false;
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -45,7 +52,6 @@ export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentP
     FabricImage.fromURL(imageUrl).then((img) => {
       (img as any).isMap = true;
       
-      // Scale to fit canvas while maintaining aspect ratio
       const canvasWidth = fabricCanvas.width || 1200;
       const canvasHeight = fabricCanvas.height || 800;
       const imgWidth = img.width || 1;
@@ -53,7 +59,7 @@ export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentP
       
       const scaleX = canvasWidth / imgWidth;
       const scaleY = canvasHeight / imgHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+      const scale = Math.min(scaleX, scaleY, 1);
       
       img.set({
         left: 0,
@@ -85,6 +91,22 @@ export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentP
     });
     fabricCanvas.renderAll();
     toast.success('All maps cleared');
+  };
+
+  const handleFocusPlayers = () => {
+    const maps = useMapStore.getState().maps;
+    const activeMap = maps.find((m: any) => m.isActive) || maps[0];
+    const mapId = activeMap?.id || 'default-map';
+    const vt = useSessionStore.getState().getViewportTransform(mapId);
+    
+    // Approximate viewport center in world coords
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const centerX = (-vt.x + vw / 2) / vt.zoom;
+    const centerY = (-vt.y + vh / 2) / vt.zoom;
+    
+    emitMapFocus({ x: centerX, y: centerY }, vt.zoom);
+    toast.success('Focus command sent to all players');
   };
 
   return (
@@ -155,9 +177,26 @@ export const MapControlsCardContent = ({ fabricCanvas }: MapControlsCardContentP
           </div>
         </TabsContent>
       </Tabs>
+
+      {isDM && (
+        <Button
+          onClick={handleFocusPlayers}
+          size="sm"
+          variant="outline"
+          className="w-full text-xs mt-4"
+        >
+          <Crosshair className="h-3 w-3 mr-1" />
+          Focus Players Here
+        </Button>
+      )}
       
       <div className="text-xs text-muted-foreground mt-4">
         Maps will be placed at the origin and can be moved/resized after placement.
+        {isDM && (
+          <span className="block mt-1 text-muted-foreground/60">
+            Tip: You can also Ctrl+Shift+Click on the map to focus players on a specific spot.
+          </span>
+        )}
       </div>
     </div>
   );
