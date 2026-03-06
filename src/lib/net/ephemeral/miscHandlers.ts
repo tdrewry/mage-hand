@@ -5,11 +5,13 @@ import { ephemeralBus } from "@/lib/net";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useFogStore } from "@/stores/fogStore";
 import { useActionStore } from "@/stores/actionStore";
+import { useChatStore } from "@/stores/chatStore";
 import { useActionPendingStore } from "@/stores/actionPendingStore";
 import type {
   FogCursorPreviewPayload,
   FogRevealPreviewPayload,
   ChatTypingPayload,
+  ChatMessagePayload,
   DiceRollingPayload,
   InitiativeDragPreviewPayload,
   InitiativeHoverPayload,
@@ -47,6 +49,10 @@ export function registerMiscHandlers(): void {
   // ── Chat & Dice ──
   ephemeralBus.on("chat.typing", (_data: ChatTypingPayload, userId) => {
     store.getState().setChatTyping(userId);
+  });
+
+  ephemeralBus.on("chat.message", (data: ChatMessagePayload, userId) => {
+    useChatStore.getState().addRemoteMessage(data.id, userId, data.senderName, data.text, data.timestamp);
   });
 
   ephemeralBus.on("dice.rolling", (data: DiceRollingPayload, userId) => {
@@ -150,4 +156,11 @@ export function registerMiscHandlers(): void {
  */
 export function emitChatTyping(): void {
   ephemeralBus.emit("chat.typing", {});
+}
+
+/**
+ * Broadcast a chat message to all peers.
+ */
+export function emitChatMessage(id: string, senderName: string, text: string): void {
+  ephemeralBus.emit("chat.message", { id, senderName, text, timestamp: Date.now() });
 }
