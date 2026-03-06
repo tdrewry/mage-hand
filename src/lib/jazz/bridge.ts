@@ -267,11 +267,17 @@ export function pushTokensToJazz(sessionRoot: any): void {
   console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz`);
 
   const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  console.log("[jazz-bridge] Token push group:", group ? "found" : "MISSING", typeof group);
 
   for (const t of tokens) {
     const init = tokenToJazzInit(t);
-    const jt = JazzTokenSchema.create(init as any, group);
-    jazzTokens.$jazz.push(jt);
+    try {
+      const jt = JazzTokenSchema.create(init as any, group);
+      jazzTokens.$jazz.push(jt);
+      console.log(`[jazz-bridge] → Jazz token: ${t.id} (${t.name})`);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to create/push JazzToken ${t.id}:`, err);
+    }
   }
 }
 
@@ -280,14 +286,23 @@ export function pushTokensToJazz(sessionRoot: any): void {
  */
 export function pushBlobsToJazz(sessionRoot: any): void {
   const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  console.log("[jazz-bridge] Blob push group:", group ? "found" : "MISSING", typeof group);
+
   if (!sessionRoot.blobs) {
     console.warn("[jazz-bridge] No blobs list on session root");
     return;
   }
 
+  let successCount = 0;
+  let failCount = 0;
+
   for (const kind of BLOB_SYNC_KINDS) {
     const reg = DurableObjectRegistry.get(kind);
-    if (!reg) continue;
+    if (!reg) {
+      console.warn(`[jazz-bridge] No registry entry for DO kind: ${kind}`);
+      failCount++;
+      continue;
+    }
 
     try {
       const state = reg.extractor();
@@ -301,12 +316,15 @@ export function pushBlobsToJazz(sessionRoot: any): void {
         updatedAt: new Date().toISOString(),
       } as any, group);
       sessionRoot.blobs.$jazz.push(blob);
+      successCount++;
+      console.log(`[jazz-bridge] → Jazz blob: ${kind} (${json.length} chars)`);
     } catch (err) {
+      failCount++;
       console.error(`[jazz-bridge] Failed to push blob ${kind}:`, err);
     }
   }
 
-  console.log(`[jazz-bridge] Pushed ${BLOB_SYNC_KINDS.length} DO blobs to Jazz`);
+  console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
 }
 
 /**
