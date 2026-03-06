@@ -40,6 +40,7 @@ export type EphemeralOpKind =
   | "group.drag.preview"
   // Roles & Presence
   | "role.handRaise"
+  | "role.assign"
   | "presence.activity"
   // UI / Cursors
   | "cursor.update"
