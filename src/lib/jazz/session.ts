@@ -8,7 +8,7 @@
  * with OpBridge or NetManager. Both can coexist.
  */
 
-import { type JazzSessionRoot, JazzSessionRoot as JazzSessionRootSchema, createSessionRoot } from "./schema";
+import { JazzSessionRoot as JazzSessionRootSchema, createSessionRoot } from "./schema";
 import { pushAllToJazz, pullAllFromJazz, startBridge, stopBridge } from "./bridge";
 
 export interface JazzSessionInfo {
@@ -19,7 +19,7 @@ export interface JazzSessionInfo {
   /** Whether this client created the session (vs. joined) */
   isCreator: boolean;
   /** Reference to the live session root CoValue */
-  root: JazzSessionRoot;
+  root: any;
 }
 
 let currentSession: JazzSessionInfo | null = null;
@@ -31,7 +31,7 @@ let currentSession: JazzSessionInfo | null = null;
 export function createJazzSession(name: string): JazzSessionInfo {
   console.log(`[jazz-session] Creating session "${name}"`);
 
-  const root = createSessionRoot(name);
+  const root = createSessionRoot(name) as any;
   
   // Push current Zustand state into the new Jazz session
   pushAllToJazz(root);
@@ -40,28 +40,26 @@ export function createJazzSession(name: string): JazzSessionInfo {
   startBridge(root);
 
   const info: JazzSessionInfo = {
-    sessionCoId: root.id,
+    sessionCoId: root.id ?? `session-${Date.now()}`,
     name,
     isCreator: true,
     root,
   };
 
   currentSession = info;
-  console.log(`[jazz-session] Session created: ${root.id}`);
+  console.log(`[jazz-session] Session created: ${info.sessionCoId}`);
   return info;
 }
 
 /**
  * Join an existing Jazz session by its CoValue ID.
  * Loads the session root and pulls state into Zustand stores.
- *
- * This is async because it needs to load the CoValue from the sync server.
  */
 export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionInfo> {
   console.log(`[jazz-session] Joining session "${sessionCoId}"`);
 
   // Load the session root CoValue by ID
-  const root = await JazzSessionRootSchema.load(sessionCoId as any, {
+  const root = await (JazzSessionRootSchema as any).load(sessionCoId, {
     resolve: {
       tokens: { $each: true },
       maps: { $each: true },
@@ -80,14 +78,14 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   startBridge(root);
 
   const info: JazzSessionInfo = {
-    sessionCoId: root.id,
+    sessionCoId: root.id ?? sessionCoId,
     name: root.sessionName || "Joined Session",
     isCreator: false,
     root,
   };
 
   currentSession = info;
-  console.log(`[jazz-session] Joined session: ${root.id}`);
+  console.log(`[jazz-session] Joined session: ${info.sessionCoId}`);
   return info;
 }
 

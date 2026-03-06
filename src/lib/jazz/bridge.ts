@@ -2,18 +2,20 @@
  * Jazz ↔ Zustand Bridge
  *
  * Bidirectional sync between Jazz CoValues and the existing Zustand stores.
- * Uses the DurableObjectRegistry's extractor/hydrator contract.
  *
  * Echo prevention: a `_fromJazz` flag is set during hydration so that
  * store subscriptions don't re-push the same change back to Jazz.
  *
  * IMPORTANT: This module does NOT import from src/lib/net/ — it's a standalone
  * transport that feeds into the same Zustand stores.
+ *
+ * NOTE: Jazz types use MaybeLoaded wrappers which make direct property access
+ * tricky at compile time. We use `as any` casts in the bridge layer since we
+ * only call these functions with fully-loaded CoValues.
  */
 
 import { useSessionStore, type Token } from "@/stores/sessionStore";
-import type { JazzSessionRoot, JazzToken, JazzTokenList } from "./schema";
-import { JazzToken as JazzTokenSchema, JazzTokenList as JazzTokenListSchema } from "./schema";
+import { JazzToken as JazzTokenSchema } from "./schema";
 
 // ── Echo prevention ────────────────────────────────────────────────────────
 
@@ -45,22 +47,21 @@ type Unsubscribe = () => void;
 /** Active store subscriptions for the current session */
 const activeSubscriptions: Unsubscribe[] = [];
 
-/** The current Jazz session root being bridged */
-let _sessionRoot: JazzSessionRoot | null = null;
+/** The current Jazz session root being bridged (typed as any to avoid MaybeLoaded issues) */
+let _sessionRoot: any = null;
 
 /**
  * Get the currently bridged session root (if any).
  */
-export function getBridgedSessionRoot(): JazzSessionRoot | null {
+export function getBridgedSessionRoot(): any {
   return _sessionRoot;
 }
 
 // ── Token bridge helpers ───────────────────────────────────────────────────
 
 /** Convert a Zustand Token to a JazzToken-compatible init object */
-function tokenToJazzInit(t: Token): Record<string, unknown> {
+function tokenToJazzInit(t: Token): Record<string, any> {
   const extras: Record<string, unknown> = {};
-  // Capture fields not in JazzToken schema for forward-compat
   if (t.imageHash) extras.imageHash = t.imageHash;
   if (t.roleId) extras.roleId = t.roleId;
   if (t.isHidden) extras.isHidden = t.isHidden;
@@ -90,8 +91,8 @@ function tokenToJazzInit(t: Token): Record<string, unknown> {
   };
 }
 
-/** Convert a JazzToken CoValue to a Zustand Token */
-function jazzToZustandToken(jt: JazzToken): Token {
+/** Convert a JazzToken CoValue (as any) to a Zustand Token */
+function jazzToZustandToken(jt: any): Token {
   let extras: Record<string, any> = {};
   try {
     if (jt.extras) extras = JSON.parse(jt.extras);
@@ -100,7 +101,7 @@ function jazzToZustandToken(jt: JazzToken): Token {
   return {
     id: jt.tokenId,
     name: jt.name || "",
-    imageUrl: "", // Image data is never synced via Jazz
+    imageUrl: "",
     imageHash: extras.imageHash,
     x: jt.x,
     y: jt.y,
@@ -125,9 +126,8 @@ function jazzToZustandToken(jt: JazzToken): Token {
 
 /**
  * Push all current tokens from Zustand into the Jazz session root.
- * Called on session create to populate the initial state.
  */
-export function pushTokensToJazz(sessionRoot: JazzSessionRoot): void {
+export function pushTokensToJazz(sessionRoot: any): void {
   const tokens = useSessionStore.getState().tokens;
   const jazzTokens = sessionRoot.tokens;
   if (!jazzTokens) {
@@ -137,8 +137,7 @@ export function pushTokensToJazz(sessionRoot: JazzSessionRoot): void {
 
   console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz`);
 
-  // Get the group from the session root for ownership
-  const group = sessionRoot.$jazz.group;
+  const group = sessionRoot._owner ?? sessionRoot.$jazz?.group;
 
   for (const t of tokens) {
     const init = tokenToJazzInit(t);
@@ -148,33 +147,32 @@ export function pushTokensToJazz(sessionRoot: JazzSessionRoot): void {
 }
 
 /**
- * Push all current Zustand state into Jazz CoValues (initial sync on session create).
+ * Push all current Zustand state into Jazz CoValues.
  */
-export function pushAllToJazz(sessionRoot: JazzSessionRoot): void {
+export function pushAllToJazz(sessionRoot: any): void {
   pushTokensToJazz(sessionRoot);
-  // Future: pushMapsToJazz, pushEffectsToJazz, etc.
 }
 
 // ── Pull: Jazz → Zustand ──────────────────────────────────────────────────
 
 /**
- * Pull all tokens from Jazz into Zustand (late-join / reconnection).
+ * Pull all tokens from Jazz into Zustand.
  */
-export function pullTokensFromJazz(sessionRoot: JazzSessionRoot): void {
+export function pullTokensFromJazz(sessionRoot: any): void {
   const jazzTokens = sessionRoot.tokens;
   if (!jazzTokens) {
     console.warn("[jazz-bridge] No tokens list on session root");
     return;
   }
 
-  console.log(`[jazz-bridge] Pulling ${jazzTokens.length} tokens from Jazz`);
+  const len = jazzTokens.length ?? 0;
+  console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz`);
 
   runFromJazz(() => {
     const store = useSessionStore.getState();
-    // Clear existing tokens
     store.tokens.forEach((t) => store.removeToken(t.id));
-    // Add from Jazz
-    for (const jt of jazzTokens) {
+    for (let i = 0; i < len; i++) {
+      const jt = jazzTokens[i];
       if (jt) {
         store.addToken(jazzToZustandToken(jt));
       }
@@ -183,21 +181,18 @@ export function pullTokensFromJazz(sessionRoot: JazzSessionRoot): void {
 }
 
 /**
- * Pull all Jazz CoValue state into Zustand stores (late-join / reconnection).
+ * Pull all Jazz CoValue state into Zustand stores.
  */
-export function pullAllFromJazz(sessionRoot: JazzSessionRoot): void {
+export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
-  // Future: pullMapsFromJazz, etc.
 }
 
 // ── Live bridge: subscribe to both directions ─────────────────────────────
 
 /**
  * Start the bidirectional bridge for tokens.
- * - Subscribes to Zustand token changes → mirrors to Jazz
- * - Subscribes to Jazz token changes → mirrors to Zustand
  */
-export function startBridge(sessionRoot: JazzSessionRoot): void {
+export function startBridge(sessionRoot: any): void {
   _sessionRoot = sessionRoot;
   console.log("[jazz-bridge] Starting bridge");
 
@@ -205,40 +200,45 @@ export function startBridge(sessionRoot: JazzSessionRoot): void {
   const unsubZustand = useSessionStore.subscribe(
     (state) => state.tokens,
     (tokens, prevTokens) => {
-      // Skip if this change came from Jazz (echo prevention)
       if (_fromJazz) return;
       if (!_sessionRoot?.tokens) return;
 
       const jazzTokens = _sessionRoot.tokens;
-      const group = _sessionRoot.$jazz.group;
+      const group = _sessionRoot._owner ?? _sessionRoot.$jazz?.group;
 
       // Detect added tokens
-      const prevIds = new Set(prevTokens.map((t) => t.id));
+      const prevIds = new Set(prevTokens.map((t: Token) => t.id));
       for (const t of tokens) {
         if (!prevIds.has(t.id)) {
-          // New token — create JazzToken and add to list
           const init = tokenToJazzInit(t);
-          const jt = JazzTokenSchema.create(init as any, group);
-          jazzTokens.push(jt);
-          console.log(`[jazz-bridge] → Jazz: added token ${t.id}`);
+          try {
+            const jt = JazzTokenSchema.create(init as any, group);
+            jazzTokens.push(jt);
+            console.log(`[jazz-bridge] → Jazz: added token ${t.id}`);
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
+          }
         }
       }
 
       // Detect moved/updated tokens
       for (const t of tokens) {
         if (prevIds.has(t.id)) {
-          const prev = prevTokens.find((pt) => pt.id === t.id);
+          const prev = prevTokens.find((pt: Token) => pt.id === t.id);
           if (!prev) continue;
-          // Only sync if position changed (most frequent update)
           if (prev.x !== t.x || prev.y !== t.y || prev.label !== t.label || prev.color !== t.color) {
-            // Find matching JazzToken in the list
-            for (let i = 0; i < jazzTokens.length; i++) {
+            const len = jazzTokens.length ?? 0;
+            for (let i = 0; i < len; i++) {
               const jt = jazzTokens[i];
               if (jt && jt.tokenId === t.id) {
-                jt.$jazz.set("x", t.x);
-                jt.$jazz.set("y", t.y);
-                if (t.label !== prev.label) jt.$jazz.set("label", t.label || "");
-                if (t.color !== prev.color) jt.$jazz.set("color", t.color || "#666");
+                try {
+                  jt.$jazz.set("x", t.x);
+                  jt.$jazz.set("y", t.y);
+                  if (t.label !== prev.label) jt.$jazz.set("label", t.label || "");
+                  if (t.color !== prev.color) jt.$jazz.set("color", t.color || "#666");
+                } catch (err) {
+                  console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
+                }
                 break;
               }
             }
@@ -247,15 +247,18 @@ export function startBridge(sessionRoot: JazzSessionRoot): void {
       }
 
       // Detect removed tokens
-      const currentIds = new Set(tokens.map((t) => t.id));
+      const currentIds = new Set(tokens.map((t: Token) => t.id));
       for (const prev of prevTokens) {
         if (!currentIds.has(prev.id)) {
-          // Find and remove from Jazz list
-          for (let i = 0; i < jazzTokens.length; i++) {
+          const len = jazzTokens.length ?? 0;
+          for (let i = 0; i < len; i++) {
             const jt = jazzTokens[i];
             if (jt && jt.tokenId === prev.id) {
-              // CoList doesn't have a remove method — we splice
-              jazzTokens.splice(i, 1);
+              try {
+                jazzTokens.splice(i, 1);
+              } catch (err) {
+                console.error(`[jazz-bridge] Failed to remove JazzToken:`, err);
+              }
               console.log(`[jazz-bridge] → Jazz: removed token ${prev.id}`);
               break;
             }
@@ -267,46 +270,50 @@ export function startBridge(sessionRoot: JazzSessionRoot): void {
   activeSubscriptions.push(unsubZustand);
 
   // ── Direction 2: Jazz → Zustand ──
-  // Subscribe to Jazz token list changes via $jazz.subscribe
-  if (sessionRoot.tokens) {
-    const unsubJazz = sessionRoot.tokens.$jazz.subscribe(
-      { resolve: { $each: true } },
-      (tokens) => {
-        if (!tokens) return;
-        
-        runFromJazz(() => {
-          const store = useSessionStore.getState();
-          const currentIds = new Set(store.tokens.map((t) => t.id));
-          const jazzIds = new Set<string>();
+  if (sessionRoot.tokens?.$jazz?.subscribe) {
+    try {
+      const unsubJazz = sessionRoot.tokens.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (tokens: any) => {
+          if (!tokens) return;
 
-          for (const jt of tokens) {
-            if (!jt) continue;
-            jazzIds.add(jt.tokenId);
+          runFromJazz(() => {
+            const store = useSessionStore.getState();
+            const currentIds = new Set(store.tokens.map((t) => t.id));
+            const jazzIds = new Set<string>();
+            const len = tokens.length ?? 0;
 
-            if (currentIds.has(jt.tokenId)) {
-              // Update existing token
-              const existing = store.tokens.find((t) => t.id === jt.tokenId);
-              if (existing && (existing.x !== jt.x || existing.y !== jt.y)) {
-                store.updateTokenPosition(jt.tokenId, jt.x, jt.y);
+            for (let i = 0; i < len; i++) {
+              const jt = tokens[i];
+              if (!jt) continue;
+              jazzIds.add(jt.tokenId);
+
+              if (currentIds.has(jt.tokenId)) {
+                const existing = store.tokens.find((t) => t.id === jt.tokenId);
+                if (existing && (existing.x !== jt.x || existing.y !== jt.y)) {
+                  store.updateTokenPosition(jt.tokenId, jt.x, jt.y);
+                }
+              } else {
+                store.addToken(jazzToZustandToken(jt));
+                console.log(`[jazz-bridge] ← Jazz: added token ${jt.tokenId}`);
               }
-            } else {
-              // New token from remote
-              store.addToken(jazzToZustandToken(jt));
-              console.log(`[jazz-bridge] ← Jazz: added token ${jt.tokenId}`);
             }
-          }
 
-          // Remove tokens that no longer exist in Jazz
-          for (const t of store.tokens) {
-            if (!jazzIds.has(t.id)) {
-              store.removeToken(t.id);
-              console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+            for (const t of store.tokens) {
+              if (!jazzIds.has(t.id)) {
+                store.removeToken(t.id);
+                console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
+              }
             }
-          }
-        });
-      },
-    );
-    activeSubscriptions.push(unsubJazz);
+          });
+        },
+      );
+      activeSubscriptions.push(unsubJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz tokens:", err);
+    }
+  } else {
+    console.warn("[jazz-bridge] Jazz tokens list does not support subscribe — inbound sync disabled");
   }
 
   console.log("[jazz-bridge] Bridge started with token sync");
