@@ -215,14 +215,21 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
       if (resolved.transport === 'jazz') {
         setCurrentUsername(username.trim());
-        const info = await joinJazzSession(resolved.connectionId);
-        setActiveTransport('jazz');
 
-        // Propagate landing-screen role selection to multiplayerStore
+        // Capture the player's landing-screen roles BEFORE joinJazzSession,
+        // because the join process hydrates stores and may overwrite player data
         const currentPlayer = useSessionStore.getState().players.find(
           p => p.id === useSessionStore.getState().currentPlayerId
         );
-        const playerRoles = currentPlayer?.roleIds ?? ['player'];
+        const playerRoles = currentPlayer?.roleIds?.length 
+          ? [...currentPlayer.roleIds] 
+          : ['player'];
+        console.log('[SessionManager] Pre-join roles captured:', playerRoles);
+
+        const info = await joinJazzSession(resolved.connectionId);
+        setActiveTransport('jazz');
+
+        // Apply the captured roles to multiplayerStore (post-hydration)
         useMultiplayerStore.getState().setRoles(playerRoles);
 
         useMultiplayerStore.getState().setCurrentSession({
