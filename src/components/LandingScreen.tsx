@@ -34,6 +34,7 @@ import {
   Wifi,
   WifiOff,
   Users,
+  Loader2,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
@@ -397,6 +398,17 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                   <Users className="w-3 h-3" />
                   {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
                 </div>
+                {!syncReady && (
+                  <div className="flex items-center gap-1.5 text-primary animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Syncing session data…</span>
+                  </div>
+                )}
+                {syncReady && (
+                  <div className="flex items-center gap-1.5 text-green-500">
+                    <span>✓ Data synced</span>
+                  </div>
+                )}
               </div>
             )}
 
