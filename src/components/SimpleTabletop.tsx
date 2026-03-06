@@ -1393,10 +1393,12 @@ export const SimpleTabletop = () => {
     if (Object.keys(remoteDragPreviews).length > 0 ||
         Object.keys(remoteHovers).length > 0 ||
         Object.keys(remoteSelections).length > 0 ||
-        Object.keys(remoteActionTargets).length > 0) {
+        Object.keys(remoteActionTargets).length > 0 ||
+        Object.keys(remoteTokenHandlePreviews).length > 0 ||
+        Object.keys(remoteMapHandlePreviews).length > 0) {
       redrawCanvas();
     }
-  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets]);
+  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
