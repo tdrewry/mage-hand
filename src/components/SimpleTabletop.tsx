@@ -348,6 +348,7 @@ export const SimpleTabletop = () => {
   // Token interaction state
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
+  const [fogRefreshTick, setFogRefreshTick] = useState(0);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
@@ -390,6 +391,7 @@ export const SimpleTabletop = () => {
 
   // Store wall geometry separately for fog computation
   const wallGeometryRef = useRef<any>(null);
+  const wallGeometryInitializedRef = useRef(false);
   
   // Combined visibility-blocking segments (walls + map objects)
   const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
@@ -2042,9 +2044,13 @@ export const SimpleTabletop = () => {
         requestAnimationFrame(() => {
           setPostProcessingVisible(true);
           redrawCanvas();
+          // Bump fog refresh tick to re-trigger the fog computation useEffect
+          setFogRefreshTick(t => t + 1);
         });
       } else {
         redrawCanvas();
+        // Bump fog refresh tick to re-trigger the fog computation useEffect
+        setFogRefreshTick(t => t + 1);
       }
     };
 
@@ -2493,6 +2499,7 @@ export const SimpleTabletop = () => {
     roles, // Re-compute when roles change (permissions affect which tokens get vision)
     selectedMapId, // Re-compute fog when switching maps (per-map explored areas)
     isEntityVisible, // Re-compute when active map set changes
+    fogRefreshTick, // Re-compute when force-refresh is triggered (e.g., initial wall geometry ready)
   ]);
 
   // Helper function to convert screen coordinates to world coordinates
@@ -3304,6 +3311,15 @@ export const SimpleTabletop = () => {
 
         // Store in separate ref for fog computation
         wallGeometryRef.current = wallGeometry;
+
+        // On first wall geometry computation, kick fog recomputation
+        // (fog useEffect may have bailed out because wallGeometryRef was null on mount)
+        if (!wallGeometryInitializedRef.current) {
+          wallGeometryInitializedRef.current = true;
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new Event('fog:force-refresh'));
+          });
+        }
         
         // Update combined segments (walls + vision-blocking map objects + imported walls)
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
