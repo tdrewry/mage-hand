@@ -133,6 +133,7 @@ import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
+import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 
 import { Z_INDEX } from "../lib/zIndex";
@@ -380,6 +381,8 @@ export const SimpleTabletop = () => {
   const remoteActionTargets = useTokenEphemeralStore((s) => s.actionTargets);
   const remoteMapHandlePreviews = useMapEphemeralStore((s) => s.handlePreviews);
   const remotePings = useMapEphemeralStore((s) => s.pings);
+  const remoteGroupSelects = useMiscEphemeralStore((s) => s.groupSelects);
+  const remoteGroupDrags = useMiscEphemeralStore((s) => s.groupDrags);
   // Local pings (own + remote) for animated rendering — each has a birth timestamp
   const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
@@ -1412,10 +1415,12 @@ export const SimpleTabletop = () => {
         Object.keys(remoteSelections).length > 0 ||
         Object.keys(remoteActionTargets).length > 0 ||
         Object.keys(remoteTokenHandlePreviews).length > 0 ||
-        Object.keys(remoteMapHandlePreviews).length > 0) {
+        Object.keys(remoteMapHandlePreviews).length > 0 ||
+        Object.keys(remoteGroupSelects).length > 0 ||
+        Object.keys(remoteGroupDrags).length > 0) {
       redrawCanvas();
     }
-  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews]);
+  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
@@ -4184,6 +4189,7 @@ export const SimpleTabletop = () => {
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
       drawRemoteHandlePreviews(ctx);
+      drawRemoteGroupPreviews(ctx);
       drawMapPings(ctx);
     }
 
@@ -4295,6 +4301,7 @@ export const SimpleTabletop = () => {
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
             drawRemoteHandlePreviews(overlayCtx);
+            drawRemoteGroupPreviews(overlayCtx);
 
             overlayCtx.restore();
           }
