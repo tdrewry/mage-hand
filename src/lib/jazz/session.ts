@@ -63,16 +63,50 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   console.log(`[jazz-session] Joining session "${sessionCoId}"`);
 
   // Load the session root CoValue by ID
-  const root = await (JazzSessionRootSchema as any).load(sessionCoId, {
-    resolve: {
-      tokens: { $each: true },
-      maps: { $each: true },
-      blobs: { $each: true },
-    },
-  });
+  let root: any;
+  try {
+    root = await (JazzSessionRootSchema as any).load(sessionCoId, {
+      resolve: {
+        tokens: { $each: true },
+        maps: { $each: true },
+        blobs: { $each: true },
+      },
+    });
+  } catch (err) {
+    console.error("[jazz-session] Failed to load session root:", err);
+    throw new Error(`Failed to load Jazz session: ${sessionCoId} — ${err}`);
+  }
 
   if (!root) {
-    throw new Error(`Failed to load Jazz session: ${sessionCoId}`);
+    throw new Error(`Failed to load Jazz session: ${sessionCoId} — root is null/undefined`);
+  }
+
+  // ── Diagnostics: inspect what we got ──
+  console.log("[jazz-session] Session root loaded:", {
+    id: root.id ?? root.$jazz?.id,
+    sessionName: root.sessionName,
+    hasTokens: !!root.tokens,
+    tokensLength: root.tokens?.length ?? "N/A",
+    hasMaps: !!root.maps,
+    mapsLength: root.maps?.length ?? "N/A",
+    hasBlobs: !!root.blobs,
+    blobsLength: root.blobs?.length ?? "N/A",
+    rootKeys: Object.keys(root).filter(k => !k.startsWith("_")),
+    $jazzKeys: root.$jazz ? Object.keys(root.$jazz) : "no $jazz",
+  });
+
+  // Log blob details
+  if (root.blobs) {
+    const blobLen = root.blobs.length ?? 0;
+    for (let i = 0; i < blobLen; i++) {
+      const b = root.blobs[i];
+      console.log(`[jazz-session] Blob[${i}]:`, {
+        kind: b?.kind,
+        version: b?.version,
+        stateLength: b?.state?.length ?? "N/A",
+        updatedAt: b?.updatedAt,
+      });
+    }
   }
 
   // Pull remote state into Zustand
@@ -87,7 +121,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   console.log('[jazz-session] Sync ready — all durable state pulled');
 
   const info: JazzSessionInfo = {
-    sessionCoId: root.id ?? sessionCoId,
+    sessionCoId: root.id ?? root.$jazz?.id ?? sessionCoId,
     name: root.sessionName || "Joined Session",
     isCreator: false,
     root,
