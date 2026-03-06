@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices } from 'lucide-react';
-import { useActionStore } from '@/stores/actionStore';
+import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices, Lock } from 'lucide-react';
+import { useActionStore, broadcastResolutionClaim } from '@/stores/actionStore';
+import { useActionPendingStore } from '@/stores/actionPendingStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 
@@ -252,7 +254,21 @@ function TargetingPhase() {
 
 function SkillCheckResolvePhase() {
   const { currentAction, setResolution, commitAction, cancelAction } = useActionStore();
+  const claims = useActionPendingStore((s) => s.claims);
+  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
+  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+
+  const handleSetResolution = useCallback((targetKey: string, r: AttackResolution) => {
+    if (!currentAction) return;
+    const username = connectedUsers.find(u => u.userId === currentUserId)?.username ?? 'DM';
+    broadcastResolutionClaim(currentAction.id, currentUserId!, username);
+    setResolution(targetKey, r);
+  }, [currentAction?.id, currentUserId, connectedUsers, setResolution]);
+
   if (!currentAction || !currentAction.attack) return null;
+
+  const claim = claims[currentAction.id];
+  const claimedByOther = !!(claim && claim.claimedBy !== currentUserId);
 
   const target = currentAction.targets[0];
   const roll = target ? currentAction.rollResults[target.targetKey] : null;
@@ -261,9 +277,20 @@ function SkillCheckResolvePhase() {
   const isNat20 = roll?.naturalRoll === 20;
   const isNat1 = roll?.naturalRoll === 1;
 
+
+
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+
+        {/* Claimed by another DM banner */}
+        {claimedByOther && (
+          <div className="flex items-center gap-2 p-2.5 rounded-md bg-accent/50 border border-accent text-accent-foreground text-xs">
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>Being resolved by <strong>{claim.claimedByName}</strong></span>
+          </div>
+        )}
 
         {/* Skill Check Header */}
         <div className="flex items-center gap-2">
@@ -298,8 +325,10 @@ function SkillCheckResolvePhase() {
           <p className="text-xs text-muted-foreground">Outcome</p>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => target && setResolution(target.targetKey, 'miss')}
+              onClick={() => target && handleSetResolution(target.targetKey, 'miss')}
+              disabled={claimedByOther}
               className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                claimedByOther ? 'opacity-50 cursor-not-allowed' :
                 resolution === 'miss'
                   ? 'bg-red-900/50 text-red-300 border-red-700 border-2'
                   : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
@@ -309,8 +338,10 @@ function SkillCheckResolvePhase() {
               Fail
             </button>
             <button
-              onClick={() => target && setResolution(target.targetKey, 'hit')}
+              onClick={() => target && handleSetResolution(target.targetKey, 'hit')}
+              disabled={claimedByOther}
               className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                claimedByOther ? 'opacity-50 cursor-not-allowed' :
                 resolution === 'hit'
                   ? 'bg-green-900/50 text-green-300 border-green-700 border-2'
                   : 'border-border/50 hover:bg-muted/50 text-muted-foreground'
@@ -325,10 +356,10 @@ function SkillCheckResolvePhase() {
         <Separator />
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
+          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction} disabled={claimedByOther}>
             Dismiss
           </Button>
-          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution}>
+          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!resolution || claimedByOther}>
             Record
           </Button>
         </div>
@@ -339,13 +370,41 @@ function SkillCheckResolvePhase() {
 
 function ResolvePhase() {
   const { currentAction, setResolution, overrideDamage, commitAction, cancelAction, removeTarget } = useActionStore();
+  const claims = useActionPendingStore((s) => s.claims);
+  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
+  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+
+  const claimAndResolve = useCallback((targetKey: string, r: AttackResolution) => {
+    if (!currentAction) return;
+    const username = connectedUsers.find(u => u.userId === currentUserId)?.username ?? 'DM';
+    broadcastResolutionClaim(currentAction.id, currentUserId!, username);
+    setResolution(targetKey, r);
+  }, [currentAction?.id, currentUserId, connectedUsers, setResolution]);
+
+  const claimAndOverride = useCallback((targetKey: string, v: number) => {
+    if (!currentAction) return;
+    const username = connectedUsers.find(u => u.userId === currentUserId)?.username ?? 'DM';
+    broadcastResolutionClaim(currentAction.id, currentUserId!, username);
+    overrideDamage(targetKey, v);
+  }, [currentAction?.id, currentUserId, connectedUsers, overrideDamage]);
+
   if (!currentAction || !currentAction.attack) return null;
 
+  const claim = claims[currentAction.id];
+  const claimedByOther = !!(claim && claim.claimedBy !== currentUserId);
   const allResolved = currentAction.targets.every(t => currentAction.resolutions[t.targetKey]);
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
+
+        {/* Claimed by another DM banner */}
+        {claimedByOther && (
+          <div className="flex items-center gap-2 p-2.5 rounded-md bg-accent/50 border border-accent text-accent-foreground text-xs">
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>Being resolved by <strong>{claim.claimedByName}</strong></span>
+          </div>
+        )}
 
         {/* Action Header */}
         <div className="flex items-center justify-between">
@@ -363,7 +422,6 @@ function ResolvePhase() {
               </p>
             </div>
           </div>
-          {/* Show all damage types from the first target's breakdown, or fallback to single type */}
           {(() => {
             const firstTarget = currentAction.targets[0];
             const dmg = firstTarget ? currentAction.damageResults[firstTarget.targetKey] : null;
@@ -388,7 +446,6 @@ function ResolvePhase() {
 
         {/* Per-target resolution */}
         {(() => {
-          // Build per-token drop counters for multi-hit labeling
           const tokenDropIndex = new Map<string, number>();
           const tokenDropTotal = new Map<string, number>();
           for (const t of currentAction.targets) {
@@ -415,8 +472,9 @@ function ResolvePhase() {
                 resolution={resolution}
                 damageType={currentAction.attack!.damageType}
                 dropLabel={dropLabel}
-                onSetResolution={(r) => setResolution(target.targetKey, r)}
-                onOverrideDamage={(v) => overrideDamage(target.targetKey, v)}
+                disabled={claimedByOther}
+                onSetResolution={(r) => claimAndResolve(target.targetKey, r)}
+                onOverrideDamage={(v) => claimAndOverride(target.targetKey, v)}
                 onDismiss={() => removeTarget(target.targetKey)}
               />
             );
@@ -425,7 +483,7 @@ function ResolvePhase() {
 
         <Separator />
 
-        {/* Aggregate damage summary per token (visible when multiple entries exist) */}
+        {/* Aggregate damage summary */}
         {(() => {
           const tokenTotals = new Map<string, { name: string; total: number; hits: number }>();
           for (const t of currentAction.targets) {
@@ -456,10 +514,10 @@ function ResolvePhase() {
         <Separator />
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction}>
+          <Button variant="outline" size="sm" className="flex-1" onClick={cancelAction} disabled={claimedByOther}>
             Cancel
           </Button>
-          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!allResolved}>
+          <Button size="sm" className="flex-1" onClick={commitAction} disabled={!allResolved || claimedByOther}>
             Commit Results
           </Button>
         </div>
@@ -481,6 +539,8 @@ interface TargetResolveCardProps {
   onSetResolution: (r: AttackResolution) => void;
   onOverrideDamage: (v: number) => void;
   onDismiss: () => void;
+  /** Whether controls are disabled (another DM has claimed this action) */
+  disabled?: boolean;
   /** Whether this is an effect-based action (shows breakdown if available) */
   isEffect?: boolean;
 }
@@ -498,6 +558,7 @@ function TargetResolveCard({
   onSetResolution,
   onOverrideDamage,
   onDismiss,
+  disabled,
   isEffect,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
@@ -667,7 +728,7 @@ function TargetResolveCard({
       </div>
 
       {/* Resolution buttons */}
-      <div className="space-y-1">
+      <div className={`space-y-1 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <p className="text-xs text-muted-foreground">Resolution {suggested !== 'miss' && `(suggested: ${RESOLUTION_CONFIG[suggested].label})`}</p>
         <div className="grid grid-cols-5 gap-1">
           {RESOLUTION_BUTTON_KEYS.map(key => {
@@ -679,6 +740,7 @@ function TargetResolveCard({
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => onSetResolution(key)}
+                      disabled={disabled}
                       className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
                         isActive
                           ? cfg.color + ' border-2'
