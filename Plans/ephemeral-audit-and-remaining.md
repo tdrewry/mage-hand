@@ -129,9 +129,7 @@ The three core P5 stub emitters are now wired:
 
 These still have handlers + stores but no emitters. Wire as UI features mature:
 
-- `map.focus` — emit when DM triggers a focus command
 - `asset.uploadProgress` — emit during asset upload flows
-- Handle preview rendering — the emitters are wired but no remote ghost overlays are rendered yet for handle previews
 
 ---
 
