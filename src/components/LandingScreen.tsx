@@ -555,7 +555,42 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* About modal */}
+      {/* Delete All Data confirmation */}
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently clear all session data, tokens, maps, regions, effects, fog,
+              and stored state from this browser instance. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                try {
+                  clearAllStores();
+                  // Also clear localStorage keys used by zustand persist
+                  const keysToRemove = Object.keys(localStorage).filter(k =>
+                    k.startsWith('vtt-') || k.startsWith('magehand-') || k.startsWith('dungeon-')
+                  );
+                  keysToRemove.forEach(k => localStorage.removeItem(k));
+                  toast.success('All data has been deleted');
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Failed to delete all data');
+                }
+                setShowDeleteAllConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={showAbout} onOpenChange={setShowAbout}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
