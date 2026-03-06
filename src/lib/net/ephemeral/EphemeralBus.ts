@@ -8,6 +8,7 @@ import { EPHEMERAL_OP_CONFIG } from "./types";
 import { TTLCache, type TTLEntry } from "./TTLCache";
 import { ThrottleManager } from "./ThrottleManager";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { isFromJazz } from "@/lib/jazz/bridge";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -119,10 +120,7 @@ export class EphemeralBus {
     // Skip ephemeral broadcasts during Jazz inbound hydration —
     // store side-effects (e.g. actionStore.broadcastActionQueue) fire during
     // blob pull, but the player shouldn't re-broadcast DM state they just received.
-    try {
-      const { isFromJazz } = require('@/lib/jazz/bridge');
-      if (isFromJazz()) return;
-    } catch { /* bridge not loaded — continue normally */ }
+    if (isFromJazz()) return;
 
     // DM-only gate (client-side check)
     if (config.dmOnly) {
