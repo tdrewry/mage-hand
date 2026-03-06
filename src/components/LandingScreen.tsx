@@ -412,7 +412,53 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
             );
           })}
         </nav>
+
+        {/* Multiplayer */}
+        <div className="space-y-2 border border-border rounded-lg p-4 bg-muted/10">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Network className="w-4 h-4 text-muted-foreground" />
+            <span>Multiplayer</span>
+            {isConnected && (
+              <Badge variant="default" className="ml-auto text-xs py-0 px-1.5">
+                <Wifi className="w-3 h-3 mr-1" />
+                Connected
+              </Badge>
+            )}
+            {!isConnected && connectionStatus === 'disconnected' && (
+              <Badge variant="secondary" className="ml-auto text-xs py-0 px-1.5">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Offline
+              </Badge>
+            )}
+          </div>
+
+          {isConnected && currentSession && (
+            <div className="text-xs text-muted-foreground space-y-1">
+              <div>Session: <span className="font-mono text-foreground">{currentSession.sessionCode}</span></div>
+              <div className="flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
+              </div>
+            </div>
+          )}
+
+          <Button
+            variant={isConnected ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSessionManagerOpen(true)}
+            className="w-full"
+          >
+            <Network className="h-4 w-4 mr-2" />
+            {isConnected ? 'Session Details' : 'Host / Join'}
+          </Button>
+        </div>
       </div>
+
+      {/* Session Manager Dialog */}
+      <SessionManager
+        open={sessionManagerOpen}
+        onOpenChange={setSessionManagerOpen}
+      />
 
       {/* Hidden file input */}
       <input
