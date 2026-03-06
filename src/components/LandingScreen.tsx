@@ -35,6 +35,7 @@ import {
   WifiOff,
   Users,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
@@ -60,6 +61,7 @@ interface LandingScreenProps {
 export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSession }) => {
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -283,6 +285,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       onClick: handleSaveSession,
     },
     {
+      id: 'delete-all',
+      label: 'Delete All Data',
+      description: 'Clear all session data and stored state',
+      icon: Trash2,
+      disabled: false,
+      active: false,
+      onClick: () => setShowDeleteAllConfirm(true),
+      destructive: true,
+    },
+    {
       id: 'about',
       label: 'About',
       description: 'Application information',
@@ -443,7 +455,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                   'w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-150 text-left group',
                   item.disabled
                     ? 'opacity-40 cursor-not-allowed'
-                    : 'hover:bg-accent cursor-pointer',
+                    : (item as any).destructive
+                      ? 'hover:bg-destructive/10 cursor-pointer'
+                      : 'hover:bg-accent cursor-pointer',
                   item.active && !item.disabled
                     ? 'border border-green-500/40 bg-green-500/10 hover:bg-green-500/20'
                     : 'border border-transparent',
@@ -453,14 +467,20 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                   'flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center',
                   item.active && !item.disabled
                     ? 'bg-green-500/20 text-green-400'
-                    : 'bg-muted text-muted-foreground group-hover:text-foreground',
+                    : (item as any).destructive
+                      ? 'bg-destructive/20 text-destructive group-hover:text-destructive'
+                      : 'bg-muted text-muted-foreground group-hover:text-foreground',
                 ].join(' ')}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={[
                     'text-sm font-medium',
-                    item.active && !item.disabled ? 'text-green-400' : 'text-foreground',
+                    item.active && !item.disabled
+                      ? 'text-green-400'
+                      : (item as any).destructive
+                        ? 'text-destructive'
+                        : 'text-foreground',
                   ].join(' ')}>
                     {item.label}
                     {item.id === 'save' && isSaving && ' …'}
@@ -535,7 +555,42 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* About modal */}
+      {/* Delete All Data confirmation */}
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently clear all session data, tokens, maps, regions, effects, fog,
+              and stored state from this browser instance. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                try {
+                  clearAllStores();
+                  // Also clear localStorage keys used by zustand persist
+                  const keysToRemove = Object.keys(localStorage).filter(k =>
+                    k.startsWith('vtt-') || k.startsWith('magehand-') || k.startsWith('dungeon-')
+                  );
+                  keysToRemove.forEach(k => localStorage.removeItem(k));
+                  toast.success('All data has been deleted');
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Failed to delete all data');
+                }
+                setShowDeleteAllConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={showAbout} onOpenChange={setShowAbout}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
