@@ -37,3 +37,4 @@ export type {
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
 export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
+export { emitChatTyping } from "./miscHandlers";
