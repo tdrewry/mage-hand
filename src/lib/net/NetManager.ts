@@ -184,6 +184,10 @@ export class NetManager {
       store.setConnectedUsers([selfUser, ...peerUsers]);
 
       console.log("✅ [NetManager] Connected:", info.sessionId, "roles:", info.roles, "peers:", peerUsers.length);
+
+      // Start 10Hz token position sync loop
+      const { startPositionSync } = require("./tokenPositionSync") as typeof import("./tokenPositionSync");
+      startPositionSync();
     });
 
     const off2 = this.session.on("opBatch", (batch: OpBatchPayload) => {
@@ -226,6 +230,10 @@ export class NetManager {
       const store = useMultiplayerStore.getState();
       store.setConnectedUsers([]);
       console.log("🔌 [NetManager] Disconnected:", code, reason);
+
+      // Stop 10Hz token position sync loop
+      const { stopPositionSync } = require("./tokenPositionSync") as typeof import("./tokenPositionSync");
+      stopPositionSync();
 
       if (!this._intentionalDisconnect && this._autoReconnect && this._lastConnectParams) {
         store.setConnectionStatus("reconnecting");
