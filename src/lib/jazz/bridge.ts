@@ -260,16 +260,19 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
     const state = JSON.parse(stateJson);
     const hash = quickHash(stateJson);
 
-    // ── Guard against destructive hydration ──
-    // If inbound state looks empty but local store has data, skip the hydration.
-    // This prevents Jazz propagation delays from wiping the DM's populated stores.
-    const inboundEmpty = isEmptyState(state);
-    if (inboundEmpty) {
-      const localState = reg.extractor();
-      const localEmpty = isEmptyState(localState);
-      if (!localEmpty) {
-        console.warn(`[jazz-bridge] ✋ Blocked destructive hydration for "${kind}" — inbound is empty but local has data`);
-        return;
+    // ── Guard against destructive hydration (creator only) ──
+    // Only the creator (DM) needs this guard — Jazz may echo back empty state
+    // before the initial push has propagated. For joiners, Jazz IS the source
+    // of truth, so we always accept inbound data (even if empty).
+    if (_isCreator) {
+      const inboundEmpty = isEmptyState(state);
+      if (inboundEmpty) {
+        const localState = reg.extractor();
+        const localEmpty = isEmptyState(localState);
+        if (!localEmpty) {
+          console.warn(`[jazz-bridge] ✋ Blocked destructive hydration for "${kind}" — inbound is empty but local has data (creator guard)`);
+          return;
+        }
       }
     }
 
