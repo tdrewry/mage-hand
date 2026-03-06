@@ -74,6 +74,13 @@ export function broadcastResolutionClaim(actionId: string, claimedBy: string | n
     });
   } catch { /* ignore */ }
 }
+
+/** Broadcast action.inProgress so peers know an action phase is active */
+function broadcastActionInProgress(actionType: string, sourceTokenId?: string) {
+  try {
+    ephemeralBus.emit('action.inProgress', { actionType, sourceTokenId });
+  } catch { /* ignore */ }
+}
 export interface ResolutionFlash {
   tokenId: string;
   x: number;
@@ -199,6 +206,7 @@ export const useActionStore = create<ActionStore>()(
       set({ pendingActions: [...get().pendingActions, entry] });
     } else {
       set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
+      broadcastActionInProgress('targeting', sourceTokenId);
     }
   },
 
@@ -415,6 +423,7 @@ export const useActionStore = create<ActionStore>()(
       set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
       // Effect actions go straight to resolve — broadcast pending
       broadcastActionPending(entry);
+      broadcastActionInProgress('resolve', sourceTokenId);
     }
   },
 
@@ -502,6 +511,7 @@ export const useActionStore = create<ActionStore>()(
 
     // Broadcast to players that resolution is pending
     broadcastActionPending(updatedAction);
+    broadcastActionInProgress('resolve', updatedAction.sourceTokenId);
   },
 
   setResolution: (targetKey, resolution) => {

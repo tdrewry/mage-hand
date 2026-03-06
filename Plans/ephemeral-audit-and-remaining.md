@@ -42,14 +42,15 @@ All 7 phases of the ephemeral implementation are **DONE**. Priorities 1–5 have
 | `mapObject.handle.preview` | ✅ | ✅ | ❌ | ❌ |
 | `map.focus` | ✅ | ✅ | ❌ | ❌ |
 | `chat.typing` | ✅ | ✅ | ✅ | **Wired in ChatCard input (P5 ✅ v0.6.86)** |
-| `initiative.drag.preview` | ✅ | ✅ | ❌ | ❌ |
-| `initiative.hover` | ✅ | ✅ | ❌ | ❌ |
+| `chat.message` | ✅ | ✅ | ✅ | **Wired in chatStore (v0.6.88)** |
+| `initiative.drag.preview` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
+| `initiative.hover` | ✅ | ✅ | ✅ | **Wired in InitiativeTrackerCard (P6 ✅ v0.6.90)** |
 | `group.select.preview` | ✅ | ✅ | ❌ | ❌ |
 | `group.drag.preview` | ✅ | ✅ | ❌ | ❌ |
 | `asset.uploadProgress` | ✅ | ✅ | ❌ | ❌ |
 | `effect.placement.preview` | ✅ | ✅ | ✅ | **Wired in effectStore (P5 ✅ v0.6.86)** |
 | `action.flash` | ✅ | ✅ | ✅ | **Wired in commitAction (P5 ✅ v0.6.86)** |
-| `action.inProgress` | ✅ | ✅ | ❌ | ❌ |
+| `action.inProgress` | ✅ | ✅ | ✅ | **Wired in actionStore phases (P6 ✅ v0.6.90)** |
 | `mapObject.door.preview` | ✅ | ✅ | ❌ | ❌ |
 
 ---
@@ -128,10 +129,8 @@ The three core P5 stub emitters are now wired:
 
 These still have handlers + stores but no emitters. Wire as UI features mature:
 
-- `action.inProgress` — emit when action enters targeting/resolve phase
 - `mapObject.door.preview` — emit when toggling door open/close
 - Handle previews (`token/region/mapObject.handle.preview`) — emit when rotate/scale handles are dragged
-- Initiative ops — emit from InitiativePanel drag/hover
 - Group ops — emit from group selection/drag
 - `asset.uploadProgress` — emit during asset upload flows
 
@@ -149,5 +148,7 @@ P4c: action.resolution.claim               ✅ v0.6.82
 P4d: Player-facing resolved history feed   ✅ v0.6.82
 P5: Core stub emitters (chat/flash/effect) ✅ v0.6.86
 P5+: Chat UI + menu buttons               ✅ v0.6.87
-P6: Remaining stub emitters                🔲 (as needed)
+P6a: action.inProgress emitter             ✅ v0.6.90
+P6b: initiative.drag/hover emitters        ✅ v0.6.90
+P7: Remaining stub emitters                🔲 (as needed)
 ```
