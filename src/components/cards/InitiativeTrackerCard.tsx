@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InitiativeCard } from '@/components/InitiativeCard';
@@ -9,6 +9,7 @@ import { useRoleStore } from '@/stores/roleStore';
 import { ChevronUp, ChevronDown, Swords, Dices } from 'lucide-react';
 import { toast } from 'sonner';
 import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
+import { ephemeralBus } from '@/lib/net';
 
 interface InitiativeTrackerCardContentProps {
   selectedTokenIds?: string[];
@@ -56,11 +57,19 @@ export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: Initiati
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
+    try {
+      ephemeralBus.emit('initiative.drag.preview', { entryIndex: index, targetIndex: index });
+    } catch { /* net off */ }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, hoverIndex?: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (hoverIndex !== undefined) {
+      try {
+        ephemeralBus.emit('initiative.hover', { entryIndex: hoverIndex });
+      } catch { /* net off */ }
+    }
   };
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
@@ -70,6 +79,10 @@ export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: Initiati
       reorderInitiative(draggedIndex, dropIndex);
       toast.success('Initiative order updated');
     }
+    // Clear hover preview
+    try {
+      ephemeralBus.emit('initiative.hover', { entryIndex: null });
+    } catch { /* net off */ }
   };
 
   const totalCards = initiativeOrder.length + 1;
