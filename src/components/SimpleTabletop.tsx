@@ -3305,6 +3305,15 @@ export const SimpleTabletop = () => {
 
         // Store in separate ref for fog computation
         wallGeometryRef.current = wallGeometry;
+
+        // On first wall geometry computation, kick fog recomputation
+        // (fog useEffect may have bailed out because wallGeometryRef was null on mount)
+        if (!wallGeometryInitializedRef.current) {
+          wallGeometryInitializedRef.current = true;
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new Event('fog:force-refresh'));
+          });
+        }
         
         // Update combined segments (walls + vision-blocking map objects + imported walls)
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
