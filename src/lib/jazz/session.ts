@@ -25,6 +25,21 @@ export interface JazzSessionInfo {
 
 let currentSession: JazzSessionInfo | null = null;
 
+/** Extract CoValue ID from a Jazz object — tries multiple accessors for compat */
+function getCoValueId(coValue: any): string | undefined {
+  // jazz-tools 0.18+: $jazz.id
+  if (coValue?.$jazz?.id) return coValue.$jazz.id;
+  // Older versions or raw access
+  if (coValue?.id && typeof coValue.id === 'string' && coValue.id.startsWith('co_')) return coValue.id;
+  if (coValue?._raw?.id) return coValue._raw.id;
+  return undefined;
+}
+
+/** Extract the owner/group from a Jazz CoValue */
+export function getCoValueGroup(coValue: any): any {
+  return coValue?.$jazz?.owner ?? coValue?._owner ?? coValue?.$jazz?.group ?? undefined;
+}
+
 /**
  * Create a new Jazz session and push current Zustand state into it.
  * Returns the session info including the CoValue ID that peers use to join.
@@ -34,6 +49,27 @@ export function createJazzSession(name: string): JazzSessionInfo {
 
   const root = createSessionRoot(name) as any;
   
+  // Extract the real CoValue ID
+  const coId = getCoValueId(root);
+  const group = getCoValueGroup(root);
+  
+  console.log("[jazz-session] Root created:", {
+    coId,
+    hasGroup: !!group,
+    $jazzKeys: root.$jazz ? Object.keys(root.$jazz) : "no $jazz",
+    rootKeys: Object.keys(root).filter((k: string) => !k.startsWith("_")),
+    hasTokens: !!root.tokens,
+    hasBlobs: !!root.blobs,
+  });
+
+  if (!coId) {
+    console.error("[jazz-session] CRITICAL: Could not extract CoValue ID from session root!", {
+      rootType: typeof root,
+      rootConstructor: root?.constructor?.name,
+      protoKeys: Object.getOwnPropertyNames(Object.getPrototypeOf(root) ?? {}),
+    });
+  }
+
   // Push current Zustand state into the new Jazz session
   pushAllToJazz(root);
   
@@ -43,15 +79,17 @@ export function createJazzSession(name: string): JazzSessionInfo {
   // Host is always sync-ready (they own the data)
   useMultiplayerStore.getState().setSyncReady(true);
 
+  const sessionCoId = coId ?? `session-${Date.now()}`;
+  
   const info: JazzSessionInfo = {
-    sessionCoId: root.id ?? `session-${Date.now()}`,
+    sessionCoId,
     name,
     isCreator: true,
     root,
   };
 
   currentSession = info;
-  console.log(`[jazz-session] Session created: ${info.sessionCoId}`);
+  console.log(`[jazz-session] Session created: ${info.sessionCoId} (isRealCoId: ${!!coId})`);
   return info;
 }
 
@@ -61,6 +99,11 @@ export function createJazzSession(name: string): JazzSessionInfo {
  */
 export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionInfo> {
   console.log(`[jazz-session] Joining session "${sessionCoId}"`);
+
+  // Validate that this looks like a real CoValue ID
+  if (!sessionCoId.startsWith('co_')) {
+    console.warn(`[jazz-session] Session ID "${sessionCoId}" does not look like a CoValue ID (expected co_...). Load will likely fail.`);
+  }
 
   // Load the session root CoValue by ID
   let root: any;
@@ -82,8 +125,9 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   }
 
   // ── Diagnostics: inspect what we got ──
+  const loadedId = getCoValueId(root);
   console.log("[jazz-session] Session root loaded:", {
-    id: root.id ?? root.$jazz?.id,
+    id: loadedId ?? sessionCoId,
     sessionName: root.sessionName,
     hasTokens: !!root.tokens,
     tokensLength: root.tokens?.length ?? "N/A",
@@ -91,7 +135,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
     mapsLength: root.maps?.length ?? "N/A",
     hasBlobs: !!root.blobs,
     blobsLength: root.blobs?.length ?? "N/A",
-    rootKeys: Object.keys(root).filter(k => !k.startsWith("_")),
+    rootKeys: Object.keys(root).filter((k: string) => !k.startsWith("_")),
     $jazzKeys: root.$jazz ? Object.keys(root.$jazz) : "no $jazz",
   });
 
@@ -121,7 +165,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   console.log('[jazz-session] Sync ready — all durable state pulled');
 
   const info: JazzSessionInfo = {
-    sessionCoId: root.id ?? root.$jazz?.id ?? sessionCoId,
+    sessionCoId: loadedId ?? sessionCoId,
     name: root.sessionName || "Joined Session",
     isCreator: false,
     root,
