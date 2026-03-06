@@ -43,8 +43,14 @@ import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerSto
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
-import { createJazzSession } from '@/lib/jazz/session';
+import { createJazzSession, joinJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
+import {
+  resolveSessionCode,
+  generateSessionCode,
+  encodeJazzCode,
+  isJazzCode,
+} from '@/lib/sessionCodeResolver';
 
 export { type TransportType } from '@/stores/multiplayerStore';
 
@@ -96,16 +102,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   const [chatText, setChatText] = useState('');
   const [transport, setTransport] = useState<TransportType>('opbridge');
 
-  // Generate random session code
-  const generateSessionCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
   const handleConnect = async (code: string) => {
     if (!username.trim()) {
       toast.error('Please enter a username');
@@ -144,17 +140,28 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   };
 
   const handleCreateSession = async () => {
+    if (!username.trim()) {
+      toast.error('Please enter a username');
+      return;
+    }
+
     if (transport === 'jazz') {
-      if (!username.trim()) {
-        toast.error('Please enter a username');
-        return;
-      }
       setIsConnecting(true);
       try {
         setCurrentUsername(username.trim());
         const info = createJazzSession(username.trim());
+        const shortCode = encodeJazzCode(info.sessionCoId);
         setActiveTransport('jazz');
-        toast.success(`Jazz session created: ${info.sessionCoId.slice(0, 12)}…`);
+
+        // Store the short code as the session code so players can copy it
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: shortCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+
+        toast.success(`Jazz session created — code: ${shortCode}`);
       } catch (error) {
         console.error('Failed to create Jazz session:', error);
         toast.error('Failed to create Jazz session');
@@ -170,8 +177,44 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     handleConnect(code);
   };
 
-  const handleJoinSession = () => {
-    handleConnect(sessionCode);
+  /** Unified join — auto-detects transport from the code format. */
+  const handleJoinSession = async () => {
+    if (!username.trim()) {
+      toast.error('Please enter a username');
+      return;
+    }
+    if (!sessionCode.trim()) {
+      toast.error('Please enter a session code');
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      const resolved = resolveSessionCode(sessionCode);
+
+      if (resolved.transport === 'jazz') {
+        setCurrentUsername(username.trim());
+        const info = await joinJazzSession(resolved.connectionId);
+        setActiveTransport('jazz');
+
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: resolved.displayCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+
+        toast.success(`Joined Jazz session: ${resolved.displayCode}`);
+      } else {
+        // OpBridge join
+        await handleConnect(resolved.connectionId);
+      }
+    } catch (error) {
+      console.error('Failed to join session:', error);
+      toast.error('Invalid or expired session code');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleLeaveSession = () => {
@@ -525,60 +568,71 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 <Label htmlFor="join-code">Session Code</Label>
                 <Input
                   id="join-code"
-                  placeholder="Enter 6-character code"
+                  placeholder="e.g. A3BK7Z or J-a8F2c9Xk"
                   value={sessionCode}
-                  onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
-                  maxLength={6}
-                  disabled={isConnecting}
-                  className="bg-input border-border text-foreground font-mono text-lg tracking-wider uppercase"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="join-password">Password (If Required)</Label>
-                <Input
-                  id="join-password"
-                  type="password"
-                  placeholder="Enter session password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // Don't force uppercase for Jazz codes (they're case-sensitive)
+                    setSessionCode(isJazzCode(val) ? val : val.toUpperCase());
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
+                  maxLength={12}
                   disabled={isConnecting}
-                  className="bg-input border-border text-foreground"
+                  className="bg-input border-border text-foreground font-mono text-lg tracking-wider"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Paste the code shared by your host — the connection type is detected automatically.
+                </p>
               </div>
 
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-full">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Advanced Settings
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <Label htmlFor="join-server-url">Server URL</Label>
+              {/* Only show password for non-Jazz codes */}
+              {!isJazzCode(sessionCode) && (
+                <div className="space-y-2">
+                  <Label htmlFor="join-password">Password (If Required)</Label>
                   <Input
-                    id="join-server-url"
-                    placeholder="ws://localhost:3001"
-                    value={localServerUrl}
-                    onChange={(e) => setLocalServerUrl(e.target.value)}
+                    id="join-password"
+                    type="password"
+                    placeholder="Enter session password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
                     disabled={isConnecting}
-                    className="bg-input border-border text-foreground font-mono text-sm"
+                    className="bg-input border-border text-foreground"
                   />
-                  <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
-                  <Input
-                    id="join-invite-token"
-                    placeholder="Enter invite token"
-                    value={inviteToken}
-                    onChange={(e) => setInviteToken(e.target.value)}
-                    disabled={isConnecting}
-                    className="bg-input border-border text-foreground text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Change server URL to connect to a remote server
-                  </p>
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+              )}
+
+              {/* Only show advanced settings for non-Jazz codes */}
+              {!isJazzCode(sessionCode) && (
+                <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Advanced Settings
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    <Label htmlFor="join-server-url">Server URL</Label>
+                    <Input
+                      id="join-server-url"
+                      placeholder="ws://localhost:3001"
+                      value={localServerUrl}
+                      onChange={(e) => setLocalServerUrl(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-input border-border text-foreground font-mono text-sm"
+                    />
+                    <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
+                    <Input
+                      id="join-invite-token"
+                      placeholder="Enter invite token"
+                      value={inviteToken}
+                      onChange={(e) => setInviteToken(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-input border-border text-foreground text-sm"
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
               <Button
                 onClick={handleJoinSession}
