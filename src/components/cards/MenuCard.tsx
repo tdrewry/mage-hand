@@ -707,6 +707,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Return to Menu Confirmation (multiplayer active) */}
+      <AlertDialog open={returnMenuDialogOpen} onOpenChange={setReturnMenuDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return to Menu?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are currently connected to a multiplayer session ({currentSession?.sessionCode}).
+              Returning to the menu will disconnect you from the session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay Connected</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                netManager.disconnect();
+                setReturnMenuDialogOpen(false);
+                setLaunched(false);
+              }}
+            >
+              Disconnect &amp; Return
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Session Manager Modal */}
       <SessionManager 
         open={sessionManagerOpen} 
