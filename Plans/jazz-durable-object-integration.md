@@ -1,22 +1,36 @@
 # Jazz.tools — Durable Object Sync Integration Plan
 
-## Status: Planning (v0.6.96)
+## Status: Phase 1 Complete (v0.7.0)
 
 ## Context
 
 ### Current Architecture
 The app has **two networking layers**:
 1. **Ephemeral** — cursors, drag previews, typing indicators → `EphemeralBus` on raw WebSocket, TTL-based, lossy. **Stays as-is.**
-2. **Durable** — token moves, chat, state commits → `OpBridge` on the same WebSocket, sequenced & acked. **Being replaced by Jazz.**
+2. **Durable** — token moves, chat, state commits → `OpBridge` on the same WebSocket, sequenced & acked. **Stays as-is.**
 
-The `DurableObjectRegistry` already provides a clean `extractor/hydrator` contract per store (18 registered DOs). Jazz CoValues will wrap this same registry pattern, giving us:
-- **CRDT-based conflict resolution** (no manual merge logic)
-- **Offline-first** with automatic reconnection sync
-- **Built-in persistence** (no separate save/load needed)
-- **Late-join recovery** via CoValue subscriptions (replaces `token.sync` catchup)
+### Transport Selection Architecture (CRITICAL)
 
-### What Jazz Replaces
-| Current | Jazz Equivalent |
+> **Jazz is a swappable transport module, NOT a replacement for OpBridge.**
+
+The durable sync layer supports **multiple transport backends** that a hosting user can select:
+
+| Transport | Backend | Use Case |
+|-----------|---------|----------|
+| `OpBridge` + WebSocket server | Custom Node.js server | Default, self-hosted, full control |
+| `Jazz` CoValues | Jazz sync server (self-hosted or cloud) | CRDT conflict resolution, offline-first |
+| *(future)* Cloudflare DOs | Cloudflare Workers | Edge-hosted, scalable |
+
+**Architectural rules:**
+1. `OpBridge` and `NetManager` remain the **default** durable transport — never remove them.
+2. Jazz lives in `src/lib/jazz/` as a **standalone module** with no imports into core networking (`src/lib/net/`).
+3. Transport selection is a **session-level config** — the hosting user picks which backend to use.
+4. All transports feed into the **same Zustand stores** — the UI layer is transport-agnostic.
+5. `DurableObjectRegistry` extractor/hydrator contracts are shared across all transports.
+6. `EphemeralBus` is **always active** regardless of which durable transport is selected.
+
+### What Jazz Provides (when selected)
+| Current (OpBridge) | Jazz Equivalent |
 |---------|----------------|
 | `OpBridge.proposeOp()` | CoValue mutation (auto-synced) |
 | `opBatch` handler + sequence tracking | CoValue subscription (`useCoState`) |
@@ -25,10 +39,11 @@ The `DurableObjectRegistry` already provides a clean `extractor/hydrator` contra
 | Server-side op ordering | Jazz CRDT merge (no server ordering needed) |
 | `lastSeenSeq` localStorage tracking | Jazz handles internally |
 
-### What Stays
+### What Always Stays
+- **OpBridge + NetManager** — default durable transport, always available
 - **EphemeralBus** — all high-frequency lossy ops (cursors, drags, pings, typing)
-- **DurableObjectRegistry** — extractor/hydrator contract (Jazz adapter wraps it)
-- **Zustand stores** — remain the source of truth for UI rendering; Jazz feeds into them
+- **DurableObjectRegistry** — extractor/hydrator contract (shared by all transports)
+- **Zustand stores** — remain the source of truth for UI rendering; transports feed into them
 
 ---
 
