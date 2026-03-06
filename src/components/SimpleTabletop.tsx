@@ -126,7 +126,7 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
@@ -335,7 +335,24 @@ export const SimpleTabletop = () => {
     if (!followDM || !dmViewport) return;
     setTransformState({ x: dmViewport.x, y: dmViewport.y, zoom: dmViewport.zoom });
   }, [followDM, dmViewport]);
-  
+
+  // ── Map Focus: DM one-shot pan command — non-DM players auto-pan to focus target ──
+  const mapFocusCommand = useMapEphemeralStore((s) => s.focus);
+  useEffect(() => {
+    if (!mapFocusCommand) return;
+    // Only non-DM players respond to focus commands
+    const { currentPlayerId: cpId, players: pls } = useSessionStore.getState();
+    const pl = pls.find((p) => p.id === cpId);
+    if (pl?.roleIds?.includes('dm')) return;
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const zoom = mapFocusCommand.zoom ?? transform.zoom;
+    const newX = canvasEl.width / 2 - mapFocusCommand.pos.x * zoom;
+    const newY = canvasEl.height / 2 - mapFocusCommand.pos.y * zoom;
+    setTransformState({ x: newX, y: newY, zoom });
+    useMapEphemeralStore.getState().setFocus(null);
+  }, [mapFocusCommand]);
+
   // Keep a ref to track the latest transform for animation loops
   // This prevents stale closure issues when wheel zoom occurs during animation
   const transformRef = useRef(transform);
@@ -7547,6 +7564,24 @@ export const SimpleTabletop = () => {
         }
 
         redrawCanvas();
+        return;
+      }
+
+      // ── CTRL+SHIFT+CLICK: DM broadcasts map focus to all players ──
+      if (e.ctrlKey && e.shiftKey && !e.metaKey && isDM) {
+        emitMapFocus({ x: worldPos.x, y: worldPos.y }, transform.zoom);
+        // Visual feedback: also ping so DM sees confirmation
+        const cursorColor = useCursorStore.getState().cursors[useSessionStore.getState().currentPlayerId || ""]?.color || "#fbbf24";
+        const pingTs = Date.now();
+        ephemeralBus.emit("map.ping", { pos: { x: worldPos.x, y: worldPos.y }, color: cursorColor, label: "Focus" });
+        setActivePings((prev) => [...prev, {
+          id: `focus-${pingTs}`,
+          pos: { x: worldPos.x, y: worldPos.y },
+          color: cursorColor,
+          label: "Focus",
+          ts: pingTs,
+        }]);
+        toast.success("Focused all players here", { duration: 1500 });
         return;
       }
 
