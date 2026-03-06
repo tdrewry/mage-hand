@@ -1,6 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { APP_VERSION } from '@/lib/version';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +29,7 @@ import {
   Save,
   Info,
   ChevronRight,
+  UserCircle,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -64,6 +68,74 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Role/username selection state
+  const [username, setUsername] = useState('');
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const roles = useRoleStore((s) => s.roles);
+  const initializeDefaultRoles = useRoleStore((s) => s.initializeDefaultRoles);
+  const players = useSessionStore((s) => s.players);
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const addPlayer = useSessionStore((s) => s.addPlayer);
+  const initializeSession = useSessionStore((s) => s.initializeSession);
+
+  // Ensure roles and session are initialized
+  useEffect(() => {
+    initializeDefaultRoles();
+    initializeSession();
+  }, []);
+
+  // Check if current player already has valid identity
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const hasValidIdentity = currentPlayer && currentPlayer.name && currentPlayer.name.trim().length > 0;
+
+  // Pre-fill from existing player if returning
+  useEffect(() => {
+    if (hasValidIdentity && currentPlayer) {
+      setUsername(currentPlayer.name);
+      setSelectedRoleIds(currentPlayer.roleIds || []);
+    } else if (roles.length > 0 && selectedRoleIds.length === 0) {
+      // Auto-select DM for first user, Player for subsequent
+      const isFirstUser = players.length === 0 || !players.some(p => p.name?.trim());
+      const defaultRole = isFirstUser ? 'dm' : 'player';
+      const role = roles.find(r => r.id === defaultRole);
+      if (role) setSelectedRoleIds([role.id]);
+    }
+  }, [roles, hasValidIdentity]);
+
+  const toggleRole = (roleId: string) => {
+    setSelectedRoleIds(prev =>
+      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  const isIdentityReady = username.trim().length > 0 && selectedRoleIds.length > 0;
+  const isDMSelected = selectedRoleIds.includes('dm');
+
+  /** Commit the player identity and set rendering mode based on role */
+  const commitIdentityAndLaunch = (launchFn: () => void) => {
+    if (!isIdentityReady) {
+      toast.error('Please enter a username and select a role before continuing.');
+      return;
+    }
+
+    // Commit player identity
+    addPlayer({
+      id: currentPlayerId,
+      name: username.trim(),
+      roleIds: selectedRoleIds,
+      isConnected: true,
+    });
+
+    // Set rendering mode based on role: DMs get edit, Players get play
+    const dungeonStore = useDungeonStore.getState();
+    if (!isDMSelected) {
+      dungeonStore.setRenderingMode('play');
+    }
+    // DMs keep whatever mode was previously set (or default 'edit')
+
+    launchFn();
+  };
 
   // Store hooks
   const sessionStore = useSessionStore();
