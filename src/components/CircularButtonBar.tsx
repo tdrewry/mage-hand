@@ -85,25 +85,39 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
       <ToolbarSeparator />
 
-      <ToolbarButton
-        icon={Play}
-        label={mode === 'play' ? 'Play Mode' : 'Switch to Play Mode'}
-        onClick={onToggleMode}
-        isActive={mode === 'play'}
-        variant={mode === 'play' ? 'active' : 'ghost'}
-        size="xs"
-        className={mode === 'play' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
-      />
+      {isDM ? (
+        <>
+          <ToolbarButton
+            icon={Play}
+            label={mode === 'play' ? 'Play Mode' : 'Switch to Play Mode'}
+            onClick={onToggleMode}
+            isActive={mode === 'play'}
+            variant={mode === 'play' ? 'active' : 'ghost'}
+            size="xs"
+            className={mode === 'play' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+          />
 
-      <ToolbarButton
-        icon={Edit}
-        label={mode === 'edit' ? 'Edit Mode' : 'Switch to Edit Mode'}
-        onClick={onToggleMode}
-        isActive={mode === 'edit'}
-        variant={mode === 'edit' ? 'active' : 'ghost'}
-        size="xs"
-        className={mode === 'edit' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
-      />
+          <ToolbarButton
+            icon={Edit}
+            label={mode === 'edit' ? 'Edit Mode' : 'Switch to Edit Mode'}
+            onClick={onToggleMode}
+            isActive={mode === 'edit'}
+            variant={mode === 'edit' ? 'active' : 'ghost'}
+            size="xs"
+            className={mode === 'edit' ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+          />
+        </>
+      ) : (
+        <ToolbarButton
+          icon={Play}
+          label="Play Mode"
+          onClick={() => {}}
+          isActive
+          variant="active"
+          size="xs"
+          className="bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+        />
+      )}
 
       <ToolbarSeparator />
 
