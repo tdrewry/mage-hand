@@ -298,11 +298,8 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       isConnected: true,
     });
 
-    if (hasSession) {
-      setShowLoadConfirm(true);
-    } else {
-      fileInputRef.current?.click();
-    }
+    // Always open file picker directly from landing page — no confirmation needed
+    fileInputRef.current?.click();
   };
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
