@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectedUser } from '@/types/multiplayerEvents';
-import type { TransportType } from '@/components/SessionManager';
+
+export type TransportType = 'opbridge' | 'jazz';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
 

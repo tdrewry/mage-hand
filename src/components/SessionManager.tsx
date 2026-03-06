@@ -39,14 +39,14 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
 import { createJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
 
-export type TransportType = 'opbridge' | 'jazz';
+export { type TransportType } from '@/stores/multiplayerStore';
 
 interface SessionManagerProps {
   open: boolean;
