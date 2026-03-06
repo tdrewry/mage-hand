@@ -413,6 +413,8 @@ export const useActionStore = create<ActionStore>()(
       set({ pendingActions: [...get().pendingActions, entry] });
     } else {
       set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+      // Effect actions go straight to resolve — broadcast pending
+      broadcastActionPending(entry);
     }
   },
 
