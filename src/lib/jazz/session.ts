@@ -4,11 +4,11 @@
  * Handles creation and joining of Jazz-backed sessions.
  * A "session" maps to a JazzSessionRoot CoValue that holds all durable state.
  *
- * Phase 1: Structural scaffolding — actual CoValue creation requires the Jazz
- * auth context which is wired in Phase 2.
+ * IMPORTANT: This is a standalone transport module — it does NOT interact
+ * with OpBridge or NetManager. Both can coexist.
  */
 
-import type { JazzSessionRoot } from "./schema";
+import { JazzSessionRoot as JazzSessionRootSchema, createSessionRoot } from "./schema";
 import { pushAllToJazz, pullAllFromJazz, startBridge, stopBridge } from "./bridge";
 
 export interface JazzSessionInfo {
@@ -18,55 +18,74 @@ export interface JazzSessionInfo {
   name: string;
   /** Whether this client created the session (vs. joined) */
   isCreator: boolean;
+  /** Reference to the live session root CoValue */
+  root: any;
 }
 
 let currentSession: JazzSessionInfo | null = null;
 
 /**
  * Create a new Jazz session and push current Zustand state into it.
- *
- * Phase 1: Returns a placeholder — actual CoValue creation comes in Phase 2
- * once the JazzProvider auth flow is integrated.
+ * Returns the session info including the CoValue ID that peers use to join.
  */
-export async function createJazzSession(name: string): Promise<JazzSessionInfo> {
-  console.log(`[jazz-session] Creating session "${name}" (Phase 1 — stub)`);
+export function createJazzSession(name: string): JazzSessionInfo {
+  console.log(`[jazz-session] Creating session "${name}"`);
 
-  // Phase 2 will:
-  // 1. Create a JazzSessionRoot CoValue via the Jazz account
-  // 2. Create child CoValues (JazzTokenList, JazzMapList, JazzDOBlobList)
-  // 3. Call pushAllToJazz(sessionRoot)
-  // 4. Call startBridge(sessionRoot)
+  const root = createSessionRoot(name) as any;
+  
+  // Push current Zustand state into the new Jazz session
+  pushAllToJazz(root);
+  
+  // Start the bidirectional bridge
+  startBridge(root);
 
   const info: JazzSessionInfo = {
-    sessionCoId: `placeholder-${Date.now()}`,
+    sessionCoId: root.id ?? `session-${Date.now()}`,
     name,
     isCreator: true,
+    root,
   };
 
   currentSession = info;
+  console.log(`[jazz-session] Session created: ${info.sessionCoId}`);
   return info;
 }
 
 /**
  * Join an existing Jazz session by its CoValue ID.
- *
- * Phase 1: Returns a placeholder — actual CoValue loading comes in Phase 2.
+ * Loads the session root and pulls state into Zustand stores.
  */
 export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionInfo> {
-  console.log(`[jazz-session] Joining session "${sessionCoId}" (Phase 1 — stub)`);
+  console.log(`[jazz-session] Joining session "${sessionCoId}"`);
 
-  // Phase 2 will:
-  // 1. Load the JazzSessionRoot CoValue by ID
-  // 2. Call pullAllFromJazz(sessionRoot)
-  // 3. Call startBridge(sessionRoot)
+  // Load the session root CoValue by ID
+  const root = await (JazzSessionRootSchema as any).load(sessionCoId, {
+    resolve: {
+      tokens: { $each: true },
+      maps: { $each: true },
+      blobs: { $each: true },
+    },
+  });
+
+  if (!root) {
+    throw new Error(`Failed to load Jazz session: ${sessionCoId}`);
+  }
+
+  // Pull remote state into Zustand
+  pullAllFromJazz(root);
+  
+  // Start the bidirectional bridge
+  startBridge(root);
 
   const info: JazzSessionInfo = {
-    sessionCoId,
-    name: "Joined Session",
+    sessionCoId: root.id ?? sessionCoId,
+    name: root.sessionName || "Joined Session",
     isCreator: false,
+    root,
   };
 
   currentSession = info;
+  console.log(`[jazz-session] Joined session: ${info.sessionCoId}`);
   return info;
 }
 

@@ -2,6 +2,7 @@
  * Jazz Integration — Public API
  *
  * Re-exports everything needed by the rest of the app.
+ * This module is a standalone transport — it does NOT depend on src/lib/net/.
  */
 
 // Schema (CoMap/CoList definitions)
@@ -13,6 +14,9 @@ export {
   JazzDOBlob,
   JazzDOBlobList,
   JazzSessionRoot,
+  MageHandAccount,
+  MageHandAccountRoot,
+  createSessionRoot,
 } from "./schema";
 
 // Provider
@@ -26,6 +30,7 @@ export {
   pullAllFromJazz,
   startBridge,
   stopBridge,
+  getBridgedSessionRoot,
 } from "./bridge";
 
 // Session management
