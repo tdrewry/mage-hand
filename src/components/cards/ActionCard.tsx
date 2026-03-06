@@ -545,6 +545,8 @@ interface TargetResolveCardProps {
   onSetResolution: (r: AttackResolution) => void;
   onOverrideDamage: (v: number) => void;
   onDismiss: () => void;
+  /** Whether controls are disabled (another DM has claimed this action) */
+  disabled?: boolean;
   /** Whether this is an effect-based action (shows breakdown if available) */
   isEffect?: boolean;
 }
