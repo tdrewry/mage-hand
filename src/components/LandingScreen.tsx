@@ -455,7 +455,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                   'w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-150 text-left group',
                   item.disabled
                     ? 'opacity-40 cursor-not-allowed'
-                    : 'hover:bg-accent cursor-pointer',
+                    : (item as any).destructive
+                      ? 'hover:bg-destructive/10 cursor-pointer'
+                      : 'hover:bg-accent cursor-pointer',
                   item.active && !item.disabled
                     ? 'border border-green-500/40 bg-green-500/10 hover:bg-green-500/20'
                     : 'border border-transparent',
@@ -465,14 +467,20 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                   'flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center',
                   item.active && !item.disabled
                     ? 'bg-green-500/20 text-green-400'
-                    : 'bg-muted text-muted-foreground group-hover:text-foreground',
+                    : (item as any).destructive
+                      ? 'bg-destructive/20 text-destructive group-hover:text-destructive'
+                      : 'bg-muted text-muted-foreground group-hover:text-foreground',
                 ].join(' ')}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={[
                     'text-sm font-medium',
-                    item.active && !item.disabled ? 'text-green-400' : 'text-foreground',
+                    item.active && !item.disabled
+                      ? 'text-green-400'
+                      : (item as any).destructive
+                        ? 'text-destructive'
+                        : 'text-foreground',
                   ].join(' ')}>
                     {item.label}
                     {item.id === 'save' && isSaving && ' …'}
