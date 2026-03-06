@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { netManager } from '@/lib/net';
+import { isJazzCode } from '@/lib/sessionCodeResolver';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
@@ -21,6 +22,9 @@ export function useAutoReconnect() {
 
       // Need session details to reconnect
       if (!state.currentSession?.sessionCode || !state.currentUsername || !state.serverUrl) return;
+
+      // Jazz sessions use their own CRDT sync — don't attempt WebSocket reconnect
+      if (isJazzCode(state.currentSession.sessionCode)) return;
 
       hasAttemptedReconnect.current = true;
       unsub(); // Stop listening
@@ -45,7 +49,7 @@ export function useAutoReconnect() {
     const state = useMultiplayerStore.getState();
     if (state._rehydrated && !hasAttemptedReconnect.current) {
       if (!state.isConnected && state.connectionStatus !== 'connecting' && state.connectionStatus !== 'reconnecting') {
-        if (state.currentSession?.sessionCode && state.currentUsername && state.serverUrl) {
+        if (state.currentSession?.sessionCode && state.currentUsername && state.serverUrl && !isJazzCode(state.currentSession.sessionCode)) {
           hasAttemptedReconnect.current = true;
           unsub();
 
