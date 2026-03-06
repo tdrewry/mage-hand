@@ -11,11 +11,20 @@ import {
   Loader2,
   Send,
   Zap,
+  Database,
+  Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +43,10 @@ import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
 import { sendPing, sendChat } from '@/lib/net/demo';
+import { createJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
+
+export type TransportType = 'opbridge' | 'jazz';
 
 interface SessionManagerProps {
   open: boolean;
@@ -66,6 +78,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [chatText, setChatText] = useState('');
+  const [transport, setTransport] = useState<TransportType>('opbridge');
 
   // Generate random session code
   const generateSessionCode = () => {
@@ -113,7 +126,27 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     }
   };
 
-  const handleCreateSession = () => {
+  const handleCreateSession = async () => {
+    if (transport === 'jazz') {
+      if (!username.trim()) {
+        toast.error('Please enter a username');
+        return;
+      }
+      setIsConnecting(true);
+      try {
+        setCurrentUsername(username.trim());
+        const info = createJazzSession(username.trim());
+        toast.success(`Jazz session created: ${info.sessionCoId.slice(0, 12)}…`);
+      } catch (error) {
+        console.error('Failed to create Jazz session:', error);
+        toast.error('Failed to create Jazz session');
+      } finally {
+        setIsConnecting(false);
+      }
+      return;
+    }
+
+    // Default: OpBridge / WebSocket
     const code = generateSessionCode();
     setSessionCode(code);
     handleConnect(code);
@@ -347,6 +380,39 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
 
               <div className="space-y-2">
+                <Label>Transport</Label>
+                <Select
+                  value={transport}
+                  onValueChange={(v) => setTransport(v as TransportType)}
+                  disabled={isConnecting}
+                >
+                  <SelectTrigger className="bg-input border-border text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="opbridge">
+                      <span className="flex items-center gap-2">
+                        <Radio className="h-3.5 w-3.5 text-primary" />
+                        OpBridge (WebSocket)
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="jazz">
+                      <span className="flex items-center gap-2">
+                        <Database className="h-3.5 w-3.5 text-primary" />
+                        Jazz (CRDT)
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {transport === 'opbridge'
+                    ? 'Real-time sync via WebSocket server (requires running server)'
+                    : 'Peer-to-peer CRDT sync via Jazz (no server needed for durable state)'}
+                </p>
+              </div>
+
+              {transport === 'opbridge' && (
+              <div className="space-y-2">
                 <Label htmlFor="create-password">Password (Optional)</Label>
                 <Input
                   id="create-password"
@@ -359,7 +425,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   className="bg-input border-border text-foreground"
                 />
               </div>
+              )}
 
+              {transport === 'opbridge' && (
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="w-full">
@@ -391,6 +459,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   </p>
                 </CollapsibleContent>
               </Collapsible>
+              )}
 
               <Button
                 onClick={handleCreateSession}
