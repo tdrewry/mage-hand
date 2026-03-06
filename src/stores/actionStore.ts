@@ -485,16 +485,21 @@ export const useActionStore = create<ActionStore>()(
       };
     }
 
+    const updatedAction = {
+      ...currentAction,
+      phase: 'resolve' as const,
+      rollResults,
+      damageResults,
+    };
+
     set({
-      currentAction: {
-        ...currentAction,
-        phase: 'resolve',
-        rollResults,
-        damageResults,
-      },
+      currentAction: updatedAction,
       isTargeting: false,
       targetingMousePos: null,
     });
+
+    // Broadcast to players that resolution is pending
+    broadcastActionPending(updatedAction);
   },
 
   setResolution: (targetKey, resolution) => {
