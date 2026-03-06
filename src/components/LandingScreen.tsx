@@ -577,7 +577,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
             <UserCircle className="w-4 h-4 text-muted-foreground" />
             <span>Player Identity</span>
             {hasValidIdentity && (
-              <span className="ml-auto text-xs text-green-400 font-normal">✓ {currentPlayer?.name}</span>
+              <span className="ml-auto text-xs text-primary font-normal">✓ {currentPlayer?.name}</span>
             )}
           </div>
 
