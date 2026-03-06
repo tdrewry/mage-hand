@@ -5,7 +5,7 @@
  * Optional primitives use z.optional(). Optional CoValue refs use co.optional().
  */
 
-import { co, z } from "jazz-tools";
+import { co, z, Group } from "jazz-tools";
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
@@ -15,6 +15,7 @@ export const JazzToken = co.map({
   y: z.number(),
   color: z.string(),
   label: z.string(),
+  name: z.string(),
   gridWidth: z.number(),
   gridHeight: z.number(),
   hp: z.optional(z.number()),
@@ -44,7 +45,7 @@ export const JazzMapEntry = co.map({
 export type JazzMapEntry = co.loaded<typeof JazzMapEntry>;
 
 export const JazzMapList = co.list(JazzMapEntry);
-export type JazzMapList = co.loaded<typeof JazzMapList>;
+export type JazzMapList = co.loaded<typeof JazzMapEntry>;
 
 // ── Generic DO State Blob ──────────────────────────────────────────────────
 
@@ -63,9 +64,54 @@ export type JazzDOBlobList = co.loaded<typeof JazzDOBlobList>;
 // ── Session Root ───────────────────────────────────────────────────────────
 
 export const JazzSessionRoot = co.map({
-  name: z.string(),
+  sessionName: z.string(),
   tokens: JazzTokenList,
   maps: JazzMapList,
   blobs: JazzDOBlobList,
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
+
+// ── Account ────────────────────────────────────────────────────────────────
+
+export const MageHandAccountRoot = co.map({
+  /** The active session root (if any) */
+  activeSession: co.optional(JazzSessionRoot),
+});
+export type MageHandAccountRoot = co.loaded<typeof MageHandAccountRoot>;
+
+export const MageHandAccount = co
+  .account({
+    root: MageHandAccountRoot,
+    profile: co.profile(),
+  })
+  .withMigration((account, creationProps?: { name: string }) => {
+    if (!account.$jazz.has("root")) {
+      account.$jazz.set("root", {});
+    }
+    if (!account.$jazz.has("profile")) {
+      account.$jazz.set("profile", {
+        name: creationProps?.name ?? "Anonymous DM",
+      });
+    }
+  });
+export type MageHandAccount = co.loaded<typeof MageHandAccount>;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Create a new JazzSessionRoot with empty lists, owned by a shared group.
+ * The group is public-readable so any peer can join via the session ID.
+ */
+export function createSessionRoot(sessionName: string): JazzSessionRoot {
+  const group = Group.create();
+  group.addMember("everyone", "writer");
+
+  const tokens = JazzTokenList.create([], group);
+  const maps = JazzMapList.create([], group);
+  const blobs = JazzDOBlobList.create([], group);
+
+  return JazzSessionRoot.create(
+    { sessionName, tokens, maps, blobs },
+    group,
+  );
+}
