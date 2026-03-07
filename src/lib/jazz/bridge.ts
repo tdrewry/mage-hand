@@ -1314,14 +1314,22 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
       if (prevIds.has(t.id)) {
         const prev = prevTokens.find((pt: Token) => pt.id === t.id);
         if (!prev) continue;
-        // Check all synced fields for changes
-        const changed = prev.x !== t.x || prev.y !== t.y || prev.label !== t.label ||
+
+        // During active local drag, skip position-only changes — ephemeral bus
+        // handles real-time previews, Jazz only needs the final position on drag end.
+        const isBeingDragged = _localDragTokens.has(t.id);
+        const posChanged = prev.x !== t.x || prev.y !== t.y;
+        const nonPosChanged = prev.label !== t.label ||
           prev.color !== t.color || prev.name !== t.name ||
           (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
           (prev as any).ac !== (t as any).ac ||
           prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
           prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
-        if (!changed) continue;
+
+        // If dragged and only position changed, defer to drag end
+        if (isBeingDragged && posChanged && !nonPosChanged) continue;
+        if (!posChanged && !nonPosChanged) continue;
+
         const len = jazzTokens.length ?? 0;
         for (let i = 0; i < len; i++) {
           const jt = jazzTokens[i];
