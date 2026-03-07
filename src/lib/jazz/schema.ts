@@ -18,18 +18,123 @@ export const JazzToken = co.map({
   name: z.string(),
   gridWidth: z.number(),
   gridHeight: z.number(),
+  mapId: z.optional(z.string()),
+  // Promoted from extras for fine-grained sync:
   hp: z.optional(z.number()),
   maxHp: z.optional(z.number()),
   ac: z.optional(z.number()),
   hostility: z.optional(z.string()),
-  mapId: z.optional(z.string()),
-  /** Serialized extra fields as JSON string for forward-compat */
+  imageHash: z.optional(z.string()),
+  roleId: z.optional(z.string()),
+  isHidden: z.optional(z.boolean()),
+  labelPosition: z.optional(z.string()),
+  labelColor: z.optional(z.string()),
+  labelBackgroundColor: z.optional(z.string()),
+  initiative: z.optional(z.number()),
+  inCombat: z.optional(z.boolean()),
+  pathStyle: z.optional(z.string()),
+  pathColor: z.optional(z.string()),
+  pathWeight: z.optional(z.number()),
+  pathOpacity: z.optional(z.number()),
+  pathGaitWidth: z.optional(z.number()),
+  footprintType: z.optional(z.string()),
+  locked: z.optional(z.boolean()),
+  notes: z.optional(z.string()),
+  statBlockJson: z.optional(z.string()),
+  quickReferenceUrl: z.optional(z.string()),
+  /** Complex nested fields (illuminationSources, entityRef, appearanceVariants) as JSON */
   extras: z.optional(z.string()),
 });
 export type JazzToken = co.loaded<typeof JazzToken>;
 
 export const JazzTokenList = co.list(JazzToken);
 export type JazzTokenList = co.loaded<typeof JazzTokenList>;
+
+// ── Region ─────────────────────────────────────────────────────────────────
+
+export const JazzRegion = co.map({
+  regionId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  color: z.string(),
+  gridType: z.string(),
+  gridSize: z.number(),
+  gridScale: z.number(),
+  gridSnapping: z.boolean(),
+  gridVisible: z.boolean(),
+  textureHash: z.optional(z.string()),
+  backgroundRepeat: z.optional(z.string()),
+  backgroundScale: z.optional(z.number()),
+  backgroundOffsetX: z.optional(z.number()),
+  backgroundOffsetY: z.optional(z.number()),
+  backgroundColor: z.optional(z.string()),
+  regionType: z.optional(z.string()),
+  rotation: z.optional(z.number()),
+  locked: z.optional(z.boolean()),
+  mapId: z.optional(z.string()),
+  smoothing: z.optional(z.boolean()),
+  /** Complex nested data serialized as JSON strings */
+  pathPointsJson: z.optional(z.string()),
+  bezierControlPointsJson: z.optional(z.string()),
+  rotationCenterJson: z.optional(z.string()),
+});
+export type JazzRegion = co.loaded<typeof JazzRegion>;
+
+export const JazzRegionList = co.list(JazzRegion);
+export type JazzRegionList = co.loaded<typeof JazzRegionList>;
+
+// ── Map Object ─────────────────────────────────────────────────────────────
+
+export const JazzMapObject = co.map({
+  objectId: z.string(),
+  positionX: z.number(),
+  positionY: z.number(),
+  width: z.number(),
+  height: z.number(),
+  rotation: z.optional(z.number()),
+  shape: z.string(),
+  fillColor: z.string(),
+  strokeColor: z.string(),
+  strokeWidth: z.number(),
+  opacity: z.number(),
+  imageHash: z.optional(z.string()),
+  textureScale: z.optional(z.number()),
+  textureOffsetX: z.optional(z.number()),
+  textureOffsetY: z.optional(z.number()),
+  castsShadow: z.boolean(),
+  blocksMovement: z.boolean(),
+  blocksVision: z.boolean(),
+  revealedByLight: z.boolean(),
+  isOpen: z.optional(z.boolean()),
+  doorType: z.optional(z.number()),
+  label: z.optional(z.string()),
+  category: z.string(),
+  locked: z.optional(z.boolean()),
+  renderOrder: z.optional(z.number()),
+  mapId: z.optional(z.string()),
+  portalName: z.optional(z.string()),
+  portalTargetId: z.optional(z.string()),
+  portalHiddenInPlay: z.optional(z.boolean()),
+  portalAutoActivateTarget: z.optional(z.boolean()),
+  annotationText: z.optional(z.string()),
+  annotationReference: z.optional(z.string()),
+  terrainFeatureId: z.optional(z.string()),
+  lightColor: z.optional(z.string()),
+  lightRadius: z.optional(z.number()),
+  lightBrightRadius: z.optional(z.number()),
+  lightIntensity: z.optional(z.number()),
+  lightEnabled: z.optional(z.boolean()),
+  /** Complex nested data serialized as JSON strings */
+  customPathJson: z.optional(z.string()),
+  wallPointsJson: z.optional(z.string()),
+  doorDirectionJson: z.optional(z.string()),
+});
+export type JazzMapObject = co.loaded<typeof JazzMapObject>;
+
+export const JazzMapObjectList = co.list(JazzMapObject);
+export type JazzMapObjectList = co.loaded<typeof JazzMapObjectList>;
 
 // ── Map Metadata ───────────────────────────────────────────────────────────
 
@@ -80,6 +185,8 @@ export const JazzSessionRoot = co.map({
   sessionName: z.string(),
   tokens: JazzTokenList,
   maps: JazzMapList,
+  regions: co.optional(JazzRegionList),
+  mapObjects: co.optional(JazzMapObjectList),
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
 });
@@ -126,11 +233,13 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
 
   const tokens = JazzTokenList.create([], group);
   const maps = JazzMapList.create([], group);
+  const regions = JazzRegionList.create([], group);
+  const mapObjects = JazzMapObjectList.create([], group);
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
 
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, blobs, textures },
+    { sessionName, tokens, maps, regions, mapObjects, blobs, textures },
     group,
   );
 }

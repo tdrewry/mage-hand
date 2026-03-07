@@ -3,10 +3,10 @@
  *
  * Bidirectional sync between Jazz CoValues and the existing Zustand stores.
  *
- * Two sync strategies:
- *   1. Fine-grained: Tokens use per-field CoValue sync for low-latency movement
- *   2. Blob sync: All other DO kinds use JazzDOBlob (JSON serialized state)
- *      via the DurableObjectRegistry extractors/hydrators
+ * Three sync strategies:
+ *   1. Fine-grained: Tokens, Regions, MapObjects use per-entity CoValue sync
+ *   2. Blob sync: Remaining DO kinds use JazzDOBlob (JSON serialized state)
+ *   3. FileStream: Textures use binary FileStream sync (see textureSync.ts)
  *
  * Echo prevention: a `_fromJazz` flag is set during hydration so that
  * store subscriptions don't re-push the same change back to Jazz.
@@ -16,11 +16,20 @@
  */
 
 import { useSessionStore, type Token } from "@/stores/sessionStore";
-import { JazzToken as JazzTokenSchema, JazzDOBlob as JazzDOBlobSchema } from "./schema";
+import { useRegionStore, type CanvasRegion } from "@/stores/regionStore";
+import { useMapObjectStore } from "@/stores/mapObjectStore";
+import type { MapObject } from "@/types/mapObjectTypes";
+import {
+  JazzToken as JazzTokenSchema,
+  JazzRegion as JazzRegionSchema,
+  JazzMapObject as JazzMapObjectSchema,
+  JazzDOBlob as JazzDOBlobSchema,
+  JazzRegionList,
+  JazzMapObjectList,
+} from "./schema";
 import { DurableObjectRegistry } from "@/lib/durableObjects";
 import "@/lib/durableObjectRegistry"; // Side-effect: registers all DO kinds
 import { useMapStore } from "@/stores/mapStore";
-import { useRegionStore } from "@/stores/regionStore";
 import { useGroupStore } from "@/stores/groupStore";
 import { useInitiativeStore } from "@/stores/initiativeStore";
 import { useRoleStore } from "@/stores/roleStore";
@@ -29,7 +38,6 @@ import { useFogStore } from "@/stores/fogStore";
 import { useLightStore } from "@/stores/lightStore";
 import { useIlluminationStore } from "@/stores/illuminationStore";
 import { useDungeonStore } from "@/stores/dungeonStore";
-import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useCreatureStore } from "@/stores/creatureStore";
 import { useHatchingStore } from "@/stores/hatchingStore";
 import { useEffectStore } from "@/stores/effectStore";
@@ -76,40 +84,6 @@ function stripEffectTexturesForSync(state: any): any {
   return stripped;
 }
 
-/**
- * Strip backgroundImage data URIs from regions state before Jazz blob sync.
- * Region textures are synced separately via FileStreams using textureHash.
- */
-function stripRegionTexturesForSync(state: any): any {
-  if (!state) return state;
-
-  // The regions extractor returns a raw array
-  if (Array.isArray(state)) {
-    return state.map((r: any) => {
-      if (!r?.backgroundImage || r.backgroundImage.length < 200) return r;
-      return { ...r, backgroundImage: '' };
-    });
-  }
-
-  return state;
-}
-
-/**
- * Strip imageUrl data URIs from map objects state before Jazz blob sync.
- * Map object textures are synced separately via FileStreams using imageHash.
- */
-function stripMapObjectTexturesForSync(state: any): any {
-  if (!state) return state;
-  if (Array.isArray(state)) {
-    return state.map((obj: any) => {
-      if (!obj?.imageUrl || obj.imageUrl.length < 200) return obj;
-      return { ...obj, imageUrl: '' };
-    });
-  }
-  return state;
-}
-
-
 let _fromJazz = false;
 
 /** Throttle map for "too large" skip warnings — one per kind per 30s */
@@ -149,6 +123,8 @@ let _sessionRoot: any = null;
 
 /** Cached child CoValue references — Jazz proxies can go stale when accessed later */
 let _cachedTokens: any = null;
+let _cachedRegions: any = null;
+let _cachedMapObjects: any = null;
 let _cachedBlobs: any = null;
 let _cachedGroup: any = null;
 
@@ -162,40 +138,41 @@ export function getBridgedSessionRoot(): any {
   return {
     ...(_sessionRoot),
     tokens: _cachedTokens ?? _sessionRoot.tokens,
+    regions: _cachedRegions ?? _sessionRoot.regions,
+    mapObjects: _cachedMapObjects ?? _sessionRoot.mapObjects,
     blobs: _cachedBlobs ?? _sessionRoot.blobs,
     _owner: _cachedGroup ?? _sessionRoot._owner,
     get $jazz() { return _sessionRoot.$jazz; },
   };
 }
 
-// ── DO kinds to sync via blob (excludes tokens — fine-grained, and UI-only kinds) ──
+// ── DO kinds to sync via blob (excludes fine-grained kinds) ──
 
 const BLOB_SYNC_KINDS = [
-  'maps', 'regions', 'groups', 'initiative', 'roles', 'visionProfiles',
-  'fog', 'lights', 'illumination', 'dungeon', 'mapObjects', 'creatures',
+  'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
+  'fog', 'lights', 'illumination', 'dungeon', 'creatures',
   'hatching', 'effects', 'actions', 'dice',
 ];
 
 // Kinds excluded from blob sync:
 // - 'tokens': fine-grained CoValue sync
+// - 'regions': fine-grained CoValue sync
+// - 'mapObjects': fine-grained CoValue sync
 // - 'cards': UI layout, per-user
 // - 'viewportTransforms': per-user viewport
 
-// ── Token bridge helpers ───────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// TOKEN BRIDGE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
 
 /** Convert a Zustand Token to a JazzToken-compatible init object */
 function tokenToJazzInit(t: Token): Record<string, any> {
+  // Complex nested structures stay in extras
   const extras: Record<string, unknown> = {};
-  if (t.imageHash) extras.imageHash = t.imageHash;
-  if (t.roleId) extras.roleId = t.roleId;
-  if (t.isHidden) extras.isHidden = t.isHidden;
-  if (t.labelPosition) extras.labelPosition = t.labelPosition;
-  if (t.labelColor) extras.labelColor = t.labelColor;
-  if (t.labelBackgroundColor) extras.labelBackgroundColor = t.labelBackgroundColor;
-  if (t.notes) extras.notes = t.notes;
-  if (t.initiative != null) extras.initiative = t.initiative;
-  if (t.inCombat) extras.inCombat = t.inCombat;
-  if (t.pathStyle) extras.pathStyle = t.pathStyle;
+  if (t.illuminationSources?.length) extras.illuminationSources = t.illuminationSources;
+  if (t.entityRef) extras.entityRef = t.entityRef;
+  if (t.appearanceVariants?.length) extras.appearanceVariants = t.appearanceVariants;
+  if (t.activeVariantId) extras.activeVariantId = t.activeVariantId;
 
   return {
     tokenId: t.id,
@@ -206,11 +183,30 @@ function tokenToJazzInit(t: Token): Record<string, any> {
     name: t.name || "",
     gridWidth: t.gridWidth,
     gridHeight: t.gridHeight,
+    mapId: t.mapId,
+    // Promoted first-class fields:
     hp: (t as any).hp,
     maxHp: (t as any).maxHp,
     ac: (t as any).ac,
     hostility: (t as any).hostility,
-    mapId: t.mapId,
+    imageHash: t.imageHash,
+    roleId: t.roleId || undefined,
+    isHidden: t.isHidden || undefined,
+    labelPosition: t.labelPosition || undefined,
+    labelColor: t.labelColor,
+    labelBackgroundColor: t.labelBackgroundColor,
+    initiative: t.initiative,
+    inCombat: t.inCombat || undefined,
+    pathStyle: t.pathStyle,
+    pathColor: t.pathColor,
+    pathWeight: t.pathWeight,
+    pathOpacity: t.pathOpacity,
+    pathGaitWidth: t.pathGaitWidth,
+    footprintType: t.footprintType,
+    locked: (t as any).locked || undefined,
+    notes: t.notes,
+    statBlockJson: t.statBlockJson,
+    quickReferenceUrl: t.quickReferenceUrl,
     extras: Object.keys(extras).length > 0 ? JSON.stringify(extras) : undefined,
   };
 }
@@ -226,29 +222,223 @@ function jazzToZustandToken(jt: any): Token {
     id: jt.tokenId,
     name: jt.name || "",
     imageUrl: "",
-    imageHash: extras.imageHash,
+    imageHash: jt.imageHash || extras.imageHash,
     x: jt.x,
     y: jt.y,
     gridWidth: jt.gridWidth,
     gridHeight: jt.gridHeight,
     label: jt.label || "",
-    labelPosition: extras.labelPosition || "below",
-    labelColor: extras.labelColor,
-    labelBackgroundColor: extras.labelBackgroundColor,
-    roleId: extras.roleId || "",
-    isHidden: extras.isHidden || false,
+    labelPosition: jt.labelPosition || extras.labelPosition || "below",
+    labelColor: jt.labelColor || extras.labelColor,
+    labelBackgroundColor: jt.labelBackgroundColor || extras.labelBackgroundColor,
+    roleId: jt.roleId || extras.roleId || "",
+    isHidden: jt.isHidden ?? extras.isHidden ?? false,
     color: jt.color,
     mapId: jt.mapId,
-    initiative: extras.initiative,
-    inCombat: extras.inCombat,
-    pathStyle: extras.pathStyle,
-    notes: extras.notes,
+    initiative: jt.initiative ?? extras.initiative,
+    inCombat: jt.inCombat ?? extras.inCombat,
+    pathStyle: jt.pathStyle || extras.pathStyle,
+    pathColor: jt.pathColor || extras.pathColor,
+    pathWeight: jt.pathWeight ?? extras.pathWeight,
+    pathOpacity: jt.pathOpacity ?? extras.pathOpacity,
+    pathGaitWidth: jt.pathGaitWidth ?? extras.pathGaitWidth,
+    footprintType: jt.footprintType || extras.footprintType,
+    notes: jt.notes || extras.notes,
+    statBlockJson: jt.statBlockJson,
+    quickReferenceUrl: jt.quickReferenceUrl,
+    illuminationSources: extras.illuminationSources,
+    entityRef: extras.entityRef,
+    appearanceVariants: extras.appearanceVariants,
+    activeVariantId: extras.activeVariantId,
   };
 }
 
-// ── Blob sync helpers ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// REGION BRIDGE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
 
-/** Throttle state: last push hash per kind to avoid redundant writes */
+/** Convert a Zustand CanvasRegion to a JazzRegion-compatible init object */
+function regionToJazzInit(r: CanvasRegion): Record<string, any> {
+  return {
+    regionId: r.id,
+    x: r.x,
+    y: r.y,
+    width: r.width,
+    height: r.height,
+    color: r.color,
+    gridType: r.gridType,
+    gridSize: r.gridSize,
+    gridScale: r.gridScale,
+    gridSnapping: r.gridSnapping,
+    gridVisible: r.gridVisible,
+    textureHash: r.textureHash,
+    backgroundRepeat: r.backgroundRepeat,
+    backgroundScale: r.backgroundScale,
+    backgroundOffsetX: r.backgroundOffsetX,
+    backgroundOffsetY: r.backgroundOffsetY,
+    backgroundColor: r.backgroundColor,
+    regionType: r.regionType,
+    rotation: r.rotation,
+    locked: r.locked,
+    mapId: r.mapId,
+    smoothing: r.smoothing,
+    pathPointsJson: r.pathPoints ? JSON.stringify(r.pathPoints) : undefined,
+    bezierControlPointsJson: r.bezierControlPoints ? JSON.stringify(r.bezierControlPoints) : undefined,
+    rotationCenterJson: r.rotationCenter ? JSON.stringify(r.rotationCenter) : undefined,
+  };
+}
+
+/** Convert a JazzRegion CoValue (as any) to a Zustand CanvasRegion */
+function jazzToZustandRegion(jr: any): CanvasRegion {
+  let pathPoints: { x: number; y: number }[] | undefined;
+  let bezierControlPoints: any[] | undefined;
+  let rotationCenter: { x: number; y: number } | undefined;
+  try { if (jr.pathPointsJson) pathPoints = JSON.parse(jr.pathPointsJson); } catch { /* */ }
+  try { if (jr.bezierControlPointsJson) bezierControlPoints = JSON.parse(jr.bezierControlPointsJson); } catch { /* */ }
+  try { if (jr.rotationCenterJson) rotationCenter = JSON.parse(jr.rotationCenterJson); } catch { /* */ }
+
+  return {
+    id: jr.regionId,
+    x: jr.x,
+    y: jr.y,
+    width: jr.width,
+    height: jr.height,
+    selected: false,
+    color: jr.color,
+    gridType: jr.gridType as any,
+    gridSize: jr.gridSize,
+    gridScale: jr.gridScale,
+    gridSnapping: jr.gridSnapping,
+    gridVisible: jr.gridVisible,
+    backgroundImage: "", // Texture loaded from IndexedDB via textureHash
+    textureHash: jr.textureHash,
+    backgroundRepeat: jr.backgroundRepeat,
+    backgroundScale: jr.backgroundScale,
+    backgroundOffsetX: jr.backgroundOffsetX,
+    backgroundOffsetY: jr.backgroundOffsetY,
+    backgroundColor: jr.backgroundColor,
+    regionType: jr.regionType,
+    rotation: jr.rotation,
+    locked: jr.locked,
+    mapId: jr.mapId,
+    smoothing: jr.smoothing,
+    pathPoints,
+    bezierControlPoints,
+    rotationCenter,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MAP OBJECT BRIDGE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Convert a Zustand MapObject to a JazzMapObject-compatible init object */
+function mapObjectToJazzInit(obj: MapObject): Record<string, any> {
+  return {
+    objectId: obj.id,
+    positionX: obj.position.x,
+    positionY: obj.position.y,
+    width: obj.width,
+    height: obj.height,
+    rotation: obj.rotation,
+    shape: obj.shape,
+    fillColor: obj.fillColor,
+    strokeColor: obj.strokeColor,
+    strokeWidth: obj.strokeWidth,
+    opacity: obj.opacity,
+    imageHash: obj.imageHash,
+    textureScale: obj.textureScale,
+    textureOffsetX: obj.textureOffsetX,
+    textureOffsetY: obj.textureOffsetY,
+    castsShadow: obj.castsShadow,
+    blocksMovement: obj.blocksMovement,
+    blocksVision: obj.blocksVision,
+    revealedByLight: obj.revealedByLight,
+    isOpen: obj.isOpen,
+    doorType: obj.doorType,
+    label: obj.label,
+    category: obj.category,
+    locked: obj.locked,
+    renderOrder: obj.renderOrder,
+    mapId: obj.mapId,
+    portalName: obj.portalName,
+    portalTargetId: obj.portalTargetId,
+    portalHiddenInPlay: obj.portalHiddenInPlay,
+    portalAutoActivateTarget: obj.portalAutoActivateTarget,
+    annotationText: obj.annotationText,
+    annotationReference: obj.annotationReference,
+    terrainFeatureId: obj.terrainFeatureId,
+    lightColor: obj.lightColor,
+    lightRadius: obj.lightRadius,
+    lightBrightRadius: obj.lightBrightRadius,
+    lightIntensity: obj.lightIntensity,
+    lightEnabled: obj.lightEnabled,
+    customPathJson: obj.customPath ? JSON.stringify(obj.customPath) : undefined,
+    wallPointsJson: obj.wallPoints ? JSON.stringify(obj.wallPoints) : undefined,
+    doorDirectionJson: obj.doorDirection ? JSON.stringify(obj.doorDirection) : undefined,
+  };
+}
+
+/** Convert a JazzMapObject CoValue (as any) to a Zustand MapObject */
+function jazzToZustandMapObject(jmo: any): MapObject {
+  let customPath: { x: number; y: number }[] | undefined;
+  let wallPoints: { x: number; y: number }[] | undefined;
+  let doorDirection: { x: number; y: number } | undefined;
+  try { if (jmo.customPathJson) customPath = JSON.parse(jmo.customPathJson); } catch { /* */ }
+  try { if (jmo.wallPointsJson) wallPoints = JSON.parse(jmo.wallPointsJson); } catch { /* */ }
+  try { if (jmo.doorDirectionJson) doorDirection = JSON.parse(jmo.doorDirectionJson); } catch { /* */ }
+
+  return {
+    id: jmo.objectId,
+    position: { x: jmo.positionX, y: jmo.positionY },
+    width: jmo.width,
+    height: jmo.height,
+    rotation: jmo.rotation,
+    shape: jmo.shape as any,
+    fillColor: jmo.fillColor,
+    strokeColor: jmo.strokeColor,
+    strokeWidth: jmo.strokeWidth,
+    opacity: jmo.opacity,
+    imageUrl: "", // Texture loaded from IndexedDB via imageHash
+    imageHash: jmo.imageHash,
+    textureScale: jmo.textureScale,
+    textureOffsetX: jmo.textureOffsetX,
+    textureOffsetY: jmo.textureOffsetY,
+    castsShadow: jmo.castsShadow,
+    blocksMovement: jmo.blocksMovement,
+    blocksVision: jmo.blocksVision,
+    revealedByLight: jmo.revealedByLight,
+    isOpen: jmo.isOpen,
+    doorType: jmo.doorType,
+    label: jmo.label,
+    category: jmo.category as any,
+    locked: jmo.locked,
+    renderOrder: jmo.renderOrder,
+    mapId: jmo.mapId,
+    portalName: jmo.portalName,
+    portalTargetId: jmo.portalTargetId,
+    portalHiddenInPlay: jmo.portalHiddenInPlay,
+    portalAutoActivateTarget: jmo.portalAutoActivateTarget,
+    annotationText: jmo.annotationText,
+    annotationReference: jmo.annotationReference,
+    terrainFeatureId: jmo.terrainFeatureId,
+    lightColor: jmo.lightColor,
+    lightRadius: jmo.lightRadius,
+    lightBrightRadius: jmo.lightBrightRadius,
+    lightIntensity: jmo.lightIntensity,
+    lightEnabled: jmo.lightEnabled,
+    customPath,
+    wallPoints,
+    doorDirection,
+    selected: false,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// BLOB SYNC HELPERS
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Hash tracking to avoid re-pushing unchanged blob state */
 const _lastPushedHash = new Map<string, string>();
 
 /** Simple hash for change detection */
@@ -286,12 +476,6 @@ function pushBlobToJazz(kind: string): void {
     // Strip texture data URIs from stores that sync textures via FileStreams
     if (kind === 'effects' && state) {
       state = stripEffectTexturesForSync(state);
-    }
-    if (kind === 'regions' && state) {
-      state = stripRegionTexturesForSync(state);
-    }
-    if (kind === 'mapObjects' && state) {
-      state = stripMapObjectTexturesForSync(state);
     }
 
     const json = JSON.stringify(state);
@@ -340,8 +524,7 @@ function pushBlobToJazz(kind: string): void {
         console.error(`[jazz-bridge] Failed to create blob ${kind}:`, err);
       }
     }
-
-    console.log(`[jazz-bridge] → Jazz blob: ${kind}`);
+    console.log(`[jazz-bridge] → Jazz blob: ${kind} (${json.length} chars)`);
   } catch (err) {
     console.error(`[jazz-bridge] Blob push error for ${kind}:`, err);
   }
@@ -360,9 +543,6 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
     const hash = quickHash(stateJson);
 
     // ── Guard against destructive hydration (creator only) ──
-    // Only the creator (DM) needs this guard — Jazz may echo back empty state
-    // before the initial push has propagated. For joiners, Jazz IS the source
-    // of truth, so we always accept inbound data (even if empty).
     if (_isCreator) {
       const inboundEmpty = isEmptyState(state);
       if (inboundEmpty) {
@@ -386,16 +566,15 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   }
 }
 
-/** Heuristic: check if a state object is "empty" (null, empty array, or object with only empty arrays/nulls) */
+/** Heuristic: check if a state object is "empty" */
 function isEmptyState(state: unknown): boolean {
   if (state == null) return true;
   if (Array.isArray(state)) return state.length === 0;
   if (typeof state === 'object') {
     const values = Object.values(state as Record<string, unknown>);
     if (values.length === 0) return true;
-    // Consider it empty if all values are null, undefined, empty arrays, or empty objects
-    return values.every(v => 
-      v == null || 
+    return values.every(v =>
+      v == null ||
       (Array.isArray(v) && v.length === 0) ||
       (typeof v === 'object' && !Array.isArray(v) && v !== null && Object.keys(v).length === 0) ||
       v === false || v === 0 || v === ''
@@ -404,11 +583,11 @@ function isEmptyState(state: unknown): boolean {
   return false;
 }
 
-// ── Push: Zustand → Jazz ───────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// PUSH: Zustand → Jazz
+// ══════════════════════════════════════════════════════════════════════════
 
-/**
- * Push all current tokens from Zustand into the Jazz session root.
- */
+/** Push all current tokens from Zustand into Jazz */
 export function pushTokensToJazz(sessionRoot: any): void {
   const tokens = useSessionStore.getState().tokens;
   const jazzTokens = sessionRoot.tokens;
@@ -418,28 +597,90 @@ export function pushTokensToJazz(sessionRoot: any): void {
   }
 
   console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz`);
-
   const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
-  console.log("[jazz-bridge] Token push group:", group ? "found" : "MISSING", typeof group);
 
   for (const t of tokens) {
     const init = tokenToJazzInit(t);
     try {
       const jt = JazzTokenSchema.create(init as any, group);
       jazzTokens.$jazz.push(jt);
-      console.log(`[jazz-bridge] → Jazz token: ${t.id} (${t.name})`);
     } catch (err) {
       console.error(`[jazz-bridge] Failed to create/push JazzToken ${t.id}:`, err);
     }
   }
 }
 
-/**
- * Push all DO blob states to Jazz.
- */
+/** Push all current regions from Zustand into Jazz */
+export function pushRegionsToJazz(sessionRoot: any): void {
+  const regions = useRegionStore.getState().regions;
+  let jazzRegions = sessionRoot.regions;
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+
+  // Lazily create regions list for legacy sessions
+  if (!jazzRegions && group) {
+    try {
+      jazzRegions = JazzRegionList.create([], group);
+      sessionRoot.$jazz.set("regions", jazzRegions);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not create regions list:", err);
+      return;
+    }
+  }
+  if (!jazzRegions) {
+    console.warn("[jazz-bridge] No regions list on session root");
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pushing ${regions.length} regions to Jazz`);
+
+  for (const r of regions) {
+    const init = regionToJazzInit(r);
+    try {
+      const jr = JazzRegionSchema.create(init as any, group);
+      jazzRegions.$jazz.push(jr);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to create/push JazzRegion ${r.id}:`, err);
+    }
+  }
+}
+
+/** Push all current map objects from Zustand into Jazz */
+export function pushMapObjectsToJazz(sessionRoot: any): void {
+  const mapObjects = useMapObjectStore.getState().mapObjects;
+  let jazzMapObjects = sessionRoot.mapObjects;
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+
+  // Lazily create mapObjects list for legacy sessions
+  if (!jazzMapObjects && group) {
+    try {
+      jazzMapObjects = JazzMapObjectList.create([], group);
+      sessionRoot.$jazz.set("mapObjects", jazzMapObjects);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not create mapObjects list:", err);
+      return;
+    }
+  }
+  if (!jazzMapObjects) {
+    console.warn("[jazz-bridge] No mapObjects list on session root");
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pushing ${mapObjects.length} map objects to Jazz`);
+
+  for (const obj of mapObjects) {
+    const init = mapObjectToJazzInit(obj);
+    try {
+      const jmo = JazzMapObjectSchema.create(init as any, group);
+      jazzMapObjects.$jazz.push(jmo);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to create/push JazzMapObject ${obj.id}:`, err);
+    }
+  }
+}
+
+/** Push all DO blob states to Jazz */
 export function pushBlobsToJazz(sessionRoot: any): void {
   const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
-  console.log("[jazz-bridge] Blob push group:", group ? "found" : "MISSING", typeof group);
 
   if (!sessionRoot.blobs) {
     console.warn("[jazz-bridge] No blobs list on session root");
@@ -452,7 +693,6 @@ export function pushBlobsToJazz(sessionRoot: any): void {
   for (const kind of BLOB_SYNC_KINDS) {
     const reg = DurableObjectRegistry.get(kind);
     if (!reg) {
-      console.warn(`[jazz-bridge] No registry entry for DO kind: ${kind}`);
       failCount++;
       continue;
     }
@@ -462,8 +702,6 @@ export function pushBlobsToJazz(sessionRoot: any): void {
 
       // Strip texture data URIs — textures sync via FileStreams
       if (kind === 'effects' && state) state = stripEffectTexturesForSync(state);
-      if (kind === 'regions' && state) state = stripRegionTexturesForSync(state);
-      if (kind === 'mapObjects' && state) state = stripMapObjectTexturesForSync(state);
 
       const json = JSON.stringify(state);
       _lastPushedHash.set(kind, quickHash(json));
@@ -477,7 +715,6 @@ export function pushBlobsToJazz(sessionRoot: any): void {
       }
 
       if (existingIdx >= 0) {
-        // Update in-place
         const existing = blobs[existingIdx];
         try {
           existing.$jazz.set("state", json);
@@ -506,19 +743,19 @@ export function pushBlobsToJazz(sessionRoot: any): void {
   console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
 }
 
-/**
- * Push all current Zustand state into Jazz CoValues.
- */
+/** Push all current Zustand state into Jazz CoValues */
 export function pushAllToJazz(sessionRoot: any): void {
   pushTokensToJazz(sessionRoot);
+  pushRegionsToJazz(sessionRoot);
+  pushMapObjectsToJazz(sessionRoot);
   pushBlobsToJazz(sessionRoot);
 }
 
-// ── Pull: Jazz → Zustand ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// PULL: Jazz → Zustand
+// ══════════════════════════════════════════════════════════════════════════
 
-/**
- * Pull all tokens from Jazz into Zustand.
- */
+/** Pull all tokens from Jazz into Zustand */
 export function pullTokensFromJazz(sessionRoot: any): void {
   const jazzTokens = sessionRoot.tokens;
   if (!jazzTokens) {
@@ -529,7 +766,6 @@ export function pullTokensFromJazz(sessionRoot: any): void {
   const len = jazzTokens.length ?? 0;
   const localTokenCount = useSessionStore.getState().tokens.length;
 
-  // Guard: don't wipe populated local tokens with empty Jazz tokens
   if (len === 0 && localTokenCount > 0) {
     console.warn(`[jazz-bridge] ✋ Blocked token pull — Jazz has 0 tokens but local has ${localTokenCount}`);
     return;
@@ -542,16 +778,68 @@ export function pullTokensFromJazz(sessionRoot: any): void {
     store.tokens.forEach((t) => store.removeToken(t.id));
     for (let i = 0; i < len; i++) {
       const jt = jazzTokens[i];
-      if (jt) {
-        store.addToken(jazzToZustandToken(jt));
-      }
+      if (jt) store.addToken(jazzToZustandToken(jt));
     }
   });
 }
 
-/**
- * Pull all DO blobs from Jazz into Zustand.
- */
+/** Pull all regions from Jazz into Zustand */
+export function pullRegionsFromJazz(sessionRoot: any): void {
+  const jazzRegions = sessionRoot.regions;
+  if (!jazzRegions) {
+    console.log("[jazz-bridge] No regions list on session root (legacy session)");
+    return;
+  }
+
+  const len = jazzRegions.length ?? 0;
+  const localCount = useRegionStore.getState().regions.length;
+
+  if (len === 0 && localCount > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked region pull — Jazz has 0 but local has ${localCount} (creator guard)`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${len} regions from Jazz (local had ${localCount})`);
+
+  runFromJazz(() => {
+    const store = useRegionStore.getState();
+    store.clearRegions();
+    for (let i = 0; i < len; i++) {
+      const jr = jazzRegions[i];
+      if (jr) store.addRegion(jazzToZustandRegion(jr));
+    }
+  });
+}
+
+/** Pull all map objects from Jazz into Zustand */
+export function pullMapObjectsFromJazz(sessionRoot: any): void {
+  const jazzMapObjects = sessionRoot.mapObjects;
+  if (!jazzMapObjects) {
+    console.log("[jazz-bridge] No mapObjects list on session root (legacy session)");
+    return;
+  }
+
+  const len = jazzMapObjects.length ?? 0;
+  const localCount = useMapObjectStore.getState().mapObjects.length;
+
+  if (len === 0 && localCount > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked mapObject pull — Jazz has 0 but local has ${localCount} (creator guard)`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${len} map objects from Jazz (local had ${localCount})`);
+
+  runFromJazz(() => {
+    const store = useMapObjectStore.getState();
+    store.clearMapObjects();
+    for (let i = 0; i < len; i++) {
+      const jmo = jazzMapObjects[i];
+      if (jmo) store.addMapObject(jazzToZustandMapObject(jmo));
+    }
+  });
+}
+
+/** Pull all DO blobs from Jazz into Zustand */
 export function pullBlobsFromJazz(sessionRoot: any): void {
   if (!sessionRoot.blobs) {
     console.warn("[jazz-bridge] No blobs list on session root");
@@ -566,6 +854,8 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   for (let i = 0; i < len; i++) {
     const blob = sessionRoot.blobs[i];
     if (!blob || !blob.kind || !blob.state) continue;
+    // Skip kinds that are now fine-grained (no longer blob-synced)
+    if (!BLOB_SYNC_KINDS.includes(blob.kind)) continue;
     const existing = latestByKind.get(blob.kind);
     if (!existing || (blob.updatedAt && (!existing.updatedAt || blob.updatedAt > existing.updatedAt))) {
       latestByKind.set(blob.kind, { state: blob.state, updatedAt: blob.updatedAt ?? '' });
@@ -578,20 +868,21 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   }
 }
 
-/**
- * Pull all Jazz CoValue state into Zustand stores.
- */
+/** Pull all Jazz CoValue state into Zustand stores */
 export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
+  pullRegionsFromJazz(sessionRoot);
+  pullMapObjectsFromJazz(sessionRoot);
   pullBlobsFromJazz(sessionRoot);
 }
 
-// ── Blob store subscriptions ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// STORE SUBSCRIPTIONS FOR BLOB SYNC
+// ══════════════════════════════════════════════════════════════════════════
 
 /** Map of DO kind → the Zustand store to subscribe to */
 const STORE_FOR_KIND: Record<string, () => any> = {
   maps: () => useMapStore,
-  regions: () => useRegionStore,
   groups: () => useGroupStore,
   initiative: () => useInitiativeStore,
   roles: () => useRoleStore,
@@ -600,7 +891,6 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   lights: () => useLightStore,
   illumination: () => useIlluminationStore,
   dungeon: () => useDungeonStore,
-  mapObjects: () => useMapObjectStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,
   effects: () => useEffectStore,
@@ -613,36 +903,179 @@ const _throttleTimers = new Map<string, number>();
 const BLOB_THROTTLE_MS = 1000; // 1Hz max per kind
 
 function throttledPushBlob(kind: string): void {
-  if (_throttleTimers.has(kind)) return; // already scheduled
+  if (_throttleTimers.has(kind)) return;
   _throttleTimers.set(kind, window.setTimeout(() => {
     _throttleTimers.delete(kind);
     pushBlobToJazz(kind);
   }, BLOB_THROTTLE_MS));
 }
 
-// ── Live bridge: subscribe to both directions ─────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// FINE-GRAINED SYNC HELPERS (regions & mapObjects outbound)
+// ══════════════════════════════════════════════════════════════════════════
+
+const FINE_GRAINED_THROTTLE_MS = 1000;
+const _fineGrainedTimers = new Map<string, number>();
+
+function throttledPushFineGrained(kind: string, fn: () => void): void {
+  if (_fineGrainedTimers.has(kind)) return;
+  _fineGrainedTimers.set(kind, window.setTimeout(() => {
+    _fineGrainedTimers.delete(kind);
+    fn();
+  }, FINE_GRAINED_THROTTLE_MS));
+}
+
+/** Sync regions from Zustand → Jazz (diff-based) */
+function syncRegionsToJazz(regions: CanvasRegion[], prevRegions: CanvasRegion[]): void {
+  const jazzRegions = _cachedRegions ?? _sessionRoot?.regions;
+  if (!jazzRegions) return;
+  const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+
+  const prevIds = new Set(prevRegions.map(r => r.id));
+  const currentIds = new Set(regions.map(r => r.id));
+
+  // Added
+  for (const r of regions) {
+    if (!prevIds.has(r.id)) {
+      try {
+        const jr = JazzRegionSchema.create(regionToJazzInit(r) as any, group);
+        jazzRegions.$jazz.push(jr);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push new region ${r.id}:`, err);
+      }
+    }
+  }
+
+  // Updated
+  for (const r of regions) {
+    if (prevIds.has(r.id)) {
+      const prev = prevRegions.find(pr => pr.id === r.id);
+      if (!prev || JSON.stringify(regionToJazzInit(r)) === JSON.stringify(regionToJazzInit(prev))) continue;
+      const len = jazzRegions.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const jr = jazzRegions[i];
+        if (jr && jr.regionId === r.id) {
+          try {
+            const init = regionToJazzInit(r);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'regionId') jr.$jazz.set(key, val ?? null);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to update region ${r.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Removed
+  for (const prev of prevRegions) {
+    if (!currentIds.has(prev.id)) {
+      const len = jazzRegions.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const jr = jazzRegions[i];
+        if (jr && jr.regionId === prev.id) {
+          try { jazzRegions.$jazz.splice(i, 1); } catch (err) {
+            console.error(`[jazz-bridge] Failed to remove region ${prev.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+/** Sync map objects from Zustand → Jazz (diff-based) */
+function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): void {
+  const jazzMapObjects = _cachedMapObjects ?? _sessionRoot?.mapObjects;
+  if (!jazzMapObjects) return;
+  const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+
+  const prevIds = new Set(prevObjects.map(o => o.id));
+  const currentIds = new Set(objects.map(o => o.id));
+
+  // Added
+  for (const obj of objects) {
+    if (!prevIds.has(obj.id)) {
+      try {
+        const jmo = JazzMapObjectSchema.create(mapObjectToJazzInit(obj) as any, group);
+        jazzMapObjects.$jazz.push(jmo);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push new mapObject ${obj.id}:`, err);
+      }
+    }
+  }
+
+  // Updated
+  for (const obj of objects) {
+    if (prevIds.has(obj.id)) {
+      const prev = prevObjects.find(po => po.id === obj.id);
+      if (!prev || JSON.stringify(mapObjectToJazzInit(obj)) === JSON.stringify(mapObjectToJazzInit(prev))) continue;
+      const len = jazzMapObjects.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const jmo = jazzMapObjects[i];
+        if (jmo && jmo.objectId === obj.id) {
+          try {
+            const init = mapObjectToJazzInit(obj);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'objectId') jmo.$jazz.set(key, val ?? null);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to update mapObject ${obj.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Removed
+  for (const prev of prevObjects) {
+    if (!currentIds.has(prev.id)) {
+      const len = jazzMapObjects.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const jmo = jazzMapObjects[i];
+        if (jmo && jmo.objectId === prev.id) {
+          try { jazzMapObjects.$jazz.splice(i, 1); } catch (err) {
+            console.error(`[jazz-bridge] Failed to remove mapObject ${prev.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LIVE BRIDGE: bidirectional subscriptions
+// ══════════════════════════════════════════════════════════════════════════
 
 /**
- * Start the bidirectional bridge for tokens + all DO blob kinds.
- * @param isCreator — true if this client created the session (authority for initial state)
+ * Start the bidirectional bridge for all entity types.
+ * @param isCreator — true if this client created the session
  */
 export function startBridge(sessionRoot: any, isCreator = false): void {
   _sessionRoot = sessionRoot;
   _isCreator = isCreator;
   // Cache child refs immediately while the proxy is still live
   _cachedTokens = sessionRoot.tokens ?? null;
+  _cachedRegions = sessionRoot.regions ?? null;
+  _cachedMapObjects = sessionRoot.mapObjects ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
+    regions: !!_cachedRegions,
+    mapObjects: !!_cachedMapObjects,
     blobs: !!_cachedBlobs,
     group: !!_cachedGroup,
     isCreator,
   });
 
-  // ── Token sync: Direction 1 (Zustand → Jazz) ──
+  // ── Token sync: Zustand → Jazz ──
   let prevTokens = useSessionStore.getState().tokens;
-  const unsubZustand = useSessionStore.subscribe((state) => {
+  const unsubTokensZustand = useSessionStore.subscribe((state) => {
     const tokens = state.tokens;
     if (tokens === prevTokens) return;
     if (_fromJazz) { prevTokens = tokens; return; }
@@ -651,71 +1084,73 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
     const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
 
-      // Detect added tokens
-      const prevIds = new Set(prevTokens.map((t: Token) => t.id));
-      for (const t of tokens) {
-        if (!prevIds.has(t.id)) {
-          const init = tokenToJazzInit(t);
-          try {
-            const jt = JazzTokenSchema.create(init as any, group);
-            jazzTokens.$jazz.push(jt);
-            console.log(`[jazz-bridge] → Jazz: added token ${t.id}`);
-          } catch (err) {
-            console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
-          }
+    // Detect added tokens
+    const prevIds = new Set(prevTokens.map((t: Token) => t.id));
+    for (const t of tokens) {
+      if (!prevIds.has(t.id)) {
+        const init = tokenToJazzInit(t);
+        try {
+          const jt = JazzTokenSchema.create(init as any, group);
+          jazzTokens.$jazz.push(jt);
+        } catch (err) {
+          console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
         }
       }
+    }
 
-      // Detect moved/updated tokens
-      for (const t of tokens) {
-        if (prevIds.has(t.id)) {
-          const prev = prevTokens.find((pt: Token) => pt.id === t.id);
-          if (!prev) continue;
-          if (prev.x !== t.x || prev.y !== t.y || prev.label !== t.label || prev.color !== t.color) {
-            const len = jazzTokens.length ?? 0;
-            for (let i = 0; i < len; i++) {
-              const jt = jazzTokens[i];
-              if (jt && jt.tokenId === t.id) {
-                try {
-                  jt.$jazz.set("x", t.x);
-                  jt.$jazz.set("y", t.y);
-                  if (t.label !== prev.label) jt.$jazz.set("label", t.label || "");
-                  if (t.color !== prev.color) jt.$jazz.set("color", t.color || "#666");
-                } catch (err) {
-                  console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
-                }
-                break;
+    // Detect moved/updated tokens
+    for (const t of tokens) {
+      if (prevIds.has(t.id)) {
+        const prev = prevTokens.find((pt: Token) => pt.id === t.id);
+        if (!prev) continue;
+        // Check all synced fields for changes
+        const changed = prev.x !== t.x || prev.y !== t.y || prev.label !== t.label ||
+          prev.color !== t.color || prev.name !== t.name ||
+          (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
+          (prev as any).ac !== (t as any).ac ||
+          prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
+          prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
+        if (!changed) continue;
+        const len = jazzTokens.length ?? 0;
+        for (let i = 0; i < len; i++) {
+          const jt = jazzTokens[i];
+          if (jt && jt.tokenId === t.id) {
+            try {
+              const init = tokenToJazzInit(t);
+              for (const [key, val] of Object.entries(init)) {
+                if (key !== 'tokenId') jt.$jazz.set(key, val ?? null);
               }
+            } catch (err) {
+              console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
             }
+            break;
           }
         }
       }
+    }
 
-      // Detect removed tokens
-      const currentIds = new Set(tokens.map((t: Token) => t.id));
-      for (const prev of prevTokens) {
-        if (!currentIds.has(prev.id)) {
-          const len = jazzTokens.length ?? 0;
-          for (let i = 0; i < len; i++) {
-            const jt = jazzTokens[i];
-            if (jt && jt.tokenId === prev.id) {
-              try {
-                jazzTokens.$jazz.splice(i, 1);
-              } catch (err) {
-                console.error(`[jazz-bridge] Failed to remove JazzToken:`, err);
-              }
-              console.log(`[jazz-bridge] → Jazz: removed token ${prev.id}`);
-              break;
+    // Detect removed tokens
+    const currentIds = new Set(tokens.map((t: Token) => t.id));
+    for (const prev of prevTokens) {
+      if (!currentIds.has(prev.id)) {
+        const len = jazzTokens.length ?? 0;
+        for (let i = 0; i < len; i++) {
+          const jt = jazzTokens[i];
+          if (jt && jt.tokenId === prev.id) {
+            try { jazzTokens.$jazz.splice(i, 1); } catch (err) {
+              console.error(`[jazz-bridge] Failed to remove JazzToken:`, err);
             }
+            break;
           }
         }
       }
+    }
 
-      prevTokens = tokens;
-    });
-  activeSubscriptions.push(unsubZustand);
+    prevTokens = tokens;
+  });
+  activeSubscriptions.push(unsubTokensZustand);
 
-  // ── Token sync: Direction 2 (Jazz → Zustand) ──
+  // ── Token sync: Jazz → Zustand ──
   if (sessionRoot.tokens?.$jazz?.subscribe) {
     try {
       const unsubJazz = sessionRoot.tokens.$jazz.subscribe(
@@ -726,7 +1161,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const len = tokens.length ?? 0;
           const localTokens = useSessionStore.getState().tokens;
 
-          // Guard: don't wipe populated local tokens with empty Jazz echo
           if (len === 0 && localTokens.length > 0) {
             console.warn(`[jazz-bridge] ✋ Blocked inbound token sync — Jazz has 0 but local has ${localTokens.length}`);
             return;
@@ -749,17 +1183,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 }
               } else {
                 store.addToken(jazzToZustandToken(jt));
-                console.log(`[jazz-bridge] ← Jazz: added token ${jt.tokenId}`);
               }
             }
 
-            // Only remove local tokens that Jazz doesn't have if we're NOT the creator
-            // The creator is the authority — Jazz may not have propagated yet
             if (!_isCreator) {
               for (const t of store.tokens) {
                 if (!jazzIds.has(t.id)) {
                   store.removeToken(t.id);
-                  console.log(`[jazz-bridge] ← Jazz: removed token ${t.id}`);
                 }
               }
             }
@@ -770,11 +1200,124 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     } catch (err) {
       console.warn("[jazz-bridge] Could not subscribe to Jazz tokens:", err);
     }
-  } else {
-    console.warn("[jazz-bridge] Jazz tokens list does not support subscribe — inbound sync disabled");
   }
 
-  // ── Blob sync: Zustand → Jazz (all DO kinds) ──
+  // ── Region sync: Zustand → Jazz ──
+  let prevRegions = useRegionStore.getState().regions;
+  const unsubRegionsZustand = useRegionStore.subscribe((state) => {
+    const regions = state.regions;
+    if (regions === prevRegions) return;
+    if (_fromJazz) { prevRegions = regions; return; }
+    const capturedPrev = prevRegions;
+    prevRegions = regions;
+    throttledPushFineGrained('regions', () => syncRegionsToJazz(regions, capturedPrev));
+  });
+  activeSubscriptions.push(unsubRegionsZustand);
+
+  // ── Region sync: Jazz → Zustand ──
+  const jazzRegionsRef = sessionRoot.regions;
+  if (jazzRegionsRef?.$jazz?.subscribe) {
+    try {
+      const unsubRegionsJazz = jazzRegionsRef.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (regions: any) => {
+          if (!regions) return;
+          const len = regions.length ?? 0;
+          const localCount = useRegionStore.getState().regions.length;
+
+          if (len === 0 && localCount > 0 && _isCreator) return;
+
+          runFromJazz(() => {
+            const store = useRegionStore.getState();
+            const currentIds = new Set(store.regions.map(r => r.id));
+            const jazzIds = new Set<string>();
+
+            for (let i = 0; i < len; i++) {
+              const jr = regions[i];
+              if (!jr) continue;
+              jazzIds.add(jr.regionId);
+
+              if (currentIds.has(jr.regionId)) {
+                store.updateRegion(jr.regionId, jazzToZustandRegion(jr));
+              } else {
+                store.addRegion(jazzToZustandRegion(jr));
+              }
+            }
+
+            if (!_isCreator) {
+              for (const r of store.regions) {
+                if (!jazzIds.has(r.id)) store.removeRegion(r.id);
+              }
+            }
+          });
+          // Update prev to prevent echo
+          prevRegions = useRegionStore.getState().regions;
+        },
+      );
+      activeSubscriptions.push(unsubRegionsJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz regions:", err);
+    }
+  }
+
+  // ── MapObject sync: Zustand → Jazz ──
+  let prevMapObjects = useMapObjectStore.getState().mapObjects;
+  const unsubMapObjectsZustand = useMapObjectStore.subscribe((state) => {
+    const mapObjects = state.mapObjects;
+    if (mapObjects === prevMapObjects) return;
+    if (_fromJazz) { prevMapObjects = mapObjects; return; }
+    const capturedPrev = prevMapObjects;
+    prevMapObjects = mapObjects;
+    throttledPushFineGrained('mapObjects', () => syncMapObjectsToJazz(mapObjects, capturedPrev));
+  });
+  activeSubscriptions.push(unsubMapObjectsZustand);
+
+  // ── MapObject sync: Jazz → Zustand ──
+  const jazzMapObjectsRef = sessionRoot.mapObjects;
+  if (jazzMapObjectsRef?.$jazz?.subscribe) {
+    try {
+      const unsubMapObjectsJazz = jazzMapObjectsRef.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (mapObjects: any) => {
+          if (!mapObjects) return;
+          const len = mapObjects.length ?? 0;
+          const localCount = useMapObjectStore.getState().mapObjects.length;
+
+          if (len === 0 && localCount > 0 && _isCreator) return;
+
+          runFromJazz(() => {
+            const store = useMapObjectStore.getState();
+            const currentIds = new Set(store.mapObjects.map(o => o.id));
+            const jazzIds = new Set<string>();
+
+            for (let i = 0; i < len; i++) {
+              const jmo = mapObjects[i];
+              if (!jmo) continue;
+              jazzIds.add(jmo.objectId);
+
+              if (currentIds.has(jmo.objectId)) {
+                store.updateMapObject(jmo.objectId, jazzToZustandMapObject(jmo));
+              } else {
+                store.addMapObject(jazzToZustandMapObject(jmo));
+              }
+            }
+
+            if (!_isCreator) {
+              for (const obj of store.mapObjects) {
+                if (!jazzIds.has(obj.id)) store.removeMapObject(obj.id);
+              }
+            }
+          });
+          prevMapObjects = useMapObjectStore.getState().mapObjects;
+        },
+      );
+      activeSubscriptions.push(unsubMapObjectsJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz mapObjects:", err);
+    }
+  }
+
+  // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
     if (!getStore) continue;
@@ -802,8 +1345,9 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           for (let i = 0; i < len; i++) {
             const blob = blobs[i];
             if (!blob || !blob.kind || !blob.state) continue;
+            // Skip kinds that are now fine-grained
+            if (!BLOB_SYNC_KINDS.includes(blob.kind)) continue;
 
-            // Check if this is newer than what we last pushed
             const hash = quickHash(blob.state);
             if (_lastPushedHash.get(blob.kind) === hash) continue;
 
@@ -829,7 +1373,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     console.warn("[jazz-bridge] Could not start texture subscription:", err);
   }
 
-  console.log(`[jazz-bridge] Bridge started with token sync + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
+  console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects (fine-grained) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
 }
 
 /**
@@ -842,14 +1386,16 @@ export function stopBridge(): void {
   activeSubscriptions.length = 0;
 
   // Clear throttle timers
-  for (const timer of _throttleTimers.values()) {
-    clearTimeout(timer);
-  }
+  for (const timer of _throttleTimers.values()) clearTimeout(timer);
   _throttleTimers.clear();
+  for (const timer of _fineGrainedTimers.values()) clearTimeout(timer);
+  _fineGrainedTimers.clear();
   _lastPushedHash.clear();
 
   _sessionRoot = null;
   _cachedTokens = null;
+  _cachedRegions = null;
+  _cachedMapObjects = null;
   _cachedBlobs = null;
   _cachedGroup = null;
   _isCreator = false;
