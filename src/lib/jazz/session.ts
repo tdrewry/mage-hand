@@ -236,6 +236,8 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
       if (hasTokens || hasBlobs) {
         console.log(`[jazz-session] Retry #${attempt}: found data! tokens=${freshRoot.tokens?.length ?? 0} blobs=${freshRoot.blobs?.length ?? 0}`);
         pullAllFromJazz(freshRoot);
+        // Also pull textures on retry
+        pullTexturesFromJazz(freshRoot).catch(() => {});
         // Update the bridge with the fresh root
         stopBridge();
         startBridge(freshRoot);
