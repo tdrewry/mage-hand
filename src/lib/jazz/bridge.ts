@@ -1435,7 +1435,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         if (t.label !== p.label || t.color !== p.color || t.name !== p.name ||
             (t as any).hp !== (p as any).hp || (t as any).maxHp !== (p as any).maxHp ||
             (t as any).ac !== (p as any).ac || t.isHidden !== p.isHidden ||
-            t.mapId !== p.mapId || t.gridWidth !== p.gridWidth || t.gridHeight !== p.gridHeight) {
+            t.mapId !== p.mapId || t.gridWidth !== p.gridWidth || t.gridHeight !== p.gridHeight ||
+            t.imageHash !== p.imageHash) {
           onlyDraggedPosChanges = false;
           break;
         }
@@ -1510,6 +1511,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         // Track if imageHash changed — need to push texture binary
         if (prev.imageHash !== t.imageHash && t.imageHash) {
           needsTexturePush = true;
+          console.log(`[jazz-bridge] 🎨 Token ${t.id} imageHash changed: ${prev.imageHash} → ${t.imageHash}`);
         }
 
         const len = jazzTokens.length ?? 0;
@@ -1521,6 +1523,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               for (const [key, val] of Object.entries(init)) {
                 if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
               }
+              console.log(`[jazz-bridge] ✅ Pushed token ${t.id} update to Jazz (imageHash: ${t.imageHash})`);
             } catch (err) {
               console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
             }
@@ -1532,8 +1535,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
     // If any token got a new imageHash, push the texture binary to Jazz
     if (needsTexturePush && _sessionRoot) {
+      console.log(`[jazz-bridge] 🎨 Triggering texture push for new imageHash(es)...`);
       import("./textureSync").then(({ pushTexturesToJazz }) => {
-        pushTexturesToJazz(_sessionRoot).catch(err => {
+        // Use _sessionRoot directly — getBridgedSessionRoot includes textures via spread
+        pushTexturesToJazz(_sessionRoot).then(() => {
+          console.log(`[jazz-bridge] 🎨 Texture push complete`);
+        }).catch(err => {
           console.warn("[jazz-bridge] Mid-session texture push failed:", err);
         });
       });

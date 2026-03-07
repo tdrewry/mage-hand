@@ -157,10 +157,13 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
       continue;
     }
 
-    // Load data URI from IndexedDB
-    const dataUrl = await loadTextureByHash(hash);
+    // Load data URI from IndexedDB — check both region and token texture stores
+    let dataUrl = await loadTextureByHash(hash);
     if (!dataUrl) {
-      console.warn(`[jazz-texture] Hash ${hash} not found in IndexedDB — skipping`);
+      dataUrl = await loadTokenTextureByHash(hash);
+    }
+    if (!dataUrl) {
+      console.warn(`[jazz-texture] Hash ${hash} not found in either IndexedDB store — skipping`);
       skipped++;
       continue;
     }
