@@ -74,6 +74,11 @@ export function createJazzSession(name: string): JazzSessionInfo {
   // Push current Zustand state into the new Jazz session
   pushAllToJazz(root);
   
+  // Push textures via FileStreams (async, non-blocking)
+  pushTexturesToJazz(root).catch(err => {
+    console.warn("[jazz-session] Texture push failed (non-fatal):", err);
+  });
+  
   // Start the bidirectional bridge (creator = source of truth)
   startBridge(root, true);
 
@@ -114,6 +119,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
         tokens: { $each: true },
         maps: { $each: true },
         blobs: { $each: true },
+        textures: { $each: true },
       },
     });
   } catch (err) {
@@ -157,6 +163,11 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   // Pull remote state into Zustand
   useMultiplayerStore.getState().setSyncReady(false);
   pullAllFromJazz(root);
+  
+  // Pull textures via FileStreams (async, non-blocking)
+  pullTexturesFromJazz(root).catch(err => {
+    console.warn("[jazz-session] Texture pull failed (non-fatal):", err);
+  });
   
   // Start the bidirectional bridge (joiner = NOT the authority)
   startBridge(root, false);
@@ -209,6 +220,7 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
           tokens: { $each: true },
           maps: { $each: true },
           blobs: { $each: true },
+          textures: { $each: true },
         },
       });
 
