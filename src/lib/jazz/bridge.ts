@@ -1500,7 +1500,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
           (prev as any).ac !== (t as any).ac ||
           prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
-          prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
+          prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight ||
+          prev.imageHash !== t.imageHash;
 
         if (isBeingDragged && posChanged && !nonPosChanged) continue;
         if (!posChanged && !nonPosChanged) continue;
