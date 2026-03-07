@@ -571,6 +571,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             size="xs"
           />
 
+          <ToolbarButton
             icon={Layers}
             label="Map Tree"
             onClick={handleToggleMapTreeCard}
