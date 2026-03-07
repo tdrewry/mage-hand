@@ -440,11 +440,7 @@ function pushBlobToJazz(kind: string): void {
   try {
     let state = reg.extractor();
 
-    // Strip texture data URIs from stores that sync textures via FileStreams
-    if (kind === 'effects' && state) {
-      state = stripEffectTexturesForSync(state);
-    }
-
+    // Effects now use fine-grained sync — no blob stripping needed
     const json = JSON.stringify(state);
     const hash = quickHash(json);
 
@@ -667,8 +663,7 @@ export function pushBlobsToJazz(sessionRoot: any): void {
     try {
       let state = reg.extractor();
 
-      // Strip texture data URIs — textures sync via FileStreams
-      if (kind === 'effects' && state) state = stripEffectTexturesForSync(state);
+      // Effects use fine-grained sync — no blob stripping needed
 
       const json = JSON.stringify(state);
       _lastPushedHash.set(kind, quickHash(json));
