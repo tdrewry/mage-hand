@@ -20,5 +20,6 @@ export const DEFAULT_MAP_FOG_SETTINGS: MapFogSettings = {
   fogOpacity: 0.95,
   exploredOpacity: 0.4,
   showExploredAreas: true,
+  dmFogOpacity: 0.3,
   effectSettings: { ...DEFAULT_FOG_EFFECT_SETTINGS },
 };
