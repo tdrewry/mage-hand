@@ -26,7 +26,7 @@ interface DragPreviewState {
   expireStale: (maxAge?: number) => void;
 }
 
-const DEFAULT_EXPIRY_MS = 400;
+const DEFAULT_EXPIRY_MS = 800;
 
 export const useDragPreviewStore = create<DragPreviewState>((set) => ({
   previews: {},
@@ -50,7 +50,23 @@ export const useDragPreviewStore = create<DragPreviewState>((set) => ({
   updateDrag: (tokenId, pos, path) =>
     set((s) => {
       const existing = s.previews[tokenId];
-      if (!existing) return s; // ignore stray updates
+      if (!existing) {
+        // Auto-create preview if begin was missed (network reorder / packet loss)
+        return {
+          previews: {
+            ...s.previews,
+            [tokenId]: {
+              tokenId,
+              userId: "unknown",
+              startPos: path?.[0] ?? pos,
+              currentPos: pos,
+              path: path ?? [pos],
+              mode: "freehand",
+              lastUpdated: Date.now(),
+            },
+          },
+        };
+      }
       return {
         previews: {
           ...s.previews,
