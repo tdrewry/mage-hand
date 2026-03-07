@@ -46,23 +46,28 @@ function stripEffectTexturesForSync(state: any): any {
   if (!state) return state;
   const stripped = { ...state };
 
-  // Strip from placedEffects
+  /** Strip texture AND icon data URIs from a template-like object */
+  const stripTemplate = (t: any): any => {
+    if (!t) return t;
+    let changed = false;
+    const copy = { ...t };
+    if (copy.texture && copy.texture.length > 200) { copy.texture = ''; changed = true; }
+    if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) { copy.icon = ''; changed = true; }
+    return changed ? copy : t;
+  };
+
+  // Strip from placedEffects — both the embedded template and top-level fields
   if (Array.isArray(stripped.placedEffects)) {
     stripped.placedEffects = stripped.placedEffects.map((e: any) => {
-      if (!e?.template?.texture || e.template.texture.length < 200) return e;
-      return {
-        ...e,
-        template: { ...e.template, texture: '' },
-      };
+      if (!e) return e;
+      const tpl = e.template ? stripTemplate(e.template) : e.template;
+      return tpl !== e.template ? { ...e, template: tpl } : e;
     });
   }
 
   // Strip from customTemplates
   if (Array.isArray(stripped.customTemplates)) {
-    stripped.customTemplates = stripped.customTemplates.map((t: any) => {
-      if (!t?.texture || t.texture.length < 200) return t;
-      return { ...t, texture: '' };
-    });
+    stripped.customTemplates = stripped.customTemplates.map(stripTemplate);
   }
 
   return stripped;

@@ -418,19 +418,25 @@ DurableObjectRegistry.register({
   label: 'Effects',
   extractor: () => {
     const state = useEffectStore.getState();
-    // Strip texture data URIs to keep blob under Jazz's 1MB limit.
+    // Strip texture AND icon data URIs to keep blob under Jazz's 1MB limit.
     // Textures are synced separately via IndexedDB texture storage.
-    const stripTexture = (obj: any) => {
+    const stripLargeData = (obj: any) => {
       if (!obj) return obj;
       const copy = { ...obj };
       if (copy.texture && copy.texture.length > 200) {
         copy.texture = ''; // Keep textureHash for lookup
       }
+      if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) {
+        copy.icon = ''; // Icons can be rebuilt from built-in templates
+      }
       return copy;
     };
     return {
-      placedEffects: state.placedEffects.map(stripTexture),
-      customTemplates: state.customTemplates.map(stripTexture),
+      placedEffects: state.placedEffects.map((e: any) => ({
+        ...stripLargeData(e),
+        template: e.template ? stripLargeData(e.template) : e.template,
+      })),
+      customTemplates: state.customTemplates.map(stripLargeData),
     };
   },
   hydrator: (state: any) => {
