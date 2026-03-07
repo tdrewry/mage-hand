@@ -26,6 +26,7 @@ import {
   notifyTextureDownloadStart,
   notifyTextureDownloadComplete,
   notifyTextureDownloadError,
+  resetTextureDownloadProgress,
 } from "@/components/TextureDownloadProgress";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -403,4 +404,6 @@ export function cleanupTextureSync(): void {
   }
   _uploadedHashes.clear();
   _downloadedHashes.clear();
+  // Reset the download progress UI so it doesn't carry over stale counts
+  resetTextureDownloadProgress();
 }
