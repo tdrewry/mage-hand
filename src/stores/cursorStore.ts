@@ -72,5 +72,12 @@ export const useCursorStore = create<CursorState>()((set) => ({
       return { cursors: rest };
     }),
 
-  setCursorSharingEnabled: (enabled) => set({ cursorSharingEnabled: enabled }),
+  setCursorSharingEnabled: (enabled) =>
+    set((state) => {
+      // When disabling, also clear all remote cursors so nothing lingers
+      if (!enabled) {
+        return { cursorSharingEnabled: false, cursors: {} };
+      }
+      return { cursorSharingEnabled: true };
+    }),
 }));

@@ -4,6 +4,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useCursorStore } from "@/stores/cursorStore";
+import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import type { CursorUpdatePayload, CursorVisibilityPayload } from "./types";
 
 let registered = false;
@@ -26,6 +27,14 @@ export function registerCursorHandlers(): void {
 
   ephemeralBus.on("cursor.visibility", (data: CursorVisibilityPayload, _userId) => {
     useCursorStore.getState().setCursorSharingEnabled(data.visible);
+    // When DM disables sharing, also clear remote token hovers to stop
+    // ephemeral-driven canvas redraws that cause selection flicker
+    if (!data.visible) {
+      const hoverStore = useTokenEphemeralStore.getState();
+      for (const uid of Object.keys(hoverStore.hovers)) {
+        hoverStore.removeHover(uid);
+      }
+    }
   });
 
   // Wire TTL cache expiry to remove stale cursors

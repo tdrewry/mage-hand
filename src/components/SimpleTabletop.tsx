@@ -165,6 +165,27 @@ import { computeEffectImpacts } from "../lib/effectHitTesting";
 import { tickAuras } from "../lib/auraEngine";
 
 
+/** Small reactive wrapper so button variant updates when cursorSharingEnabled changes */
+const CursorToggleButton: React.FC = () => {
+  const enabled = useCursorStore((s) => s.cursorSharingEnabled);
+  return (
+    <Button
+      variant={enabled ? "default" : "outline"}
+      size="sm"
+      className="h-8 gap-1.5 text-xs"
+      onClick={() => {
+        const next = !enabled;
+        useCursorStore.getState().setCursorSharingEnabled(next);
+        ephemeralBus.emit("cursor.visibility", { visible: next });
+        toast.success(next ? "Cursor sharing enabled" : "Cursor sharing disabled");
+      }}
+    >
+      <MousePointer2 className="h-3.5 w-3.5" />
+      Cursors
+    </Button>
+  );
+};
+
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
   React.useEffect(() => {
@@ -9918,7 +9939,9 @@ export const SimpleTabletop = () => {
 
         if (distance <= radius) {
           setHoveredTokenId(token.id);
-          ephemeralBus.emit("token.hover", { tokenId: token.id });
+          if (useCursorStore.getState().cursorSharingEnabled) {
+            ephemeralBus.emit("token.hover", { tokenId: token.id });
+          }
           foundHoveredToken = true;
 
           // Update cursor based on controllability
@@ -9932,7 +9955,9 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
-        ephemeralBus.emit("token.hover", { tokenId: null });
+        if (useCursorStore.getState().cursorSharingEnabled) {
+          ephemeralBus.emit("token.hover", { tokenId: null });
+        }
         
         // Check if hovering over a door (DM in play mode)
         if (isDM && renderingMode === 'play') {
@@ -11852,20 +11877,7 @@ export const SimpleTabletop = () => {
           className="absolute bottom-4 left-28 select-none"
           style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
         >
-          <Button
-            variant={useCursorStore.getState().cursorSharingEnabled ? "default" : "outline"}
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => {
-              const next = !useCursorStore.getState().cursorSharingEnabled;
-              useCursorStore.getState().setCursorSharingEnabled(next);
-              ephemeralBus.emit("cursor.visibility", { visible: next });
-              toast.success(next ? "Cursor sharing enabled" : "Cursor sharing disabled");
-            }}
-          >
-            <MousePointer2 className="h-3.5 w-3.5" />
-            Cursors
-          </Button>
+          <CursorToggleButton />
         </div>
       )}
 
