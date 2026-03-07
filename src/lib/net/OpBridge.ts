@@ -5,6 +5,7 @@
 import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contract/v1";
 import { toast } from "sonner";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useRegionStore } from "@/stores/regionStore";
 // dragPreviewStore handlers moved to ephemeral tokenHandlers.ts
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
@@ -101,6 +102,23 @@ class OpBridgeImpl {
         ),
       }));
       console.log(`🔄 [OpBridge] token.update applied for ${d.id}`);
+    });
+
+    this.register("region.update", (data) => {
+      const d = data as Record<string, unknown>;
+      if (!d || typeof d.id !== 'string') return;
+      const store = useRegionStore.getState();
+      const existing = store.regions.find(r => r.id === d.id);
+      if (!existing) {
+        console.warn(`[OpBridge] region.update: region ${d.id} not found locally`);
+        return;
+      }
+      useRegionStore.setState((state) => ({
+        regions: state.regions.map(r =>
+          r.id === d.id ? { ...r, ...d } : r
+        ),
+      }));
+      console.log(`🔄 [OpBridge] region.update applied for ${d.id}`);
     });
 
     // Token drag preview ops moved to ephemeral tokenHandlers.ts (Priority 1 migration)
