@@ -1829,6 +1829,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
             if (tokensChanged) {
               store.setTokens(finalTokens);
+              // If any token's illumination changed, dispatch a soft fog refresh
+              // so the fog layer picks up the new illumination settings without
+              // flashing black (soft = keep existing masks during recomputation).
+              try {
+                window.dispatchEvent(new CustomEvent('fog:force-refresh', { detail: { soft: true } }));
+              } catch { /* SSR guard */ }
             }
           });
 
