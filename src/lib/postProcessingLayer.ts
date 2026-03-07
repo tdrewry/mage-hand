@@ -363,6 +363,11 @@ export function resizePostProcessing(
     illuminationSprite.x = 0;
     illuminationSprite.y = 0;
   }
+
+  // renderer.resize() clears the WebGL canvas.  Invalidate the fog fast-path
+  // caches so the next applyFogPostProcessing call performs a full Canvas 2D
+  // redraw + GPU texture upload instead of skipping via CSS offset.
+  _lastRenderTransform = { x: 0, y: 0, zoom: 0 };
 }
 
 export function setPostProcessingVisible(visible: boolean): void {

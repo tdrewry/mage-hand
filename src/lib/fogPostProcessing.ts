@@ -475,9 +475,15 @@ export function applyFogPostProcessing(
       originX,
       originY
     );
-    if (illuminationCanvas) {
-      updateIlluminationTexture(illuminationCanvas);
-    }
+  } else if (illuminationCtx && illuminationCanvas) {
+    // No illumination sources — clear stale color overlay to prevent
+    // ghost glow from a previous frame persisting on the PixiJS layer.
+    illuminationCtx.clearRect(0, 0, illuminationCanvas.width, illuminationCanvas.height);
+  }
+  // Always upload illumination texture (even when cleared) so stale content
+  // doesn't linger on the GPU sprite.
+  if (illuminationCanvas) {
+    updateIlluminationTexture(illuminationCanvas);
   }
 
   // Push fog mask to PixiJS
