@@ -161,7 +161,14 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   viewportTransforms: {},
   
   addToken: (token) => {
-    set((state) => ({ tokens: [...state.tokens, token] }));
+    set((state) => {
+      // Dedup guard: if a token with this ID already exists, skip
+      if (state.tokens.some(t => t.id === token.id)) {
+        console.warn(`[sessionStore] ⚠️ addToken skipped — token ${token.id} already exists`);
+        return state;
+      }
+      return { tokens: [...state.tokens, token] };
+    });
   },
   
   setTokens: (tokens) => set({ tokens }),
