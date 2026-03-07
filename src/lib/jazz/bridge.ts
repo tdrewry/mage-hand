@@ -18,14 +18,23 @@
 import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { useRegionStore, type CanvasRegion } from "@/stores/regionStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
+import { useEffectStore } from "@/stores/effectStore";
 import type { MapObject } from "@/types/mapObjectTypes";
+import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
+import { computeScaledTemplate } from "@/types/effectTypes";
+import { getBuiltInTemplate } from "@/lib/effectTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
   JazzRegion as JazzRegionSchema,
   JazzMapObject as JazzMapObjectSchema,
+  JazzPlacedEffect as JazzPlacedEffectSchema,
+  JazzCustomTemplate as JazzCustomTemplateSchema,
   JazzDOBlob as JazzDOBlobSchema,
   JazzRegionList,
   JazzMapObjectList,
+  JazzPlacedEffectList,
+  JazzCustomTemplateList,
+  JazzEffectState,
 } from "./schema";
 import { DurableObjectRegistry } from "@/lib/durableObjects";
 import "@/lib/durableObjectRegistry"; // Side-effect: registers all DO kinds
@@ -40,49 +49,10 @@ import { useIlluminationStore } from "@/stores/illuminationStore";
 import { useDungeonStore } from "@/stores/dungeonStore";
 import { useCreatureStore } from "@/stores/creatureStore";
 import { useHatchingStore } from "@/stores/hatchingStore";
-import { useEffectStore } from "@/stores/effectStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 
-// ── Effect texture stripping for Jazz sync ─────────────────────────────────
-
-/**
- * Strip texture data URIs from effects state before Jazz blob sync.
- * Textures are synced separately via FileStreams — we only need textureHash.
- */
-function stripEffectTexturesForSync(state: any): any {
-  if (!state) return state;
-  const stripped = { ...state };
-
-  /** Strip texture AND icon data URIs from a template-like object */
-  const stripTemplate = (t: any): any => {
-    if (!t) return t;
-    let changed = false;
-    const copy = { ...t };
-    if (copy.texture && copy.texture.length > 200) { copy.texture = ''; changed = true; }
-    if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) { copy.icon = ''; changed = true; }
-    return changed ? copy : t;
-  };
-
-  // Strip the ENTIRE template snapshot from placedEffects.
-  // Templates are reconstructible from templateId + castLevel on the receiving side.
-  // This is the primary fix for the 2-3MB effects blob.
-  if (Array.isArray(stripped.placedEffects)) {
-    stripped.placedEffects = stripped.placedEffects.map((e: any) => {
-      if (!e) return e;
-      // Keep only essential fields, drop the full template snapshot
-      const { template, ...rest } = e;
-      return rest;
-    });
-  }
-
-  // Strip from customTemplates
-  if (Array.isArray(stripped.customTemplates)) {
-    stripped.customTemplates = stripped.customTemplates.map(stripTemplate);
-  }
-
-  return stripped;
-}
+// (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
 let _fromJazz = false;
 
@@ -125,6 +95,7 @@ let _sessionRoot: any = null;
 let _cachedTokens: any = null;
 let _cachedRegions: any = null;
 let _cachedMapObjects: any = null;
+let _cachedEffects: any = null;
 let _cachedBlobs: any = null;
 let _cachedGroup: any = null;
 
@@ -140,6 +111,7 @@ export function getBridgedSessionRoot(): any {
     tokens: _cachedTokens ?? _sessionRoot.tokens,
     regions: _cachedRegions ?? _sessionRoot.regions,
     mapObjects: _cachedMapObjects ?? _sessionRoot.mapObjects,
+    effects: _cachedEffects ?? _sessionRoot.effects,
     blobs: _cachedBlobs ?? _sessionRoot.blobs,
     _owner: _cachedGroup ?? _sessionRoot._owner,
     get $jazz() { return _sessionRoot.$jazz; },
@@ -151,15 +123,12 @@ export function getBridgedSessionRoot(): any {
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
   'fog', 'lights', 'illumination', 'dungeon', 'creatures',
-  'hatching', 'effects', 'actions', 'dice',
+  'hatching', 'actions', 'dice',
 ];
 
-// Kinds excluded from blob sync:
-// - 'tokens': fine-grained CoValue sync
-// - 'regions': fine-grained CoValue sync
-// - 'mapObjects': fine-grained CoValue sync
-// - 'cards': UI layout, per-user
-// - 'viewportTransforms': per-user viewport
+// Kinds excluded from blob sync (fine-grained CoValue sync):
+// - 'tokens', 'regions', 'mapObjects', 'effects'
+// Per-user (not synced): 'cards', 'viewportTransforms'
 
 // ══════════════════════════════════════════════════════════════════════════
 // TOKEN BRIDGE HELPERS
@@ -435,6 +404,100 @@ function jazzToZustandMapObject(jmo: any): MapObject {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// EFFECT BRIDGE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Strip large data URIs from a template for sync */
+function stripTemplateForSync(t: any): any {
+  if (!t) return t;
+  const copy = { ...t };
+  if (copy.texture && copy.texture.length > 200) copy.texture = '';
+  if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) copy.icon = '';
+  return copy;
+}
+
+/** Convert a PlacedEffect to a JazzPlacedEffect-compatible init */
+function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
+  return {
+    effectId: e.id,
+    templateId: e.templateId,
+    originX: e.origin.x,
+    originY: e.origin.y,
+    direction: e.direction,
+    casterId: e.casterId,
+    mapId: e.mapId,
+    castLevel: e.castLevel,
+    roundsRemaining: e.roundsRemaining,
+    groupId: e.groupId,
+    animationPaused: e.animationPaused,
+    isAura: e.isAura,
+    anchorTokenId: e.anchorTokenId,
+    recurring: e.template?.recurring,
+    impactedTargetsJson: e.impactedTargets?.length ? JSON.stringify(e.impactedTargets) : undefined,
+    triggeredTokenIdsJson: e.triggeredTokenIds?.length ? JSON.stringify(e.triggeredTokenIds) : undefined,
+    tokensInsideAreaJson: e.tokensInsideArea?.length ? JSON.stringify(e.tokensInsideArea) : undefined,
+    waypointsJson: e.waypoints?.length ? JSON.stringify(e.waypoints) : undefined,
+  };
+}
+
+/** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
+function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLevel?: number) => EffectTemplate | undefined): PlacedEffect | null {
+  const template = templateLookup(je.templateId, je.castLevel);
+  if (!template) {
+    console.warn(`[jazz-bridge] Could not reconstruct template for effect ${je.effectId} (templateId: ${je.templateId})`);
+    return null;
+  }
+
+  let impactedTargets: any[] = [];
+  let triggeredTokenIds: string[] = [];
+  let tokensInsideArea: string[] | undefined;
+  let waypoints: { x: number; y: number }[] | undefined;
+  try { if (je.impactedTargetsJson) impactedTargets = JSON.parse(je.impactedTargetsJson); } catch { /* */ }
+  try { if (je.triggeredTokenIdsJson) triggeredTokenIds = JSON.parse(je.triggeredTokenIdsJson); } catch { /* */ }
+  try { if (je.tokensInsideAreaJson) tokensInsideArea = JSON.parse(je.tokensInsideAreaJson); } catch { /* */ }
+  try { if (je.waypointsJson) waypoints = JSON.parse(je.waypointsJson); } catch { /* */ }
+
+  // Apply recurring override if set
+  const finalTemplate = je.recurring !== undefined && je.recurring !== null
+    ? { ...template, recurring: je.recurring }
+    : template;
+
+  return {
+    id: je.effectId,
+    templateId: je.templateId,
+    template: finalTemplate,
+    origin: { x: je.originX, y: je.originY },
+    direction: je.direction,
+    casterId: je.casterId,
+    placedAt: performance.now(),
+    roundsRemaining: je.roundsRemaining,
+    mapId: je.mapId,
+    castLevel: je.castLevel,
+    animationPaused: je.animationPaused,
+    impactedTargets,
+    triggeredTokenIds,
+    tokensInsideArea,
+    groupId: je.groupId,
+    waypoints,
+    anchorTokenId: je.anchorTokenId,
+    isAura: je.isAura,
+  };
+}
+
+/** Build a template lookup function using custom templates + built-ins */
+function buildTemplateLookup(customTemplates: EffectTemplate[]): (id: string, castLevel?: number) => EffectTemplate | undefined {
+  const customById = new Map<string, EffectTemplate>();
+  for (const t of customTemplates) {
+    if (t?.id) customById.set(t.id, t);
+  }
+  return (id: string, castLevel?: number) => {
+    const base = customById.get(id) ?? getBuiltInTemplate(id);
+    if (!base) return undefined;
+    return computeScaledTemplate(base, castLevel);
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // BLOB SYNC HELPERS
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -473,11 +536,7 @@ function pushBlobToJazz(kind: string): void {
   try {
     let state = reg.extractor();
 
-    // Strip texture data URIs from stores that sync textures via FileStreams
-    if (kind === 'effects' && state) {
-      state = stripEffectTexturesForSync(state);
-    }
-
+    // Effects now use fine-grained sync — no blob stripping needed
     const json = JSON.stringify(state);
     const hash = quickHash(json);
 
@@ -700,8 +759,7 @@ export function pushBlobsToJazz(sessionRoot: any): void {
     try {
       let state = reg.extractor();
 
-      // Strip texture data URIs — textures sync via FileStreams
-      if (kind === 'effects' && state) state = stripEffectTexturesForSync(state);
+      // Effects use fine-grained sync — no blob stripping needed
 
       const json = JSON.stringify(state);
       _lastPushedHash.set(kind, quickHash(json));
@@ -743,11 +801,65 @@ export function pushBlobsToJazz(sessionRoot: any): void {
   console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
 }
 
+/** Push all effects (placed + custom templates) from Zustand into Jazz */
+export function pushEffectsToJazz(sessionRoot: any): void {
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  let effectState = sessionRoot.effects;
+
+  // Lazily create effects container for legacy sessions
+  if (!effectState && group) {
+    try {
+      const placedEffects = JazzPlacedEffectList.create([], group);
+      const customTemplates = JazzCustomTemplateList.create([], group);
+      effectState = JazzEffectState.create({ placedEffects, customTemplates }, group);
+      sessionRoot.$jazz.set("effects", effectState);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not create effects container:", err);
+      return;
+    }
+  }
+  if (!effectState) {
+    console.warn("[jazz-bridge] No effects container on session root");
+    return;
+  }
+
+  const store = useEffectStore.getState();
+
+  // Push custom templates (stripped of large data)
+  console.log(`[jazz-bridge] Pushing ${store.customTemplates.length} custom templates to Jazz`);
+  for (const t of store.customTemplates) {
+    const stripped = stripTemplateForSync(t);
+    try {
+      const jt = JazzCustomTemplateSchema.create({
+        templateId: t.id,
+        templateJson: JSON.stringify(stripped),
+      } as any, group);
+      effectState.customTemplates.$jazz.push(jt);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push custom template ${t.id}:`, err);
+    }
+  }
+
+  // Push placed effects (no template snapshot — reconstructed on pull)
+  const activePlaced = store.placedEffects.filter(e => !e.dismissedAt);
+  console.log(`[jazz-bridge] Pushing ${activePlaced.length} placed effects to Jazz`);
+  for (const e of activePlaced) {
+    const init = placedEffectToJazzInit(e);
+    try {
+      const je = JazzPlacedEffectSchema.create(init as any, group);
+      effectState.placedEffects.$jazz.push(je);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push placed effect ${e.id}:`, err);
+    }
+  }
+}
+
 /** Push all current Zustand state into Jazz CoValues */
 export function pushAllToJazz(sessionRoot: any): void {
   pushTokensToJazz(sessionRoot);
   pushRegionsToJazz(sessionRoot);
   pushMapObjectsToJazz(sessionRoot);
+  pushEffectsToJazz(sessionRoot);
   pushBlobsToJazz(sessionRoot);
 }
 
@@ -868,11 +980,74 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   }
 }
 
+/** Pull all effects from Jazz into Zustand */
+export function pullEffectsFromJazz(sessionRoot: any): void {
+  const effectState = sessionRoot.effects;
+  if (!effectState) {
+    console.log("[jazz-bridge] No effects container on session root (legacy session)");
+    return;
+  }
+
+  // Pull custom templates first (needed for template reconstruction)
+  const jazzCustomTemplates = effectState.customTemplates;
+  const customTemplates: EffectTemplate[] = [];
+  if (jazzCustomTemplates) {
+    const ctLen = jazzCustomTemplates.length ?? 0;
+    for (let i = 0; i < ctLen; i++) {
+      const jct = jazzCustomTemplates[i];
+      if (!jct?.templateJson) continue;
+      try {
+        const parsed = JSON.parse(jct.templateJson);
+        customTemplates.push(parsed);
+      } catch { /* invalid JSON */ }
+    }
+  }
+
+  // Pull placed effects
+  const jazzPlaced = effectState.placedEffects;
+  const placedLen = jazzPlaced?.length ?? 0;
+  const localPlacedCount = useEffectStore.getState().placedEffects.length;
+
+  if (placedLen === 0 && customTemplates.length === 0 && localPlacedCount > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked effects pull — Jazz has 0 but local has ${localPlacedCount} (creator guard)`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${customTemplates.length} custom templates, ${placedLen} placed effects from Jazz`);
+
+  const lookup = buildTemplateLookup(customTemplates);
+
+  runFromJazz(() => {
+    const store = useEffectStore.getState();
+    // Clear existing
+    const mapIds = new Set(store.placedEffects.map(e => e.mapId));
+    mapIds.forEach(id => store.clearEffectsForMap(id));
+
+    // Restore custom templates
+    for (const t of customTemplates) {
+      store.addCustomTemplate(t);
+    }
+
+    // Restore placed effects
+    const restored: PlacedEffect[] = [];
+    for (let i = 0; i < placedLen; i++) {
+      const je = jazzPlaced[i];
+      if (!je) continue;
+      const effect = jazzToZustandPlacedEffect(je, lookup);
+      if (effect) restored.push(effect);
+    }
+    if (restored.length > 0) {
+      useEffectStore.setState({ placedEffects: restored });
+    }
+  });
+}
+
 /** Pull all Jazz CoValue state into Zustand stores */
 export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
   pullRegionsFromJazz(sessionRoot);
   pullMapObjectsFromJazz(sessionRoot);
+  pullEffectsFromJazz(sessionRoot);
   pullBlobsFromJazz(sessionRoot);
 }
 
@@ -893,7 +1068,6 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   dungeon: () => useDungeonStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,
-  effects: () => useEffectStore,
   actions: () => useActionStore,
   dice: () => useDiceStore,
 };
@@ -1062,12 +1236,14 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedRegions = sessionRoot.regions ?? null;
   _cachedMapObjects = sessionRoot.mapObjects ?? null;
+  _cachedEffects = sessionRoot.effects ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
     regions: !!_cachedRegions,
     mapObjects: !!_cachedMapObjects,
+    effects: !!_cachedEffects,
     blobs: !!_cachedBlobs,
     group: !!_cachedGroup,
     isCreator,
@@ -1317,6 +1493,35 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
+  // ── Effect sync: Zustand → Jazz ──
+  let prevEffects = useEffectStore.getState().placedEffects;
+  const unsubEffectsZustand = useEffectStore.subscribe((state) => {
+    const effects = state.placedEffects;
+    if (effects === prevEffects) return;
+    if (_fromJazz) { prevEffects = effects; return; }
+    prevEffects = effects;
+    // Throttled full re-push of effects (simpler than diff for complex nested state)
+    throttledPushFineGrained('effects', () => {
+      const effectState = _cachedEffects ?? _sessionRoot?.effects;
+      if (!effectState?.placedEffects) return;
+      const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+      // Clear and re-push all placed effects
+      const jazzPlaced = effectState.placedEffects;
+      const len = jazzPlaced.length ?? 0;
+      for (let i = len - 1; i >= 0; i--) {
+        try { jazzPlaced.$jazz.splice(i, 1); } catch { /* */ }
+      }
+      const active = useEffectStore.getState().placedEffects.filter((e: any) => !e.dismissedAt);
+      for (const e of active) {
+        try {
+          const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
+          jazzPlaced.$jazz.push(je);
+        } catch { /* */ }
+      }
+    });
+  });
+  activeSubscriptions.push(unsubEffectsZustand);
+
   // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
@@ -1396,6 +1601,7 @@ export function stopBridge(): void {
   _cachedTokens = null;
   _cachedRegions = null;
   _cachedMapObjects = null;
+  _cachedEffects = null;
   _cachedBlobs = null;
   _cachedGroup = null;
   _isCreator = false;

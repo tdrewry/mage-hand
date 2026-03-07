@@ -136,6 +136,59 @@ export type JazzMapObject = co.loaded<typeof JazzMapObject>;
 export const JazzMapObjectList = co.list(JazzMapObject);
 export type JazzMapObjectList = co.loaded<typeof JazzMapObjectList>;
 
+// ── Placed Effect ──────────────────────────────────────────────────────────
+// No template snapshot — reconstructed from templateId + castLevel on hydration.
+
+export const JazzPlacedEffect = co.map({
+  effectId: z.string(),
+  templateId: z.string(),
+  originX: z.number(),
+  originY: z.number(),
+  direction: z.optional(z.number()),
+  casterId: z.optional(z.string()),
+  mapId: z.string(),
+  castLevel: z.optional(z.number()),
+  roundsRemaining: z.optional(z.number()),
+  groupId: z.optional(z.string()),
+  animationPaused: z.optional(z.boolean()),
+  isAura: z.optional(z.boolean()),
+  anchorTokenId: z.optional(z.string()),
+  recurring: z.optional(z.boolean()),
+  /** JSON: EffectImpact[] */
+  impactedTargetsJson: z.optional(z.string()),
+  /** JSON: string[] */
+  triggeredTokenIdsJson: z.optional(z.string()),
+  /** JSON: string[] */
+  tokensInsideAreaJson: z.optional(z.string()),
+  /** JSON: { x: number; y: number }[] */
+  waypointsJson: z.optional(z.string()),
+});
+export type JazzPlacedEffect = co.loaded<typeof JazzPlacedEffect>;
+
+export const JazzPlacedEffectList = co.list(JazzPlacedEffect);
+export type JazzPlacedEffectList = co.loaded<typeof JazzPlacedEffectList>;
+
+// ── Custom Effect Template ─────────────────────────────────────────────────
+// Stripped of large data URIs (texture/icon) — those sync via FileStreams.
+
+export const JazzCustomTemplate = co.map({
+  templateId: z.string(),
+  /** JSON.stringify of the full EffectTemplate (minus texture/icon data URIs) */
+  templateJson: z.string(),
+});
+export type JazzCustomTemplate = co.loaded<typeof JazzCustomTemplate>;
+
+export const JazzCustomTemplateList = co.list(JazzCustomTemplate);
+export type JazzCustomTemplateList = co.loaded<typeof JazzCustomTemplateList>;
+
+// ── Effect State Container ─────────────────────────────────────────────────
+
+export const JazzEffectState = co.map({
+  placedEffects: JazzPlacedEffectList,
+  customTemplates: JazzCustomTemplateList,
+});
+export type JazzEffectState = co.loaded<typeof JazzEffectState>;
+
 // ── Map Metadata ───────────────────────────────────────────────────────────
 
 export const JazzMapEntry = co.map({
@@ -187,6 +240,7 @@ export const JazzSessionRoot = co.map({
   maps: JazzMapList,
   regions: co.optional(JazzRegionList),
   mapObjects: co.optional(JazzMapObjectList),
+  effects: co.optional(JazzEffectState),
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
 });
@@ -235,11 +289,14 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
   const maps = JazzMapList.create([], group);
   const regions = JazzRegionList.create([], group);
   const mapObjects = JazzMapObjectList.create([], group);
+  const placedEffects = JazzPlacedEffectList.create([], group);
+  const customTemplates = JazzCustomTemplateList.create([], group);
+  const effects = JazzEffectState.create({ placedEffects, customTemplates }, group);
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
 
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, regions, mapObjects, blobs, textures },
+    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures },
     group,
   );
 }
