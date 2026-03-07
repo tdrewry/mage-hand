@@ -272,6 +272,27 @@ function tokenToJazzInit(t: Token): Record<string, any> {
   };
 }
 
+/**
+ * Deep-compare two entity objects, skipping specified keys.
+ * Returns true if any field differs (uses JSON.stringify for objects/arrays
+ * to avoid false positives from parsed JSON creating new references).
+ */
+function _hasEntityChanges(existing: any, incoming: any, skipKeys: string[]): boolean {
+  const skip = new Set(skipKeys);
+  for (const key of Object.keys(incoming)) {
+    if (skip.has(key)) continue;
+    const inVal = incoming[key];
+    const exVal = existing[key];
+    if (inVal === exVal) continue;
+    if (inVal == null && exVal == null) continue;
+    if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
+      if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+    }
+    return true;
+  }
+  return false;
+}
+
 /** Convert a JazzToken CoValue (as any) to a Zustand Token */
 function jazzToZustandToken(jt: any): Token {
   let extras: Record<string, any> = {};
