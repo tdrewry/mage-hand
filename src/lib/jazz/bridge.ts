@@ -1340,6 +1340,50 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// JAZZ COLIST DEDUP CLEANUP
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Remove duplicate entries from a Jazz CoList by a key field.
+ *  Keeps the LAST occurrence (most recent write). */
+function _dedupeJazzCoList(coList: any, keyField: string): number {
+  if (!coList) return 0;
+  const len = coList.length ?? 0;
+  if (len <= 1) return 0;
+
+  // Build map of key → last index
+  const lastIndex = new Map<string, number>();
+  for (let i = 0; i < len; i++) {
+    const item = coList[i];
+    if (item && item[keyField]) {
+      lastIndex.set(item[keyField], i);
+    }
+  }
+
+  // Collect indices to remove (duplicates that aren't the last occurrence)
+  const toRemove: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const item = coList[i];
+    if (item && item[keyField] && lastIndex.get(item[keyField]) !== i) {
+      toRemove.push(i);
+    }
+  }
+
+  // Remove in reverse order to preserve indices
+  let removed = 0;
+  for (let i = toRemove.length - 1; i >= 0; i--) {
+    try {
+      coList.$jazz.splice(toRemove[i], 1);
+      removed++;
+    } catch { /* */ }
+  }
+
+  if (removed > 0) {
+    console.warn(`[jazz-bridge] 🧹 Cleaned ${removed} duplicate entries from CoList (key: ${keyField})`);
+  }
+  return removed;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // LIVE BRIDGE: bidirectional subscriptions
 // ══════════════════════════════════════════════════════════════════════════
 
