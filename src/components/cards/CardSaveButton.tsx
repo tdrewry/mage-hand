@@ -13,7 +13,7 @@ import { Save } from 'lucide-react';
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
-export type CardSaveContextType = 'token' | 'region' | 'map-object' | 'effect' | 'session';
+export type CardSaveContextType = 'token' | 'region' | 'map-object' | 'effect';
 
 export interface CardSaveContext {
   /** Entity category this save is scoped to. */
