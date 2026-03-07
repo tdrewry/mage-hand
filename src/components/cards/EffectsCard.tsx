@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { CardSaveEvent } from '@/components/cards/CardSaveButton';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
@@ -1253,8 +1254,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
   const handleSave = () => {
     if (!form.name.trim()) return;
     updateCustomTemplate(template.id, formToTemplateData(form));
-    // Fire sync event for network propagation
-    window.dispatchEvent(new (await import('@/components/cards/CardSaveButton').then(m => m.CardSaveEvent))({ context: { type: 'effect', id: template.id } }));
+    window.dispatchEvent(new CardSaveEvent({ context: { type: 'effect', id: template.id } }));
     onDone();
   };
 
