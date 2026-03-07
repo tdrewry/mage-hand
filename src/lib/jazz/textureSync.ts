@@ -260,6 +260,8 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
         await saveTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         downloaded++;
+        // Apply to entities immediately so textures appear without refresh
+        _applyTextureToEntities(hash, dataUrl);
         notifyTextureDownloadComplete(hash);
         console.log(`[jazz-texture] ← Downloaded texture ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
       } else {
