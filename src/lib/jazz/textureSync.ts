@@ -147,22 +147,18 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
         owner: group,
       });
 
-      // Get the FileStream's CoValue ID for storage
+      // Get the FileStream's CoValue ID
       const fileStreamId =
-        fileStream?.$jazz?.id ?? fileStream?.id ?? fileStream?._raw?.id;
+        (fileStream as any)?.$jazz?.id ??
+        (fileStream as any)?.id ??
+        (fileStream as any)?._raw?.id;
 
       if (!fileStreamId) {
         console.warn(`[jazz-texture] Could not get FileStream ID for hash ${hash}`);
         continue;
       }
 
-      // Store entry: hash + mimeType + fileStreamId (as string ref)
-      // We store the ID as a string since we can't embed a co.fileStream() ref
-      // in a dynamically created CoMap
-      const entryData = JSON.stringify({ hash, mimeType, fileStreamId });
-
-      // Push as a simple string entry in the textures list
-      // We'll use JazzDOBlob-style approach: store metadata as JSON
+      // Create texture entry and push to list
       const { JazzTextureEntry } = await import("./schema");
       const entry = JazzTextureEntry.create(
         { hash, mimeType, fileStreamId } as any,

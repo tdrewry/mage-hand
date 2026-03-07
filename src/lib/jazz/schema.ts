@@ -123,9 +123,10 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
   const tokens = JazzTokenList.create([], group);
   const maps = JazzMapList.create([], group);
   const blobs = JazzDOBlobList.create([], group);
+  const textures = JazzTextureList.create([], group);
 
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, blobs },
+    { sessionName, tokens, maps, blobs, textures },
     group,
   );
 }
