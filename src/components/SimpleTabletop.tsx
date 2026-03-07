@@ -9048,10 +9048,10 @@ export const SimpleTabletop = () => {
       if (distance > 10) {
         // Sample every 10 world units — mutate ref directly (no re-render needed)
         dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
-
-        // ── Emit drag update to network (throttled 50ms) with current path ──
-        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPathRef.current });
       }
+
+      // ── Emit drag update to network on every move (throttled 50ms by EphemeralBus) ──
+      emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPathRef.current });
 
       // Update primary token position
       updateTokenPosition(draggedTokenId, newX, newY);
