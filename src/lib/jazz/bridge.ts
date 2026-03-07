@@ -799,11 +799,65 @@ export function pushBlobsToJazz(sessionRoot: any): void {
   console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
 }
 
+/** Push all effects (placed + custom templates) from Zustand into Jazz */
+export function pushEffectsToJazz(sessionRoot: any): void {
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  let effectState = sessionRoot.effects;
+
+  // Lazily create effects container for legacy sessions
+  if (!effectState && group) {
+    try {
+      const placedEffects = JazzPlacedEffectList.create([], group);
+      const customTemplates = JazzCustomTemplateList.create([], group);
+      effectState = JazzEffectState.create({ placedEffects, customTemplates }, group);
+      sessionRoot.$jazz.set("effects", effectState);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not create effects container:", err);
+      return;
+    }
+  }
+  if (!effectState) {
+    console.warn("[jazz-bridge] No effects container on session root");
+    return;
+  }
+
+  const store = useEffectStore.getState();
+
+  // Push custom templates (stripped of large data)
+  console.log(`[jazz-bridge] Pushing ${store.customTemplates.length} custom templates to Jazz`);
+  for (const t of store.customTemplates) {
+    const stripped = stripTemplateForSync(t);
+    try {
+      const jt = JazzCustomTemplateSchema.create({
+        templateId: t.id,
+        templateJson: JSON.stringify(stripped),
+      } as any, group);
+      effectState.customTemplates.$jazz.push(jt);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push custom template ${t.id}:`, err);
+    }
+  }
+
+  // Push placed effects (no template snapshot — reconstructed on pull)
+  const activePlaced = store.placedEffects.filter(e => !e.dismissedAt);
+  console.log(`[jazz-bridge] Pushing ${activePlaced.length} placed effects to Jazz`);
+  for (const e of activePlaced) {
+    const init = placedEffectToJazzInit(e);
+    try {
+      const je = JazzPlacedEffectSchema.create(init as any, group);
+      effectState.placedEffects.$jazz.push(je);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push placed effect ${e.id}:`, err);
+    }
+  }
+}
+
 /** Push all current Zustand state into Jazz CoValues */
 export function pushAllToJazz(sessionRoot: any): void {
   pushTokensToJazz(sessionRoot);
   pushRegionsToJazz(sessionRoot);
   pushMapObjectsToJazz(sessionRoot);
+  pushEffectsToJazz(sessionRoot);
   pushBlobsToJazz(sessionRoot);
 }
 
