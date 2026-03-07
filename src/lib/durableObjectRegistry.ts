@@ -11,6 +11,8 @@
  */
 
 import { DurableObjectRegistry } from './durableObjects';
+import { computeScaledTemplate } from '@/types/effectTypes';
+import { getBuiltInTemplate } from '@/lib/effectTemplateLibrary';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useRegionStore } from '@/stores/regionStore';
@@ -418,24 +420,22 @@ DurableObjectRegistry.register({
   label: 'Effects',
   extractor: () => {
     const state = useEffectStore.getState();
-    // Strip texture AND icon data URIs to keep blob under Jazz's 1MB limit.
-    // Textures are synced separately via IndexedDB texture storage.
+    // Strip the entire template snapshot from placed effects.
+    // Templates are reconstructed from templateId + castLevel on hydration.
+    // This keeps the blob well under Jazz's 1MB limit.
     const stripLargeData = (obj: any) => {
       if (!obj) return obj;
       const copy = { ...obj };
-      if (copy.texture && copy.texture.length > 200) {
-        copy.texture = ''; // Keep textureHash for lookup
-      }
-      if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) {
-        copy.icon = ''; // Icons can be rebuilt from built-in templates
-      }
+      if (copy.texture && copy.texture.length > 200) copy.texture = '';
+      if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) copy.icon = '';
       return copy;
     };
     return {
-      placedEffects: state.placedEffects.map((e: any) => ({
-        ...stripLargeData(e),
-        template: e.template ? stripLargeData(e.template) : e.template,
-      })),
+      placedEffects: state.placedEffects.map((e: any) => {
+        // Drop the full template snapshot — it's reconstructible
+        const { template, ...rest } = e;
+        return rest;
+      }),
       customTemplates: state.customTemplates.map(stripLargeData),
     };
   },
