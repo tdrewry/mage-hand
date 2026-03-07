@@ -111,20 +111,32 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
     console.warn(`[jazz-session] Session ID "${sessionCoId}" does not look like a CoValue ID (expected co_...). Load will likely fail.`);
   }
 
-  // Load the session root CoValue by ID
+  // Load the session root CoValue by ID, with retry for IDB closing errors
   let root: any;
-  try {
-    root = await (JazzSessionRootSchema as any).load(sessionCoId, {
-      resolve: {
-        tokens: { $each: true },
-        maps: { $each: true },
-        blobs: { $each: true },
-        textures: { $each: true },
-      },
-    });
-  } catch (err) {
-    console.error("[jazz-session] Failed to load session root:", err);
-    throw new Error(`Failed to load Jazz session: ${sessionCoId} — ${err}`);
+  const MAX_IDB_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_IDB_RETRIES; attempt++) {
+    try {
+      root = await (JazzSessionRootSchema as any).load(sessionCoId, {
+        resolve: {
+          tokens: { $each: true },
+          maps: { $each: true },
+          blobs: { $each: true },
+          textures: { $each: true },
+        },
+      });
+      break; // success
+    } catch (err: any) {
+      const msg = String(err?.message ?? err);
+      const isIdbClosing = msg.includes('database connection is closing') || msg.includes('InvalidStateError');
+      if (isIdbClosing && attempt < MAX_IDB_RETRIES) {
+        const delay = 500 * (attempt + 1);
+        console.warn(`[jazz-session] IDB connection closing — retry ${attempt + 1}/${MAX_IDB_RETRIES} in ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      console.error("[jazz-session] Failed to load session root:", err);
+      throw new Error(`Failed to load Jazz session: ${sessionCoId} — ${err}`);
+    }
   }
 
   if (!root) {
