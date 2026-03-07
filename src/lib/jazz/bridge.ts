@@ -1316,7 +1316,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             try {
               const init = tokenToJazzInit(t);
               for (const [key, val] of Object.entries(init)) {
-                if (key !== 'tokenId') jt.$jazz.set(key, val ?? null);
+                if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
               }
             } catch (err) {
               console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
