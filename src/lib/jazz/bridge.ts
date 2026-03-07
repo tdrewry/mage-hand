@@ -86,8 +86,21 @@ function stripRegionTexturesForSync(state: any): any {
   return state;
 }
 
+/**
+ * Strip imageUrl data URIs from map objects state before Jazz blob sync.
+ * Map object textures are synced separately via FileStreams using imageHash.
+ */
+function stripMapObjectTexturesForSync(state: any): any {
+  if (!state) return state;
+  if (Array.isArray(state)) {
+    return state.map((obj: any) => {
+      if (!obj?.imageUrl || obj.imageUrl.length < 200) return obj;
+      return { ...obj, imageUrl: '' };
+    });
+  }
+  return state;
+}
 
-let _fromJazz = false;
 
 /** Whether the local client created this session (source of truth for initial state) */
 let _isCreator = false;
@@ -257,13 +270,15 @@ function pushBlobToJazz(kind: string): void {
   try {
     let state = reg.extractor();
 
-    // Strip texture data URIs from effects to avoid exceeding Jazz's 1MB limit
-    // Textures are synced separately via FileStreams
+    // Strip texture data URIs from stores that sync textures via FileStreams
     if (kind === 'effects' && state) {
       state = stripEffectTexturesForSync(state);
     }
     if (kind === 'regions' && state) {
       state = stripRegionTexturesForSync(state);
+    }
+    if (kind === 'mapObjects' && state) {
+      state = stripMapObjectTexturesForSync(state);
     }
 
     const json = JSON.stringify(state);
@@ -275,7 +290,11 @@ function pushBlobToJazz(kind: string): void {
     // Guard: Jazz has a 1MB transaction limit
     const JAZZ_MAX_BYTES = 1_000_000;
     if (json.length > JAZZ_MAX_BYTES) {
-      console.warn(`[jazz-bridge] ⚠️ Blob "${kind}" too large for Jazz sync (${(json.length / 1024 / 1024).toFixed(1)}MB > 1MB) — skipping`);
+      const now = Date.now();
+      if (!_lastSkipWarn.has(kind) || now - _lastSkipWarn.get(kind)! > 30000) {
+        console.warn(`[jazz-bridge] ⚠️ Blob "${kind}" too large for Jazz sync (${(json.length / 1024 / 1024).toFixed(1)}MB > 1MB) — skipping`);
+        _lastSkipWarn.set(kind, now);
+      }
       return;
     }
 
