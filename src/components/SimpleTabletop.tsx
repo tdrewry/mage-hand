@@ -2089,16 +2089,20 @@ export const SimpleTabletop = () => {
 
   // DM escape hatch: listen for manual fog-refresh requests from the UI
   useEffect(() => {
-    const handleForceFogRefresh = () => {
-      console.log('[Fog] Force refresh triggered by DM');
+    const handleForceFogRefresh = (e?: Event) => {
+      // Detect if this is a "soft" refresh (illumination-only, no geometry change)
+      // Soft refreshes keep existing fog masks to prevent black flash
+      const isSoft = e instanceof CustomEvent && (e as CustomEvent).detail?.soft === true;
 
-      // 1. Rebuild combined wall+obstacle segments from fresh state
-      if (wallGeometryRef.current) {
-        const mapObjectSegments = mapObjectsToSegments(mapObjects);
+      // 1. Extract wall segments (same as redrawCanvas)
+      const wallSegments = wallSegmentsRef.current;
+      if (wallSegments && wallSegments.length > 0) {
+        const mapObjSegments = buildMapObjectWallSegments(filteredMapObjects);
+        const importedWalls = importedWallSegmentsRef.current || [];
         combinedSegmentsRef.current = [
-          ...wallGeometryRef.current.wallSegments,
-          ...mapObjectSegments,
-          ...importedWallSegments,
+          ...wallSegments,
+          ...mapObjSegments,
+          ...importedWalls,
         ];
       }
 
@@ -2116,14 +2120,20 @@ export const SimpleTabletop = () => {
       // 4. Clear global Paper.js / visibility-polygon cache
       clearVisibilityCache();
 
-      // 5. Null out the fog mask to force fresh computation
-      fogMasksRef.current = null;
+      // 5. Only null fog masks for hard refreshes (geometry changes).
+      //    Soft refreshes (illumination-only) keep old masks to prevent black flash.
+      if (!isSoft) {
+        fogMasksRef.current = null;
+      }
+
+      // Always invalidate illumination cache so it's rebuilt with new data
+      illuminationSourcesCacheRef.current = null;
 
       // 6. Reset PixiJS post-processing layer for a clean frame
       if (isPostProcessingReadyRef.current) {
-        setPostProcessingVisible(false);
+        if (!isSoft) setPostProcessingVisible(false);
         requestAnimationFrame(() => {
-          setPostProcessingVisible(true);
+          if (!isSoft) setPostProcessingVisible(true);
           redrawCanvas();
           // Bump fog refresh tick to re-trigger the fog computation useEffect
           setFogRefreshTick(t => t + 1);
@@ -4081,15 +4091,18 @@ export const SimpleTabletop = () => {
             };
           });
         }
-        const illuminationSources = [...illuminationSourcesCacheRef.current];
+        // Use cached array directly to preserve reference identity for the CSS fast-path
+        // in applyFogPostProcessing (identity check avoids expensive Canvas 2D redraws).
+        // Only create a new array when adding drag preview sources below.
+        let illuminationSources = illuminationSourcesCacheRef.current!;
         
         // Add real-time drag preview as an additional illumination source
         if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && dragPreviewPosition && draggedTokenId) {
           const draggedToken = tokens.find(t => t.id === draggedTokenId);
           if (draggedToken) {
             const tokenSettings = draggedToken.illuminationSources?.[0];
-            
-            illuminationSources.push({
+            // Spread into a NEW array only when adding drag preview
+            illuminationSources = [...illuminationSources, {
               id: 'drag-preview',
               name: 'Drag Preview',
               enabled: true,
@@ -4110,7 +4123,7 @@ export const SimpleTabletop = () => {
               animationSpeed: 1.0,
               animationIntensity: 0.3,
               visibilityPolygon: dragPreviewVisibilityRef.current,
-            });
+            }];
           }
         }
         

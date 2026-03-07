@@ -109,6 +109,24 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const stylesCard = cards.find((c) => c.type === CardType.STYLES);
   const historyCard = cards.find((c) => c.type === CardType.HISTORY);
   const effectsCard = cards.find((c) => c.type === CardType.EFFECTS);
+  const actionCard = cards.find((c) => c.type === CardType.ACTION_CARD);
+
+  const handleToggleActionCard = () => {
+    if (actionCard) {
+      setVisibility(actionCard.id, !actionCard.isVisible);
+    } else {
+      registerCard({
+        type: CardType.ACTION_CARD,
+        title: 'Action',
+        defaultPosition: { x: window.innerWidth - 420, y: 80 },
+        defaultSize: { width: 400, height: 500 },
+        minSize: { width: 340, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
 
   const handleToggleEffectsCard = () => {
     if (effectsCard) {
