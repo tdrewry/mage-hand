@@ -2022,7 +2022,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     console.warn("[jazz-bridge] Could not start texture subscription:", err);
   }
 
-  console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects (fine-grained) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
+  console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects + effects (fine-grained, bidirectional) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
 }
 
 /**
