@@ -402,6 +402,100 @@ function jazzToZustandMapObject(jmo: any): MapObject {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// EFFECT BRIDGE HELPERS
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Strip large data URIs from a template for sync */
+function stripTemplateForSync(t: any): any {
+  if (!t) return t;
+  const copy = { ...t };
+  if (copy.texture && copy.texture.length > 200) copy.texture = '';
+  if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) copy.icon = '';
+  return copy;
+}
+
+/** Convert a PlacedEffect to a JazzPlacedEffect-compatible init */
+function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
+  return {
+    effectId: e.id,
+    templateId: e.templateId,
+    originX: e.origin.x,
+    originY: e.origin.y,
+    direction: e.direction,
+    casterId: e.casterId,
+    mapId: e.mapId,
+    castLevel: e.castLevel,
+    roundsRemaining: e.roundsRemaining,
+    groupId: e.groupId,
+    animationPaused: e.animationPaused,
+    isAura: e.isAura,
+    anchorTokenId: e.anchorTokenId,
+    recurring: e.template?.recurring,
+    impactedTargetsJson: e.impactedTargets?.length ? JSON.stringify(e.impactedTargets) : undefined,
+    triggeredTokenIdsJson: e.triggeredTokenIds?.length ? JSON.stringify(e.triggeredTokenIds) : undefined,
+    tokensInsideAreaJson: e.tokensInsideArea?.length ? JSON.stringify(e.tokensInsideArea) : undefined,
+    waypointsJson: e.waypoints?.length ? JSON.stringify(e.waypoints) : undefined,
+  };
+}
+
+/** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
+function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLevel?: number) => EffectTemplate | undefined): PlacedEffect | null {
+  const template = templateLookup(je.templateId, je.castLevel);
+  if (!template) {
+    console.warn(`[jazz-bridge] Could not reconstruct template for effect ${je.effectId} (templateId: ${je.templateId})`);
+    return null;
+  }
+
+  let impactedTargets: any[] = [];
+  let triggeredTokenIds: string[] = [];
+  let tokensInsideArea: string[] | undefined;
+  let waypoints: { x: number; y: number }[] | undefined;
+  try { if (je.impactedTargetsJson) impactedTargets = JSON.parse(je.impactedTargetsJson); } catch { /* */ }
+  try { if (je.triggeredTokenIdsJson) triggeredTokenIds = JSON.parse(je.triggeredTokenIdsJson); } catch { /* */ }
+  try { if (je.tokensInsideAreaJson) tokensInsideArea = JSON.parse(je.tokensInsideAreaJson); } catch { /* */ }
+  try { if (je.waypointsJson) waypoints = JSON.parse(je.waypointsJson); } catch { /* */ }
+
+  // Apply recurring override if set
+  const finalTemplate = je.recurring !== undefined && je.recurring !== null
+    ? { ...template, recurring: je.recurring }
+    : template;
+
+  return {
+    id: je.effectId,
+    templateId: je.templateId,
+    template: finalTemplate,
+    origin: { x: je.originX, y: je.originY },
+    direction: je.direction,
+    casterId: je.casterId,
+    placedAt: performance.now(),
+    roundsRemaining: je.roundsRemaining,
+    mapId: je.mapId,
+    castLevel: je.castLevel,
+    animationPaused: je.animationPaused,
+    impactedTargets,
+    triggeredTokenIds,
+    tokensInsideArea,
+    groupId: je.groupId,
+    waypoints,
+    anchorTokenId: je.anchorTokenId,
+    isAura: je.isAura,
+  };
+}
+
+/** Build a template lookup function using custom templates + built-ins */
+function buildTemplateLookup(customTemplates: EffectTemplate[]): (id: string, castLevel?: number) => EffectTemplate | undefined {
+  const customById = new Map<string, EffectTemplate>();
+  for (const t of customTemplates) {
+    if (t?.id) customById.set(t.id, t);
+  }
+  return (id: string, castLevel?: number) => {
+    const base = customById.get(id) ?? getBuiltInTemplate(id);
+    if (!base) return undefined;
+    return computeScaledTemplate(base, castLevel);
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // BLOB SYNC HELPERS
 // ══════════════════════════════════════════════════════════════════════════
 
