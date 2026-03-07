@@ -2270,6 +2270,75 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   });
   activeSubscriptions.push(unsubCustomTemplatesZustand);
 
+  // ── Illumination sync: Zustand → Jazz (creator-only outbound) ──
+  if (_isCreator) {
+    let prevLights = useIlluminationStore.getState().lights;
+    const unsubIlluminationZustand = useIlluminationStore.subscribe((state) => {
+      const lights = state.lights;
+      if (lights === prevLights) return;
+      if (_fromJazz) { prevLights = lights; return; }
+      prevLights = lights;
+      throttledPushFineGrained('illumination', () => {
+        const jazzList = _cachedIllumination ?? _sessionRoot?.illuminationSources;
+        if (!jazzList) return;
+        const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+
+        // Clear and re-push (simpler than diff for small lists)
+        const len = jazzList.length ?? 0;
+        for (let i = len - 1; i >= 0; i--) {
+          try { jazzList.$jazz.splice(i, 1); } catch { /* */ }
+        }
+        for (const light of lights) {
+          try {
+            const jl = JazzIlluminationSourceSchema.create(illuminationToJazzInit(light) as any, group);
+            jazzList.$jazz.push(jl);
+          } catch { /* */ }
+        }
+        console.log(`[jazz-bridge] → Jazz illumination (live): ${lights.length} sources`);
+      });
+    });
+    activeSubscriptions.push(unsubIlluminationZustand);
+  }
+
+  // ── Illumination sync: Jazz → Zustand (inbound for all clients) ──
+  if (_cachedIllumination?.$jazz?.subscribe) {
+    try {
+      const unsubIlluminationJazz = _cachedIllumination.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (jazzList: any) => {
+          if (!jazzList) return;
+          // Startup grace for creator
+          if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) return;
+
+          const len = jazzList.length ?? 0;
+          const localCount = useIlluminationStore.getState().lights.length;
+          if (len === 0 && localCount > 0 && _isCreator) return;
+
+          const lights: IlluminationSource[] = [];
+          for (let i = 0; i < len; i++) {
+            const jl = jazzList[i];
+            if (!jl || !jl.sourceId) continue;
+            lights.push(jazzToZustandIllumination(jl));
+          }
+
+          // Deep compare to avoid false-positive updates
+          const currentLights = useIlluminationStore.getState().lights;
+          if (JSON.stringify(lights) === JSON.stringify(currentLights.map(l => {
+            const { visibilityPolygon, ...rest } = l;
+            return rest;
+          }))) return;
+
+          runFromJazz(() => {
+            useIlluminationStore.getState().setLights(lights);
+          });
+        },
+      );
+      activeSubscriptions.push(unsubIlluminationJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz illumination sources:", err);
+    }
+  }
+
   // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
