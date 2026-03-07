@@ -97,6 +97,32 @@ function _isPositionSuppressed(tokenId: string): boolean {
   return _localDragTokens.has(tokenId) || _dragGraceTokens.has(tokenId);
 }
 
+/**
+ * Async texture resolution: when a token arrives with an imageHash but no imageUrl,
+ * try to load the texture from local IndexedDB. If found, update the token's imageUrl.
+ * If not found, the texture FileStream subscription will handle it when it arrives.
+ */
+async function _resolveTokenTextures(entries: { id: string; hash: string }[]): Promise<void> {
+  const { loadTextureByHash: loadRegionTex } = await import("@/lib/textureStorage");
+  const { loadTextureByHash: loadTokenTex } = await import("@/lib/tokenTextureStorage");
+  
+  for (const { id, hash } of entries) {
+    let dataUrl = await loadTokenTex(hash);
+    if (!dataUrl) dataUrl = await loadRegionTex(hash);
+    
+    if (dataUrl) {
+      const store = useSessionStore.getState();
+      const token = store.tokens.find(t => t.id === id);
+      if (token && (!token.imageUrl || token.imageUrl.length === 0)) {
+        console.log(`[jazz-bridge] 🎨 Resolved texture for token ${id} from local IDB (hash: ${hash})`);
+        store.updateTokenImage(id, dataUrl, hash);
+      }
+    } else {
+      console.log(`[jazz-bridge] 🎨 Token ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
+    }
+  }
+}
+
 /** Push a single token's current position to Jazz (used after drag end) */
 function _pushTokenFinalPosition(tokenId: string): void {
   const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
