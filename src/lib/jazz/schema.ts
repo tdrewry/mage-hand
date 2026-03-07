@@ -219,6 +219,36 @@ export type JazzDOBlob = co.loaded<typeof JazzDOBlob>;
 export const JazzDOBlobList = co.list(JazzDOBlob);
 export type JazzDOBlobList = co.loaded<typeof JazzDOBlobList>;
 
+// ── Illumination Source (Fine-Grained) ────────────────────────────────────
+
+export const JazzIlluminationSource = co.map({
+  sourceId: z.string(),
+  name: z.string(),
+  enabled: z.boolean(),
+  positionX: z.number(),
+  positionY: z.number(),
+  range: z.number(),
+  brightZone: z.number(),
+  brightIntensity: z.number(),
+  dimIntensity: z.number(),
+  color: z.string(),
+  colorEnabled: z.boolean(),
+  colorIntensity: z.number(),
+  softEdge: z.boolean(),
+  softEdgeRadius: z.number(),
+  animation: z.string(),
+  animationSpeed: z.number(),
+  animationIntensity: z.number(),
+  mapId: z.optional(z.string()),
+  clipShape: z.optional(z.string()),
+  coneAngle: z.optional(z.number()),
+  coneDirection: z.optional(z.number()),
+});
+export type JazzIlluminationSource = co.loaded<typeof JazzIlluminationSource>;
+
+export const JazzIlluminationSourceList = co.list(JazzIlluminationSource);
+export type JazzIlluminationSourceList = co.loaded<typeof JazzIlluminationSourceList>;
+
 // ── Texture Entry (FileStream reference) ──────────────────────────────────
 
 export const JazzTextureEntry = co.map({
@@ -243,6 +273,7 @@ export const JazzSessionRoot = co.map({
   effects: co.optional(JazzEffectState),
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
+  illuminationSources: co.optional(JazzIlluminationSourceList),
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
@@ -294,9 +325,10 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
   const effects = JazzEffectState.create({ placedEffects, customTemplates }, group);
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
+  const illuminationSources = JazzIlluminationSourceList.create([], group);
 
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures },
+    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures, illuminationSources },
     group,
   );
 }

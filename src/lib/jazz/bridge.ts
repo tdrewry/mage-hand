@@ -30,6 +30,8 @@ import {
   JazzPlacedEffect as JazzPlacedEffectSchema,
   JazzCustomTemplate as JazzCustomTemplateSchema,
   JazzDOBlob as JazzDOBlobSchema,
+  JazzIlluminationSource as JazzIlluminationSourceSchema,
+  JazzIlluminationSourceList,
   JazzRegionList,
   JazzMapObjectList,
   JazzPlacedEffectList,
@@ -189,6 +191,7 @@ let _cachedRegions: any = null;
 let _cachedMapObjects: any = null;
 let _cachedEffects: any = null;
 let _cachedBlobs: any = null;
+let _cachedIllumination: any = null;
 let _cachedGroup: any = null;
 
 /**
@@ -197,7 +200,6 @@ let _cachedGroup: any = null;
  */
 export function getBridgedSessionRoot(): any {
   if (!_sessionRoot) return null;
-  // Return a facade that uses cached refs
   return {
     ...(_sessionRoot),
     tokens: _cachedTokens ?? _sessionRoot.tokens,
@@ -205,6 +207,7 @@ export function getBridgedSessionRoot(): any {
     mapObjects: _cachedMapObjects ?? _sessionRoot.mapObjects,
     effects: _cachedEffects ?? _sessionRoot.effects,
     blobs: _cachedBlobs ?? _sessionRoot.blobs,
+    illuminationSources: _cachedIllumination ?? _sessionRoot.illuminationSources,
     _owner: _cachedGroup ?? _sessionRoot._owner,
     get $jazz() { return _sessionRoot.$jazz; },
   };
@@ -214,7 +217,7 @@ export function getBridgedSessionRoot(): any {
 
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
-  'fog', 'lights', 'illumination', 'dungeon', 'creatures',
+  'fog', 'lights', 'dungeon', 'creatures',
   'hatching', 'actions', 'dice',
 ];
 
@@ -1126,6 +1129,7 @@ export function pushAllToJazz(sessionRoot: any): void {
   pushRegionsToJazz(sessionRoot);
   pushMapObjectsToJazz(sessionRoot);
   pushEffectsToJazz(sessionRoot);
+  pushIlluminationToJazz(sessionRoot);
   pushBlobsToJazz(sessionRoot);
 }
 
@@ -1308,12 +1312,125 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// FINE-GRAINED ILLUMINATION SYNC
+// ══════════════════════════════════════════════════════════════════════════
+
+import type { IlluminationSource, IlluminationClipShape } from '@/types/illumination';
+
+/** Convert Zustand IlluminationSource → Jazz CoMap init */
+function illuminationToJazzInit(light: IlluminationSource): Record<string, unknown> {
+  return {
+    sourceId: light.id,
+    name: light.name,
+    enabled: light.enabled,
+    positionX: light.position.x,
+    positionY: light.position.y,
+    range: light.range,
+    brightZone: light.brightZone,
+    brightIntensity: light.brightIntensity,
+    dimIntensity: light.dimIntensity,
+    color: light.color,
+    colorEnabled: light.colorEnabled,
+    colorIntensity: light.colorIntensity,
+    softEdge: light.softEdge,
+    softEdgeRadius: light.softEdgeRadius,
+    animation: light.animation,
+    animationSpeed: light.animationSpeed,
+    animationIntensity: light.animationIntensity,
+    mapId: light.mapId ?? undefined,
+    clipShape: light.clipShape ?? undefined,
+    coneAngle: light.coneAngle ?? undefined,
+    coneDirection: light.coneDirection ?? undefined,
+  };
+}
+
+/** Convert Jazz CoMap → Zustand IlluminationSource */
+function jazzToZustandIllumination(jl: any): IlluminationSource {
+  return {
+    id: jl.sourceId,
+    name: jl.name,
+    enabled: jl.enabled,
+    position: { x: jl.positionX, y: jl.positionY },
+    range: jl.range,
+    brightZone: jl.brightZone,
+    brightIntensity: jl.brightIntensity,
+    dimIntensity: jl.dimIntensity,
+    color: jl.color,
+    colorEnabled: jl.colorEnabled,
+    colorIntensity: jl.colorIntensity,
+    softEdge: jl.softEdge,
+    softEdgeRadius: jl.softEdgeRadius,
+    animation: jl.animation as IlluminationSource['animation'],
+    animationSpeed: jl.animationSpeed,
+    animationIntensity: jl.animationIntensity,
+    mapId: jl.mapId ?? undefined,
+    clipShape: (jl.clipShape as IlluminationClipShape) ?? undefined,
+    coneAngle: jl.coneAngle ?? undefined,
+    coneDirection: jl.coneDirection ?? undefined,
+  };
+}
+
+/** Push illumination sources from Zustand → Jazz */
+function pushIlluminationToJazz(sessionRoot: any): void {
+  const jazzList = sessionRoot.illuminationSources;
+  if (!jazzList) return;
+  const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+  const store = useIlluminationStore.getState();
+
+  // Clear existing
+  const len = jazzList.length ?? 0;
+  for (let i = len - 1; i >= 0; i--) {
+    try { jazzList.$jazz.splice(i, 1); } catch { /* */ }
+  }
+
+  // Push current lights
+  for (const light of store.lights) {
+    try {
+      const jl = JazzIlluminationSourceSchema.create(illuminationToJazzInit(light) as any, group);
+      jazzList.$jazz.push(jl);
+    } catch (err) {
+      console.error(`[jazz-bridge] Failed to push illumination source ${light.id}:`, err);
+    }
+  }
+  console.log(`[jazz-bridge] → Jazz illumination: ${store.lights.length} sources`);
+}
+
+/** Pull illumination sources from Jazz → Zustand */
+export function pullIlluminationFromJazz(sessionRoot: any): void {
+  const jazzList = sessionRoot.illuminationSources;
+  if (!jazzList) {
+    console.log("[jazz-bridge] No illuminationSources list on session root (legacy session — will use blob fallback)");
+    return;
+  }
+
+  const len = jazzList.length ?? 0;
+  if (len === 0 && useIlluminationStore.getState().lights.length > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked illumination pull — Jazz has 0 but local has data (creator guard)`);
+    return;
+  }
+
+  const lights: IlluminationSource[] = [];
+  for (let i = 0; i < len; i++) {
+    const jl = jazzList[i];
+    if (!jl || !jl.sourceId) continue;
+    lights.push(jazzToZustandIllumination(jl));
+  }
+
+  runFromJazz(() => {
+    const store = useIlluminationStore.getState();
+    store.setLights(lights);
+    console.log(`[jazz-bridge] ← Jazz illumination: ${lights.length} sources`);
+  });
+}
+
 /** Pull all Jazz CoValue state into Zustand stores */
 export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
   pullRegionsFromJazz(sessionRoot);
   pullMapObjectsFromJazz(sessionRoot);
   pullEffectsFromJazz(sessionRoot);
+  pullIlluminationFromJazz(sessionRoot);
   pullBlobsFromJazz(sessionRoot);
 }
 
@@ -1330,7 +1447,6 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   visionProfiles: () => useVisionProfileStore,
   fog: () => useFogStore,
   lights: () => useLightStore,
-  illumination: () => useIlluminationStore,
   dungeon: () => useDungeonStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,
@@ -1554,6 +1670,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   _cachedMapObjects = sessionRoot.mapObjects ?? null;
   _cachedEffects = sessionRoot.effects ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
+  _cachedIllumination = sessionRoot.illuminationSources ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
@@ -1561,6 +1678,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     mapObjects: !!_cachedMapObjects,
     effects: !!_cachedEffects,
     blobs: !!_cachedBlobs,
+    illumination: !!_cachedIllumination,
     group: !!_cachedGroup,
     isCreator,
   });
@@ -2152,6 +2270,75 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   });
   activeSubscriptions.push(unsubCustomTemplatesZustand);
 
+  // ── Illumination sync: Zustand → Jazz (creator-only outbound) ──
+  if (_isCreator) {
+    let prevLights = useIlluminationStore.getState().lights;
+    const unsubIlluminationZustand = useIlluminationStore.subscribe((state) => {
+      const lights = state.lights;
+      if (lights === prevLights) return;
+      if (_fromJazz) { prevLights = lights; return; }
+      prevLights = lights;
+      throttledPushFineGrained('illumination', () => {
+        const jazzList = _cachedIllumination ?? _sessionRoot?.illuminationSources;
+        if (!jazzList) return;
+        const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+
+        // Clear and re-push (simpler than diff for small lists)
+        const len = jazzList.length ?? 0;
+        for (let i = len - 1; i >= 0; i--) {
+          try { jazzList.$jazz.splice(i, 1); } catch { /* */ }
+        }
+        for (const light of lights) {
+          try {
+            const jl = JazzIlluminationSourceSchema.create(illuminationToJazzInit(light) as any, group);
+            jazzList.$jazz.push(jl);
+          } catch { /* */ }
+        }
+        console.log(`[jazz-bridge] → Jazz illumination (live): ${lights.length} sources`);
+      });
+    });
+    activeSubscriptions.push(unsubIlluminationZustand);
+  }
+
+  // ── Illumination sync: Jazz → Zustand (inbound for all clients) ──
+  if (_cachedIllumination?.$jazz?.subscribe) {
+    try {
+      const unsubIlluminationJazz = _cachedIllumination.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (jazzList: any) => {
+          if (!jazzList) return;
+          // Startup grace for creator
+          if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) return;
+
+          const len = jazzList.length ?? 0;
+          const localCount = useIlluminationStore.getState().lights.length;
+          if (len === 0 && localCount > 0 && _isCreator) return;
+
+          const lights: IlluminationSource[] = [];
+          for (let i = 0; i < len; i++) {
+            const jl = jazzList[i];
+            if (!jl || !jl.sourceId) continue;
+            lights.push(jazzToZustandIllumination(jl));
+          }
+
+          // Deep compare to avoid false-positive updates
+          const currentLights = useIlluminationStore.getState().lights;
+          if (JSON.stringify(lights) === JSON.stringify(currentLights.map(l => {
+            const { visibilityPolygon, ...rest } = l;
+            return rest;
+          }))) return;
+
+          runFromJazz(() => {
+            useIlluminationStore.getState().setLights(lights);
+          });
+        },
+      );
+      activeSubscriptions.push(unsubIlluminationJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz illumination sources:", err);
+    }
+  }
+
   // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
@@ -2208,7 +2395,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     console.warn("[jazz-bridge] Could not start texture subscription:", err);
   }
 
-  console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects + effects (fine-grained, bidirectional) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
+  console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects + effects + illumination (fine-grained) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
 }
 
 /**
@@ -2234,6 +2421,7 @@ export function stopBridge(): void {
   _cachedMapObjects = null;
   _cachedEffects = null;
   _cachedBlobs = null;
+  _cachedIllumination = null;
   _cachedGroup = null;
   _isCreator = false;
   console.log("[jazz-bridge] Bridge stopped");
