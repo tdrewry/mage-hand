@@ -18,14 +18,23 @@
 import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { useRegionStore, type CanvasRegion } from "@/stores/regionStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
+import { useEffectStore } from "@/stores/effectStore";
 import type { MapObject } from "@/types/mapObjectTypes";
+import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
+import { computeScaledTemplate } from "@/types/effectTypes";
+import { getBuiltInTemplate } from "@/lib/effectTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
   JazzRegion as JazzRegionSchema,
   JazzMapObject as JazzMapObjectSchema,
+  JazzPlacedEffect as JazzPlacedEffectSchema,
+  JazzCustomTemplate as JazzCustomTemplateSchema,
   JazzDOBlob as JazzDOBlobSchema,
   JazzRegionList,
   JazzMapObjectList,
+  JazzPlacedEffectList,
+  JazzCustomTemplateList,
+  JazzEffectState,
 } from "./schema";
 import { DurableObjectRegistry } from "@/lib/durableObjects";
 import "@/lib/durableObjectRegistry"; // Side-effect: registers all DO kinds
@@ -40,7 +49,6 @@ import { useIlluminationStore } from "@/stores/illuminationStore";
 import { useDungeonStore } from "@/stores/dungeonStore";
 import { useCreatureStore } from "@/stores/creatureStore";
 import { useHatchingStore } from "@/stores/hatchingStore";
-import { useEffectStore } from "@/stores/effectStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 
