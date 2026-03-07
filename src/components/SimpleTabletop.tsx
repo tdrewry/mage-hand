@@ -372,7 +372,8 @@ export const SimpleTabletop = () => {
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [dragPath, setDragPath] = useState<{ x: number; y: number }[]>([]);
+  const dragPathRef = useRef<{ x: number; y: number }[]>([]);
+  const dragPath = dragPathRef.current;
 
   // Remote drag previews — subscribe to store for canvas redraws
   const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
