@@ -95,6 +95,7 @@ let _sessionRoot: any = null;
 let _cachedTokens: any = null;
 let _cachedRegions: any = null;
 let _cachedMapObjects: any = null;
+let _cachedEffects: any = null;
 let _cachedBlobs: any = null;
 let _cachedGroup: any = null;
 
