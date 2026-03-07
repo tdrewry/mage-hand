@@ -3982,9 +3982,14 @@ export const SimpleTabletop = () => {
 
     // Render fog of war BEFORE tokens (in world coordinate space)
     // Use pre-computed masks from useEffect
+    // Fog renders in both play mode (full opacity) and DM mode (dmFogOpacity)
+    const shouldRenderFog = fogEnabled && !fogRevealAll;
+    const effectiveFogOpacity = isPlayMode ? fogOpacity : dmFogOpacity;
+    const effectiveExploredOpacity = isPlayMode ? exploredOpacity : Math.min(exploredOpacity, dmFogOpacity);
     // SAFETY: If fog is enabled but masks haven't been computed yet, render full black
     // to prevent accidentally revealing the map on initial load / refresh.
-    if (isPlayMode && fogEnabled && !fogRevealAll && !fogMasksRef.current) {
+    // Only apply safety black in play mode — DM should never be fully blacked out.
+    if (isPlayMode && shouldRenderFog && !fogMasksRef.current) {
       ctx.save();
       ctx.fillStyle = 'rgba(0, 0, 0, 1)';
       ctx.fillRect(
@@ -3995,7 +4000,7 @@ export const SimpleTabletop = () => {
       );
       ctx.restore();
     }
-    if (isPlayMode && fogEnabled && !fogRevealAll && fogMasksRef.current) {
+    if (shouldRenderFog && fogMasksRef.current) {
       // Check if we should use PixiJS post-processing instead of main canvas fog
       const usePostProcessing = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled;
 
