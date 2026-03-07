@@ -74,9 +74,12 @@ export function registerTokenHandlers(): void {
     if (useMultiplayerStore.getState().activeTransport === 'jazz') return;
     // Skip our own echoed position syncs
     if (userId === useMultiplayerStore.getState().currentUserId) return;
-    const store = useSessionStore.getState();
+    const sessionStore = useSessionStore.getState();
+    const activeDragPreviews = useDragPreviewStore.getState().previews;
     for (const p of data.positions) {
-      store.updateTokenPosition(p.tokenId, p.x, p.y);
+      // Skip tokens with active remote drag previews — drag.update handles those
+      if (activeDragPreviews[p.tokenId]) continue;
+      sessionStore.updateTokenPosition(p.tokenId, p.x, p.y);
     }
   });
 
