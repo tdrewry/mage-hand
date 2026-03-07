@@ -1129,6 +1129,7 @@ export function pushAllToJazz(sessionRoot: any): void {
   pushRegionsToJazz(sessionRoot);
   pushMapObjectsToJazz(sessionRoot);
   pushEffectsToJazz(sessionRoot);
+  pushIlluminationToJazz(sessionRoot);
   pushBlobsToJazz(sessionRoot);
 }
 
@@ -1669,6 +1670,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   _cachedMapObjects = sessionRoot.mapObjects ?? null;
   _cachedEffects = sessionRoot.effects ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
+  _cachedIllumination = sessionRoot.illuminationSources ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
@@ -1676,6 +1678,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     mapObjects: !!_cachedMapObjects,
     effects: !!_cachedEffects,
     blobs: !!_cachedBlobs,
+    illumination: !!_cachedIllumination,
     group: !!_cachedGroup,
     isCreator,
   });
@@ -2349,6 +2352,7 @@ export function stopBridge(): void {
   _cachedMapObjects = null;
   _cachedEffects = null;
   _cachedBlobs = null;
+  _cachedIllumination = null;
   _cachedGroup = null;
   _isCreator = false;
   console.log("[jazz-bridge] Bridge stopped");
