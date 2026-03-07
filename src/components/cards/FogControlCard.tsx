@@ -202,7 +202,33 @@ export function FogControlCardContent({
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
-          How dark unexplored areas appear
+          How dark unexplored areas appear to players
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* DM Fog Opacity */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="dm-fog-opacity" className="text-sm font-medium flex items-center gap-2">
+            <Eye className="h-3 w-3" />
+            DM Unexplored Darkness
+          </Label>
+          <span className="text-xs font-medium">{Math.round(dmFogOpacity * 100)}%</span>
+        </div>
+        <Slider
+          id="dm-fog-opacity"
+          min={0}
+          max={100}
+          step={5}
+          value={[dmFogOpacity * 100]}
+          onValueChange={([value]) => updateSettings({ dmFogOpacity: Math.max(0, Math.min(1, value / 100)) })}
+          disabled={!enabled}
+          className="w-full"
+        />
+        <p className="text-xs text-muted-foreground">
+          How dark unexplored areas appear to the DM (lower = see more)
         </p>
       </div>
 
