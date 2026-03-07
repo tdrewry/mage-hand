@@ -81,7 +81,7 @@ export const JazzSessionRoot = co.map({
   tokens: JazzTokenList,
   maps: JazzMapList,
   blobs: JazzDOBlobList,
-  textures: JazzTextureList,
+  textures: co.optional(JazzTextureList),
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
@@ -99,13 +99,17 @@ export const MageHandAccount = co
     profile: co.profile(),
   })
   .withMigration((account, creationProps?: { name: string }) => {
-    if (!account.$jazz.has("root")) {
-      account.$jazz.set("root", {});
-    }
-    if (!account.$jazz.has("profile")) {
-      account.$jazz.set("profile", {
-        name: creationProps?.name ?? "Anonymous DM",
-      });
+    try {
+      if (!account.$jazz.has("root")) {
+        account.$jazz.set("root", {});
+      }
+      if (!account.$jazz.has("profile")) {
+        account.$jazz.set("profile", {
+          name: creationProps?.name ?? "Anonymous DM",
+        });
+      }
+    } catch (err) {
+      console.error("[jazz-schema] Migration error:", err);
     }
   });
 export type MageHandAccount = co.loaded<typeof MageHandAccount>;
