@@ -13,6 +13,8 @@ export function registerCursorHandlers(): void {
   registered = true;
 
   ephemeralBus.on("cursor.update", (data: CursorUpdatePayload, userId) => {
+    // Skip store update if cursor sharing is disabled — reduces unnecessary state churn
+    if (!useCursorStore.getState().cursorSharingEnabled) return;
     useCursorStore.getState().setCursor(userId, {
       userId,
       x: data.pos.x,

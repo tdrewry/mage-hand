@@ -8941,9 +8941,11 @@ export const SimpleTabletop = () => {
     // Always track screen-space mouse position for fog brush reticle seeding
     lastMousePosRef.current = { x: mouseX, y: mouseY };
 
-    // ── EPHEMERAL CURSOR: broadcast world-space position ──
-    const worldCursorPos = screenToWorld(mouseX, mouseY);
-    ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
+    // ── EPHEMERAL CURSOR: broadcast world-space position (only when sharing enabled) ──
+    if (useCursorStore.getState().cursorSharingEnabled) {
+      const worldCursorPos = screenToWorld(mouseX, mouseY);
+      ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
+    }
 
     // ── ACTION TARGETING: track mouse position for reticle ──
     const actionStoreState = useActionStore.getState();
