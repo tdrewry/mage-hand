@@ -789,7 +789,7 @@ export function pushTokensToJazz(sessionRoot: any): void {
   }
 }
 
-/** Push all current regions from Zustand into Jazz */
+/** Push all current regions from Zustand into Jazz (upsert — no duplicates) */
 export function pushRegionsToJazz(sessionRoot: any): void {
   const regions = useRegionStore.getState().regions;
   let jazzRegions = sessionRoot.regions;
@@ -810,20 +810,46 @@ export function pushRegionsToJazz(sessionRoot: any): void {
     return;
   }
 
-  console.log(`[jazz-bridge] Pushing ${regions.length} regions to Jazz`);
+  // Build set of existing Jazz region IDs for upsert
+  const existingIds = new Set<string>();
+  const len = jazzRegions.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    if (jazzRegions[i]?.regionId) existingIds.add(jazzRegions[i].regionId);
+  }
+
+  console.log(`[jazz-bridge] Pushing ${regions.length} regions to Jazz (${existingIds.size} already exist)`);
 
   for (const r of regions) {
-    const init = regionToJazzInit(r);
-    try {
-      const jr = JazzRegionSchema.create(init as any, group);
-      jazzRegions.$jazz.push(jr);
-    } catch (err) {
-      console.error(`[jazz-bridge] Failed to create/push JazzRegion ${r.id}:`, err);
+    if (existingIds.has(r.id)) {
+      // Upsert: update existing entry
+      for (let i = 0; i < len; i++) {
+        const jr = jazzRegions[i];
+        if (jr && jr.regionId === r.id) {
+          try {
+            const init = regionToJazzInit(r);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'regionId') jr.$jazz.set(key, val ?? undefined);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to upsert JazzRegion ${r.id}:`, err);
+          }
+          break;
+        }
+      }
+    } else {
+      const init = regionToJazzInit(r);
+      try {
+        const jr = JazzRegionSchema.create(init as any, group);
+        jazzRegions.$jazz.push(jr);
+        existingIds.add(r.id);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to create/push JazzRegion ${r.id}:`, err);
+      }
     }
   }
 }
 
-/** Push all current map objects from Zustand into Jazz */
+/** Push all current map objects from Zustand into Jazz (upsert — no duplicates) */
 export function pushMapObjectsToJazz(sessionRoot: any): void {
   const mapObjects = useMapObjectStore.getState().mapObjects;
   let jazzMapObjects = sessionRoot.mapObjects;
@@ -844,15 +870,41 @@ export function pushMapObjectsToJazz(sessionRoot: any): void {
     return;
   }
 
-  console.log(`[jazz-bridge] Pushing ${mapObjects.length} map objects to Jazz`);
+  // Build set of existing Jazz mapObject IDs for upsert
+  const existingIds = new Set<string>();
+  const len = jazzMapObjects.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    if (jazzMapObjects[i]?.objectId) existingIds.add(jazzMapObjects[i].objectId);
+  }
+
+  console.log(`[jazz-bridge] Pushing ${mapObjects.length} map objects to Jazz (${existingIds.size} already exist)`);
 
   for (const obj of mapObjects) {
-    const init = mapObjectToJazzInit(obj);
-    try {
-      const jmo = JazzMapObjectSchema.create(init as any, group);
-      jazzMapObjects.$jazz.push(jmo);
-    } catch (err) {
-      console.error(`[jazz-bridge] Failed to create/push JazzMapObject ${obj.id}:`, err);
+    if (existingIds.has(obj.id)) {
+      // Upsert: update existing entry
+      for (let i = 0; i < len; i++) {
+        const jmo = jazzMapObjects[i];
+        if (jmo && jmo.objectId === obj.id) {
+          try {
+            const init = mapObjectToJazzInit(obj);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'objectId') jmo.$jazz.set(key, val ?? undefined);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to upsert JazzMapObject ${obj.id}:`, err);
+          }
+          break;
+        }
+      }
+    } else {
+      const init = mapObjectToJazzInit(obj);
+      try {
+        const jmo = JazzMapObjectSchema.create(init as any, group);
+        jazzMapObjects.$jazz.push(jmo);
+        existingIds.add(obj.id);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to create/push JazzMapObject ${obj.id}:`, err);
+      }
     }
   }
 }
@@ -943,7 +995,7 @@ export function pushBlobsToJazz(sessionRoot: any): void {
   }
 }
 
-/** Push all effects (placed + custom templates) from Zustand into Jazz */
+/** Push all effects (placed + custom templates) from Zustand into Jazz (upsert — no duplicates) */
 export function pushEffectsToJazz(sessionRoot: any): void {
   const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
   let effectState = sessionRoot.effects;
@@ -967,31 +1019,73 @@ export function pushEffectsToJazz(sessionRoot: any): void {
 
   const store = useEffectStore.getState();
 
-  // Push custom templates (stripped of large data)
-  console.log(`[jazz-bridge] Pushing ${store.customTemplates.length} custom templates to Jazz`);
+  // Push custom templates (upsert by templateId)
+  const jazzTemplates = effectState.customTemplates;
+  const existingTemplateIds = new Set<string>();
+  const ctLen = jazzTemplates?.length ?? 0;
+  for (let i = 0; i < ctLen; i++) {
+    if (jazzTemplates[i]?.templateId) existingTemplateIds.add(jazzTemplates[i].templateId);
+  }
+
+  console.log(`[jazz-bridge] Pushing ${store.customTemplates.length} custom templates to Jazz (${existingTemplateIds.size} already exist)`);
   for (const t of store.customTemplates) {
     const stripped = stripTemplateForSync(t);
-    try {
-      const jt = JazzCustomTemplateSchema.create({
-        templateId: t.id,
-        templateJson: JSON.stringify(stripped),
-      } as any, group);
-      effectState.customTemplates.$jazz.push(jt);
-    } catch (err) {
-      console.error(`[jazz-bridge] Failed to push custom template ${t.id}:`, err);
+    const jsonStr = JSON.stringify(stripped);
+    if (existingTemplateIds.has(t.id)) {
+      for (let i = 0; i < ctLen; i++) {
+        const jt = jazzTemplates[i];
+        if (jt && jt.templateId === t.id) {
+          try { jt.$jazz.set('templateJson', jsonStr); } catch { /* */ }
+          break;
+        }
+      }
+    } else {
+      try {
+        const jt = JazzCustomTemplateSchema.create({
+          templateId: t.id,
+          templateJson: jsonStr,
+        } as any, group);
+        jazzTemplates.$jazz.push(jt);
+        existingTemplateIds.add(t.id);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push custom template ${t.id}:`, err);
+      }
     }
   }
 
-  // Push placed effects (no template snapshot — reconstructed on pull)
+  // Push placed effects (upsert by effectId)
+  const jazzPlaced = effectState.placedEffects;
+  const existingEffectIds = new Set<string>();
+  const peLen = jazzPlaced?.length ?? 0;
+  for (let i = 0; i < peLen; i++) {
+    if (jazzPlaced[i]?.effectId) existingEffectIds.add(jazzPlaced[i].effectId);
+  }
+
   const activePlaced = store.placedEffects.filter(e => !e.dismissedAt);
-  console.log(`[jazz-bridge] Pushing ${activePlaced.length} placed effects to Jazz`);
+  console.log(`[jazz-bridge] Pushing ${activePlaced.length} placed effects to Jazz (${existingEffectIds.size} already exist)`);
   for (const e of activePlaced) {
-    const init = placedEffectToJazzInit(e);
-    try {
-      const je = JazzPlacedEffectSchema.create(init as any, group);
-      effectState.placedEffects.$jazz.push(je);
-    } catch (err) {
-      console.error(`[jazz-bridge] Failed to push placed effect ${e.id}:`, err);
+    if (existingEffectIds.has(e.id)) {
+      for (let i = 0; i < peLen; i++) {
+        const je = jazzPlaced[i];
+        if (je && je.effectId === e.id) {
+          try {
+            const init = placedEffectToJazzInit(e);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'effectId') je.$jazz.set(key, val ?? undefined);
+            }
+          } catch { /* */ }
+          break;
+        }
+      }
+    } else {
+      const init = placedEffectToJazzInit(e);
+      try {
+        const je = JazzPlacedEffectSchema.create(init as any, group);
+        jazzPlaced.$jazz.push(je);
+        existingEffectIds.add(e.id);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push placed effect ${e.id}:`, err);
+      }
     }
   }
 }
@@ -1020,8 +1114,8 @@ export function pullTokensFromJazz(sessionRoot: any): void {
   const len = jazzTokens.length ?? 0;
   const localTokenCount = useSessionStore.getState().tokens.length;
 
-  if (len === 0 && localTokenCount > 0) {
-    console.warn(`[jazz-bridge] ✋ Blocked token pull — Jazz has 0 tokens but local has ${localTokenCount}`);
+  if (len === 0 && localTokenCount > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked token pull — Jazz has 0 tokens but local has ${localTokenCount} (creator guard)`);
     return;
   }
 
