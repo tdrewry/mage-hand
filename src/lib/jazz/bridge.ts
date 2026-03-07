@@ -1743,6 +1743,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             // Build the new token array in a single pass to avoid stale-state bugs
             // from multiple store mutations referencing an old getState() snapshot.
             let tokensChanged = false;
+            let illuminationChanged = false;
             const updatedTokens = localTokens.map(existing => {
               return existing;
             });
@@ -1791,6 +1792,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   break;
                 }
 
+                // Track if illumination specifically changed
+                if (hasNonPosChange) {
+                  const oldIllu = JSON.stringify(existing.illuminationSources ?? []);
+                  const newIllu = JSON.stringify(incoming.illuminationSources ?? []);
+                  if (oldIllu !== newIllu) illuminationChanged = true;
+                }
+
                 hasChange = posChanged || hasNonPosChange;
                 if (hasChange) {
                   const merged: Token = {
@@ -1829,12 +1837,15 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
             if (tokensChanged) {
               store.setTokens(finalTokens);
-              // If any token's illumination changed, dispatch a soft fog refresh
-              // so the fog layer picks up the new illumination settings without
-              // flashing black (soft = keep existing masks during recomputation).
-              try {
-                window.dispatchEvent(new CustomEvent('fog:force-refresh', { detail: { soft: true } }));
-              } catch { /* SSR guard */ }
+              // Only dispatch fog refresh when illumination settings actually changed.
+              // Position-only sync is handled by the normal fog computation useEffect.
+              // Each client renders fog locally — we only need to refresh when the
+              // illumination *parameters* (range, brightZone, color, etc.) change.
+              if (illuminationChanged) {
+                try {
+                  window.dispatchEvent(new CustomEvent('fog:force-refresh', { detail: { soft: true } }));
+                } catch { /* SSR guard */ }
+              }
             }
           });
 
