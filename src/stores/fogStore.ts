@@ -245,6 +245,7 @@ const persistOptions: PersistOptions<FogState, Partial<FogState>> = {
           fogOpacity: raw.fogOpacity ?? 0.95,
           exploredOpacity: raw.exploredOpacity ?? 0.4,
           showExploredAreas: raw.showExploredAreas ?? true,
+          dmFogOpacity: 0.3,
           effectSettings: raw.effectSettings ?? { ...DEFAULT_MAP_FOG_SETTINGS.effectSettings },
         },
       };
