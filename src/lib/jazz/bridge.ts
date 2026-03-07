@@ -1837,15 +1837,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
             if (tokensChanged) {
               store.setTokens(finalTokens);
-              // Only dispatch fog refresh when illumination settings actually changed.
-              // Position-only sync is handled by the normal fog computation useEffect.
-              // Each client renders fog locally — we only need to refresh when the
-              // illumination *parameters* (range, brightZone, color, etc.) change.
-              if (illuminationChanged) {
-                try {
-                  window.dispatchEvent(new CustomEvent('fog:force-refresh', { detail: { soft: true } }));
-                } catch { /* SSR guard */ }
-              }
+              // Illumination changes are handled client-side by the fog computation
+              // useEffect (via its filteredTokens dependency). No fog:force-refresh
+              // dispatch needed — the useEffect detects illuminationSettingsChanged
+              // and rebuilds vis data + illumination cache after its debounce.
             }
           });
 
