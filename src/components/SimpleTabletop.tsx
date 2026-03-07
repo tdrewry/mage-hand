@@ -1378,8 +1378,8 @@ export const SimpleTabletop = () => {
   // ── Expire stale remote drag previews every 300ms ──
   useEffect(() => {
     const id = setInterval(() => {
-      useDragPreviewStore.getState().expireStale(400);
-    }, 300);
+      useDragPreviewStore.getState().expireStale(800);
+    }, 500);
     return () => clearInterval(id);
   }, []);
 
@@ -1412,7 +1412,8 @@ export const SimpleTabletop = () => {
     return () => cancelAnimationFrame(id);
   }, [activePings]);
 
-  // ── Redraw canvas when remote ephemeral overlays change ──
+  // ── Redraw canvas when remote ephemeral overlays change (batched via rAF) ──
+  const ephemeralRedrawRafRef = useRef<number | null>(null);
   useEffect(() => {
     if (Object.keys(remoteDragPreviews).length > 0 ||
         Object.keys(remoteHovers).length > 0 ||
@@ -1422,8 +1423,16 @@ export const SimpleTabletop = () => {
         Object.keys(remoteMapHandlePreviews).length > 0 ||
         Object.keys(remoteGroupSelects).length > 0 ||
         Object.keys(remoteGroupDrags).length > 0) {
-      redrawCanvas();
+      // Batch into a single rAF to avoid redundant redraws from rapid store updates
+      if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
+      ephemeralRedrawRafRef.current = requestAnimationFrame(() => {
+        ephemeralRedrawRafRef.current = null;
+        redrawCanvas();
+      });
     }
+    return () => {
+      if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
+    };
   }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)

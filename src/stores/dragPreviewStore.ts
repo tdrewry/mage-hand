@@ -26,7 +26,7 @@ interface DragPreviewState {
   expireStale: (maxAge?: number) => void;
 }
 
-const DEFAULT_EXPIRY_MS = 400;
+const DEFAULT_EXPIRY_MS = 800;
 
 export const useDragPreviewStore = create<DragPreviewState>((set) => ({
   previews: {},
