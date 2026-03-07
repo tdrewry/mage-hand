@@ -1521,7 +1521,7 @@ function _dedupeJazzCoList(coList: any, keyField: string): number {
  */
 export function startBridge(sessionRoot: any, isCreator = false): void {
   _sessionRoot = sessionRoot;
-  _isCreator = isCreator;
+  _bridgeStartedAt = Date.now();
   // Cache child refs immediately while the proxy is still live
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedRegions = sessionRoot.regions ?? null;
@@ -1905,6 +1905,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const localCount = useMapObjectStore.getState().mapObjects.length;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
+          // Startup grace: suppress inbound for creator during initial propagation
+          if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) {
+            console.log(`[jazz-bridge] Skipping inbound mapObjects during startup grace`);
+            return;
+          }
 
           runFromJazz(() => {
             const store = useMapObjectStore.getState();
@@ -1979,6 +1984,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const localCount = useEffectStore.getState().placedEffects.length;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
+          // Startup grace: suppress inbound for creator during initial propagation
+          if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) {
+            console.log(`[jazz-bridge] Skipping inbound effects during startup grace`);
+            return;
+          }
 
           // Rebuild template lookup from current custom templates
           const customTemplates = useEffectStore.getState().customTemplates;
