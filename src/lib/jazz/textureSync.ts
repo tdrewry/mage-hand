@@ -17,7 +17,6 @@
 import { co } from "jazz-tools";
 import { JazzTextureList } from "./schema";
 import { loadTextureByHash, saveTextureByHash } from "@/lib/textureStorage";
-import { loadTextureByHash as loadTokenTextureByHash, saveTextureByHash as saveTokenTextureByHash } from "@/lib/tokenTextureStorage";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
