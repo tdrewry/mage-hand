@@ -56,12 +56,15 @@ function stripEffectTexturesForSync(state: any): any {
     return changed ? copy : t;
   };
 
-  // Strip from placedEffects — both the embedded template and top-level fields
+  // Strip the ENTIRE template snapshot from placedEffects.
+  // Templates are reconstructible from templateId + castLevel on the receiving side.
+  // This is the primary fix for the 2-3MB effects blob.
   if (Array.isArray(stripped.placedEffects)) {
     stripped.placedEffects = stripped.placedEffects.map((e: any) => {
       if (!e) return e;
-      const tpl = e.template ? stripTemplate(e.template) : e.template;
-      return tpl !== e.template ? { ...e, template: tpl } : e;
+      // Keep only essential fields, drop the full template snapshot
+      const { template, ...rest } = e;
+      return rest;
     });
   }
 
