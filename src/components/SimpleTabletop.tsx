@@ -1311,6 +1311,7 @@ export const SimpleTabletop = () => {
           }
           
           emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
+          markTokenDragEnd(draggedTokenId);
           setIsDraggingToken(false);
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
