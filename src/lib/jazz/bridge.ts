@@ -1315,6 +1315,30 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const tokens = state.tokens;
     if (tokens === prevTokens) return;
     if (_fromJazz) { prevTokens = tokens; return; }
+
+    // ── FAST PATH: if ALL changes are position-only on dragged tokens, skip entirely ──
+    if (_localDragTokens.size > 0 && tokens.length === prevTokens.length) {
+      let onlyDraggedPosChanges = true;
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        const p = prevTokens[i];
+        if (t === p) continue; // same reference, no change
+        if (!_localDragTokens.has(t.id)) { onlyDraggedPosChanges = false; break; }
+        // Check if non-position fields changed
+        if (t.label !== p.label || t.color !== p.color || t.name !== p.name ||
+            (t as any).hp !== (p as any).hp || (t as any).maxHp !== (p as any).maxHp ||
+            (t as any).ac !== (p as any).ac || t.isHidden !== p.isHidden ||
+            t.mapId !== p.mapId || t.gridWidth !== p.gridWidth || t.gridHeight !== p.gridHeight) {
+          onlyDraggedPosChanges = false;
+          break;
+        }
+      }
+      if (onlyDraggedPosChanges) {
+        prevTokens = tokens;
+        return; // Skip all Jazz work — only dragged positions changed
+      }
+    }
+
     const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
     if (!jazzTokens) { prevTokens = tokens; return; }
 
@@ -1340,8 +1364,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         const prev = prevTokens.find((pt: Token) => pt.id === t.id);
         if (!prev) continue;
 
-        // During active local drag, skip position-only changes — ephemeral bus
-        // handles real-time previews, Jazz only needs the final position on drag end.
+        // During active local drag, skip position-only changes
         const isBeingDragged = _localDragTokens.has(t.id);
         const posChanged = prev.x !== t.x || prev.y !== t.y;
         const nonPosChanged = prev.label !== t.label ||
@@ -1351,7 +1374,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
           prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
 
-        // If dragged and only position changed, defer to drag end
         if (isBeingDragged && posChanged && !nonPosChanged) continue;
         if (!posChanged && !nonPosChanged) continue;
 
