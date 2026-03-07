@@ -61,6 +61,19 @@ export type JazzDOBlob = co.loaded<typeof JazzDOBlob>;
 export const JazzDOBlobList = co.list(JazzDOBlob);
 export type JazzDOBlobList = co.loaded<typeof JazzDOBlobList>;
 
+// ── Texture Entry (FileStream reference) ──────────────────────────────────
+
+export const JazzTextureEntry = co.map({
+  hash: z.string(),
+  mimeType: z.string(),
+  /** CoValue ID of the FileStream (stored as string for portability) */
+  fileStreamId: z.string(),
+});
+export type JazzTextureEntry = co.loaded<typeof JazzTextureEntry>;
+
+export const JazzTextureList = co.list(JazzTextureEntry);
+export type JazzTextureList = co.loaded<typeof JazzTextureList>;
+
 // ── Session Root ───────────────────────────────────────────────────────────
 
 export const JazzSessionRoot = co.map({
@@ -68,6 +81,7 @@ export const JazzSessionRoot = co.map({
   tokens: JazzTokenList,
   maps: JazzMapList,
   blobs: JazzDOBlobList,
+  textures: JazzTextureList,
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
