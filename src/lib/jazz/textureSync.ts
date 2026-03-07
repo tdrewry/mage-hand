@@ -260,6 +260,8 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
         await saveTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         downloaded++;
+        // Apply to entities immediately so textures appear without refresh
+        _applyTextureToEntities(hash, dataUrl);
         notifyTextureDownloadComplete(hash);
         console.log(`[jazz-texture] ← Downloaded texture ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
       } else {
@@ -275,6 +277,50 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
   console.log(
     `[jazz-texture] Pull complete: ${downloaded} downloaded, ${skipped} skipped (of ${len} total)`
   );
+}
+
+// ── Apply textures to in-memory entities ──────────────────────────────────
+
+/**
+ * After downloading a texture, apply it to all tokens/regions/mapObjects
+ * that reference this hash but don't have the image data loaded yet.
+ */
+function _applyTextureToEntities(hash: string, dataUrl: string): void {
+  // Tokens
+  const sessionStore = useSessionStore.getState();
+  const tokensNeedingTexture = sessionStore.tokens.filter(
+    t => t.imageHash === hash && (!t.imageUrl || t.imageUrl.length === 0)
+  );
+  if (tokensNeedingTexture.length > 0) {
+    for (const t of tokensNeedingTexture) {
+      sessionStore.updateTokenImage(t.id, dataUrl, hash);
+    }
+    console.log(`[jazz-texture] Applied texture ${hash} to ${tokensNeedingTexture.length} token(s)`);
+  }
+
+  // Regions
+  const regionStore = useRegionStore.getState();
+  const regionsNeedingTexture = regionStore.regions.filter(
+    r => r.textureHash === hash && (!r.backgroundImage || r.backgroundImage.length === 0)
+  );
+  if (regionsNeedingTexture.length > 0) {
+    for (const r of regionsNeedingTexture) {
+      regionStore.updateRegion(r.id, { backgroundImage: dataUrl });
+    }
+    console.log(`[jazz-texture] Applied texture ${hash} to ${regionsNeedingTexture.length} region(s)`);
+  }
+
+  // Map Objects
+  const mapObjStore = useMapObjectStore.getState();
+  const objectsNeedingTexture = mapObjStore.mapObjects.filter(
+    (o: any) => o.imageHash === hash && (!o.imageUrl || o.imageUrl.length === 0)
+  );
+  if (objectsNeedingTexture.length > 0) {
+    for (const o of objectsNeedingTexture) {
+      mapObjStore.updateMapObject(o.id, { imageUrl: dataUrl } as any);
+    }
+    console.log(`[jazz-texture] Applied texture ${hash} to ${objectsNeedingTexture.length} mapObject(s)`);
+  }
 }
 
 // ── Subscription for live texture updates ──────────────────────────────────
@@ -310,6 +356,8 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
           const existing = await loadTextureByHash(entry.hash);
           if (existing) {
             _downloadedHashes.add(entry.hash);
+            // Even if in IndexedDB, entities may not have it applied in-memory
+            _applyTextureToEntities(entry.hash, existing);
             continue;
           }
 
@@ -321,6 +369,8 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
               const dataUrl = await blobToDataUri(blob);
               await saveTextureByHash(entry.hash, dataUrl);
               _downloadedHashes.add(entry.hash);
+              // Apply to all referencing entities immediately
+              _applyTextureToEntities(entry.hash, dataUrl);
               notifyTextureDownloadComplete(entry.hash);
               console.log(`[jazz-texture] ← Live download: ${entry.hash} (${(blob.size / 1024).toFixed(1)}KB)`);
             } else {
