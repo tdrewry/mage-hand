@@ -64,9 +64,34 @@ export function markTokenDragStart(tokenId: string): void {
   _localDragTokens.add(tokenId);
 }
 
-/** Unmark a token drag (resumes inbound Jazz position sync) */
+/** Unmark a token drag — pushes final position to Jazz and resumes inbound sync */
 export function markTokenDragEnd(tokenId: string): void {
   _localDragTokens.delete(tokenId);
+  // Push final position to Jazz now that drag is complete
+  _pushTokenFinalPosition(tokenId);
+}
+
+/** Push a single token's current position to Jazz (used after drag end) */
+function _pushTokenFinalPosition(tokenId: string): void {
+  const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
+  if (!jazzTokens) return;
+  const token = useSessionStore.getState().tokens.find(t => t.id === tokenId);
+  if (!token) return;
+  const len = jazzTokens.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const jt = jazzTokens[i];
+    if (jt && jt.tokenId === tokenId) {
+      try {
+        const init = tokenToJazzInit(token);
+        for (const [key, val] of Object.entries(init)) {
+          if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
+        }
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push final token position:`, err);
+      }
+      break;
+    }
+  }
 }
 
 /** Throttle map for "too large" skip warnings — one per kind per 30s */
@@ -1314,14 +1339,22 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
       if (prevIds.has(t.id)) {
         const prev = prevTokens.find((pt: Token) => pt.id === t.id);
         if (!prev) continue;
-        // Check all synced fields for changes
-        const changed = prev.x !== t.x || prev.y !== t.y || prev.label !== t.label ||
+
+        // During active local drag, skip position-only changes — ephemeral bus
+        // handles real-time previews, Jazz only needs the final position on drag end.
+        const isBeingDragged = _localDragTokens.has(t.id);
+        const posChanged = prev.x !== t.x || prev.y !== t.y;
+        const nonPosChanged = prev.label !== t.label ||
           prev.color !== t.color || prev.name !== t.name ||
           (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
           (prev as any).ac !== (t as any).ac ||
           prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
           prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
-        if (!changed) continue;
+
+        // If dragged and only position changed, defer to drag end
+        if (isBeingDragged && posChanged && !nonPosChanged) continue;
+        if (!posChanged && !nonPosChanged) continue;
+
         const len = jazzTokens.length ?? 0;
         for (let i = 0; i < len; i++) {
           const jt = jazzTokens[i];

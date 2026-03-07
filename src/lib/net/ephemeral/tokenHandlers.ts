@@ -68,7 +68,10 @@ export function registerTokenHandlers(): void {
   });
 
   // ── Token position sync (10Hz delta broadcast) ──
+  // When Jazz is active, position sync is handled by Jazz CoValue subscriptions.
   ephemeralBus.on("token.position.sync", (data: TokenPositionSyncPayload, userId) => {
+    // Skip when Jazz handles position sync
+    if (useMultiplayerStore.getState().activeTransport === 'jazz') return;
     // Skip our own echoed position syncs
     if (userId === useMultiplayerStore.getState().currentUserId) return;
     const store = useSessionStore.getState();
