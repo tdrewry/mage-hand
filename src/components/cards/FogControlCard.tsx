@@ -49,6 +49,7 @@ export function FogControlCardContent({
     visionRange,
     fogOpacity,
     exploredOpacity,
+    dmFogOpacity = 0.3,
     effectSettings,
   } = settings;
 

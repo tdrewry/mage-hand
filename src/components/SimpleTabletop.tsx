@@ -560,6 +560,7 @@ export const SimpleTabletop = () => {
   const fogVisionRange = currentMapFog.visionRange;
   const fogOpacity = currentMapFog.fogOpacity;
   const exploredOpacity = currentMapFog.exploredOpacity;
+  const dmFogOpacity = currentMapFog.dmFogOpacity ?? 0.3;
   const effectSettings = currentMapFog.effectSettings;
 
   // Fog setters targeting current map
