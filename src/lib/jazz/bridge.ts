@@ -36,7 +36,38 @@ import { useEffectStore } from "@/stores/effectStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 
-// ── Echo prevention ────────────────────────────────────────────────────────
+// ── Effect texture stripping for Jazz sync ─────────────────────────────────
+
+/**
+ * Strip texture data URIs from effects state before Jazz blob sync.
+ * Textures are synced separately via FileStreams — we only need textureHash.
+ */
+function stripEffectTexturesForSync(state: any): any {
+  if (!state) return state;
+  const stripped = { ...state };
+
+  // Strip from placedEffects
+  if (Array.isArray(stripped.placedEffects)) {
+    stripped.placedEffects = stripped.placedEffects.map((e: any) => {
+      if (!e?.template?.texture || e.template.texture.length < 200) return e;
+      return {
+        ...e,
+        template: { ...e.template, texture: '' },
+      };
+    });
+  }
+
+  // Strip from customTemplates
+  if (Array.isArray(stripped.customTemplates)) {
+    stripped.customTemplates = stripped.customTemplates.map((t: any) => {
+      if (!t?.texture || t.texture.length < 200) return t;
+      return { ...t, texture: '' };
+    });
+  }
+
+  return stripped;
+}
+
 
 let _fromJazz = false;
 
@@ -206,7 +237,14 @@ function pushBlobToJazz(kind: string): void {
   if (!reg) return;
 
   try {
-    const state = reg.extractor();
+    let state = reg.extractor();
+
+    // Strip texture data URIs from effects to avoid exceeding Jazz's 1MB limit
+    // Textures are synced separately via FileStreams
+    if (kind === 'effects' && state) {
+      state = stripEffectTexturesForSync(state);
+    }
+
     const json = JSON.stringify(state);
     const hash = quickHash(json);
 
