@@ -12,7 +12,7 @@ import { MapObject } from '../types/mapObjectTypes';
 import { LightSource } from '../stores/lightStore';
 import { EntityGroup, GroupMember, EntityGeometry, createEntityGroup } from './groupTransforms';
 import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
-import { getAllTokenMappings, importTokenTextures } from './tokenTextureStorage';
+import { getAllTokenMappings, importTokenTextures } from './textureStorage';
 
 // ============= Prefab Data Structure =============
 

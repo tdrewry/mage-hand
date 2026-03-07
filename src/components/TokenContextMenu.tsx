@@ -49,7 +49,7 @@ import {
   canAssignTokenRoles 
 } from '../lib/rolePermissions';
 import { toast } from 'sonner';
-import { saveTokenTexture, loadTextureByHash, hashImageData, saveVariantTexture } from '@/lib/tokenTextureStorage';
+import { saveTokenTexture, loadTextureByHash, hashImageData, saveVariantTexture } from '@/lib/textureStorage';
 import { uploadTexture } from '@/lib/textureSync';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
