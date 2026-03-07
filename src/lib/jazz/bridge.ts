@@ -59,16 +59,42 @@ let _fromJazz = false;
 /** Token IDs currently being dragged locally — suppress inbound Jazz position updates */
 const _localDragTokens = new Set<string>();
 
+/** Tokens in post-drag grace period — still suppress inbound Jazz position for a short window */
+const _dragGraceTokens = new Set<string>();
+const _dragGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const DRAG_GRACE_MS = 600; // ms to keep suppressing inbound after drag end
+
 /** Mark a token as being locally dragged (suppresses inbound Jazz position sync) */
 export function markTokenDragStart(tokenId: string): void {
+  // Clear any lingering grace period from a previous drag
+  const existingTimer = _dragGraceTimers.get(tokenId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    _dragGraceTimers.delete(tokenId);
+    _dragGraceTokens.delete(tokenId);
+  }
   _localDragTokens.add(tokenId);
 }
 
-/** Unmark a token drag — pushes final position to Jazz and resumes inbound sync */
+/** Unmark a token drag — pushes final position to Jazz, then keeps suppressing
+ *  inbound Jazz position updates for a grace period to prevent snap-back from
+ *  stale CRDT data arriving before the final position has round-tripped. */
 export function markTokenDragEnd(tokenId: string): void {
-  _localDragTokens.delete(tokenId);
-  // Push final position to Jazz now that drag is complete
+  // Push final position BEFORE removing from drag set
   _pushTokenFinalPosition(tokenId);
+  // Move from active-drag to grace period (still suppresses inbound position)
+  _localDragTokens.delete(tokenId);
+  _dragGraceTokens.add(tokenId);
+  const timer = setTimeout(() => {
+    _dragGraceTokens.delete(tokenId);
+    _dragGraceTimers.delete(tokenId);
+  }, DRAG_GRACE_MS);
+  _dragGraceTimers.set(tokenId, timer);
+}
+
+/** Check if a token's inbound position should be suppressed (dragging or grace period) */
+function _isPositionSuppressed(tokenId: string): boolean {
+  return _localDragTokens.has(tokenId) || _dragGraceTokens.has(tokenId);
 }
 
 /** Push a single token's current position to Jazz (used after drag end) */
@@ -1442,8 +1468,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               if (!jt || !jt.tokenId) continue;
               jazzIds.add(jt.tokenId);
 
-              // Skip position updates for tokens being dragged locally
-              const isLocallyDragged = _localDragTokens.has(jt.tokenId);
+              // Skip position updates for tokens being dragged locally or in grace period
+              const isLocallyDragged = _isPositionSuppressed(jt.tokenId);
 
               if (currentIds.has(jt.tokenId)) {
                 const existing = store.tokens.find((t) => t.id === jt.tokenId);
