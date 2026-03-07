@@ -9,6 +9,10 @@
 export {
   JazzToken,
   JazzTokenList,
+  JazzRegion,
+  JazzRegionList,
+  JazzMapObject,
+  JazzMapObjectList,
   JazzMapEntry,
   JazzMapList,
   JazzDOBlob,
