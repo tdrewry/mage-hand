@@ -17,7 +17,6 @@ Create a reusable `CardSaveButton` component that fires a `card:save` DOM event 
 | `region` | `region.update` | ✅ Done |
 | `map-object` | `mapObject.update` | ✅ Done |
 | `effect` | `effect.update` | ✅ Done |
-| `session` | TBD | Planned |
 
 ## Integration Points
 - **Edit Token modal** (`TokenContextMenu.tsx`): Fires `CardSaveEvent` after `applyTokenEdit()`
