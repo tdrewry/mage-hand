@@ -22,6 +22,7 @@ import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { emitLocalOp } from "@/lib/net";
+import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import { useMapStore } from "../stores/mapStore";
@@ -1310,6 +1311,7 @@ export const SimpleTabletop = () => {
           }
           
           emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
+          markTokenDragEnd(draggedTokenId);
           setIsDraggingToken(false);
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
@@ -8488,6 +8490,7 @@ export const SimpleTabletop = () => {
         setIsDraggingToken(true);
         ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
+        markTokenDragStart(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
@@ -10335,6 +10338,7 @@ export const SimpleTabletop = () => {
       // Clear multi-drag start positions
       multiDragStartPositionsRef.current = {};
 
+      if (draggedTokenId) markTokenDragEnd(draggedTokenId);
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
@@ -10916,6 +10920,7 @@ export const SimpleTabletop = () => {
 
         setIsDraggingToken(true);
         setDraggedTokenId(clickedToken.id);
+        markTokenDragStart(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
@@ -11140,6 +11145,7 @@ export const SimpleTabletop = () => {
           }
         }
 
+        if (draggedTokenId) markTokenDragEnd(draggedTokenId);
         setIsDraggingToken(false);
         setDraggedTokenId(null);
         setDragOffset({ x: 0, y: 0 });
