@@ -74,16 +74,16 @@ function stripEffectTexturesForSync(state: any): any {
  */
 function stripRegionTexturesForSync(state: any): any {
   if (!state) return state;
-  const stripped = { ...state };
 
-  if (Array.isArray(stripped.regions)) {
-    stripped.regions = stripped.regions.map((r: any) => {
+  // The regions extractor returns a raw array
+  if (Array.isArray(state)) {
+    return state.map((r: any) => {
       if (!r?.backgroundImage || r.backgroundImage.length < 200) return r;
       return { ...r, backgroundImage: '' };
     });
   }
 
-  return stripped;
+  return state;
 }
 
 
