@@ -126,6 +126,20 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     setJsonError(null);
   }, []);
 
+  // ── Details tab state ────────────────────────────────────────────────────
+  const [notes, setNotes] = useState(token?.notes ?? '');
+  const [quickRef, setQuickRef] = useState(token?.quickReferenceUrl ?? '');
+
+  // Stub a blank character if no data exists
+  const handleCreateBlank = useCallback(() => {
+    const blank = generateBlankTemplate();
+    blank.name = token?.name || 'Character Name';
+    const json = JSON.stringify(blank, null, 2);
+    setJsonValue(json);
+    setJsonError(null);
+    setActiveTab('character');
+  }, [token]);
+
   /** Unified save — persists character JSON + details in one action. */
   const handleSaveAll = useCallback(() => {
     if (!token) return;
@@ -133,9 +147,7 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
       toast.error('Fix JSON errors before saving');
       return;
     }
-    // Persist character/JSON data
     updateTokenStatBlockJson(token.id, jsonValue);
-    // Persist details
     updateTokenDetails(token.id, notes, quickRef, jsonValue);
     toast.success('Changes saved');
   }, [token, jsonError, jsonValue, notes, quickRef, updateTokenStatBlockJson, updateTokenDetails]);
