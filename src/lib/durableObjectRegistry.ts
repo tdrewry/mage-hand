@@ -182,6 +182,7 @@ DurableObjectRegistry.register({
   kind: 'fog',
   version: 1,
   label: 'Fog of War',
+  authoritative: true,
   extractor: () => {
     const s = useFogStore.getState();
     return {
@@ -233,6 +234,7 @@ DurableObjectRegistry.register({
   kind: 'lights',
   version: 1,
   label: 'Legacy Lights',
+  authoritative: true,
   extractor: () => ({
     lights: useLightStore.getState().lights,
     globalAmbientLight: useLightStore.getState().globalAmbientLight,
@@ -251,6 +253,7 @@ DurableObjectRegistry.register({
   kind: 'illumination',
   version: 1,
   label: 'Illumination',
+  authoritative: true,
   extractor: () => ({
     lights: useIlluminationStore.getState().lights,
     globalAmbientLight: useIlluminationStore.getState().globalAmbientLight,
@@ -294,6 +297,7 @@ DurableObjectRegistry.register({
   kind: 'dungeon',
   version: 1,
   label: 'Dungeon Features',
+  authoritative: true,
   extractor: () => {
     const s = useDungeonStore.getState();
     return {

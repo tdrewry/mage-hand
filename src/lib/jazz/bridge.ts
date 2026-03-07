@@ -646,6 +646,11 @@ function pushBlobToJazz(kind: string): void {
   const reg = DurableObjectRegistry.get(kind);
   if (!reg) return;
 
+  // Authoritative guard: only the session creator may push authoritative blobs
+  if (reg.authoritative && !_isCreator) {
+    return;
+  }
+
   try {
     let state = reg.extractor();
 

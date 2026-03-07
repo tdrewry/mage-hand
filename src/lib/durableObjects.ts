@@ -61,6 +61,12 @@ export interface DORegistration {
   hydrator: (state: unknown) => void;
   /** Return a summary string, e.g. "12 tokens" */
   summarizer?: () => string;
+  /**
+   * When true, only the session creator (first DM) may push this blob outbound.
+   * Non-creators will only pull (consume) this blob from Jazz.
+   * Use for DM-authoritative state like fog, illumination, dungeon features.
+   */
+  authoritative?: boolean;
 }
 
 class DurableObjectRegistryImpl {
