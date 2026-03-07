@@ -710,7 +710,18 @@ function isEmptyState(state: unknown): boolean {
 // PUSH: Zustand → Jazz
 // ══════════════════════════════════════════════════════════════════════════
 
-/** Push all current tokens from Zustand into Jazz */
+/** Build a Set of existing tokenIds in a Jazz CoList */
+function _getJazzTokenIds(jazzTokens: any): Set<string> {
+  const ids = new Set<string>();
+  const len = jazzTokens?.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const jt = jazzTokens[i];
+    if (jt?.tokenId) ids.add(jt.tokenId);
+  }
+  return ids;
+}
+
+/** Push all current tokens from Zustand into Jazz (upsert — no duplicates) */
 export function pushTokensToJazz(sessionRoot: any): void {
   const tokens = useSessionStore.getState().tokens;
   const jazzTokens = sessionRoot.tokens;
@@ -719,16 +730,37 @@ export function pushTokensToJazz(sessionRoot: any): void {
     return;
   }
 
-  console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz`);
+  const existingIds = _getJazzTokenIds(jazzTokens);
+  console.log(`[jazz-bridge] Pushing ${tokens.length} tokens to Jazz (${existingIds.size} already exist)`);
   const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
 
   for (const t of tokens) {
-    const init = tokenToJazzInit(t);
-    try {
-      const jt = JazzTokenSchema.create(init as any, group);
-      jazzTokens.$jazz.push(jt);
-    } catch (err) {
-      console.error(`[jazz-bridge] Failed to create/push JazzToken ${t.id}:`, err);
+    if (existingIds.has(t.id)) {
+      // Upsert: update existing entry instead of creating a duplicate
+      const len = jazzTokens.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const jt = jazzTokens[i];
+        if (jt && jt.tokenId === t.id) {
+          try {
+            const init = tokenToJazzInit(t);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to upsert JazzToken ${t.id}:`, err);
+          }
+          break;
+        }
+      }
+    } else {
+      const init = tokenToJazzInit(t);
+      try {
+        const jt = JazzTokenSchema.create(init as any, group);
+        jazzTokens.$jazz.push(jt);
+        existingIds.add(t.id); // Track so subsequent dupes in same batch are caught
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to create/push JazzToken ${t.id}:`, err);
+      }
     }
   }
 }
@@ -1308,6 +1340,50 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// JAZZ COLIST DEDUP CLEANUP
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Remove duplicate entries from a Jazz CoList by a key field.
+ *  Keeps the LAST occurrence (most recent write). */
+function _dedupeJazzCoList(coList: any, keyField: string): number {
+  if (!coList) return 0;
+  const len = coList.length ?? 0;
+  if (len <= 1) return 0;
+
+  // Build map of key → last index
+  const lastIndex = new Map<string, number>();
+  for (let i = 0; i < len; i++) {
+    const item = coList[i];
+    if (item && item[keyField]) {
+      lastIndex.set(item[keyField], i);
+    }
+  }
+
+  // Collect indices to remove (duplicates that aren't the last occurrence)
+  const toRemove: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const item = coList[i];
+    if (item && item[keyField] && lastIndex.get(item[keyField]) !== i) {
+      toRemove.push(i);
+    }
+  }
+
+  // Remove in reverse order to preserve indices
+  let removed = 0;
+  for (let i = toRemove.length - 1; i >= 0; i--) {
+    try {
+      coList.$jazz.splice(toRemove[i], 1);
+      removed++;
+    } catch { /* */ }
+  }
+
+  if (removed > 0) {
+    console.warn(`[jazz-bridge] 🧹 Cleaned ${removed} duplicate entries from CoList (key: ${keyField})`);
+  }
+  return removed;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // LIVE BRIDGE: bidirectional subscriptions
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -1334,6 +1410,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     group: !!_cachedGroup,
     isCreator,
   });
+
+  // ── Startup dedup: clean any existing duplicates in Jazz CoLists ──
+  if (_cachedTokens) _dedupeJazzCoList(_cachedTokens, 'tokenId');
+  if (_cachedRegions) _dedupeJazzCoList(_cachedRegions, 'regionId');
+  if (_cachedMapObjects) _dedupeJazzCoList(_cachedMapObjects, 'objectId');
 
   // ── Token sync: Zustand → Jazz ──
   let prevTokens = useSessionStore.getState().tokens;
@@ -1370,16 +1451,37 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
     const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
 
-    // Detect added tokens
+    // Detect added tokens — check Jazz list to prevent duplicates
     const prevIds = new Set(prevTokens.map((t: Token) => t.id));
+    const jazzExistingIds = _getJazzTokenIds(jazzTokens);
     for (const t of tokens) {
       if (!prevIds.has(t.id)) {
-        const init = tokenToJazzInit(t);
-        try {
-          const jt = JazzTokenSchema.create(init as any, group);
-          jazzTokens.$jazz.push(jt);
-        } catch (err) {
-          console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
+        if (jazzExistingIds.has(t.id)) {
+          console.log(`[jazz-bridge] ⚠️ Token ${t.id} already in Jazz — upsert instead of push`);
+          // Upsert existing
+          const len = jazzTokens.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const jt = jazzTokens[i];
+            if (jt && jt.tokenId === t.id) {
+              try {
+                const init = tokenToJazzInit(t);
+                for (const [key, val] of Object.entries(init)) {
+                  if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
+                }
+              } catch (err) {
+                console.error(`[jazz-bridge] Failed to upsert JazzToken:`, err);
+              }
+              break;
+            }
+          }
+        } else {
+          const init = tokenToJazzInit(t);
+          try {
+            const jt = JazzTokenSchema.create(init as any, group);
+            jazzTokens.$jazz.push(jt);
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to create JazzToken:`, err);
+          }
         }
       }
     }
@@ -1468,19 +1570,25 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             // from multiple store mutations referencing an old getState() snapshot.
             let tokensChanged = false;
             const updatedTokens = localTokens.map(existing => {
-              // Will be replaced below if Jazz has an update for this token
               return existing;
             });
 
+            // Deduplicate inbound Jazz tokens — only process the LAST entry per tokenId
+            // Jazz CoLists can accumulate duplicates from repeated pushes
+            const deduped = new Map<string, { jt: any; idx: number }>();
             for (let i = 0; i < len; i++) {
               const jt = tokens[i];
               if (!jt || !jt.tokenId) continue;
-              jazzIds.add(jt.tokenId);
+              deduped.set(jt.tokenId, { jt, idx: i }); // Last-write wins
+            }
 
-              const isLocallyDragged = _isPositionSuppressed(jt.tokenId);
+            for (const [tokenId, { jt }] of deduped) {
+              jazzIds.add(tokenId);
 
-              if (currentIds.has(jt.tokenId)) {
-                const localIdx = updatedTokens.findIndex((t) => t.id === jt.tokenId);
+              const isLocallyDragged = _isPositionSuppressed(tokenId);
+
+              if (currentIds.has(tokenId)) {
+                const localIdx = updatedTokens.findIndex((t) => t.id === tokenId);
                 if (localIdx === -1) continue;
                 const existing = updatedTokens[localIdx];
 
