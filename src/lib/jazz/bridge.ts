@@ -272,6 +272,27 @@ function tokenToJazzInit(t: Token): Record<string, any> {
   };
 }
 
+/**
+ * Deep-compare two entity objects, skipping specified keys.
+ * Returns true if any field differs (uses JSON.stringify for objects/arrays
+ * to avoid false positives from parsed JSON creating new references).
+ */
+function _hasEntityChanges(existing: any, incoming: any, skipKeys: string[]): boolean {
+  const skip = new Set(skipKeys);
+  for (const key of Object.keys(incoming)) {
+    if (skip.has(key)) continue;
+    const inVal = incoming[key];
+    const exVal = existing[key];
+    if (inVal === exVal) continue;
+    if (inVal == null && exVal == null) continue;
+    if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
+      if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+    }
+    return true;
+  }
+  return false;
+}
+
 /** Convert a JazzToken CoValue (as any) to a Zustand Token */
 function jazzToZustandToken(jt: any): Token {
   let extras: Record<string, any> = {};
@@ -1752,11 +1773,22 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Check position change
                 const posChanged = !isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y);
 
-                // Check non-position changes
+                // Check non-position changes (deep-compare objects/arrays to avoid
+                // false positives from parsed JSON extras like illuminationSources)
                 let hasNonPosChange = false;
                 for (const key of Object.keys(incoming) as (keyof Token)[]) {
                   if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
-                  if (incoming[key] !== existing[key]) { hasNonPosChange = true; break; }
+                  const inVal = incoming[key];
+                  const exVal = existing[key];
+                  if (inVal === exVal) continue;
+                  // Both null/undefined → equal
+                  if (inVal == null && exVal == null) continue;
+                  // Deep-compare objects/arrays via JSON to avoid false positives
+                  if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
+                    if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+                  }
+                  hasNonPosChange = true;
+                  break;
                 }
 
                 hasChange = posChanged || hasNonPosChange;
@@ -1847,7 +1879,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
           runFromJazz(() => {
             const store = useRegionStore.getState();
-            const currentIds = new Set(store.regions.map(r => r.id));
+            const localRegions = store.regions;
+            const currentMap = new Map(localRegions.map(r => [r.id, r]));
             const jazzIds = new Set<string>();
 
             for (let i = 0; i < len; i++) {
@@ -1855,8 +1888,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               if (!jr) continue;
               jazzIds.add(jr.regionId);
 
-              if (currentIds.has(jr.regionId)) {
-                store.updateRegion(jr.regionId, jazzToZustandRegion(jr));
+              const existing = currentMap.get(jr.regionId);
+              if (existing) {
+                // Only update if something actually changed (deep-compare parsed JSON fields)
+                const incoming = jazzToZustandRegion(jr);
+                if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'backgroundImage'])) {
+                  store.updateRegion(jr.regionId, incoming);
+                }
               } else {
                 store.addRegion(jazzToZustandRegion(jr));
               }
@@ -1913,7 +1951,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
           runFromJazz(() => {
             const store = useMapObjectStore.getState();
-            const currentIds = new Set(store.mapObjects.map(o => o.id));
+            const localObjects = store.mapObjects;
+            const currentMap = new Map(localObjects.map(o => [o.id, o]));
             const jazzIds = new Set<string>();
 
             for (let i = 0; i < len; i++) {
@@ -1921,8 +1960,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               if (!jmo) continue;
               jazzIds.add(jmo.objectId);
 
-              if (currentIds.has(jmo.objectId)) {
-                store.updateMapObject(jmo.objectId, jazzToZustandMapObject(jmo));
+              const existing = currentMap.get(jmo.objectId);
+              if (existing) {
+                // Only update if something actually changed (deep-compare parsed JSON fields)
+                const incoming = jazzToZustandMapObject(jmo);
+                if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'imageUrl'])) {
+                  store.updateMapObject(jmo.objectId, incoming);
+                }
               } else {
                 store.addMapObject(jazzToZustandMapObject(jmo));
               }
