@@ -186,6 +186,23 @@ const CursorToggleButton: React.FC = () => {
   );
 };
 
+/** Non-interactive cursor status indicator for connected clients (non-DM) */
+const CursorStatusIndicator: React.FC = () => {
+  const enabled = useCursorStore((s) => s.cursorSharingEnabled);
+  return (
+    <div
+      className={`inline-flex items-center h-8 gap-1.5 text-xs px-3 rounded-md border ${
+        enabled
+          ? "bg-primary/15 border-primary/30 text-primary"
+          : "bg-muted/50 border-border text-muted-foreground"
+      }`}
+    >
+      <MousePointer2 className="h-3.5 w-3.5" />
+      Cursors {enabled ? "On" : "Off"}
+    </div>
+  );
+};
+
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
   React.useEffect(() => {
@@ -11878,6 +11895,16 @@ export const SimpleTabletop = () => {
           style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
         >
           <CursorToggleButton />
+        </div>
+      )}
+
+      {/* Client Cursor Sharing Status — non-interactive indicator for non-DMs */}
+      {!isDM && (
+        <div
+          className="absolute bottom-4 left-28 select-none pointer-events-none"
+          style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+        >
+          <CursorStatusIndicator />
         </div>
       )}
 
