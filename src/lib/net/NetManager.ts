@@ -191,6 +191,11 @@ export class NetManager {
       const store = useMultiplayerStore.getState();
       store.setConnectionStatus("connected");
 
+      // OpBridge sessions don't go through Jazz sync — mark sync as ready immediately
+      if (!this._ephemeralOnly) {
+        store.setSyncReady(true);
+      }
+
       // In ephemeral-only mode (Jazz tandem), don't overwrite session/roles
       // that were already set by the Jazz session manager.
       if (!this._ephemeralOnly) {
