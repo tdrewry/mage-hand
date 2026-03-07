@@ -126,6 +126,12 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
         resolve: {
           tokens: { $each: true },
           maps: { $each: true },
+          regions: { $each: true },
+          mapObjects: { $each: true },
+          effects: {
+            placedEffects: { $each: true },
+            customTemplates: { $each: true },
+          },
           blobs: { $each: true },
           textures: { $each: true },
         },
@@ -158,6 +164,11 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
     tokensLength: root.tokens?.length ?? "N/A",
     hasMaps: !!root.maps,
     mapsLength: root.maps?.length ?? "N/A",
+    hasRegions: !!root.regions,
+    regionsLength: root.regions?.length ?? "N/A",
+    hasMapObjects: !!root.mapObjects,
+    mapObjectsLength: root.mapObjects?.length ?? "N/A",
+    hasEffects: !!root.effects,
     hasBlobs: !!root.blobs,
     blobsLength: root.blobs?.length ?? "N/A",
     rootKeys: Object.keys(root).filter((k: string) => !k.startsWith("_")),
@@ -191,7 +202,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
   startBridge(root, false);
 
   // Check if initial pull got meaningful data
-  const hasData = !!(root.tokens?.length || root.blobs?.length);
+  const hasData = !!(root.tokens?.length || root.blobs?.length || root.regions?.length || root.mapObjects?.length);
   
   if (!hasData) {
     // Schedule retries — the host may not have pushed yet or Jazz sync is still propagating
@@ -237,6 +248,12 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
         resolve: {
           tokens: { $each: true },
           maps: { $each: true },
+          regions: { $each: true },
+          mapObjects: { $each: true },
+          effects: {
+            placedEffects: { $each: true },
+            customTemplates: { $each: true },
+          },
           blobs: { $each: true },
           textures: { $each: true },
         },
