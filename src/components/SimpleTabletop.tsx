@@ -203,6 +203,7 @@ const CursorStatusIndicator: React.FC = () => {
   );
 };
 
+export const SimpleTabletop = () => {
   // Register ephemeral handlers once
   React.useEffect(() => {
     registerCursorHandlers();
