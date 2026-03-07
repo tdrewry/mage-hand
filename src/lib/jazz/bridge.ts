@@ -111,6 +111,7 @@ export function getBridgedSessionRoot(): any {
     tokens: _cachedTokens ?? _sessionRoot.tokens,
     regions: _cachedRegions ?? _sessionRoot.regions,
     mapObjects: _cachedMapObjects ?? _sessionRoot.mapObjects,
+    effects: _cachedEffects ?? _sessionRoot.effects,
     blobs: _cachedBlobs ?? _sessionRoot.blobs,
     _owner: _cachedGroup ?? _sessionRoot._owner,
     get $jazz() { return _sessionRoot.$jazz; },
