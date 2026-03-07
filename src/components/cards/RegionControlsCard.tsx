@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { useRegionStore, CanvasRegion } from '@/stores/regionStore';
+import { CardSaveButton } from './CardSaveButton';
 
 interface RegionControlsCardContentProps {
   regionId: string | null;
@@ -215,8 +216,18 @@ export const RegionControlsCardContent: React.FC<RegionControlsCardContentProps>
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Save & Sync */}
       <div className="pt-2 border-t space-y-2">
+        <CardSaveButton
+          context={{ type: 'region', id: region.id }}
+          onSave={() => {
+            console.log(`[RegionControlsCard] Save triggered for region ${region.id}`);
+          }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-2">
         <Button
           variant={region.locked ? "default" : "outline"}
           size="sm"

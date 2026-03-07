@@ -8,6 +8,7 @@
 import { CardSaveEvent, type CardSaveEventDetail } from '@/components/cards/CardSaveButton';
 import { opBridge } from './OpBridge';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useRegionStore } from '@/stores/regionStore';
 
 function handleCardSave(e: Event) {
   const detail = (e as CustomEvent<CardSaveEventDetail>).detail;
@@ -44,7 +45,44 @@ function handleCardSave(e: Event) {
       });
       break;
     }
-    // Future: region, map-object, effect, session
+    case 'region': {
+      if (!id) break;
+      const region = useRegionStore.getState().regions.find(r => r.id === id);
+      if (!region) break;
+      opBridge.emitLocalOp({
+        kind: 'region.update',
+        targets: { entityIds: [id] },
+        data: {
+          id: region.id,
+          x: region.x,
+          y: region.y,
+          width: region.width,
+          height: region.height,
+          color: region.color,
+          gridType: region.gridType,
+          gridSize: region.gridSize,
+          gridScale: region.gridScale,
+          gridSnapping: region.gridSnapping,
+          gridVisible: region.gridVisible,
+          backgroundColor: region.backgroundColor,
+          backgroundImage: region.backgroundImage,
+          textureHash: region.textureHash,
+          backgroundRepeat: region.backgroundRepeat,
+          backgroundScale: region.backgroundScale,
+          backgroundOffsetX: region.backgroundOffsetX,
+          backgroundOffsetY: region.backgroundOffsetY,
+          regionType: region.regionType,
+          pathPoints: region.pathPoints,
+          bezierControlPoints: region.bezierControlPoints,
+          smoothing: region.smoothing,
+          rotation: region.rotation,
+          rotationCenter: region.rotationCenter,
+          locked: region.locked,
+          mapId: region.mapId,
+        },
+      });
+      break;
+    }
     default:
       console.log(`[cardSaveSync] No sync handler for context type: ${type}`);
   }

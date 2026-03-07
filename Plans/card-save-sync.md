@@ -14,7 +14,7 @@ Create a reusable `CardSaveButton` component that fires a `card:save` DOM event 
 | Type | Op Kind | Status |
 |------|---------|--------|
 | `token` | `token.update` | ✅ Done |
-| `region` | TBD | Planned |
+| `region` | `region.update` | ✅ Done |
 | `map-object` | TBD | Planned |
 | `effect` | TBD | Planned |
 | `session` | TBD | Planned |
@@ -30,4 +30,7 @@ Create a reusable `CardSaveButton` component that fires a `card:save` DOM event 
 - [x] token.update OpBridge handler (receive side)
 - [x] CharacterSheetCard unified save
 - [x] Edit Token modal fires sync event
-- [ ] Future: region/map-object/effect context handlers
+- [x] region.update OpBridge handler (receive side)
+- [x] RegionControlsCard Save Changes button
+- [x] region.update added to Jazz suppression list
+- [ ] Future: map-object/effect context handlers
