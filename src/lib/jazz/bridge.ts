@@ -1432,11 +1432,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
-          // Skip ALL position updates while any local drag is active —
-          // Jazz may have stale positions that would corrupt local state.
-          // Final positions are pushed explicitly via _pushTokenFinalPosition on drag end.
-          if (_localDragTokens.size > 0) return;
-
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const currentIds = new Set(store.tokens.map((t) => t.id));
@@ -1447,10 +1442,31 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               if (!jt || !jt.tokenId) continue;
               jazzIds.add(jt.tokenId);
 
+              // Skip position updates for tokens being dragged locally
+              const isLocallyDragged = _localDragTokens.has(jt.tokenId);
+
               if (currentIds.has(jt.tokenId)) {
                 const existing = store.tokens.find((t) => t.id === jt.tokenId);
-                if (existing && (existing.x !== jt.x || existing.y !== jt.y)) {
+                if (!existing) continue;
+
+                // Sync position (unless locally dragged)
+                if (!isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y)) {
                   store.updateTokenPosition(jt.tokenId, jt.x, jt.y);
+                }
+
+                // Sync non-position properties regardless of drag state
+                const incoming = jazzToZustandToken(jt);
+                const propUpdates: Partial<Token> = {};
+                let hasUpdates = false;
+                for (const key of Object.keys(incoming) as (keyof Token)[]) {
+                  if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
+                  if (incoming[key] !== existing[key]) {
+                    (propUpdates as any)[key] = incoming[key];
+                    hasUpdates = true;
+                  }
+                }
+                if (hasUpdates) {
+                  store.updateToken(jt.tokenId, propUpdates);
                 }
               } else {
                 store.addToken(jazzToZustandToken(jt));
