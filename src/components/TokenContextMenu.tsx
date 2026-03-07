@@ -1734,7 +1734,14 @@ export const TokenContextMenu = ({
             <Button variant="outline" onClick={() => setShowTokenEditModal(false)}>
               Cancel
             </Button>
-            <Button onClick={applyTokenEdit}>
+            <Button onClick={() => {
+              applyTokenEdit();
+              // Fire card:save for network sync
+              const { CardSaveEvent } = require('@/components/cards/CardSaveButton');
+              targetTokens.forEach(t => {
+                window.dispatchEvent(new CardSaveEvent({ context: { type: 'token', id: t.id } }));
+              });
+            }}>
               Save Changes
             </Button>
           </DialogFooter>
