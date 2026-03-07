@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useMapStore } from '@/stores/mapStore';
 import { MapObject, MapObjectCategory, MAP_OBJECT_CATEGORY_LABELS, MAP_OBJECT_PRESETS, DOOR_TYPE_STYLES } from '@/types/mapObjectTypes';
+import { CardSaveButton } from './CardSaveButton';
 
 export const MapObjectPanelCardContent = () => {
   const mapObjects = useMapObjectStore((state) => state.mapObjects);
@@ -419,6 +420,16 @@ export const MapObjectPanelCardContent = () => {
             </div>
           )}
           
+          {/* Save & Sync (single selection only) */}
+          {singleSelected && (
+            <CardSaveButton
+              context={{ type: 'map-object', id: singleSelected.id }}
+              onSave={() => {
+                console.log(`[MapObjectPanelCard] Save triggered for ${singleSelected.id}`);
+              }}
+            />
+          )}
+
           {/* Actions */}
           <div className="flex gap-2">
             <Button
