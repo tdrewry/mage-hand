@@ -52,45 +52,7 @@ import { useHatchingStore } from "@/stores/hatchingStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 
-// ── Effect texture stripping for Jazz sync ─────────────────────────────────
-
-/**
- * Strip texture data URIs from effects state before Jazz blob sync.
- * Textures are synced separately via FileStreams — we only need textureHash.
- */
-function stripEffectTexturesForSync(state: any): any {
-  if (!state) return state;
-  const stripped = { ...state };
-
-  /** Strip texture AND icon data URIs from a template-like object */
-  const stripTemplate = (t: any): any => {
-    if (!t) return t;
-    let changed = false;
-    const copy = { ...t };
-    if (copy.texture && copy.texture.length > 200) { copy.texture = ''; changed = true; }
-    if (copy.icon && typeof copy.icon === 'string' && copy.icon.length > 200) { copy.icon = ''; changed = true; }
-    return changed ? copy : t;
-  };
-
-  // Strip the ENTIRE template snapshot from placedEffects.
-  // Templates are reconstructible from templateId + castLevel on the receiving side.
-  // This is the primary fix for the 2-3MB effects blob.
-  if (Array.isArray(stripped.placedEffects)) {
-    stripped.placedEffects = stripped.placedEffects.map((e: any) => {
-      if (!e) return e;
-      // Keep only essential fields, drop the full template snapshot
-      const { template, ...rest } = e;
-      return rest;
-    });
-  }
-
-  // Strip from customTemplates
-  if (Array.isArray(stripped.customTemplates)) {
-    stripped.customTemplates = stripped.customTemplates.map(stripTemplate);
-  }
-
-  return stripped;
-}
+// (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
 let _fromJazz = false;
 
@@ -159,15 +121,12 @@ export function getBridgedSessionRoot(): any {
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
   'fog', 'lights', 'illumination', 'dungeon', 'creatures',
-  'hatching', 'effects', 'actions', 'dice',
+  'hatching', 'actions', 'dice',
 ];
 
-// Kinds excluded from blob sync:
-// - 'tokens': fine-grained CoValue sync
-// - 'regions': fine-grained CoValue sync
-// - 'mapObjects': fine-grained CoValue sync
-// - 'cards': UI layout, per-user
-// - 'viewportTransforms': per-user viewport
+// Kinds excluded from blob sync (fine-grained CoValue sync):
+// - 'tokens', 'regions', 'mapObjects', 'effects'
+// Per-user (not synced): 'cards', 'viewportTransforms'
 
 // ══════════════════════════════════════════════════════════════════════════
 // TOKEN BRIDGE HELPERS
