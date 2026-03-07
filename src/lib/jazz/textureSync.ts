@@ -21,6 +21,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
 import { useMapStore } from "@/stores/mapStore";
+import { useMapObjectStore } from "@/stores/mapObjectStore";
 import {
   notifyTextureDownloadStart,
   notifyTextureDownloadComplete,
@@ -78,6 +79,11 @@ export function collectAllTextureHashes(): Set<string> {
   // Maps
   for (const m of useMapStore.getState().maps) {
     if ((m as any).imageHash) hashes.add((m as any).imageHash);
+  }
+
+  // Map Objects
+  for (const obj of useMapObjectStore.getState().mapObjects) {
+    if ((obj as any).imageHash) hashes.add((obj as any).imageHash);
   }
 
   return hashes;

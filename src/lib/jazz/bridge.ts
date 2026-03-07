@@ -86,8 +86,26 @@ function stripRegionTexturesForSync(state: any): any {
   return state;
 }
 
+/**
+ * Strip imageUrl data URIs from map objects state before Jazz blob sync.
+ * Map object textures are synced separately via FileStreams using imageHash.
+ */
+function stripMapObjectTexturesForSync(state: any): any {
+  if (!state) return state;
+  if (Array.isArray(state)) {
+    return state.map((obj: any) => {
+      if (!obj?.imageUrl || obj.imageUrl.length < 200) return obj;
+      return { ...obj, imageUrl: '' };
+    });
+  }
+  return state;
+}
+
 
 let _fromJazz = false;
+
+/** Throttle map for "too large" skip warnings — one per kind per 30s */
+const _lastSkipWarn = new Map<string, number>();
 
 /** Whether the local client created this session (source of truth for initial state) */
 let _isCreator = false;
@@ -257,13 +275,15 @@ function pushBlobToJazz(kind: string): void {
   try {
     let state = reg.extractor();
 
-    // Strip texture data URIs from effects to avoid exceeding Jazz's 1MB limit
-    // Textures are synced separately via FileStreams
+    // Strip texture data URIs from stores that sync textures via FileStreams
     if (kind === 'effects' && state) {
       state = stripEffectTexturesForSync(state);
     }
     if (kind === 'regions' && state) {
       state = stripRegionTexturesForSync(state);
+    }
+    if (kind === 'mapObjects' && state) {
+      state = stripMapObjectTexturesForSync(state);
     }
 
     const json = JSON.stringify(state);
@@ -275,7 +295,11 @@ function pushBlobToJazz(kind: string): void {
     // Guard: Jazz has a 1MB transaction limit
     const JAZZ_MAX_BYTES = 1_000_000;
     if (json.length > JAZZ_MAX_BYTES) {
-      console.warn(`[jazz-bridge] ⚠️ Blob "${kind}" too large for Jazz sync (${(json.length / 1024 / 1024).toFixed(1)}MB > 1MB) — skipping`);
+      const now = Date.now();
+      if (!_lastSkipWarn.has(kind) || now - _lastSkipWarn.get(kind)! > 30000) {
+        console.warn(`[jazz-bridge] ⚠️ Blob "${kind}" too large for Jazz sync (${(json.length / 1024 / 1024).toFixed(1)}MB > 1MB) — skipping`);
+        _lastSkipWarn.set(kind, now);
+      }
       return;
     }
 
@@ -426,17 +450,43 @@ export function pushBlobsToJazz(sessionRoot: any): void {
     }
 
     try {
-      const state = reg.extractor();
+      let state = reg.extractor();
+
+      // Strip texture data URIs — textures sync via FileStreams
+      if (kind === 'effects' && state) state = stripEffectTexturesForSync(state);
+      if (kind === 'regions' && state) state = stripRegionTexturesForSync(state);
+      if (kind === 'mapObjects' && state) state = stripMapObjectTexturesForSync(state);
+
       const json = JSON.stringify(state);
       _lastPushedHash.set(kind, quickHash(json));
 
-      const blob = JazzDOBlobSchema.create({
-        kind,
-        version: reg.version,
-        state: json,
-        updatedAt: new Date().toISOString(),
-      } as any, group);
-      sessionRoot.blobs.$jazz.push(blob);
+      // Check for existing blob of this kind to avoid duplicates
+      const blobs = sessionRoot.blobs;
+      const blobLen = blobs.length ?? 0;
+      let existingIdx = -1;
+      for (let i = 0; i < blobLen; i++) {
+        if (blobs[i]?.kind === kind) { existingIdx = i; break; }
+      }
+
+      if (existingIdx >= 0) {
+        // Update in-place
+        const existing = blobs[existingIdx];
+        try {
+          existing.$jazz.set("state", json);
+          existing.$jazz.set("version", reg.version);
+          existing.$jazz.set("updatedAt", new Date().toISOString());
+        } catch (err) {
+          console.error(`[jazz-bridge] Failed to update existing blob ${kind}:`, err);
+        }
+      } else {
+        const blob = JazzDOBlobSchema.create({
+          kind,
+          version: reg.version,
+          state: json,
+          updatedAt: new Date().toISOString(),
+        } as any, group);
+        sessionRoot.blobs.$jazz.push(blob);
+      }
       successCount++;
       console.log(`[jazz-bridge] → Jazz blob: ${kind} (${json.length} chars)`);
     } catch (err) {
@@ -503,10 +553,20 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   const len = sessionRoot.blobs.length ?? 0;
   console.log(`[jazz-bridge] Pulling ${len} DO blobs from Jazz`);
 
+  // Deduplicate by kind — keep only the blob with the latest updatedAt
+  const latestByKind = new Map<string, { state: string; updatedAt: string }>();
   for (let i = 0; i < len; i++) {
     const blob = sessionRoot.blobs[i];
     if (!blob || !blob.kind || !blob.state) continue;
-    pullBlobFromJazz(blob.kind, blob.state);
+    const existing = latestByKind.get(blob.kind);
+    if (!existing || (blob.updatedAt && (!existing.updatedAt || blob.updatedAt > existing.updatedAt))) {
+      latestByKind.set(blob.kind, { state: blob.state, updatedAt: blob.updatedAt ?? '' });
+    }
+  }
+
+  console.log(`[jazz-bridge] Deduplicated ${len} blobs to ${latestByKind.size} unique kinds`);
+  for (const [kind, { state }] of latestByKind) {
+    pullBlobFromJazz(kind, state);
   }
 }
 
