@@ -103,6 +103,9 @@ export class NetworkSession {
   private lastAppliedSeq: OpSeq = 0;
   private connectedInfo?: NetworkSessionInfo;
 
+  /** Cleanup function for the pending "open" handler from a previous connect() call */
+  private _pendingOpenCleanup?: () => void;
+
   // Outgoing op batching
   private batchQueue: Array<{ clientOpId?: string; op: EngineOp }> = [];
   private batchTimer?: number;
@@ -140,6 +143,13 @@ export class NetworkSession {
     this.sessionCode = params.sessionCode;
     this.lastAppliedSeq = params.lastSeenSeq ?? 0;
 
+    // Clean up any stale "open" handler from a previous connect() call
+    // to prevent sending duplicate hellos
+    if (this._pendingOpenCleanup) {
+      this._pendingOpenCleanup();
+      this._pendingOpenCleanup = undefined;
+    }
+
     return new Promise((resolve, reject) => {
       let settled = false;
 
@@ -150,6 +160,13 @@ export class NetworkSession {
       });
 
       const offRejected = this.on("rejected", (rej) => {
+        // Suppress benign "Unhandled: hello" rejections — server received
+        // a duplicate hello on an already-authenticated connection
+        const msg = rej.message ?? rej.code ?? "";
+        if (msg.includes("Unhandled") && msg.includes("hello")) {
+          console.log("[NetworkSession] Suppressed benign duplicate-hello rejection");
+          return;
+        }
         if (settled) return;
         settled = true;
         offConnected(); offRejected(); offError();
@@ -167,6 +184,7 @@ export class NetworkSession {
 
       const offOpen = this.transport.on("open", () => {
         offOpen();
+        this._pendingOpenCleanup = undefined;
         const hello: Msg<"hello", HelloPayload> = {
           v: PROTOCOL_VERSION,
           t: "hello",
@@ -186,6 +204,7 @@ export class NetworkSession {
         };
         this.sendMsg(hello);
       });
+      this._pendingOpenCleanup = offOpen;
     });
   }
 

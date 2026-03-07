@@ -188,6 +188,37 @@ export class LocalRoomServer {
       }
 
       switch (msg.t) {
+        case "hello": {
+          // Duplicate hello on an already-authenticated connection — re-send welcome
+          console.log(`[room] Duplicate hello from ${ctx.userId} — re-sending welcome`);
+          const peers: UserSummary[] = [];
+          for (const c of session.clients) {
+            if (c !== ctx) {
+              peers.push({ userId: c.userId, username: c.username, roles: c.roles });
+            }
+          }
+          const welcome: ServerToClientMessage = {
+            v: PROTOCOL_VERSION,
+            t: "welcome",
+            clientId: msg.clientId,
+            sessionId: session.sessionId,
+            sessionCode: session.sessionCode,
+            userId: ctx.userId,
+            ts: nowIso(),
+            p: {
+              sessionId: session.sessionId,
+              user: { userId: ctx.userId, username: ctx.username, roles: ctx.roles },
+              permissions: ctx.permissions,
+              currentSeq: session.seq,
+              snapshot: session.snapshot,
+              peers,
+              features: { opBatching: true, maxBatchSize: 25, maxMessageBytes: 256_000 },
+            } satisfies WelcomePayload,
+          };
+          send(ws, welcome);
+          return;
+        }
+
         case "propose_ops": {
           if (!msg.clientSeq) return send(ws, this.reject({ code: "bad_request", message: "Missing clientSeq" }));
 
