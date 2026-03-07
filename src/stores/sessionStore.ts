@@ -167,6 +167,10 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   setTokens: (tokens) => set({ tokens }),
   
   updateTokenPosition: (tokenId, x, y) => {
+    const state = get();
+    const existing = state.tokens.find(t => t.id === tokenId);
+    // Skip if position is exactly the same (no-op)
+    if (existing && existing.x === x && existing.y === y) return;
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, x, y } : token
