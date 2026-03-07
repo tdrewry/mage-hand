@@ -639,7 +639,7 @@ export const SimpleTabletop = () => {
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
     containerRef: canvasContainerRef,
-    enabled: renderingMode === 'play' && fogEnabled && effectSettings.postProcessingEnabled,
+    enabled: fogEnabled && !fogRevealAll && effectSettings.postProcessingEnabled,
     width: fogBounds.width,
     height: fogBounds.height,
     originX: fogBounds.originX,
