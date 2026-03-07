@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin, Copy, BookOpen, Star, Zap, RotateCw } from 'lucide-react';
+import { CardSaveEvent } from '@/components/cards/CardSaveButton';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
@@ -1736,8 +1737,6 @@ export const TokenContextMenu = ({
             </Button>
             <Button onClick={() => {
               applyTokenEdit();
-              // Fire card:save for network sync
-              const { CardSaveEvent } = require('@/components/cards/CardSaveButton');
               targetTokens.forEach(t => {
                 window.dispatchEvent(new CardSaveEvent({ context: { type: 'token', id: t.id } }));
               });
