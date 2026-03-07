@@ -111,9 +111,15 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
     console.warn(`[jazz-session] Session ID "${sessionCoId}" does not look like a CoValue ID (expected co_...). Load will likely fail.`);
   }
 
+  // Give Jazz's internal IDB client time to fully initialise before we
+  // issue our first .load().  Without this, the IDB connection is sometimes
+  // still in a "closing" state from a previous provider mount cycle, and
+  // Jazz's queryIndexedDbStore throws InvalidStateError.
+  await new Promise(r => setTimeout(r, 300));
+
   // Load the session root CoValue by ID, with retry for IDB closing errors
   let root: any;
-  const MAX_IDB_RETRIES = 3;
+  const MAX_IDB_RETRIES = 4;
   for (let attempt = 0; attempt <= MAX_IDB_RETRIES; attempt++) {
     try {
       root = await (JazzSessionRootSchema as any).load(sessionCoId, {
@@ -129,7 +135,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
       const msg = String(err?.message ?? err);
       const isIdbClosing = msg.includes('database connection is closing') || msg.includes('InvalidStateError');
       if (isIdbClosing && attempt < MAX_IDB_RETRIES) {
-        const delay = 500 * (attempt + 1);
+        const delay = 600 * (attempt + 1);
         console.warn(`[jazz-session] IDB connection closing — retry ${attempt + 1}/${MAX_IDB_RETRIES} in ${delay}ms`);
         await new Promise(r => setTimeout(r, delay));
         continue;
