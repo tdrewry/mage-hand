@@ -218,7 +218,7 @@ export function registerMiscHandlers(): void {
 async function applyAcceptedArt(data: AssetAcceptedPayload): Promise<void> {
   try {
     if (data.targetType === 'token') {
-      await saveTokenTextureByHash(data.textureHash, data.textureDataUrl);
+      await saveTextureByHash(data.textureHash, data.textureDataUrl);
       useSessionStore.getState().updateTokenImage(data.targetId, data.textureDataUrl, data.textureHash);
       toast.success(`Art applied to token`);
     } else if (data.targetType === 'region') {
