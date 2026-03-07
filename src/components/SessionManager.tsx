@@ -86,12 +86,15 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
   const [username, setUsername] = useState(currentUsername || landingUsername || '');
 
-  // Sync username when dialog opens and a landing identity exists
+  // Always pre-fill from landing identity when dialog opens
   React.useEffect(() => {
-    if (open && !username && (landingUsername || currentUsername)) {
-      setUsername(landingUsername || currentUsername || '');
+    if (open) {
+      const preferred = landingUsername || currentUsername || '';
+      if (preferred && preferred !== username) {
+        setUsername(preferred);
+      }
     }
-  }, [open]);
+  }, [open, landingUsername, currentUsername]);
   const [sessionCode, setSessionCode] = useState('');
   const [password, setPassword] = useState('');
   const [inviteToken, setInviteToken] = useState('');
