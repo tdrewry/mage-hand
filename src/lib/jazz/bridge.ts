@@ -450,17 +450,43 @@ export function pushBlobsToJazz(sessionRoot: any): void {
     }
 
     try {
-      const state = reg.extractor();
+      let state = reg.extractor();
+
+      // Strip texture data URIs — textures sync via FileStreams
+      if (kind === 'effects' && state) state = stripEffectTexturesForSync(state);
+      if (kind === 'regions' && state) state = stripRegionTexturesForSync(state);
+      if (kind === 'mapObjects' && state) state = stripMapObjectTexturesForSync(state);
+
       const json = JSON.stringify(state);
       _lastPushedHash.set(kind, quickHash(json));
 
-      const blob = JazzDOBlobSchema.create({
-        kind,
-        version: reg.version,
-        state: json,
-        updatedAt: new Date().toISOString(),
-      } as any, group);
-      sessionRoot.blobs.$jazz.push(blob);
+      // Check for existing blob of this kind to avoid duplicates
+      const blobs = sessionRoot.blobs;
+      const blobLen = blobs.length ?? 0;
+      let existingIdx = -1;
+      for (let i = 0; i < blobLen; i++) {
+        if (blobs[i]?.kind === kind) { existingIdx = i; break; }
+      }
+
+      if (existingIdx >= 0) {
+        // Update in-place
+        const existing = blobs[existingIdx];
+        try {
+          existing.$jazz.set("state", json);
+          existing.$jazz.set("version", reg.version);
+          existing.$jazz.set("updatedAt", new Date().toISOString());
+        } catch (err) {
+          console.error(`[jazz-bridge] Failed to update existing blob ${kind}:`, err);
+        }
+      } else {
+        const blob = JazzDOBlobSchema.create({
+          kind,
+          version: reg.version,
+          state: json,
+          updatedAt: new Date().toISOString(),
+        } as any, group);
+        sessionRoot.blobs.$jazz.push(blob);
+      }
       successCount++;
       console.log(`[jazz-bridge] → Jazz blob: ${kind} (${json.length} chars)`);
     } catch (err) {
