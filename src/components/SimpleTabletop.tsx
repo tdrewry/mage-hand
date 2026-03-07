@@ -2094,22 +2094,22 @@ export const SimpleTabletop = () => {
       // Soft refreshes keep existing fog masks to prevent black flash
       const isSoft = e instanceof CustomEvent && (e as CustomEvent).detail?.soft === true;
 
-      // 1. Extract wall segments (same as redrawCanvas)
-      const wallSegments = wallSegmentsRef.current;
-      if (wallSegments && wallSegments.length > 0) {
-        const mapObjSegments = buildMapObjectWallSegments(filteredMapObjects);
-        const importedWalls = importedWallSegmentsRef.current || [];
-        combinedSegmentsRef.current = [
-          ...wallSegments,
-          ...mapObjSegments,
-          ...importedWalls,
-        ];
+      if (!isSoft) {
+        // Hard refresh: rebuild combined wall segments
+        if (wallGeometryRef.current) {
+          const mapObjectSegments = mapObjectsToSegments(filteredMapObjects);
+          combinedSegmentsRef.current = [
+            ...wallGeometryRef.current.wallSegments,
+            ...mapObjectSegments,
+            ...importedWallSegments,
+          ];
+        }
+
+        // Notify light system that obstacle geometry has changed
+        notifyObstaclesChanged();
       }
 
-      // 2. Notify light system that obstacle geometry has changed
-      notifyObstaclesChanged();
-
-      // 3. Clear all per-token visibility caches
+      // Clear all per-token visibility caches
       tokenVisibilityCacheRef.current.forEach((cached) => {
         if (cached?.visionPath?.remove) cached.visionPath.remove();
       });
@@ -2117,11 +2117,11 @@ export const SimpleTabletop = () => {
       prevTokenPositionsRef.current.clear();
       prevTokenIlluminationRef.current?.clear?.();
 
-      // 4. Clear global Paper.js / visibility-polygon cache
+      // Clear global Paper.js / visibility-polygon cache
       clearVisibilityCache();
 
-      // 5. Only null fog masks for hard refreshes (geometry changes).
-      //    Soft refreshes (illumination-only) keep old masks to prevent black flash.
+      // Only null fog masks for hard refreshes (geometry changes).
+      // Soft refreshes (illumination-only) keep old masks to prevent black flash.
       if (!isSoft) {
         fogMasksRef.current = null;
       }
@@ -2129,18 +2129,16 @@ export const SimpleTabletop = () => {
       // Always invalidate illumination cache so it's rebuilt with new data
       illuminationSourcesCacheRef.current = null;
 
-      // 6. Reset PixiJS post-processing layer for a clean frame
+      // Reset PixiJS post-processing layer for a clean frame
       if (isPostProcessingReadyRef.current) {
         if (!isSoft) setPostProcessingVisible(false);
         requestAnimationFrame(() => {
           if (!isSoft) setPostProcessingVisible(true);
           redrawCanvas();
-          // Bump fog refresh tick to re-trigger the fog computation useEffect
           setFogRefreshTick(t => t + 1);
         });
       } else {
         redrawCanvas();
-        // Bump fog refresh tick to re-trigger the fog computation useEffect
         setFogRefreshTick(t => t + 1);
       }
     };
