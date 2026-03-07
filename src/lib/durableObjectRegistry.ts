@@ -444,22 +444,36 @@ DurableObjectRegistry.register({
     // Clear placed effects on all maps
     const mapIds = new Set(store.placedEffects.map(e => e.mapId));
     mapIds.forEach(id => store.clearEffectsForMap(id));
-    // Re-add custom templates
+    // Re-add custom templates first so they're available for template reconstruction
     (state?.customTemplates || []).forEach((t: any) => {
       store.addCustomTemplate(t);
     });
-    // Restore placed effects (including auras)
+    // Build a lookup of custom templates by id for reconstruction
+    const customById = new Map<string, any>();
+    (state?.customTemplates || []).forEach((t: any) => { if (t?.id) customById.set(t.id, t); });
+    // Restore placed effects — reconstruct template from templateId + castLevel
     if (state?.placedEffects?.length) {
       const now = performance.now();
       const restored = state.placedEffects
         .filter((e: any) => !e.dismissedAt) // Skip dismissed effects
-        .map((e: any) => ({
-          ...e,
-          placedAt: now, // Reset to current time so animations work
-          dismissedAt: undefined,
-          // Ensure aura fields are initialized
-          ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
-        }));
+        .map((e: any) => {
+          // Reconstruct template if missing (stripped during sync)
+          let template = e.template;
+          if (!template && e.templateId) {
+            const base = customById.get(e.templateId) ?? getBuiltInTemplate(e.templateId);
+            if (base) {
+              template = computeScaledTemplate(base, e.castLevel);
+            }
+          }
+          return {
+            ...e,
+            template: template ?? e.template,
+            placedAt: now,
+            dismissedAt: undefined,
+            ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
+          };
+        })
+        .filter((e: any) => e.template); // Drop effects whose template can't be found
       useEffectStore.setState({ placedEffects: restored });
     }
   },
