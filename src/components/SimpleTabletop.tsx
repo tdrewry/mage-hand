@@ -10338,6 +10338,7 @@ export const SimpleTabletop = () => {
       // Clear multi-drag start positions
       multiDragStartPositionsRef.current = {};
 
+      if (draggedTokenId) markTokenDragEnd(draggedTokenId);
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
@@ -11144,6 +11145,7 @@ export const SimpleTabletop = () => {
           }
         }
 
+        if (draggedTokenId) markTokenDragEnd(draggedTokenId);
         setIsDraggingToken(false);
         setDraggedTokenId(null);
         setDragOffset({ x: 0, y: 0 });
