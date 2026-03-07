@@ -262,7 +262,9 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
 
       if (blob) {
         const dataUrl = await blobToDataUri(blob);
+        // Save to BOTH texture stores so tokens and regions can find it
         await saveTextureByHash(hash, dataUrl);
+        await saveTokenTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         downloaded++;
         // Apply to entities immediately so textures appear without refresh
@@ -376,7 +378,9 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
             const blob = await Promise.race([downloadPromise, timeoutPromise]);
             if (blob) {
               const dataUrl = await blobToDataUri(blob);
+              // Save to BOTH texture stores
               await saveTextureByHash(entry.hash, dataUrl);
+              await saveTokenTextureByHash(entry.hash, dataUrl);
               _downloadedHashes.add(entry.hash);
               _applyTextureToEntities(entry.hash, dataUrl);
               notifyTextureDownloadComplete(entry.hash);
