@@ -4152,8 +4152,8 @@ export const SimpleTabletop = () => {
         applyPostProcessingEffects(
           ctx,
           fogMasksRef.current,
-          fogOpacity,
-          exploredOpacity,
+          effectiveFogOpacity,
+          effectiveExploredOpacity,
           transform,
           {
             sources: illuminationSources,
