@@ -2045,6 +2045,7 @@ export function stopBridge(): void {
   _throttleTimers.clear();
   for (const timer of _fineGrainedTimers.values()) clearTimeout(timer);
   _fineGrainedTimers.clear();
+  _fineGrainedPending.clear();
   _lastPushedHash.clear();
 
   _sessionRoot = null;
