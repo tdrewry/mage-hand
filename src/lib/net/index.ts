@@ -11,7 +11,7 @@ import { initCardSaveSync } from "./cardSaveSync";
 // Durable op kinds that Jazz handles via store-subscription sync.
 // When Jazz is the active transport these are redundant through OpBridge.
 const JAZZ_SYNCED_OPS = new Set([
-  'token.move', 'token.sync', 'token.add', 'token.remove',
+  'token.move', 'token.sync', 'token.add', 'token.remove', 'token.update',
 ]);
 
 // Create singletons and wire circular references
