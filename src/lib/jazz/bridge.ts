@@ -798,7 +798,29 @@ export function pushBlobsToJazz(sessionRoot: any): void {
     }
   }
 
-  console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
+  // ── Diagnostic: blob size report ──
+  const MB = 1024 * 1024;
+  const sizeEntries = Array.from(_lastPushedHash.entries()).map(([k]) => {
+    // Re-extract to measure (cheap since we just did it)
+    const reg = DurableObjectRegistry.get(k);
+    if (!reg) return null;
+    try {
+      const bytes = new Blob([JSON.stringify(reg.extractor())]).size;
+      const pct = ((bytes / MB) * 100).toFixed(1);
+      const warn = bytes > 0.75 * MB ? ' ⚠️ APPROACHING 1MB LIMIT' : bytes > MB ? ' 🚨 OVER 1MB LIMIT' : '';
+      return { kind: k, bytes, pct, warn };
+    } catch { return null; }
+  }).filter(Boolean) as { kind: string; bytes: number; pct: string; warn: string }[];
+
+  if (sizeEntries.length > 0) {
+    console.groupCollapsed(`[jazz-bridge] Blob size report (${successCount}/${BLOB_SYNC_KINDS.length} pushed, ${failCount} failed)`);
+    sizeEntries
+      .sort((a, b) => b.bytes - a.bytes)
+      .forEach(e => console.log(`  ${e.kind}: ${(e.bytes / 1024).toFixed(1)} KB (${e.pct}% of 1MB)${e.warn}`));
+    console.groupEnd();
+  } else {
+    console.log(`[jazz-bridge] Pushed ${successCount}/${BLOB_SYNC_KINDS.length} DO blobs (${failCount} failed)`);
+  }
 }
 
 /** Push all effects (placed + custom templates) from Zustand into Jazz */
