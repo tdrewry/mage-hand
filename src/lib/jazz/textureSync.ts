@@ -17,7 +17,6 @@
 import { co } from "jazz-tools";
 import { JazzTextureList } from "./schema";
 import { loadTextureByHash, saveTextureByHash } from "@/lib/textureStorage";
-import { loadTextureByHash as loadTokenTextureByHash, saveTextureByHash as saveTokenTextureByHash } from "@/lib/tokenTextureStorage";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
@@ -157,13 +156,10 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
       continue;
     }
 
-    // Load data URI from IndexedDB — check both region and token texture stores
-    let dataUrl = await loadTextureByHash(hash);
+    // Load data URI from IndexedDB (unified store)
+    const dataUrl = await loadTextureByHash(hash);
     if (!dataUrl) {
-      dataUrl = await loadTokenTextureByHash(hash);
-    }
-    if (!dataUrl) {
-      console.warn(`[jazz-texture] Hash ${hash} not found in either IndexedDB store — skipping`);
+      console.warn(`[jazz-texture] Hash ${hash} not found in IndexedDB — skipping`);
       skipped++;
       continue;
     }
@@ -262,9 +258,7 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
 
       if (blob) {
         const dataUrl = await blobToDataUri(blob);
-        // Save to BOTH texture stores so tokens and regions can find it
         await saveTextureByHash(hash, dataUrl);
-        await saveTokenTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         downloaded++;
         // Apply to entities immediately so textures appear without refresh
@@ -359,9 +353,8 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
           if (!entry?.hash || !entry?.fileStreamId) continue;
           if (_downloadedHashes.has(entry.hash)) continue;
 
-          // Check both texture storage DBs (regions + tokens)
-          let existing = await loadTextureByHash(entry.hash);
-          if (!existing) existing = await loadTokenTextureByHash(entry.hash);
+          // Check unified texture storage
+          const existing = await loadTextureByHash(entry.hash);
           if (existing) {
             _downloadedHashes.add(entry.hash);
             _applyTextureToEntities(entry.hash, existing);
@@ -378,9 +371,7 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
             const blob = await Promise.race([downloadPromise, timeoutPromise]);
             if (blob) {
               const dataUrl = await blobToDataUri(blob);
-              // Save to BOTH texture stores
               await saveTextureByHash(entry.hash, dataUrl);
-              await saveTokenTextureByHash(entry.hash, dataUrl);
               _downloadedHashes.add(entry.hash);
               _applyTextureToEntities(entry.hash, dataUrl);
               notifyTextureDownloadComplete(entry.hash);

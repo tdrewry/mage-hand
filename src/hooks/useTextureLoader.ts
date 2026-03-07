@@ -6,14 +6,10 @@ import {
   loadRegionTextures, 
   saveRegionTexture, 
   removeRegionTexture,
-  loadTextureByHash as loadRegionTextureByHash,
-  saveTextureByHash as saveRegionTextureByHash
-} from '@/lib/textureStorage';
-import {
+  loadTextureByHash,
+  saveTextureByHash,
   saveTokenTexture,
-  loadTextureByHash as loadTokenTextureByHash,
-  saveTextureByHash as saveTokenTextureByHash
-} from '@/lib/tokenTextureStorage';
+} from '@/lib/textureStorage';
 import { 
   requestTexture as requestTextureFromServer,
   uploadTexture,
@@ -113,14 +109,14 @@ export function useTextureLoader() {
 
         try {
           // Try local cache first (IndexedDB)
-          let dataUrl = await loadRegionTextureByHash(hash);
+          let dataUrl = await loadTextureByHash(hash);
           
           // Only request from server if we're connected to multiplayer
           if (!dataUrl && isConnected) {
             dataUrl = await requestTextureFromServer(hash);
             
             if (dataUrl) {
-              await saveRegionTextureByHash(hash, dataUrl);
+              await saveTextureByHash(hash, dataUrl);
             }
           }
 
@@ -194,14 +190,14 @@ export function useTextureLoader() {
 
         try {
           // Try local cache first
-          let dataUrl = await loadTokenTextureByHash(hash);
+          let dataUrl = await loadTextureByHash(hash);
           
           // Only request from server if we're connected to multiplayer
           if (!dataUrl && isConnected) {
             dataUrl = await requestTextureFromServer(hash);
             
             if (dataUrl) {
-              await saveTokenTextureByHash(hash, dataUrl);
+              await saveTextureByHash(hash, dataUrl);
             }
           }
 

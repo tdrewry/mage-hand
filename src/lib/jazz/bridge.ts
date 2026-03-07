@@ -103,12 +103,10 @@ function _isPositionSuppressed(tokenId: string): boolean {
  * If not found, the texture FileStream subscription will handle it when it arrives.
  */
 async function _resolveTokenTextures(entries: { id: string; hash: string }[]): Promise<void> {
-  const { loadTextureByHash: loadRegionTex } = await import("@/lib/textureStorage");
-  const { loadTextureByHash: loadTokenTex } = await import("@/lib/tokenTextureStorage");
+  const { loadTextureByHash } = await import("@/lib/textureStorage");
   
   for (const { id, hash } of entries) {
-    let dataUrl = await loadTokenTex(hash);
-    if (!dataUrl) dataUrl = await loadRegionTex(hash);
+    const dataUrl = await loadTextureByHash(hash);
     
     if (dataUrl) {
       const store = useSessionStore.getState();
