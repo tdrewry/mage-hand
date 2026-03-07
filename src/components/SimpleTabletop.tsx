@@ -22,6 +22,7 @@ import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { emitLocalOp } from "@/lib/net";
+import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import { useMapStore } from "../stores/mapStore";
@@ -8488,6 +8489,7 @@ export const SimpleTabletop = () => {
         setIsDraggingToken(true);
         ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
+        markTokenDragStart(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
@@ -10916,6 +10918,7 @@ export const SimpleTabletop = () => {
 
         setIsDraggingToken(true);
         setDraggedTokenId(clickedToken.id);
+        markTokenDragStart(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
