@@ -354,28 +354,32 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
           if (!entry?.hash || !entry?.fileStreamId) continue;
           if (_downloadedHashes.has(entry.hash)) continue;
 
-          // Check local cache
-          const existing = await loadTextureByHash(entry.hash);
+          // Check both texture storage DBs (regions + tokens)
+          let existing = await loadTextureByHash(entry.hash);
+          if (!existing) existing = await loadTokenTextureByHash(entry.hash);
           if (existing) {
             _downloadedHashes.add(entry.hash);
-            // Even if in IndexedDB, entities may not have it applied in-memory
             _applyTextureToEntities(entry.hash, existing);
             continue;
           }
 
-          // New texture — download it
+          // New texture — download it with timeout
           notifyTextureDownloadStart(entry.hash);
           try {
-            const blob = await co.fileStream().loadAsBlob(entry.fileStreamId);
+            const downloadPromise = co.fileStream().loadAsBlob(entry.fileStreamId);
+            const timeoutPromise = new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 15000) // 15s timeout
+            );
+            const blob = await Promise.race([downloadPromise, timeoutPromise]);
             if (blob) {
               const dataUrl = await blobToDataUri(blob);
               await saveTextureByHash(entry.hash, dataUrl);
               _downloadedHashes.add(entry.hash);
-              // Apply to all referencing entities immediately
               _applyTextureToEntities(entry.hash, dataUrl);
               notifyTextureDownloadComplete(entry.hash);
               console.log(`[jazz-texture] ← Live download: ${entry.hash} (${(blob.size / 1024).toFixed(1)}KB)`);
             } else {
+              console.warn(`[jazz-texture] FileStream download returned null/timed out for ${entry.hash}`);
               notifyTextureDownloadError(entry.hash);
             }
           } catch (err) {
