@@ -97,6 +97,32 @@ function _isPositionSuppressed(tokenId: string): boolean {
   return _localDragTokens.has(tokenId) || _dragGraceTokens.has(tokenId);
 }
 
+/**
+ * Async texture resolution: when a token arrives with an imageHash but no imageUrl,
+ * try to load the texture from local IndexedDB. If found, update the token's imageUrl.
+ * If not found, the texture FileStream subscription will handle it when it arrives.
+ */
+async function _resolveTokenTextures(entries: { id: string; hash: string }[]): Promise<void> {
+  const { loadTextureByHash: loadRegionTex } = await import("@/lib/textureStorage");
+  const { loadTextureByHash: loadTokenTex } = await import("@/lib/tokenTextureStorage");
+  
+  for (const { id, hash } of entries) {
+    let dataUrl = await loadTokenTex(hash);
+    if (!dataUrl) dataUrl = await loadRegionTex(hash);
+    
+    if (dataUrl) {
+      const store = useSessionStore.getState();
+      const token = store.tokens.find(t => t.id === id);
+      if (token && (!token.imageUrl || token.imageUrl.length === 0)) {
+        console.log(`[jazz-bridge] 🎨 Resolved texture for token ${id} from local IDB (hash: ${hash})`);
+        store.updateTokenImage(id, dataUrl, hash);
+      }
+    } else {
+      console.log(`[jazz-bridge] 🎨 Token ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
+    }
+  }
+}
+
 /** Push a single token's current position to Jazz (used after drag end) */
 function _pushTokenFinalPosition(tokenId: string): void {
   const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
@@ -1583,6 +1609,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
+          const tokensNeedingTextureResolve: { id: string; hash: string }[] = [];
+
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const localTokens = store.tokens;
@@ -1641,11 +1669,19 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                     x: posChanged ? jt.x : existing.x,
                     y: posChanged ? jt.y : existing.y,
                   };
+                  // If imageHash changed, flag for async texture resolution
+                  if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
+                    tokensNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                  }
                   updatedTokens[localIdx] = merged;
                   tokensChanged = true;
                 }
               } else {
-                updatedTokens.push(jazzToZustandToken(jt));
+                const newToken = jazzToZustandToken(jt);
+                if (newToken.imageHash && !newToken.imageUrl) {
+                  tokensNeedingTextureResolve.push({ id: newToken.id, hash: newToken.imageHash });
+                }
+                updatedTokens.push(newToken);
                 tokensChanged = true;
               }
             }
@@ -1661,6 +1697,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               store.setTokens(finalTokens);
             }
           });
+
+          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
+          if (tokensNeedingTextureResolve.length > 0) {
+            _resolveTokenTextures(tokensNeedingTextureResolve);
+          }
         },
       );
       activeSubscriptions.push(unsubJazz);
