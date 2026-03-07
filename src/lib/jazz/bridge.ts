@@ -1154,7 +1154,7 @@ function syncRegionsToJazz(regions: CanvasRegion[], prevRegions: CanvasRegion[])
           try {
             const init = regionToJazzInit(r);
             for (const [key, val] of Object.entries(init)) {
-              if (key !== 'regionId') jr.$jazz.set(key, val ?? null);
+              if (key !== 'regionId') jr.$jazz.set(key, val ?? undefined);
             }
           } catch (err) {
             console.error(`[jazz-bridge] Failed to update region ${r.id}:`, err);
@@ -1215,7 +1215,7 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
           try {
             const init = mapObjectToJazzInit(obj);
             for (const [key, val] of Object.entries(init)) {
-              if (key !== 'objectId') jmo.$jazz.set(key, val ?? null);
+              if (key !== 'objectId') jmo.$jazz.set(key, val ?? undefined);
             }
           } catch (err) {
             console.error(`[jazz-bridge] Failed to update mapObject ${obj.id}:`, err);
@@ -1316,7 +1316,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             try {
               const init = tokenToJazzInit(t);
               for (const [key, val] of Object.entries(init)) {
-                if (key !== 'tokenId') jt.$jazz.set(key, val ?? null);
+                if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
               }
             } catch (err) {
               console.error(`[jazz-bridge] Failed to update JazzToken:`, err);
