@@ -253,11 +253,6 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
             {parsedCharacter ? (
               <>
                 <EditableCharacterSheet character={parsedCharacter} onChange={handleCharacterChange} />
-                <div className="px-3 pb-3">
-                  <Button size="sm" className="w-full" onClick={handleSaveJson} disabled={!!jsonError}>
-                    <Save className="w-3.5 h-3.5 mr-1.5" /> Save Character
-                  </Button>
-                </div>
               </>
             ) : (
               <div className="p-6 text-center text-muted-foreground text-sm space-y-3">
@@ -314,11 +309,6 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
               />
             </Suspense>
           </div>
-          <div className="px-4 py-2 shrink-0">
-            <Button size="sm" className="w-full" onClick={handleSaveJson} disabled={!!jsonError}>
-              <Save className="w-3.5 h-3.5 mr-1.5" /> Save JSON
-            </Button>
-          </div>
         </TabsContent>
 
         {/* ── Details tab ──────────────────────────────────────────────── */}
@@ -351,13 +341,19 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
                   onChange={(e) => setQuickRef(e.target.value)}
                 />
               </div>
-              <Button size="sm" onClick={handleSaveDetails} className="w-full">
-                <Save className="w-3.5 h-3.5 mr-1.5" /> Save Details
-              </Button>
             </div>
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      {/* Unified save button — always visible at bottom */}
+      <div className="px-4 py-2 border-t border-border shrink-0">
+        <CardSaveButton
+          context={{ type: 'token', id: token.id }}
+          onSave={handleSaveAll}
+          disabled={!!jsonError}
+        />
+      </div>
     </div>
   );
 }
