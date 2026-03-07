@@ -1432,6 +1432,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
+          // Skip ALL position updates while any local drag is active —
+          // Jazz may have stale positions that would corrupt local state.
+          // Final positions are pushed explicitly via _pushTokenFinalPosition on drag end.
+          if (_localDragTokens.size > 0) return;
+
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const currentIds = new Set(store.tokens.map((t) => t.id));
@@ -1439,12 +1444,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
             for (let i = 0; i < len; i++) {
               const jt = tokens[i];
-              if (!jt) continue;
+              if (!jt || !jt.tokenId) continue;
               jazzIds.add(jt.tokenId);
 
               if (currentIds.has(jt.tokenId)) {
-                // Skip position updates for tokens being locally dragged
-                if (_localDragTokens.has(jt.tokenId)) continue;
                 const existing = store.tokens.find((t) => t.id === jt.tokenId);
                 if (existing && (existing.x !== jt.x || existing.y !== jt.y)) {
                   store.updateTokenPosition(jt.tokenId, jt.x, jt.y);
