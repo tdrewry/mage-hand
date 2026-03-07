@@ -21,7 +21,7 @@ import { VisionProfile } from '../stores/visionProfileStore';
 import { CardState } from '../types/cardTypes';
 import { MapObject } from '../types/mapObjectTypes';
 import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
-import { getAllTokenMappings, importTokenTextures } from './tokenTextureStorage';
+import { getAllTokenMappings, importTokenTextures } from './textureStorage';
 import type { IlluminationSource } from '@/types/illumination';
 import type { DndBeyondCharacter, Monster5eTools } from '@/types/creatureTypes';
 import type { DysonHatchingOptions } from '@/lib/shaders/dysonHatchingFilter';
