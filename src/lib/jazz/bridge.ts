@@ -1234,12 +1234,14 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   _cachedTokens = sessionRoot.tokens ?? null;
   _cachedRegions = sessionRoot.regions ?? null;
   _cachedMapObjects = sessionRoot.mapObjects ?? null;
+  _cachedEffects = sessionRoot.effects ?? null;
   _cachedBlobs = sessionRoot.blobs ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
     regions: !!_cachedRegions,
     mapObjects: !!_cachedMapObjects,
+    effects: !!_cachedEffects,
     blobs: !!_cachedBlobs,
     group: !!_cachedGroup,
     isCreator,
