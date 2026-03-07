@@ -51,7 +51,7 @@ function handleCardSave(e: Event) {
       if (!region) break;
       opBridge.emitLocalOp({
         kind: 'region.update',
-        targets: { regionIds: [id] },
+        targets: { entityIds: [id] },
         data: {
           id: region.id,
           x: region.x,
