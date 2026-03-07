@@ -126,35 +126,19 @@ export function CharacterSheetCardContent({ tokenId, characterId }: CharacterShe
     setJsonError(null);
   }, []);
 
-  const handleSaveJson = () => {
+  /** Unified save — persists character JSON + details in one action. */
+  const handleSaveAll = useCallback(() => {
     if (!token) return;
     if (jsonError) {
       toast.error('Fix JSON errors before saving');
       return;
     }
+    // Persist character/JSON data
     updateTokenStatBlockJson(token.id, jsonValue);
-    toast.success('Character data saved');
-  };
-
-  // Stub a blank character if no data exists
-  const handleCreateBlank = useCallback(() => {
-    const blank = generateBlankTemplate();
-    blank.name = token?.name || 'Character Name';
-    const json = JSON.stringify(blank, null, 2);
-    setJsonValue(json);
-    setJsonError(null);
-    setActiveTab('character');
-  }, [token]);
-
-  // ── Details tab state ────────────────────────────────────────────────────
-  const [notes, setNotes] = useState(token?.notes ?? '');
-  const [quickRef, setQuickRef] = useState(token?.quickReferenceUrl ?? '');
-
-  const handleSaveDetails = () => {
-    if (!token) return;
-    updateTokenDetails(token.id, notes, quickRef, token.statBlockJson);
-    toast.success('Details saved');
-  };
+    // Persist details
+    updateTokenDetails(token.id, notes, quickRef, jsonValue);
+    toast.success('Changes saved');
+  }, [token, jsonError, jsonValue, notes, quickRef, updateTokenStatBlockJson, updateTokenDetails]);
 
   const handleLinkCreature = (creatureId: string, creatureType: 'character' | 'monster') => {
     if (!token) return;
