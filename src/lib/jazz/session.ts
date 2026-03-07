@@ -10,6 +10,7 @@
 
 import { JazzSessionRoot as JazzSessionRootSchema, createSessionRoot } from "./schema";
 import { pushAllToJazz, pullAllFromJazz, startBridge, stopBridge } from "./bridge";
+import { pushTexturesToJazz, pullTexturesFromJazz, cleanupTextureSync } from "./textureSync";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 export interface JazzSessionInfo {
