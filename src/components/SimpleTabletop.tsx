@@ -4031,10 +4031,10 @@ export const SimpleTabletop = () => {
           fogCtx.scale(transform.zoom, transform.zoom);
           
           // Render base fog layers to offscreen canvas
-          fogCtx.fillStyle = `rgba(0, 0, 0, ${fogOpacity})`;
+          fogCtx.fillStyle = `rgba(0, 0, 0, ${effectiveFogOpacity})`;
           fogCtx.fill(fogMasksRef.current.unexploredMask);
 
-          fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
+          fogCtx.fillStyle = `rgba(0, 0, 0, ${effectiveExploredOpacity})`;
           fogCtx.fill(fogMasksRef.current.exploredOnlyMask);
 
           // Cut out visibility areas from fog using destination-out
