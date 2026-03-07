@@ -9,6 +9,8 @@ import { CardSaveEvent, type CardSaveEventDetail } from '@/components/cards/Card
 import { opBridge } from './OpBridge';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRegionStore } from '@/stores/regionStore';
+import { useEffectStore } from '@/stores/effectStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
 
 function handleCardSave(e: Event) {
   const detail = (e as CustomEvent<CardSaveEventDetail>).detail;
@@ -79,6 +81,38 @@ function handleCardSave(e: Event) {
           rotationCenter: region.rotationCenter,
           locked: region.locked,
           mapId: region.mapId,
+        },
+      });
+      break;
+    }
+    case 'effect': {
+      if (!id) break;
+      const template = useEffectStore.getState().allTemplates.find(t => t.id === id);
+      if (!template) break;
+      // Strip large texture data — send hash only
+      const { texture, ...rest } = template;
+      opBridge.emitLocalOp({
+        kind: 'effect.update',
+        targets: { entityIds: [id] },
+        data: {
+          ...rest,
+          textureHash: template.textureHash,
+        },
+      });
+      break;
+    }
+    case 'map-object': {
+      if (!id) break;
+      const obj = useMapObjectStore.getState().mapObjects.find(o => o.id === id);
+      if (!obj) break;
+      // Strip large image data — send hash only
+      const { imageUrl, ...objRest } = obj;
+      opBridge.emitLocalOp({
+        kind: 'mapObject.update',
+        targets: { entityIds: [id] },
+        data: {
+          ...objRest,
+          imageHash: obj.imageHash,
         },
       });
       break;

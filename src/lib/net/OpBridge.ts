@@ -6,6 +6,8 @@ import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contr
 import { toast } from "sonner";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
+import { useEffectStore } from "@/stores/effectStore";
+import { useMapObjectStore } from "@/stores/mapObjectStore";
 // dragPreviewStore handlers moved to ephemeral tokenHandlers.ts
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
@@ -119,6 +121,33 @@ class OpBridgeImpl {
         ),
       }));
       console.log(`🔄 [OpBridge] region.update applied for ${d.id}`);
+    });
+
+    this.register("effect.update", (data) => {
+      const d = data as Record<string, unknown>;
+      if (!d || typeof d.id !== 'string') return;
+      const store = useEffectStore.getState();
+      // Effect templates are synced via customTemplates
+      const existing = store.allTemplates.find(t => t.id === d.id);
+      if (!existing) {
+        console.warn(`[OpBridge] effect.update: template ${d.id} not found locally`);
+        return;
+      }
+      store.updateCustomTemplate(d.id as string, d as Record<string, unknown>);
+      console.log(`🔄 [OpBridge] effect.update applied for ${d.id}`);
+    });
+
+    this.register("mapObject.update", (data) => {
+      const d = data as Record<string, unknown>;
+      if (!d || typeof d.id !== 'string') return;
+      const store = useMapObjectStore.getState();
+      const existing = store.mapObjects.find(o => o.id === d.id);
+      if (!existing) {
+        console.warn(`[OpBridge] mapObject.update: object ${d.id} not found locally`);
+        return;
+      }
+      store.updateMapObject(d.id as string, d as Record<string, unknown>);
+      console.log(`🔄 [OpBridge] mapObject.update applied for ${d.id}`);
     });
 
     // Token drag preview ops moved to ephemeral tokenHandlers.ts (Priority 1 migration)

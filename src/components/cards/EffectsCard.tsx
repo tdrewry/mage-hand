@@ -1253,6 +1253,8 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
   const handleSave = () => {
     if (!form.name.trim()) return;
     updateCustomTemplate(template.id, formToTemplateData(form));
+    // Fire sync event for network propagation
+    window.dispatchEvent(new (await import('@/components/cards/CardSaveButton').then(m => m.CardSaveEvent))({ context: { type: 'effect', id: template.id } }));
     onDone();
   };
 
