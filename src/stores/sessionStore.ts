@@ -167,19 +167,11 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   setTokens: (tokens) => set({ tokens }),
   
   updateTokenPosition: (tokenId, x, y) => {
-    const state = get();
-    const existingToken = state.tokens.find(t => t.id === tokenId);
-    
-    // Only update if position actually changed significantly (avoid micro-movements)
-    if (!existingToken || 
-        Math.abs(existingToken.x - x) > 2 || 
-        Math.abs(existingToken.y - y) > 2) {
-      set((state) => ({
-        tokens: state.tokens.map((token) =>
-          token.id === tokenId ? { ...token, x, y } : token
-        ),
-      }));
-    }
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, x, y } : token
+      ),
+    }));
   },
 
   updateTokenLabel: (tokenId, label) => {
