@@ -15,8 +15,8 @@ Create a reusable `CardSaveButton` component that fires a `card:save` DOM event 
 |------|---------|--------|
 | `token` | `token.update` | ✅ Done |
 | `region` | `region.update` | ✅ Done |
-| `map-object` | TBD | Planned |
-| `effect` | TBD | Planned |
+| `map-object` | `mapObject.update` | ✅ Done |
+| `effect` | `effect.update` | ✅ Done |
 | `session` | TBD | Planned |
 
 ## Integration Points
@@ -33,4 +33,10 @@ Create a reusable `CardSaveButton` component that fires a `card:save` DOM event 
 - [x] region.update OpBridge handler (receive side)
 - [x] RegionControlsCard Save Changes button
 - [x] region.update added to Jazz suppression list
-- [ ] Future: map-object/effect context handlers
+- [x] effect.update OpBridge handler (receive side)
+- [x] EditTemplateForm fires CardSaveEvent on save
+- [x] effect.update added to Jazz suppression list
+- [x] mapObject.update OpBridge handler (receive side)
+- [x] MapObjectPanelCard Save Changes button
+- [x] mapObject.update added to Jazz suppression list
+- [ ] Future: session context handler

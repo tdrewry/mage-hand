@@ -13,6 +13,8 @@ import { initCardSaveSync } from "./cardSaveSync";
 const JAZZ_SYNCED_OPS = new Set([
   'token.move', 'token.sync', 'token.add', 'token.remove', 'token.update',
   'region.update',
+  'effect.update',
+  'mapObject.update',
 ]);
 
 // Create singletons and wire circular references
