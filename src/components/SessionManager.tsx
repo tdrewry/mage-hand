@@ -279,6 +279,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       }).catch(() => {});
     }
 
+    // Fully reset multiplayer state to local-only defaults
+    useMultiplayerStore.getState().reset();
+
     setSessionCode('');
     setPassword('');
     toast.info('Left session');

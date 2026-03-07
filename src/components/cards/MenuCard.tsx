@@ -744,6 +744,8 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             <AlertDialogAction
               onClick={() => {
                 netManager.disconnect();
+                // Fully reset multiplayer state to local-only
+                useMultiplayerStore.getState().reset();
                 setReturnMenuDialogOpen(false);
                 setLaunched(false);
               }}
