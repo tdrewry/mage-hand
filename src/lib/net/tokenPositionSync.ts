@@ -4,6 +4,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 /** Snapshot of last-emitted positions keyed by tokenId. */
 const lastPositions = new Map<string, { x: number; y: number }>();
@@ -13,6 +14,10 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 
 /** Diff current token positions against last snapshot and emit changes. */
 function tickPositionSync(): void {
+  // When Jazz is the active transport, it handles durable position sync —
+  // skip the ephemeral position broadcast to avoid duplicating updates.
+  if (useMultiplayerStore.getState().activeTransport === 'jazz') return;
+
   const tokens = useSessionStore.getState().tokens;
   const changed: Array<{ tokenId: string; x: number; y: number }> = [];
 
