@@ -28,6 +28,9 @@ export class WsTransport implements ITransport {
   connect(url: string): void {
     if (this.state === "connecting" || this.state === "open") return;
 
+    // Clean up any previous socket before creating a new one
+    this.cleanup();
+
     this.state = "connecting";
     try {
       this.ws = new WebSocket(url);
@@ -53,6 +56,7 @@ export class WsTransport implements ITransport {
 
     this.ws.onclose = (ev) => {
       this.state = "closed";
+      this.ws = undefined;
       this.emitter.emit("close", { code: ev.code, reason: ev.reason, wasClean: ev.wasClean });
     };
   }
@@ -68,6 +72,18 @@ export class WsTransport implements ITransport {
   close(code?: number, reason?: string): void {
     if (!this.ws) return;
     this.ws.close(code, reason);
+    // Note: ws reference is cleared in the onclose handler
+  }
+
+  /** Strip event handlers from the old socket so it can't fire stale events. */
+  private cleanup(): void {
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      this.ws = undefined;
+    }
   }
 
   on<K extends keyof TransportEvents>(event: K, cb: Listener<TransportEvents[K]>): () => void {

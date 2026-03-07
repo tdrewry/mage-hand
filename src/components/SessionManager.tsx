@@ -269,15 +269,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   };
 
   const handleLeaveSession = () => {
-    // Tear down WebSocket (handles both standalone and tandem modes)
-    netManager.disconnect();
-
-    // If Jazz was active, also tear down the Jazz bridge
+    // If Jazz was active, tear down the bridge synchronously BEFORE closing WS
+    // so Jazz cleanup happens while the connection is still live
     if (activeTransport === 'jazz') {
-      import('@/lib/jazz/session').then(({ leaveJazzSession }) => {
+      try {
+        // Use synchronous import — leaveJazzSession is already loaded at this point
+        const { leaveJazzSession } = require('@/lib/jazz/session');
         leaveJazzSession();
-      }).catch(() => {});
+      } catch {
+        // Fallback: async import (shouldn't normally reach here)
+        import('@/lib/jazz/session').then(({ leaveJazzSession }) => {
+          leaveJazzSession();
+        }).catch(() => {});
+      }
     }
+
+    // Tear down WebSocket — sends close frame so server broadcasts presence:leave
+    netManager.disconnect();
 
     // Fully reset multiplayer state to local-only defaults
     useMultiplayerStore.getState().reset();
