@@ -1105,8 +1105,9 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         if (!prev) continue;
         // Check all synced fields for changes
         const changed = prev.x !== t.x || prev.y !== t.y || prev.label !== t.label ||
-          prev.color !== t.color || prev.name !== t.name || prev.hp !== (t as any).hp ||
-          prev.maxHp !== (t as any).maxHp || prev.ac !== (t as any).ac ||
+          prev.color !== t.color || prev.name !== t.name ||
+          (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
+          (prev as any).ac !== (t as any).ac ||
           prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
           prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight;
         if (!changed) continue;
