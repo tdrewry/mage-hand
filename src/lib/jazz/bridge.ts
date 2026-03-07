@@ -1456,17 +1456,20 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
                 // Sync non-position properties regardless of drag state
                 const incoming = jazzToZustandToken(jt);
-                const propUpdates: Partial<Token> = {};
-                let hasUpdates = false;
+                let hasNonPosChange = false;
                 for (const key of Object.keys(incoming) as (keyof Token)[]) {
                   if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
-                  if (incoming[key] !== existing[key]) {
-                    (propUpdates as any)[key] = incoming[key];
-                    hasUpdates = true;
-                  }
+                  if (incoming[key] !== existing[key]) { hasNonPosChange = true; break; }
                 }
-                if (hasUpdates) {
-                  store.updateToken(jt.tokenId, propUpdates);
+                if (hasNonPosChange) {
+                  // Merge non-position fields into the token
+                  const merged = { ...existing, ...incoming, x: existing.x, y: existing.y, id: existing.id, imageUrl: existing.imageUrl };
+                  // If we already updated position above, use those
+                  if (!isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y)) {
+                    merged.x = jt.x;
+                    merged.y = jt.y;
+                  }
+                  store.setTokens(store.tokens.map(t => t.id === jt.tokenId ? merged : t));
                 }
               } else {
                 store.addToken(jazzToZustandToken(jt));
