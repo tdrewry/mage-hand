@@ -206,7 +206,14 @@ function pushBlobToJazz(kind: string): void {
   if (!reg) return;
 
   try {
-    const state = reg.extractor();
+    let state = reg.extractor();
+
+    // Strip texture data URIs from effects to avoid exceeding Jazz's 1MB limit
+    // Textures are synced separately via FileStreams
+    if (kind === 'effects' && state) {
+      state = stripEffectTexturesForSync(state);
+    }
+
     const json = JSON.stringify(state);
     const hash = quickHash(json);
 
