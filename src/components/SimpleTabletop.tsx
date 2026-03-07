@@ -1313,6 +1313,7 @@ export const SimpleTabletop = () => {
           
           emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
           markTokenDragEnd(draggedTokenId);
+          unmarkDraggedForSync(draggedTokenId);
           setIsDraggingToken(false);
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
@@ -8492,6 +8493,7 @@ export const SimpleTabletop = () => {
         ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
         markTokenDragStart(clickedToken.id);
+        markDraggedForSync(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
@@ -10340,7 +10342,7 @@ export const SimpleTabletop = () => {
       // Clear multi-drag start positions
       multiDragStartPositionsRef.current = {};
 
-      if (draggedTokenId) markTokenDragEnd(draggedTokenId);
+      if (draggedTokenId) { markTokenDragEnd(draggedTokenId); unmarkDraggedForSync(draggedTokenId); }
       setIsDraggingToken(false);
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
@@ -10923,6 +10925,7 @@ export const SimpleTabletop = () => {
         setIsDraggingToken(true);
         setDraggedTokenId(clickedToken.id);
         markTokenDragStart(clickedToken.id);
+        markDraggedForSync(clickedToken.id);
         setDragOffset({
           x: worldPos.x - clickedToken.x,
           y: worldPos.y - clickedToken.y,
@@ -11147,7 +11150,7 @@ export const SimpleTabletop = () => {
           }
         }
 
-        if (draggedTokenId) markTokenDragEnd(draggedTokenId);
+        if (draggedTokenId) { markTokenDragEnd(draggedTokenId); unmarkDraggedForSync(draggedTokenId); }
         setIsDraggingToken(false);
         setDraggedTokenId(null);
         setDragOffset({ x: 0, y: 0 });
