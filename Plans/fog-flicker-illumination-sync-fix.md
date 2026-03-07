@@ -1,4 +1,4 @@
-# Fog Flicker & Illumination Sync Fix (v0.7.96)
+# Fog Flicker & Illumination Sync Fix (v0.7.96 → v0.7.97)
 
 ## Problems Fixed
 
@@ -11,35 +11,46 @@ was never used when illumination existed, causing PixiJS canvas misalignment dur
 **Fix**: Use `illuminationSourcesCacheRef.current` directly instead of spreading. Only create a 
 new array when drag preview sources need to be appended.
 
-### 2. Host loses illumination when player connects
+### 2. Bridge fired fog:force-refresh on EVERY token sync (v0.7.96 regression)
+**Root cause**: The v0.7.96 fix dispatched `fog:force-refresh` whenever `tokensChanged` was true,
+including position-only syncs from drag operations. This caused constant fog recomputation during
+normal multiplayer use.
+
+**Fix**: Track `illuminationChanged` separately by deep-comparing `illuminationSources` arrays.
+Only dispatch `fog:force-refresh` when illumination parameters actually change — not on position
+or other property updates.
+
+### 3. Soft refresh was too aggressive (v0.7.96 regression)
+**Root cause**: Even "soft" refreshes cleared ALL per-token visibility caches, Paper.js geometry,
+and `prevTokenPositionsRef`, then triggered `setFogRefreshTick` which forced a full fog 
+recomputation cycle. This was nearly as expensive as a hard refresh.
+
+**Fix**: Soft refresh now ONLY invalidates `illuminationSourcesCacheRef` and calls `redrawCanvas()`.
+No visibility cache clearing, no Paper.js cleanup, no fogRefreshTick bump. Each client renders
+fog locally based on its own illumination data — the soft refresh just ensures the illumination
+cache is rebuilt with the latest token settings on the next render frame.
+
+### 4. Host loses illumination when player connects
 **Root cause**: The `fog:force-refresh` handler nulled `fogMasksRef.current`, causing the safety 
-full-black rectangle to render (line 3960) during recomputation. When Jazz auto-sync triggered 
-a fog refresh on player join, this flashed the entire map black.
+full-black rectangle to render during recomputation.
 
-**Fix**: Introduced "soft" fog refresh mode (`{ detail: { soft: true } }`). Soft refreshes 
-keep existing fog masks and don't hide/show the PixiJS layer, preventing any visual disruption.
-Hard refreshes (geometry changes) still null masks as before.
+**Fix**: Soft refreshes never null fog masks (addressed by making soft refresh minimal).
 
-### 3. Illumination changes not syncing until token moved
-**Root cause**: When illumination changes arrived via Jazz, `store.setTokens()` fired but the 
-fog useEffect's debounced recomputation sometimes didn't fully propagate to the illumination 
-cache rebuild. No explicit fog refresh was dispatched.
+### 5. Missing Action Card button
+**Fix**: Added a Zap icon button to the VerticalToolbar's play mode section.
 
-**Fix**: After `store.setTokens()` in the Jazz → Zustand token subscription, dispatch a soft 
-`fog:force-refresh` event. This explicitly invalidates the illumination cache and triggers fog 
-recomputation without the black flash.
-
-### 4. Missing Action Card button
-**Fix**: Added a Zap icon button to the VerticalToolbar's play mode section to open/toggle 
-the Action Card without needing an active action.
+## Architecture Principle
+Fog geometry sync is ONLY for explored regions (`serializedExploredAreasPerMap`). Illumination
+syncs settings only (via Jazz token `illuminationSources` field) — each client instance renders
+fog of war independently based on its hardware capabilities.
 
 ## Files Changed
 | File | Change |
 |------|--------|
-| `src/components/SimpleTabletop.tsx` | Fix 1 (identity-preserving cache), Fix 2 (soft refresh) |
-| `src/lib/jazz/bridge.ts` | Fix 3 (dispatch fog:force-refresh on token sync) |
-| `src/components/VerticalToolbar.tsx` | Fix 4 (Action Card button) |
-| `src/lib/version.ts` | Bumped to 0.7.96 |
+| `src/components/SimpleTabletop.tsx` | Minimal soft refresh (cache invalidation + redraw only) |
+| `src/lib/jazz/bridge.ts` | Track `illuminationChanged` separately; gate fog refresh |
+| `src/components/VerticalToolbar.tsx` | Action Card button (v0.7.96) |
+| `src/lib/version.ts` | Bumped to 0.7.97 |
 
 ## Impact on External Services
 None — all changes are client-side. No WebSocket server or Jazz service changes needed.
