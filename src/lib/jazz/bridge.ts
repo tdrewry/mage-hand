@@ -1583,6 +1583,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
+          const tokensNeedingTextureResolve: { id: string; hash: string }[] = [];
+
           runFromJazz(() => {
             const store = useSessionStore.getState();
             const localTokens = store.tokens;
@@ -1592,7 +1594,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             // Build the new token array in a single pass to avoid stale-state bugs
             // from multiple store mutations referencing an old getState() snapshot.
             let tokensChanged = false;
-            const tokensNeedingTextureResolve: { id: string; hash: string }[] = [];
             const updatedTokens = localTokens.map(existing => {
               return existing;
             });
@@ -1642,7 +1643,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                     x: posChanged ? jt.x : existing.x,
                     y: posChanged ? jt.y : existing.y,
                   };
-                  // If imageHash changed and we have no imageUrl, flag for async resolution
+                  // If imageHash changed, flag for async texture resolution
                   if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
                     tokensNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
                   }
