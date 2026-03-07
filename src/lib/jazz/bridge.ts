@@ -150,6 +150,10 @@ const _lastSkipWarn = new Map<string, number>();
 /** Whether the local client created this session (source of truth for initial state) */
 let _isCreator = false;
 
+/** Timestamp when the bridge was started — used for startup grace period */
+let _bridgeStartedAt = 0;
+const STARTUP_GRACE_MS = 2000;
+
 /** Returns true when the current store mutation originated from Jazz (inbound sync). */
 export function isFromJazz(): boolean {
   return _fromJazz;
@@ -1814,9 +1818,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const regions = state.regions;
     if (regions === prevRegions) return;
     if (_fromJazz) { prevRegions = regions; return; }
-    const capturedPrev = prevRegions;
-    prevRegions = regions;
-    throttledPushFineGrained('regions', () => syncRegionsToJazz(regions, capturedPrev));
+    // DON'T update prevRegions here — let the throttled fn do it for correct diff
+    throttledPushFineGrained('regions', () => {
+      const currentRegions = useRegionStore.getState().regions;
+      syncRegionsToJazz(currentRegions, prevRegions);
+      prevRegions = currentRegions;
+    });
   });
   activeSubscriptions.push(unsubRegionsZustand);
 
@@ -1832,6 +1839,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const localCount = useRegionStore.getState().regions.length;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
+          // Startup grace: suppress inbound for creator during initial propagation
+          if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) {
+            console.log(`[jazz-bridge] Skipping inbound regions during startup grace`);
+            return;
+          }
 
           runFromJazz(() => {
             const store = useRegionStore.getState();
@@ -1872,9 +1884,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const mapObjects = state.mapObjects;
     if (mapObjects === prevMapObjects) return;
     if (_fromJazz) { prevMapObjects = mapObjects; return; }
-    const capturedPrev = prevMapObjects;
-    prevMapObjects = mapObjects;
-    throttledPushFineGrained('mapObjects', () => syncMapObjectsToJazz(mapObjects, capturedPrev));
+    // DON'T update prevMapObjects here — let the throttled fn do it for correct diff
+    throttledPushFineGrained('mapObjects', () => {
+      const currentMapObjects = useMapObjectStore.getState().mapObjects;
+      syncMapObjectsToJazz(currentMapObjects, prevMapObjects);
+      prevMapObjects = currentMapObjects;
+    });
   });
   activeSubscriptions.push(unsubMapObjectsZustand);
 
