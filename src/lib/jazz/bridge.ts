@@ -1468,8 +1468,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               if (!jt || !jt.tokenId) continue;
               jazzIds.add(jt.tokenId);
 
-              // Skip position updates for tokens being dragged locally
-              const isLocallyDragged = _localDragTokens.has(jt.tokenId);
+              // Skip position updates for tokens being dragged locally or in grace period
+              const isLocallyDragged = _isPositionSuppressed(jt.tokenId);
 
               if (currentIds.has(jt.tokenId)) {
                 const existing = store.tokens.find((t) => t.id === jt.tokenId);
