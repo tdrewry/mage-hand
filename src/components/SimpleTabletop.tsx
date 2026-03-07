@@ -9041,6 +9041,7 @@ export const SimpleTabletop = () => {
       // Add point to drag path (sample every few pixels for smoother path)
       const currentPath = dragPathRef.current;
       const lastPoint = currentPath[currentPath.length - 1];
+      const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
       if (distance > 10) {
         // Sample every 10 world units — mutate ref directly (no re-render needed)
         dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
