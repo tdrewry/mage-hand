@@ -372,7 +372,7 @@ export const SimpleTabletop = () => {
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [dragPath, setDragPath] = useState<{ x: number; y: number }[]>([]);
+  const dragPathRef = useRef<{ x: number; y: number }[]>([]);
 
   // Remote drag previews — subscribe to store for canvas redraws
   const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
@@ -1316,7 +1316,7 @@ export const SimpleTabletop = () => {
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
           setDragStartPos({ x: 0, y: 0 });
-          setDragPath([]);
+          dragPathRef.current = [];
           setGroupedTokens([]);
           setTempTokenPositions(undefined);
           // Clear real-time vision preview
@@ -1328,7 +1328,7 @@ export const SimpleTabletop = () => {
           setDraggedTokenId(null);
           setDragOffset({ x: 0, y: 0 });
           setDragStartPos({ x: 0, y: 0 });
-          setDragPath([]);
+          dragPathRef.current = [];
           setGroupedTokens([]);
           setTempTokenPositions(undefined);
           dragPreviewVisibilityRef.current = null;
@@ -5050,7 +5050,7 @@ export const SimpleTabletop = () => {
 
   // Function to draw drag path
   const drawDragPath = (ctx: CanvasRenderingContext2D, token: any) => {
-    // For free movement: draw straight line from start to current position
+    const dragPath = dragPathRef.current;
     // TODO: For grid movement, this will use grid-based pathfinding algorithms
 
     const gridSize = 40; // Grid unit size in pixels
@@ -8498,7 +8498,7 @@ export const SimpleTabletop = () => {
 
         // Store original position for ghost and path
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
-        setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+        dragPathRef.current = [{ x: clickedToken.x, y: clickedToken.y }];
         
         // Capture stable visibility snapshot at drag start to prevent flashing
         if (currentVisibilityRef.current) {
@@ -9039,14 +9039,15 @@ export const SimpleTabletop = () => {
       }
 
       // Add point to drag path (sample every few pixels for smoother path)
-      const lastPoint = dragPath[dragPath.length - 1];
+      const currentPath = dragPathRef.current;
+      const lastPoint = currentPath[currentPath.length - 1];
       const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
       if (distance > 10) {
-        // Sample every 10 world units
-        setDragPath((prev) => [...prev, { x: newX, y: newY }]);
+        // Sample every 10 world units — mutate ref directly (no re-render needed)
+        dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
 
-        // ── Emit drag update to network (throttled 50ms) with full path ──
-        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPath });
+        // ── Emit drag update to network (throttled 50ms) with current path ──
+        emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPathRef.current });
       }
 
       // Update primary token position
@@ -10343,7 +10344,7 @@ export const SimpleTabletop = () => {
       setDraggedTokenId(null);
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
-      setDragPath([]);
+      dragPathRef.current = [];
       setInitialTokenState(null);
 
       // If a modifier-click on an already-selected token happened and no drag occurred,
@@ -10926,7 +10927,7 @@ export const SimpleTabletop = () => {
           y: worldPos.y - clickedToken.y,
         });
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
-        setDragPath([{ x: clickedToken.x, y: clickedToken.y }]);
+        dragPathRef.current = [{ x: clickedToken.x, y: clickedToken.y }];
 
         // ── Emit drag begin (touch path) ──
         emitDragBegin({ tokenId: clickedToken.id, startPos: { x: clickedToken.x, y: clickedToken.y }, mode: "freehand" });
@@ -10992,7 +10993,7 @@ export const SimpleTabletop = () => {
         const newY = worldPos.y - dragOffset.y;
 
         // Update drag path
-        setDragPath(prev => [...prev, { x: newX, y: newY }]);
+        dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
 
         // Update token position
         updateTokenPosition(draggedTokenId, newX, newY);
@@ -11150,7 +11151,7 @@ export const SimpleTabletop = () => {
         setDraggedTokenId(null);
         setDragOffset({ x: 0, y: 0 });
         setDragStartPos({ x: 0, y: 0 });
-        setDragPath([]);
+        dragPathRef.current = [];
         setInitialTokenState(null);
         
         if (stableVisibilityRef.current) {
