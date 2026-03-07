@@ -240,6 +240,7 @@ export const JazzSessionRoot = co.map({
   maps: JazzMapList,
   regions: co.optional(JazzRegionList),
   mapObjects: co.optional(JazzMapObjectList),
+  effects: co.optional(JazzEffectState),
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
 });
