@@ -1641,11 +1641,19 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                     x: posChanged ? jt.x : existing.x,
                     y: posChanged ? jt.y : existing.y,
                   };
+                  // If imageHash changed and we have no imageUrl, flag for async resolution
+                  if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
+                    tokensNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                  }
                   updatedTokens[localIdx] = merged;
                   tokensChanged = true;
                 }
               } else {
-                updatedTokens.push(jazzToZustandToken(jt));
+                const newToken = jazzToZustandToken(jt);
+                if (newToken.imageHash && !newToken.imageUrl) {
+                  tokensNeedingTextureResolve.push({ id: newToken.id, hash: newToken.imageHash });
+                }
+                updatedTokens.push(newToken);
                 tokensChanged = true;
               }
             }
