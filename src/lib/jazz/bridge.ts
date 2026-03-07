@@ -527,10 +527,20 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   const len = sessionRoot.blobs.length ?? 0;
   console.log(`[jazz-bridge] Pulling ${len} DO blobs from Jazz`);
 
+  // Deduplicate by kind — keep only the blob with the latest updatedAt
+  const latestByKind = new Map<string, { state: string; updatedAt: string }>();
   for (let i = 0; i < len; i++) {
     const blob = sessionRoot.blobs[i];
     if (!blob || !blob.kind || !blob.state) continue;
-    pullBlobFromJazz(blob.kind, blob.state);
+    const existing = latestByKind.get(blob.kind);
+    if (!existing || (blob.updatedAt && (!existing.updatedAt || blob.updatedAt > existing.updatedAt))) {
+      latestByKind.set(blob.kind, { state: blob.state, updatedAt: blob.updatedAt ?? '' });
+    }
+  }
+
+  console.log(`[jazz-bridge] Deduplicated ${len} blobs to ${latestByKind.size} unique kinds`);
+  for (const [kind, { state }] of latestByKind) {
+    pullBlobFromJazz(kind, state);
   }
 }
 
