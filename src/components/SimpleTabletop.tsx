@@ -5050,7 +5050,7 @@ export const SimpleTabletop = () => {
 
   // Function to draw drag path
   const drawDragPath = (ctx: CanvasRenderingContext2D, token: any) => {
-    // For free movement: draw straight line from start to current position
+    const dragPath = dragPathRef.current;
     // TODO: For grid movement, this will use grid-based pathfinding algorithms
 
     const gridSize = 40; // Grid unit size in pixels
@@ -9039,8 +9039,8 @@ export const SimpleTabletop = () => {
       }
 
       // Add point to drag path (sample every few pixels for smoother path)
-      const lastPoint = dragPath[dragPath.length - 1];
-      const distance = Math.sqrt((newX - lastPoint.x) ** 2 + (newY - lastPoint.y) ** 2);
+      const currentPath = dragPathRef.current;
+      const lastPoint = currentPath[currentPath.length - 1];
       if (distance > 10) {
         // Sample every 10 world units — mutate ref directly (no re-render needed)
         dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
