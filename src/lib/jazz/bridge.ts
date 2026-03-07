@@ -1460,54 +1460,74 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
           runFromJazz(() => {
             const store = useSessionStore.getState();
-            const currentIds = new Set(store.tokens.map((t) => t.id));
+            const localTokens = store.tokens;
+            const currentIds = new Set(localTokens.map((t) => t.id));
             const jazzIds = new Set<string>();
+
+            // Build the new token array in a single pass to avoid stale-state bugs
+            // from multiple store mutations referencing an old getState() snapshot.
+            let tokensChanged = false;
+            const updatedTokens = localTokens.map(existing => {
+              // Will be replaced below if Jazz has an update for this token
+              return existing;
+            });
 
             for (let i = 0; i < len; i++) {
               const jt = tokens[i];
               if (!jt || !jt.tokenId) continue;
               jazzIds.add(jt.tokenId);
 
-              // Skip position updates for tokens being dragged locally or in grace period
               const isLocallyDragged = _isPositionSuppressed(jt.tokenId);
 
               if (currentIds.has(jt.tokenId)) {
-                const existing = store.tokens.find((t) => t.id === jt.tokenId);
-                if (!existing) continue;
+                const localIdx = updatedTokens.findIndex((t) => t.id === jt.tokenId);
+                if (localIdx === -1) continue;
+                const existing = updatedTokens[localIdx];
 
-                // Sync position (unless locally dragged)
-                if (!isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y)) {
-                  store.updateTokenPosition(jt.tokenId, jt.x, jt.y);
-                }
-
-                // Sync non-position properties regardless of drag state
+                // Build merged token: start with existing, overlay incoming non-position fields
                 const incoming = jazzToZustandToken(jt);
+                let hasChange = false;
+
+                // Check position change
+                const posChanged = !isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y);
+
+                // Check non-position changes
                 let hasNonPosChange = false;
                 for (const key of Object.keys(incoming) as (keyof Token)[]) {
                   if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
                   if (incoming[key] !== existing[key]) { hasNonPosChange = true; break; }
                 }
-                if (hasNonPosChange) {
-                  // Merge non-position fields into the token
-                  const merged = { ...existing, ...incoming, x: existing.x, y: existing.y, id: existing.id, imageUrl: existing.imageUrl };
-                  // If we already updated position above, use those
-                  if (!isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y)) {
-                    merged.x = jt.x;
-                    merged.y = jt.y;
-                  }
-                  store.setTokens(store.tokens.map(t => t.id === jt.tokenId ? merged : t));
+
+                hasChange = posChanged || hasNonPosChange;
+                if (hasChange) {
+                  const merged: Token = {
+                    ...existing,
+                    ...incoming,
+                    // Preserve local-only fields
+                    id: existing.id,
+                    imageUrl: existing.imageUrl,
+                    // Position: use Jazz values only if not suppressed
+                    x: posChanged ? jt.x : existing.x,
+                    y: posChanged ? jt.y : existing.y,
+                  };
+                  updatedTokens[localIdx] = merged;
+                  tokensChanged = true;
                 }
               } else {
-                store.addToken(jazzToZustandToken(jt));
+                updatedTokens.push(jazzToZustandToken(jt));
+                tokensChanged = true;
               }
             }
 
+            // Remove tokens that no longer exist in Jazz (non-creator only)
+            let finalTokens = updatedTokens;
             if (!_isCreator) {
-              for (const t of store.tokens) {
-                if (!jazzIds.has(t.id)) {
-                  store.removeToken(t.id);
-                }
-              }
+              finalTokens = updatedTokens.filter(t => jazzIds.has(t.id));
+              if (finalTokens.length !== updatedTokens.length) tokensChanged = true;
+            }
+
+            if (tokensChanged) {
+              store.setTokens(finalTokens);
             }
           });
         },

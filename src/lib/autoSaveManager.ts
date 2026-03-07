@@ -25,7 +25,7 @@ export interface AutoSaveSettings {
 }
 
 export const DEFAULT_AUTO_SAVE_SETTINGS: AutoSaveSettings = {
-  enabled: true,
+  enabled: false,
   intervalMinutes: 2,
 };
 
@@ -132,6 +132,24 @@ export class AutoSaveManager {
       const creatureState = useCreatureStore.getState();
       const hatchingState = useHatchingStore.getState();
 
+      // Strip large data URIs from tokens to avoid blowing up localStorage
+      const strippedTokens = sessionState.tokens.map(t => {
+        const stripped = { ...t };
+        if (stripped.imageUrl && stripped.imageUrl.startsWith('data:')) {
+          stripped.imageUrl = ''; // Keep imageHash for recovery from IndexedDB
+        }
+        return stripped;
+      });
+
+      // Strip large data URIs from regions
+      const strippedRegions = regionState.regions.map(r => {
+        const stripped = { ...r };
+        if (stripped.backgroundImage && stripped.backgroundImage.startsWith('data:')) {
+          stripped.backgroundImage = ''; // Keep textureHash for recovery
+        }
+        return stripped;
+      });
+
       const projectData: ProjectData = {
         metadata: {
           id: 'autosave',
@@ -140,10 +158,10 @@ export class AutoSaveManager {
           modifiedAt: new Date().toISOString(),
           version: '1.0.0',
         },
-        tokens: sessionState.tokens,
+        tokens: strippedTokens,
         players: sessionState.players,
         maps: mapState.maps,
-        regions: regionState.regions,
+        regions: strippedRegions,
         groups: groupState.groups,
         viewport: { x: 0, y: 0, zoom: 1 },
         settings: {
@@ -177,7 +195,6 @@ export class AutoSaveManager {
         cardStates: cardState.cards,
         dungeonData: {
           doors: dungeonState.doors,
-          // annotations are now MapObjects — serialized with mapObjects below
           importedWallSegments: dungeonState.importedWallSegments,
           lightSources: dungeonState.lightSources,
           renderingMode: dungeonState.renderingMode,
@@ -205,8 +222,6 @@ export class AutoSaveManager {
       };
 
       const serialized = serializeProject(projectData);
-      // Store only the inner ProjectData (not the SerializedProject wrapper) so that
-      // loadAutoSave() can return it directly as ProjectData without unwrapping.
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(serialized.data));
       
       this.lastSaveTime = Date.now();
