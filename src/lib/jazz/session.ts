@@ -266,6 +266,7 @@ export function leaveJazzSession(): void {
   }
   if (!currentSession) return;
   stopBridge();
+  cleanupTextureSync();
   useMultiplayerStore.getState().setSyncReady(false);
   console.log(`[jazz-session] Left session "${currentSession.sessionCoId}"`);
   currentSession = null;
