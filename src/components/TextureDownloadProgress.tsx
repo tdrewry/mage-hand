@@ -12,7 +12,15 @@ interface TextureDownloadState {
 let downloadState: TextureDownloadState = { total: 0, completed: 0, inProgress: [] };
 const listeners = new Set<(state: TextureDownloadState) => void>();
 
+/** Reset the download progress counter (call on session leave/menu return) */
+export function resetTextureDownloadProgress(): void {
+  downloadState = { total: 0, completed: 0, inProgress: [] };
+  listeners.forEach(l => l(downloadState));
+}
+
 export function notifyTextureDownloadStart(hash: string): void {
+  // Deduplicate: don't increment total if this hash is already tracked
+  if (downloadState.inProgress.includes(hash)) return;
   downloadState = {
     ...downloadState,
     total: downloadState.total + 1,
@@ -22,6 +30,8 @@ export function notifyTextureDownloadStart(hash: string): void {
 }
 
 export function notifyTextureDownloadComplete(hash: string): void {
+  // Only increment completed if this hash was actually in progress
+  if (!downloadState.inProgress.includes(hash)) return;
   downloadState = {
     ...downloadState,
     completed: downloadState.completed + 1,
@@ -41,11 +51,24 @@ export function notifyTextureDownloadComplete(hash: string): void {
 }
 
 export function notifyTextureDownloadError(hash: string): void {
+  if (!downloadState.inProgress.includes(hash)) return;
+  // Count errors as completed so the counter resolves
   downloadState = {
     ...downloadState,
+    completed: downloadState.completed + 1,
     inProgress: downloadState.inProgress.filter(h => h !== hash)
   };
   listeners.forEach(l => l(downloadState));
+  
+  // Reset after all resolve
+  if (downloadState.completed === downloadState.total && downloadState.inProgress.length === 0) {
+    setTimeout(() => {
+      if (downloadState.inProgress.length === 0) {
+        downloadState = { total: 0, completed: 0, inProgress: [] };
+        listeners.forEach(l => l(downloadState));
+      }
+    }, 2000);
+  }
 }
 
 /**
