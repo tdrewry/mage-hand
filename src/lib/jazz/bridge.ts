@@ -1232,12 +1232,18 @@ function throttledPushBlob(kind: string): void {
 
 const FINE_GRAINED_THROTTLE_MS = 1000;
 const _fineGrainedTimers = new Map<string, number>();
+/** Pending functions — always updated to the LATEST closure so trailing state wins */
+const _fineGrainedPending = new Map<string, () => void>();
 
 function throttledPushFineGrained(kind: string, fn: () => void): void {
+  // Always store the latest function (trailing-edge: last-write wins)
+  _fineGrainedPending.set(kind, fn);
   if (_fineGrainedTimers.has(kind)) return;
   _fineGrainedTimers.set(kind, window.setTimeout(() => {
     _fineGrainedTimers.delete(kind);
-    fn();
+    const pendingFn = _fineGrainedPending.get(kind);
+    _fineGrainedPending.delete(kind);
+    if (pendingFn) pendingFn();
   }, FINE_GRAINED_THROTTLE_MS));
 }
 
@@ -2039,6 +2045,7 @@ export function stopBridge(): void {
   _throttleTimers.clear();
   for (const timer of _fineGrainedTimers.values()) clearTimeout(timer);
   _fineGrainedTimers.clear();
+  _fineGrainedPending.clear();
   _lastPushedHash.clear();
 
   _sessionRoot = null;
