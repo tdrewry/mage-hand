@@ -22,6 +22,7 @@ export interface MapFogSettings {
   fogOpacity: number; // 0-1, how dark the fog is for unexplored areas
   exploredOpacity: number; // 0-1, how dark explored but not visible areas are
   showExploredAreas: boolean; // Whether to show previously explored areas as dimmed
+  dmFogOpacity: number; // 0-1, how dark unexplored areas appear to the DM (default 0.3)
   effectSettings: FogEffectSettings;
 }
 
