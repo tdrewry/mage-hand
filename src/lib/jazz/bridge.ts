@@ -1411,6 +1411,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     isCreator,
   });
 
+  // ── Startup dedup: clean any existing duplicates in Jazz CoLists ──
+  if (_cachedTokens) _dedupeJazzCoList(_cachedTokens, 'tokenId');
+  if (_cachedRegions) _dedupeJazzCoList(_cachedRegions, 'regionId');
+  if (_cachedMapObjects) _dedupeJazzCoList(_cachedMapObjects, 'objectId');
+
   // ── Token sync: Zustand → Jazz ──
   let prevTokens = useSessionStore.getState().tokens;
   const unsubTokensZustand = useSessionStore.subscribe((state) => {
