@@ -1487,6 +1487,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
 
     // Detect moved/updated tokens
+    let needsTexturePush = false;
     for (const t of tokens) {
       if (prevIds.has(t.id)) {
         const prev = prevTokens.find((pt: Token) => pt.id === t.id);
@@ -1506,6 +1507,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         if (isBeingDragged && posChanged && !nonPosChanged) continue;
         if (!posChanged && !nonPosChanged) continue;
 
+        // Track if imageHash changed — need to push texture binary
+        if (prev.imageHash !== t.imageHash && t.imageHash) {
+          needsTexturePush = true;
+        }
+
         const len = jazzTokens.length ?? 0;
         for (let i = 0; i < len; i++) {
           const jt = jazzTokens[i];
@@ -1522,6 +1528,15 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           }
         }
       }
+    }
+
+    // If any token got a new imageHash, push the texture binary to Jazz
+    if (needsTexturePush && _sessionRoot) {
+      import("./textureSync").then(({ pushTexturesToJazz }) => {
+        pushTexturesToJazz(_sessionRoot).catch(err => {
+          console.warn("[jazz-bridge] Mid-session texture push failed:", err);
+        });
+      });
     }
 
     // Detect removed tokens
