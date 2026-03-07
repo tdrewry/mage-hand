@@ -10,7 +10,6 @@ import {
   Code2,
   Layers,
   ExternalLink,
-  Save,
   AlertCircle,
 } from 'lucide-react';
 import { useSessionStore, type EntityRef } from '@/stores/sessionStore';
@@ -18,6 +17,7 @@ import { useCreatureStore } from '@/stores/creatureStore';
 import { LinkedCreatureSection } from '@/components/LinkedCreatureSection';
 import { EditableCharacterSheet } from '@/components/EditableCharacterSheet';
 import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
+import { CardSaveButton } from '@/components/cards/CardSaveButton';
 import type { DndBeyondCharacter } from '@/types/creatureTypes';
 import { toast } from 'sonner';
 
