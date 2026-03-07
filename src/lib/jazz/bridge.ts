@@ -1333,7 +1333,6 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   visionProfiles: () => useVisionProfileStore,
   fog: () => useFogStore,
   lights: () => useLightStore,
-  illumination: () => useIlluminationStore,
   dungeon: () => useDungeonStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,
