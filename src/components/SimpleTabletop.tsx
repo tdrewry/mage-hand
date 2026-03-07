@@ -165,6 +165,27 @@ import { computeEffectImpacts } from "../lib/effectHitTesting";
 import { tickAuras } from "../lib/auraEngine";
 
 
+/** Small reactive wrapper so button variant updates when cursorSharingEnabled changes */
+const CursorToggleButton: React.FC = () => {
+  const enabled = useCursorStore((s) => s.cursorSharingEnabled);
+  return (
+    <Button
+      variant={enabled ? "default" : "outline"}
+      size="sm"
+      className="h-8 gap-1.5 text-xs"
+      onClick={() => {
+        const next = !enabled;
+        useCursorStore.getState().setCursorSharingEnabled(next);
+        ephemeralBus.emit("cursor.visibility", { visible: next });
+        toast.success(next ? "Cursor sharing enabled" : "Cursor sharing disabled");
+      }}
+    >
+      <MousePointer2 className="h-3.5 w-3.5" />
+      Cursors
+    </Button>
+  );
+};
+
 export const SimpleTabletop = () => {
   // Register ephemeral handlers once
   React.useEffect(() => {
