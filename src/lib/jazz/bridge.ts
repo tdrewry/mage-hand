@@ -1493,6 +1493,35 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
+  // ── Effect sync: Zustand → Jazz ──
+  let prevEffects = useEffectStore.getState().placedEffects;
+  const unsubEffectsZustand = useEffectStore.subscribe((state) => {
+    const effects = state.placedEffects;
+    if (effects === prevEffects) return;
+    if (_fromJazz) { prevEffects = effects; return; }
+    prevEffects = effects;
+    // Throttled full re-push of effects (simpler than diff for complex nested state)
+    throttledPushFineGrained('effects', () => {
+      const effectState = _cachedEffects ?? _sessionRoot?.effects;
+      if (!effectState?.placedEffects) return;
+      const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+      // Clear and re-push all placed effects
+      const jazzPlaced = effectState.placedEffects;
+      const len = jazzPlaced.length ?? 0;
+      for (let i = len - 1; i >= 0; i--) {
+        try { jazzPlaced.$jazz.splice(i, 1); } catch { /* */ }
+      }
+      const active = useEffectStore.getState().placedEffects.filter((e: any) => !e.dismissedAt);
+      for (const e of active) {
+        try {
+          const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
+          jazzPlaced.$jazz.push(je);
+        } catch { /* */ }
+      }
+    });
+  });
+  activeSubscriptions.push(unsubEffectsZustand);
+
   // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
@@ -1572,6 +1601,7 @@ export function stopBridge(): void {
   _cachedTokens = null;
   _cachedRegions = null;
   _cachedMapObjects = null;
+  _cachedEffects = null;
   _cachedBlobs = null;
   _cachedGroup = null;
   _isCreator = false;
