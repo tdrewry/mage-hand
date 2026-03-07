@@ -102,6 +102,11 @@ function stripMapObjectTexturesForSync(state: any): any {
 }
 
 
+let _fromJazz = false;
+
+/** Throttle map for "too large" skip warnings — one per kind per 30s */
+const _lastSkipWarn = new Map<string, number>();
+
 /** Whether the local client created this session (source of truth for initial state) */
 let _isCreator = false;
 
