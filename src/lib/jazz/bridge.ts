@@ -855,7 +855,6 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   dungeon: () => useDungeonStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,
-  effects: () => useEffectStore,
   actions: () => useActionStore,
   dice: () => useDiceStore,
 };
