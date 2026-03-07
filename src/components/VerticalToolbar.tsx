@@ -563,6 +563,14 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
+            icon={Zap}
+            label="Actions"
+            onClick={handleToggleActionCard}
+            isActive={actionCard?.isVisible}
+            variant="ghost"
+            size="xs"
+          />
+
             icon={Layers}
             label="Map Tree"
             onClick={handleToggleMapTreeCard}
