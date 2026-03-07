@@ -68,6 +68,24 @@ function stripEffectTexturesForSync(state: any): any {
   return stripped;
 }
 
+/**
+ * Strip backgroundImage data URIs from regions state before Jazz blob sync.
+ * Region textures are synced separately via FileStreams using textureHash.
+ */
+function stripRegionTexturesForSync(state: any): any {
+  if (!state) return state;
+  const stripped = { ...state };
+
+  if (Array.isArray(stripped.regions)) {
+    stripped.regions = stripped.regions.map((r: any) => {
+      if (!r?.backgroundImage || r.backgroundImage.length < 200) return r;
+      return { ...r, backgroundImage: '' };
+    });
+  }
+
+  return stripped;
+}
+
 
 let _fromJazz = false;
 
@@ -243,6 +261,9 @@ function pushBlobToJazz(kind: string): void {
     // Textures are synced separately via FileStreams
     if (kind === 'effects' && state) {
       state = stripEffectTexturesForSync(state);
+    }
+    if (kind === 'regions' && state) {
+      state = stripRegionTexturesForSync(state);
     }
 
     const json = JSON.stringify(state);
