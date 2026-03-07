@@ -30,6 +30,8 @@ import {
   JazzPlacedEffect as JazzPlacedEffectSchema,
   JazzCustomTemplate as JazzCustomTemplateSchema,
   JazzDOBlob as JazzDOBlobSchema,
+  JazzIlluminationSource as JazzIlluminationSourceSchema,
+  JazzIlluminationSourceList,
   JazzRegionList,
   JazzMapObjectList,
   JazzPlacedEffectList,
@@ -189,6 +191,7 @@ let _cachedRegions: any = null;
 let _cachedMapObjects: any = null;
 let _cachedEffects: any = null;
 let _cachedBlobs: any = null;
+let _cachedIllumination: any = null;
 let _cachedGroup: any = null;
 
 /**
@@ -197,7 +200,6 @@ let _cachedGroup: any = null;
  */
 export function getBridgedSessionRoot(): any {
   if (!_sessionRoot) return null;
-  // Return a facade that uses cached refs
   return {
     ...(_sessionRoot),
     tokens: _cachedTokens ?? _sessionRoot.tokens,
@@ -205,6 +207,7 @@ export function getBridgedSessionRoot(): any {
     mapObjects: _cachedMapObjects ?? _sessionRoot.mapObjects,
     effects: _cachedEffects ?? _sessionRoot.effects,
     blobs: _cachedBlobs ?? _sessionRoot.blobs,
+    illuminationSources: _cachedIllumination ?? _sessionRoot.illuminationSources,
     _owner: _cachedGroup ?? _sessionRoot._owner,
     get $jazz() { return _sessionRoot.$jazz; },
   };
@@ -214,7 +217,7 @@ export function getBridgedSessionRoot(): any {
 
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
-  'fog', 'lights', 'illumination', 'dungeon', 'creatures',
+  'fog', 'lights', 'dungeon', 'creatures',
   'hatching', 'actions', 'dice',
 ];
 
