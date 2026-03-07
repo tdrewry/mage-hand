@@ -15,6 +15,7 @@
  */
 
 import { co } from "jazz-tools";
+import { JazzTextureList } from "./schema";
 import { loadTextureByHash, saveTextureByHash } from "@/lib/textureStorage";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
@@ -92,10 +93,28 @@ const _uploadedHashes = new Map<string, string>();
  * the session root's texture list.
  */
 export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
-  const textures = sessionRoot.textures;
-  if (!textures) {
-    console.warn("[jazz-texture] No textures list on session root");
+  if (!sessionRoot) {
+    console.warn("[jazz-texture] No session root — cannot push textures");
     return;
+  }
+
+  // Lazily create the textures list if it doesn't exist on an older session root
+  let textures = sessionRoot.textures;
+  if (!textures) {
+    try {
+      const group = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group;
+      if (group) {
+        textures = JazzTextureList.create([], group);
+        sessionRoot.$jazz?.set?.("textures", textures);
+        console.log("[jazz-texture] Created missing textures list on session root");
+      } else {
+        console.warn("[jazz-texture] No group on session root — cannot create textures list");
+        return;
+      }
+    } catch (err) {
+      console.warn("[jazz-texture] Could not create textures list:", err);
+      return;
+    }
   }
 
   const group =
@@ -263,9 +282,9 @@ let _textureUnsubscribe: (() => void) | null = null;
 export function subscribeToTextureChanges(sessionRoot: any): () => void {
   if (_textureUnsubscribe) _textureUnsubscribe();
 
-  const textures = sessionRoot.textures;
+  const textures = sessionRoot?.textures;
   if (!textures?.$jazz?.subscribe) {
-    console.warn("[jazz-texture] Textures list does not support subscribe");
+    console.log("[jazz-texture] Textures list not available or does not support subscribe — skipping");
     return () => {};
   }
 
