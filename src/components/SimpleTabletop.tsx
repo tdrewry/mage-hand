@@ -11882,7 +11882,7 @@ export const SimpleTabletop = () => {
       )}
 
       {/* Client Cursor Sharing Status — non-interactive indicator for non-DMs */}
-      {!isDM && isConnected && (
+      {!isDM && (
         <div
           className="absolute bottom-4 left-28 select-none pointer-events-none"
           style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
