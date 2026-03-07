@@ -56,6 +56,19 @@ import { useDiceStore } from "@/stores/diceStore";
 
 let _fromJazz = false;
 
+/** Token IDs currently being dragged locally — suppress inbound Jazz position updates */
+const _localDragTokens = new Set<string>();
+
+/** Mark a token as being locally dragged (suppresses inbound Jazz position sync) */
+export function markTokenDragStart(tokenId: string): void {
+  _localDragTokens.add(tokenId);
+}
+
+/** Unmark a token drag (resumes inbound Jazz position sync) */
+export function markTokenDragEnd(tokenId: string): void {
+  _localDragTokens.delete(tokenId);
+}
+
 /** Throttle map for "too large" skip warnings — one per kind per 30s */
 const _lastSkipWarn = new Map<string, number>();
 
