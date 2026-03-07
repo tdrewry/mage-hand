@@ -978,11 +978,74 @@ export function pullBlobsFromJazz(sessionRoot: any): void {
   }
 }
 
+/** Pull all effects from Jazz into Zustand */
+export function pullEffectsFromJazz(sessionRoot: any): void {
+  const effectState = sessionRoot.effects;
+  if (!effectState) {
+    console.log("[jazz-bridge] No effects container on session root (legacy session)");
+    return;
+  }
+
+  // Pull custom templates first (needed for template reconstruction)
+  const jazzCustomTemplates = effectState.customTemplates;
+  const customTemplates: EffectTemplate[] = [];
+  if (jazzCustomTemplates) {
+    const ctLen = jazzCustomTemplates.length ?? 0;
+    for (let i = 0; i < ctLen; i++) {
+      const jct = jazzCustomTemplates[i];
+      if (!jct?.templateJson) continue;
+      try {
+        const parsed = JSON.parse(jct.templateJson);
+        customTemplates.push(parsed);
+      } catch { /* invalid JSON */ }
+    }
+  }
+
+  // Pull placed effects
+  const jazzPlaced = effectState.placedEffects;
+  const placedLen = jazzPlaced?.length ?? 0;
+  const localPlacedCount = useEffectStore.getState().placedEffects.length;
+
+  if (placedLen === 0 && customTemplates.length === 0 && localPlacedCount > 0 && _isCreator) {
+    console.warn(`[jazz-bridge] ✋ Blocked effects pull — Jazz has 0 but local has ${localPlacedCount} (creator guard)`);
+    return;
+  }
+
+  console.log(`[jazz-bridge] Pulling ${customTemplates.length} custom templates, ${placedLen} placed effects from Jazz`);
+
+  const lookup = buildTemplateLookup(customTemplates);
+
+  runFromJazz(() => {
+    const store = useEffectStore.getState();
+    // Clear existing
+    const mapIds = new Set(store.placedEffects.map(e => e.mapId));
+    mapIds.forEach(id => store.clearEffectsForMap(id));
+
+    // Restore custom templates
+    for (const t of customTemplates) {
+      store.addCustomTemplate(t);
+    }
+
+    // Restore placed effects
+    const restored: PlacedEffect[] = [];
+    for (let i = 0; i < placedLen; i++) {
+      const je = jazzPlaced[i];
+      if (!je) continue;
+      const effect = jazzToZustandPlacedEffect(je, lookup);
+      if (effect) restored.push(effect);
+    }
+    if (restored.length > 0) {
+      useEffectStore.setState({ placedEffects: restored });
+    }
+  });
+}
+
 /** Pull all Jazz CoValue state into Zustand stores */
 export function pullAllFromJazz(sessionRoot: any): void {
   pullTokensFromJazz(sessionRoot);
   pullRegionsFromJazz(sessionRoot);
   pullMapObjectsFromJazz(sessionRoot);
+  pullEffectsFromJazz(sessionRoot);
   pullBlobsFromJazz(sessionRoot);
 }
 
