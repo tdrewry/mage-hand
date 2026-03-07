@@ -6,6 +6,7 @@ import { opBridge } from "./OpBridge";
 import { EphemeralBus } from "./ephemeral";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import type { EngineOp } from "../../../networking/contract/v1";
+import { initCardSaveSync } from "./cardSaveSync";
 
 // Durable op kinds that Jazz handles via store-subscription sync.
 // When Jazz is the active transport these are redundant through OpBridge.
@@ -22,6 +23,9 @@ setEphemeralBusRef(ephemeralBus);
 
 opBridge.setProposeOp((op, id) => netManager.proposeOp(op, id));
 ephemeralBus.setSendFn((op) => netManager.sendEphemeral(op.kind, op.data));
+
+// Wire card-level save → sync bridge
+initCardSaveSync();
 
 /** Convenience: emit a local op to the network (echo-safe).
  *  Skips durable ops that Jazz already syncs via store subscriptions. */

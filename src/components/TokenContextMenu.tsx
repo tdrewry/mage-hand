@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Edit3, Palette, Trash2, Dices, Plus, Eye, Scan, Shield, Lightbulb, Sparkles, Upload, X, ExternalLink, Link2, Save, Bookmark, Footprints, FileText, Swords, MapPin, Copy, BookOpen, Star, Zap, RotateCw } from 'lucide-react';
+import { CardSaveEvent } from '@/components/cards/CardSaveButton';
 import { LinkedCreatureSection } from './LinkedCreatureSection';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
 import { ImageImportModal, type ImageImportResult } from './modals/ImageImportModal';
@@ -1734,7 +1735,12 @@ export const TokenContextMenu = ({
             <Button variant="outline" onClick={() => setShowTokenEditModal(false)}>
               Cancel
             </Button>
-            <Button onClick={applyTokenEdit}>
+            <Button onClick={() => {
+              applyTokenEdit();
+              targetTokens.forEach(t => {
+                window.dispatchEvent(new CardSaveEvent({ context: { type: 'token', id: t.id } }));
+              });
+            }}>
               Save Changes
             </Button>
           </DialogFooter>

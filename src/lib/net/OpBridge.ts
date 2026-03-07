@@ -85,6 +85,24 @@ class OpBridgeImpl {
       toast.info(`Synced ${d.tokens.length} token(s): ${created} new, ${updated} updated`);
     });
 
+    this.register("token.update", (data) => {
+      const d = data as Record<string, unknown>;
+      if (!d || typeof d.id !== 'string') return;
+      const store = useSessionStore.getState();
+      const existing = store.tokens.find(t => t.id === d.id);
+      if (!existing) {
+        console.warn(`[OpBridge] token.update: token ${d.id} not found locally`);
+        return;
+      }
+      // Merge all provided fields into the token
+      useSessionStore.setState((state) => ({
+        tokens: state.tokens.map(t =>
+          t.id === d.id ? { ...t, ...d } : t
+        ),
+      }));
+      console.log(`🔄 [OpBridge] token.update applied for ${d.id}`);
+    });
+
     // Token drag preview ops moved to ephemeral tokenHandlers.ts (Priority 1 migration)
   }
 
