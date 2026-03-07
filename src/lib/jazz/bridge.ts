@@ -690,7 +690,19 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
-  console.log(`[jazz-bridge] Bridge started with token sync + ${BLOB_SYNC_KINDS.length} DO blob kinds`);
+  // ── Texture sync: subscribe to live texture additions ──
+  try {
+    import("./textureSync").then(({ subscribeToTextureChanges }) => {
+      const unsubTextures = subscribeToTextureChanges(sessionRoot);
+      activeSubscriptions.push(unsubTextures);
+    }).catch(err => {
+      console.warn("[jazz-bridge] Could not start texture subscription:", err);
+    });
+  } catch (err) {
+    console.warn("[jazz-bridge] Could not start texture subscription:", err);
+  }
+
+  console.log(`[jazz-bridge] Bridge started with token sync + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
 }
 
 /**

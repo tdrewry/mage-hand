@@ -13,6 +13,8 @@ export {
   JazzMapList,
   JazzDOBlob,
   JazzDOBlobList,
+  JazzTextureEntry,
+  JazzTextureList,
   JazzSessionRoot,
   MageHandAccount,
   MageHandAccountRoot,
@@ -41,3 +43,12 @@ export {
   getCurrentJazzSession,
   type JazzSessionInfo,
 } from "./session";
+
+// Texture sync (FileStream-based)
+export {
+  pushTexturesToJazz,
+  pullTexturesFromJazz,
+  subscribeToTextureChanges,
+  cleanupTextureSync,
+  collectAllTextureHashes,
+} from "./textureSync";
