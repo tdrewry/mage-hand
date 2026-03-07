@@ -1592,6 +1592,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             // Build the new token array in a single pass to avoid stale-state bugs
             // from multiple store mutations referencing an old getState() snapshot.
             let tokensChanged = false;
+            const tokensNeedingTextureResolve: { id: string; hash: string }[] = [];
             const updatedTokens = localTokens.map(existing => {
               return existing;
             });
@@ -1669,6 +1670,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               store.setTokens(finalTokens);
             }
           });
+
+          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
+          if (tokensNeedingTextureResolve.length > 0) {
+            _resolveTokenTextures(tokensNeedingTextureResolve);
+          }
         },
       );
       activeSubscriptions.push(unsubJazz);
