@@ -325,9 +325,10 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
   const effects = JazzEffectState.create({ placedEffects, customTemplates }, group);
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
+  const illuminationSources = JazzIlluminationSourceList.create([], group);
 
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures },
+    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures, illuminationSources },
     group,
   );
 }
