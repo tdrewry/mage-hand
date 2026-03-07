@@ -186,7 +186,23 @@ const CursorToggleButton: React.FC = () => {
   );
 };
 
-export const SimpleTabletop = () => {
+/** Non-interactive cursor status indicator for connected clients (non-DM) */
+const CursorStatusIndicator: React.FC = () => {
+  const enabled = useCursorStore((s) => s.cursorSharingEnabled);
+  return (
+    <div
+      className={`inline-flex items-center h-8 gap-1.5 text-xs px-3 rounded-md border ${
+        enabled
+          ? "bg-primary/15 border-primary/30 text-primary"
+          : "bg-muted/50 border-border text-muted-foreground"
+      }`}
+    >
+      <MousePointer2 className="h-3.5 w-3.5" />
+      Cursors {enabled ? "On" : "Off"}
+    </div>
+  );
+};
+
   // Register ephemeral handlers once
   React.useEffect(() => {
     registerCursorHandlers();
