@@ -98,10 +98,27 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setCurrentSession: (session) => set({ currentSession: session }),
       setCurrentUserId: (userId) => set({ currentUserId: userId }),
       setCurrentUsername: (username) => set({ currentUsername: username }),
-      setConnectedUsers: (users) => set({ connectedUsers: users }),
+      setConnectedUsers: (users) => {
+        // Deduplicate by userId — first occurrence wins (preserves priority of selfUser)
+        const seen = new Set<string>();
+        const deduped = users.filter(u => {
+          if (seen.has(u.userId)) return false;
+          seen.add(u.userId);
+          return true;
+        });
+        set({ connectedUsers: deduped });
+      },
       
       addConnectedUser: (user) => set((state) => {
-        if (state.connectedUsers.some(u => u.userId === user.userId)) return state;
+        const existing = state.connectedUsers.find(u => u.userId === user.userId);
+        if (existing) {
+          // Update existing entry (e.g. username or roles changed on reconnect)
+          return {
+            connectedUsers: state.connectedUsers.map(u =>
+              u.userId === user.userId ? { ...u, ...user, connectedAt: u.connectedAt } : u
+            ),
+          };
+        }
         return { connectedUsers: [...state.connectedUsers, user] };
       }),
       
