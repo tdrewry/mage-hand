@@ -692,9 +692,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
   // ── Texture sync: subscribe to live texture additions ──
   try {
-    const { subscribeToTextureChanges } = await import("./textureSync");
-    const unsubTextures = subscribeToTextureChanges(sessionRoot);
-    activeSubscriptions.push(unsubTextures);
+    import("./textureSync").then(({ subscribeToTextureChanges }) => {
+      const unsubTextures = subscribeToTextureChanges(sessionRoot);
+      activeSubscriptions.push(unsubTextures);
+    }).catch(err => {
+      console.warn("[jazz-bridge] Could not start texture subscription:", err);
+    });
   } catch (err) {
     console.warn("[jazz-bridge] Could not start texture subscription:", err);
   }
