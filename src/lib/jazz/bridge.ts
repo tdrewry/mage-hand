@@ -1852,6 +1852,120 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   });
   activeSubscriptions.push(unsubEffectsZustand);
 
+  // ── Effect sync: Jazz → Zustand (inbound placed effects + custom templates) ──
+  const jazzEffectsRef = sessionRoot.effects;
+  if (jazzEffectsRef?.placedEffects?.$jazz?.subscribe) {
+    try {
+      const unsubEffectsJazz = jazzEffectsRef.placedEffects.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (placedEffects: any) => {
+          if (!placedEffects) return;
+          const len = placedEffects.length ?? 0;
+          const localCount = useEffectStore.getState().placedEffects.length;
+
+          if (len === 0 && localCount > 0 && _isCreator) return;
+
+          // Rebuild template lookup from current custom templates
+          const customTemplates = useEffectStore.getState().customTemplates;
+          const lookup = buildTemplateLookup(customTemplates);
+
+          runFromJazz(() => {
+            const restored: PlacedEffect[] = [];
+            for (let i = 0; i < len; i++) {
+              const je = placedEffects[i];
+              if (!je) continue;
+              const effect = jazzToZustandPlacedEffect(je, lookup);
+              if (effect) restored.push(effect);
+            }
+            useEffectStore.setState({ placedEffects: restored });
+          });
+          prevEffects = useEffectStore.getState().placedEffects;
+        },
+      );
+      activeSubscriptions.push(unsubEffectsJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz placed effects:", err);
+    }
+  }
+
+  // ── Custom template sync: Jazz → Zustand ──
+  if (jazzEffectsRef?.customTemplates?.$jazz?.subscribe) {
+    try {
+      const unsubCustomTemplatesJazz = jazzEffectsRef.customTemplates.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (templates: any) => {
+          if (!templates) return;
+          const len = templates.length ?? 0;
+
+          runFromJazz(() => {
+            const store = useEffectStore.getState();
+            const parsed: EffectTemplate[] = [];
+            for (let i = 0; i < len; i++) {
+              const jct = templates[i];
+              if (!jct?.templateJson) continue;
+              try {
+                parsed.push(JSON.parse(jct.templateJson));
+              } catch { /* invalid JSON */ }
+            }
+
+            // Upsert: add new ones, update existing
+            for (const t of parsed) {
+              const existing = store.customTemplates.find(ct => ct.id === t.id);
+              if (existing) {
+                store.updateCustomTemplate(t.id, t);
+              } else {
+                store.addCustomTemplate(t);
+              }
+            }
+
+            // Remove templates no longer in Jazz (non-creator only)
+            if (!_isCreator) {
+              const jazzIds = new Set(parsed.map(t => t.id));
+              for (const ct of store.customTemplates) {
+                if (!jazzIds.has(ct.id)) {
+                  store.deleteTemplate(ct.id);
+                }
+              }
+            }
+          });
+        },
+      );
+      activeSubscriptions.push(unsubCustomTemplatesJazz);
+    } catch (err) {
+      console.warn("[jazz-bridge] Could not subscribe to Jazz custom templates:", err);
+    }
+  }
+
+  // ── Custom template sync: Zustand → Jazz (outbound) ──
+  let prevCustomTemplates = useEffectStore.getState().customTemplates;
+  const unsubCustomTemplatesZustand = useEffectStore.subscribe((state) => {
+    const templates = state.customTemplates;
+    if (templates === prevCustomTemplates) return;
+    if (_fromJazz) { prevCustomTemplates = templates; return; }
+    prevCustomTemplates = templates;
+    throttledPushFineGrained('customTemplates', () => {
+      const effectState = _cachedEffects ?? _sessionRoot?.effects;
+      if (!effectState?.customTemplates) return;
+      const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+      const jazzTemplates = effectState.customTemplates;
+      const ctLen = jazzTemplates.length ?? 0;
+      for (let i = ctLen - 1; i >= 0; i--) {
+        try { jazzTemplates.$jazz.splice(i, 1); } catch { /* */ }
+      }
+      for (const t of templates) {
+        const stripped = stripTemplateForSync(t);
+        try {
+          const jt = JazzCustomTemplateSchema.create({
+            templateId: t.id,
+            templateJson: JSON.stringify(stripped),
+          } as any, group);
+          jazzTemplates.$jazz.push(jt);
+        } catch { /* */ }
+      }
+    });
+  });
+  activeSubscriptions.push(unsubCustomTemplatesZustand);
+
   // ── Blob sync: Zustand → Jazz (remaining DO kinds) ──
   for (const kind of BLOB_SYNC_KINDS) {
     const getStore = STORE_FOR_KIND[kind];
