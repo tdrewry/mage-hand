@@ -340,6 +340,7 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
   if (_textureUnsubscribe) _textureUnsubscribe();
 
   const textures = sessionRoot?.textures;
+  _cachedTextureList = textures ?? null;
   if (!textures?.$jazz?.subscribe) {
     console.log("[jazz-texture] Textures list not available or does not support subscribe — skipping");
     return () => {};
