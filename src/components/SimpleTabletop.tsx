@@ -695,17 +695,13 @@ export const SimpleTabletop = () => {
 
   // Merge remote portal activations from ephemeral store into the ref
   useEffect(() => {
-    const unsub = useMapEphemeralStore.subscribe(
-      (state) => state.portalActivations,
-      (activations) => {
-        for (const [objectId, ts] of Object.entries(activations)) {
-          // Only set if not already active locally (avoid overwriting local flash)
-          if (!portalActivationsRef.current.has(objectId)) {
-            portalActivationsRef.current.set(objectId, performance.now());
-          }
+    const unsub = useMapEphemeralStore.subscribe((state) => {
+      for (const objectId of Object.keys(state.portalActivations)) {
+        if (!portalActivationsRef.current.has(objectId)) {
+          portalActivationsRef.current.set(objectId, performance.now());
         }
-      },
-    );
+      }
+    });
     return unsub;
   }, []);
   
