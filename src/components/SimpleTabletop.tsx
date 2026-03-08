@@ -159,7 +159,7 @@ import {
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
 import { useEffectStore } from "../stores/effectStore";
-import { renderPlacedEffects, renderPlacementPreview, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/effectRenderer";
+import { renderPlacedEffects, renderPlacementPreview, renderRemoteEffectPreviews, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/effectRenderer";
 import { EffectContextMenu } from "./EffectContextMenu";
 import { computeEffectImpacts } from "../lib/effectHitTesting";
 import { tickAuras } from "../lib/auraEngine";
@@ -4252,6 +4252,7 @@ export const SimpleTabletop = () => {
         if (effectState.placement?.previewOrigin) {
           renderPlacementPreview({ ctx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
         }
+        renderRemoteEffectPreviews({ ctx, time: performance.now(), gridSize: effectGridSize });
       }
 
       // Draw drag path BEFORE tokens so footprints appear below token art
@@ -4364,6 +4365,7 @@ export const SimpleTabletop = () => {
               if (effectState.placement?.previewOrigin) {
                 renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
               }
+              renderRemoteEffectPreviews({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize });
             }
 
             // Draw drag path BEFORE tokens so footprints appear below token art

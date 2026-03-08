@@ -15,6 +15,9 @@ import type {
   EffectPlacementState,
 } from '@/types/effectTypes';
 import { isBurstShape } from '@/types/effectTypes';
+import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
+import { useEffectStore } from '@/stores/effectStore';
+import { getBuiltInTemplate } from '@/lib/effectTemplateLibrary';
 import type { LineSegment, Point } from '@/lib/visibilityEngine';
 import { computeVisibilityFromSegments } from '@/lib/visibilityEngine';
 import { animatedTextureManager } from '@/lib/animatedTextureManager';
@@ -954,5 +957,45 @@ export function renderAuraEffects(
     ctx.setLineDash([]);
 
     ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Remote effect placement preview ghosts
+// ---------------------------------------------------------------------------
+
+/**
+ * Render semi-transparent ghost shapes for each remote user's effect
+ * placement preview. Reads from miscEphemeralStore.effectPlacementPreviews.
+ */
+export function renderRemoteEffectPreviews(rc: EffectRenderContext): void {
+  const previews = useMiscEphemeralStore.getState().effectPlacementPreviews;
+  const entries = Object.entries(previews);
+  if (entries.length === 0) return;
+
+  const effectStore = useEffectStore.getState();
+
+  for (const [_userId, preview] of entries) {
+    // Resolve the template — check custom store templates first, then built-ins
+    let template: EffectTemplate | undefined =
+      effectStore.allTemplates.find((t) => t.id === preview.templateId) ??
+      getBuiltInTemplate(preview.templateId);
+
+    if (!template) continue;
+
+    const origin = preview.origin;
+    const direction = preview.direction ?? 0;
+
+    rc.ctx.save();
+
+    // Ghost fill — low opacity with subtle pulse
+    rc.ctx.globalAlpha = 0.2 + Math.sin(rc.time * 0.003) * 0.08;
+    drawShape(rc, template, origin, direction, 0);
+
+    // Ghost outline — dashed, slightly brighter
+    rc.ctx.globalAlpha = 0.45 + Math.sin(rc.time * 0.004) * 0.1;
+    strokeShape(rc, template, origin, direction);
+
+    rc.ctx.restore();
   }
 }
