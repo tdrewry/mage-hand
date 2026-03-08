@@ -10,6 +10,8 @@ import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useActionPendingStore } from "@/stores/actionPendingStore";
 import { useArtSubmissionStore } from "@/stores/artSubmissionStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useCardStore } from "@/stores/cardStore";
+import { CardType } from "@/types/cardTypes";
 import { saveTextureByHash } from "@/lib/textureStorage";
 import { toast } from "sonner";
 import type {
@@ -35,6 +37,26 @@ import type {
 } from "./types";
 
 let registered = false;
+
+/** Open the Action Card for DMs when a remote action arrives */
+function openActionCardForDM() {
+  const cardStore = useCardStore.getState();
+  let actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+  if (!actionCard) {
+    const newId = cardStore.registerCard({
+      type: CardType.ACTION_CARD,
+      title: 'Action',
+      defaultPosition: { x: 400, y: 200 },
+      defaultSize: { width: 420, height: 480 },
+      defaultVisible: true,
+    });
+    actionCard = cardStore.getCard(newId) ?? undefined;
+  }
+  if (actionCard) {
+    cardStore.setVisibility(actionCard.id, true);
+    cardStore.bringToFront(actionCard.id);
+  }
+}
 
 export function registerMiscHandlers(): void {
   if (registered) return;
@@ -111,11 +133,24 @@ export function registerMiscHandlers(): void {
 
   // ── Actions (DM queue sync) ──
   ephemeralBus.on("action.queue.sync", (data: ActionQueueSyncPayload, _userId) => {
+    const hadAction = !!useActionStore.getState().currentAction;
     useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory);
+
+    // Auto-open Action Card for DMs when a new action arrives
+    if (!hadAction && data.currentAction) {
+      const roles = useMultiplayerStore.getState().roles;
+      if (roles.includes("dm")) {
+        openActionCardForDM();
+      }
+    }
   });
 
-  // ── Action Pending (broadcast to all — players see toast) ──
+  // ── Action Pending (broadcast to all — players see toast, DMs see Action Card) ──
   ephemeralBus.on("action.pending", (data: ActionPendingPayload, _userId) => {
+    const roles = useMultiplayerStore.getState().roles;
+    if (roles.includes("dm")) {
+      openActionCardForDM();
+    }
     useActionPendingStore.getState().setPending({
       ...data,
       receivedAt: Date.now(),

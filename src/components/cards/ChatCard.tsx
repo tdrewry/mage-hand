@@ -259,10 +259,17 @@ export const ChatCardContent: React.FC = () => {
     });
   }, [entries, currentUserId]);
 
-  // Auto-scroll on new entries
+  // Auto-scroll on new entries — target the ScrollArea viewport (parent of content div)
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    // The scrollable viewport is the parent element created by ScrollArea
+    const viewport = el?.parentElement;
+    if (viewport) {
+      // Use requestAnimationFrame to ensure DOM has updated with new content
+      requestAnimationFrame(() => {
+        viewport.scrollTop = viewport.scrollHeight;
+      });
+    }
   }, [visibleEntries.length]);
 
   const isWhisperMode = whisperTargets.length > 0;
