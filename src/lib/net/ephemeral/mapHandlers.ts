@@ -6,6 +6,7 @@ import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import type {
   DmViewportPayload,
+  DmEnforceFollowPayload,
   MapPingPayload,
   MapFocusPayload,
   RegionDragUpdatePayload,
@@ -26,6 +27,11 @@ export function registerMapHandlers(): void {
 
   ephemeralBus.on("map.dm.viewport", (data: DmViewportPayload, userId) => {
     store.getState().setDmViewport({ userId, x: data.x, y: data.y, zoom: data.zoom });
+  });
+
+  ephemeralBus.on("map.dm.enforceFollow", (data: DmEnforceFollowPayload, _userId) => {
+    // DM is commanding all players to follow/unfollow
+    store.getState().setFollowDM(data.enforce);
   });
 
   ephemeralBus.on("map.ping", (data: MapPingPayload, userId) => {
