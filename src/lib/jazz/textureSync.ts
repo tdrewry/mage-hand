@@ -218,6 +218,7 @@ const _downloadedHashes = new Set<string>();
  */
 export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
   const textures = sessionRoot.textures;
+  _cachedTextureList = textures ?? null;
   if (!textures) {
     console.log("[jazz-texture] No textures list on session root");
     return;
