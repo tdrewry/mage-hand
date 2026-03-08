@@ -978,7 +978,7 @@ export function renderRemoteEffectPreviews(rc: EffectRenderContext): void {
   for (const [_userId, preview] of entries) {
     // Resolve the template — check custom store templates first, then built-ins
     let template: EffectTemplate | undefined =
-      effectStore.templates.find((t) => t.id === preview.templateId) ??
+      effectStore.allTemplates.find((t) => t.id === preview.templateId) ??
       getBuiltInTemplate(preview.templateId);
 
     if (!template) continue;
