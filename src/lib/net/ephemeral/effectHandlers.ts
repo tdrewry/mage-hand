@@ -4,6 +4,7 @@
 import { ephemeralBus } from "@/lib/net";
 import { useEffectStore } from "@/stores/effectStore";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
+import { triggerSound } from "@/lib/soundEngine";
 import type { EffectImpact } from "@/types/effectTypes";
 import type {
   EffectAuraStatePayload,
