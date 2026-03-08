@@ -7297,11 +7297,10 @@ export const SimpleTabletop = () => {
         cancelAnimationFrame(animationId);
       }
     };
-    // Include transform in dependencies so animation loop recreates with fresh transform values
-    // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
-    // Include regions for animated region textures
-    // Include mapObjects so door state changes are reflected immediately in animation frames
-  }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
+    // transform is accessed via transformRef to avoid tearing down the animation
+    // loop on every zoom tick (which caused jank). Other deps are kept because
+    // they control whether the loop should run at all.
+  }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, animationsPaused, renderingMode]);
 
   // ---------------------------------------------------------------------------
   // Marquee DOM helpers — update/hide the marquee <div> directly via ref so
