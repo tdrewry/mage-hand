@@ -72,33 +72,47 @@ DurableObjectRegistry.register({
     selectedMapId: useMapStore.getState().selectedMapId,
   }),
   hydrator: (state: any) => {
-    const store = useMapStore.getState();
-    store.maps.forEach(m => store.removeMap(m.id));
+    const mapsArr: any[] = state?.maps || (Array.isArray(state) ? state : []);
 
-    const mapsArr = state?.maps || state || []; // v2 has { maps, structures }, v1 has just array
-    mapsArr.forEach((m: any) => {
-      store.restoreMap({ ...m, regions: m.regions || [] });
+    // Restore maps directly via setState to bypass the always-one-map invariant
+    // which would create a phantom blank map during the clear phase.
+    const restoredMaps = mapsArr.map((m: any) => ({
+      ...m,
+      regions: m.regions || [],
+      imageUrl: m.imageUrl || '', // large data stripped during extract
+    }));
+
+    // Init fog settings for each incoming map
+    restoredMaps.forEach((m: any) => {
+      useFogStore.getState().initMapFogSettings(m.id);
     });
+
+    // Atomic replacement — no intermediate empty state
+    const stateUpdate: any = {
+      maps: restoredMaps.length > 0 ? restoredMaps : useMapStore.getState().maps,
+    };
 
     // Restore structures if present (v2+)
     if (state?.structures && Array.isArray(state.structures)) {
-      useMapStore.setState({ structures: state.structures });
+      stateUpdate.structures = state.structures;
     }
 
     // For non-creator clients: follow the DM's selected map
     if (state?.selectedMapId) {
-      const mapExists = mapsArr.some((m: any) => m.id === state.selectedMapId);
+      const mapExists = restoredMaps.some((m: any) => m.id === state.selectedMapId);
       if (mapExists) {
-        store.setSelectedMap(state.selectedMapId);
+        stateUpdate.selectedMapId = state.selectedMapId;
       }
     }
 
-    // Select the first active map if no valid selection
+    useMapStore.setState(stateUpdate);
+
+    // Fallback: if no valid selection, pick first active map
     const currentSelected = useMapStore.getState().selectedMapId;
-    const activeMap = mapsArr.find((m: any) => m.active);
-    if (!currentSelected || !mapsArr.some((m: any) => m.id === currentSelected)) {
-      if (activeMap) store.setSelectedMap(activeMap.id);
-      else if (mapsArr.length > 0) store.setSelectedMap(mapsArr[0].id);
+    if (!currentSelected || !restoredMaps.some((m: any) => m.id === currentSelected)) {
+      const activeMap = restoredMaps.find((m: any) => m.active);
+      if (activeMap) useMapStore.setState({ selectedMapId: activeMap.id });
+      else if (restoredMaps.length > 0) useMapStore.setState({ selectedMapId: restoredMaps[0].id });
     }
   },
   summarizer: () => `${useMapStore.getState().maps.length} maps`,
