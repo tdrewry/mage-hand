@@ -2061,8 +2061,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         });
       });
     }
-
-    prevRegions = regions;
   });
   activeSubscriptions.push(unsubRegionsZustand);
 
@@ -2178,8 +2176,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         });
       });
     }
-
-    prevMapObjects = mapObjects;
   });
   activeSubscriptions.push(unsubMapObjectsZustand);
 
