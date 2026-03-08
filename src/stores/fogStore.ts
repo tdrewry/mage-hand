@@ -75,10 +75,8 @@ interface FogState {
 
 // Define the store creator separately for better type inference
 const fogStoreCreator: StateCreator<FogState> = (set) => ({
-  // Per-map fog settings - default map starts with defaults
-  fogSettingsPerMap: {
-    'default-map': { ...DEFAULT_MAP_FOG_SETTINGS },
-  },
+  // Per-map fog settings - initialized on demand via getMapFogSettings fallback
+  fogSettingsPerMap: {},
 
   // Global fields
   serializedExploredAreas: '',
@@ -180,9 +178,7 @@ const fogStoreCreator: StateCreator<FogState> = (set) => ({
 
   resetFog: () => {
     set({
-      fogSettingsPerMap: {
-        'default-map': { ...DEFAULT_MAP_FOG_SETTINGS },
-      },
+      fogSettingsPerMap: {},
       serializedExploredAreas: '',
       serializedExploredAreasPerMap: {},
       fogVersion: 1,
