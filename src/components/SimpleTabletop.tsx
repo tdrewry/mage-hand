@@ -1194,8 +1194,9 @@ export const SimpleTabletop = () => {
       return;
     }
 
-    // Trigger activation flash on the source portal immediately
+    // Trigger activation flash on the source portal immediately (local + network)
     portalActivationsRef.current.set(portalAtDrop.id, performance.now());
+    emitPortalActivate(portalAtDrop.id);
 
     // DM gets a confirmation prompt; non-DM teleports instantly
     if (isDM) {
