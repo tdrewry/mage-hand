@@ -128,7 +128,7 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitPortalActivate } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
@@ -692,6 +692,18 @@ export const SimpleTabletop = () => {
 
   // Portal activation flash effect — maps portalId to start timestamp
   const portalActivationsRef = useRef<Map<string, number>>(new Map());
+
+  // Merge remote portal activations from ephemeral store into the ref
+  useEffect(() => {
+    const unsub = useMapEphemeralStore.subscribe((state) => {
+      for (const objectId of Object.keys(state.portalActivations)) {
+        if (!portalActivationsRef.current.has(objectId)) {
+          portalActivationsRef.current.set(objectId, performance.now());
+        }
+      }
+    });
+    return unsub;
+  }, []);
   
   // Pending teleport confirmation (DM approval)
   const [pendingTeleport, setPendingTeleport] = useState<{
@@ -1094,8 +1106,9 @@ export const SimpleTabletop = () => {
     const targetPortal = allMapObjects.find(obj => obj.id === targetPortalId);
     if (!sourcePortal || !targetPortal) return;
 
-    // Trigger activation flash on source portal
+    // Trigger activation flash on source portal (local + network)
     portalActivationsRef.current.set(sourcePortalId, performance.now());
+    emitPortalActivate(sourcePortalId);
 
     toast.success(`Teleporting to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
 
@@ -1114,8 +1127,9 @@ export const SimpleTabletop = () => {
       }
       updateTokenPosition(tokenId, targetX, targetY);
 
-      // Trigger activation flash on target portal
+      // Trigger activation flash on target portal (local + network)
       portalActivationsRef.current.set(targetPortalId, performance.now());
+      emitPortalActivate(targetPortalId);
 
       // If target portal is on a different map, reassign token's mapId
       if (targetPortal.mapId && targetPortal.mapId !== sourcePortal.mapId) {
@@ -1130,6 +1144,7 @@ export const SimpleTabletop = () => {
           if (sourcePortal.portalAutoActivateTarget) {
             useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
             useMapStore.getState().setSelectedMap(targetPortal.mapId!);
+            emitMapSelectMap(targetPortal.mapId!);
             toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
             requestAnimationFrame(() => {
               if (canvasRef.current) {
@@ -1146,6 +1161,7 @@ export const SimpleTabletop = () => {
           }
         } else if ((sourcePortal.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
+          emitMapSelectMap(targetPortal.mapId);
           requestAnimationFrame(() => {
             if (canvasRef.current) {
               const canvas = canvasRef.current;
@@ -1190,8 +1206,9 @@ export const SimpleTabletop = () => {
       return;
     }
 
-    // Trigger activation flash on the source portal immediately
+    // Trigger activation flash on the source portal immediately (local + network)
     portalActivationsRef.current.set(portalAtDrop.id, performance.now());
+    emitPortalActivate(portalAtDrop.id);
 
     // DM gets a confirmation prompt; non-DM teleports instantly
     if (isDM) {
