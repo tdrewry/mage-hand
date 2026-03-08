@@ -3,6 +3,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useEffectStore } from "@/stores/effectStore";
+import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import type { EffectImpact } from "@/types/effectTypes";
 import type {
   EffectAuraStatePayload,
@@ -26,10 +27,21 @@ export function registerEffectHandlers(): void {
   });
 
   // ── Placement Preview (inbound from other players) ──
-  // Currently a no-op placeholder; rendering of remote placement ghosts
-  // will be implemented in Phase 3.
-  ephemeralBus.on("effect.placement.preview", (_data: EffectPlacementPreviewPayload, _userId) => {
-    // Phase 3: store preview in an ephemeral overlay store for rendering
+  ephemeralBus.on("effect.placement.preview", (data: EffectPlacementPreviewPayload, userId) => {
+    useMiscEphemeralStore.getState().setEffectPlacementPreview(userId, {
+      templateId: data.templateId,
+      origin: data.origin,
+      direction: data.direction,
+    });
+  });
+
+  // TTL expiry cleanup for placement previews
+  ephemeralBus.onCacheChange((key, entry) => {
+    if (entry) return;
+    if (key.startsWith("effect.placement.preview::")) {
+      const userId = key.replace("effect.placement.preview::", "");
+      useMiscEphemeralStore.getState().removeEffectPlacementPreview(userId);
+    }
   });
 }
 
