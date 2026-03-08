@@ -97,7 +97,10 @@ export interface DmViewportPayload {
   zoom: number;
 }
 
-export interface MapPingPayload {
+export interface DmEnforceFollowPayload {
+  enforce: boolean;
+}
+
   pos: Vec2;
   color?: string;
   label?: string;
