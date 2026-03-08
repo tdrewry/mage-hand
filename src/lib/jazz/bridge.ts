@@ -53,6 +53,7 @@ import { useCreatureStore } from "@/stores/creatureStore";
 import { useHatchingStore } from "@/stores/hatchingStore";
 import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
+import { useMapFocusStore } from "@/stores/mapFocusStore";
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
