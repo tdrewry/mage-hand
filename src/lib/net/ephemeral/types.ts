@@ -101,6 +101,7 @@ export interface DmEnforceFollowPayload {
   enforce: boolean;
 }
 
+export interface MapPingPayload {
   pos: Vec2;
   color?: string;
   label?: string;
