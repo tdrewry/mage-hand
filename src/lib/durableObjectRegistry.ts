@@ -62,19 +62,42 @@ DurableObjectRegistry.register({
 // ── Maps ───────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
   kind: 'maps',
-  version: 1,
+  version: 2,
   label: 'Maps',
-  extractor: () => useMapStore.getState().maps.map(m => ({ ...m, imageUrl: '' })),
+  authoritative: true, // DM is the source of truth for map activation/structure
+  extractor: () => ({
+    maps: useMapStore.getState().maps.map(m => ({ ...m, imageUrl: '' })),
+    structures: useMapStore.getState().structures,
+    selectedMapId: useMapStore.getState().selectedMapId,
+  }),
   hydrator: (state: any) => {
     const store = useMapStore.getState();
     store.maps.forEach(m => store.removeMap(m.id));
-    const mapsArr = state || [];
+
+    const mapsArr = state?.maps || state || []; // v2 has { maps, structures }, v1 has just array
     mapsArr.forEach((m: any) => {
       store.restoreMap({ ...m, regions: m.regions || [] });
     });
-    // Select the first restored map so the canvas renders effects correctly
-    if (mapsArr.length > 0) {
-      store.setSelectedMap(mapsArr[0].id);
+
+    // Restore structures if present (v2+)
+    if (state?.structures && Array.isArray(state.structures)) {
+      useMapStore.setState({ structures: state.structures });
+    }
+
+    // For non-creator clients: follow the DM's selected map
+    if (state?.selectedMapId) {
+      const mapExists = mapsArr.some((m: any) => m.id === state.selectedMapId);
+      if (mapExists) {
+        store.setSelectedMap(state.selectedMapId);
+      }
+    }
+
+    // Select the first active map if no valid selection
+    const currentSelected = useMapStore.getState().selectedMapId;
+    const activeMap = mapsArr.find((m: any) => m.active);
+    if (!currentSelected || !mapsArr.some((m: any) => m.id === currentSelected)) {
+      if (activeMap) store.setSelectedMap(activeMap.id);
+      else if (mapsArr.length > 0) store.setSelectedMap(mapsArr[0].id);
     }
   },
   summarizer: () => `${useMapStore.getState().maps.length} maps`,
