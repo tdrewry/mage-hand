@@ -404,6 +404,44 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
   };
 }
 
+/**
+ * On-demand texture download via Jazz FileStream.
+ * Searches the session's texture list for a matching hash and downloads it.
+ * Returns the data URL if successful, or null if not found/failed.
+ */
+export async function requestTextureViaJazz(hash: string): Promise<string | null> {
+  if (_downloadedHashes.has(hash)) return null; // Already processed
+  
+  const textures = _cachedTextureList;
+  if (!textures) return null;
+  
+  const len = textures.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const entry = textures[i];
+    if (!entry?.hash || entry.hash !== hash || !entry.fileStreamId) continue;
+    
+    try {
+      const downloadPromise = co.fileStream().loadAsBlob(entry.fileStreamId);
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 15000)
+      );
+      const blob = await Promise.race([downloadPromise, timeoutPromise]);
+      if (blob) {
+        const dataUrl = await blobToDataUri(blob);
+        await saveTextureByHash(hash, dataUrl);
+        _downloadedHashes.add(hash);
+        _applyTextureToEntities(hash, dataUrl);
+        console.log(`[jazz-texture] ← On-demand download: ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
+        return dataUrl;
+      }
+    } catch (err) {
+      console.error(`[jazz-texture] On-demand download failed for ${hash}:`, err);
+    }
+    break;
+  }
+  return null;
+}
+
 /** Clean up texture sync state */
 export function cleanupTextureSync(): void {
   if (_textureUnsubscribe) {
@@ -412,6 +450,7 @@ export function cleanupTextureSync(): void {
   }
   _uploadedHashes.clear();
   _downloadedHashes.clear();
+  _cachedTextureList = null;
   // Reset the download progress UI so it doesn't carry over stale counts
   resetTextureDownloadProgress();
 }
