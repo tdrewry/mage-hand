@@ -5,6 +5,7 @@ import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useMapStore } from "@/stores/mapStore";
+import { triggerSound } from "@/lib/soundEngine";
 import type {
   DmViewportPayload,
   DmEnforceFollowPayload,
@@ -104,6 +105,7 @@ export function registerMapHandlers(): void {
 
   // Portal activation flash (remote portal animation trigger)
   ephemeralBus.on("portal.activate", (data: PortalActivatePayload, _userId) => {
+    triggerSound('portal.activate');
     store.getState().setPortalActivation(data.objectId);
   });
 

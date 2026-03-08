@@ -4,6 +4,7 @@
 import { ephemeralBus } from "@/lib/net";
 import { useEffectStore } from "@/stores/effectStore";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
+import { triggerSound } from "@/lib/soundEngine";
 import type { EffectImpact } from "@/types/effectTypes";
 import type {
   EffectAuraStatePayload,
@@ -28,6 +29,7 @@ export function registerEffectHandlers(): void {
 
   // ── Placement Preview (inbound from other players) ──
   ephemeralBus.on("effect.placement.preview", (data: EffectPlacementPreviewPayload, userId) => {
+    triggerSound('effect.placed');
     useMiscEphemeralStore.getState().setEffectPlacementPreview(userId, {
       templateId: data.templateId,
       origin: data.origin,
