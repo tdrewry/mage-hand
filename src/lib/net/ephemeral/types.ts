@@ -62,7 +62,10 @@ export type EphemeralOpKind =
   | "asset.rejected"
   // Effects & Auras
   | "effect.aura.state"
-  | "effect.placement.preview";
+  | "effect.placement.preview"
+  // Portal & Map Activation
+  | "map.dm.selectMap"
+  | "portal.activate";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
@@ -342,6 +345,16 @@ export interface EffectPlacementPreviewPayload {
   direction?: number;
 }
 
+// -- Portal & Map Activation --
+
+export interface MapDmSelectMapPayload {
+  mapId: string;
+}
+
+export interface PortalActivatePayload {
+  objectId: string;
+}
+
 // -- Token Position Sync --
 
 export interface TokenPositionSyncPayload {
@@ -395,6 +408,8 @@ export interface EphemeralPayloadMap {
   "asset.rejected": AssetRejectedPayload;
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
+  "map.dm.selectMap": MapDmSelectMapPayload;
+  "portal.activate": PortalActivatePayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -484,4 +499,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Effects & Auras
   "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
   "effect.placement.preview": { throttleMs: 67, ttlMs: 300,  keyStrategy: "userId" },
+
+  // Portal & Map Activation
+  "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
+  "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
 };

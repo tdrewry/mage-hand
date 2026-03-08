@@ -154,8 +154,9 @@ export class EphemeralBus {
    */
   receive(kind: EphemeralOpKind, data: unknown, userId: UserId): void {
     // Echo prevention: skip our own ephemeral events
+    // Guard against null-null comparison — if localUserId is null/undefined, don't skip
     const localUserId = useMultiplayerStore.getState().currentUserId;
-    if (userId === localUserId) return;
+    if (localUserId && userId === localUserId) return;
 
     const config = EPHEMERAL_OP_CONFIG[kind];
     if (!config) {
