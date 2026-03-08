@@ -1370,6 +1370,9 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
       useEffectStore.setState({ placedEffects: restored });
     }
   });
+
+  // Resolve effect template textures from IDB (async, mirrors region texture resolution)
+  _resolveEffectTextures(customTemplates);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
