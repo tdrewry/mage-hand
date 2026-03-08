@@ -3104,6 +3104,10 @@ export const SimpleTabletop = () => {
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
 
+    // Read transform from ref so animation loops and rAF callbacks always
+    // use the latest value, avoiding stale-closure jank during zoom.
+    const transform = transformRef.current;
+
     // ── Multi-map filtering: shadow raw store arrays with map-scoped versions ──
     // All rendering code below uses these local aliases instead of the raw store data.
     const tokens = filteredTokens;
@@ -7203,8 +7207,17 @@ export const SimpleTabletop = () => {
   }, []);
 
   // Redraw when transform, tokens, regions, path, or combat state changes
+  // Use rAF batching so rapid zoom wheel events coalesce into a single redraw per frame
+  const transformRedrawRafRef = useRef<number | null>(null);
   useEffect(() => {
-    redrawCanvas();
+    if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
+    transformRedrawRafRef.current = requestAnimationFrame(() => {
+      transformRedrawRafRef.current = null;
+      redrawCanvas();
+    });
+    return () => {
+      if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
+    };
   }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
 
   // --- Auto-pause animations while panning or fog brush is active ---
@@ -7288,11 +7301,10 @@ export const SimpleTabletop = () => {
         cancelAnimationFrame(animationId);
       }
     };
-    // Include transform in dependencies so animation loop recreates with fresh transform values
-    // This prevents stale closures causing "snap" zoom behavior when hovering over tokens
-    // Include regions for animated region textures
-    // Include mapObjects so door state changes are reflected immediately in animation frames
-  }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, transform, animationsPaused, renderingMode]);
+    // transform is accessed via transformRef to avoid tearing down the animation
+    // loop on every zoom tick (which caused jank). Other deps are kept because
+    // they control whether the loop should run at all.
+  }, [tokens, regions, mapObjects, hoveredTokenId, players, currentPlayerId, roles, animationsPaused, renderingMode]);
 
   // ---------------------------------------------------------------------------
   // Marquee DOM helpers — update/hide the marquee <div> directly via ref so
