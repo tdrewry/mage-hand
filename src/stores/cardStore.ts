@@ -304,7 +304,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   [CardType.MAP_TREE]: {
     title: 'Map Tree',
     defaultPosition: { x: 320, y: 80 },
-    defaultSize: { width: 320, height: 500 },
+    defaultSize: { width: 460, height: 500 },
     minSize: { width: 260, height: 300 },
     isResizable: true,
     isClosable: true,
