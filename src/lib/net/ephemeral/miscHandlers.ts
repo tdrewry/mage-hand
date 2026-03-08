@@ -145,11 +145,16 @@ export function registerMiscHandlers(): void {
     }
   });
 
-  // ── Action Pending (broadcast to all — players see toast) ──
+  // ── Action Pending (broadcast to all — players see toast, DMs see Action Card) ──
   ephemeralBus.on("action.pending", (data: ActionPendingPayload, _userId) => {
+    const roles = useMultiplayerStore.getState().roles;
+    if (roles.includes("dm")) {
+      openActionCardForDM();
+    }
     useActionPendingStore.getState().setPending({
       ...data,
       receivedAt: Date.now(),
+    });
     });
   });
 
