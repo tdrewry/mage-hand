@@ -1230,14 +1230,27 @@ export function pullRegionsFromJazz(sessionRoot: any): void {
 
   console.log(`[jazz-bridge] Pulling ${len} regions from Jazz (local had ${localCount})`);
 
+  const regionsNeedingTextureResolve: { id: string; hash: string }[] = [];
+
   runFromJazz(() => {
     const store = useRegionStore.getState();
     store.clearRegions();
     for (let i = 0; i < len; i++) {
       const jr = jazzRegions[i];
-      if (jr) store.addRegion(jazzToZustandRegion(jr));
+      if (jr) {
+        const region = jazzToZustandRegion(jr);
+        store.addRegion(region);
+        if (region.textureHash) {
+          regionsNeedingTextureResolve.push({ id: region.id, hash: region.textureHash });
+        }
+      }
     }
   });
+
+  // Resolve textures from local IDB (same pattern as live subscription handler)
+  if (regionsNeedingTextureResolve.length > 0) {
+    _resolveRegionTextures(regionsNeedingTextureResolve);
+  }
 }
 
 /** Pull all map objects from Jazz into Zustand */
