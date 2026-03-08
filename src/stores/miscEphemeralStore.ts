@@ -127,4 +127,6 @@ export const useMiscEphemeralStore = create<MiscEphemeralState>((set) => ({
   removeHandRaise: (userId) => set((s) => ({ handRaises: removeKey(s.handRaises, userId) })),
   setUploadProgress: (userId, data) => set((s) => ({ uploadProgress: { ...s.uploadProgress, [userId]: data } })),
   removeUploadProgress: (userId) => set((s) => ({ uploadProgress: removeKey(s.uploadProgress, userId) })),
+  setEffectPlacementPreview: (userId, data) => set((s) => ({ effectPlacementPreviews: { ...s.effectPlacementPreviews, [userId]: data } })),
+  removeEffectPlacementPreview: (userId) => set((s) => ({ effectPlacementPreviews: removeKey(s.effectPlacementPreviews, userId) })),
 }));
