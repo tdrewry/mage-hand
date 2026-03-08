@@ -2031,12 +2031,36 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const regions = state.regions;
     if (regions === prevRegions) return;
     if (_fromJazz) { prevRegions = regions; return; }
+
+    // Check if any region textureHash changed — need to push texture binary
+    let needsTexturePush = false;
+    for (const r of regions) {
+      const prev = prevRegions.find(pr => pr.id === r.id);
+      if (prev && prev.textureHash !== r.textureHash && r.textureHash) {
+        needsTexturePush = true;
+        console.log(`[jazz-bridge] 🎨 Region ${r.id} textureHash changed: ${prev.textureHash} → ${r.textureHash}`);
+      }
+    }
+
     // DON'T update prevRegions here — let the throttled fn do it for correct diff
+    const capturedPrev = prevRegions;
     throttledPushFineGrained('regions', () => {
       const currentRegions = useRegionStore.getState().regions;
-      syncRegionsToJazz(currentRegions, prevRegions);
+      syncRegionsToJazz(currentRegions, capturedPrev);
       prevRegions = currentRegions;
     });
+
+    // Trigger texture push if textureHash changed
+    if (needsTexturePush && _sessionRoot) {
+      console.log(`[jazz-bridge] 🎨 Triggering texture push for new region textureHash(es)...`);
+      import("./textureSync").then(({ pushTexturesToJazz }) => {
+        pushTexturesToJazz(_sessionRoot).catch(err => {
+          console.warn("[jazz-bridge] Mid-session region texture push failed:", err);
+        });
+      });
+    }
+
+    prevRegions = regions;
   });
   activeSubscriptions.push(unsubRegionsZustand);
 
