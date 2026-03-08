@@ -1498,6 +1498,7 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   hatching: () => useHatchingStore,
   actions: () => useActionStore,
   dice: () => useDiceStore,
+  mapFocus: () => useMapFocusStore,
 };
 
 /** Throttle timers per kind */
