@@ -5,6 +5,7 @@ import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useMapStore } from "@/stores/mapStore";
+import { triggerSound } from "@/lib/soundEngine";
 import type {
   DmViewportPayload,
   DmEnforceFollowPayload,
