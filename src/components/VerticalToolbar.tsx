@@ -230,6 +230,13 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     }
   };
 
+  const handleToggleFog = () => {
+    const mapId = selectedMapId || 'default-map';
+    const currentSettings = useFogStore.getState().getMapFogSettings(mapId);
+    useFogStore.getState().setMapFogSettings(mapId, { enabled: !currentSettings.enabled });
+    toast.success(`Fog of War ${!currentSettings.enabled ? 'enabled' : 'disabled'} for current map`);
+  };
+
   const handleToggleFogCard = () => {
     if (fogCard) {
       setVisibility(fogCard.id, !fogCard.isVisible);
@@ -495,8 +502,8 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             <ToolbarButton
               icon={CloudFog}
               label={`Fog of War ${fogEnabled ? 'On' : 'Off'}`}
-              onClick={handleToggleFogCard}
-              isActive={fogCard?.isVisible}
+              onClick={handleToggleFog}
+              isActive={fogEnabled}
               variant="ghost"
               size="xs"
             />

@@ -83,6 +83,7 @@ let _lastIlluminationSources: object | null = null;  // identity check
 let _lastFullRenderTime = 0;
 const FULL_RENDER_INTERVAL = 100; // Force a full redraw at least every 100ms during pan
 let _lastZoom = 0; // Track zoom for throttle bypass on zoom changes
+const ZOOM_THROTTLE_INTERVAL = 33; // ~30fps cap during zoom to prevent GPU overload
 
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;
@@ -348,17 +349,13 @@ export function applyFogPostProcessing(
     }
   }
 
-  // Throttle full redraws — but ONLY if zoom hasn't changed.
-  // Zoom changes require an immediate full redraw to avoid visible misalignment
-  // between the main canvas (new zoom) and the stale PixiJS layer (old zoom).
+  // Throttle full redraws.  Zoom changes need a full redraw (CSS offset
+  // can't handle scale changes), but at a lower framerate (~30fps) to
+  // avoid GPU overload with expensive Canvas 2D + PixiJS texture uploads.
   const zoomChanged = _lastZoom !== 0 && _lastZoom !== transform.zoom;
-  if (!zoomChanged && now - lastUpdateTime < MIN_UPDATE_INTERVAL) {
-    // Even though a full redraw is throttled, keep the PixiJS canvas aligned
-    // with the main canvas via CSS offset.  Without this, when illumination
-    // sources exist (new array identity every frame → illuUnchanged=false),
-    // the CSS fast-path above is skipped and the fog layer stays at its old
-    // position while the main canvas redraws at the new transform — causing
-    // a visible flash.
+  const throttleMs = zoomChanged ? ZOOM_THROTTLE_INTERVAL : MIN_UPDATE_INTERVAL;
+  if (now - lastUpdateTime < throttleMs) {
+    // Keep the PixiJS canvas aligned via CSS offset when possible
     panOffsetPostProcessing(transform);
     return;
   }

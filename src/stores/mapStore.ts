@@ -141,23 +141,23 @@ interface MapStore {
   navigateFloor: (direction: 'up' | 'down') => string | null;
 }
 
-const createDefaultMap = (): GameMap => ({
-  id: 'default-map',
-  name: 'Default Battlemap',
+const createDefaultMap = (id?: string): GameMap => ({
+  id: id || `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  name: '',
   bounds: { x: 0, y: 0, width: 2000, height: 2000 },
   backgroundColor: '#2a2a2a',
   active: true,
   zIndex: 0,
   regions: [
     {
-      id: 'default-region',
+      id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: 'Main Area',
       points: [
         { x: 0, y: 0 },
         { x: 2000, y: 0 },
         { x: 2000, y: 2000 },
         { x: 0, y: 2000 }
-      ], // Rectangle as polygon
+      ],
       gridType: 'square',
       gridSize: 40,
       gridColor: '#ffffff',
@@ -167,10 +167,11 @@ const createDefaultMap = (): GameMap => ({
   ]
 });
 
-// Define the store creator separately for better type inference
+const _initialMap = createDefaultMap();
+
 const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
-  maps: [createDefaultMap()],
-  selectedMapId: 'default-map',
+  maps: [_initialMap],
+  selectedMapId: _initialMap.id,
   structures: [],
   autoFocusFollowsToken: false,
 
@@ -204,7 +205,13 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
 
   removeMap: (id) => {
     set((state) => {
-      const newMaps = state.maps.filter((map) => map.id !== id);
+      let newMaps = state.maps.filter((map) => map.id !== id);
+      // Invariant: always have at least one active map
+      if (newMaps.length === 0) {
+        const fallback = createDefaultMap();
+        newMaps = [fallback];
+        useFogStore.getState().initMapFogSettings(fallback.id);
+      }
       return {
         maps: newMaps,
         selectedMapId: state.selectedMapId === id ? newMaps[0]?.id || null : state.selectedMapId,
