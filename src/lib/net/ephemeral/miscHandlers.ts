@@ -156,6 +156,11 @@ export function registerMiscHandlers(): void {
     const roles = useMultiplayerStore.getState().roles;
     if (roles.includes("dm")) {
       openActionCardForDM();
+      triggerSound('action.pending');
+      toast.info(`${data.sourceName} used ${data.attackName}`, {
+        description: `Targeting: ${data.targetNames?.join(', ') || 'unknown'}`,
+        duration: 6000,
+      });
     }
     useActionPendingStore.getState().setPending({
       ...data,
