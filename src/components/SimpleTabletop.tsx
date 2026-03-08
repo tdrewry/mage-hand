@@ -7203,8 +7203,17 @@ export const SimpleTabletop = () => {
   }, []);
 
   // Redraw when transform, tokens, regions, path, or combat state changes
+  // Use rAF batching so rapid zoom wheel events coalesce into a single redraw per frame
+  const transformRedrawRafRef = useRef<number | null>(null);
   useEffect(() => {
-    redrawCanvas();
+    if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
+    transformRedrawRafRef.current = requestAnimationFrame(() => {
+      transformRedrawRafRef.current = null;
+      redrawCanvas();
+    });
+    return () => {
+      if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
+    };
   }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
 
   // --- Auto-pause animations while panning or fog brush is active ---
