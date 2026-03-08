@@ -1,9 +1,7 @@
 /**
  * Texture Synchronization Service
  * 
- * NOTE: The old Socket.IO-based texture sync has been removed.
- * Network texture sync will be re-implemented via the WebSocket JSON protocol.
- * This module retains the local caching API so existing consumers still compile.
+ * Local caching API + Jazz FileStream fallback for network texture retrieval.
  */
 
 import { compressTexture, updateTextureMaxSize, type CompressionResult } from './textureCompression';
@@ -13,7 +11,7 @@ import { hashImageData } from './textureStorage';
 const localTextureCache = new Map<string, string>();
 
 /**
- * Upload a texture (currently local-only; network sync TODO via new protocol)
+ * Upload a texture (currently local-only; Jazz FileStream handles network sync)
  */
 export async function uploadTexture(
   hash: string, 
@@ -25,10 +23,25 @@ export async function uploadTexture(
 }
 
 /**
- * Request a texture – returns from local cache or null
+ * Request a texture – returns from local cache, or falls back to Jazz FileStream download
  */
 export async function requestTexture(hash: string): Promise<string | null> {
-  return localTextureCache.get(hash) ?? null;
+  const cached = localTextureCache.get(hash);
+  if (cached) return cached;
+  
+  // Fallback: try Jazz FileStream download
+  try {
+    const { requestTextureViaJazz } = await import('./jazz/textureSync');
+    const dataUrl = await requestTextureViaJazz(hash);
+    if (dataUrl) {
+      localTextureCache.set(hash, dataUrl);
+      return dataUrl;
+    }
+  } catch {
+    // Jazz not available — return null
+  }
+  
+  return null;
 }
 
 /** Check if a texture exists locally (in cache) */
