@@ -13,6 +13,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useCardStore } from "@/stores/cardStore";
 import { CardType } from "@/types/cardTypes";
 import { saveTextureByHash } from "@/lib/textureStorage";
+import { triggerSound } from "@/lib/soundEngine";
 import { toast } from "sonner";
 import type {
   FogCursorPreviewPayload,
