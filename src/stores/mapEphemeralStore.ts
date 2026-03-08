@@ -71,6 +71,10 @@ interface MapEphemeralState {
   /** Follow DM viewport toggle (player-side) */
   followDM: boolean;
   setFollowDM: (v: boolean) => void;
+
+  /** DM-side: whether enforce-follow is active (broadcast to players) */
+  enforceFollowDM: boolean;
+  setEnforceFollowDM: (v: boolean) => void;
 }
 
 export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
@@ -82,6 +86,8 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
   handlePreviews: {},
   followDM: false,
   setFollowDM: (v) => set({ followDM: v }),
+  enforceFollowDM: false,
+  setEnforceFollowDM: (v) => set({ enforceFollowDM: v }),
 
   setDmViewport: (vp) => set({ dmViewport: vp }),
   addPing: (userId, ping) =>
