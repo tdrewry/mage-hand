@@ -141,6 +141,23 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
         size="xs"
       />
 
+      {isDM && (
+        <ToolbarButton
+          icon={ScanEye}
+          label={enforceFollowDM ? 'Release Player Viewports' : 'Lock Players to DM Viewport'}
+          onClick={() => {
+            const newVal = !enforceFollowDM;
+            setEnforceFollowDM(newVal);
+            ephemeralBus.emit('map.dm.enforceFollow', { enforce: newVal });
+            toast.info(newVal ? 'Players locked to your viewport' : 'Players released from viewport lock');
+          }}
+          isActive={enforceFollowDM}
+          variant={enforceFollowDM ? 'active' : 'ghost'}
+          size="xs"
+          className={enforceFollowDM ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+        />
+      )}
+
       {!isDM && (
         <>
           <ToolbarSeparator />
