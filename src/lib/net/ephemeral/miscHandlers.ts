@@ -38,6 +38,26 @@ import type {
 
 let registered = false;
 
+/** Open the Action Card for DMs when a remote action arrives */
+function openActionCardForDM() {
+  const cardStore = useCardStore.getState();
+  let actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
+  if (!actionCard) {
+    const newId = cardStore.registerCard({
+      type: CardType.ACTION_CARD,
+      title: 'Action',
+      defaultPosition: { x: 400, y: 200 },
+      defaultSize: { width: 420, height: 480 },
+      defaultVisible: true,
+    });
+    actionCard = cardStore.getCard(newId) ?? undefined;
+  }
+  if (actionCard) {
+    cardStore.setVisibility(actionCard.id, true);
+    cardStore.bringToFront(actionCard.id);
+  }
+}
+
 export function registerMiscHandlers(): void {
   if (registered) return;
   registered = true;
