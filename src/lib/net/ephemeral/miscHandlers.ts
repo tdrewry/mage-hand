@@ -13,6 +13,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useCardStore } from "@/stores/cardStore";
 import { CardType } from "@/types/cardTypes";
 import { saveTextureByHash } from "@/lib/textureStorage";
+import { triggerSound } from "@/lib/soundEngine";
 import { toast } from "sonner";
 import type {
   FogCursorPreviewPayload,
@@ -141,6 +142,11 @@ export function registerMiscHandlers(): void {
       const roles = useMultiplayerStore.getState().roles;
       if (roles.includes("dm")) {
         openActionCardForDM();
+        triggerSound('action.received');
+        toast.info(`Action received: ${data.currentAction.attackName || 'New action'}`, {
+          description: `From ${data.currentAction.sourceName || 'a player'}`,
+          duration: 5000,
+        });
       }
     }
   });
@@ -150,6 +156,11 @@ export function registerMiscHandlers(): void {
     const roles = useMultiplayerStore.getState().roles;
     if (roles.includes("dm")) {
       openActionCardForDM();
+      triggerSound('action.pending');
+      toast.info(`${data.sourceName} used ${data.attackName}`, {
+        description: `Targeting: ${data.targetNames?.join(', ') || 'unknown'}`,
+        duration: 6000,
+      });
     }
     useActionPendingStore.getState().setPending({
       ...data,
@@ -159,6 +170,7 @@ export function registerMiscHandlers(): void {
 
   // ── Action Resolved (broadcast to all — players see outcome summary) ──
   ephemeralBus.on("action.resolved", (data: ActionResolvedPayload, _userId) => {
+    triggerSound('action.resolved');
     useActionPendingStore.getState().addResolved({
       ...data,
       receivedAt: Date.now(),
