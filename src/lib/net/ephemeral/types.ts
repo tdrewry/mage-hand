@@ -355,6 +355,7 @@ export interface EphemeralPayloadMap {
   "token.drag.end": { tokenId: string };
   "token.position.sync": TokenPositionSyncPayload;
   "map.dm.viewport": DmViewportPayload;
+  "map.dm.enforceFollow": DmEnforceFollowPayload;
   "map.ping": MapPingPayload;
   "map.focus": MapFocusPayload;
   "region.drag.update": RegionDragUpdatePayload;
@@ -421,6 +422,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Map & Camera
   "map.dm.viewport":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "session", dmOnly: true },
+  "map.dm.enforceFollow":   { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
   "map.ping":               { throttleMs: 0,   ttlMs: 1000, keyStrategy: "userId" },
   "map.focus":              { throttleMs: 0,   ttlMs: 1000, keyStrategy: "session", dmOnly: true },
 
