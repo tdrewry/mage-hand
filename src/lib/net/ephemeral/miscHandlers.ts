@@ -142,6 +142,11 @@ export function registerMiscHandlers(): void {
       const roles = useMultiplayerStore.getState().roles;
       if (roles.includes("dm")) {
         openActionCardForDM();
+        triggerSound('action.received');
+        toast.info(`Action received: ${data.currentAction.attackName || 'New action'}`, {
+          description: `From ${data.currentAction.sourceName || 'a player'}`,
+          duration: 5000,
+        });
       }
     }
   });
