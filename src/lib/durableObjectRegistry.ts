@@ -31,6 +31,7 @@ import { useHatchingStore } from '@/stores/hatchingStore';
 import { useDiceStore } from '@/stores/diceStore';
 import { useActionStore } from '@/stores/actionStore';
 import { useEffectStore } from '@/stores/effectStore';
+import { useMapFocusStore } from '@/stores/mapFocusStore';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
@@ -507,6 +508,26 @@ DurableObjectRegistry.register({
   summarizer: () => {
     const s = useEffectStore.getState();
     return `${s.placedEffects.length} placed, ${s.customTemplates.length} custom templates`;
+  },
+});
+
+// ── Map Focus Settings ────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'mapFocus',
+  version: 1,
+  label: 'Map Focus Settings',
+  authoritative: true, // DM controls blur/opacity for all clients
+  extractor: () => ({
+    unfocusedOpacity: useMapFocusStore.getState().unfocusedOpacity,
+    unfocusedBlur: useMapFocusStore.getState().unfocusedBlur,
+    selectionLockEnabled: useMapFocusStore.getState().selectionLockEnabled,
+  }),
+  hydrator: (state: any) => {
+    if (!state || typeof state !== 'object') return;
+    const store = useMapFocusStore.getState();
+    if (state.unfocusedOpacity !== undefined) store.setUnfocusedOpacity(state.unfocusedOpacity);
+    if (state.unfocusedBlur !== undefined) store.setUnfocusedBlur(state.unfocusedBlur);
+    if (state.selectionLockEnabled !== undefined) store.setSelectionLockEnabled(state.selectionLockEnabled);
   },
 });
 
