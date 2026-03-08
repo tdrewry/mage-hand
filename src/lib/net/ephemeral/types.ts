@@ -16,6 +16,7 @@ export type EphemeralOpKind =
   | "token.position.sync"
   // Map & Camera
   | "map.dm.viewport"
+  | "map.dm.enforceFollow"
   | "map.ping"
   | "map.focus"
   // Regions
