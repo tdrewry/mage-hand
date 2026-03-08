@@ -501,9 +501,8 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           {isDM && (
             <ToolbarButton
               icon={CloudFog}
-              label={`Fog of War ${fogEnabled ? 'On' : 'Off'} (click: toggle, long-press: settings)`}
+              label={`Fog of War ${fogEnabled ? 'On' : 'Off'}`}
               onClick={handleToggleFog}
-              onContextMenu={(e) => { e.preventDefault(); handleToggleFogCard(); }}
               isActive={fogEnabled}
               variant="ghost"
               size="xs"
