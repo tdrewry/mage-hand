@@ -264,7 +264,7 @@ export function getBridgedSessionRoot(): any {
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
   'fog', 'lights', 'dungeon', 'creatures',
-  'hatching', 'actions', 'dice',
+  'hatching', 'actions', 'dice', 'mapFocus',
 ];
 
 // Kinds excluded from blob sync (fine-grained CoValue sync):
