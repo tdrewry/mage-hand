@@ -7,6 +7,7 @@ import {
   Footprints,
   Eye,
   Hand,
+  ScanEye,
 } from 'lucide-react';
 import { useCardStore } from '@/stores/cardStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
@@ -40,6 +41,8 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
 
   const followDM = useMapEphemeralStore((s) => s.followDM);
   const setFollowDM = useMapEphemeralStore((s) => s.setFollowDM);
+  const enforceFollowDM = useMapEphemeralStore((s) => s.enforceFollowDM);
+  const setEnforceFollowDM = useMapEphemeralStore((s) => s.setEnforceFollowDM);
 
   const menuCard = cards.find((c) => c.type === CardType.MENU);
   const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
