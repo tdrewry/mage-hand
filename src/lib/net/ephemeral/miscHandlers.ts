@@ -10,6 +10,8 @@ import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useActionPendingStore } from "@/stores/actionPendingStore";
 import { useArtSubmissionStore } from "@/stores/artSubmissionStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useCardStore } from "@/stores/cardStore";
+import { CardType } from "@/types/cardTypes";
 import { saveTextureByHash } from "@/lib/textureStorage";
 import { toast } from "sonner";
 import type {
@@ -111,7 +113,16 @@ export function registerMiscHandlers(): void {
 
   // ── Actions (DM queue sync) ──
   ephemeralBus.on("action.queue.sync", (data: ActionQueueSyncPayload, _userId) => {
+    const hadAction = !!useActionStore.getState().currentAction;
     useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory);
+
+    // Auto-open Action Card for DMs when a new action arrives
+    if (!hadAction && data.currentAction) {
+      const roles = useMultiplayerStore.getState().roles;
+      if (roles.includes("dm")) {
+        openActionCardForDM();
+      }
+    }
   });
 
   // ── Action Pending (broadcast to all — players see toast) ──
