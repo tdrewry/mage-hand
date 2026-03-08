@@ -2148,12 +2148,36 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const mapObjects = state.mapObjects;
     if (mapObjects === prevMapObjects) return;
     if (_fromJazz) { prevMapObjects = mapObjects; return; }
+
+    // Check if any mapObject imageHash changed — need to push texture binary
+    let needsTexturePush = false;
+    for (const obj of mapObjects) {
+      const prev = prevMapObjects.find(po => po.id === obj.id);
+      if (prev && prev.imageHash !== obj.imageHash && obj.imageHash) {
+        needsTexturePush = true;
+        console.log(`[jazz-bridge] 🎨 MapObject ${obj.id} imageHash changed: ${prev.imageHash} → ${obj.imageHash}`);
+      }
+    }
+
     // DON'T update prevMapObjects here — let the throttled fn do it for correct diff
+    const capturedPrev = prevMapObjects;
     throttledPushFineGrained('mapObjects', () => {
       const currentMapObjects = useMapObjectStore.getState().mapObjects;
-      syncMapObjectsToJazz(currentMapObjects, prevMapObjects);
+      syncMapObjectsToJazz(currentMapObjects, capturedPrev);
       prevMapObjects = currentMapObjects;
     });
+
+    // Trigger texture push if imageHash changed
+    if (needsTexturePush && _sessionRoot) {
+      console.log(`[jazz-bridge] 🎨 Triggering texture push for new mapObject imageHash(es)...`);
+      import("./textureSync").then(({ pushTexturesToJazz }) => {
+        pushTexturesToJazz(_sessionRoot).catch(err => {
+          console.warn("[jazz-bridge] Mid-session mapObject texture push failed:", err);
+        });
+      });
+    }
+
+    prevMapObjects = mapObjects;
   });
   activeSubscriptions.push(unsubMapObjectsZustand);
 
