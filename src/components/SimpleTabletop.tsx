@@ -1094,8 +1094,9 @@ export const SimpleTabletop = () => {
     const targetPortal = allMapObjects.find(obj => obj.id === targetPortalId);
     if (!sourcePortal || !targetPortal) return;
 
-    // Trigger activation flash on source portal
+    // Trigger activation flash on source portal (local + network)
     portalActivationsRef.current.set(sourcePortalId, performance.now());
+    emitPortalActivate(sourcePortalId);
 
     toast.success(`Teleporting to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
 
@@ -1114,8 +1115,9 @@ export const SimpleTabletop = () => {
       }
       updateTokenPosition(tokenId, targetX, targetY);
 
-      // Trigger activation flash on target portal
+      // Trigger activation flash on target portal (local + network)
       portalActivationsRef.current.set(targetPortalId, performance.now());
+      emitPortalActivate(targetPortalId);
 
       // If target portal is on a different map, reassign token's mapId
       if (targetPortal.mapId && targetPortal.mapId !== sourcePortal.mapId) {
@@ -1130,6 +1132,7 @@ export const SimpleTabletop = () => {
           if (sourcePortal.portalAutoActivateTarget) {
             useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
             useMapStore.getState().setSelectedMap(targetPortal.mapId!);
+            emitMapSelectMap(targetPortal.mapId!);
             toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
             requestAnimationFrame(() => {
               if (canvasRef.current) {
@@ -1146,6 +1149,7 @@ export const SimpleTabletop = () => {
           }
         } else if ((sourcePortal.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
+          emitMapSelectMap(targetPortal.mapId);
           requestAnimationFrame(() => {
             if (canvasRef.current) {
               const canvas = canvasRef.current;
