@@ -88,6 +88,9 @@ export function registerMiscHandlers(): void {
     if (data.whisperTo && data.whisperTo.length > 0) {
       const myId = useMultiplayerStore.getState().currentUserId;
       if (myId && !data.whisperTo.includes(myId)) return; // Not for us
+      triggerSound('chat.whisper');
+    } else {
+      triggerSound('chat.message');
     }
     useChatStore.getState().addRemoteMessage(data.id, userId, data.senderName, data.text, data.timestamp, data.whisperTo);
   });
