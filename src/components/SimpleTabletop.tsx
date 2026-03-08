@@ -692,6 +692,22 @@ export const SimpleTabletop = () => {
 
   // Portal activation flash effect — maps portalId to start timestamp
   const portalActivationsRef = useRef<Map<string, number>>(new Map());
+
+  // Merge remote portal activations from ephemeral store into the ref
+  useEffect(() => {
+    const unsub = useMapEphemeralStore.subscribe(
+      (state) => state.portalActivations,
+      (activations) => {
+        for (const [objectId, ts] of Object.entries(activations)) {
+          // Only set if not already active locally (avoid overwriting local flash)
+          if (!portalActivationsRef.current.has(objectId)) {
+            portalActivationsRef.current.set(objectId, performance.now());
+          }
+        }
+      },
+    );
+    return unsub;
+  }, []);
   
   // Pending teleport confirmation (DM approval)
   const [pendingTeleport, setPendingTeleport] = useState<{
