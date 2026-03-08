@@ -51,6 +51,12 @@ export interface RemoteUploadProgress {
   percent: number;
 }
 
+export interface RemoteEffectPlacementPreview {
+  templateId: string;
+  origin: { x: number; y: number };
+  direction?: number;
+}
+
 interface MiscEphemeralState {
   fogCursors: Record<string, RemoteFogCursor>;
   chatTyping: Record<string, RemoteChatTyping>;
@@ -61,6 +67,7 @@ interface MiscEphemeralState {
   groupDrags: Record<string, RemoteGroupDrag>;
   handRaises: Record<string, RemoteHandRaise>;
   uploadProgress: Record<string, RemoteUploadProgress>;
+  effectPlacementPreviews: Record<string, RemoteEffectPlacementPreview>;
 
   // Setters
   setFogCursor: (userId: string, data: RemoteFogCursor) => void;
@@ -81,6 +88,8 @@ interface MiscEphemeralState {
   removeHandRaise: (userId: string) => void;
   setUploadProgress: (userId: string, data: RemoteUploadProgress) => void;
   removeUploadProgress: (userId: string) => void;
+  setEffectPlacementPreview: (userId: string, data: RemoteEffectPlacementPreview) => void;
+  removeEffectPlacementPreview: (userId: string) => void;
 }
 
 const removeKey = <T>(record: Record<string, T>, key: string): Record<string, T> => {
@@ -98,6 +107,7 @@ export const useMiscEphemeralStore = create<MiscEphemeralState>((set) => ({
   groupDrags: {},
   handRaises: {},
   uploadProgress: {},
+  effectPlacementPreviews: {},
 
   setFogCursor: (userId, data) => set((s) => ({ fogCursors: { ...s.fogCursors, [userId]: data } })),
   removeFogCursor: (userId) => set((s) => ({ fogCursors: removeKey(s.fogCursors, userId) })),
@@ -117,4 +127,6 @@ export const useMiscEphemeralStore = create<MiscEphemeralState>((set) => ({
   removeHandRaise: (userId) => set((s) => ({ handRaises: removeKey(s.handRaises, userId) })),
   setUploadProgress: (userId, data) => set((s) => ({ uploadProgress: { ...s.uploadProgress, [userId]: data } })),
   removeUploadProgress: (userId) => set((s) => ({ uploadProgress: removeKey(s.uploadProgress, userId) })),
+  setEffectPlacementPreview: (userId, data) => set((s) => ({ effectPlacementPreviews: { ...s.effectPlacementPreviews, [userId]: data } })),
+  removeEffectPlacementPreview: (userId) => set((s) => ({ effectPlacementPreviews: removeKey(s.effectPlacementPreviews, userId) })),
 }));

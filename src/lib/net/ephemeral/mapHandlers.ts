@@ -1,9 +1,10 @@
 // src/lib/net/ephemeral/mapHandlers.ts
-// Registers ephemeral handlers for map, region, and map object ops.
+// Registers ephemeral handlers for map, region, map object, and portal ops.
 
 import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
+import { useMapStore } from "@/stores/mapStore";
 import type {
   DmViewportPayload,
   DmEnforceFollowPayload,
@@ -15,6 +16,8 @@ import type {
   RegionHandlePreviewPayload,
   MapObjectHandlePreviewPayload,
   TokenHandlePreviewPayload,
+  MapDmSelectMapPayload,
+  PortalActivatePayload,
 } from "./types";
 
 let registered = false;
@@ -93,6 +96,17 @@ export function registerMapHandlers(): void {
     });
   });
 
+  // Map selection sync (DM selects/switches map → players follow)
+  ephemeralBus.on("map.dm.selectMap", (data: MapDmSelectMapPayload, _userId) => {
+    console.log(`[mapHandlers] DM switched to map: ${data.mapId}`);
+    useMapStore.getState().setSelectedMap(data.mapId);
+  });
+
+  // Portal activation flash (remote portal animation trigger)
+  ephemeralBus.on("portal.activate", (data: PortalActivatePayload, _userId) => {
+    store.getState().setPortalActivation(data.objectId);
+  });
+
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -116,6 +130,9 @@ export function registerMapHandlers(): void {
     } else if (key.startsWith("mapObject.handle.preview::")) {
       const entityId = key.replace("mapObject.handle.preview::", "");
       store.getState().removeHandlePreview(entityId);
+    } else if (key.startsWith("portal.activate::")) {
+      const objectId = key.replace("portal.activate::", "");
+      store.getState().removePortalActivation(objectId);
     }
   });
 }
@@ -155,4 +172,19 @@ export function emitGroupDragPreview(groupId: string, delta: { x: number; y: num
 /** Broadcast a map focus command to all connected players (DM only). */
 export function emitMapFocus(pos: { x: number; y: number }, zoom?: number): void {
   ephemeralBus.emit("map.focus", { pos, zoom });
+}
+
+/** Broadcast DM map selection to all connected players. */
+export function emitMapSelectMap(mapId: string): void {
+  ephemeralBus.emit("map.dm.selectMap", { mapId });
+}
+
+/** Broadcast portal activation flash to all peers. */
+export function emitPortalActivate(objectId: string): void {
+  ephemeralBus.emit("portal.activate", { objectId });
+}
+
+/** Broadcast a region drag update to peers. */
+export function emitRegionDragUpdate(regionId: string, pos: { x: number; y: number }): void {
+  ephemeralBus.emit("region.drag.update", { regionId, pos });
 }

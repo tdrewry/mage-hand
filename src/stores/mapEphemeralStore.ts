@@ -56,6 +56,8 @@ interface MapEphemeralState {
   mapObjectDrags: Record<string, RemoteEntityDrag>;
   /** Remote region/mapObject handle previews keyed by entityId */
   handlePreviews: Record<string, RemoteHandlePreview>;
+  /** Remote portal activation flashes keyed by objectId */
+  portalActivations: Record<string, number>; // objectId → timestamp
 
   setDmViewport: (vp: RemoteDmViewport | null) => void;
   addPing: (userId: string, ping: RemoteMapPing) => void;
@@ -67,6 +69,8 @@ interface MapEphemeralState {
   removeMapObjectDrag: (entityId: string) => void;
   setHandlePreview: (entityId: string, preview: RemoteHandlePreview) => void;
   removeHandlePreview: (entityId: string) => void;
+  setPortalActivation: (objectId: string) => void;
+  removePortalActivation: (objectId: string) => void;
 
   /** Follow DM viewport toggle (player-side) */
   followDM: boolean;
@@ -84,6 +88,7 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
   regionDrags: {},
   mapObjectDrags: {},
   handlePreviews: {},
+  portalActivations: {},
   followDM: false,
   setFollowDM: (v) => set({ followDM: v }),
   enforceFollowDM: false,
@@ -107,4 +112,8 @@ export const useMapEphemeralStore = create<MapEphemeralState>((set) => ({
     set((s) => ({ handlePreviews: { ...s.handlePreviews, [entityId]: preview } })),
   removeHandlePreview: (entityId) =>
     set((s) => ({ handlePreviews: removeKey(s.handlePreviews, entityId) })),
+  setPortalActivation: (objectId) =>
+    set((s) => ({ portalActivations: { ...s.portalActivations, [objectId]: Date.now() } })),
+  removePortalActivation: (objectId) =>
+    set((s) => ({ portalActivations: removeKey(s.portalActivations, objectId) })),
 }));
