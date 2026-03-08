@@ -207,6 +207,9 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
 
 // ── Pull: Player ← Jazz ───────────────────────────────────────────────────
 
+// ── Cached reference to session texture list for on-demand downloads ──────
+let _cachedTextureList: any = null;
+
 /** Set of hashes we've already downloaded this session (avoid re-fetching) */
 const _downloadedHashes = new Set<string>();
 
