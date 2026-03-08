@@ -170,6 +170,7 @@ export function registerMiscHandlers(): void {
 
   // ── Action Resolved (broadcast to all — players see outcome summary) ──
   ephemeralBus.on("action.resolved", (data: ActionResolvedPayload, _userId) => {
+    triggerSound('action.resolved');
     useActionPendingStore.getState().addResolved({
       ...data,
       receivedAt: Date.now(),
