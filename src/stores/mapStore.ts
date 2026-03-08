@@ -167,10 +167,11 @@ const createDefaultMap = (id?: string): GameMap => ({
   ]
 });
 
-// Define the store creator separately for better type inference
+const _initialMap = createDefaultMap();
+
 const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
-  maps: [createDefaultMap()],
-  selectedMapId: 'default-map',
+  maps: [_initialMap],
+  selectedMapId: _initialMap.id,
   structures: [],
   autoFocusFollowsToken: false,
 
