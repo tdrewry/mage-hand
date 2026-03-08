@@ -123,6 +123,52 @@ async function _resolveTokenTextures(entries: { id: string; hash: string }[]): P
   }
 }
 
+/**
+ * Async texture resolution for regions: when a region arrives with a textureHash but no backgroundImage,
+ * try to load the texture from local IndexedDB. If found, update the region's backgroundImage.
+ */
+async function _resolveRegionTextures(entries: { id: string; hash: string }[]): Promise<void> {
+  const { loadTextureByHash } = await import("@/lib/textureStorage");
+  
+  for (const { id, hash } of entries) {
+    const dataUrl = await loadTextureByHash(hash);
+    
+    if (dataUrl) {
+      const store = useRegionStore.getState();
+      const region = store.regions.find(r => r.id === id);
+      if (region && (!region.backgroundImage || region.backgroundImage.length === 0)) {
+        console.log(`[jazz-bridge] 🎨 Resolved texture for region ${id} from local IDB (hash: ${hash})`);
+        store.updateRegion(id, { backgroundImage: dataUrl });
+      }
+    } else {
+      console.log(`[jazz-bridge] 🎨 Region ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
+    }
+  }
+}
+
+/**
+ * Async texture resolution for map objects: when a map object arrives with an imageHash but no imageUrl,
+ * try to load the texture from local IndexedDB. If found, update the map object's imageUrl.
+ */
+async function _resolveMapObjectTextures(entries: { id: string; hash: string }[]): Promise<void> {
+  const { loadTextureByHash } = await import("@/lib/textureStorage");
+  
+  for (const { id, hash } of entries) {
+    const dataUrl = await loadTextureByHash(hash);
+    
+    if (dataUrl) {
+      const store = useMapObjectStore.getState();
+      const obj = store.mapObjects.find(o => o.id === id);
+      if (obj && (!obj.imageUrl || obj.imageUrl.length === 0)) {
+        console.log(`[jazz-bridge] 🎨 Resolved texture for mapObject ${id} from local IDB (hash: ${hash})`);
+        store.updateMapObject(id, { imageUrl: dataUrl });
+      }
+    } else {
+      console.log(`[jazz-bridge] 🎨 MapObject ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
+    }
+  }
+}
+
 /** Push a single token's current position to Jazz (used after drag end) */
 function _pushTokenFinalPosition(tokenId: string): void {
   const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
@@ -2012,6 +2058,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
+          const regionsNeedingTextureResolve: { id: string; hash: string }[] = [];
+
           runFromJazz(() => {
             const store = useRegionStore.getState();
             const localRegions = store.regions;
@@ -2028,10 +2076,23 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Only update if something actually changed (deep-compare parsed JSON fields)
                 const incoming = jazzToZustandRegion(jr);
                 if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'backgroundImage'])) {
-                  store.updateRegion(jr.regionId, incoming);
+                  // Preserve local backgroundImage (loaded from IndexedDB, not synced)
+                  store.updateRegion(jr.regionId, {
+                    ...incoming,
+                    backgroundImage: existing.backgroundImage,
+                  });
+                  // If textureHash changed, flag for async texture resolution
+                  if (incoming.textureHash && incoming.textureHash !== existing.textureHash) {
+                    regionsNeedingTextureResolve.push({ id: existing.id, hash: incoming.textureHash });
+                  }
                 }
               } else {
-                store.addRegion(jazzToZustandRegion(jr));
+                const newRegion = jazzToZustandRegion(jr);
+                store.addRegion(newRegion);
+                // New region with textureHash needs texture resolution
+                if (newRegion.textureHash) {
+                  regionsNeedingTextureResolve.push({ id: newRegion.id, hash: newRegion.textureHash });
+                }
               }
             }
 
@@ -2041,6 +2102,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               }
             }
           });
+
+          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
+          if (regionsNeedingTextureResolve.length > 0) {
+            _resolveRegionTextures(regionsNeedingTextureResolve);
+          }
+
           // Update prev to prevent echo
           prevRegions = useRegionStore.getState().regions;
         },
@@ -2084,6 +2151,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             return;
           }
 
+          const mapObjectsNeedingTextureResolve: { id: string; hash: string }[] = [];
+
           runFromJazz(() => {
             const store = useMapObjectStore.getState();
             const localObjects = store.mapObjects;
@@ -2100,10 +2169,23 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Only update if something actually changed (deep-compare parsed JSON fields)
                 const incoming = jazzToZustandMapObject(jmo);
                 if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'imageUrl'])) {
-                  store.updateMapObject(jmo.objectId, incoming);
+                  // Preserve local imageUrl (loaded from IndexedDB, not synced)
+                  store.updateMapObject(jmo.objectId, {
+                    ...incoming,
+                    imageUrl: existing.imageUrl,
+                  });
+                  // If imageHash changed, flag for async texture resolution
+                  if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
+                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                  }
                 }
               } else {
-                store.addMapObject(jazzToZustandMapObject(jmo));
+                const newObj = jazzToZustandMapObject(jmo);
+                store.addMapObject(newObj);
+                // New map object with imageHash needs texture resolution
+                if (newObj.imageHash) {
+                  mapObjectsNeedingTextureResolve.push({ id: newObj.id, hash: newObj.imageHash });
+                }
               }
             }
 
@@ -2113,6 +2195,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               }
             }
           });
+
+          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
+          if (mapObjectsNeedingTextureResolve.length > 0) {
+            _resolveMapObjectTextures(mapObjectsNeedingTextureResolve);
+          }
+
           prevMapObjects = useMapObjectStore.getState().mapObjects;
         },
       );
