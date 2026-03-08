@@ -96,6 +96,7 @@ export function registerMiscHandlers(): void {
   });
 
   ephemeralBus.on("dice.rolling", (data: DiceRollingPayload, userId) => {
+    triggerSound('dice.roll');
     store.getState().setDiceRolling(userId, data.formula);
   });
 

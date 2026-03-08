@@ -29,6 +29,7 @@ export function registerEffectHandlers(): void {
 
   // ── Placement Preview (inbound from other players) ──
   ephemeralBus.on("effect.placement.preview", (data: EffectPlacementPreviewPayload, userId) => {
+    triggerSound('effect.placed');
     useMiscEphemeralStore.getState().setEffectPlacementPreview(userId, {
       templateId: data.templateId,
       origin: data.origin,

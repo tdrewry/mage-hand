@@ -105,6 +105,7 @@ export function registerMapHandlers(): void {
 
   // Portal activation flash (remote portal animation trigger)
   ephemeralBus.on("portal.activate", (data: PortalActivatePayload, _userId) => {
+    triggerSound('portal.activate');
     store.getState().setPortalActivation(data.objectId);
   });
 
