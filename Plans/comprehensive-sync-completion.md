@@ -47,7 +47,7 @@
 1. **Wire `emitMapSelectMap`** into portal teleport and DM map switch
 2. **Wire `emitPortalActivate`** into portal activation flash
 3. **Wire `emitRegionDragUpdate`** into region drag mousemove handler
-4. **Render remote effect placement previews** in effectRenderer.ts using miscEphemeralStore
+4. **Render remote effect placement previews** in effectRenderer.ts using miscEphemeralStore — ✅ DONE (v0.7.117)
 
 ## External Impact
 
