@@ -170,6 +170,34 @@ async function _resolveMapObjectTextures(entries: { id: string; hash: string }[]
   }
 }
 
+/**
+ * Async texture resolution for effect templates: when a custom template arrives with a textureHash
+ * but no texture data, try to load from local IndexedDB. If found, update the template's texture field.
+ */
+async function _resolveEffectTextures(customTemplates: EffectTemplate[]): Promise<void> {
+  const { loadTextureByHash } = await import("@/lib/textureStorage");
+  const needsResolve = customTemplates.filter(t => t.textureHash && (!t.texture || t.texture.length < 200));
+  if (needsResolve.length === 0) return;
+
+  console.log(`[jazz-bridge] 🎨 Resolving textures for ${needsResolve.length} effect templates`);
+  for (const t of needsResolve) {
+    const dataUrl = await loadTextureByHash(t.textureHash!);
+    if (dataUrl) {
+      console.log(`[jazz-bridge] 🎨 Resolved texture for effect template ${t.id} from local IDB (hash: ${t.textureHash})`);
+      useEffectStore.getState().updateCustomTemplate(t.id, { texture: dataUrl });
+    } else {
+      console.log(`[jazz-bridge] 🎨 Effect template ${t.id} needs hash ${t.textureHash} — not in local IDB yet, waiting for FileStream`);
+      // Try Jazz FileStream fallback
+      try {
+        const { requestTextureViaJazz } = await import("@/lib/jazz/textureSync");
+        if (requestTextureViaJazz) {
+          requestTextureViaJazz(t.textureHash!).catch(() => {});
+        }
+      } catch { /* textureSync not available */ }
+    }
+  }
+}
+
 /** Push a single token's current position to Jazz (used after drag end) */
 function _pushTokenFinalPosition(tokenId: string): void {
   const jazzTokens = _cachedTokens ?? _sessionRoot?.tokens;
