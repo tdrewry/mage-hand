@@ -155,7 +155,6 @@ export function registerMiscHandlers(): void {
       ...data,
       receivedAt: Date.now(),
     });
-    });
   });
 
   // ── Action Resolved (broadcast to all — players see outcome summary) ──
