@@ -3104,6 +3104,10 @@ export const SimpleTabletop = () => {
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
 
+    // Read transform from ref so animation loops and rAF callbacks always
+    // use the latest value, avoiding stale-closure jank during zoom.
+    const transform = transformRef.current;
+
     // ── Multi-map filtering: shadow raw store arrays with map-scoped versions ──
     // All rendering code below uses these local aliases instead of the raw store data.
     const tokens = filteredTokens;
