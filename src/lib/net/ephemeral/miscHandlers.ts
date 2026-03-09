@@ -102,6 +102,11 @@ export function registerMiscHandlers(): void {
     store.getState().setDiceRolling(userId, data.formula);
   });
 
+  // Dice result: add to chat log for all peers
+  ephemeralBus.on("dice.result", (data: DiceResultPayload, _userId) => {
+    useChatStore.getState().addDiceEntry(data as any);
+  });
+
   // ── Initiative ──
   ephemeralBus.on("initiative.drag.preview", (data: InitiativeDragPreviewPayload, userId) => {
     store.getState().setInitiativeDrag(userId, { userId, entryIndex: data.entryIndex, targetIndex: data.targetIndex });
