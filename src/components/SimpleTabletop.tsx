@@ -585,19 +585,6 @@ export const SimpleTabletop = () => {
   // Instead we compute world-space bounds (zoom-only projection), then use the
   // current pan to derive originX/Y.  Only zoom and region changes trigger a
   // resize; pan is handled by CSS offset in the post-processing layer.
-  // ---------------------------------------------------------------------------
-  // Quantize zoom into coarse buckets so small scroll increments don't trigger
-  // expensive canvas resizes.  Each bucket covers a ~2× zoom range; the generous
-  // PAN_MARGIN already absorbs the projection differences within a bucket.
-  const quantizedZoom = useMemo(() => {
-    // Round zoom to the nearest power-of-sqrt(2) step (~41% increments).
-    // This means the fog canvas only resizes when the user zooms past a
-    // major threshold, not on every single wheel tick.
-    const logBase = Math.log(Math.SQRT2);
-    const step = Math.round(Math.log(transform.zoom) / logBase);
-    return Math.pow(Math.SQRT2, step);
-  }, [transform.zoom]);
-
   const fogBounds = useMemo(() => {
     const vw = canvasDimensions.width;
     const vh = canvasDimensions.height;
