@@ -635,7 +635,7 @@ export const SimpleTabletop = () => {
     const totalH = maxY - originY;
 
     return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
-  }, [canvasDimensions.width, canvasDimensions.height, regions, quantizedZoom, isEntityVisible]);
+  }, [canvasDimensions.width, canvasDimensions.height, regions, transform.zoom, isEntityVisible]);
 
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
