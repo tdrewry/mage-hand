@@ -4436,7 +4436,6 @@ export const SimpleTabletop = () => {
               drawDragGhostAndPath(overlayCtx);
             }
             // ── Remote ephemeral overlays on overlay ──
-            drawRemoteDragPreviews(overlayCtx);
             drawRemoteTokenHovers(overlayCtx);
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
