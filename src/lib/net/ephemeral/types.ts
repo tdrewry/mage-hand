@@ -67,6 +67,9 @@ export type EphemeralOpKind =
   // Portal & Map Activation
   | "map.dm.selectMap"
   | "portal.activate"
+  | "portal.teleport.request"
+  | "portal.teleport.approved"
+  | "portal.teleport.denied"
   // Ambient
   | "ambient.loop.play"
   | "ambient.loop.stop";
@@ -371,6 +374,35 @@ export interface PortalActivatePayload {
   objectId: string;
 }
 
+export interface PortalTeleportRequestPayload {
+  requestId: string;
+  tokenId: string;
+  tokenName: string;
+  sourcePortalId: string;
+  sourcePortalName: string;
+  targetPortalId: string;
+  targetPortalName: string;
+  requestingPlayerName: string;
+  dropPosition?: { x: number; y: number };
+}
+
+export interface PortalTeleportApprovedPayload {
+  requestId: string;
+  tokenId: string;
+  sourcePortalId: string;
+  targetPortalId: string;
+  dropPosition?: { x: number; y: number };
+  /** If the teleport switches maps, the new active map ID */
+  activeMapId?: string;
+  /** Full map tree activation state so all clients match DM */
+  mapActivations?: Array<{ mapId: string; active: boolean }>;
+}
+
+export interface PortalTeleportDeniedPayload {
+  requestId: string;
+  reason?: string;
+}
+
 // -- Ambient --
 
 export interface AmbientLoopPlayPayload {
@@ -438,6 +470,9 @@ export interface EphemeralPayloadMap {
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
   "portal.activate": PortalActivatePayload;
+  "portal.teleport.request": PortalTeleportRequestPayload;
+  "portal.teleport.approved": PortalTeleportApprovedPayload;
+  "portal.teleport.denied": PortalTeleportDeniedPayload;
   "ambient.loop.play": AmbientLoopPlayPayload;
   "ambient.loop.stop": AmbientLoopStopPayload;
 }
@@ -534,6 +569,9 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
   "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
+  "portal.teleport.request": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "none" },
+  "portal.teleport.approved": { throttleMs: 0, ttlMs: 10000, keyStrategy: "none", dmOnly: true },
+  "portal.teleport.denied": { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "none", dmOnly: true },
 
   // Ambient
   "ambient.loop.play":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },

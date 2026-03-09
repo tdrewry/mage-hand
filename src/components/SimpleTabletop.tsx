@@ -129,7 +129,7 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitPortalActivate } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied } from "@/lib/net/ephemeral/mapHandlers";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
@@ -650,7 +650,84 @@ export const SimpleTabletop = () => {
     });
     return unsub;
   }, []);
-  
+
+  // ── Listen for portal teleport requests (DM) and approvals/denials (players) ──
+  useEffect(() => {
+    // DM receives teleport requests from players
+    const unsubRequest = ephemeralBus.on("portal.teleport.request", (data: any, _userId) => {
+      const { currentPlayerId: cpId, players: pls } = useSessionStore.getState();
+      const cp = pls.find(p => p.id === cpId);
+      if (!cp?.roleIds?.includes('dm')) return; // Only DM handles requests
+      
+      setPendingTeleport({
+        tokenId: data.tokenId,
+        tokenName: data.tokenName,
+        sourcePortalId: data.sourcePortalId,
+        sourcePortalName: data.sourcePortalName,
+        targetPortalId: data.targetPortalId,
+        targetPortalName: data.targetPortalName,
+        dropPosition: data.dropPosition,
+        requestId: data.requestId,
+        requestingPlayerName: data.requestingPlayerName,
+      });
+    });
+
+    // Players receive approval — execute the teleport
+    const unsubApproved = ephemeralBus.on("portal.teleport.approved", (data: any, _userId) => {
+      const { currentPlayerId: cpId, players: pls } = useSessionStore.getState();
+      const cp = pls.find(p => p.id === cpId);
+      if (cp?.roleIds?.includes('dm')) return; // DM already executed locally
+
+      // Apply map activations if provided (sync map tree state from DM)
+      if (data.mapActivations) {
+        for (const ma of data.mapActivations) {
+          useMapStore.getState().updateMap(ma.mapId, { active: ma.active });
+        }
+      }
+      // Switch to the active map if specified
+      if (data.activeMapId) {
+        useMapStore.getState().setSelectedMap(data.activeMapId);
+      }
+
+      // Execute the teleport on client
+      const allMapObjects = useMapObjectStore.getState().mapObjects;
+      const sourcePortal = allMapObjects.find(obj => obj.id === data.sourcePortalId);
+      const targetPortal = allMapObjects.find(obj => obj.id === data.targetPortalId);
+      if (!sourcePortal || !targetPortal) return;
+
+      let targetX = targetPortal.position.x;
+      let targetY = targetPortal.position.y;
+      if (data.dropPosition && sourcePortal.width > 0 && sourcePortal.height > 0) {
+        const relX = (data.dropPosition.x - sourcePortal.position.x) / sourcePortal.width;
+        const relY = (data.dropPosition.y - sourcePortal.position.y) / sourcePortal.height;
+        targetX += relX * targetPortal.width;
+        targetY += relY * targetPortal.height;
+      }
+
+      // Move token
+      useSessionStore.getState().updateTokenPosition(data.tokenId, targetX, targetY);
+      // Reassign mapId if cross-map
+      if (targetPortal.mapId && targetPortal.mapId !== sourcePortal.mapId) {
+        useSessionStore.setState(state => ({
+          tokens: state.tokens.map(t => t.id === data.tokenId ? { ...t, mapId: targetPortal.mapId } : t)
+        }));
+      }
+
+      toast.success(`Token teleported to ${targetPortal.portalName || 'portal'}`, { duration: 1500 });
+    });
+
+    // Players receive denial
+    const unsubDenied = ephemeralBus.on("portal.teleport.denied", (data: any, _userId) => {
+      toast.error(data.reason || 'Teleport request denied by DM', { duration: 3000 });
+    });
+
+    return () => {
+      unsubRequest();
+      unsubApproved();
+      unsubDenied();
+    };
+  }, []);
+
   // Pending teleport confirmation (DM approval)
   const [pendingTeleport, setPendingTeleport] = useState<{
     tokenId: string;
@@ -660,6 +737,8 @@ export const SimpleTabletop = () => {
     targetPortalId: string;
     targetPortalName: string;
     dropPosition?: { x: number; y: number };
+    requestId?: string;
+    requestingPlayerName?: string;
   } | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
   
@@ -1156,7 +1235,7 @@ export const SimpleTabletop = () => {
     portalActivationsRef.current.set(portalAtDrop.id, performance.now());
     emitPortalActivate(portalAtDrop.id);
 
-    // DM gets a confirmation prompt; non-DM teleports instantly
+    // DM gets a confirmation prompt; non-DM sends a request to DM for approval
     if (isDM) {
       const dropPos = { x: token.x, y: token.y };
       setPendingTeleport({
@@ -1169,7 +1248,21 @@ export const SimpleTabletop = () => {
         dropPosition: dropPos,
       });
     } else {
-      executeTeleport(tokenId, portalAtDrop.id, targetPortal.id, { x: token.x, y: token.y });
+      // Non-DM: send a teleport request to the DM for approval
+      const requestId = `ptr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const playerName = currentPlayer?.name || 'Player';
+      emitPortalTeleportRequest({
+        requestId,
+        tokenId,
+        tokenName: token.name || 'Token',
+        sourcePortalId: portalAtDrop.id,
+        sourcePortalName: portalAtDrop.portalName || 'Portal',
+        targetPortalId: targetPortal.id,
+        targetPortalName: targetPortal.portalName || 'Portal',
+        requestingPlayerName: playerName,
+        dropPosition: { x: token.x, y: token.y },
+      });
+      toast.info('Teleport request sent to DM for approval', { duration: 3000 });
     }
   }, [tokens, isDM, executeTeleport]);
 
@@ -12074,24 +12167,63 @@ export const SimpleTabletop = () => {
 
 
       {/* Portal Teleport DM Confirmation Dialog */}
-      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) setPendingTeleport(null); }}>
+      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) { 
+        if (pendingTeleport?.requestId) {
+          emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM dismissed the request' });
+        }
+        setPendingTeleport(null); 
+      }}}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Teleportation</AlertDialogTitle>
             <AlertDialogDescription>
+              {pendingTeleport?.requestingPlayerName && (
+                <span className="block text-sm text-muted-foreground mb-1">
+                  Requested by <strong>{pendingTeleport.requestingPlayerName}</strong>
+                </span>
+              )}
               Teleport <strong>{pendingTeleport?.tokenName}</strong> from{' '}
               <strong>{pendingTeleport?.sourcePortalName}</strong> to{' '}
               <strong>{pendingTeleport?.targetPortalName}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingTeleport(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              if (pendingTeleport?.requestId) {
+                emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM denied the teleport' });
+              }
+              setPendingTeleport(null);
+            }}>Deny</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (pendingTeleport) {
+                // Execute teleport locally on DM
                 executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
+                
+                // Broadcast approval to all clients with map state
+                const maps = useMapStore.getState().maps;
+                const allMapObjects = useMapObjectStore.getState().mapObjects;
+                const targetPortal = allMapObjects.find(obj => obj.id === pendingTeleport.targetPortalId);
+                const sourcePortal = allMapObjects.find(obj => obj.id === pendingTeleport.sourcePortalId);
+                const isCrossMap = targetPortal?.mapId && sourcePortal?.mapId && targetPortal.mapId !== sourcePortal.mapId;
+                
+                const approvalPayload: any = {
+                  requestId: pendingTeleport.requestId || '',
+                  tokenId: pendingTeleport.tokenId,
+                  sourcePortalId: pendingTeleport.sourcePortalId,
+                  targetPortalId: pendingTeleport.targetPortalId,
+                  dropPosition: pendingTeleport.dropPosition,
+                };
+
+                if (isCrossMap) {
+                  // Include full map activation state so all clients match DM
+                  approvalPayload.activeMapId = useMapStore.getState().selectedMapId;
+                  approvalPayload.mapActivations = maps.map(m => ({ mapId: m.id, active: m.active }));
+                }
+
+                emitPortalTeleportApproved(approvalPayload);
                 setPendingTeleport(null);
               }
-            }}>Teleport</AlertDialogAction>
+            }}>Approve Teleport</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
