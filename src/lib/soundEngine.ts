@@ -345,6 +345,7 @@ export async function playSound(event: SoundEvent): Promise<void> {
     const randomId = queue[Math.floor(Math.random() * queue.length)];
     try {
       const ctx = getAudioContext();
+      if (!ctx) return;
       const buffer = await getAudioBuffer(randomId, ctx);
       if (buffer) {
         playBuffer(buffer, effectiveGain);
