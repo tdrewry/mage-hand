@@ -10683,6 +10683,7 @@ export const SimpleTabletop = () => {
           });
         }
 
+        if (draggedMapObjectId) ephemeralBus.emit("mapObject.drag.end", { objectId: draggedMapObjectId });
         setIsDraggingMapObject(false);
         setDraggedMapObjectId(null);
         setMapObjectDragOffset({ x: 0, y: 0 });
