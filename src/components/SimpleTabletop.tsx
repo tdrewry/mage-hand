@@ -1367,6 +1367,7 @@ export const SimpleTabletop = () => {
                   duration: 3000,
                   description: blockDetails
                 });
+                triggerSound('movement.collision');
                 
                 // Snap back to original position
                 updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
