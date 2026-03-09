@@ -2447,10 +2447,16 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             }
 
             if (changed) {
-              const { buildAllTemplates: _buildAll } = _getEffectStoreHelpers();
+              // Rebuild allTemplates inline (mirrors effectStore's buildAllTemplates)
+              const { BUILT_IN_EFFECT_TEMPLATES } = require('@/lib/effectTemplateLibrary');
+              const customIds = new Set(newCustom.map((t: any) => t.id));
+              const hiddenSet = new Set(store.hiddenBuiltInIds);
+              const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
+              const allTemplates = [...visibleBuiltIns, ...newCustom];
+
               useEffectStore.setState({
                 customTemplates: newCustom,
-                allTemplates: _buildAll(newCustom, store.hiddenBuiltInIds),
+                allTemplates,
               });
 
               // Resolve textures for templates that have hashes but no data
