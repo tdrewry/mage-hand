@@ -125,16 +125,33 @@ const SYNTH_DEFAULTS: Record<SoundEvent, SynthDef> = {
   'ambient.loop':    { type: 'sine', frequency: 200, duration: 0.01, gain: 0 },
 };
 
-// ── Audio Context (lazy singleton) ──────────────────────────────────────
+// ── Audio Context (lazy singleton — only created on user gesture) ────────
 
 let audioCtx: AudioContext | null = null;
+let userHasInteracted = false;
+
+// Listen for first user gesture to unlock audio
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    userHasInteracted = true;
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+  };
+  window.addEventListener('click', unlockAudio, { once: true });
+  window.addEventListener('keydown', unlockAudio, { once: true });
+  window.addEventListener('touchstart', unlockAudio, { once: true });
+}
 
 function getAudioContext(): AudioContext {
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
-  // Resume if suspended (browser autoplay policy)
-  if (audioCtx.state === 'suspended') {
+  // Only resume if user has interacted (avoids browser warning)
+  if (audioCtx.state === 'suspended' && userHasInteracted) {
     audioCtx.resume().catch(() => {});
   }
   return audioCtx;
