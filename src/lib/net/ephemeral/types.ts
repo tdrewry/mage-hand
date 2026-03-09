@@ -492,6 +492,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "chat.typing":            { throttleMs: 200, ttlMs: 2000, keyStrategy: "userId" },
   "chat.message":           { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none" },
   "dice.rolling":           { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
+  "dice.result":            { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none" },
 
   // Initiative
   "initiative.drag.preview": { throttleMs: 50, ttlMs: 400,  keyStrategy: "userId" },
