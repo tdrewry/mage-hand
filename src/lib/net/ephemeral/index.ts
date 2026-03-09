@@ -16,6 +16,7 @@ export type {
   TokenHoverPayload,
   SelectionPreviewPayload,
   TokenPositionSyncPayload,
+  TokenMetaSyncPayload,
   DmViewportPayload,
   MapPingPayload,
   MapFocusPayload,

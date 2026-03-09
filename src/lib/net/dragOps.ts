@@ -1,8 +1,9 @@
 // src/lib/net/dragOps.ts
-// Emit helpers for token drag preview ops.
+// Emit helpers for token drag preview ops and token meta sync.
 // Uses the ephemeral pipeline (not durable op-log) for low-latency, lossy previews.
 
 import { ephemeralBus } from "@/lib/net";
+import { useSessionStore } from "@/stores/sessionStore";
 
 export interface DragBeginPayload {
   tokenId: string;
@@ -43,5 +44,21 @@ export function emitDragUpdate(payload: DragUpdatePayload): void {
 export function emitDragEnd(payload: DragEndPayload): void {
   ephemeralBus.emit("token.drag.end", {
     tokenId: payload.tokenId,
+  });
+}
+
+/**
+ * Emit token metadata sync via ephemeral bus (throttled at 200ms per token).
+ * Broadcasts label, color, pathStyle, appearance, size, etc. for live preview
+ * on remote clients. Excludes position (handled by drag/position sync).
+ */
+export function emitTokenMetaSync(tokenId: string): void {
+  const token = useSessionStore.getState().tokens.find(t => t.id === tokenId);
+  if (!token) return;
+  // Send all metadata fields except position and large blobs
+  const { x: _x, y: _y, imageUrl: _img, statBlockJson: _sb, ...meta } = token;
+  ephemeralBus.emit("token.meta.sync", {
+    tokenId,
+    meta,
   });
 }
