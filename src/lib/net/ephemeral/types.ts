@@ -467,6 +467,9 @@ export interface EphemeralPayloadMap {
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
   "portal.activate": PortalActivatePayload;
+  "portal.teleport.request": PortalTeleportRequestPayload;
+  "portal.teleport.approved": PortalTeleportApprovedPayload;
+  "portal.teleport.denied": PortalTeleportDeniedPayload;
   "ambient.loop.play": AmbientLoopPlayPayload;
   "ambient.loop.stop": AmbientLoopStopPayload;
 }
