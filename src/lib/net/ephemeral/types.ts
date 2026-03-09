@@ -66,6 +66,7 @@ export type EphemeralOpKind =
   | "effect.placement.preview"
   // Portal & Map Activation
   | "map.dm.selectMap"
+  | "map.tree.sync"
   | "portal.activate"
   | "portal.teleport.request"
   | "portal.teleport.approved"
