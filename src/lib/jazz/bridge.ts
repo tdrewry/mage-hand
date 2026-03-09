@@ -1701,7 +1701,73 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+/** Sync placed effects from Zustand → Jazz (diff-based, mirrors regions/mapObjects pattern) */
+function syncEffectsToJazz(effects: PlacedEffect[], prevEffects: PlacedEffect[]): void {
+  const effectState = _cachedEffects ?? _sessionRoot?.effects;
+  if (!effectState?.placedEffects) return;
+  const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+  const jazzPlaced = effectState.placedEffects;
+
+  // Only sync non-dismissed effects
+  const active = effects.filter(e => !e.dismissedAt);
+  const prevActive = prevEffects.filter(e => !e.dismissedAt);
+
+  const prevIds = new Set(prevActive.map(e => e.id));
+  const currentIds = new Set(active.map(e => e.id));
+
+  // Added
+  for (const e of active) {
+    if (!prevIds.has(e.id)) {
+      try {
+        const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
+        jazzPlaced.$jazz.push(je);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push new effect ${e.id}:`, err);
+      }
+    }
+  }
+
+  // Updated
+  for (const e of active) {
+    if (prevIds.has(e.id)) {
+      const prev = prevActive.find(pe => pe.id === e.id);
+      if (!prev || JSON.stringify(placedEffectToJazzInit(e)) === JSON.stringify(placedEffectToJazzInit(prev))) continue;
+      const len = jazzPlaced.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const je = jazzPlaced[i];
+        if (je && je.effectId === e.id) {
+          try {
+            const init = placedEffectToJazzInit(e);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'effectId') je.$jazz.set(key, val ?? undefined);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to update effect ${e.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Removed
+  for (const prev of prevActive) {
+    if (!currentIds.has(prev.id)) {
+      const len = jazzPlaced.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const je = jazzPlaced[i];
+        if (je && je.effectId === prev.id) {
+          try { jazzPlaced.$jazz.splice(i, 1); } catch (err) {
+            console.error(`[jazz-bridge] Failed to remove effect ${prev.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+
 // JAZZ COLIST DEDUP CLEANUP
 // ══════════════════════════════════════════════════════════════════════════
 
