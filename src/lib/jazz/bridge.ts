@@ -2317,7 +2317,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   });
   activeSubscriptions.push(unsubEffectsZustand);
 
-  // ── Effect sync: Jazz → Zustand (inbound placed effects + custom templates) ──
+  // ── Effect sync: Jazz → Zustand (inbound placed effects) ──
   const jazzEffectsRef = sessionRoot.effects;
   if (jazzEffectsRef?.placedEffects?.$jazz?.subscribe) {
     try {
@@ -2327,6 +2327,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           if (!placedEffects) return;
           const len = placedEffects.length ?? 0;
           const localCount = useEffectStore.getState().placedEffects.length;
+
+          // Guard: if outbound throttle is active for effects, skip inbound
+          // (we're likely seeing our own intermediate state)
+          if (_fineGrainedTimers.has('effects')) return;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
           // Startup grace: suppress inbound for creator during initial propagation
@@ -2339,14 +2343,39 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const customTemplates = useEffectStore.getState().customTemplates;
           const lookup = buildTemplateLookup(customTemplates);
 
-          runFromJazz(() => {
-            const restored: PlacedEffect[] = [];
-            for (let i = 0; i < len; i++) {
-              const je = placedEffects[i];
-              if (!je) continue;
-              const effect = jazzToZustandPlacedEffect(je, lookup);
-              if (effect) restored.push(effect);
+          const restored: PlacedEffect[] = [];
+          for (let i = 0; i < len; i++) {
+            const je = placedEffects[i];
+            if (!je) continue;
+            const effect = jazzToZustandPlacedEffect(je, lookup);
+            if (effect) restored.push(effect);
+          }
+
+          // Deep compare to avoid redundant store writes
+          const currentLocal = useEffectStore.getState().placedEffects;
+          const restoredIds = restored.map(e => e.id).sort().join(',');
+          const localIds = currentLocal.map(e => e.id).sort().join(',');
+          if (restoredIds === localIds) {
+            // Same set of IDs — check for property changes
+            let hasChanges = false;
+            for (const re of restored) {
+              const le = currentLocal.find(e => e.id === re.id);
+              if (!le) { hasChanges = true; break; }
+              if (re.roundsRemaining !== le.roundsRemaining ||
+                  re.animationPaused !== le.animationPaused ||
+                  re.origin.x !== le.origin.x || re.origin.y !== le.origin.y ||
+                  re.direction !== le.direction ||
+                  JSON.stringify(re.impactedTargets) !== JSON.stringify(le.impactedTargets) ||
+                  JSON.stringify(re.triggeredTokenIds) !== JSON.stringify(le.triggeredTokenIds) ||
+                  JSON.stringify(re.tokensInsideArea) !== JSON.stringify(le.tokensInsideArea)) {
+                hasChanges = true;
+                break;
+              }
             }
+            if (!hasChanges) return;
+          }
+
+          runFromJazz(() => {
             useEffectStore.setState({ placedEffects: restored });
           });
           prevEffects = useEffectStore.getState().placedEffects;
