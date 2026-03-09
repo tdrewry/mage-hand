@@ -4640,20 +4640,8 @@ export const SimpleTabletop = () => {
       ctx.arc(p.startPos.x, p.startPos.y, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw ghost circle at current drag position
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(p.currentPos.x, p.currentPos.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw border ring on current position
-      ctx.globalAlpha = 0.6;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2 / transform.zoom;
-      ctx.beginPath();
-      ctx.arc(p.currentPos.x, p.currentPos.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
+      // (Ghost at current position removed — the real token sprite renders here
+      //  via the normal pipeline since token.drag.update calls updateTokenPosition)
 
       // Draw username label above current position
       ctx.globalAlpha = 0.7;

@@ -1,37 +1,28 @@
-# Lifecycle-Based Drag/Placement Previews (v0.7.155 → v0.7.156)
+# Lifecycle-Based Drag/Placement Previews
 
-## Problem
-TTL-based expiry was the primary mechanism for clearing drag/placement previews. This caused previews to vanish when the user paused mid-drag, requiring inflated TTL values (5000ms) as a workaround — fragile and wasteful.
+## v0.7.155 → v0.7.156: Lifecycle semantics
+Switched from TTL-based expiry to explicit lifecycle (begin/update/end). TTL set to 0 for lifecycle-managed ops.
 
-## Solution
-Switched to explicit lifecycle semantics: `begin` creates the preview, `update` refreshes it, `end`/`cancel` removes it. TTL is set to 0 (never expires) for lifecycle-managed ops — cleanup is driven entirely by explicit events and disconnect handling.
+## v0.7.160: Unified Drag Model
 
-## Changes
+### Problem
+Remote drag previews rendered as simplified colored circles via a parallel pipeline (`drawRemoteDragPreviews`), while the actual token sprite stayed frozen at its pre-drag position. The 10Hz `token.position.sync` skipped tokens with active drag previews, so the real sprite never moved during a remote drag.
 
-### TTL config (`src/lib/net/ephemeral/types.ts`)
-- `token.drag.begin`: `ttlMs: 0` (was 5000)
-- `token.drag.update`: `ttlMs: 0` (was 5000)
-- `token.drag.end`: kept at 400ms (termination signal)
-- `effect.placement.preview`: `ttlMs: 0` (was 5000)
+### Solution
+In `token.drag.update` handler, also call `updateTokenPosition()` so the real token sprite moves in the session store — exactly like a local drag. The normal render pipeline draws the full token (texture, name, auras, status rings) at the drag position.
 
-### Drag preview store (`src/stores/dragPreviewStore.ts`)
-- Removed `expireStale()` method — no longer needed
-- `endDrag()` and `clearUser()` remain as explicit cleanup paths
+Simplified `drawRemoteDragPreviews` to only render supplementary decoration:
+- Ghost circle at **start** position (origin marker)
+- Movement trail polyline
+- Dashed distance line from start → current
+- Username label
 
-### SimpleTabletop (`src/components/SimpleTabletop.tsx`)
-- Removed `setInterval` that called `expireStale(800)` every 500ms
+Removed the redundant ghost circle and border ring at the current drag position — the real token sprite is already there.
 
-### Effect placement cancel signal (`src/stores/effectStore.ts`)
-- `cancelPlacement()` now emits `effect.placement.preview` with empty `templateId` to clear remote previews
+### Changes
+- `src/lib/net/ephemeral/tokenHandlers.ts` — `token.drag.update` handler now calls `updateTokenPosition()`
+- `src/components/SimpleTabletop.tsx` — removed current-position ghost circle/ring from `drawRemoteDragPreviews`
+- `src/lib/version.ts` — bumped to 0.7.160
 
-### Effect handler (`src/lib/net/ephemeral/effectHandlers.ts`)
-- Inbound handler treats empty/falsy `templateId` as a clear signal → calls `removeEffectPlacementPreview`
-- Removed `onCacheChange` listener (TTL expiry no longer drives cleanup)
-
-## Disconnect Safety Net
-- `clearUser()` on presence disconnect handles crash/exit recovery for drag previews
-- Effect placement previews cleared when the user's presence disconnects
-
-## Impact on External Services
-- **WebSocket server**: No changes needed — op kinds unchanged, server is kind-agnostic
-- **Jazz service**: Unaffected — drag previews are ephemeral-only
+### Impact on External Services
+None — all client-side rendering changes. WebSocket server and Jazz unaffected.
