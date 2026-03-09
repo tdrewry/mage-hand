@@ -315,6 +315,10 @@ export class NetManager {
                 if (root) {
                   console.log(`[NetManager] Auto-pushing durable state for new player: ${p.user.username}`);
                   pushAllToJazz(root);
+                  // Trigger fog refresh on DM side to recover from any store churn
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('fog:force-refresh'));
+                  }, 100);
                 }
               }).catch(() => {});
             }
