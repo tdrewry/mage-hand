@@ -7979,6 +7979,7 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
           clearMapObjectSelection();
+          emitGroupSelectPreview(null);
           clearLightSelection();
         } else {
           // Play mode: clicking empty space — clear selection (unless shift held) then start marquee
