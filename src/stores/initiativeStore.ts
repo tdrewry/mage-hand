@@ -52,6 +52,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       roundNumber: 1,
       isTrackerVisible: true
     });
+    triggerSound('initiative.combatStart');
   },
   
   endCombat: () => {
