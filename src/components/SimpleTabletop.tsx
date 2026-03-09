@@ -660,6 +660,8 @@ export const SimpleTabletop = () => {
     targetPortalId: string;
     targetPortalName: string;
     dropPosition?: { x: number; y: number };
+    requestId?: string;
+    requestingPlayerName?: string;
   } | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
   
