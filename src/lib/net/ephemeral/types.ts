@@ -557,6 +557,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "token.drag.update":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
   "token.position.sync":    { throttleMs: 100, ttlMs: 500,  keyStrategy: "session" },
+  "token.meta.sync":        { throttleMs: 200, ttlMs: 2000, keyStrategy: "entityId" },
 
   // Map & Camera
   "map.dm.viewport":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "session", dmOnly: true },
