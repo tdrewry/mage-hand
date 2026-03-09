@@ -5,12 +5,14 @@ import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useMapStore } from "@/stores/mapStore";
+import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { triggerSound } from "@/lib/soundEngine";
 import type {
   DmViewportPayload,
   DmEnforceFollowPayload,
   MapPingPayload,
   MapFocusPayload,
+  MapTreeSyncPayload,
   RegionDragUpdatePayload,
   MapObjectDragUpdatePayload,
   MapObjectDoorPreviewPayload,
