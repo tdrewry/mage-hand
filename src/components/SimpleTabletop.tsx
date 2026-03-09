@@ -25,9 +25,7 @@ import { emitLocalOp } from "@/lib/net";
 import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { markDraggedForSync, unmarkDraggedForSync } from "@/lib/net/tokenPositionSync";
-
-import { useMapStore } from "../stores/mapStore";
-import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
+egionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
 import { useInitiativeStore } from "../stores/initiativeStore";
 import { useCardStore } from "../stores/cardStore";
@@ -152,8 +150,7 @@ import {
   drawOffScreenIndicator as drawOffScreenIndicatorFn,
   drawMapPings as drawMapPingsFn,
   drawRemoteDragPreviews as drawRemoteDragPreviewsFn,
-  drawRemoteTokenHovers as drawRemoteTokenHoversFn,
-  drawRemoteSelectionPreviews as drawRemoteSelectionPreviewsFn,
+  drawRemoteeSelectionPreviews as drawRemoteSelectionPreviewsFn,
   drawRemoteActionTargets as drawRemoteActionTargetsFn,
 } from "../lib/canvasDrawHelpers";
 import {
