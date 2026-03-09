@@ -8027,7 +8027,20 @@ export const SimpleTabletop = () => {
       }
     }
 
-    // Check if DM right-clicked on a placed effect (before token/entity checks)
+    // Tokens have highest priority for context menus
+    if (clickedToken) {
+      const event = new CustomEvent("showTokenContextMenu", {
+        detail: {
+          tokenId: clickedToken.id,
+          x: e.clientX,
+          y: e.clientY,
+        },
+      });
+      window.dispatchEvent(event);
+      return;
+    }
+
+    // Check if DM right-clicked on a placed effect (after token check)
     if (isDM) {
       const effectState = useEffectStore.getState();
       const activeMapId = selectedMapId || 'default-map';
@@ -8047,19 +8060,7 @@ export const SimpleTabletop = () => {
       }
     }
 
-    if (clickedToken) {
-      // Dispatch custom event for TokenContextManager
-      const event = new CustomEvent("showTokenContextMenu", {
-        detail: {
-          tokenId: clickedToken.id,
-          x: e.clientX,
-          y: e.clientY,
-        },
-      });
-      window.dispatchEvent(event);
-    } else if (clickedMapObject && renderingMode === "edit") {
-      // Show map object context menu in edit mode
-      // Select the map object if not already selected
+    if (clickedMapObject && renderingMode === "edit") {
       if (!selectedMapObjectIds.includes(clickedMapObject.id)) {
         selectMapObject(clickedMapObject.id, false);
       }
@@ -8069,7 +8070,6 @@ export const SimpleTabletop = () => {
         mapObjectId: clickedMapObject.id,
       });
     } else if (clickedRegion) {
-      // Show region context menu
       showRegionContextMenu(e.clientX, e.clientY, clickedRegion);
     }
   };
