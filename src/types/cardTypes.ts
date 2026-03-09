@@ -30,6 +30,7 @@ export enum CardType {
   EFFECTS = 'effects',
   CHAT = 'chat',
   ART_APPROVAL = 'art_approval',
+  SOUND_SETTINGS = 'sound_settings',
 }
 
 /** Card types that require DM role — players cannot open or see these */
