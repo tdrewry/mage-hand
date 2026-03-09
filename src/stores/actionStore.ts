@@ -469,6 +469,11 @@ export const useActionStore = create<ActionStore>()(
     const { currentAction } = get();
     if (!currentAction || currentAction.targets.length === 0 || !currentAction.attack) return;
 
+    // Clear remote targeting reticle
+    try {
+      ephemeralBus.emit('action.target.preview', { sourceTokenId: '', pos: { x: 0, y: 0 } });
+    } catch { /* ignore */ }
+
     // Roll attack and damage for each target
     const rollResults: Record<string, ActionRollResult> = {};
     const damageResults: Record<string, DamageResult> = {};
