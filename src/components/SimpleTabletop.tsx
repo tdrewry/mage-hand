@@ -11210,6 +11210,7 @@ export const SimpleTabletop = () => {
                 ? 'Cannot leave region boundary' 
                 : 'Movement blocked by obstacle';
               toast.error(blockReason);
+              triggerSound('movement.collision');
               updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
             }
           }
