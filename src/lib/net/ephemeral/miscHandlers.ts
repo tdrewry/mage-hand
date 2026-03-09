@@ -276,15 +276,19 @@ async function applyAcceptedArt(data: AssetAcceptedPayload): Promise<void> {
     if (data.targetType === 'token') {
       await saveTextureByHash(data.textureHash, data.textureDataUrl);
       useSessionStore.getState().updateTokenImage(data.targetId, data.textureDataUrl, data.textureHash);
+      triggerSound('ui.success');
       toast.success(`Art applied to token`);
     } else if (data.targetType === 'region') {
       await saveTextureByHash(data.textureHash, data.textureDataUrl);
       // Region texture application would go through regionStore
+      triggerSound('ui.success');
       toast.success(`Art applied to region`);
     } else {
+      triggerSound('ui.success');
       toast.success(`Art accepted for ${data.targetType}`);
     }
   } catch (err) {
+    triggerSound('ui.error');
     console.error("[miscHandlers] Failed to apply accepted art:", err);
   }
 }

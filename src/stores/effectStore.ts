@@ -429,6 +429,7 @@ export const useEffectStore = create<EffectState>()(
       persistTemplateTexture(effect.template);
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
+      triggerSound('effect.placed');
       return effect;
     },
 
