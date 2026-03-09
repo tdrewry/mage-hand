@@ -1751,6 +1751,10 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
           clearSelection();
+          clearMapObjectSelection();
+          // Clear remote previews
+          emitGroupSelectPreview(null);
+          ephemeralBus.emit("selection.preview", {});
           redrawCanvas();
         }
       }
