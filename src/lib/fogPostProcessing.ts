@@ -313,21 +313,20 @@ export function applyFogPostProcessing(
   originX = 0,
   originY = 0
 ): void {
-  const totalW = canvasWidth + FIXED_PADDING * 2;
-  const totalH = canvasHeight + FIXED_PADDING * 2;
-
-  // (Re)initialize if content SIZE changed (expensive — reallocates canvases)
-  if (
-    !fogCanvas ||
-    fogCanvas.width !== totalW ||
-    fogCanvas.height !== totalH
-  ) {
+  // Canvas2D fog canvases are managed exclusively by usePostProcessing
+  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here —
+  // that would desync the Canvas2D texture from the PixiJS renderer,
+  // which only resizes on >10% dimension changes.
+  if (!fogCanvas) {
     initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
   } else {
     // Just update origin tracking (cheap — no canvas reallocation)
     _lastOriginX = originX;
     _lastOriginY = originY;
   }
+
+  const totalW = fogCanvas!.width;
+  const totalH = fogCanvas!.height;
 
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
 
