@@ -265,6 +265,7 @@ async function loadCustomBuffer(eventName: SoundEvent): Promise<AudioBuffer | nu
   }
   try {
     const ctx = getAudioContext();
+    if (!ctx) return null;
     const buffer = await ctx.decodeAudioData(entry.audioData.slice(0));
     customSoundCache.set(eventName, buffer);
     return buffer;
