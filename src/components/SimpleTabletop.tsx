@@ -1173,7 +1173,7 @@ export const SimpleTabletop = () => {
     } else {
       // Non-DM: send a teleport request to the DM for approval
       const requestId = `ptr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const playerName = useMultiplayerStore.getState().username || 'Player';
+      const playerName = currentPlayer?.name || 'Player';
       emitPortalTeleportRequest({
         requestId,
         tokenId,
