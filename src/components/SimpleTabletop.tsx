@@ -637,14 +637,12 @@ export const SimpleTabletop = () => {
     return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
   }, [canvasDimensions.width, canvasDimensions.height, regions, transform.zoom, isEntityVisible]);
 
-  // Post-processing hook for fog effects
+  // Post-processing hook for fog effects — viewport-sized, no fogBounds needed
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
     containerRef: canvasContainerRef,
     enabled: fogEnabled && !fogRevealAll && effectSettings.postProcessingEnabled,
-    width: fogBounds.width,
-    height: fogBounds.height,
-    originX: fogBounds.originX,
-    originY: fogBounds.originY,
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
   });
 
   // Region edge hatching post-processing hook
