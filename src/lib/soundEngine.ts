@@ -302,33 +302,47 @@ function playBuffer(buffer: AudioBuffer, masterGain: number): void {
 // ── Public API ──────────────────────────────────────────────────────────
 
 import { useSoundStore } from '@/stores/soundStore';
+import { getAudioBuffer } from './audioLibrary';
 
 /**
  * Play a sound for the given event.
- * Checks: enabled → per-event enabled → custom file → synth fallback
+ * Priority: event queue (random pick) → legacy custom file → synth fallback.
  */
 export async function playSound(event: SoundEvent): Promise<void> {
   const state = useSoundStore.getState();
   if (!state.enabled) return;
   if (state.disabledEvents[event]) return;
+  if (event === 'ambient.loop') return; // ambient handled by ambientEngine
 
   const masterGain = state.masterVolume;
   const categoryGain = state.categoryVolumes[getCategory(event)] ?? 1;
   const effectiveGain = masterGain * categoryGain;
   if (effectiveGain <= 0) return;
 
-  // Try custom sound first
+  // 1) Try event queue (audio library) — random pick
+  const queue = state.eventQueues?.[event] ?? [];
+  if (queue.length > 0) {
+    const randomId = queue[Math.floor(Math.random() * queue.length)];
+    try {
+      const ctx = getAudioContext();
+      const buffer = await getAudioBuffer(randomId, ctx);
+      if (buffer) {
+        playBuffer(buffer, effectiveGain);
+        return;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // 2) Legacy: single custom sound per event (backward compat)
   try {
     const buffer = await loadCustomBuffer(event);
     if (buffer) {
       playBuffer(buffer, effectiveGain);
       return;
     }
-  } catch {
-    // Fall through to synth
-  }
+  } catch { /* fall through */ }
 
-  // Synthesized default
+  // 3) Synthesized default
   const def = SYNTH_DEFAULTS[event];
   if (def && def.gain !== 0) {
     playSynth(def, effectiveGain);

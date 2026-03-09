@@ -132,6 +132,7 @@ import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePrevie
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
+import { registerAmbientHandlers } from "@/lib/net/ephemeral/ambientHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
@@ -212,6 +213,7 @@ export const SimpleTabletop = () => {
     registerMapHandlers();
     registerMiscHandlers();
     registerEffectHandlers();
+    registerAmbientHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);

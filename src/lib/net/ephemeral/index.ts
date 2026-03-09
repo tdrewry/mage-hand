@@ -42,3 +42,4 @@ export { EPHEMERAL_OP_CONFIG } from "./types";
 export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
 export { emitChatTyping, emitChatMessage, emitAssetUploadProgress, emitArtSubmission, emitArtAccepted, emitArtRejected } from "./miscHandlers";
 export { emitMapSelectMap, emitPortalActivate, emitRegionDragUpdate } from "./mapHandlers";
+export { registerAmbientHandlers, emitAmbientLoopPlay, emitAmbientLoopStop } from "./ambientHandlers";

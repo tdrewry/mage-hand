@@ -65,7 +65,10 @@ export type EphemeralOpKind =
   | "effect.placement.preview"
   // Portal & Map Activation
   | "map.dm.selectMap"
-  | "portal.activate";
+  | "portal.activate"
+  // Ambient
+  | "ambient.loop.play"
+  | "ambient.loop.stop";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
@@ -355,6 +358,17 @@ export interface PortalActivatePayload {
   objectId: string;
 }
 
+// -- Ambient --
+
+export interface AmbientLoopPlayPayload {
+  loopId: string;
+  volume: number;
+}
+
+export interface AmbientLoopStopPayload {
+  // intentionally empty
+}
+
 // -- Token Position Sync --
 
 export interface TokenPositionSyncPayload {
@@ -410,6 +424,8 @@ export interface EphemeralPayloadMap {
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
   "portal.activate": PortalActivatePayload;
+  "ambient.loop.play": AmbientLoopPlayPayload;
+  "ambient.loop.stop": AmbientLoopStopPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -503,4 +519,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
   "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
+
+  // Ambient
+  "ambient.loop.play":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
+  "ambient.loop.stop":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
 };
