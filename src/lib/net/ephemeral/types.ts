@@ -424,6 +424,8 @@ export interface EphemeralPayloadMap {
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
   "portal.activate": PortalActivatePayload;
+  "ambient.loop.play": AmbientLoopPlayPayload;
+  "ambient.loop.stop": AmbientLoopStopPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
