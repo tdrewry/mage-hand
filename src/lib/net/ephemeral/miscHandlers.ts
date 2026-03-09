@@ -75,6 +75,7 @@ export function registerMiscHandlers(): void {
     if (data.shape === "committed" && data.serializedExploredAreas != null) {
       const mapId = data.mapId || 'default-map';
       useFogStore.getState().setSerializedExploredAreasForMap(mapId, data.serializedExploredAreas);
+      triggerSound('fog.reveal');
     }
   });
 
