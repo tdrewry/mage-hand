@@ -449,8 +449,10 @@ export const ChatCardContent: React.FC = () => {
           {visibleEntries.map((entry) =>
             entry.type === 'message' ? (
               <ChatMessageBubble key={entry.id} entry={entry} />
+            ) : entry.type === 'dice' ? (
+              <ChatDiceBubble key={entry.id} entry={entry} />
             ) : (
-              <ChatActionBubble key={entry.id} entry={entry} />
+              <ChatActionBubble key={entry.id} entry={entry as ChatActionEntry} />
             )
           )}
         </div>
