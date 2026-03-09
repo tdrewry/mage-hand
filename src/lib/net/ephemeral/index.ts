@@ -37,6 +37,9 @@ export type {
   EffectPlacementPreviewPayload,
   MapDmSelectMapPayload,
   PortalActivatePayload,
+  PortalTeleportRequestPayload,
+  PortalTeleportApprovedPayload,
+  PortalTeleportDeniedPayload,
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
 export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
