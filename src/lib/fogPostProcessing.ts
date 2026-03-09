@@ -112,8 +112,6 @@ export function initFogCanvas(
 ): void {
   _lastContentW = width;
   _lastContentH = height;
-  _lastOriginX = originX;
-  _lastOriginY = originY;
 
   const totalW = width + FIXED_PADDING * 2;
   const totalH = height + FIXED_PADDING * 2;
