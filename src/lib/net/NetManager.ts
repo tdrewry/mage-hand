@@ -305,6 +305,7 @@ export class NetManager {
           store.addConnectedUser(user);
           // Don't toast for our own join
           if (p.user.userId !== store.currentUserId) {
+            triggerSound('ui.notification');
             toast.info(`${p.user.username} joined the session`, { duration: 3000 });
             
             // Auto-push durable state when a player joins in Jazz tandem mode
@@ -322,6 +323,7 @@ export class NetManager {
           break;
         case "leave":
           store.removeConnectedUser(p.user.userId);
+          triggerSound('ui.notification');
           toast.info(`${p.user.username} left the session`, { duration: 3000 });
           console.log(`👤 [NetManager] User left: ${p.user.username}`);
           break;
