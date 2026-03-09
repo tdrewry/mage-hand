@@ -36,6 +36,7 @@ export type {
   EffectAuraStatePayload,
   EffectPlacementPreviewPayload,
   MapDmSelectMapPayload,
+  MapTreeSyncPayload,
   PortalActivatePayload,
   PortalTeleportRequestPayload,
   PortalTeleportApprovedPayload,
