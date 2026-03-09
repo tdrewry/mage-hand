@@ -313,10 +313,6 @@ export function applyFogPostProcessing(
   // which only resizes on >10% dimension changes.
   if (!fogCanvas) {
     initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
-  } else {
-    // Just update origin tracking (cheap — no canvas reallocation)
-    _lastOriginX = originX;
-    _lastOriginY = originY;
   }
 
   const totalW = fogCanvas!.width;
