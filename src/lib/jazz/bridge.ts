@@ -642,7 +642,20 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
 
 /** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
 function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLevel?: number) => EffectTemplate | undefined): PlacedEffect | null {
-  const template = templateLookup(je.templateId, je.castLevel);
+  let template = templateLookup(je.templateId, je.castLevel);
+
+  // Fallback: use embedded template snapshot if local lookup fails
+  // (custom template CoList may not have synced yet)
+  if (!template && je.templateJson) {
+    try {
+      const embedded = JSON.parse(je.templateJson);
+      if (embedded && embedded.id) {
+        template = computeScaledTemplate(embedded, je.castLevel);
+        console.log(`[jazz-bridge] Using embedded template snapshot for effect ${je.effectId} (templateId: ${je.templateId})`);
+      }
+    } catch { /* invalid JSON */ }
+  }
+
   if (!template) {
     console.warn(`[jazz-bridge] Could not reconstruct template for effect ${je.effectId} (templateId: ${je.templateId})`);
     return null;
