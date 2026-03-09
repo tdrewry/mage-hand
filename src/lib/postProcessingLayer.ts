@@ -370,6 +370,19 @@ export function resizePostProcessing(
   _lastRenderTransform = { x: 0, y: 0, zoom: 0 };
 }
 
+/**
+ * Cheap CSS-only reposition of the PixiJS canvas (no GPU resize).
+ * Use when origin changed but canvas dimensions are still large enough.
+ */
+export function repositionPostProcessing(originX: number, originY: number): void {
+  if (!pixiApp || !isInitialized) return;
+  _originX = originX;
+  _originY = originY;
+  const canvas = pixiApp.canvas as HTMLCanvasElement;
+  canvas.style.top  = `${_originY - FIXED_PADDING}px`;
+  canvas.style.left = `${_originX - FIXED_PADDING}px`;
+}
+
 export function setPostProcessingVisible(visible: boolean): void {
   if (!pixiApp || !isInitialized) return;
   const canvas = pixiApp.canvas as HTMLCanvasElement;
