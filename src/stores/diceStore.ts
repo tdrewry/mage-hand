@@ -43,6 +43,11 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
       rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
     }));
     triggerSound('dice.result');
+    // Feed into chat log
+    try {
+      const { useChatStore } = require('@/stores/chatStore');
+      useChatStore.getState().addDiceEntry(result);
+    } catch { /* chat store may not be available */ }
     return result;
   },
 
