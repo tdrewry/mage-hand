@@ -61,11 +61,33 @@ export function registerMapHandlers(): void {
     store.getState().setFocus({ pos: data.pos, zoom: data.zoom });
   });
 
+  // ── Region drag lifecycle ──
+  ephemeralBus.on("region.drag.begin", (data: RegionDragBeginPayload, userId) => {
+    store.getState().setRegionDrag(data.regionId, {
+      entityId: data.regionId,
+      userId,
+      pos: data.startPos,
+    });
+  });
+
   ephemeralBus.on("region.drag.update", (data: RegionDragUpdatePayload, userId) => {
     store.getState().setRegionDrag(data.regionId, {
       entityId: data.regionId,
       userId,
       pos: data.pos,
+    });
+  });
+
+  ephemeralBus.on("region.drag.end", (data: RegionDragEndPayload, _userId) => {
+    store.getState().removeRegionDrag(data.regionId);
+  });
+
+  // ── MapObject drag lifecycle ──
+  ephemeralBus.on("mapObject.drag.begin", (data: MapObjectDragBeginPayload, userId) => {
+    store.getState().setMapObjectDrag(data.objectId, {
+      entityId: data.objectId,
+      userId,
+      pos: data.startPos,
     });
   });
 
@@ -75,6 +97,10 @@ export function registerMapHandlers(): void {
       userId,
       pos: data.pos,
     });
+  });
+
+  ephemeralBus.on("mapObject.drag.end", (data: MapObjectDragEndPayload, _userId) => {
+    store.getState().removeMapObjectDrag(data.objectId);
   });
 
   // Door toggle preview — remote peer toggled a door
