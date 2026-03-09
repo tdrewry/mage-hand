@@ -46,7 +46,6 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
     triggerSound('dice.result');
     // Feed into chat log
     try {
-      const { useChatStore } = require('@/stores/chatStore');
       useChatStore.getState().addDiceEntry(result);
     } catch { /* chat store may not be available */ }
     return result;
