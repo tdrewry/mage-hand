@@ -21,6 +21,7 @@ import type {
   ChatTypingPayload,
   ChatMessagePayload,
   DiceRollingPayload,
+  DiceResultPayload,
   InitiativeDragPreviewPayload,
   InitiativeHoverPayload,
   GroupSelectPreviewPayload,
