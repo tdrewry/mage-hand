@@ -460,6 +460,14 @@ export interface TokenPositionSyncPayload {
   positions: Array<{ tokenId: string; x: number; y: number }>;
 }
 
+// -- Token Meta Sync --
+
+export interface TokenMetaSyncPayload {
+  tokenId: string;
+  /** Partial token fields — only changed metadata, no position */
+  meta: Record<string, unknown>;
+}
+
 // ── Payload Map (opKind → payload type) ─────────────────────────
 
 export interface EphemeralPayloadMap {
