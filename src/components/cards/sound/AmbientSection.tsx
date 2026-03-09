@@ -43,6 +43,11 @@ export const AmbientSection: React.FC = () => {
     ).then((results) => setLoops(results.filter(Boolean) as AmbientLoopMeta[]));
   }, [customAmbientLoopIds]);
 
+  // Sync ambient gain when master, category, or ambient volume changes
+  useEffect(() => {
+    if (activeAmbientLoopId) setAmbientGain(ambientVolume);
+  }, [masterVolume, categoryVolumes, ambientVolume, activeAmbientLoopId]);
+
   const ambientCatVol = categoryVolumes['ambient'] ?? 1;
 
   const handlePlay = (loopId: string) => {
