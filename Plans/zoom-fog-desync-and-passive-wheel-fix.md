@@ -1,4 +1,4 @@
-# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133 → v0.7.136)
+# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133 → v0.7.137)
 
 ## Problems
 1. Fog of war rendering desynced from the map during zoom (offset/drift)
