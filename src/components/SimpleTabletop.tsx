@@ -12202,12 +12202,8 @@ export const SimpleTabletop = () => {
                 // Execute teleport locally on DM
                 executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
                 
-                // Broadcast approval to all clients with map state
+                // Broadcast approval to all clients — always include full map tree state
                 const maps = useMapStore.getState().maps;
-                const allMapObjects = useMapObjectStore.getState().mapObjects;
-                const targetPortal = allMapObjects.find(obj => obj.id === pendingTeleport.targetPortalId);
-                const sourcePortal = allMapObjects.find(obj => obj.id === pendingTeleport.sourcePortalId);
-                const isCrossMap = targetPortal?.mapId && sourcePortal?.mapId && targetPortal.mapId !== sourcePortal.mapId;
                 
                 const approvalPayload: any = {
                   requestId: pendingTeleport.requestId || '',
@@ -12215,15 +12211,14 @@ export const SimpleTabletop = () => {
                   sourcePortalId: pendingTeleport.sourcePortalId,
                   targetPortalId: pendingTeleport.targetPortalId,
                   dropPosition: pendingTeleport.dropPosition,
+                  // Always include map tree state so clients fully sync with DM
+                  activeMapId: useMapStore.getState().selectedMapId,
+                  mapActivations: maps.map(m => ({ mapId: m.id, active: m.active })),
                 };
 
-                if (isCrossMap) {
-                  // Include full map activation state so all clients match DM
-                  approvalPayload.activeMapId = useMapStore.getState().selectedMapId;
-                  approvalPayload.mapActivations = maps.map(m => ({ mapId: m.id, active: m.active }));
-                }
-
                 emitPortalTeleportApproved(approvalPayload);
+                // Also emit full map tree sync to ensure focus/structure settings arrive
+                emitMapTreeSync();
                 setPendingTeleport(null);
               }
             }}>Approve Teleport</AlertDialogAction>
