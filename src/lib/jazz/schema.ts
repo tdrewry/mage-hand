@@ -137,7 +137,8 @@ export const JazzMapObjectList = co.list(JazzMapObject);
 export type JazzMapObjectList = co.loaded<typeof JazzMapObjectList>;
 
 // ── Placed Effect ──────────────────────────────────────────────────────────
-// No template snapshot — reconstructed from templateId + castLevel on hydration.
+// Carries a stripped template snapshot as fallback for when the custom template
+// hasn't synced yet on the remote client.
 
 export const JazzPlacedEffect = co.map({
   effectId: z.string(),
@@ -154,6 +155,8 @@ export const JazzPlacedEffect = co.map({
   isAura: z.optional(z.boolean()),
   anchorTokenId: z.optional(z.string()),
   recurring: z.optional(z.boolean()),
+  /** JSON: stripped EffectTemplate snapshot (fallback for template reconstruction) */
+  templateJson: z.optional(z.string()),
   /** JSON: EffectImpact[] */
   impactedTargetsJson: z.optional(z.string()),
   /** JSON: string[] */

@@ -609,6 +609,14 @@ function stripTemplateForSync(t: any): any {
 
 /** Convert a PlacedEffect to a JazzPlacedEffect-compatible init */
 function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
+  // Embed a stripped template snapshot so remote clients can reconstruct
+  // even if the custom template CoList hasn't synced yet.
+  let templateJson: string | undefined;
+  if (e.template) {
+    const stripped = stripTemplateForSync(e.template);
+    try { templateJson = JSON.stringify(stripped); } catch { /* */ }
+  }
+
   return {
     effectId: e.id,
     templateId: e.templateId,
@@ -624,6 +632,7 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
     isAura: e.isAura,
     anchorTokenId: e.anchorTokenId,
     recurring: e.template?.recurring,
+    templateJson,
     impactedTargetsJson: e.impactedTargets?.length ? JSON.stringify(e.impactedTargets) : undefined,
     triggeredTokenIdsJson: e.triggeredTokenIds?.length ? JSON.stringify(e.triggeredTokenIds) : undefined,
     tokensInsideAreaJson: e.tokensInsideArea?.length ? JSON.stringify(e.tokensInsideArea) : undefined,
@@ -633,7 +642,20 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
 
 /** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
 function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLevel?: number) => EffectTemplate | undefined): PlacedEffect | null {
-  const template = templateLookup(je.templateId, je.castLevel);
+  let template = templateLookup(je.templateId, je.castLevel);
+
+  // Fallback: use embedded template snapshot if local lookup fails
+  // (custom template CoList may not have synced yet)
+  if (!template && je.templateJson) {
+    try {
+      const embedded = JSON.parse(je.templateJson);
+      if (embedded && embedded.id) {
+        template = computeScaledTemplate(embedded, je.castLevel);
+        console.log(`[jazz-bridge] Using embedded template snapshot for effect ${je.effectId} (templateId: ${je.templateId})`);
+      }
+    } catch { /* invalid JSON */ }
+  }
+
   if (!template) {
     console.warn(`[jazz-bridge] Could not reconstruct template for effect ${je.effectId} (templateId: ${je.templateId})`);
     return null;
