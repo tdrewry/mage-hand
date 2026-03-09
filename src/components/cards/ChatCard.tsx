@@ -12,6 +12,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Send, Swords, Target, MessageSquare, Eye, Users, X, Dice5 } from 'lucide-react';
 import { useChatStore, type ChatMessage, type ChatActionEntry, type ChatDiceEntry } from '@/stores/chatStore';
+import { useDiceStore } from '@/stores/diceStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { emitChatTyping } from '@/lib/net/ephemeral/miscHandlers';
