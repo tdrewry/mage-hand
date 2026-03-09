@@ -118,6 +118,7 @@ import { RegionControlBar } from "./RegionControlBar";
 import { FogBrushToolbar } from "./FogBrushToolbar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
+import { triggerSound } from "../lib/soundEngine";
 import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
