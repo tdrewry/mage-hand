@@ -4294,6 +4294,8 @@ export const SimpleTabletop = () => {
       if (isDraggingToken && draggedTokenId) {
         drawDragPathOnly(ctx);
       }
+      // Draw remote drag paths before tokens too
+      drawRemoteDragDecorations(ctx, 'path');
       
       drawTokensToContext(ctx);
 
