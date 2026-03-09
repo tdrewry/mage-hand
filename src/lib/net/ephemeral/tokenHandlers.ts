@@ -6,6 +6,7 @@ import { ephemeralBus } from "@/lib/net";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { useRemoteDragStore } from "@/stores/remoteDragStore";
 import type {
   TokenHoverPayload,
   TokenHandlePreviewPayload,
