@@ -9,6 +9,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
+import { BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
 // dragPreviewStore handlers moved to ephemeral tokenHandlers.ts
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
