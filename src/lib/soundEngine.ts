@@ -309,6 +309,7 @@ function playSynth(def: SynthDef, masterGain: number): void {
 /** Play a custom AudioBuffer */
 function playBuffer(buffer: AudioBuffer, masterGain: number): void {
   const ctx = getAudioContext();
+  if (!ctx) return;
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   const gain = ctx.createGain();
