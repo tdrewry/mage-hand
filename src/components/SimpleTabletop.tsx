@@ -4593,6 +4593,134 @@ export const SimpleTabletop = () => {
     // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
   };
 
+  // ── Draw remote drag decorations (ghost-at-origin + path trail for remote draggers) ──
+  // This reuses the same visual style as the local drag path/ghost so remote
+  // drags look identical to local ones.
+  const drawRemoteDragDecorations = (ctx: CanvasRenderingContext2D, phase: 'path' | 'ghost') => {
+    const drags = remoteDrags;
+    const entries = Object.entries(drags);
+    if (entries.length === 0) return;
+
+    for (const [tokenId, dragState] of entries) {
+      // Skip tokens we're dragging locally — local draw handles those
+      if (tokenId === draggedTokenId) continue;
+
+      const token = tokens.find((t) => t.id === tokenId);
+      if (!token) continue;
+
+      if (phase === 'ghost') {
+        // Draw ghost at start position (same as local drawGhostToken)
+        drawGhostToken(ctx, dragState.startPos.x, dragState.startPos.y, token);
+      } else {
+        // phase === 'path': draw path + distance decorations (same as local drawDragPath)
+        const gridSize = 40;
+        const pathStyle = token.pathStyle || 'dashed';
+        const pathColor = token.pathColor || token.color || '#ffffff';
+        const pathWeight = token.pathWeight ?? 3;
+        const pathOpacity = token.pathOpacity ?? 0.7;
+        const pathGaitWidth = token.pathGaitWidth ?? 0.6;
+        const footprintType = token.footprintType || 'barefoot';
+
+        ctx.save();
+
+        // Straight line distance indicator
+        const dx = token.x - dragState.startPos.x;
+        const dy = token.y - dragState.startPos.y;
+        const distancePixels = Math.sqrt(dx * dx + dy * dy);
+        const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
+
+        ctx.strokeStyle = pathColor;
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.globalAlpha = 0.3;
+        ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
+        ctx.beginPath();
+        ctx.moveTo(dragState.startPos.x, dragState.startPos.y);
+        ctx.lineTo(token.x, token.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Distance text at midpoint
+        if (distancePixels > 10) {
+          const midX = (dragState.startPos.x + token.x) / 2;
+          const midY = (dragState.startPos.y + token.y) / 2;
+
+          ctx.globalAlpha = 0.9;
+          ctx.font = `${14 / transform.zoom}px Arial`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          const textMetrics = ctx.measureText(`${distanceGridUnits} units`);
+          const textWidth = textMetrics.width;
+          const textHeight = 14 / transform.zoom;
+
+          ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+          ctx.fillRect(
+            midX - textWidth / 2 - 4 / transform.zoom,
+            midY - textHeight / 2,
+            textWidth + 8 / transform.zoom,
+            textHeight,
+          );
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(`${distanceGridUnits} units`, midX, midY);
+        }
+
+        // Draw detailed movement path
+        const dragPath = dragState.path;
+        if (dragPath.length > 1 && pathStyle !== 'none') {
+          let pathDistance = 0;
+          for (let i = 1; i < dragPath.length; i++) {
+            const pdx = dragPath[i].x - dragPath[i - 1].x;
+            const pdy = dragPath[i].y - dragPath[i - 1].y;
+            pathDistance += Math.sqrt(pdx * pdx + pdy * pdy);
+          }
+          const pathDistanceGridUnits = (pathDistance / gridSize).toFixed(2);
+
+          if (pathStyle === 'footprint') {
+            const baseTokenSize = 40;
+            const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
+            const footprintSize = tokenSize * 0.3 * (pathWeight / 3);
+            drawFootprintPath(ctx, dragPath, footprintType, pathColor, footprintSize, pathOpacity, pathGaitWidth, transform.zoom);
+          } else {
+            drawStyledLinePath(ctx, dragPath, pathStyle as 'solid' | 'dashed', pathColor, pathWeight, pathOpacity, transform.zoom);
+          }
+
+          // Path distance label near origin
+          if (dragPath.length > 2 && pathDistance > 10) {
+            const originPoint = dragPath[0];
+            const offsetX = 40 / transform.zoom;
+            const offsetY = -40 / transform.zoom;
+            const textX = originPoint.x + offsetX;
+            const textY = originPoint.y + offsetY;
+
+            ctx.globalAlpha = 0.9;
+            ctx.font = `${12 / transform.zoom}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const pathText = `Path: ${pathDistanceGridUnits}`;
+            const textMetrics = ctx.measureText(pathText);
+            const textWidth = textMetrics.width;
+            const textHeight = 12 / transform.zoom;
+
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(
+              textX - textWidth / 2 - 3 / transform.zoom,
+              textY - textHeight / 2,
+              textWidth + 6 / transform.zoom,
+              textHeight,
+            );
+
+            ctx.fillStyle = pathColor;
+            ctx.fillText(pathText, textX, textY);
+          }
+        }
+
+        ctx.restore();
+      }
+    }
+  };
+
 
   // ── Draw remote token hover highlights (colored ring around hovered token) ──
   const drawRemoteTokenHovers = (ctx: CanvasRenderingContext2D) => {
