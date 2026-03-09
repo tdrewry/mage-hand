@@ -22,7 +22,7 @@ import { useEffectStore } from "@/stores/effectStore";
 import type { MapObject } from "@/types/mapObjectTypes";
 import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
 import { computeScaledTemplate } from "@/types/effectTypes";
-import { getBuiltInTemplate } from "@/lib/effectTemplateLibrary";
+import { getBuiltInTemplate, BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
   JazzRegion as JazzRegionSchema,
@@ -1701,7 +1701,73 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
+/** Sync placed effects from Zustand → Jazz (diff-based, mirrors regions/mapObjects pattern) */
+function syncEffectsToJazz(effects: PlacedEffect[], prevEffects: PlacedEffect[]): void {
+  const effectState = _cachedEffects ?? _sessionRoot?.effects;
+  if (!effectState?.placedEffects) return;
+  const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
+  const jazzPlaced = effectState.placedEffects;
+
+  // Only sync non-dismissed effects
+  const active = effects.filter(e => !e.dismissedAt);
+  const prevActive = prevEffects.filter(e => !e.dismissedAt);
+
+  const prevIds = new Set(prevActive.map(e => e.id));
+  const currentIds = new Set(active.map(e => e.id));
+
+  // Added
+  for (const e of active) {
+    if (!prevIds.has(e.id)) {
+      try {
+        const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
+        jazzPlaced.$jazz.push(je);
+      } catch (err) {
+        console.error(`[jazz-bridge] Failed to push new effect ${e.id}:`, err);
+      }
+    }
+  }
+
+  // Updated
+  for (const e of active) {
+    if (prevIds.has(e.id)) {
+      const prev = prevActive.find(pe => pe.id === e.id);
+      if (!prev || JSON.stringify(placedEffectToJazzInit(e)) === JSON.stringify(placedEffectToJazzInit(prev))) continue;
+      const len = jazzPlaced.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const je = jazzPlaced[i];
+        if (je && je.effectId === e.id) {
+          try {
+            const init = placedEffectToJazzInit(e);
+            for (const [key, val] of Object.entries(init)) {
+              if (key !== 'effectId') je.$jazz.set(key, val ?? undefined);
+            }
+          } catch (err) {
+            console.error(`[jazz-bridge] Failed to update effect ${e.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Removed
+  for (const prev of prevActive) {
+    if (!currentIds.has(prev.id)) {
+      const len = jazzPlaced.length ?? 0;
+      for (let i = 0; i < len; i++) {
+        const je = jazzPlaced[i];
+        if (je && je.effectId === prev.id) {
+          try { jazzPlaced.$jazz.splice(i, 1); } catch (err) {
+            console.error(`[jazz-bridge] Failed to remove effect ${prev.id}:`, err);
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+
 // JAZZ COLIST DEDUP CLEANUP
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -2300,36 +2366,24 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
-  // ── Effect sync: Zustand → Jazz ──
+  // ── Effect sync: Zustand → Jazz (diff-based) ──
   let prevEffects = useEffectStore.getState().placedEffects;
   const unsubEffectsZustand = useEffectStore.subscribe((state) => {
     const effects = state.placedEffects;
     if (effects === prevEffects) return;
     if (_fromJazz) { prevEffects = effects; return; }
+    // DON'T update prevEffects here — let the throttled fn do it for correct diff
+    const capturedPrev = prevEffects;
     prevEffects = effects;
-    // Throttled full re-push of effects (simpler than diff for complex nested state)
     throttledPushFineGrained('effects', () => {
-      const effectState = _cachedEffects ?? _sessionRoot?.effects;
-      if (!effectState?.placedEffects) return;
-      const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
-      // Clear and re-push all placed effects
-      const jazzPlaced = effectState.placedEffects;
-      const len = jazzPlaced.length ?? 0;
-      for (let i = len - 1; i >= 0; i--) {
-        try { jazzPlaced.$jazz.splice(i, 1); } catch { /* */ }
-      }
-      const active = useEffectStore.getState().placedEffects.filter((e: any) => !e.dismissedAt);
-      for (const e of active) {
-        try {
-          const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
-          jazzPlaced.$jazz.push(je);
-        } catch { /* */ }
-      }
+      const currentEffects = useEffectStore.getState().placedEffects;
+      syncEffectsToJazz(currentEffects, capturedPrev);
+      prevEffects = currentEffects;
     });
   });
   activeSubscriptions.push(unsubEffectsZustand);
 
-  // ── Effect sync: Jazz → Zustand (inbound placed effects + custom templates) ──
+  // ── Effect sync: Jazz → Zustand (inbound placed effects) ──
   const jazzEffectsRef = sessionRoot.effects;
   if (jazzEffectsRef?.placedEffects?.$jazz?.subscribe) {
     try {
@@ -2339,6 +2393,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           if (!placedEffects) return;
           const len = placedEffects.length ?? 0;
           const localCount = useEffectStore.getState().placedEffects.length;
+
+          // Guard: if outbound throttle is active for effects, skip inbound
+          // (we're likely seeing our own intermediate state)
+          if (_fineGrainedTimers.has('effects')) return;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
           // Startup grace: suppress inbound for creator during initial propagation
@@ -2351,14 +2409,39 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const customTemplates = useEffectStore.getState().customTemplates;
           const lookup = buildTemplateLookup(customTemplates);
 
-          runFromJazz(() => {
-            const restored: PlacedEffect[] = [];
-            for (let i = 0; i < len; i++) {
-              const je = placedEffects[i];
-              if (!je) continue;
-              const effect = jazzToZustandPlacedEffect(je, lookup);
-              if (effect) restored.push(effect);
+          const restored: PlacedEffect[] = [];
+          for (let i = 0; i < len; i++) {
+            const je = placedEffects[i];
+            if (!je) continue;
+            const effect = jazzToZustandPlacedEffect(je, lookup);
+            if (effect) restored.push(effect);
+          }
+
+          // Deep compare to avoid redundant store writes
+          const currentLocal = useEffectStore.getState().placedEffects;
+          const restoredIds = restored.map(e => e.id).sort().join(',');
+          const localIds = currentLocal.map(e => e.id).sort().join(',');
+          if (restoredIds === localIds) {
+            // Same set of IDs — check for property changes
+            let hasChanges = false;
+            for (const re of restored) {
+              const le = currentLocal.find(e => e.id === re.id);
+              if (!le) { hasChanges = true; break; }
+              if (re.roundsRemaining !== le.roundsRemaining ||
+                  re.animationPaused !== le.animationPaused ||
+                  re.origin.x !== le.origin.x || re.origin.y !== le.origin.y ||
+                  re.direction !== le.direction ||
+                  JSON.stringify(re.impactedTargets) !== JSON.stringify(le.impactedTargets) ||
+                  JSON.stringify(re.triggeredTokenIds) !== JSON.stringify(le.triggeredTokenIds) ||
+                  JSON.stringify(re.tokensInsideArea) !== JSON.stringify(le.tokensInsideArea)) {
+                hasChanges = true;
+                break;
+              }
             }
+            if (!hasChanges) return;
+          }
+
+          runFromJazz(() => {
             useEffectStore.setState({ placedEffects: restored });
           });
           prevEffects = useEffectStore.getState().placedEffects;
@@ -2379,35 +2462,70 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           if (!templates) return;
           const len = templates.length ?? 0;
 
+          // Guard: if outbound throttle is active, skip inbound
+          if (_fineGrainedTimers.has('customTemplates')) return;
+
+          const parsed: EffectTemplate[] = [];
+          for (let i = 0; i < len; i++) {
+            const jct = templates[i];
+            if (!jct?.templateJson) continue;
+            try {
+              parsed.push(JSON.parse(jct.templateJson));
+            } catch { /* invalid JSON */ }
+          }
+
+          // Use setState directly to avoid side effects from store CRUD methods
+          // (addCustomTemplate generates new IDs, deleteTemplate hides built-ins)
           runFromJazz(() => {
             const store = useEffectStore.getState();
-            const parsed: EffectTemplate[] = [];
-            for (let i = 0; i < len; i++) {
-              const jct = templates[i];
-              if (!jct?.templateJson) continue;
-              try {
-                parsed.push(JSON.parse(jct.templateJson));
-              } catch { /* invalid JSON */ }
-            }
+            const localIds = new Set(store.customTemplates.map(t => t.id));
+            const jazzIds = new Set(parsed.map(t => t.id));
 
-            // Upsert: add new ones, update existing
+            let changed = false;
+            let newCustom = [...store.customTemplates];
+
+            // Upsert: add or update templates from Jazz
             for (const t of parsed) {
-              const existing = store.customTemplates.find(ct => ct.id === t.id);
-              if (existing) {
-                store.updateCustomTemplate(t.id, t);
+              const idx = newCustom.findIndex(ct => ct.id === t.id);
+              if (idx >= 0) {
+                // Check for meaningful changes before updating
+                if (JSON.stringify(stripTemplateForSync(newCustom[idx])) !== JSON.stringify(stripTemplateForSync(t))) {
+                  // Preserve local texture data if the incoming template has none
+                  const merged = { ...t };
+                  if ((!merged.texture || merged.texture.length < 200) && newCustom[idx].texture && newCustom[idx].texture.length >= 200) {
+                    merged.texture = newCustom[idx].texture;
+                  }
+                  newCustom[idx] = merged;
+                  changed = true;
+                }
               } else {
-                store.addCustomTemplate(t);
+                newCustom.push(t);
+                changed = true;
               }
             }
 
             // Remove templates no longer in Jazz (non-creator only)
+            // Filter directly — do NOT call store.deleteTemplate which hides built-ins
             if (!_isCreator) {
-              const jazzIds = new Set(parsed.map(t => t.id));
-              for (const ct of store.customTemplates) {
-                if (!jazzIds.has(ct.id)) {
-                  store.deleteTemplate(ct.id);
-                }
-              }
+              const before = newCustom.length;
+              newCustom = newCustom.filter(ct => jazzIds.has(ct.id));
+              if (newCustom.length !== before) changed = true;
+            }
+
+            if (changed) {
+              // Rebuild allTemplates inline (mirrors effectStore's buildAllTemplates)
+              const customIds = new Set(newCustom.map((t: any) => t.id));
+              const hiddenSet = new Set(store.hiddenBuiltInIds);
+              const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
+              const allTemplates = [...visibleBuiltIns, ...newCustom];
+
+              useEffectStore.setState({
+                customTemplates: newCustom,
+                allTemplates,
+              });
+
+              // Resolve textures for templates that have hashes but no data
+              _resolveEffectTextures(newCustom);
             }
           });
         },
@@ -2418,32 +2536,73 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
-  // ── Custom template sync: Zustand → Jazz (outbound) ──
+  // ── Custom template sync: Zustand → Jazz (outbound, diff-based) ──
   let prevCustomTemplates = useEffectStore.getState().customTemplates;
   const unsubCustomTemplatesZustand = useEffectStore.subscribe((state) => {
     const templates = state.customTemplates;
     if (templates === prevCustomTemplates) return;
     if (_fromJazz) { prevCustomTemplates = templates; return; }
+    const capturedPrev = prevCustomTemplates;
     prevCustomTemplates = templates;
     throttledPushFineGrained('customTemplates', () => {
       const effectState = _cachedEffects ?? _sessionRoot?.effects;
       if (!effectState?.customTemplates) return;
       const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
       const jazzTemplates = effectState.customTemplates;
-      const ctLen = jazzTemplates.length ?? 0;
-      for (let i = ctLen - 1; i >= 0; i--) {
-        try { jazzTemplates.$jazz.splice(i, 1); } catch { /* */ }
+      const currentTemplates = useEffectStore.getState().customTemplates;
+
+      const prevIds = new Set(capturedPrev.map(t => t.id));
+      const currentIds = new Set(currentTemplates.map(t => t.id));
+
+      // Added
+      for (const t of currentTemplates) {
+        if (!prevIds.has(t.id)) {
+          const stripped = stripTemplateForSync(t);
+          try {
+            const jt = JazzCustomTemplateSchema.create({
+              templateId: t.id,
+              templateJson: JSON.stringify(stripped),
+            } as any, group);
+            jazzTemplates.$jazz.push(jt);
+          } catch { /* */ }
+        }
       }
-      for (const t of templates) {
-        const stripped = stripTemplateForSync(t);
-        try {
-          const jt = JazzCustomTemplateSchema.create({
-            templateId: t.id,
-            templateJson: JSON.stringify(stripped),
-          } as any, group);
-          jazzTemplates.$jazz.push(jt);
-        } catch { /* */ }
+
+      // Updated
+      for (const t of currentTemplates) {
+        if (prevIds.has(t.id)) {
+          const prev = capturedPrev.find(pt => pt.id === t.id);
+          const strippedCurrent = stripTemplateForSync(t);
+          const strippedPrev = prev ? stripTemplateForSync(prev) : null;
+          if (strippedPrev && JSON.stringify(strippedCurrent) === JSON.stringify(strippedPrev)) continue;
+          const len = jazzTemplates.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const jt = jazzTemplates[i];
+            if (jt && jt.templateId === t.id) {
+              try {
+                jt.$jazz.set('templateJson', JSON.stringify(strippedCurrent));
+              } catch { /* */ }
+              break;
+            }
+          }
+        }
       }
+
+      // Removed
+      for (const prev of capturedPrev) {
+        if (!currentIds.has(prev.id)) {
+          const len = jazzTemplates.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const jt = jazzTemplates[i];
+            if (jt && jt.templateId === prev.id) {
+              try { jazzTemplates.$jazz.splice(i, 1); } catch { /* */ }
+              break;
+            }
+          }
+        }
+      }
+
+      prevCustomTemplates = currentTemplates;
     });
   });
   activeSubscriptions.push(unsubCustomTemplatesZustand);
