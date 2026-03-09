@@ -449,7 +449,30 @@ export const ChatCardContent: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Autocomplete navigation
+      // Slash command autocomplete navigation
+      if (slashSuggestions.length > 0 && acSuggestions.length === 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setAcIndex((i) => (i + 1) % slashSuggestions.length);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setAcIndex((i) => (i - 1 + slashSuggestions.length) % slashSuggestions.length);
+          return;
+        }
+        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          applySlashCommand(slashSuggestions[acIndex].command);
+          return;
+        }
+        if (e.key === 'Escape') {
+          setDraft('');
+          return;
+        }
+      }
+
+      // Whisper name autocomplete navigation
       if (acSuggestions.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -467,7 +490,6 @@ export const ChatCardContent: React.FC = () => {
           return;
         }
         if (e.key === 'Escape') {
-          // Clear draft to dismiss autocomplete
           setDraft('');
           return;
         }
@@ -480,7 +502,7 @@ export const ChatCardContent: React.FC = () => {
         try { emitChatTyping(); } catch { /* net may be off */ }
       }
     },
-    [handleSend, acSuggestions, acIndex, applyAutocomplete]
+    [handleSend, slashSuggestions, acSuggestions, acIndex, applySlashCommand, applyAutocomplete]
   );
 
   return (
