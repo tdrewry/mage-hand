@@ -129,7 +129,8 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied } from "@/lib/net/ephemeral/mapHandlers";
+import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
@@ -206,6 +207,8 @@ const CursorStatusIndicator: React.FC = () => {
 };
 
 export const SimpleTabletop = () => {
+  // Auto-broadcast map tree state changes from DM to all clients
+  useMapTreeSync();
   // Register ephemeral handlers once
   React.useEffect(() => {
     registerCursorHandlers();
@@ -12199,12 +12202,8 @@ export const SimpleTabletop = () => {
                 // Execute teleport locally on DM
                 executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
                 
-                // Broadcast approval to all clients with map state
+                // Broadcast approval to all clients — always include full map tree state
                 const maps = useMapStore.getState().maps;
-                const allMapObjects = useMapObjectStore.getState().mapObjects;
-                const targetPortal = allMapObjects.find(obj => obj.id === pendingTeleport.targetPortalId);
-                const sourcePortal = allMapObjects.find(obj => obj.id === pendingTeleport.sourcePortalId);
-                const isCrossMap = targetPortal?.mapId && sourcePortal?.mapId && targetPortal.mapId !== sourcePortal.mapId;
                 
                 const approvalPayload: any = {
                   requestId: pendingTeleport.requestId || '',
@@ -12212,15 +12211,14 @@ export const SimpleTabletop = () => {
                   sourcePortalId: pendingTeleport.sourcePortalId,
                   targetPortalId: pendingTeleport.targetPortalId,
                   dropPosition: pendingTeleport.dropPosition,
+                  // Always include map tree state so clients fully sync with DM
+                  activeMapId: useMapStore.getState().selectedMapId,
+                  mapActivations: maps.map(m => ({ mapId: m.id, active: m.active })),
                 };
 
-                if (isCrossMap) {
-                  // Include full map activation state so all clients match DM
-                  approvalPayload.activeMapId = useMapStore.getState().selectedMapId;
-                  approvalPayload.mapActivations = maps.map(m => ({ mapId: m.id, active: m.active }));
-                }
-
                 emitPortalTeleportApproved(approvalPayload);
+                // Also emit full map tree sync to ensure focus/structure settings arrive
+                emitMapTreeSync();
                 setPendingTeleport(null);
               }
             }}>Approve Teleport</AlertDialogAction>

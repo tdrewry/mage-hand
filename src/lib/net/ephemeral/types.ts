@@ -66,6 +66,7 @@ export type EphemeralOpKind =
   | "effect.placement.preview"
   // Portal & Map Activation
   | "map.dm.selectMap"
+  | "map.tree.sync"
   | "portal.activate"
   | "portal.teleport.request"
   | "portal.teleport.approved"
@@ -370,6 +371,22 @@ export interface MapDmSelectMapPayload {
   mapId: string;
 }
 
+/** Full map tree state broadcast from DM → all clients. */
+export interface MapTreeSyncPayload {
+  /** Per-map activation state */
+  mapActivations: Array<{ mapId: string; active: boolean }>;
+  /** DM's currently selected/focused map */
+  selectedMapId: string | null;
+  /** Structure definitions (buildings, floors) */
+  structures: Array<{ id: string; name: string; exclusiveFocus?: boolean }>;
+  /** Map focus/blur settings */
+  focusSettings: {
+    unfocusedOpacity: number;
+    unfocusedBlur: number;
+    selectionLockEnabled: boolean;
+  };
+}
+
 export interface PortalActivatePayload {
   objectId: string;
 }
@@ -469,6 +486,7 @@ export interface EphemeralPayloadMap {
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
+  "map.tree.sync": MapTreeSyncPayload;
   "portal.activate": PortalActivatePayload;
   "portal.teleport.request": PortalTeleportRequestPayload;
   "portal.teleport.approved": PortalTeleportApprovedPayload;
@@ -568,6 +586,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
+  "map.tree.sync":          { throttleMs: 300, ttlMs: 5000, keyStrategy: "session", dmOnly: true },
   "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
   "portal.teleport.request": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "none" },
   "portal.teleport.approved": { throttleMs: 0, ttlMs: 10000, keyStrategy: "none", dmOnly: true },

@@ -5,12 +5,14 @@ import { ephemeralBus } from "@/lib/net";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useMapStore } from "@/stores/mapStore";
+import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { triggerSound } from "@/lib/soundEngine";
 import type {
   DmViewportPayload,
   DmEnforceFollowPayload,
   MapPingPayload,
   MapFocusPayload,
+  MapTreeSyncPayload,
   RegionDragUpdatePayload,
   MapObjectDragUpdatePayload,
   MapObjectDoorPreviewPayload,
@@ -106,6 +108,41 @@ export function registerMapHandlers(): void {
     useMapStore.getState().setSelectedMap(data.mapId);
   });
 
+  // Full map tree sync from DM → all clients
+  ephemeralBus.on("map.tree.sync", (data: MapTreeSyncPayload, _userId) => {
+    console.log(`[mapHandlers] Received map tree sync from DM — ${data.mapActivations.length} maps`);
+
+    // Apply map activations
+    const mapStore = useMapStore.getState();
+    for (const ma of data.mapActivations) {
+      const existing = mapStore.maps.find(m => m.id === ma.mapId);
+      if (existing && existing.active !== ma.active) {
+        mapStore.updateMap(ma.mapId, { active: ma.active });
+      }
+    }
+
+    // Apply structures
+    if (data.structures) {
+      useMapStore.setState({ structures: data.structures });
+    }
+
+    // Apply selected map
+    if (data.selectedMapId) {
+      const exists = useMapStore.getState().maps.some(m => m.id === data.selectedMapId);
+      if (exists) {
+        useMapStore.getState().setSelectedMap(data.selectedMapId);
+      }
+    }
+
+    // Apply focus settings
+    if (data.focusSettings) {
+      const fs = useMapFocusStore.getState();
+      fs.setUnfocusedOpacity(data.focusSettings.unfocusedOpacity);
+      fs.setUnfocusedBlur(data.focusSettings.unfocusedBlur);
+      fs.setSelectionLockEnabled(data.focusSettings.selectionLockEnabled);
+    }
+  });
+
   // Portal activation flash (remote portal animation trigger)
   ephemeralBus.on("portal.activate", (data: PortalActivatePayload, _userId) => {
     triggerSound('portal.activate');
@@ -182,6 +219,27 @@ export function emitMapFocus(pos: { x: number; y: number }, zoom?: number): void
 /** Broadcast DM map selection to all connected players. */
 export function emitMapSelectMap(mapId: string): void {
   ephemeralBus.emit("map.dm.selectMap", { mapId });
+}
+
+/** Broadcast full map tree state from DM to all clients. */
+export function emitMapTreeSync(): void {
+  const maps = useMapStore.getState().maps;
+  const structures = useMapStore.getState().structures;
+  const selectedMapId = useMapStore.getState().selectedMapId;
+  const focus = useMapFocusStore.getState();
+
+  const payload: MapTreeSyncPayload = {
+    mapActivations: maps.map(m => ({ mapId: m.id, active: m.active })),
+    selectedMapId,
+    structures: structures.map(s => ({ id: s.id, name: s.name, exclusiveFocus: s.exclusiveFocus })),
+    focusSettings: {
+      unfocusedOpacity: focus.unfocusedOpacity,
+      unfocusedBlur: focus.unfocusedBlur,
+      selectionLockEnabled: focus.selectionLockEnabled,
+    },
+  };
+
+  ephemeralBus.emit("map.tree.sync", payload);
 }
 
 /** Broadcast portal activation flash to all peers. */
