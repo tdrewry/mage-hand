@@ -10068,7 +10068,8 @@ export const SimpleTabletop = () => {
 
         if (distance <= radius) {
           setHoveredTokenId(token.id);
-          if (useCursorStore.getState().cursorSharingEnabled) {
+          if (useCursorStore.getState().cursorSharingEnabled && lastEmittedHoverRef.current !== token.id) {
+            lastEmittedHoverRef.current = token.id;
             ephemeralBus.emit("token.hover", { tokenId: token.id });
           }
           foundHoveredToken = true;
