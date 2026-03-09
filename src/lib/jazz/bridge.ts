@@ -1949,13 +1949,9 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         // During active local drag, skip position-only changes
         const isBeingDragged = _localDragTokens.has(t.id);
         const posChanged = prev.x !== t.x || prev.y !== t.y;
-        const nonPosChanged = prev.label !== t.label ||
-          prev.color !== t.color || prev.name !== t.name ||
-          (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
-          (prev as any).ac !== (t as any).ac ||
-          prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
-          prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight ||
-          prev.imageHash !== t.imageHash;
+        // Use generic deep comparison for ALL non-position fields to avoid
+        // missing fields like statBlockJson, notes, pathStyle, labelColor, etc.
+        const nonPosChanged = _hasEntityChanges(prev, t, ['id', 'x', 'y', 'imageUrl']);
 
         if (isBeingDragged && posChanged && !nonPosChanged) continue;
         if (!posChanged && !nonPosChanged) continue;
