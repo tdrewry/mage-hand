@@ -586,6 +586,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
+  "map.tree.sync":          { throttleMs: 300, ttlMs: 5000, keyStrategy: "session", dmOnly: true },
   "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
   "portal.teleport.request": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "none" },
   "portal.teleport.approved": { throttleMs: 0, ttlMs: 10000, keyStrategy: "none", dmOnly: true },
