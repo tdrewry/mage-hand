@@ -4327,6 +4327,8 @@ export const SimpleTabletop = () => {
       if (isDraggingToken && draggedTokenId) {
         drawDragGhostAndPath(ctx);
       }
+      // Draw remote drag ghosts on top of tokens
+      drawRemoteDragDecorations(ctx, 'ghost');
 
       // ── Remote ephemeral overlays ──
       drawRemoteTokenHovers(ctx);
