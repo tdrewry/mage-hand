@@ -21,6 +21,7 @@ import type {
   ChatTypingPayload,
   ChatMessagePayload,
   DiceRollingPayload,
+  DiceResultPayload,
   InitiativeDragPreviewPayload,
   InitiativeHoverPayload,
   GroupSelectPreviewPayload,
@@ -99,6 +100,11 @@ export function registerMiscHandlers(): void {
   ephemeralBus.on("dice.rolling", (data: DiceRollingPayload, userId) => {
     triggerSound('dice.roll');
     store.getState().setDiceRolling(userId, data.formula);
+  });
+
+  // Dice result: add to chat log for all peers
+  ephemeralBus.on("dice.result", (data: DiceResultPayload, _userId) => {
+    useChatStore.getState().addDiceEntry(data as any);
   });
 
   // ── Initiative ──

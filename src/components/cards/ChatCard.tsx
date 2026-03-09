@@ -332,6 +332,23 @@ export const ChatCardContent: React.FC = () => {
 
   const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
 
+  // Slash command definitions
+  const SLASH_COMMANDS = useMemo(() => [
+    { command: '/roll', alias: '/r', description: 'Roll dice', usage: '/roll 2d20+5', icon: '🎲' },
+    { command: '/whisper', alias: '/w', description: 'Whisper to player', usage: '/w name message', icon: '👁' },
+  ], []);
+
+  // Slash command autocomplete: show when typing just "/"
+  const slashSuggestions = useMemo(() => {
+    if (!draft.startsWith('/')) return [];
+    // If already a complete command with args, don't show slash hints
+    if (/^\/(?:roll|r|w|whisper)\s/i.test(draft)) return [];
+    const partial = draft.slice(1).toLowerCase();
+    return SLASH_COMMANDS.filter(
+      (cmd) => cmd.command.slice(1).startsWith(partial) || cmd.alias.slice(1).startsWith(partial)
+    );
+  }, [draft, SLASH_COMMANDS]);
+
   // Autocomplete: parse partial /w input and match player names
   const acSuggestions = useMemo(() => {
     const match = draft.match(/^\/(?:w|whisper)\s+(\S*)$/i);
@@ -346,10 +363,18 @@ export const ChatCardContent: React.FC = () => {
     );
   }, [draft, connectedUsers, currentUserId]);
 
+  // Combined suggestions: slash commands take priority over whisper names
+  const hasAnySuggestions = slashSuggestions.length > 0 || acSuggestions.length > 0;
+
   // Reset autocomplete index when suggestions change
   useEffect(() => {
     setAcIndex(0);
-  }, [acSuggestions.length]);
+  }, [slashSuggestions.length, acSuggestions.length]);
+
+  const applySlashCommand = useCallback((command: string) => {
+    setDraft(command + ' ');
+    inputRef.current?.focus();
+  }, []);
 
   const applyAutocomplete = useCallback((username: string) => {
     // Replace partial name with full name, add trailing space for message
@@ -424,7 +449,30 @@ export const ChatCardContent: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Autocomplete navigation
+      // Slash command autocomplete navigation
+      if (slashSuggestions.length > 0 && acSuggestions.length === 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setAcIndex((i) => (i + 1) % slashSuggestions.length);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setAcIndex((i) => (i - 1 + slashSuggestions.length) % slashSuggestions.length);
+          return;
+        }
+        if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          applySlashCommand(slashSuggestions[acIndex].command);
+          return;
+        }
+        if (e.key === 'Escape') {
+          setDraft('');
+          return;
+        }
+      }
+
+      // Whisper name autocomplete navigation
       if (acSuggestions.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -442,7 +490,6 @@ export const ChatCardContent: React.FC = () => {
           return;
         }
         if (e.key === 'Escape') {
-          // Clear draft to dismiss autocomplete
           setDraft('');
           return;
         }
@@ -455,7 +502,7 @@ export const ChatCardContent: React.FC = () => {
         try { emitChatTyping(); } catch { /* net may be off */ }
       }
     },
-    [handleSend, acSuggestions, acIndex, applyAutocomplete]
+    [handleSend, slashSuggestions, acSuggestions, acIndex, applySlashCommand, applyAutocomplete]
   );
 
   return (
@@ -502,6 +549,31 @@ export const ChatCardContent: React.FC = () => {
           >
             <X className="h-3 w-3" />
           </Button>
+        </div>
+      )}
+
+      {/* Slash command autocomplete */}
+      {slashSuggestions.length > 0 && acSuggestions.length === 0 && (
+        <div className="px-2 pb-1">
+          <div className="rounded-md border border-border bg-popover p-1 space-y-0.5">
+            <p className="text-[9px] text-muted-foreground px-2 py-0.5">Commands</p>
+            {slashSuggestions.map((cmd, i) => (
+              <button
+                key={cmd.command}
+                className={`w-full text-left rounded px-2 py-1.5 text-xs flex items-center gap-2 ${
+                  i === acIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-muted'
+                }`}
+                onMouseDown={(e) => { e.preventDefault(); applySlashCommand(cmd.command); }}
+                onMouseEnter={() => setAcIndex(i)}
+              >
+                <span className="text-sm shrink-0">{cmd.icon}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono font-medium">{cmd.command}</span>
+                  <span className="text-[10px] text-muted-foreground">{cmd.description} — <span className="font-mono">{cmd.usage}</span></span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

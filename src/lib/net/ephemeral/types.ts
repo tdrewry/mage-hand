@@ -33,6 +33,7 @@ export type EphemeralOpKind =
   | "chat.typing"
   | "chat.message"
   | "dice.rolling"
+  | "dice.result"
   // Initiative
   | "initiative.drag.preview"
   | "initiative.hover"
@@ -186,6 +187,18 @@ export interface ChatMessagePayload {
 
 export interface DiceRollingPayload {
   formula?: string;
+}
+
+export interface DiceResultPayload {
+  id: string;
+  formula: string;
+  groups: Array<{ count: number; sides: number; results: number[]; keptResults: number[]; keepHighest?: number; keepLowest?: number }>;
+  modifier: number;
+  total: number;
+  timestamp: number;
+  label?: string;
+  rolledBy?: string;
+  meta?: Record<string, unknown>;
 }
 
 // -- Initiative --
@@ -399,6 +412,7 @@ export interface EphemeralPayloadMap {
   "chat.typing": ChatTypingPayload;
   "chat.message": ChatMessagePayload;
   "dice.rolling": DiceRollingPayload;
+  "dice.result": DiceResultPayload;
   "initiative.drag.preview": InitiativeDragPreviewPayload;
   "initiative.hover": InitiativeHoverPayload;
   "group.select.preview": GroupSelectPreviewPayload;
@@ -478,6 +492,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "chat.typing":            { throttleMs: 200, ttlMs: 2000, keyStrategy: "userId" },
   "chat.message":           { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none" },
   "dice.rolling":           { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
+  "dice.result":            { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none" },
 
   // Initiative
   "initiative.drag.preview": { throttleMs: 50, ttlMs: 400,  keyStrategy: "userId" },
