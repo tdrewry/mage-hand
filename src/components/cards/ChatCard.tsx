@@ -259,18 +259,18 @@ export const ChatCardContent: React.FC = () => {
     });
   }, [entries, currentUserId]);
 
-  // Auto-scroll on new entries — target the ScrollArea viewport (parent of content div)
+  // Auto-scroll on new entries — find the Radix ScrollArea viewport via data attribute
   useEffect(() => {
     const el = scrollRef.current;
-    // The scrollable viewport is the parent element created by ScrollArea
-    const viewport = el?.parentElement;
+    if (!el) return;
+    // Walk up to find the [data-radix-scroll-area-viewport] element
+    const viewport = el.closest('[data-radix-scroll-area-viewport]');
     if (viewport) {
-      // Use requestAnimationFrame to ensure DOM has updated with new content
       requestAnimationFrame(() => {
         viewport.scrollTop = viewport.scrollHeight;
       });
     }
-  }, [visibleEntries.length]);
+  }, [visibleEntries]);
 
   const isWhisperMode = whisperTargets.length > 0;
 
