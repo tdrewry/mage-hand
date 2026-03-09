@@ -10,8 +10,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Send, Swords, Target, MessageSquare, Eye, Users, X } from 'lucide-react';
-import { useChatStore, type ChatMessage, type ChatActionEntry } from '@/stores/chatStore';
+import { Send, Swords, Target, MessageSquare, Eye, Users, X, Dice5 } from 'lucide-react';
+import { useChatStore, type ChatMessage, type ChatActionEntry, type ChatDiceEntry } from '@/stores/chatStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { emitChatTyping } from '@/lib/net/ephemeral/miscHandlers';
@@ -118,6 +118,61 @@ function ChatActionBubble({ entry }: { entry: ChatActionEntry }) {
           <span className="text-[10px] text-muted-foreground">
             {hitCount}/{totalTargets} hit
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatDiceBubble({ entry }: { entry: ChatDiceEntry }) {
+  const { roll } = entry;
+  const metaSource = roll.meta?.source as string | undefined;
+  const metaReason = roll.meta?.reason as string | undefined;
+  const contextLabel = [metaSource, metaReason].filter(Boolean).join(' · ');
+
+  return (
+    <div className="mx-2 my-1">
+      <div className="rounded-lg border border-border bg-card/50 p-2.5 space-y-1">
+        <div className="flex items-center gap-2">
+          <Dice5 className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="text-xs font-medium text-foreground">
+            {roll.rolledBy || 'Unknown'}
+          </span>
+          <span className="text-[10px] text-muted-foreground">rolled</span>
+          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-mono">
+            {roll.formula}
+          </Badge>
+        </div>
+
+        {contextLabel && (
+          <div className="text-[10px] text-muted-foreground italic px-0.5">
+            {contextLabel}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 flex-wrap">
+            {roll.groups.map((g, gi) => (
+              <span key={gi} className="text-[10px] text-muted-foreground font-mono">
+                [{g.keptResults.join(', ')}]
+              </span>
+            ))}
+            {roll.modifier !== 0 && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {roll.modifier > 0 ? '+' : ''}{roll.modifier}
+              </span>
+            )}
+          </div>
+          <span className="text-sm font-bold text-foreground">{roll.total}</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-muted-foreground/60">
+            {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {roll.label && (
+            <span className="text-[10px] text-muted-foreground">{roll.label}</span>
+          )}
         </div>
       </div>
     </div>
@@ -394,8 +449,10 @@ export const ChatCardContent: React.FC = () => {
           {visibleEntries.map((entry) =>
             entry.type === 'message' ? (
               <ChatMessageBubble key={entry.id} entry={entry} />
+            ) : entry.type === 'dice' ? (
+              <ChatDiceBubble key={entry.id} entry={entry} />
             ) : (
-              <ChatActionBubble key={entry.id} entry={entry} />
+              <ChatActionBubble key={entry.id} entry={entry as ChatActionEntry} />
             )
           )}
         </div>

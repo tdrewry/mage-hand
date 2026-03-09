@@ -3,6 +3,7 @@ import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
 import { rollDice, type DiceRollResult, type RollMetadata } from '@/lib/diceEngine';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useChatStore } from '@/stores/chatStore';
 import { ephemeralBus } from '@/lib/net';
 import { triggerSound } from '@/lib/soundEngine';
 
@@ -43,6 +44,10 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
       rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
     }));
     triggerSound('dice.result');
+    // Feed into chat log
+    try {
+      useChatStore.getState().addDiceEntry(result);
+    } catch { /* chat store may not be available */ }
     return result;
   },
 

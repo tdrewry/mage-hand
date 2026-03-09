@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import type { ActionHistoryEntry } from '@/types/actionTypes';
+import type { DiceRollResult } from '@/lib/diceEngine';
 import { emitChatMessage } from '@/lib/net/ephemeral/miscHandlers';
 
-export type ChatEntryType = 'message' | 'action';
+export type ChatEntryType = 'message' | 'action' | 'dice';
 
 export interface ChatMessage {
   id: string;
@@ -22,7 +23,14 @@ export interface ChatActionEntry {
   timestamp: number;
 }
 
-export type ChatEntry = ChatMessage | ChatActionEntry;
+export interface ChatDiceEntry {
+  id: string;
+  type: 'dice';
+  roll: DiceRollResult;
+  timestamp: number;
+}
+
+export type ChatEntry = ChatMessage | ChatActionEntry | ChatDiceEntry;
 
 interface ChatState {
   entries: ChatEntry[];
@@ -31,6 +39,7 @@ interface ChatState {
   /** Add a message received from a remote peer (no re-broadcast) */
   addRemoteMessage: (id: string, senderId: string, senderName: string, text: string, timestamp: number, whisperTo?: string[]) => void;
   addActionEntry: (action: ActionHistoryEntry) => void;
+  addDiceEntry: (roll: DiceRollResult) => void;
   clearChat: () => void;
 }
 
@@ -78,6 +87,18 @@ export const useChatStore = create<ChatState>((set) => ({
         },
       ].slice(-200),
     })),
+
+  addDiceEntry: (roll) =>
+    set((s) => {
+      const id = `chat-dice-${roll.id}`;
+      if (s.entries.some((e) => e.id === id)) return s;
+      return {
+        entries: [
+          ...s.entries,
+          { id, type: 'dice' as const, roll, timestamp: roll.timestamp },
+        ].slice(-200),
+      };
+    }),
 
   clearChat: () => set({ entries: [] }),
 }));
