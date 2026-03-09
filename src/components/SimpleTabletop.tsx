@@ -1533,7 +1533,7 @@ export const SimpleTabletop = () => {
     return () => {
       if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
     };
-  }, [remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
+  }, [remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags, remoteDrags]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
