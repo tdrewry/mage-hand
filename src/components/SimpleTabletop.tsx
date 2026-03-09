@@ -10085,7 +10085,8 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
-        if (useCursorStore.getState().cursorSharingEnabled) {
+        if (useCursorStore.getState().cursorSharingEnabled && lastEmittedHoverRef.current !== null) {
+          lastEmittedHoverRef.current = null;
           ephemeralBus.emit("token.hover", { tokenId: null });
         }
         
