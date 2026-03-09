@@ -19,6 +19,9 @@ import type {
   TokenHandlePreviewPayload,
   MapDmSelectMapPayload,
   PortalActivatePayload,
+  PortalTeleportRequestPayload,
+  PortalTeleportApprovedPayload,
+  PortalTeleportDeniedPayload,
 } from "./types";
 
 let registered = false;
