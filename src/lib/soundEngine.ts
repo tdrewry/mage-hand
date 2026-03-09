@@ -377,8 +377,16 @@ export function getSoundEventsByCategory(): Record<SoundEventCategory, SoundEven
 
 // ── Sound Profile Export/Import ─────────────────────────────────────────
 
+export interface SoundProfileLibraryEntry {
+  id: string;
+  name: string;
+  fileName: string;
+  mimeType: string;
+  audioBase64: string;
+}
+
 export interface SoundProfile {
-  version: 1;
+  version: 2;
   name: string;
   description?: string;
   exportedAt: number;
@@ -386,22 +394,48 @@ export interface SoundProfile {
     masterVolume: number;
     categoryVolumes: Record<string, number>;
     disabledEvents: Record<string, boolean>;
+    eventQueues: Record<string, string[]>;
+    ambientVolume: number;
+    customAmbientLoopIds: string[];
+    activeAmbientLoopId: string | null;
   };
-  /** Base64-encoded custom audio files */
+  /** Legacy per-event custom sounds (v1 compat) */
   customSounds: Array<{
     eventName: string;
     mimeType: string;
     fileName: string;
     audioBase64: string;
   }>;
+  /** Audio library entries referenced by eventQueues and ambient loops */
+  libraryEntries: SoundProfileLibraryEntry[];
 }
 
 export async function exportSoundProfile(name: string, description?: string): Promise<SoundProfile> {
   const state = useSoundStore.getState();
   const customs = await getAllCustomSounds();
 
+  // Collect all referenced library IDs from event queues + ambient loops
+  const referencedIds = new Set<string>();
+  for (const ids of Object.values(state.eventQueues)) {
+    ids.forEach(id => referencedIds.add(id));
+  }
+  for (const id of state.customAmbientLoopIds) {
+    referencedIds.add(id);
+  }
+
+  // Export referenced library entries with embedded audio data
+  const { exportLibraryEntries } = await import('@/lib/audioLibrary');
+  const libEntries = await exportLibraryEntries([...referencedIds]);
+  const libraryEntries: SoundProfileLibraryEntry[] = libEntries.map(e => ({
+    id: e.id,
+    name: e.name,
+    fileName: e.fileName,
+    mimeType: e.mimeType,
+    audioBase64: arrayBufferToBase64(e.audioData),
+  }));
+
   return {
-    version: 1,
+    version: 2,
     name,
     description,
     exportedAt: Date.now(),
@@ -409,6 +443,10 @@ export async function exportSoundProfile(name: string, description?: string): Pr
       masterVolume: state.masterVolume,
       categoryVolumes: { ...state.categoryVolumes },
       disabledEvents: { ...state.disabledEvents },
+      eventQueues: { ...state.eventQueues },
+      ambientVolume: state.ambientVolume,
+      customAmbientLoopIds: [...state.customAmbientLoopIds],
+      activeAmbientLoopId: state.activeAmbientLoopId,
     },
     customSounds: customs.map(c => ({
       eventName: c.eventName,
@@ -416,6 +454,7 @@ export async function exportSoundProfile(name: string, description?: string): Pr
       fileName: c.fileName,
       audioBase64: arrayBufferToBase64(c.audioData),
     })),
+    libraryEntries,
   };
 }
 
@@ -425,15 +464,46 @@ export async function importSoundProfile(profile: SoundProfile): Promise<void> {
   store.setCategoryVolumes(profile.settings.categoryVolumes);
   store.setDisabledEvents(profile.settings.disabledEvents);
 
-  // Import custom audio files
-  const entries: SoundEntry[] = profile.customSounds.map(c => ({
-    eventName: c.eventName,
-    mimeType: c.mimeType,
-    fileName: c.fileName,
-    audioData: base64ToArrayBuffer(c.audioBase64),
-    addedAt: Date.now(),
-  }));
-  await importCustomSounds(entries);
+  // Import legacy custom sounds (v1 compat)
+  if (profile.customSounds?.length) {
+    const entries: SoundEntry[] = profile.customSounds.map(c => ({
+      eventName: c.eventName,
+      mimeType: c.mimeType,
+      fileName: c.fileName,
+      audioData: base64ToArrayBuffer(c.audioBase64),
+      addedAt: Date.now(),
+    }));
+    await importCustomSounds(entries);
+  }
+
+  // Import audio library entries (v2)
+  if (profile.libraryEntries?.length) {
+    const { importLibraryEntries, invalidateAudioBuffer } = await import('@/lib/audioLibrary');
+    const libEntries = profile.libraryEntries.map(e => ({
+      id: e.id,
+      name: e.name,
+      fileName: e.fileName,
+      mimeType: e.mimeType,
+      audioData: base64ToArrayBuffer(e.audioBase64),
+      addedAt: Date.now(),
+    }));
+    await importLibraryEntries(libEntries);
+    invalidateAudioBuffer();
+  }
+
+  // Restore event queues and ambient settings (v2)
+  if (profile.settings.eventQueues) {
+    store.setEventQueues(profile.settings.eventQueues);
+  }
+  if (profile.settings.ambientVolume !== undefined) {
+    store.setAmbientVolume(profile.settings.ambientVolume);
+  }
+  if (profile.settings.customAmbientLoopIds) {
+    // Replace custom ambient loop IDs
+    const current = store.customAmbientLoopIds;
+    for (const id of current) store.removeCustomAmbientLoop(id);
+    for (const id of profile.settings.customAmbientLoopIds) store.addCustomAmbientLoop(id);
+  }
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
