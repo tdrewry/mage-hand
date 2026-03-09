@@ -4,7 +4,6 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
-import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import type {
@@ -55,18 +54,19 @@ export function registerTokenHandlers(): void {
 
   // ── Token drag preview ops (migrated from durable OpBridge) ──
 
-  ephemeralBus.on("token.drag.begin", (data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, userId) => {
-    useDragPreviewStore.getState().beginDrag(data.tokenId, userId, data.startPos, data.mode ?? "freehand");
+  // token.drag.begin — no-op on receiver; token will move on updates
+  ephemeralBus.on("token.drag.begin", (_data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, _userId) => {
+    // Intentionally empty — real token sprite moves via drag.update
   });
 
-  ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
-    useDragPreviewStore.getState().updateDrag(data.tokenId, data.pos, data.path);
+  ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, _userId) => {
     // Move the actual token sprite so it renders via the normal pipeline
     useSessionStore.getState().updateTokenPosition(data.tokenId, data.pos.x, data.pos.y);
   });
 
-  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
-    useDragPreviewStore.getState().endDrag(data.tokenId);
+  // token.drag.end — no-op; final position arrives via durable sync
+  ephemeralBus.on("token.drag.end", (_data: { tokenId: string }, _userId) => {
+    // Intentionally empty
   });
 
   // ── Token position sync (10Hz delta broadcast) ──
@@ -77,10 +77,7 @@ export function registerTokenHandlers(): void {
     // Skip our own echoed position syncs
     if (userId === useMultiplayerStore.getState().currentUserId) return;
     const sessionStore = useSessionStore.getState();
-    const activeDragPreviews = useDragPreviewStore.getState().previews;
     for (const p of data.positions) {
-      // Skip tokens with active remote drag previews — drag.update handles those
-      if (activeDragPreviews[p.tokenId]) continue;
       sessionStore.updateTokenPosition(p.tokenId, p.x, p.y);
     }
   });

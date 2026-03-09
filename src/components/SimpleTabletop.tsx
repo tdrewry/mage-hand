@@ -25,7 +25,6 @@ import { emitLocalOp } from "@/lib/net";
 import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { markDraggedForSync, unmarkDraggedForSync } from "@/lib/net/tokenPositionSync";
-import { useDragPreviewStore } from "@/stores/dragPreviewStore";
 import { useMapStore } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
@@ -151,8 +150,7 @@ import {
   drawTargetingLineHelper as drawTargetingLineHelperFn,
   drawOffScreenIndicator as drawOffScreenIndicatorFn,
   drawMapPings as drawMapPingsFn,
-  drawRemoteDragPreviews as drawRemoteDragPreviewsFn,
-  drawRemoteTokenHovers as drawRemoteTokenHoversFn,
+  
   drawRemoteSelectionPreviews as drawRemoteSelectionPreviewsFn,
   drawRemoteActionTargets as drawRemoteActionTargetsFn,
 } from "../lib/canvasDrawHelpers";
@@ -419,8 +417,6 @@ export const SimpleTabletop = () => {
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const dragPathRef = useRef<{ x: number; y: number }[]>([]);
 
-  // Remote drag previews — subscribe to store for canvas redraws
-  const remoteDragPreviews = useDragPreviewStore((s) => s.previews);
   const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
   const remoteTokenHandlePreviews = useTokenEphemeralStore((s) => s.handlePreviews);
   const remoteSelections = useTokenEphemeralStore((s) => s.selectionPreviews);
@@ -1535,7 +1531,7 @@ export const SimpleTabletop = () => {
     return () => {
       if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
     };
-  }, [remoteDragPreviews, remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
+  }, [remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags]);
 
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
@@ -4329,7 +4325,6 @@ export const SimpleTabletop = () => {
       }
 
       // ── Remote ephemeral overlays ──
-      drawRemoteDragPreviews(ctx);
       drawRemoteTokenHovers(ctx);
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
@@ -4442,7 +4437,6 @@ export const SimpleTabletop = () => {
               drawDragGhostAndPath(overlayCtx);
             }
             // ── Remote ephemeral overlays on overlay ──
-            drawRemoteDragPreviews(overlayCtx);
             drawRemoteTokenHovers(overlayCtx);
             drawRemoteSelectionPreviews(overlayCtx);
             drawRemoteActionTargets(overlayCtx);
@@ -4591,69 +4585,6 @@ export const SimpleTabletop = () => {
     // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
   };
 
-  // ── Draw remote drag previews (ghost + line from start → current) ──
-  const drawRemoteDragPreviews = (ctx: CanvasRenderingContext2D) => {
-    const previews = Object.values(remoteDragPreviews);
-    if (previews.length === 0) return;
-
-    ctx.save();
-    for (const p of previews) {
-      const baseTokenSize = 40;
-      const token = tokens.find((t) => t.id === p.tokenId);
-      const tokenSize = token ? Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize : baseTokenSize;
-      const radius = tokenSize / 2;
-      const color = token?.color || "#888888";
-
-      // Draw movement trail polyline if path has 2+ points
-      if (p.path.length >= 2) {
-        ctx.globalAlpha = 0.45;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2.5 / transform.zoom;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(p.path[0].x, p.path[0].y);
-        for (let i = 1; i < p.path.length; i++) {
-          ctx.lineTo(p.path[i].x, p.path[i].y);
-        }
-        // Extend to currentPos (may be ahead of last path point)
-        ctx.lineTo(p.currentPos.x, p.currentPos.y);
-        ctx.stroke();
-      }
-
-      // Draw dashed straight-line distance indicator from start to current
-      ctx.globalAlpha = 0.25;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5 / transform.zoom;
-      ctx.setLineDash([6 / transform.zoom, 4 / transform.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(p.startPos.x, p.startPos.y);
-      ctx.lineTo(p.currentPos.x, p.currentPos.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Draw ghost circle at start position
-      ctx.globalAlpha = 0.2;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(p.startPos.x, p.startPos.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // (Ghost at current position removed — the real token sprite renders here
-      //  via the normal pipeline since token.drag.update calls updateTokenPosition)
-
-      // Draw username label above current position
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${11 / transform.zoom}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      const label = p.userId.slice(0, 8);
-      ctx.fillText(label, p.currentPos.x, p.currentPos.y - radius - 4 / transform.zoom);
-    }
-    ctx.restore();
-  };
 
   // ── Draw remote token hover highlights (colored ring around hovered token) ──
   const drawRemoteTokenHovers = (ctx: CanvasRenderingContext2D) => {
