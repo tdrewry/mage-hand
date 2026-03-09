@@ -83,7 +83,7 @@ let _lastIlluminationSources: object | null = null;  // identity check
 let _lastFullRenderTime = 0;
 const FULL_RENDER_INTERVAL = 100; // Force a full redraw at least every 100ms during pan
 let _lastZoom = 0; // Track zoom for throttle bypass on zoom changes
-const ZOOM_THROTTLE_INTERVAL = 33; // ~30fps cap during zoom to prevent GPU overload
+const ZOOM_THROTTLE_INTERVAL = 50; // ~20fps cap during zoom to prevent GPU overload
 
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;

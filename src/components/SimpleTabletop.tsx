@@ -586,6 +586,18 @@ export const SimpleTabletop = () => {
   // current pan to derive originX/Y.  Only zoom and region changes trigger a
   // resize; pan is handled by CSS offset in the post-processing layer.
   // ---------------------------------------------------------------------------
+  // Quantize zoom into coarse buckets so small scroll increments don't trigger
+  // expensive canvas resizes.  Each bucket covers a ~2× zoom range; the generous
+  // PAN_MARGIN already absorbs the projection differences within a bucket.
+  const quantizedZoom = useMemo(() => {
+    // Round zoom to the nearest power-of-sqrt(2) step (~41% increments).
+    // This means the fog canvas only resizes when the user zooms past a
+    // major threshold, not on every single wheel tick.
+    const logBase = Math.log(Math.SQRT2);
+    const step = Math.round(Math.log(transform.zoom) / logBase);
+    return Math.pow(Math.SQRT2, step);
+  }, [transform.zoom]);
+
   const fogBounds = useMemo(() => {
     const vw = canvasDimensions.width;
     const vh = canvasDimensions.height;
@@ -617,13 +629,15 @@ export const SimpleTabletop = () => {
       return { width: vw, height: vh, originX: 0, originY: 0 };
     }
 
-    // Project world bounds to screen space at current zoom (with generous pan margin)
-    // We use a large pan margin so the canvas doesn't need resizing during normal pan.
-    const PAN_MARGIN = 2000; // px of extra coverage in each direction
-    const sMinX = worldMinX * transform.zoom - PAN_MARGIN;
-    const sMinY = worldMinY * transform.zoom - PAN_MARGIN;
-    const sMaxX = worldMaxX * transform.zoom + PAN_MARGIN;
-    const sMaxY = worldMaxY * transform.zoom + PAN_MARGIN;
+    // Project world bounds to screen space at QUANTIZED zoom (with generous pan margin).
+    // Using quantizedZoom instead of transform.zoom means this only recalculates
+    // when zoom crosses a major threshold, preventing expensive canvas resizes on
+    // every scroll wheel tick.
+    const PAN_MARGIN = 3000; // Increased margin to absorb quantization error
+    const sMinX = worldMinX * quantizedZoom - PAN_MARGIN;
+    const sMinY = worldMinY * quantizedZoom - PAN_MARGIN;
+    const sMaxX = worldMaxX * quantizedZoom + PAN_MARGIN;
+    const sMaxY = worldMaxY * quantizedZoom + PAN_MARGIN;
 
     // Union with viewport (at origin 0,0)
     const minX = Math.min(0, sMinX);
@@ -637,7 +651,7 @@ export const SimpleTabletop = () => {
     const totalH = maxY - originY;
 
     return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
-  }, [canvasDimensions.width, canvasDimensions.height, regions, transform.zoom, isEntityVisible]);
+  }, [canvasDimensions.width, canvasDimensions.height, regions, quantizedZoom, isEntityVisible]);
 
   // Post-processing hook for fog effects
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
