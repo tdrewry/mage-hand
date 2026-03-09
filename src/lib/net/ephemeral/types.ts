@@ -14,6 +14,7 @@ export type EphemeralOpKind =
   | "token.drag.update"
   | "token.drag.end"
   | "token.position.sync"
+  | "token.meta.sync"
   // Map & Camera
   | "map.dm.viewport"
   | "map.dm.enforceFollow"
