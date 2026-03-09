@@ -229,6 +229,16 @@ export const useEffectStore = create<EffectState>()(
           allTemplates: buildAllTemplates(updated, s.hiddenBuiltInIds),
         };
       });
+
+      // Emit durable op for WebSocket sync (template addition)
+      import("@/lib/net").then(({ emitLocalOp, opBridge }) => {
+        if (opBridge.isApplyingRemote) return;
+        // Strip large texture data for network payload
+        const stripped = { ...template };
+        if (stripped.texture && stripped.texture.length > 200) stripped.texture = '';
+        emitLocalOp({ kind: 'effect.template.add', data: { template: stripped } });
+      }).catch(() => {});
+
       return template;
     },
 
