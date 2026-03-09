@@ -478,6 +478,7 @@ export interface EphemeralPayloadMap {
   "token.drag.update": { tokenId: string; pos: Vec2; path?: Vec2[] };
   "token.drag.end": { tokenId: string };
   "token.position.sync": TokenPositionSyncPayload;
+  "token.meta.sync": TokenMetaSyncPayload;
   "map.dm.viewport": DmViewportPayload;
   "map.dm.enforceFollow": DmEnforceFollowPayload;
   "map.ping": MapPingPayload;
