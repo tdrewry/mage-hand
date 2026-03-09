@@ -1,4 +1,4 @@
-# Lifecycle-Based Drag/Placement Previews (v0.7.155)
+# Lifecycle-Based Drag/Placement Previews (v0.7.155 → v0.7.156)
 
 ## Problem
 TTL-based expiry was the primary mechanism for clearing drag/placement previews. This caused previews to vanish when the user paused mid-drag, requiring inflated TTL values (5000ms) as a workaround — fragile and wasteful.

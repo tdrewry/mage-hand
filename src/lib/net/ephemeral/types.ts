@@ -20,10 +20,14 @@ export type EphemeralOpKind =
   | "map.ping"
   | "map.focus"
   // Regions
+  | "region.drag.begin"
   | "region.drag.update"
+  | "region.drag.end"
   | "region.handle.preview"
   // Map Objects
+  | "mapObject.drag.begin"
   | "mapObject.drag.update"
+  | "mapObject.drag.end"
   | "mapObject.handle.preview"
   | "mapObject.door.preview"
   // Fog & Vision
@@ -125,9 +129,18 @@ export interface MapFocusPayload {
 
 // -- Regions --
 
+export interface RegionDragBeginPayload {
+  regionId: string;
+  startPos: Vec2;
+}
+
 export interface RegionDragUpdatePayload {
   regionId: string;
   pos: Vec2;
+}
+
+export interface RegionDragEndPayload {
+  regionId: string;
 }
 
 export interface RegionHandlePreviewPayload {
@@ -139,9 +152,18 @@ export interface RegionHandlePreviewPayload {
 
 // -- Map Objects --
 
+export interface MapObjectDragBeginPayload {
+  objectId: string;
+  startPos: Vec2;
+}
+
 export interface MapObjectDragUpdatePayload {
   objectId: string;
   pos: Vec2;
+}
+
+export interface MapObjectDragEndPayload {
+  objectId: string;
 }
 
 export interface MapObjectHandlePreviewPayload {
@@ -451,9 +473,13 @@ export interface EphemeralPayloadMap {
   "map.dm.enforceFollow": DmEnforceFollowPayload;
   "map.ping": MapPingPayload;
   "map.focus": MapFocusPayload;
+  "region.drag.begin": RegionDragBeginPayload;
   "region.drag.update": RegionDragUpdatePayload;
+  "region.drag.end": RegionDragEndPayload;
   "region.handle.preview": RegionHandlePreviewPayload;
+  "mapObject.drag.begin": MapObjectDragBeginPayload;
   "mapObject.drag.update": MapObjectDragUpdatePayload;
+  "mapObject.drag.end": MapObjectDragEndPayload;
   "mapObject.handle.preview": MapObjectHandlePreviewPayload;
   "mapObject.door.preview": MapObjectDoorPreviewPayload;
   "fog.cursor.preview": FogCursorPreviewPayload;
@@ -529,11 +555,15 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "map.focus":              { throttleMs: 0,   ttlMs: 1000, keyStrategy: "session", dmOnly: true },
 
   // Regions
-  "region.drag.update":     { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
+  "region.drag.begin":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
+  "region.drag.update":     { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
+  "region.drag.end":        { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
   "region.handle.preview":  { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
 
   // Map Objects
-  "mapObject.drag.update":  { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
+  "mapObject.drag.begin":   { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
+  "mapObject.drag.update":  { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
+  "mapObject.drag.end":     { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
   "mapObject.handle.preview": { throttleMs: 50, ttlMs: 400, keyStrategy: "entityId" },
   "mapObject.door.preview": { throttleMs: 0,   ttlMs: 500,  keyStrategy: "entityId" },
 

@@ -13,8 +13,12 @@ import type {
   MapPingPayload,
   MapFocusPayload,
   MapTreeSyncPayload,
+  RegionDragBeginPayload,
   RegionDragUpdatePayload,
+  RegionDragEndPayload,
+  MapObjectDragBeginPayload,
   MapObjectDragUpdatePayload,
+  MapObjectDragEndPayload,
   MapObjectDoorPreviewPayload,
   RegionHandlePreviewPayload,
   MapObjectHandlePreviewPayload,
@@ -57,11 +61,33 @@ export function registerMapHandlers(): void {
     store.getState().setFocus({ pos: data.pos, zoom: data.zoom });
   });
 
+  // ── Region drag lifecycle ──
+  ephemeralBus.on("region.drag.begin", (data: RegionDragBeginPayload, userId) => {
+    store.getState().setRegionDrag(data.regionId, {
+      entityId: data.regionId,
+      userId,
+      pos: data.startPos,
+    });
+  });
+
   ephemeralBus.on("region.drag.update", (data: RegionDragUpdatePayload, userId) => {
     store.getState().setRegionDrag(data.regionId, {
       entityId: data.regionId,
       userId,
       pos: data.pos,
+    });
+  });
+
+  ephemeralBus.on("region.drag.end", (data: RegionDragEndPayload, _userId) => {
+    store.getState().removeRegionDrag(data.regionId);
+  });
+
+  // ── MapObject drag lifecycle ──
+  ephemeralBus.on("mapObject.drag.begin", (data: MapObjectDragBeginPayload, userId) => {
+    store.getState().setMapObjectDrag(data.objectId, {
+      entityId: data.objectId,
+      userId,
+      pos: data.startPos,
     });
   });
 
@@ -71,6 +97,10 @@ export function registerMapHandlers(): void {
       userId,
       pos: data.pos,
     });
+  });
+
+  ephemeralBus.on("mapObject.drag.end", (data: MapObjectDragEndPayload, _userId) => {
+    store.getState().removeMapObjectDrag(data.objectId);
   });
 
   // Door toggle preview — remote peer toggled a door
@@ -160,12 +190,7 @@ export function registerMapHandlers(): void {
       store.getState().removePing(userId);
     } else if (key.startsWith("map.focus::")) {
       store.getState().setFocus(null);
-    } else if (key.startsWith("region.drag.update::")) {
-      const entityId = key.replace("region.drag.update::", "");
-      store.getState().removeRegionDrag(entityId);
-    } else if (key.startsWith("mapObject.drag.update::")) {
-      const entityId = key.replace("mapObject.drag.update::", "");
-      store.getState().removeMapObjectDrag(entityId);
+    // region.drag and mapObject.drag cleanup is lifecycle-based (begin/end), not TTL
     } else if (key.startsWith("region.handle.preview::")) {
       const entityId = key.replace("region.handle.preview::", "");
       store.getState().removeHandlePreview(entityId);
@@ -262,7 +287,32 @@ export function emitPortalTeleportDenied(payload: PortalTeleportDeniedPayload): 
   ephemeralBus.emit("portal.teleport.denied", payload);
 }
 
+/** Broadcast a region drag begin to peers. */
+export function emitRegionDragBegin(regionId: string, startPos: { x: number; y: number }): void {
+  ephemeralBus.emit("region.drag.begin", { regionId, startPos });
+}
+
 /** Broadcast a region drag update to peers. */
 export function emitRegionDragUpdate(regionId: string, pos: { x: number; y: number }): void {
   ephemeralBus.emit("region.drag.update", { regionId, pos });
+}
+
+/** Broadcast a region drag end to peers. */
+export function emitRegionDragEnd(regionId: string): void {
+  ephemeralBus.emit("region.drag.end", { regionId });
+}
+
+/** Broadcast a map object drag begin to peers. */
+export function emitMapObjectDragBegin(objectId: string, startPos: { x: number; y: number }): void {
+  ephemeralBus.emit("mapObject.drag.begin", { objectId, startPos });
+}
+
+/** Broadcast a map object drag update to peers. */
+export function emitMapObjectDragUpdate(objectId: string, pos: { x: number; y: number }): void {
+  ephemeralBus.emit("mapObject.drag.update", { objectId, pos });
+}
+
+/** Broadcast a map object drag end to peers. */
+export function emitMapObjectDragEnd(objectId: string): void {
+  ephemeralBus.emit("mapObject.drag.end", { objectId });
 }

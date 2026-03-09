@@ -1452,11 +1452,13 @@ export const SimpleTabletop = () => {
           setDragPreviewPosition(null);
         }
         if (isDraggingRegion) {
+          if (draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
           setIsDraggingRegion(false);
           setDraggedRegionId(null);
           setDragPreview(null);
         }
         if (isDraggingMapObject) {
+          if (draggedMapObjectId) ephemeralBus.emit("mapObject.drag.end", { objectId: draggedMapObjectId });
           setIsDraggingMapObject(false);
           setDraggedMapObjectId(null);
           setMapObjectDragOffset({ x: 0, y: 0 });
@@ -8819,6 +8821,7 @@ export const SimpleTabletop = () => {
               setIsDraggingMapObject(true);
               setDraggedMapObjectId(clickedMapObject.id);
               setMapObjectDragOffset({ x: worldPos.x - clickedMapObject.position.x, y: worldPos.y - clickedMapObject.position.y });
+              ephemeralBus.emit("mapObject.drag.begin", { objectId: clickedMapObject.id, startPos: { x: clickedMapObject.position.x, y: clickedMapObject.position.y } });
               const mobjDragGroup = useGroupStore.getState().getGroupForEntity(clickedMapObject.id);
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               snap[clickedMapObject.id] = { type: 'mapObject', position: { ...clickedMapObject.position }, wallPoints: clickedMapObject.wallPoints ? clickedMapObject.wallPoints.map(p => ({ ...p })) : undefined };
@@ -8838,6 +8841,7 @@ export const SimpleTabletop = () => {
             setIsDraggingMapObject(true);
             setDraggedMapObjectId(clickedMapObject.id);
             setMapObjectDragOffset({ x: worldPos.x - clickedMapObject.position.x, y: worldPos.y - clickedMapObject.position.y });
+            ephemeralBus.emit("mapObject.drag.begin", { objectId: clickedMapObject.id, startPos: { x: clickedMapObject.position.x, y: clickedMapObject.position.y } });
             const mobjDragGroup2 = useGroupStore.getState().getGroupForEntity(clickedMapObject.id);
             const snap2: typeof groupSiblingSnapshotsRef.current = {};
             snap2[clickedMapObject.id] = { type: 'mapObject', position: { ...clickedMapObject.position }, wallPoints: clickedMapObject.wallPoints ? clickedMapObject.wallPoints.map(p => ({ ...p })) : undefined };
@@ -8936,6 +8940,7 @@ export const SimpleTabletop = () => {
           } else {
             // Start dragging the region (for both grouped and ungrouped)
             setIsDraggingRegion(true);
+            ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
             setDraggedRegionId(clickedRegion.id);
             regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
             if (currentVisibilityRef.current) {
@@ -10678,6 +10683,7 @@ export const SimpleTabletop = () => {
           });
         }
 
+        if (draggedMapObjectId) ephemeralBus.emit("mapObject.drag.end", { objectId: draggedMapObjectId });
         setIsDraggingMapObject(false);
         setDraggedMapObjectId(null);
         setMapObjectDragOffset({ x: 0, y: 0 });
@@ -10915,6 +10921,7 @@ export const SimpleTabletop = () => {
 
     // Reset all region drag states (runs for normal drag, rotation, and resize)
     if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
+      if (isDraggingRegion && draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
       setDraggedRegionId(null);
@@ -11139,6 +11146,7 @@ export const SimpleTabletop = () => {
         if (clickedRegion && clickedRegion.selected && !clickedRegion.locked) {
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
+          ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
           
           if (currentVisibilityRef.current) {
             stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
@@ -11408,6 +11416,7 @@ export const SimpleTabletop = () => {
           setTransformingRegionId(null);
         }
 
+        if (draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
         setIsDraggingRegion(false);
         setDraggedRegionId(null);
         setRegionDragOffset({ x: 0, y: 0 });
