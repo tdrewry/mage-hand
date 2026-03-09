@@ -1276,6 +1276,7 @@ export const SimpleTabletop = () => {
 
       // Mark this token as triggered for this effect
       useEffectStore.getState().markTokenTriggered(effect.id, tokenId);
+      triggerSound('effect.triggered');
 
       // Token entered a trap/persistent effect — open Action Card
       const cardStore = useCardStore.getState();
