@@ -116,6 +116,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       
       return { currentTurnIndex: nextIndex, initiativeOrder: updatedOrder };
     });
+    triggerSound('initiative.turnChange');
   },
   
   previousTurn: () => {
