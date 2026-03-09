@@ -540,9 +540,9 @@ export interface EphemeralOpConfig {
  */
 export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Tokens
-  "token.handle.preview":   { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
-  "token.hover":            { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
-  "selection.preview":      { throttleMs: 50,  ttlMs: 400,  keyStrategy: "userId" },
+  "token.handle.preview":   { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
+  "token.hover":            { throttleMs: 100, ttlMs: 0,    keyStrategy: "userId" },
+  "selection.preview":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "userId" },
   "token.drag.begin":       { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.update":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
