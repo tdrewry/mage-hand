@@ -185,6 +185,7 @@ export function registerMiscHandlers(): void {
   // ── Action Resolution Claim (multi-DM coordination) ──
   ephemeralBus.on("action.resolution.claim", (data: ActionResolutionClaimPayload, _userId) => {
     if (data.claimedBy) {
+      triggerSound('action.claim');
       useActionPendingStore.getState().setClaim(data.actionId, {
         actionId: data.actionId,
         claimedBy: data.claimedBy,
