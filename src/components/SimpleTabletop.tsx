@@ -213,6 +213,7 @@ export const SimpleTabletop = () => {
     registerMapHandlers();
     registerMiscHandlers();
     registerEffectHandlers();
+    registerAmbientHandlers();
   }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
