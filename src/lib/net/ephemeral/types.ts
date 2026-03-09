@@ -582,7 +582,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Effects & Auras
   "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
-  "effect.placement.preview": { throttleMs: 67, ttlMs: 300,  keyStrategy: "userId" },
+  "effect.placement.preview": { throttleMs: 67, ttlMs: 5000, keyStrategy: "userId" },
 
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
