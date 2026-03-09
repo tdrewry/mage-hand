@@ -599,7 +599,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "action.target.preview":  { throttleMs: 50,  ttlMs: 0,    keyStrategy: "userId" },
   "action.flash":           { throttleMs: 0,   ttlMs: 1000, keyStrategy: "entityId" },
   "action.inProgress":      { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
-  "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session", dmOnly: true },
+  "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session" },
   "action.pending":         { throttleMs: 0,   ttlMs: 15000, keyStrategy: "entityId", dmOnly: true },
   "action.resolved":        { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "entityId", dmOnly: true },
   "action.resolution.claim": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "entityId", dmOnly: true },
