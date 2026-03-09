@@ -190,12 +190,7 @@ export function registerMapHandlers(): void {
       store.getState().removePing(userId);
     } else if (key.startsWith("map.focus::")) {
       store.getState().setFocus(null);
-    } else if (key.startsWith("region.drag.update::")) {
-      const entityId = key.replace("region.drag.update::", "");
-      store.getState().removeRegionDrag(entityId);
-    } else if (key.startsWith("mapObject.drag.update::")) {
-      const entityId = key.replace("mapObject.drag.update::", "");
-      store.getState().removeMapObjectDrag(entityId);
+    // region.drag and mapObject.drag cleanup is lifecycle-based (begin/end), not TTL
     } else if (key.startsWith("region.handle.preview::")) {
       const entityId = key.replace("region.handle.preview::", "");
       store.getState().removeHandlePreview(entityId);
