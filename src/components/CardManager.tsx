@@ -242,6 +242,8 @@ function renderCardContent(
       return <ChatCardContent />;
     case CardType.ART_APPROVAL:
       return <ArtApprovalCardContent />;
+    case CardType.SOUND_SETTINGS:
+      return <SoundSettingsCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
