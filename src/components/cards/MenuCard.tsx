@@ -669,6 +669,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Dices className="h-4 w-4 mr-2" />
           Dice Box
         </Button>
+
+        <Button 
+          variant={soundSettingsCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (soundSettingsCard) {
+              setVisibility(soundSettingsCard.id, !soundSettingsCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.SOUND_SETTINGS,
+                title: 'Sound Settings',
+                defaultPosition: { x: 360, y: 80 },
+                defaultSize: { width: 380, height: 600 },
+                minSize: { width: 320, height: 400 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <Volume2 className="h-4 w-4 mr-2" />
+          Sound Settings
+        </Button>
       </div>
 
       <Separator />
