@@ -131,9 +131,9 @@ const EventRow: React.FC<EventRowProps> = ({ event, disabled, onToggle }) => {
       <Button
         variant="ghost"
         size="icon"
-        className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
         onClick={() => triggerSound(event)}
-        title="Preview"
+        title="Preview sound"
       >
         <Play className="h-3 w-3" />
       </Button>
