@@ -473,6 +473,12 @@ export const useEffectStore = create<EffectState>()(
         ),
       }));
       triggerSound('effect.removed');
+
+      // Emit durable op for WebSocket sync
+      import("@/lib/net").then(({ emitLocalOp, opBridge }) => {
+        if (opBridge.isApplyingRemote) return;
+        emitLocalOp({ kind: 'effect.dismiss', data: { effectId } });
+      }).catch(() => {});
     },
 
     cancelEffect: (effectId, getCharacter) => {
