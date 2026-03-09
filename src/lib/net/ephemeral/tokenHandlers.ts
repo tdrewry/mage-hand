@@ -77,10 +77,7 @@ export function registerTokenHandlers(): void {
     // Skip our own echoed position syncs
     if (userId === useMultiplayerStore.getState().currentUserId) return;
     const sessionStore = useSessionStore.getState();
-    const activeDragPreviews = useDragPreviewStore.getState().previews;
     for (const p of data.positions) {
-      // Skip tokens with active remote drag previews — drag.update handles those
-      if (activeDragPreviews[p.tokenId]) continue;
       sessionStore.updateTokenPosition(p.tokenId, p.x, p.y);
     }
   });

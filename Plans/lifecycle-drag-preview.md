@@ -9,20 +9,32 @@ Switched from TTL-based expiry to explicit lifecycle (begin/update/end). TTL set
 Remote drag previews rendered as simplified colored circles via a parallel pipeline (`drawRemoteDragPreviews`), while the actual token sprite stayed frozen at its pre-drag position. The 10Hz `token.position.sync` skipped tokens with active drag previews, so the real sprite never moved during a remote drag.
 
 ### Solution
-In `token.drag.update` handler, also call `updateTokenPosition()` so the real token sprite moves in the session store — exactly like a local drag. The normal render pipeline draws the full token (texture, name, auras, status rings) at the drag position.
+In `token.drag.update` handler, also call `updateTokenPosition()` so the real token sprite moves in the session store — exactly like a local drag.
 
-Simplified `drawRemoteDragPreviews` to only render supplementary decoration:
-- Ghost circle at **start** position (origin marker)
-- Movement trail polyline
-- Dashed distance line from start → current
-- Username label
+## v0.7.161: Remove Ghost Preview System
 
-Removed the redundant ghost circle and border ring at the current drag position — the real token sprite is already there.
+### Problem
+The ghost preview system (`dragPreviewStore` + `drawRemoteDragPreviews`) was entirely redundant after v0.7.160. It caused lingering artifacts — ghost circles labeled "unknown" from the auto-create path when `begin` messages were missed. Two rendering systems competed to draw the same token.
+
+### Solution
+Removed the entire ghost preview pipeline:
+- Deleted `src/stores/dragPreviewStore.ts`
+- Removed `drawRemoteDragPreviews` from both `SimpleTabletop.tsx` and `canvasDrawHelpers.ts`
+- Simplified `tokenHandlers.ts`: `token.drag.update` only calls `updateTokenPosition()`, begin/end are no-ops
+- Removed the `activeDragPreviews` skip guard from `token.position.sync` — no longer needed
+
+### What Remains
+- `emitDragBegin/Update/End` — still emitted by local dragger for remote position updates
+- `token.drag.update` handler calls `updateTokenPosition()` to move real sprite
+- `drawDragGhostAndPath` — local-only ghost/path the dragger sees (unrelated to remote previews)
+- `markDraggedForSync/unmarkDraggedForSync` — still needed so 10Hz broadcast excludes locally-dragged tokens
 
 ### Changes
-- `src/lib/net/ephemeral/tokenHandlers.ts` — `token.drag.update` handler now calls `updateTokenPosition()`
-- `src/components/SimpleTabletop.tsx` — removed current-position ghost circle/ring from `drawRemoteDragPreviews`
-- `src/lib/version.ts` — bumped to 0.7.160
+- `src/stores/dragPreviewStore.ts` — deleted
+- `src/lib/net/ephemeral/tokenHandlers.ts` — removed all dragPreviewStore usage
+- `src/components/SimpleTabletop.tsx` — removed drawRemoteDragPreviews, subscription, import
+- `src/lib/canvasDrawHelpers.ts` — removed drawRemoteDragPreviews export
+- `src/lib/version.ts` — bumped to 0.7.161
 
 ### Impact on External Services
 None — all client-side rendering changes. WebSocket server and Jazz unaffected.
