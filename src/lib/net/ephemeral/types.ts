@@ -33,6 +33,7 @@ export type EphemeralOpKind =
   | "chat.typing"
   | "chat.message"
   | "dice.rolling"
+  | "dice.result"
   // Initiative
   | "initiative.drag.preview"
   | "initiative.hover"
