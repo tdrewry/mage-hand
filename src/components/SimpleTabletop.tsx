@@ -7887,6 +7887,8 @@ export const SimpleTabletop = () => {
             setSelectedTokenIds([clickedToken.id]);
           }
         }
+        // Clear stale marquee/group selection previews on remote clients
+        ephemeralBus.emit("selection.preview", {});
         // Clear map object selection when selecting token (unless group propagation already set it)
         if (!getGroupForEntity(clickedToken.id)) {
           clearMapObjectSelection();
