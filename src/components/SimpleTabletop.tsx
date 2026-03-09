@@ -432,6 +432,8 @@ export const SimpleTabletop = () => {
   // Local pings (own + remote) for animated rendering — each has a birth timestamp
   const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
+  /** Track last emitted token.hover to avoid spamming null on every mousemove */
+  const lastEmittedHoverRef = useRef<string | null>(null);
   // Multi-token drag: stores start positions for every token in the selection at drag start
   const multiDragStartPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
   // Pending deselect: token to remove from selection on mouseup IF no drag was detected
@@ -10066,7 +10068,8 @@ export const SimpleTabletop = () => {
 
         if (distance <= radius) {
           setHoveredTokenId(token.id);
-          if (useCursorStore.getState().cursorSharingEnabled) {
+          if (useCursorStore.getState().cursorSharingEnabled && lastEmittedHoverRef.current !== token.id) {
+            lastEmittedHoverRef.current = token.id;
             ephemeralBus.emit("token.hover", { tokenId: token.id });
           }
           foundHoveredToken = true;
@@ -10082,7 +10085,8 @@ export const SimpleTabletop = () => {
 
       if (!foundHoveredToken) {
         setHoveredTokenId(null);
-        if (useCursorStore.getState().cursorSharingEnabled) {
+        if (useCursorStore.getState().cursorSharingEnabled && lastEmittedHoverRef.current !== null) {
+          lastEmittedHoverRef.current = null;
           ephemeralBus.emit("token.hover", { tokenId: null });
         }
         
