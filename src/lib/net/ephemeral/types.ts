@@ -371,6 +371,22 @@ export interface MapDmSelectMapPayload {
   mapId: string;
 }
 
+/** Full map tree state broadcast from DM → all clients. */
+export interface MapTreeSyncPayload {
+  /** Per-map activation state */
+  mapActivations: Array<{ mapId: string; active: boolean }>;
+  /** DM's currently selected/focused map */
+  selectedMapId: string | null;
+  /** Structure definitions (buildings, floors) */
+  structures: Array<{ id: string; name: string; exclusiveFocus?: boolean }>;
+  /** Map focus/blur settings */
+  focusSettings: {
+    unfocusedOpacity: number;
+    unfocusedBlur: number;
+    selectionLockEnabled: boolean;
+  };
+}
+
 export interface PortalActivatePayload {
   objectId: string;
 }
