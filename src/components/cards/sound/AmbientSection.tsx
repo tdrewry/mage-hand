@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
-  Play, Square, Radio, Upload, Trash2, Volume2,
+  Play, Square, Radio, Upload, Trash2, Volume2, Plus,
 } from 'lucide-react';
 import { useSoundStore } from '@/stores/soundStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import {
-  BUILTIN_AMBIENT_LOOPS,
   playAmbientLoop,
   stopAmbientLoop,
   setAmbientGain,
@@ -29,21 +28,21 @@ export const AmbientSection: React.FC = () => {
   const roles = useMultiplayerStore((s) => s.roles);
   const isDM = roles.includes('dm');
   const uploadRef = useRef<HTMLInputElement>(null);
+  const [customName, setCustomName] = useState('');
 
   // Resolve custom loop names from library
-  const [customLoops, setCustomLoops] = useState<AmbientLoopMeta[]>([]);
+  const [loops, setLoops] = useState<AmbientLoopMeta[]>([]);
   useEffect(() => {
     Promise.all(
       customAmbientLoopIds.map(async (id) => {
         const entry = await getFromAudioLibrary(id);
         return entry
-          ? { id, name: entry.name, description: entry.fileName, builtin: false }
+          ? { id, name: entry.name, description: entry.fileName }
           : null;
       })
-    ).then((results) => setCustomLoops(results.filter(Boolean) as AmbientLoopMeta[]));
+    ).then((results) => setLoops(results.filter(Boolean) as AmbientLoopMeta[]));
   }, [customAmbientLoopIds]);
 
-  const allLoops = [...BUILTIN_AMBIENT_LOOPS, ...customLoops];
   const ambientCatVol = categoryVolumes['ambient'] ?? 1;
 
   const handlePlay = (loopId: string) => {
@@ -72,8 +71,10 @@ export const AmbientSection: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const entry = await addToAudioLibrary(file);
+      const name = customName.trim() || file.name.replace(/\.[^/.]+$/, '');
+      const entry = await addToAudioLibrary(file, name);
       addCustomAmbientLoop(entry.id);
+      setCustomName('');
       toast.success(`Added "${entry.name}" as ambient loop`);
     } catch {
       toast.error('Failed to add ambient loop');
@@ -84,7 +85,7 @@ export const AmbientSection: React.FC = () => {
   const handleRemoveCustom = (id: string) => {
     removeCustomAmbientLoop(id);
     if (activeAmbientLoopId === id) handleStop();
-    toast.success('Custom ambient loop removed');
+    toast.success('Ambient loop removed');
   };
 
   return (
@@ -130,8 +131,13 @@ export const AmbientSection: React.FC = () => {
       </div>
 
       {/* Loop list */}
+      {loops.length === 0 && (
+        <p className="text-[10px] text-muted-foreground italic py-2">
+          No ambient loops added yet. Upload an audio file below.
+        </p>
+      )}
       <div className="space-y-1 max-h-48 overflow-y-auto">
-        {allLoops.map((loop) => (
+        {loops.map((loop) => (
           <div
             key={loop.id}
             className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-colors ${
@@ -145,9 +151,6 @@ export const AmbientSection: React.FC = () => {
             )}
             <div className="flex-1 min-w-0">
               <span className="font-medium text-foreground">{loop.name}</span>
-              {loop.builtin && (
-                <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1.5">synth</Badge>
-              )}
               <p className="text-[10px] text-muted-foreground truncate">{loop.description}</p>
             </div>
 
@@ -173,29 +176,37 @@ export const AmbientSection: React.FC = () => {
               </Button>
             )}
 
-            {/* Remove custom */}
-            {!loop.builtin && (
-              <Button
-                variant="ghost" size="icon"
-                className="h-5 w-5 shrink-0 text-destructive/70 hover:text-destructive"
-                onClick={() => handleRemoveCustom(loop.id)}
-                title="Remove custom loop"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            )}
+            {/* Remove */}
+            <Button
+              variant="ghost" size="icon"
+              className="h-5 w-5 shrink-0 text-destructive/70 hover:text-destructive"
+              onClick={() => handleRemoveCustom(loop.id)}
+              title="Remove loop"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
           </div>
         ))}
       </div>
 
-      {/* Upload custom */}
-      <Button
-        variant="outline" size="sm"
-        className="w-full h-7 text-xs"
-        onClick={() => uploadRef.current?.click()}
-      >
-        <Upload className="h-3 w-3 mr-1.5" /> Add Custom Loop
-      </Button>
+      {/* Add custom loop with name */}
+      <Separator />
+      <div className="space-y-1.5">
+        <span className="text-[10px] text-muted-foreground font-medium">Add Sound</span>
+        <Input
+          placeholder="Loop name (optional)"
+          value={customName}
+          onChange={(e) => setCustomName(e.target.value)}
+          className="h-7 text-xs"
+        />
+        <Button
+          variant="outline" size="sm"
+          className="w-full h-7 text-xs"
+          onClick={() => uploadRef.current?.click()}
+        >
+          <Plus className="h-3 w-3 mr-1.5" /> Choose Audio File
+        </Button>
+      </div>
       <input
         ref={uploadRef} type="file" accept="audio/*"
         className="hidden" onChange={handleUpload}

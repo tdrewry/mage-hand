@@ -118,6 +118,7 @@ import { RegionControlBar } from "./RegionControlBar";
 import { FogBrushToolbar } from "./FogBrushToolbar";
 import { drawFootprintPath, drawStyledLinePath } from "../lib/footprintShapes";
 import { checkMovementCollision, getBlockingObjects } from "../lib/movementCollision";
+import { triggerSound } from "../lib/soundEngine";
 import { useTouchEvents } from "../hooks/useTouchEvents";
 import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
@@ -1276,6 +1277,7 @@ export const SimpleTabletop = () => {
 
       // Mark this token as triggered for this effect
       useEffectStore.getState().markTokenTriggered(effect.id, tokenId);
+      triggerSound('effect.triggered');
 
       // Token entered a trap/persistent effect — open Action Card
       const cardStore = useCardStore.getState();
@@ -1367,6 +1369,7 @@ export const SimpleTabletop = () => {
                   duration: 3000,
                   description: blockDetails
                 });
+                triggerSound('movement.collision');
                 
                 // Snap back to original position
                 updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
@@ -10370,6 +10373,7 @@ export const SimpleTabletop = () => {
                 duration: 3000,
                 description: blockDetails
               });
+              triggerSound('movement.collision');
               
               // Snap back primary token and all multi-dragged tokens to their start positions
               const startPositions = multiDragStartPositionsRef.current;
@@ -11208,6 +11212,7 @@ export const SimpleTabletop = () => {
                 ? 'Cannot leave region boundary' 
                 : 'Movement blocked by obstacle';
               toast.error(blockReason);
+              triggerSound('movement.collision');
               updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
             }
           }
