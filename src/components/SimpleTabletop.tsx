@@ -616,15 +616,12 @@ export const SimpleTabletop = () => {
       return { width: vw, height: vh, originX: 0, originY: 0 };
     }
 
-    // Project world bounds to screen space at QUANTIZED zoom (with generous pan margin).
-    // Using quantizedZoom instead of transform.zoom means this only recalculates
-    // when zoom crosses a major threshold, preventing expensive canvas resizes on
-    // every scroll wheel tick.
-    const PAN_MARGIN = 3000; // Increased margin to absorb quantization error
-    const sMinX = worldMinX * quantizedZoom - PAN_MARGIN;
-    const sMinY = worldMinY * quantizedZoom - PAN_MARGIN;
-    const sMaxX = worldMaxX * quantizedZoom + PAN_MARGIN;
-    const sMaxY = worldMaxY * quantizedZoom + PAN_MARGIN;
+    // Project world bounds to screen space at current zoom with generous pan margin.
+    const PAN_MARGIN = 2000;
+    const sMinX = worldMinX * transform.zoom - PAN_MARGIN;
+    const sMinY = worldMinY * transform.zoom - PAN_MARGIN;
+    const sMaxX = worldMaxX * transform.zoom + PAN_MARGIN;
+    const sMaxY = worldMaxY * transform.zoom + PAN_MARGIN;
 
     // Union with viewport (at origin 0,0)
     const minX = Math.min(0, sMinX);
