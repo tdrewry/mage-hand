@@ -426,6 +426,7 @@ export const SimpleTabletop = () => {
   const remotePings = useMapEphemeralStore((s) => s.pings);
   const remoteGroupSelects = useMiscEphemeralStore((s) => s.groupSelects);
   const remoteGroupDrags = useMiscEphemeralStore((s) => s.groupDrags);
+  const remoteDrags = useRemoteDragStore((s) => s.drags);
   // Local pings (own + remote) for animated rendering — each has a birth timestamp
   const [activePings, setActivePings] = useState<Array<{ id: string; pos: { x: number; y: number }; color: string; ts: number }>>([]);
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
