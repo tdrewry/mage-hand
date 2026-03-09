@@ -61,6 +61,8 @@ export function registerTokenHandlers(): void {
 
   ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
     useDragPreviewStore.getState().updateDrag(data.tokenId, data.pos, data.path);
+    // Move the actual token sprite so it renders via the normal pipeline
+    useSessionStore.getState().updateTokenPosition(data.tokenId, data.pos.x, data.pos.y);
   });
 
   ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
