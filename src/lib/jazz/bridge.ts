@@ -2300,31 +2300,19 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
-  // ── Effect sync: Zustand → Jazz ──
+  // ── Effect sync: Zustand → Jazz (diff-based) ──
   let prevEffects = useEffectStore.getState().placedEffects;
   const unsubEffectsZustand = useEffectStore.subscribe((state) => {
     const effects = state.placedEffects;
     if (effects === prevEffects) return;
     if (_fromJazz) { prevEffects = effects; return; }
+    // DON'T update prevEffects here — let the throttled fn do it for correct diff
+    const capturedPrev = prevEffects;
     prevEffects = effects;
-    // Throttled full re-push of effects (simpler than diff for complex nested state)
     throttledPushFineGrained('effects', () => {
-      const effectState = _cachedEffects ?? _sessionRoot?.effects;
-      if (!effectState?.placedEffects) return;
-      const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
-      // Clear and re-push all placed effects
-      const jazzPlaced = effectState.placedEffects;
-      const len = jazzPlaced.length ?? 0;
-      for (let i = len - 1; i >= 0; i--) {
-        try { jazzPlaced.$jazz.splice(i, 1); } catch { /* */ }
-      }
-      const active = useEffectStore.getState().placedEffects.filter((e: any) => !e.dismissedAt);
-      for (const e of active) {
-        try {
-          const je = JazzPlacedEffectSchema.create(placedEffectToJazzInit(e) as any, group);
-          jazzPlaced.$jazz.push(je);
-        } catch { /* */ }
-      }
+      const currentEffects = useEffectStore.getState().placedEffects;
+      syncEffectsToJazz(currentEffects, capturedPrev);
+      prevEffects = currentEffects;
     });
   });
   activeSubscriptions.push(unsubEffectsZustand);
