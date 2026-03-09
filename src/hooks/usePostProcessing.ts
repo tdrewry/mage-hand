@@ -132,22 +132,27 @@ export function usePostProcessing({
     };
   }, []);
 
-  // Update size/origin when content bounds resize — throttled to prevent GPU thrashing
-  // during rapid zoom. Only resize when dimensions change by >10% or origin shifts significantly.
+  // Update size/origin when content bounds change.
+  // Expensive GPU resize only when dimensions change significantly (>10%).
+  // Origin-only changes use cheap CSS repositioning.
   const lastResizeDims = useRef({ width: 0, height: 0, originX: 0, originY: 0 });
   useEffect(() => {
-    if (initRef.current && isPostProcessingReady() && width > 0 && height > 0) {
-      const prev = lastResizeDims.current;
-      const wRatio = prev.width > 0 ? Math.abs(width - prev.width) / prev.width : 1;
-      const hRatio = prev.height > 0 ? Math.abs(height - prev.height) / prev.height : 1;
-      const originShift = Math.abs(originX - prev.originX) + Math.abs(originY - prev.originY);
-      
-      // Only resize if dimensions changed by >10% or origin shifted significantly
-      if (wRatio > 0.1 || hRatio > 0.1 || originShift > 200 || prev.width === 0) {
-        lastResizeDims.current = { width, height, originX, originY };
-        resizePostProcessing(width, height, originX, originY);
-        resizeFogCanvas(width, height, undefined, originX, originY);
-      }
+    if (!initRef.current || !isPostProcessingReady() || width <= 0 || height <= 0) return;
+
+    const prev = lastResizeDims.current;
+    const wRatio = prev.width > 0 ? Math.abs(width - prev.width) / prev.width : 1;
+    const hRatio = prev.height > 0 ? Math.abs(height - prev.height) / prev.height : 1;
+    const dimsChanged = wRatio > 0.1 || hRatio > 0.1 || prev.width === 0;
+
+    if (dimsChanged) {
+      // Full GPU resize (expensive — clears WebGL canvas)
+      lastResizeDims.current = { width, height, originX, originY };
+      resizePostProcessing(width, height, originX, originY);
+      resizeFogCanvas(width, height, undefined, originX, originY);
+    } else if (originX !== prev.originX || originY !== prev.originY) {
+      // Origin shifted but canvas is big enough — cheap CSS reposition only
+      lastResizeDims.current = { ...prev, originX, originY };
+      repositionPostProcessing(originX, originY);
     }
   }, [width, height, originX, originY]);
 
