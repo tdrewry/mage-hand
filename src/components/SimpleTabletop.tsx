@@ -11416,6 +11416,7 @@ export const SimpleTabletop = () => {
           setTransformingRegionId(null);
         }
 
+        if (draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
         setIsDraggingRegion(false);
         setDraggedRegionId(null);
         setRegionDragOffset({ x: 0, y: 0 });
