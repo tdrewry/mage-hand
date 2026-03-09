@@ -19,6 +19,11 @@ export function setEphemeralBusRef(bus: import("./ephemeral").EphemeralBus): voi
   _ephemeralBus = bus;
 }
 
+// Throttle for auto-push on player join — prevents cascading state sync when
+// multiple players join in rapid succession (which can cause hung clients).
+let _lastAutoPushTs = 0;
+const AUTO_PUSH_THROTTLE_MS = 2000;
+
 export type NetConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
 function seqStorageKey(sessionCode: string): string {
