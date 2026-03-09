@@ -280,6 +280,7 @@ async function loadCustomBuffer(eventName: SoundEvent): Promise<AudioBuffer | nu
 /** Play a synthesized tone from a SynthDef */
 function playSynth(def: SynthDef, masterGain: number): void {
   const ctx = getAudioContext();
+  if (!ctx) return;
   const now = ctx.currentTime;
   const gain = ctx.createGain();
   const effectiveGain = (def.gain ?? 0.2) * masterGain;
