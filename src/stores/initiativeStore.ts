@@ -63,6 +63,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       initiativeOrder: [],
       restrictMovement: false
     });
+    triggerSound('initiative.combatEnd');
   },
   
   setInitiativeOrder: (order) => set({ initiativeOrder: order }),
