@@ -4410,6 +4410,7 @@ export const SimpleTabletop = () => {
             if (isDraggingToken && draggedTokenId) {
               drawDragPathOnly(overlayCtx);
             }
+            drawRemoteDragDecorations(overlayCtx, 'path');
             
             // Draw tokens on top of effects
             drawTokensToContext(overlayCtx);
