@@ -596,7 +596,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "presence.viewingMap":    { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
 
   // Actions
-  "action.target.preview":  { throttleMs: 50,  ttlMs: 500,  keyStrategy: "userId" },
+  "action.target.preview":  { throttleMs: 50,  ttlMs: 0,    keyStrategy: "userId" },
   "action.flash":           { throttleMs: 0,   ttlMs: 1000, keyStrategy: "entityId" },
   "action.inProgress":      { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
   "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session", dmOnly: true },
