@@ -358,6 +358,17 @@ export interface PortalActivatePayload {
   objectId: string;
 }
 
+// -- Ambient --
+
+export interface AmbientLoopPlayPayload {
+  loopId: string;
+  volume: number;
+}
+
+export interface AmbientLoopStopPayload {
+  // intentionally empty
+}
+
 // -- Token Position Sync --
 
 export interface TokenPositionSyncPayload {
