@@ -67,6 +67,9 @@ export type EphemeralOpKind =
   // Portal & Map Activation
   | "map.dm.selectMap"
   | "portal.activate"
+  | "portal.teleport.request"
+  | "portal.teleport.approved"
+  | "portal.teleport.denied"
   // Ambient
   | "ambient.loop.play"
   | "ambient.loop.stop";
