@@ -14,7 +14,17 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+    // Force single instances of React and Three.js to prevent dispatcher/context mismatches
+    // that cause hung clients under load (multiple connections).
+    dedupe: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "three",
+      "@react-three/fiber",
+      "@react-three/drei",
+      "zustand",
+    ],
   },
   build: {
     rollupOptions: {
@@ -23,6 +33,7 @@ export default defineConfig(({ mode }) => ({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'],
           'vendor-canvas': ['paper', 'fabric'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
         },
       },
     },
