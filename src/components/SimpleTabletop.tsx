@@ -8936,6 +8936,7 @@ export const SimpleTabletop = () => {
           } else {
             // Start dragging the region (for both grouped and ungrouped)
             setIsDraggingRegion(true);
+            ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
             setDraggedRegionId(clickedRegion.id);
             regionDragStartRef.current = { x: clickedRegion.x, y: clickedRegion.y };
             if (currentVisibilityRef.current) {
