@@ -1525,21 +1525,13 @@ export const SimpleTabletop = () => {
   // ── Redraw canvas when remote ephemeral overlays change (batched via rAF) ──
   const ephemeralRedrawRafRef = useRef<number | null>(null);
   useEffect(() => {
-    if (Object.keys(remoteDragPreviews).length > 0 ||
-        Object.keys(remoteHovers).length > 0 ||
-        Object.keys(remoteSelections).length > 0 ||
-        Object.keys(remoteActionTargets).length > 0 ||
-        Object.keys(remoteTokenHandlePreviews).length > 0 ||
-        Object.keys(remoteMapHandlePreviews).length > 0 ||
-        Object.keys(remoteGroupSelects).length > 0 ||
-        Object.keys(remoteGroupDrags).length > 0) {
-      // Batch into a single rAF to avoid redundant redraws from rapid store updates
-      if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
-      ephemeralRedrawRafRef.current = requestAnimationFrame(() => {
-        ephemeralRedrawRafRef.current = null;
-        redrawCanvas();
-      });
-    }
+    // Always redraw when ephemeral state changes — including transitions to empty
+    // (clears lingering ghost previews from the canvas when a drag/hover ends)
+    if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
+    ephemeralRedrawRafRef.current = requestAnimationFrame(() => {
+      ephemeralRedrawRafRef.current = null;
+      redrawCanvas();
+    });
     return () => {
       if (ephemeralRedrawRafRef.current !== null) cancelAnimationFrame(ephemeralRedrawRafRef.current);
     };
