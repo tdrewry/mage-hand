@@ -1883,12 +1883,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         const p = prevTokens[i];
         if (t === p) continue; // same reference, no change
         if (!_localDragTokens.has(t.id)) { onlyDraggedPosChanges = false; break; }
-        // Check if non-position fields changed
-        if (t.label !== p.label || t.color !== p.color || t.name !== p.name ||
-            (t as any).hp !== (p as any).hp || (t as any).maxHp !== (p as any).maxHp ||
-            (t as any).ac !== (p as any).ac || t.isHidden !== p.isHidden ||
-            t.mapId !== p.mapId || t.gridWidth !== p.gridWidth || t.gridHeight !== p.gridHeight ||
-            t.imageHash !== p.imageHash) {
+        // Check if non-position fields changed using generic deep comparison
+        if (_hasEntityChanges(p, t, ['id', 'x', 'y', 'imageUrl'])) {
           onlyDraggedPosChanges = false;
           break;
         }
