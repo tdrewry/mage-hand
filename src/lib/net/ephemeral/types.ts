@@ -20,7 +20,9 @@ export type EphemeralOpKind =
   | "map.ping"
   | "map.focus"
   // Regions
+  | "region.drag.begin"
   | "region.drag.update"
+  | "region.drag.end"
   | "region.handle.preview"
   // Map Objects
   | "mapObject.drag.update"
