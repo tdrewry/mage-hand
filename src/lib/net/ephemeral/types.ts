@@ -412,6 +412,7 @@ export interface EphemeralPayloadMap {
   "chat.typing": ChatTypingPayload;
   "chat.message": ChatMessagePayload;
   "dice.rolling": DiceRollingPayload;
+  "dice.result": DiceResultPayload;
   "initiative.drag.preview": InitiativeDragPreviewPayload;
   "initiative.hover": InitiativeHoverPayload;
   "group.select.preview": GroupSelectPreviewPayload;
