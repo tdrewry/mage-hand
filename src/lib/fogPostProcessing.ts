@@ -307,9 +307,7 @@ export function applyFogPostProcessing(
   originY = 0
 ): void {
   // Canvas2D fog canvases are managed exclusively by usePostProcessing
-  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here —
-  // that would desync the Canvas2D texture from the PixiJS renderer,
-  // which only resizes on >10% dimension changes.
+  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here.
   if (!fogCanvas) {
     initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
   }
