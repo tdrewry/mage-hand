@@ -38,3 +38,20 @@ Removed the entire ghost preview pipeline:
 
 ### Impact on External Services
 None — all client-side rendering changes. WebSocket server and Jazz unaffected.
+
+## v0.7.162: Remote Drag Decorations
+
+### Problem
+After removing the ghost preview system, remote clients only saw the token moving but missed
+the drag decorations (ghost-at-origin, path trail, distance labels) that the local dragger sees.
+
+### Solution
+Created `remoteDragStore` — a lightweight store tracking decoration metadata (startPos, path)
+per token. `drawRemoteDragDecorations()` renders the same visuals as local drag (ghost at origin,
+straight-line distance, movement path with footprints/dashed/solid matching token settings).
+
+### Changes
+- `src/stores/remoteDragStore.ts` — new lightweight store
+- `src/lib/net/ephemeral/tokenHandlers.ts` — populate store on begin/update/end
+- `src/components/SimpleTabletop.tsx` — subscribe + draw at path & ghost phases
+- `src/lib/version.ts` — bumped to 0.7.162
