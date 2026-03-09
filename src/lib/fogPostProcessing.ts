@@ -46,6 +46,7 @@ import {
   renderPostProcessing,
   setLastRenderTransform,
   panOffsetPostProcessing,
+  repositionPostProcessing,
   resetPostProcessingOffset,
   FIXED_PADDING,
   type EffectSettings,
