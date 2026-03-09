@@ -10,7 +10,6 @@ import {
   initPostProcessing,
   cleanupPostProcessing,
   resizePostProcessing,
-  repositionPostProcessing,
   setPostProcessingVisible,
   updateEffectSettings,
   isPostProcessingReady,
@@ -135,25 +134,14 @@ export function usePostProcessing({
   // Update size/origin when content bounds change.
   // Expensive GPU resize only when dimensions change significantly (>10%).
   // Origin-only changes use cheap CSS repositioning.
-  const lastResizeDims = useRef({ width: 0, height: 0, originX: 0, originY: 0 });
+  // Resize PixiJS renderer + fog Canvas2D whenever fogBounds change.
+  // fogBounds is memoised on transform.zoom (not pan), so this only fires on
+  // zoom or region changes — never on every pan frame.
   useEffect(() => {
     if (!initRef.current || !isPostProcessingReady() || width <= 0 || height <= 0) return;
 
-    const prev = lastResizeDims.current;
-    const wRatio = prev.width > 0 ? Math.abs(width - prev.width) / prev.width : 1;
-    const hRatio = prev.height > 0 ? Math.abs(height - prev.height) / prev.height : 1;
-    const dimsChanged = wRatio > 0.1 || hRatio > 0.1 || prev.width === 0;
-
-    if (dimsChanged) {
-      // Full GPU resize (expensive — clears WebGL canvas)
-      lastResizeDims.current = { width, height, originX, originY };
-      resizePostProcessing(width, height, originX, originY);
-      resizeFogCanvas(width, height, undefined, originX, originY);
-    } else if (originX !== prev.originX || originY !== prev.originY) {
-      // Origin shifted but canvas is big enough — cheap CSS reposition only
-      lastResizeDims.current = { ...prev, originX, originY };
-      repositionPostProcessing(originX, originY);
-    }
+    resizePostProcessing(width, height, originX, originY);
+    resizeFogCanvas(width, height, undefined, originX, originY);
   }, [width, height, originX, originY]);
 
   // Update effect settings when they change

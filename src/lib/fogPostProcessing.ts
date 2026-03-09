@@ -46,7 +46,6 @@ import {
   renderPostProcessing,
   setLastRenderTransform,
   panOffsetPostProcessing,
-  repositionPostProcessing,
   resetPostProcessingOffset,
   FIXED_PADDING,
   type EffectSettings,
@@ -89,9 +88,6 @@ const ZOOM_THROTTLE_INTERVAL = 50; // ~20fps cap during zoom to prevent GPU over
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;
 let _lastContentH = 0;
-// Canvas origin (CSS px offset from container origin to content bbox top-left)
-let _lastOriginX = 0;
-let _lastOriginY = 0;
 
 /**
  * Returns the padding used by the coordinate system.
@@ -115,8 +111,6 @@ export function initFogCanvas(
 ): void {
   _lastContentW = width;
   _lastContentH = height;
-  _lastOriginX = originX;
-  _lastOriginY = originY;
 
   const totalW = width + FIXED_PADDING * 2;
   const totalH = height + FIXED_PADDING * 2;
@@ -149,8 +143,6 @@ export function resizeFogCanvas(
 ): void {
   _lastContentW = width;
   _lastContentH = height;
-  _lastOriginX = originX;
-  _lastOriginY = originY;
 
   const totalW = width + FIXED_PADDING * 2;
   const totalH = height + FIXED_PADDING * 2;
@@ -315,15 +307,9 @@ export function applyFogPostProcessing(
   originY = 0
 ): void {
   // Canvas2D fog canvases are managed exclusively by usePostProcessing
-  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here —
-  // that would desync the Canvas2D texture from the PixiJS renderer,
-  // which only resizes on >10% dimension changes.
+  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here.
   if (!fogCanvas) {
     initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
-  } else {
-    // Just update origin tracking (cheap — no canvas reallocation)
-    _lastOriginX = originX;
-    _lastOriginY = originY;
   }
 
   const totalW = fogCanvas!.width;
@@ -484,13 +470,6 @@ export function applyFogPostProcessing(
   if (illuminationCanvas) {
     updateIlluminationTexture(illuminationCanvas);
   }
-
-  // Sync PixiJS canvas CSS origin to match the origin used in the fog Canvas2D
-  // rendering above.  Without this, resetPostProcessingOffset uses a stale
-  // _originX/_originY from the last resize/reposition, causing misalignment
-  // when fogBounds origin changes during zoom but dimensions stay within the
-  // >10% resize threshold.
-  repositionPostProcessing(originX, originY);
 
   // Push fog mask to PixiJS
   updateFogTexture(fogCanvas);

@@ -1,4 +1,4 @@
-# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133 → v0.7.137)
+# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133 → v0.7.138)
 
 ## Problems
 1. Fog of war rendering desynced from the map during zoom (offset/drift)
@@ -32,8 +32,8 @@ fogBounds uses `transform.zoom` for correct origin/dimension calculation.
 ### 3. Removed Canvas2D auto-resize in applyFogPostProcessing (v0.7.136)
 Canvas2D fog canvases are now managed exclusively by `usePostProcessing` (via `initFogCanvas`/`resizeFogCanvas`). The auto-resize check that compared exact pixel dimensions was removed — this keeps Canvas2D and PixiJS canvases in lockstep, preventing size mismatches during zoom.
 
-### 4. Fog canvas origin tracking without reinit (v0.7.134)
-`applyFogPostProcessing` no longer calls `initFogCanvas` when only origin changed — just updates tracking vars.
+### 4. Removed >10% resize threshold — always resize on fogBounds change (v0.7.138)
+The root cause: `usePostProcessing` had a >10% dimension-change threshold before calling `resizePostProcessing`/`resizeFogCanvas`. Small zoom increments didn't cross this threshold, so the PixiJS renderer stayed at stale dimensions while fog Canvas2D drew at new coordinates. This caused the fog texture to stretch/shift. Fix: always resize when `fogBounds` changes. This is safe because `fogBounds` is memoised on `transform.zoom` (not pan), so it only fires on zoom or region changes (~10-20 times/sec during scroll, already throttled by `ZOOM_THROTTLE_INTERVAL`). Removed the `repositionPostProcessing` band-aid from `applyFogPostProcessing` and stale origin tracking vars.
 
 ### 5. Native wheel listener with passive:false (v0.7.133)
 Replaced React `onWheel` with native `addEventListener('wheel', ..., { passive: false })`.
