@@ -7908,6 +7908,7 @@ export const SimpleTabletop = () => {
             setSelectedTokenIds([]);
             clearSelection();
             setSelectedRegionIds([]);
+            emitGroupSelectPreview(null);
           }
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
