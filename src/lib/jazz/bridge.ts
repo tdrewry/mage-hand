@@ -1883,12 +1883,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         const p = prevTokens[i];
         if (t === p) continue; // same reference, no change
         if (!_localDragTokens.has(t.id)) { onlyDraggedPosChanges = false; break; }
-        // Check if non-position fields changed
-        if (t.label !== p.label || t.color !== p.color || t.name !== p.name ||
-            (t as any).hp !== (p as any).hp || (t as any).maxHp !== (p as any).maxHp ||
-            (t as any).ac !== (p as any).ac || t.isHidden !== p.isHidden ||
-            t.mapId !== p.mapId || t.gridWidth !== p.gridWidth || t.gridHeight !== p.gridHeight ||
-            t.imageHash !== p.imageHash) {
+        // Check if non-position fields changed using generic deep comparison
+        if (_hasEntityChanges(p, t, ['id', 'x', 'y', 'imageUrl'])) {
           onlyDraggedPosChanges = false;
           break;
         }
@@ -1949,13 +1945,9 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         // During active local drag, skip position-only changes
         const isBeingDragged = _localDragTokens.has(t.id);
         const posChanged = prev.x !== t.x || prev.y !== t.y;
-        const nonPosChanged = prev.label !== t.label ||
-          prev.color !== t.color || prev.name !== t.name ||
-          (prev as any).hp !== (t as any).hp || (prev as any).maxHp !== (t as any).maxHp ||
-          (prev as any).ac !== (t as any).ac ||
-          prev.isHidden !== t.isHidden || prev.mapId !== t.mapId ||
-          prev.gridWidth !== t.gridWidth || prev.gridHeight !== t.gridHeight ||
-          prev.imageHash !== t.imageHash;
+        // Use generic deep comparison for ALL non-position fields to avoid
+        // missing fields like statBlockJson, notes, pathStyle, labelColor, etc.
+        const nonPosChanged = _hasEntityChanges(prev, t, ['id', 'x', 'y', 'imageUrl']);
 
         if (isBeingDragged && posChanged && !nonPosChanged) continue;
         if (!posChanged && !nonPosChanged) continue;
