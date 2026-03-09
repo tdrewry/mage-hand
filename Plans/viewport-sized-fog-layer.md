@@ -1,26 +1,25 @@
-# Fog of War: Viewport-Sized PixiJS Layer (v0.7.139)
+# Fog of War: Viewport-Sized PixiJS Layer (v0.7.139) + Join Recovery (v0.7.140)
 
 ## Status: Implemented
 
-## Problem
-The PixiJS fog canvas was **content-sized** (sized to the bounding box of all regions with 600px padding, CSS-positioned), while the main rendering canvas was **viewport-sized** (fixed to the browser viewport with `translate+scale`). This mismatch caused:
-1. **Alignment drift** on zoom — three systems (PixiJS canvas size, Canvas2D size, CSS position) had to agree every frame
-2. **Flash on zoom** — every zoom tick triggered `renderer.resize()` which clears the WebGL buffer, showing one frame of transparent fog
+## v0.7.139 Summary
+- Switched fog post-processing from content-sized to viewport-sized.
+- Removed zoom-time renderer resizing and CSS offset tracking.
+- Eliminated zoom flash and alignment drift from mixed coordinate systems.
 
-## Solution
-Made the PixiJS canvas and fog Canvas2D **viewport-sized**, matching the main canvas exactly:
-- Canvas positioned at `top: -50px; left: -50px` (50px edge padding for blur bleed)
-- Fog Canvas2D uses `ctx.translate(EDGE_PADDING + transform.x, EDGE_PADDING + transform.y); ctx.scale(zoom, zoom)` — same as main canvas
-- No resize on zoom/pan — only on window resize
-- Removed `fogBounds` calculation, `FIXED_PADDING` (600px), `originX/Y` tracking, CSS-offset fast-paths
+## v0.7.140 Follow-up Fix
+### Problem
+On host/DM, when a player joined in Jazz tandem mode, `pushAllToJazz` could cause brief fog rendering disruption until the next interaction (pan/zoom/token move).
 
-## Files Changed
-- `src/lib/postProcessingLayer.ts` — Viewport-sized canvas, removed content-tracking complexity
-- `src/lib/fogPostProcessing.ts` — Same transform as main canvas, removed CSS fast-paths
-- `src/hooks/usePostProcessing.ts` — Accepts viewport dimensions only, no origin props
-- `src/components/SimpleTabletop.tsx` — Removed `fogBounds` useMemo, passes viewport dimensions directly
-- `src/lib/version.ts` — Bumped to 0.7.139
+### Fix
+After auto-sync on peer join, dispatch a DM-side fog refresh event:
+- `window.dispatchEvent(new CustomEvent('fog:force-refresh'))` (delayed 100ms)
+- This reinitializes fog masks/post-processing immediately, without waiting for manual interaction.
 
-## Why This Fixes Both Problems
-1. **Alignment**: fog uses identical `translate+scale` as main canvas — pixel-aligned by definition
-2. **Flash**: no `renderer.resize()` on zoom → no WebGL buffer clear → no flash
+### Files Changed
+- `src/lib/net/NetManager.ts`
+- `src/lib/version.ts` (0.7.140)
+
+## External Impact
+- Impacts join-time Jazz/WebSocket tandem sync behavior only.
+- No server protocol/schema changes; no websocket/jazz service restart required.
