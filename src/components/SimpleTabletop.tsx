@@ -207,6 +207,8 @@ const CursorStatusIndicator: React.FC = () => {
 };
 
 export const SimpleTabletop = () => {
+  // Auto-broadcast map tree state changes from DM to all clients
+  useMapTreeSync();
   // Register ephemeral handlers once
   React.useEffect(() => {
     registerCursorHandlers();
