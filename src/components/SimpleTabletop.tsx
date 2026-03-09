@@ -1452,11 +1452,13 @@ export const SimpleTabletop = () => {
           setDragPreviewPosition(null);
         }
         if (isDraggingRegion) {
+          if (draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
           setIsDraggingRegion(false);
           setDraggedRegionId(null);
           setDragPreview(null);
         }
         if (isDraggingMapObject) {
+          if (draggedMapObjectId) ephemeralBus.emit("mapObject.drag.end", { objectId: draggedMapObjectId });
           setIsDraggingMapObject(false);
           setDraggedMapObjectId(null);
           setMapObjectDragOffset({ x: 0, y: 0 });
