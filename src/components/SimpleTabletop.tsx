@@ -138,6 +138,7 @@ import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
 import { useMapEphemeralStore } from "@/stores/mapEphemeralStore";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
+import { useRemoteDragStore } from "@/stores/remoteDragStore";
 import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 
 import { Z_INDEX } from "../lib/zIndex";
