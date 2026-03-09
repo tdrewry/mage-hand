@@ -430,6 +430,30 @@ export const useEffectStore = create<EffectState>()(
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
       triggerSound('effect.placed');
+
+      // Emit durable op for WebSocket sync (suppressed when Jazz is active)
+      import("@/lib/net").then(({ emitLocalOp, opBridge }) => {
+        if (opBridge.isApplyingRemote) return;
+        emitLocalOp({
+          kind: 'effect.place',
+          data: {
+            id: effect.id,
+            templateId: effect.templateId,
+            template: effect.template, // full snapshot for non-Jazz clients
+            origin: effect.origin,
+            direction: effect.direction,
+            casterId: effect.casterId,
+            mapId: effect.mapId,
+            impactedTargets: effect.impactedTargets,
+            groupId: effect.groupId,
+            castLevel: effect.castLevel,
+            waypoints: effect.waypoints,
+            isAura: effect.isAura,
+            anchorTokenId: effect.anchorTokenId,
+          },
+        });
+      }).catch(() => {});
+
       return effect;
     },
 
