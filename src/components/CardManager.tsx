@@ -153,6 +153,7 @@ function getCardTitle(type: CardType): string {
     [CardType.EFFECTS]: 'Effects',
     [CardType.CHAT]: 'Chat',
     [CardType.ART_APPROVAL]: 'Art Approval',
+    [CardType.SOUND_SETTINGS]: 'Sound Settings',
   };
   
   return titles[type] || type;
