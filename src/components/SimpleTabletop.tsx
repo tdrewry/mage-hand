@@ -25,7 +25,7 @@ import { emitLocalOp } from "@/lib/net";
 import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { markDraggedForSync, unmarkDraggedForSync } from "@/lib/net/tokenPositionSync";
-import { useDragPreviewStore } from "@/stores/dragPreviewStore";
+
 import { useMapStore } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
