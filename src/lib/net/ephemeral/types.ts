@@ -371,6 +371,35 @@ export interface PortalActivatePayload {
   objectId: string;
 }
 
+export interface PortalTeleportRequestPayload {
+  requestId: string;
+  tokenId: string;
+  tokenName: string;
+  sourcePortalId: string;
+  sourcePortalName: string;
+  targetPortalId: string;
+  targetPortalName: string;
+  requestingPlayerName: string;
+  dropPosition?: { x: number; y: number };
+}
+
+export interface PortalTeleportApprovedPayload {
+  requestId: string;
+  tokenId: string;
+  sourcePortalId: string;
+  targetPortalId: string;
+  dropPosition?: { x: number; y: number };
+  /** If the teleport switches maps, the new active map ID */
+  activeMapId?: string;
+  /** Full map tree activation state so all clients match DM */
+  mapActivations?: Array<{ mapId: string; active: boolean }>;
+}
+
+export interface PortalTeleportDeniedPayload {
+  requestId: string;
+  reason?: string;
+}
+
 // -- Ambient --
 
 export interface AmbientLoopPlayPayload {
