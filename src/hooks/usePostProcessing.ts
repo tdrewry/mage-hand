@@ -10,7 +10,6 @@ import {
   initPostProcessing,
   cleanupPostProcessing,
   resizePostProcessing,
-  repositionPostProcessing,
   setPostProcessingVisible,
   updateEffectSettings,
   isPostProcessingReady,
