@@ -552,6 +552,31 @@ export const ChatCardContent: React.FC = () => {
         </div>
       )}
 
+      {/* Slash command autocomplete */}
+      {slashSuggestions.length > 0 && acSuggestions.length === 0 && (
+        <div className="px-2 pb-1">
+          <div className="rounded-md border border-border bg-popover p-1 space-y-0.5">
+            <p className="text-[9px] text-muted-foreground px-2 py-0.5">Commands</p>
+            {slashSuggestions.map((cmd, i) => (
+              <button
+                key={cmd.command}
+                className={`w-full text-left rounded px-2 py-1.5 text-xs flex items-center gap-2 ${
+                  i === acIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-muted'
+                }`}
+                onMouseDown={(e) => { e.preventDefault(); applySlashCommand(cmd.command); }}
+                onMouseEnter={() => setAcIndex(i)}
+              >
+                <span className="text-sm shrink-0">{cmd.icon}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono font-medium">{cmd.command}</span>
+                  <span className="text-[10px] text-muted-foreground">{cmd.description} — <span className="font-mono">{cmd.usage}</span></span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Autocomplete dropdown for /w */}
       {acSuggestions.length > 0 && (
         <div className="px-2 pb-1">
