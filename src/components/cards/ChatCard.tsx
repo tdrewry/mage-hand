@@ -12,6 +12,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Send, Swords, Target, MessageSquare, Eye, Users, X, Dice5 } from 'lucide-react';
 import { useChatStore, type ChatMessage, type ChatActionEntry, type ChatDiceEntry } from '@/stores/chatStore';
+import { useDiceStore } from '@/stores/diceStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { emitChatTyping } from '@/lib/net/ephemeral/miscHandlers';
@@ -357,9 +358,32 @@ export const ChatCardContent: React.FC = () => {
     inputRef.current?.focus();
   }, [draft]);
 
+  const diceRoll = useDiceStore((s) => s.roll);
+
   const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+
+    // Parse /roll or /r slash command: /roll 2d20+5 optional label
+    const rollMatch = text.match(/^\/(?:roll|r)\s+([^\s][\s\S]*)/i);
+    if (rollMatch) {
+      const parts = rollMatch[1].trim();
+      // Split into formula and optional label: first token is formula, rest is label
+      const spaceIdx = parts.indexOf(' ');
+      const formula = spaceIdx === -1 ? parts : parts.slice(0, spaceIdx);
+      const label = spaceIdx === -1 ? undefined : parts.slice(spaceIdx + 1).trim() || undefined;
+      try {
+        diceRoll(formula, label, { source: currentUsername || 'You', reason: label });
+      } catch {
+        addMessage(
+          currentUserId || 'local',
+          'System',
+          `Invalid dice formula: "${formula}"`
+        );
+      }
+      setDraft('');
+      return;
+    }
 
     // Parse /w or /whisper slash command: /w username message
     const slashMatch = text.match(/^\/(?:w|whisper)\s+(\S+)\s+([\s\S]+)/i);
@@ -396,7 +420,7 @@ export const ChatCardContent: React.FC = () => {
       isWhisperMode ? whisperTargets : undefined
     );
     setDraft('');
-  }, [draft, addMessage, currentUserId, currentUsername, isWhisperMode, whisperTargets, connectedUsers]);
+  }, [draft, addMessage, diceRoll, currentUserId, currentUsername, isWhisperMode, whisperTargets, connectedUsers]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
