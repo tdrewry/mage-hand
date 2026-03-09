@@ -1490,13 +1490,6 @@ export const SimpleTabletop = () => {
   // No need for manual click-outside handling - Radix handles it
 
   // Update highlights whenever tokens or regions change (but not during drag - handled separately)
-  // ── Expire stale remote drag previews every 300ms ──
-  useEffect(() => {
-    const id = setInterval(() => {
-      useDragPreviewStore.getState().expireStale(800);
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
 
   // ── Merge remote pings into activePings for animated rendering ──
   useEffect(() => {

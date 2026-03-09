@@ -29,21 +29,17 @@ export function registerEffectHandlers(): void {
 
   // ── Placement Preview (inbound from other players) ──
   ephemeralBus.on("effect.placement.preview", (data: EffectPlacementPreviewPayload, userId) => {
+    // Empty/null templateId is a "clear" signal (placement completed or cancelled)
+    if (!data.templateId) {
+      useMiscEphemeralStore.getState().removeEffectPlacementPreview(userId);
+      return;
+    }
     triggerSound('effect.placed');
     useMiscEphemeralStore.getState().setEffectPlacementPreview(userId, {
       templateId: data.templateId,
       origin: data.origin,
       direction: data.direction,
     });
-  });
-
-  // TTL expiry cleanup for placement previews
-  ephemeralBus.onCacheChange((key, entry) => {
-    if (entry) return;
-    if (key.startsWith("effect.placement.preview::")) {
-      const userId = key.replace("effect.placement.preview::", "");
-      useMiscEphemeralStore.getState().removeEffectPlacementPreview(userId);
-    }
   });
 }
 

@@ -517,8 +517,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "token.handle.preview":   { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
   "token.hover":            { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
   "selection.preview":      { throttleMs: 50,  ttlMs: 400,  keyStrategy: "userId" },
-  "token.drag.begin":       { throttleMs: 0,   ttlMs: 5000, keyStrategy: "entityId" },
-  "token.drag.update":      { throttleMs: 50,  ttlMs: 5000, keyStrategy: "entityId" },
+  "token.drag.begin":       { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
+  "token.drag.update":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
   "token.position.sync":    { throttleMs: 100, ttlMs: 500,  keyStrategy: "session" },
 
@@ -582,7 +582,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Effects & Auras
   "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
-  "effect.placement.preview": { throttleMs: 67, ttlMs: 5000, keyStrategy: "userId" },
+  "effect.placement.preview": { throttleMs: 67, ttlMs: 0,    keyStrategy: "userId" },
 
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },

@@ -395,7 +395,16 @@ export const useEffectStore = create<EffectState>()(
       }
     },
 
-    cancelPlacement: () => set({ placement: null }),
+    cancelPlacement: () => {
+      set({ placement: null });
+      // Emit clear signal so remote clients remove the placement preview
+      import("@/lib/net").then(({ ephemeralBus }) => {
+        ephemeralBus.emit("effect.placement.preview", {
+          templateId: "",
+          origin: { x: 0, y: 0 },
+        });
+      }).catch(() => { /* net not available */ });
+    },
 
     // ------------------------------------------------------------------
     // Placed effects

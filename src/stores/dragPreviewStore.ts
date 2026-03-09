@@ -22,11 +22,8 @@ interface DragPreviewState {
   endDrag: (tokenId: string) => void;
   /** Remove all previews for a disconnected user. */
   clearUser: (userId: string) => void;
-  /** Remove stale entries older than maxAge ms. */
-  expireStale: (maxAge?: number) => void;
 }
 
-const DEFAULT_EXPIRY_MS = 800;
 
 export const useDragPreviewStore = create<DragPreviewState>((set) => ({
   previews: {},
@@ -95,13 +92,4 @@ export const useDragPreviewStore = create<DragPreviewState>((set) => ({
       return { previews: filtered };
     }),
 
-  expireStale: (maxAge = DEFAULT_EXPIRY_MS) =>
-    set((s) => {
-      const now = Date.now();
-      const filtered: Record<string, DragPreview> = {};
-      for (const [k, v] of Object.entries(s.previews)) {
-        if (now - v.lastUpdated < maxAge) filtered[k] = v;
-      }
-      return { previews: filtered };
-    }),
 }));
