@@ -316,15 +316,17 @@ export function applyFogPostProcessing(
   const totalW = canvasWidth + FIXED_PADDING * 2;
   const totalH = canvasHeight + FIXED_PADDING * 2;
 
-  // (Re)initialize if content size or origin changed
+  // (Re)initialize if content SIZE changed (expensive — reallocates canvases)
   if (
     !fogCanvas ||
     fogCanvas.width !== totalW ||
-    fogCanvas.height !== totalH ||
-    _lastOriginX !== originX ||
-    _lastOriginY !== originY
+    fogCanvas.height !== totalH
   ) {
     initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
+  } else {
+    // Just update origin tracking (cheap — no canvas reallocation)
+    _lastOriginX = originX;
+    _lastOriginY = originY;
   }
 
   if (!isPostProcessingReady() || !fogMasks || !fogCanvas || !fogCtx) return;
