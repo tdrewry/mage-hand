@@ -150,7 +150,7 @@ import {
   drawTargetingLineHelper as drawTargetingLineHelperFn,
   drawOffScreenIndicator as drawOffScreenIndicatorFn,
   drawMapPings as drawMapPingsFn,
-  drawRemoteDragPreviews as drawRemoteDragPreviewsFn,
+  
   drawRemoteeSelectionPreviews as drawRemoteSelectionPreviewsFn,
   drawRemoteActionTargets as drawRemoteActionTargetsFn,
 } from "../lib/canvasDrawHelpers";
