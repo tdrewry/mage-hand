@@ -11844,7 +11844,7 @@ export const SimpleTabletop = () => {
             // Existing polygon path drawing
             if (pathDrawingMode === "drawing" && pathDrawingType === "polygon") finishPathDrawing();
           }}
-          onWheel={handleWheel}
+          
           onContextMenu={handleContextMenu}
           onTouchStart={touchHandlers.handleTouchStart}
           onTouchMove={touchHandlers.handleTouchMove}
