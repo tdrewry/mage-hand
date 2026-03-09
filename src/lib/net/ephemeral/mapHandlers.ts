@@ -108,6 +108,41 @@ export function registerMapHandlers(): void {
     useMapStore.getState().setSelectedMap(data.mapId);
   });
 
+  // Full map tree sync from DM → all clients
+  ephemeralBus.on("map.tree.sync", (data: MapTreeSyncPayload, _userId) => {
+    console.log(`[mapHandlers] Received map tree sync from DM — ${data.mapActivations.length} maps`);
+
+    // Apply map activations
+    const mapStore = useMapStore.getState();
+    for (const ma of data.mapActivations) {
+      const existing = mapStore.maps.find(m => m.id === ma.mapId);
+      if (existing && existing.active !== ma.active) {
+        mapStore.updateMap(ma.mapId, { active: ma.active });
+      }
+    }
+
+    // Apply structures
+    if (data.structures) {
+      useMapStore.setState({ structures: data.structures });
+    }
+
+    // Apply selected map
+    if (data.selectedMapId) {
+      const exists = useMapStore.getState().maps.some(m => m.id === data.selectedMapId);
+      if (exists) {
+        useMapStore.getState().setSelectedMap(data.selectedMapId);
+      }
+    }
+
+    // Apply focus settings
+    if (data.focusSettings) {
+      const fs = useMapFocusStore.getState();
+      fs.setUnfocusedOpacity(data.focusSettings.unfocusedOpacity);
+      fs.setUnfocusedBlur(data.focusSettings.unfocusedBlur);
+      fs.setSelectionLockEnabled(data.focusSettings.selectionLockEnabled);
+    }
+  });
+
   // Portal activation flash (remote portal animation trigger)
   ephemeralBus.on("portal.activate", (data: PortalActivatePayload, _userId) => {
     triggerSound('portal.activate');
