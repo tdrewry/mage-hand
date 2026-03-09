@@ -8819,6 +8819,7 @@ export const SimpleTabletop = () => {
               setIsDraggingMapObject(true);
               setDraggedMapObjectId(clickedMapObject.id);
               setMapObjectDragOffset({ x: worldPos.x - clickedMapObject.position.x, y: worldPos.y - clickedMapObject.position.y });
+              ephemeralBus.emit("mapObject.drag.begin", { objectId: clickedMapObject.id, startPos: { x: clickedMapObject.position.x, y: clickedMapObject.position.y } });
               const mobjDragGroup = useGroupStore.getState().getGroupForEntity(clickedMapObject.id);
               const snap: typeof groupSiblingSnapshotsRef.current = {};
               snap[clickedMapObject.id] = { type: 'mapObject', position: { ...clickedMapObject.position }, wallPoints: clickedMapObject.wallPoints ? clickedMapObject.wallPoints.map(p => ({ ...p })) : undefined };
