@@ -12167,24 +12167,63 @@ export const SimpleTabletop = () => {
 
 
       {/* Portal Teleport DM Confirmation Dialog */}
-      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) setPendingTeleport(null); }}>
+      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) { 
+        if (pendingTeleport?.requestId) {
+          emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM dismissed the request' });
+        }
+        setPendingTeleport(null); 
+      }}}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Teleportation</AlertDialogTitle>
             <AlertDialogDescription>
+              {pendingTeleport?.requestingPlayerName && (
+                <span className="block text-sm text-muted-foreground mb-1">
+                  Requested by <strong>{pendingTeleport.requestingPlayerName}</strong>
+                </span>
+              )}
               Teleport <strong>{pendingTeleport?.tokenName}</strong> from{' '}
               <strong>{pendingTeleport?.sourcePortalName}</strong> to{' '}
               <strong>{pendingTeleport?.targetPortalName}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingTeleport(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              if (pendingTeleport?.requestId) {
+                emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM denied the teleport' });
+              }
+              setPendingTeleport(null);
+            }}>Deny</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (pendingTeleport) {
+                // Execute teleport locally on DM
                 executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
+                
+                // Broadcast approval to all clients with map state
+                const maps = useMapStore.getState().maps;
+                const allMapObjects = useMapObjectStore.getState().mapObjects;
+                const targetPortal = allMapObjects.find(obj => obj.id === pendingTeleport.targetPortalId);
+                const sourcePortal = allMapObjects.find(obj => obj.id === pendingTeleport.sourcePortalId);
+                const isCrossMap = targetPortal?.mapId && sourcePortal?.mapId && targetPortal.mapId !== sourcePortal.mapId;
+                
+                const approvalPayload: any = {
+                  requestId: pendingTeleport.requestId || '',
+                  tokenId: pendingTeleport.tokenId,
+                  sourcePortalId: pendingTeleport.sourcePortalId,
+                  targetPortalId: pendingTeleport.targetPortalId,
+                  dropPosition: pendingTeleport.dropPosition,
+                };
+
+                if (isCrossMap) {
+                  // Include full map activation state so all clients match DM
+                  approvalPayload.activeMapId = useMapStore.getState().selectedMapId;
+                  approvalPayload.mapActivations = maps.map(m => ({ mapId: m.id, active: m.active }));
+                }
+
+                emitPortalTeleportApproved(approvalPayload);
                 setPendingTeleport(null);
               }
-            }}>Teleport</AlertDialogAction>
+            }}>Approve Teleport</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
