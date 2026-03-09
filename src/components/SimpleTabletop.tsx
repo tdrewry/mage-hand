@@ -1158,7 +1158,7 @@ export const SimpleTabletop = () => {
     portalActivationsRef.current.set(portalAtDrop.id, performance.now());
     emitPortalActivate(portalAtDrop.id);
 
-    // DM gets a confirmation prompt; non-DM teleports instantly
+    // DM gets a confirmation prompt; non-DM sends a request to DM for approval
     if (isDM) {
       const dropPos = { x: token.x, y: token.y };
       setPendingTeleport({
@@ -1171,7 +1171,21 @@ export const SimpleTabletop = () => {
         dropPosition: dropPos,
       });
     } else {
-      executeTeleport(tokenId, portalAtDrop.id, targetPortal.id, { x: token.x, y: token.y });
+      // Non-DM: send a teleport request to the DM for approval
+      const requestId = `ptr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const playerName = useMultiplayerStore.getState().username || 'Player';
+      emitPortalTeleportRequest({
+        requestId,
+        tokenId,
+        tokenName: token.name || 'Token',
+        sourcePortalId: portalAtDrop.id,
+        sourcePortalName: portalAtDrop.portalName || 'Portal',
+        targetPortalId: targetPortal.id,
+        targetPortalName: targetPortal.portalName || 'Portal',
+        requestingPlayerName: playerName,
+        dropPosition: { x: token.x, y: token.y },
+      });
+      toast.info('Teleport request sent to DM for approval', { duration: 3000 });
     }
   }, [tokens, isDM, executeTeleport]);
 
