@@ -4,6 +4,7 @@ import { syncPatch } from '@/lib/sync';
 import { rollDice, type DiceRollResult, type RollMetadata } from '@/lib/diceEngine';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { ephemeralBus } from '@/lib/net';
+import { triggerSound } from '@/lib/soundEngine';
 
 const MAX_HISTORY = 50;
 
