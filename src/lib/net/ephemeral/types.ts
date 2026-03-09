@@ -473,9 +473,13 @@ export interface EphemeralPayloadMap {
   "map.dm.enforceFollow": DmEnforceFollowPayload;
   "map.ping": MapPingPayload;
   "map.focus": MapFocusPayload;
+  "region.drag.begin": RegionDragBeginPayload;
   "region.drag.update": RegionDragUpdatePayload;
+  "region.drag.end": RegionDragEndPayload;
   "region.handle.preview": RegionHandlePreviewPayload;
+  "mapObject.drag.begin": MapObjectDragBeginPayload;
   "mapObject.drag.update": MapObjectDragUpdatePayload;
+  "mapObject.drag.end": MapObjectDragEndPayload;
   "mapObject.handle.preview": MapObjectHandlePreviewPayload;
   "mapObject.door.preview": MapObjectDoorPreviewPayload;
   "fog.cursor.preview": FogCursorPreviewPayload;
