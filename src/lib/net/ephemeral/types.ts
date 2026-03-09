@@ -65,7 +65,10 @@ export type EphemeralOpKind =
   | "effect.placement.preview"
   // Portal & Map Activation
   | "map.dm.selectMap"
-  | "portal.activate";
+  | "portal.activate"
+  // Ambient
+  | "ambient.loop.play"
+  | "ambient.loop.stop";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
