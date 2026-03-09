@@ -611,7 +611,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "asset.rejected":         { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "none", dmOnly: true },
 
   // Effects & Auras
-  "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
+  "effect.aura.state":      { throttleMs: 200, ttlMs: 0,    keyStrategy: "entityId" },
   "effect.placement.preview": { throttleMs: 67, ttlMs: 0,    keyStrategy: "userId" },
 
   // Portal & Map Activation

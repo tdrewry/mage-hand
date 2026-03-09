@@ -83,22 +83,4 @@ export function registerTokenHandlers(): void {
     }
   });
 
-  // Wire TTL cache expiry to clean up stale entries
-  ephemeralBus.onCacheChange((key, entry) => {
-    if (entry) return; // only care about removals
-
-    if (key.startsWith("token.hover::")) {
-      const userId = key.replace("token.hover::", "");
-      store.getState().removeHover(userId);
-    } else if (key.startsWith("token.handle.preview::")) {
-      const userId = key.replace("token.handle.preview::", "");
-      store.getState().removeHandlePreview(userId);
-    } else if (key.startsWith("selection.preview::")) {
-      const userId = key.replace("selection.preview::", "");
-      store.getState().removeSelectionPreview(userId);
-    } else if (key.startsWith("action.target.preview::")) {
-      const userId = key.replace("action.target.preview::", "");
-      store.getState().removeActionTarget(userId);
-    }
-  });
 }
