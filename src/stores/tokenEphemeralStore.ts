@@ -56,9 +56,12 @@ export const useTokenEphemeralStore = create<TokenEphemeralState>((set) => ({
   actionTargets: {},
 
   setHover: (userId, tokenId) =>
-    set((s) => ({
-      hovers: { ...s.hovers, [userId]: { userId, tokenId } },
-    })),
+    set((s) => {
+      // Skip update if value hasn't changed — prevents unnecessary canvas redraws
+      const existing = s.hovers[userId];
+      if (existing && existing.tokenId === tokenId) return s;
+      return { hovers: { ...s.hovers, [userId]: { userId, tokenId } } };
+    }),
   removeHover: (userId) =>
     set((s) => {
       const { [userId]: _, ...rest } = s.hovers;

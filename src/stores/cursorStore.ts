@@ -55,16 +55,26 @@ export const useCursorStore = create<CursorState>()((set) => ({
   cursorSharingEnabled: true,
 
   setCursor: (userId, cursor) =>
-    set((state) => ({
-      cursors: {
-        ...state.cursors,
-        [userId]: {
-          ...cursor,
-          color: cursor.color || getColorForUser(userId),
-          lastSeen: Date.now(),
+    set((state) => {
+      // Skip update if position hasn't meaningfully changed (within 0.5 world units)
+      // Prevents unnecessary React renders and canvas redraws on remote clients
+      const existing = state.cursors[userId];
+      if (existing) {
+        const dx = Math.abs(existing.x - cursor.x);
+        const dy = Math.abs(existing.y - cursor.y);
+        if (dx < 0.5 && dy < 0.5 && existing.tool === cursor.tool) return state;
+      }
+      return {
+        cursors: {
+          ...state.cursors,
+          [userId]: {
+            ...cursor,
+            color: cursor.color || getColorForUser(userId),
+            lastSeen: Date.now(),
+          },
         },
-      },
-    })),
+      };
+    }),
 
   removeCursor: (userId) =>
     set((state) => {
