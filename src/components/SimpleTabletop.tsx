@@ -10921,6 +10921,7 @@ export const SimpleTabletop = () => {
 
     // Reset all region drag states (runs for normal drag, rotation, and resize)
     if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
+      if (isDraggingRegion && draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
       setIsDraggingRegion(false);
       setIsResizingRegion(false);
       setDraggedRegionId(null);
