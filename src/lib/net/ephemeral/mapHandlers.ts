@@ -189,6 +189,21 @@ export function emitPortalActivate(objectId: string): void {
   ephemeralBus.emit("portal.activate", { objectId });
 }
 
+/** Player requests DM approval for a portal teleport. */
+export function emitPortalTeleportRequest(payload: PortalTeleportRequestPayload): void {
+  ephemeralBus.emit("portal.teleport.request", payload);
+}
+
+/** DM approves a portal teleport request — broadcast to all clients. */
+export function emitPortalTeleportApproved(payload: PortalTeleportApprovedPayload): void {
+  ephemeralBus.emit("portal.teleport.approved", payload);
+}
+
+/** DM denies a portal teleport request. */
+export function emitPortalTeleportDenied(payload: PortalTeleportDeniedPayload): void {
+  ephemeralBus.emit("portal.teleport.denied", payload);
+}
+
 /** Broadcast a region drag update to peers. */
 export function emitRegionDragUpdate(regionId: string, pos: { x: number; y: number }): void {
   ephemeralBus.emit("region.drag.update", { regionId, pos });
