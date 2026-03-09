@@ -168,6 +168,7 @@ export class NetManager {
   proposeOp(op: EngineOp, clientOpId?: string): void {
     if (!this.isConnected) {
       console.warn("[NetManager] proposeOp called but not connected — op dropped:", op.kind);
+      triggerSound('ui.error');
       toast.error("Not connected — operation not sent");
       return;
     }
