@@ -240,8 +240,7 @@ class OpBridgeImpl {
           const newCustom = [...s.customTemplates, { ...d.template, isBuiltIn: false }];
           const customIds = new Set(newCustom.map(t => t.id));
           const hiddenSet = new Set(s.hiddenBuiltInIds);
-          const { BUILT_IN_EFFECT_TEMPLATES: builtIns } = require('@/lib/effectTemplateLibrary');
-          const visibleBuiltIns = builtIns.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
+          const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
           return {
             customTemplates: newCustom,
             allTemplates: [...visibleBuiltIns, ...newCustom],
