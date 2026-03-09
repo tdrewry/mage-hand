@@ -125,15 +125,32 @@ const SYNTH_DEFAULTS: Record<SoundEvent, SynthDef> = {
   'ambient.loop':    { type: 'sine', frequency: 200, duration: 0.01, gain: 0 },
 };
 
-// ── Audio Context (lazy singleton) ──────────────────────────────────────
+// ── Audio Context (lazy singleton — only created on user gesture) ────────
 
 let audioCtx: AudioContext | null = null;
+let userHasInteracted = false;
 
-function getAudioContext(): AudioContext {
+// Listen for first user gesture to unlock audio
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    userHasInteracted = true;
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+  };
+  window.addEventListener('click', unlockAudio, { once: true });
+  window.addEventListener('keydown', unlockAudio, { once: true });
+  window.addEventListener('touchstart', unlockAudio, { once: true });
+}
+
+function getAudioContext(): AudioContext | null {
+  if (!userHasInteracted) return null;
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
-  // Resume if suspended (browser autoplay policy)
   if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
   }
@@ -248,6 +265,7 @@ async function loadCustomBuffer(eventName: SoundEvent): Promise<AudioBuffer | nu
   }
   try {
     const ctx = getAudioContext();
+    if (!ctx) return null;
     const buffer = await ctx.decodeAudioData(entry.audioData.slice(0));
     customSoundCache.set(eventName, buffer);
     return buffer;
@@ -262,6 +280,7 @@ async function loadCustomBuffer(eventName: SoundEvent): Promise<AudioBuffer | nu
 /** Play a synthesized tone from a SynthDef */
 function playSynth(def: SynthDef, masterGain: number): void {
   const ctx = getAudioContext();
+  if (!ctx) return;
   const now = ctx.currentTime;
   const gain = ctx.createGain();
   const effectiveGain = (def.gain ?? 0.2) * masterGain;
@@ -290,6 +309,7 @@ function playSynth(def: SynthDef, masterGain: number): void {
 /** Play a custom AudioBuffer */
 function playBuffer(buffer: AudioBuffer, masterGain: number): void {
   const ctx = getAudioContext();
+  if (!ctx) return;
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   const gain = ctx.createGain();
@@ -325,6 +345,7 @@ export async function playSound(event: SoundEvent): Promise<void> {
     const randomId = queue[Math.floor(Math.random() * queue.length)];
     try {
       const ctx = getAudioContext();
+      if (!ctx) return;
       const buffer = await getAudioBuffer(randomId, ctx);
       if (buffer) {
         playBuffer(buffer, effectiveGain);

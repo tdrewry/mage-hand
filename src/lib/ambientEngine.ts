@@ -17,18 +17,33 @@ export interface AmbientLoopMeta {
   description: string;
 }
 
-// ── Audio context (lazy singleton) ──────────────────────────────────────
+// ── Audio context (lazy singleton — deferred until user gesture) ─────────
 
 let _ctx: AudioContext | null = null;
+let _userGesture = false;
 
-function getCtx(): AudioContext {
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    _userGesture = true;
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
+    window.removeEventListener('click', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('click', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  window.addEventListener('touchstart', unlock, { once: true });
+}
+
+function getCtx(): AudioContext | null {
+  if (!_userGesture) return null;
   if (!_ctx) _ctx = new AudioContext();
   if (_ctx.state === 'suspended') _ctx.resume().catch(() => {});
   return _ctx;
 }
 
 /** Expose the audio context for external consumers that need it. */
-export function getAmbientAudioContext(): AudioContext {
+export function getAmbientAudioContext(): AudioContext | null {
   return getCtx();
 }
 
@@ -52,6 +67,7 @@ export async function playAmbientLoop(loopId: string, volume: number): Promise<v
   if (!state.enabled) return;
 
   const ctx = getCtx();
+  if (!ctx) return;
   const masterVol = state.masterVolume * (state.categoryVolumes['ambient'] ?? 1) * volume;
   const gainNode = ctx.createGain();
   gainNode.gain.value = Math.max(0, Math.min(1, masterVol));
