@@ -129,9 +129,18 @@ export interface MapFocusPayload {
 
 // -- Regions --
 
+export interface RegionDragBeginPayload {
+  regionId: string;
+  startPos: Vec2;
+}
+
 export interface RegionDragUpdatePayload {
   regionId: string;
   pos: Vec2;
+}
+
+export interface RegionDragEndPayload {
+  regionId: string;
 }
 
 export interface RegionHandlePreviewPayload {
