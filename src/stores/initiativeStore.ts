@@ -1,6 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
+import { triggerSound } from '@/lib/soundEngine';
 
 export interface InitiativeEntry {
   tokenId: string;
@@ -51,6 +52,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       roundNumber: 1,
       isTrackerVisible: true
     });
+    triggerSound('initiative.combatStart');
   },
   
   endCombat: () => {
@@ -61,6 +63,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       initiativeOrder: [],
       restrictMovement: false
     });
+    triggerSound('initiative.combatEnd');
   },
   
   setInitiativeOrder: (order) => set({ initiativeOrder: order }),
@@ -113,6 +116,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
       
       return { currentTurnIndex: nextIndex, initiativeOrder: updatedOrder };
     });
+    triggerSound('initiative.turnChange');
   },
   
   previousTurn: () => {

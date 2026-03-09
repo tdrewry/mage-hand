@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { triggerSound } from '@/lib/soundEngine';
 import type {
   EffectTemplate,
   PlacedEffect,
@@ -428,6 +429,7 @@ export const useEffectStore = create<EffectState>()(
       persistTemplateTexture(effect.template);
 
       set((s) => ({ placedEffects: [...s.placedEffects, effect] }));
+      triggerSound('effect.placed');
       return effect;
     },
 
@@ -435,6 +437,7 @@ export const useEffectStore = create<EffectState>()(
       set((s) => ({
         placedEffects: s.placedEffects.filter((e) => e.id !== effectId),
       }));
+      triggerSound('effect.removed');
     },
 
     dismissEffect: (effectId) => {
@@ -445,6 +448,7 @@ export const useEffectStore = create<EffectState>()(
             : e
         ),
       }));
+      triggerSound('effect.removed');
     },
 
     cancelEffect: (effectId, getCharacter) => {

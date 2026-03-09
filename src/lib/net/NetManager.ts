@@ -9,6 +9,7 @@ import { isEphemeralOp } from "./ephemeral";
 import type { EphemeralOpKind } from "./ephemeral";
 import { startPositionSync, stopPositionSync } from "./tokenPositionSync";
 import { toast } from "sonner";
+import { triggerSound } from "@/lib/soundEngine";
 
 // Lazy reference to ephemeralBus to break circular dependency with ./index
 let _ephemeralBus: import("./ephemeral").EphemeralBus | null = null;
@@ -167,6 +168,7 @@ export class NetManager {
   proposeOp(op: EngineOp, clientOpId?: string): void {
     if (!this.isConnected) {
       console.warn("[NetManager] proposeOp called but not connected — op dropped:", op.kind);
+      triggerSound('ui.error');
       toast.error("Not connected — operation not sent");
       return;
     }
@@ -303,6 +305,7 @@ export class NetManager {
           store.addConnectedUser(user);
           // Don't toast for our own join
           if (p.user.userId !== store.currentUserId) {
+            triggerSound('ui.notification');
             toast.info(`${p.user.username} joined the session`, { duration: 3000 });
             
             // Auto-push durable state when a player joins in Jazz tandem mode
@@ -320,6 +323,7 @@ export class NetManager {
           break;
         case "leave":
           store.removeConnectedUser(p.user.userId);
+          triggerSound('ui.notification');
           toast.info(`${p.user.username} left the session`, { duration: 3000 });
           console.log(`👤 [NetManager] User left: ${p.user.username}`);
           break;

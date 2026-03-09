@@ -4,6 +4,7 @@
 
 import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contract/v1";
 import { toast } from "sonner";
+import { triggerSound } from "@/lib/soundEngine";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
@@ -48,6 +49,7 @@ class OpBridgeImpl {
     this.register("token.move", (data) => {
       const d = data as { tokenId: string; x: number; y: number };
       useSessionStore.getState().updateTokenPosition(d.tokenId, d.x, d.y);
+      triggerSound('movement.commit');
     });
 
     this.register("token.sync", (data) => {

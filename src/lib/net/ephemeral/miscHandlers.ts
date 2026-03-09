@@ -75,6 +75,7 @@ export function registerMiscHandlers(): void {
     if (data.shape === "committed" && data.serializedExploredAreas != null) {
       const mapId = data.mapId || 'default-map';
       useFogStore.getState().setSerializedExploredAreasForMap(mapId, data.serializedExploredAreas);
+      triggerSound('fog.reveal');
     }
   });
 
@@ -184,6 +185,7 @@ export function registerMiscHandlers(): void {
   // ── Action Resolution Claim (multi-DM coordination) ──
   ephemeralBus.on("action.resolution.claim", (data: ActionResolutionClaimPayload, _userId) => {
     if (data.claimedBy) {
+      triggerSound('action.claim');
       useActionPendingStore.getState().setClaim(data.actionId, {
         actionId: data.actionId,
         claimedBy: data.claimedBy,
@@ -206,6 +208,7 @@ export function registerMiscHandlers(): void {
     const roles = useMultiplayerStore.getState().roles;
     if (!roles.includes("dm")) return;
 
+    triggerSound('asset.submitted');
     useArtSubmissionStore.getState().addSubmission({
       id: data.submissionId,
       playerId: userId,
@@ -226,12 +229,14 @@ export function registerMiscHandlers(): void {
 
   // ── Art Accepted (DM → all) ──
   ephemeralBus.on("asset.accepted", (data: AssetAcceptedPayload, _userId) => {
+    triggerSound('asset.approved');
     // Apply the accepted texture to the target entity
     applyAcceptedArt(data);
   });
 
   // ── Art Rejected (DM → submitter) ──
   ephemeralBus.on("asset.rejected", (data: AssetRejectedPayload, _userId) => {
+    triggerSound('asset.rejected');
     toast.info(`Art submission was declined${data.reason ? `: ${data.reason}` : ""}`, {
       description: "The DM did not approve your art submission.",
     });
@@ -271,15 +276,19 @@ async function applyAcceptedArt(data: AssetAcceptedPayload): Promise<void> {
     if (data.targetType === 'token') {
       await saveTextureByHash(data.textureHash, data.textureDataUrl);
       useSessionStore.getState().updateTokenImage(data.targetId, data.textureDataUrl, data.textureHash);
+      triggerSound('ui.success');
       toast.success(`Art applied to token`);
     } else if (data.targetType === 'region') {
       await saveTextureByHash(data.textureHash, data.textureDataUrl);
       // Region texture application would go through regionStore
+      triggerSound('ui.success');
       toast.success(`Art applied to region`);
     } else {
+      triggerSound('ui.success');
       toast.success(`Art accepted for ${data.targetType}`);
     }
   } catch (err) {
+    triggerSound('ui.error');
     console.error("[miscHandlers] Failed to apply accepted art:", err);
   }
 }
