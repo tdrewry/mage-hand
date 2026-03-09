@@ -11086,6 +11086,8 @@ export const SimpleTabletop = () => {
       selectedRegionIds.forEach(id => deselectRegion(id));
       setSelectedRegionIds([]);
       clearMapObjectSelection();
+      emitGroupSelectPreview(null);
+      ephemeralBus.emit("selection.preview", {});
       redrawCanvas();
     },
     onDragStart: (x, y, rect) => {
