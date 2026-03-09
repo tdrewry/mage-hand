@@ -2514,7 +2514,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
             if (changed) {
               // Rebuild allTemplates inline (mirrors effectStore's buildAllTemplates)
-              const { BUILT_IN_EFFECT_TEMPLATES } = require('@/lib/effectTemplateLibrary');
               const customIds = new Set(newCustom.map((t: any) => t.id));
               const hiddenSet = new Set(store.hiddenBuiltInIds);
               const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
