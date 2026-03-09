@@ -4324,7 +4324,6 @@ export const SimpleTabletop = () => {
       }
 
       // ── Remote ephemeral overlays ──
-      drawRemoteDragPreviews(ctx);
       drawRemoteTokenHovers(ctx);
       drawRemoteSelectionPreviews(ctx);
       drawRemoteActionTargets(ctx);
