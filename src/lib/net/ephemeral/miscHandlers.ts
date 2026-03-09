@@ -208,6 +208,7 @@ export function registerMiscHandlers(): void {
     const roles = useMultiplayerStore.getState().roles;
     if (!roles.includes("dm")) return;
 
+    triggerSound('asset.submitted');
     useArtSubmissionStore.getState().addSubmission({
       id: data.submissionId,
       playerId: userId,
@@ -228,12 +229,14 @@ export function registerMiscHandlers(): void {
 
   // ── Art Accepted (DM → all) ──
   ephemeralBus.on("asset.accepted", (data: AssetAcceptedPayload, _userId) => {
+    triggerSound('asset.approved');
     // Apply the accepted texture to the target entity
     applyAcceptedArt(data);
   });
 
   // ── Art Rejected (DM → submitter) ──
   ephemeralBus.on("asset.rejected", (data: AssetRejectedPayload, _userId) => {
+    triggerSound('asset.rejected');
     toast.info(`Art submission was declined${data.reason ? `: ${data.reason}` : ""}`, {
       description: "The DM did not approve your art submission.",
     });
