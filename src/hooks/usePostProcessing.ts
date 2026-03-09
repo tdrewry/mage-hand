@@ -1,6 +1,9 @@
 /**
  * Hook for managing PixiJS post-processing layer
  * Integrates with the fog of war system for GPU-accelerated effects
+ *
+ * The PixiJS canvas is viewport-sized — it never resizes on zoom or pan,
+ * only when the browser window resizes.
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
@@ -25,14 +28,10 @@ import type { IlluminationSource } from '@/types/illumination';
 interface UsePostProcessingOptions {
   containerRef: React.RefObject<HTMLElement>;
   enabled: boolean;
-  /** Content bbox width in CSS px (may be larger than viewport for large maps). */
+  /** Viewport width in CSS px. */
   width: number;
-  /** Content bbox height in CSS px (may be larger than viewport for large maps). */
+  /** Viewport height in CSS px. */
   height: number;
-  /** CSS px distance from container origin to content bbox top-left (X axis). Default 0. */
-  originX?: number;
-  /** CSS px distance from container origin to content bbox top-left (Y axis). Default 0. */
-  originY?: number;
 }
 
 export interface IlluminationData {
@@ -46,11 +45,8 @@ export function usePostProcessing({
   enabled,
   width,
   height,
-  originX = 0,
-  originY = 0,
 }: UsePostProcessingOptions) {
   const [isReady, setIsReady] = useState(false);
-  // Keep a ref in sync so redrawCanvas closures always read the latest value
   const isReadyRef = useRef(false);
   const initRef = useRef(false);
   const initializingRef = useRef(false);
@@ -64,13 +60,9 @@ export function usePostProcessing({
 
   // Initialize PixiJS when enabled and dimensions are valid
   useEffect(() => {
-    // Skip if dimensions are invalid
-    if (width <= 0 || height <= 0) {
-      return;
-    }
+    if (width <= 0 || height <= 0) return;
 
     if (!enabled || !containerRef.current || !effectSettings.postProcessingEnabled) {
-      // Only hide — don't destroy — so re-enabling is instant
       if (initRef.current) {
         setPostProcessingVisible(false);
         setReady(false);
@@ -86,18 +78,15 @@ export function usePostProcessing({
       const success = await initPostProcessing(containerRef.current, {
         width,
         height,
-        originX,
-        originY,
         resolution: window.devicePixelRatio || 1,
       });
 
       if (success) {
-        initFogCanvas(width, height, undefined, originX, originY);
+        initFogCanvas(width, height);
         initRef.current = true;
         setPostProcessingVisible(true);
         setReady(true);
       } else if (retryCount < 2) {
-        // GPU context may have been lost after idle — retry after a short delay
         console.warn(`Post-processing init failed, retrying (${retryCount + 1}/2)…`);
         initializingRef.current = false;
         setTimeout(() => init(retryCount + 1), 1000);
@@ -110,14 +99,10 @@ export function usePostProcessing({
     if (!initRef.current) {
       init();
     } else {
-      // Already initialised — just make sure it's visible and mark ready
       setPostProcessingVisible(true);
       setReady(true);
     }
-
-    // No cleanup here — we don't want to hide the layer on every dep change.
-    // Hiding is handled explicitly in the `!enabled` branch above.
-  }, [enabled, effectSettings.postProcessingEnabled, containerRef, width, height, originX, originY]);
+  }, [enabled, effectSettings.postProcessingEnabled, containerRef, width, height]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -131,18 +116,13 @@ export function usePostProcessing({
     };
   }, []);
 
-  // Update size/origin when content bounds change.
-  // Expensive GPU resize only when dimensions change significantly (>10%).
-  // Origin-only changes use cheap CSS repositioning.
-  // Resize PixiJS renderer + fog Canvas2D whenever fogBounds change.
-  // fogBounds is memoised on transform.zoom (not pan), so this only fires on
-  // zoom or region changes — never on every pan frame.
+  // Resize only when viewport dimensions change (window resize)
   useEffect(() => {
     if (!initRef.current || !isPostProcessingReady() || width <= 0 || height <= 0) return;
 
-    resizePostProcessing(width, height, originX, originY);
-    resizeFogCanvas(width, height, undefined, originX, originY);
-  }, [width, height, originX, originY]);
+    resizePostProcessing(width, height);
+    resizeFogCanvas(width, height);
+  }, [width, height]);
 
   // Update effect settings when they change
   useEffect(() => {
@@ -178,17 +158,13 @@ export function usePostProcessing({
         width,
         height,
         transform,
-        illuminationData,
-        originX,
-        originY
+        illuminationData
       );
     },
-    [width, height, originX, originY, effectSettings.postProcessingEnabled]
+    [width, height, effectSettings.postProcessingEnabled]
   );
 
   return {
-    // Expose both the reactive state (for triggering re-renders) and the ref
-    // (for use inside canvas draw callbacks that capture stale closures).
     isReady,
     isReadyRef,
     applyEffects,

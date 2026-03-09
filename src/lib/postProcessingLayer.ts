@@ -3,22 +3,21 @@
  *
  * COORDINATE SPACE DESIGN
  * =======================
- * The PixiJS canvas covers the content bounding box (all regions + tokens in
- * screen space) plus FIXED_PADDING on every side.  Its CSS top/left are set so
- * that it starts at (contentLeft - FIXED_PADDING, contentTop - FIXED_PADDING)
- * relative to the container.
+ * The PixiJS canvas is **viewport-sized** — it matches the main rendering canvas
+ * exactly.  It sits at position: absolute; top: 0; left: 0 and never moves.
  *
- * When content fits entirely within the viewport the canvas is simply
- * (viewport + FIXED_PADDING*2) — the same as before.  When content extends
- * beyond the viewport on any side the canvas grows to cover that content, so
- * fog is always drawn over every region regardless of pan position.
+ * The fog Canvas2D (in fogPostProcessing.ts) uses the same
+ *   ctx.translate(transform.x, transform.y)
+ *   ctx.scale(transform.zoom, transform.zoom)
+ * as the main canvas, so fog masks are pixel-aligned by definition.
  *
- * The fog canvas (Canvas 2D) is initialised at the SAME pixel dimensions and
- * uses translate(FIXED_PADDING - originX + pan.x, FIXED_PADDING - originY + pan.y)
- * / scale(zoom) so that world-space coordinates land in the correct fog-canvas pixel.
+ * A small EDGE_PADDING (50px) is added to all sides so blur filters don't
+ * clip at the viewport edge.  The PixiJS canvas is positioned at
+ * (-EDGE_PADDING, -EDGE_PADDING) and sized (viewport + 2 × EDGE_PADDING).
  *
- * FIXED_PADDING is chosen to be large enough that light circles whose centres are
- * at the content edge still render fully.
+ * Resizing only happens when the browser viewport changes — never on zoom or pan.
+ * This eliminates the WebGL buffer clear flash that occurred with the old
+ * content-sized approach.
  */
 
 import * as PIXI from 'pixi.js';
@@ -26,18 +25,17 @@ import { Z_INDEX } from './zIndex';
 import { IlluminationFilter } from './shaders/illuminationFilter';
 
 // ---------------------------------------------------------------------------
-// Fixed padding — padding around the content bounding box on every side.
+// Edge padding — small bleed area so blur doesn't clip at viewport edges.
 // ---------------------------------------------------------------------------
-export const FIXED_PADDING = 600;
+export const EDGE_PADDING = 50;
 
 export interface PostProcessingConfig {
+  /** Viewport width in CSS px. */
   width: number;
+  /** Viewport height in CSS px. */
   height: number;
   resolution?: number;
   antialias?: boolean;
-  /** Origin offset: how many CSS px the content bbox top-left is above/left of the container origin. */
-  originX?: number;
-  originY?: number;
 }
 
 export interface EffectSettings {
@@ -69,14 +67,9 @@ let containerRef: HTMLElement | null = null;
 let isInitialized = false;
 let currentSettings: EffectSettings = { ...DEFAULT_EFFECT_SETTINGS };
 
-// Stored dimensions — content bbox dimensions (without padding)
-let _contentW = 0;
-let _contentH = 0;
-// CSS origin of the fog canvas relative to the container
-let _originX = 0;
-let _originY = 0;
-// Last transform used for a full fog render — used for CSS-offset fast path during pan
-let _lastRenderTransform = { x: 0, y: 0, zoom: 0 };
+// Stored viewport dimensions (without padding)
+let _viewportW = 0;
+let _viewportH = 0;
 
 function getQualityMultiplier(quality: EffectSettings['effectQuality']): number {
   switch (quality) {
@@ -89,7 +82,7 @@ function getQualityMultiplier(quality: EffectSettings['effectQuality']): number 
 
 // WebGL context loss / restore handlers
 function _onContextLost(e: Event): void {
-  e.preventDefault(); // Allow context restoration
+  e.preventDefault();
   console.warn('⚠️ PixiJS WebGL context lost — fog layer suspended');
   isInitialized = false;
 }
@@ -97,28 +90,22 @@ function _onContextLost(e: Event): void {
 function _onContextRestored(): void {
   console.log('✅ PixiJS WebGL context restored — forcing texture re-upload');
   isInitialized = true;
-  // Destroy old textures so the next updateFogTexture/updateIlluminationTexture
-  // calls recreate them from the current Canvas 2D sources.
   if (fogTexture) { fogTexture.destroy(false); fogTexture = null; }
   if (illuminationTexture) { illuminationTexture.destroy(false); illuminationTexture = null; }
 }
 
-/** Total canvas dimension = content size + 2 × padding. */
-function totalSize(contentPx: number): number {
-  return contentPx + FIXED_PADDING * 2;
+/** Total canvas dimension = viewport + 2 × edge padding. */
+function totalSize(viewportPx: number): number {
+  return viewportPx + EDGE_PADDING * 2;
 }
 
-/** Apply CSS positioning to the PixiJS canvas based on current origin. */
-function applyCanvasCSS(canvas: HTMLCanvasElement, contentW: number, contentH: number): void {
+/** Apply CSS positioning to the PixiJS canvas. */
+function applyCanvasCSS(canvas: HTMLCanvasElement, viewportW: number, viewportH: number): void {
   canvas.style.position = 'absolute';
-  // The fog canvas starts at (originX - FIXED_PADDING, originY - FIXED_PADDING)
-  // relative to the container.  originX/Y are the CSS px distances from the
-  // container top-left to the content bounding-box top-left (can be negative
-  // when content is above / left of the viewport).
-  canvas.style.top  = `${_originY - FIXED_PADDING}px`;
-  canvas.style.left = `${_originX - FIXED_PADDING}px`;
-  canvas.style.width  = `${totalSize(contentW)}px`;
-  canvas.style.height = `${totalSize(contentH)}px`;
+  canvas.style.top = `${-EDGE_PADDING}px`;
+  canvas.style.left = `${-EDGE_PADDING}px`;
+  canvas.style.width = `${totalSize(viewportW)}px`;
+  canvas.style.height = `${totalSize(viewportH)}px`;
   canvas.style.pointerEvents = 'none';
   canvas.style.zIndex = String(Z_INDEX.CANVAS_ELEMENTS.FOG_POST_PROCESSING);
 }
@@ -126,9 +113,7 @@ function applyCanvasCSS(canvas: HTMLCanvasElement, contentW: number, contentH: n
 /**
  * Initialize the PixiJS post-processing layer.
  *
- * width/height = content bbox dimensions in CSS px.
- * originX/Y    = CSS px position of the content bbox top-left inside the container.
- *                Typically 0 when content fits in the viewport (same as before).
+ * width/height = viewport dimensions in CSS px.
  */
 export async function initPostProcessing(
   container: HTMLElement,
@@ -139,10 +124,8 @@ export async function initPostProcessing(
       await cleanupPostProcessing();
     }
 
-    _contentW = config.width;
-    _contentH = config.height;
-    _originX  = config.originX ?? 0;
-    _originY  = config.originY ?? 0;
+    _viewportW = config.width;
+    _viewportH = config.height;
 
     const qm = getQualityMultiplier(currentSettings.effectQuality);
     const canvasW = Math.floor(totalSize(config.width) * qm);
@@ -156,15 +139,10 @@ export async function initPostProcessing(
       antialias: config.antialias ?? true,
       resolution: config.resolution ?? 1,
       autoDensity: true,
-      // Force WebGL to prevent "CanvasRenderer is not yet implemented" fallback
       preference: 'webgl',
-      // Disable auto-render — we call render() manually via renderPostProcessing().
-      // This prevents the internal ticker from calling render() on a corrupted
-      // GPU context, which causes cascading "push" errors.
       autoStart: false,
     });
 
-    // Stop the shared ticker entirely so PixiJS never auto-renders
     pixiApp.ticker.stop();
 
     const canvas = pixiApp.canvas as HTMLCanvasElement;
@@ -203,19 +181,17 @@ export async function initPostProcessing(
 
     isInitialized = true;
 
-    // Listen for WebGL context loss (e.g. switching browser tabs can evict the context)
     const canvas2 = pixiApp.canvas as HTMLCanvasElement;
     canvas2.addEventListener('webglcontextlost', _onContextLost);
     canvas2.addEventListener('webglcontextrestored', _onContextRestored);
 
     console.log(
-      `✅ PixiJS post-processing initialized — content ${config.width}×${config.height}, ` +
-      `origin (${_originX}, ${_originY}), canvas ${canvasW}×${canvasH}, padding ${FIXED_PADDING}px`
+      `✅ PixiJS post-processing initialized — viewport ${config.width}×${config.height}, ` +
+      `canvas ${canvasW}×${canvasH}, edge padding ${EDGE_PADDING}px`
     );
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize post-processing:', error);
-    // Clean up partial init to avoid dangling state
     if (pixiApp) {
       try { pixiApp.ticker.stop(); } catch (_) { /* noop */ }
       try { pixiApp.destroy(true); } catch (_) { /* noop */ }
@@ -227,8 +203,8 @@ export async function initPostProcessing(
 }
 
 /**
- * Update the fog texture from a padded Canvas 2D source.
- * The source canvas MUST be totalSize(contentW) × totalSize(contentH).
+ * Update the fog texture from a Canvas 2D source.
+ * The source canvas MUST be totalSize(viewportW) × totalSize(viewportH).
  */
 export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !fogSprite || !isInitialized) return;
@@ -259,7 +235,7 @@ export function updateFogTexture(sourceCanvas: HTMLCanvasElement): void {
 }
 
 /**
- * Update the illumination overlay texture from a padded Canvas 2D source.
+ * Update the illumination overlay texture from a Canvas 2D source.
  */
 export function updateIlluminationTexture(sourceCanvas: HTMLCanvasElement): void {
   if (!pixiApp || !illuminationSprite || !isInitialized) return;
@@ -302,44 +278,28 @@ export function updateEffectSettings(settings: Partial<EffectSettings>): void {
     illuminationFilter.globalEdgeBlur = currentSettings.edgeBlur;
   }
 
-  // Quality change requires renderer resize — sprite/renderer size mismatch
-  // otherwise causes a white screen (fog texture no longer covers the canvas)
-  if (settings.effectQuality && settings.effectQuality !== prevQuality && isInitialized && _contentW > 0) {
-    resizePostProcessing(_contentW, _contentH, _originX, _originY);
+  // Quality change requires renderer resize
+  if (settings.effectQuality && settings.effectQuality !== prevQuality && isInitialized && _viewportW > 0) {
+    resizePostProcessing(_viewportW, _viewportH);
   }
 }
 
-/** No-op — retained for call-site compatibility. Shader is a pass-through. */
-export function updateIlluminationData(_data: unknown): void {
-  // Intentional no-op. All illumination geometry is on Canvas 2D now.
-}
+/** No-op — retained for call-site compatibility. */
+export function updateIlluminationData(_data: unknown): void {}
 
 export function getEffectSettings(): EffectSettings {
   return { ...currentSettings };
 }
 
-/** Return current origin so fog canvas can use matching translate. */
-export function getPostProcessingOrigin(): { x: number; y: number } {
-  return { x: _originX, y: _originY };
-}
-
 /**
- * Resize the post-processing layer when content bounds or viewport changes.
- * width/height = new content bbox dimensions.
- * originX/Y    = new CSS origin of the content bbox inside the container.
+ * Resize the post-processing layer when the viewport changes.
+ * Only called on window resize — never on zoom or pan.
  */
-export function resizePostProcessing(
-  width: number,
-  height: number,
-  originX?: number,
-  originY?: number
-): void {
+export function resizePostProcessing(width: number, height: number): void {
   if (!pixiApp || !isInitialized) return;
 
-  _contentW = width;
-  _contentH = height;
-  if (originX !== undefined) _originX = originX;
-  if (originY !== undefined) _originY = originY;
+  _viewportW = width;
+  _viewportH = height;
 
   const qm = getQualityMultiplier(currentSettings.effectQuality);
   const canvasW = Math.floor(totalSize(width) * qm);
@@ -363,24 +323,6 @@ export function resizePostProcessing(
     illuminationSprite.x = 0;
     illuminationSprite.y = 0;
   }
-
-  // renderer.resize() clears the WebGL canvas.  Invalidate the fog fast-path
-  // caches so the next applyFogPostProcessing call performs a full Canvas 2D
-  // redraw + GPU texture upload instead of skipping via CSS offset.
-  _lastRenderTransform = { x: 0, y: 0, zoom: 0 };
-}
-
-/**
- * Cheap CSS-only reposition of the PixiJS canvas (no GPU resize).
- * Use when origin changed but canvas dimensions are still large enough.
- */
-export function repositionPostProcessing(originX: number, originY: number): void {
-  if (!pixiApp || !isInitialized) return;
-  _originX = originX;
-  _originY = originY;
-  const canvas = pixiApp.canvas as HTMLCanvasElement;
-  canvas.style.top  = `${_originY - FIXED_PADDING}px`;
-  canvas.style.left = `${_originX - FIXED_PADDING}px`;
 }
 
 export function setPostProcessingVisible(visible: boolean): void {
@@ -398,7 +340,6 @@ export function getPostProcessingCanvas(): HTMLCanvasElement | null {
 }
 
 export async function cleanupPostProcessing(): Promise<void> {
-  // Mark uninitialised FIRST to prevent any in-flight render calls
   isInitialized = false;
 
   try {
@@ -411,7 +352,6 @@ export async function cleanupPostProcessing(): Promise<void> {
 
     if (pixiApp) {
       try {
-        // Stop ticker before destroy to prevent render-during-teardown
         pixiApp.ticker.stop();
         const canvas = pixiApp.canvas as HTMLCanvasElement | undefined;
         if (canvas) {
@@ -438,48 +378,8 @@ export function renderPostProcessing(): void {
   try {
     pixiApp.render();
   } catch (err) {
-    // GPU context lost — internal PixiJS state is corrupted
     console.warn('PixiJS render failed (GPU context lost?), cleaning up:', err);
     isInitialized = false;
     cleanupPostProcessing();
   }
-}
-
-/**
- * Record the transform used for the last full fog render.
- * Called by fogPostProcessing after a full Canvas 2D redraw.
- */
-export function setLastRenderTransform(transform: { x: number; y: number; zoom: number }): void {
-  _lastRenderTransform = { ...transform };
-}
-
-/**
- * CSS-offset fast path: during pan (no zoom change), skip the expensive
- * Canvas 2D fog redraw and just reposition the PixiJS canvas to match.
- *
- * Returns true if the fast path was used (caller should skip full redraw).
- */
-export function panOffsetPostProcessing(transform: { x: number; y: number; zoom: number }): boolean {
-  if (!pixiApp || !isInitialized) return false;
-  // Zoom changed — need full redraw for correct scaling
-  if (_lastRenderTransform.zoom !== transform.zoom || _lastRenderTransform.zoom === 0) return false;
-
-  const dx = transform.x - _lastRenderTransform.x;
-  const dy = transform.y - _lastRenderTransform.y;
-  if (dx === 0 && dy === 0) return false; // nothing to offset
-
-  const canvas = pixiApp.canvas as HTMLCanvasElement;
-  canvas.style.left = `${_originX - FIXED_PADDING + dx}px`;
-  canvas.style.top  = `${_originY - FIXED_PADDING + dy}px`;
-  return true;
-}
-
-/**
- * Reset the PixiJS canvas CSS position back to its canonical location.
- * Called after a full fog redraw so there's no stale offset.
- */
-export function resetPostProcessingOffset(): void {
-  if (!pixiApp || !isInitialized) return;
-  const canvas = pixiApp.canvas as HTMLCanvasElement;
-  applyCanvasCSS(canvas, _contentW, _contentH);
 }
