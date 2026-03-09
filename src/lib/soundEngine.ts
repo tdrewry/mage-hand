@@ -146,12 +146,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('touchstart', unlockAudio, { once: true });
 }
 
-function getAudioContext(): AudioContext {
+function getAudioContext(): AudioContext | null {
+  if (!userHasInteracted) return null;
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
-  // Only resume if user has interacted (avoids browser warning)
-  if (audioCtx.state === 'suspended' && userHasInteracted) {
+  if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
   }
   return audioCtx;
