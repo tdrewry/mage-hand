@@ -540,9 +540,9 @@ export interface EphemeralOpConfig {
  */
 export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Tokens
-  "token.handle.preview":   { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
-  "token.hover":            { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
-  "selection.preview":      { throttleMs: 50,  ttlMs: 400,  keyStrategy: "userId" },
+  "token.handle.preview":   { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
+  "token.hover":            { throttleMs: 100, ttlMs: 0,    keyStrategy: "userId" },
+  "selection.preview":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "userId" },
   "token.drag.begin":       { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.update":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
@@ -596,10 +596,10 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "presence.viewingMap":    { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
 
   // Actions
-  "action.target.preview":  { throttleMs: 50,  ttlMs: 500,  keyStrategy: "userId" },
+  "action.target.preview":  { throttleMs: 50,  ttlMs: 0,    keyStrategy: "userId" },
   "action.flash":           { throttleMs: 0,   ttlMs: 1000, keyStrategy: "entityId" },
   "action.inProgress":      { throttleMs: 0,   ttlMs: 3000, keyStrategy: "userId" },
-  "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session", dmOnly: true },
+  "action.queue.sync":      { throttleMs: 500, ttlMs: 10000, keyStrategy: "session" },
   "action.pending":         { throttleMs: 0,   ttlMs: 15000, keyStrategy: "entityId", dmOnly: true },
   "action.resolved":        { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "entityId", dmOnly: true },
   "action.resolution.claim": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "entityId", dmOnly: true },
@@ -611,7 +611,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "asset.rejected":         { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "none", dmOnly: true },
 
   // Effects & Auras
-  "effect.aura.state":      { throttleMs: 200, ttlMs: 500,  keyStrategy: "entityId" },
+  "effect.aura.state":      { throttleMs: 200, ttlMs: 0,    keyStrategy: "entityId" },
   "effect.placement.preview": { throttleMs: 67, ttlMs: 0,    keyStrategy: "userId" },
 
   // Portal & Map Activation

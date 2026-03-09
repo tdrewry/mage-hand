@@ -469,6 +469,11 @@ export const useActionStore = create<ActionStore>()(
     const { currentAction } = get();
     if (!currentAction || currentAction.targets.length === 0 || !currentAction.attack) return;
 
+    // Clear remote targeting reticle
+    try {
+      ephemeralBus.emit('action.target.preview', { sourceTokenId: '', pos: { x: 0, y: 0 } });
+    } catch { /* ignore */ }
+
     // Roll attack and damage for each target
     const rollResults: Record<string, ActionRollResult> = {};
     const damageResults: Record<string, DamageResult> = {};
@@ -671,7 +676,14 @@ export const useActionStore = create<ActionStore>()(
   },
 
   cancelAction: () => {
-    const { currentAction } = get();
+    const { currentAction, isTargeting } = get();
+
+    // Clear remote targeting reticle
+    if (isTargeting) {
+      try {
+        ephemeralBus.emit('action.target.preview', { sourceTokenId: '', pos: { x: 0, y: 0 } });
+      } catch { /* ignore */ }
+    }
 
     // Remove placed effects for instant effect actions (including all multi-drop group members)
     if (currentAction?.category === 'effect' && currentAction.effectInfo) {
