@@ -314,18 +314,24 @@ export class NetManager {
             toast.info(`${p.user.username} joined the session`, { duration: 3000 });
             
             // Auto-push durable state when a player joins in Jazz tandem mode
-            if (this._ephemeralOnly && store.roles.includes('dm')) {
-              import('@/lib/jazz/bridge').then(({ getBridgedSessionRoot, pushAllToJazz }) => {
-                const root = getBridgedSessionRoot();
-                if (root) {
-                  console.log(`[NetManager] Auto-pushing durable state for new player: ${p.user.username}`);
-                  pushAllToJazz(root);
-                  // Trigger fog refresh on DM side to recover from any store churn
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('fog:force-refresh'));
-                  }, 100);
-                }
-              }).catch(() => {});
+            // Throttled to prevent cascading state sync when multiple players join rapidly
+            const now = Date.now();
+            if (this._ephemeralOnly && store.roles.includes('dm') && (now - _lastAutoPushTs) >= AUTO_PUSH_THROTTLE_MS) {
+              _lastAutoPushTs = now;
+              // Defer the push to allow the connection to stabilize
+              setTimeout(() => {
+                import('@/lib/jazz/bridge').then(({ getBridgedSessionRoot, pushAllToJazz }) => {
+                  const root = getBridgedSessionRoot();
+                  if (root) {
+                    console.log(`[NetManager] Auto-pushing durable state for new player: ${p.user.username}`);
+                    pushAllToJazz(root);
+                    // Trigger fog refresh on DM side to recover from any store churn
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('fog:force-refresh'));
+                    }, 100);
+                  }
+                }).catch(() => {});
+              }, 500);
             }
           }
           console.log(`👤 [NetManager] User joined: ${p.user.username}`);
