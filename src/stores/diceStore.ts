@@ -42,6 +42,7 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
     set((state) => ({
       rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
     }));
+    triggerSound('dice.result');
     return result;
   },
 

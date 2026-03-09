@@ -9,6 +9,7 @@ import { isEphemeralOp } from "./ephemeral";
 import type { EphemeralOpKind } from "./ephemeral";
 import { startPositionSync, stopPositionSync } from "./tokenPositionSync";
 import { toast } from "sonner";
+import { triggerSound } from "@/lib/soundEngine";
 
 // Lazy reference to ephemeralBus to break circular dependency with ./index
 let _ephemeralBus: import("./ephemeral").EphemeralBus | null = null;
