@@ -558,6 +558,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "region.drag.begin":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
   "region.drag.update":     { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "region.drag.end":        { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
+  "region.handle.preview":  { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
 
   // Map Objects
   "mapObject.drag.begin":   { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
