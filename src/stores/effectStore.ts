@@ -436,6 +436,7 @@ export const useEffectStore = create<EffectState>()(
       set((s) => ({
         placedEffects: s.placedEffects.filter((e) => e.id !== effectId),
       }));
+      triggerSound('effect.removed');
     },
 
     dismissEffect: (effectId) => {
@@ -446,6 +447,7 @@ export const useEffectStore = create<EffectState>()(
             : e
         ),
       }));
+      triggerSound('effect.removed');
     },
 
     cancelEffect: (effectId, getCharacter) => {

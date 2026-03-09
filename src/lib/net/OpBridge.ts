@@ -49,6 +49,7 @@ class OpBridgeImpl {
     this.register("token.move", (data) => {
       const d = data as { tokenId: string; x: number; y: number };
       useSessionStore.getState().updateTokenPosition(d.tokenId, d.x, d.y);
+      triggerSound('movement.commit');
     });
 
     this.register("token.sync", (data) => {
