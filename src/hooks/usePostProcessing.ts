@@ -131,11 +131,22 @@ export function usePostProcessing({
     };
   }, []);
 
-  // Update size/origin when content bounds resize
+  // Update size/origin when content bounds resize — throttled to prevent GPU thrashing
+  // during rapid zoom. Only resize when dimensions change by >10% or origin shifts significantly.
+  const lastResizeDims = useRef({ width: 0, height: 0, originX: 0, originY: 0 });
   useEffect(() => {
     if (initRef.current && isPostProcessingReady() && width > 0 && height > 0) {
-      resizePostProcessing(width, height, originX, originY);
-      resizeFogCanvas(width, height, undefined, originX, originY);
+      const prev = lastResizeDims.current;
+      const wRatio = prev.width > 0 ? Math.abs(width - prev.width) / prev.width : 1;
+      const hRatio = prev.height > 0 ? Math.abs(height - prev.height) / prev.height : 1;
+      const originShift = Math.abs(originX - prev.originX) + Math.abs(originY - prev.originY);
+      
+      // Only resize if dimensions changed by >10% or origin shifted significantly
+      if (wRatio > 0.1 || hRatio > 0.1 || originShift > 200 || prev.width === 0) {
+        lastResizeDims.current = { width, height, originX, originY };
+        resizePostProcessing(width, height, originX, originY);
+        resizeFogCanvas(width, height, undefined, originX, originY);
+      }
     }
   }, [width, height, originX, originY]);
 
