@@ -23,7 +23,6 @@ export default defineConfig(({ mode }) => ({
       "three",
       "@react-three/fiber",
       "@react-three/drei",
-      "zustand",
     ],
   },
   build: {
