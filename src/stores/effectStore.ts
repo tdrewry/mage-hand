@@ -490,6 +490,13 @@ export const useEffectStore = create<EffectState>()(
             : e
         ),
       }));
+
+      // Emit durable op for WebSocket sync
+      import("@/lib/net").then(({ emitLocalOp, opBridge }) => {
+        if (opBridge.isApplyingRemote) return;
+        emitLocalOp({ kind: 'effect.cancel', data: { effectId } });
+      }).catch(() => {});
+
       return affectedTokenIds;
     },
 
