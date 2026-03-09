@@ -519,4 +519,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Portal & Map Activation
   "map.dm.selectMap":       { throttleMs: 0,   ttlMs: 2000, keyStrategy: "session", dmOnly: true },
   "portal.activate":        { throttleMs: 100, ttlMs: 1000, keyStrategy: "entityId" },
+
+  // Ambient
+  "ambient.loop.play":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
+  "ambient.loop.stop":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
 };
