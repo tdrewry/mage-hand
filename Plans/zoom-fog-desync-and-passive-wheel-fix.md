@@ -1,4 +1,4 @@
-# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133)
+# Zoom Fog Desync & Passive Wheel Listener Fix (v0.7.133 → v0.7.134)
 
 ## Problems
 1. Fog of war rendering desynced from the map during zoom (offset/drift)
@@ -6,27 +6,35 @@
 
 ## Root Causes
 
-### Fog Desync
-The v0.7.131 fix introduced `quantizedZoom` — a coarsely-bucketed zoom value used for fog canvas sizing. However, `fogBounds` computed `originX`/`originY` using `quantizedZoom` while the fog *rendering* (`applyFogPostProcessing`) used the real `transform.zoom`. This mismatch caused the fog overlay to be positioned incorrectly relative to the map content whenever `quantizedZoom !== transform.zoom`.
+### Fog Desync (v0.7.131 regression)
+The v0.7.131 fix introduced `quantizedZoom` for fog canvas sizing. `fogBounds` computed `originX`/`originY` using `quantizedZoom` while fog *rendering* used real `transform.zoom`, causing positional mismatch.
+
+### Fog Desync (v0.7.133 incomplete fix)
+Removing quantizedZoom exposed a second issue: every zoom tick changed fogBounds origin, which triggered either:
+- `resizePostProcessing()` → `renderer.resize()` → WebGL canvas cleared (thrashing)
+- `initFogCanvas()` (origin-change detection) → offscreen canvas reallocation (thrashing)
 
 ### Passive Wheel
-React's `onWheel` handler is registered as a passive event listener by default (React 17+). Calling `e.preventDefault()` inside a passive listener is a no-op and logs a warning.
+React's `onWheel` handler is passive by default; `preventDefault()` is a no-op.
 
-## Fixes
+## Fixes (v0.7.134)
 
-### 1. Removed quantizedZoom, added resize throttling
-- `fogBounds` now uses the real `transform.zoom` for all calculations (origin + dimensions), ensuring pixel-perfect alignment
-- To prevent the GPU thrashing that quantizedZoom was solving, `usePostProcessing` now only calls `resizePostProcessing`/`resizeFogCanvas` when dimensions change by >10% or origin shifts by >200px
-- PAN_MARGIN restored to 2000px (was inflated to 3000px to compensate for quantization error)
+### 1. Removed quantizedZoom, use real zoom everywhere
+fogBounds uses `transform.zoom` for correct origin/dimension calculation.
 
-### 2. Native wheel listener with passive:false
-- Replaced React `onWheel={handleWheel}` with a native `addEventListener('wheel', ..., { passive: false })` via useEffect
-- This allows `preventDefault()` to work correctly, stopping page scroll during canvas zoom
+### 2. Split resize vs reposition in usePostProcessing
+- **GPU resize** (expensive): only when width/height change by >10%
+- **CSS reposition** (cheap): when only origin changes — new `repositionPostProcessing()` just updates CSS `left`/`top`
+
+### 3. Fog canvas origin tracking without reinit
+`applyFogPostProcessing` no longer calls `initFogCanvas` when only origin changed — just updates tracking vars.
+
+### 4. Native wheel listener with passive:false
+Replaced React `onWheel` with native `addEventListener('wheel', ..., { passive: false })`.
 
 ## Files Changed
 - `src/components/SimpleTabletop.tsx` — removed quantizedZoom, native wheel listener
-- `src/hooks/usePostProcessing.ts` — resize throttling
-- `src/lib/version.ts` — 0.7.133
-
-## Impact on External Services
-None — client-side rendering changes only.
+- `src/hooks/usePostProcessing.ts` — resize vs reposition split
+- `src/lib/postProcessingLayer.ts` — new `repositionPostProcessing()`
+- `src/lib/fogPostProcessing.ts` — origin-only update without canvas reinit
+- `src/lib/version.ts` — 0.7.134
