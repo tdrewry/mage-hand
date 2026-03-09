@@ -24,6 +24,7 @@ import { NetworkDemoCardContent } from '@/components/cards/NetworkDemoCard';
 import { EffectsCardContent } from '@/components/cards/EffectsCard';
 import { ChatCardContent } from '@/components/cards/ChatCard';
 import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
+import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -152,6 +153,7 @@ function getCardTitle(type: CardType): string {
     [CardType.EFFECTS]: 'Effects',
     [CardType.CHAT]: 'Chat',
     [CardType.ART_APPROVAL]: 'Art Approval',
+    [CardType.SOUND_SETTINGS]: 'Sound Settings',
   };
   
   return titles[type] || type;
@@ -240,6 +242,8 @@ function renderCardContent(
       return <ChatCardContent />;
     case CardType.ART_APPROVAL:
       return <ArtApprovalCardContent />;
+    case CardType.SOUND_SETTINGS:
+      return <SoundSettingsCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
