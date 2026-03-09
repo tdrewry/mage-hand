@@ -221,6 +221,27 @@ export function emitMapSelectMap(mapId: string): void {
   ephemeralBus.emit("map.dm.selectMap", { mapId });
 }
 
+/** Broadcast full map tree state from DM to all clients. */
+export function emitMapTreeSync(): void {
+  const maps = useMapStore.getState().maps;
+  const structures = useMapStore.getState().structures;
+  const selectedMapId = useMapStore.getState().selectedMapId;
+  const focus = useMapFocusStore.getState();
+
+  const payload: MapTreeSyncPayload = {
+    mapActivations: maps.map(m => ({ mapId: m.id, active: m.active })),
+    selectedMapId,
+    structures: structures.map(s => ({ id: s.id, name: s.name, exclusiveFocus: s.exclusiveFocus })),
+    focusSettings: {
+      unfocusedOpacity: focus.unfocusedOpacity,
+      unfocusedBlur: focus.unfocusedBlur,
+      selectionLockEnabled: focus.selectionLockEnabled,
+    },
+  };
+
+  ephemeralBus.emit("map.tree.sync", payload);
+}
+
 /** Broadcast portal activation flash to all peers. */
 export function emitPortalActivate(objectId: string): void {
   ephemeralBus.emit("portal.activate", { objectId });
