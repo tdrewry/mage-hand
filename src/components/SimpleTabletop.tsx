@@ -7151,6 +7151,9 @@ export const SimpleTabletop = () => {
   };
 
   // Function to draw off-screen token indicator
+  // IMPORTANT: Uses transformRef.current instead of the closure-captured `transform`
+  // so that indicators are positioned correctly when the viewport is driven remotely
+  // (e.g. DM enforce viewport follow) where the ref updates before React re-renders.
   const drawOffScreenIndicator = (
     ctx: CanvasRenderingContext2D,
     token: any,
@@ -7166,9 +7169,11 @@ export const SimpleTabletop = () => {
     const indicatorSize = 8;
     const indicatorLength = 20;
 
-    // Transform token position to screen coordinates
-    const tokenScreenX = token.x * transform.zoom + transform.x;
-    const tokenScreenY = token.y * transform.zoom + transform.y;
+    // Read latest transform from ref — avoids stale closure when viewport is
+    // updated by remote DM follow or map tree sync
+    const t = transformRef.current;
+    const tokenScreenX = token.x * t.zoom + t.x;
+    const tokenScreenY = token.y * t.zoom + t.y;
 
     // Calculate center of viewport
     const centerX = canvas.width / 2;
