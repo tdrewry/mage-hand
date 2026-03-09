@@ -22,11 +22,8 @@ interface DragPreviewState {
   endDrag: (tokenId: string) => void;
   /** Remove all previews for a disconnected user. */
   clearUser: (userId: string) => void;
-  /** Remove stale entries older than maxAge ms. */
-  expireStale: (maxAge?: number) => void;
 }
 
-const DEFAULT_EXPIRY_MS = 800;
 
 export const useDragPreviewStore = create<DragPreviewState>((set) => ({
   previews: {},
