@@ -89,9 +89,6 @@ const ZOOM_THROTTLE_INTERVAL = 50; // ~20fps cap during zoom to prevent GPU over
 // Content bbox dimensions tracked so we can guard resize calls
 let _lastContentW = 0;
 let _lastContentH = 0;
-// Canvas origin (CSS px offset from container origin to content bbox top-left)
-let _lastOriginX = 0;
-let _lastOriginY = 0;
 
 /**
  * Returns the padding used by the coordinate system.
