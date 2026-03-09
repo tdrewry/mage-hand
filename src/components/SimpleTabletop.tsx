@@ -10371,6 +10371,7 @@ export const SimpleTabletop = () => {
                 duration: 3000,
                 description: blockDetails
               });
+              triggerSound('movement.collision');
               
               // Snap back primary token and all multi-dragged tokens to their start positions
               const startPositions = multiDragStartPositionsRef.current;
