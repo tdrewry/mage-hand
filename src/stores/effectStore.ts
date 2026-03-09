@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { triggerSound } from '@/lib/soundEngine';
 import type {
   EffectTemplate,
   PlacedEffect,

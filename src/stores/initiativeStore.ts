@@ -1,6 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
+import { triggerSound } from '@/lib/soundEngine';
 
 export interface InitiativeEntry {
   tokenId: string;

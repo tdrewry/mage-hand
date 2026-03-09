@@ -4,6 +4,7 @@
 
 import type { EngineOp, UserId, Iso8601, OpSeq } from "../../../networking/contract/v1";
 import { toast } from "sonner";
+import { triggerSound } from "@/lib/soundEngine";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
 import { useEffectStore } from "@/stores/effectStore";
