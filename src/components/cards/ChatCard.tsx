@@ -332,6 +332,23 @@ export const ChatCardContent: React.FC = () => {
 
   const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
 
+  // Slash command definitions
+  const SLASH_COMMANDS = useMemo(() => [
+    { command: '/roll', alias: '/r', description: 'Roll dice', usage: '/roll 2d20+5', icon: '🎲' },
+    { command: '/whisper', alias: '/w', description: 'Whisper to player', usage: '/w name message', icon: '👁' },
+  ], []);
+
+  // Slash command autocomplete: show when typing just "/"
+  const slashSuggestions = useMemo(() => {
+    if (!draft.startsWith('/')) return [];
+    // If already a complete command with args, don't show slash hints
+    if (/^\/(?:roll|r|w|whisper)\s/i.test(draft)) return [];
+    const partial = draft.slice(1).toLowerCase();
+    return SLASH_COMMANDS.filter(
+      (cmd) => cmd.command.slice(1).startsWith(partial) || cmd.alias.slice(1).startsWith(partial)
+    );
+  }, [draft, SLASH_COMMANDS]);
+
   // Autocomplete: parse partial /w input and match player names
   const acSuggestions = useMemo(() => {
     const match = draft.match(/^\/(?:w|whisper)\s+(\S*)$/i);
@@ -346,10 +363,18 @@ export const ChatCardContent: React.FC = () => {
     );
   }, [draft, connectedUsers, currentUserId]);
 
+  // Combined suggestions: slash commands take priority over whisper names
+  const hasAnySuggestions = slashSuggestions.length > 0 || acSuggestions.length > 0;
+
   // Reset autocomplete index when suggestions change
   useEffect(() => {
     setAcIndex(0);
-  }, [acSuggestions.length]);
+  }, [slashSuggestions.length, acSuggestions.length]);
+
+  const applySlashCommand = useCallback((command: string) => {
+    setDraft(command + ' ');
+    inputRef.current?.focus();
+  }, []);
 
   const applyAutocomplete = useCallback((username: string) => {
     // Replace partial name with full name, add trailing space for message
