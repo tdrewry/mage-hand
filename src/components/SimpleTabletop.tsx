@@ -10892,7 +10892,7 @@ export const SimpleTabletop = () => {
     }
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+  const handleWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault();
 
     // ── FOG REVEAL BRUSH: scroll adjusts brush radius ──
@@ -10925,7 +10925,15 @@ export const SimpleTabletop = () => {
       y: newY,
       zoom: newZoom,
     });
-  };
+  }, [fogRevealBrushActive, fogEnabled, isDM, renderingMode, transform, setTransform]);
+
+  // Attach wheel handler as non-passive to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheelNative);
+  }, [handleWheelNative]);
 
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     handleCanvasContextMenu(e);
