@@ -11140,6 +11140,7 @@ export const SimpleTabletop = () => {
         if (clickedRegion && clickedRegion.selected && !clickedRegion.locked) {
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
+          ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
           
           if (currentVisibilityRef.current) {
             stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
