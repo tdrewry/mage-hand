@@ -287,7 +287,32 @@ export function emitPortalTeleportDenied(payload: PortalTeleportDeniedPayload): 
   ephemeralBus.emit("portal.teleport.denied", payload);
 }
 
+/** Broadcast a region drag begin to peers. */
+export function emitRegionDragBegin(regionId: string, startPos: { x: number; y: number }): void {
+  ephemeralBus.emit("region.drag.begin", { regionId, startPos });
+}
+
 /** Broadcast a region drag update to peers. */
 export function emitRegionDragUpdate(regionId: string, pos: { x: number; y: number }): void {
   ephemeralBus.emit("region.drag.update", { regionId, pos });
+}
+
+/** Broadcast a region drag end to peers. */
+export function emitRegionDragEnd(regionId: string): void {
+  ephemeralBus.emit("region.drag.end", { regionId });
+}
+
+/** Broadcast a map object drag begin to peers. */
+export function emitMapObjectDragBegin(objectId: string, startPos: { x: number; y: number }): void {
+  ephemeralBus.emit("mapObject.drag.begin", { objectId, startPos });
+}
+
+/** Broadcast a map object drag update to peers. */
+export function emitMapObjectDragUpdate(objectId: string, pos: { x: number; y: number }): void {
+  ephemeralBus.emit("mapObject.drag.update", { objectId, pos });
+}
+
+/** Broadcast a map object drag end to peers. */
+export function emitMapObjectDragEnd(objectId: string): void {
+  ephemeralBus.emit("mapObject.drag.end", { objectId });
 }
