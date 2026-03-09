@@ -7953,6 +7953,7 @@ export const SimpleTabletop = () => {
           if (!getGroupForEntity(clickedRegion.id)) {
             setSelectedTokenIds([]);
             clearMapObjectSelection();
+            emitGroupSelectPreview(null);
           }
         } else {
           // In play mode, clicking a region clears token selection and starts marquee
