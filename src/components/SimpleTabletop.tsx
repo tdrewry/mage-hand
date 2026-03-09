@@ -582,60 +582,7 @@ export const SimpleTabletop = () => {
   // because any change triggers resizePostProcessing → pixiApp.renderer.resize()
   // which CLEARS the WebGL canvas, causing fog to vanish during pan.
   //
-  // Instead we compute world-space bounds (zoom-only projection), then use the
-  // current pan to derive originX/Y.  Only zoom and region changes trigger a
-  // resize; pan is handled by CSS offset in the post-processing layer.
-  const fogBounds = useMemo(() => {
-    const vw = canvasDimensions.width;
-    const vh = canvasDimensions.height;
-    if (vw <= 0 || vh <= 0) return { width: vw, height: vh, originX: 0, originY: 0 };
-
-    // Compute world-space bounding box of all regions
-    let worldMinX = Infinity, worldMinY = Infinity, worldMaxX = -Infinity, worldMaxY = -Infinity;
-    let hasRegions = false;
-
-    regions.filter(r => isEntityVisible(r.mapId)).forEach((region) => {
-      hasRegions = true;
-      let rMinX: number, rMinY: number, rMaxX: number, rMaxY: number;
-      if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
-        const xs = region.pathPoints.map((p) => p.x);
-        const ys = region.pathPoints.map((p) => p.y);
-        rMinX = Math.min(...xs); rMinY = Math.min(...ys);
-        rMaxX = Math.max(...xs); rMaxY = Math.max(...ys);
-      } else {
-        rMinX = region.x; rMinY = region.y;
-        rMaxX = region.x + region.width; rMaxY = region.y + region.height;
-      }
-      worldMinX = Math.min(worldMinX, rMinX);
-      worldMinY = Math.min(worldMinY, rMinY);
-      worldMaxX = Math.max(worldMaxX, rMaxX);
-      worldMaxY = Math.max(worldMaxY, rMaxY);
-    });
-
-    if (!hasRegions) {
-      return { width: vw, height: vh, originX: 0, originY: 0 };
-    }
-
-    // Project world bounds to screen space at current zoom with generous pan margin.
-    const PAN_MARGIN = 2000;
-    const sMinX = worldMinX * transform.zoom - PAN_MARGIN;
-    const sMinY = worldMinY * transform.zoom - PAN_MARGIN;
-    const sMaxX = worldMaxX * transform.zoom + PAN_MARGIN;
-    const sMaxY = worldMaxY * transform.zoom + PAN_MARGIN;
-
-    // Union with viewport (at origin 0,0)
-    const minX = Math.min(0, sMinX);
-    const minY = Math.min(0, sMinY);
-    const maxX = Math.max(vw, sMaxX);
-    const maxY = Math.max(vh, sMaxY);
-
-    const originX = Math.min(0, minX);
-    const originY = Math.min(0, minY);
-    const totalW = maxX - originX;
-    const totalH = maxY - originY;
-
-    return { width: Math.ceil(totalW), height: Math.ceil(totalH), originX: Math.floor(originX), originY: Math.floor(originY) };
-  }, [canvasDimensions.width, canvasDimensions.height, regions, transform.zoom, isEntityVisible]);
+  // fogBounds removed — PixiJS layer is now viewport-sized, matching the main canvas.
 
   // Post-processing hook for fog effects — viewport-sized, no fogBounds needed
   const { applyEffects: applyPostProcessingEffects, isReady: isPostProcessingReady, isReadyRef: isPostProcessingReadyRef } = usePostProcessing({
