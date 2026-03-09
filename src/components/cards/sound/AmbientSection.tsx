@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 export const AmbientSection: React.FC = () => {
   const {
     activeAmbientLoopId, ambientVolume, customAmbientLoopIds,
-    categoryVolumes, setAmbientVolume, setActiveAmbientLoopId,
+    categoryVolumes, masterVolume, setAmbientVolume, setActiveAmbientLoopId,
     addCustomAmbientLoop, removeCustomAmbientLoop, setCategoryVolume,
   } = useSoundStore();
 
