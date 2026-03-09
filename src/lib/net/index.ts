@@ -13,7 +13,7 @@ import { initCardSaveSync } from "./cardSaveSync";
 const JAZZ_SYNCED_OPS = new Set([
   'token.move', 'token.sync', 'token.add', 'token.remove', 'token.update',
   'region.update',
-  'effect.update',
+  'effect.update', 'effect.place', 'effect.dismiss', 'effect.cancel', 'effect.template.add',
   'mapObject.update',
 ]);
 

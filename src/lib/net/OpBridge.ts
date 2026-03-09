@@ -139,6 +139,117 @@ class OpBridgeImpl {
       console.log(`🔄 [OpBridge] effect.update applied for ${d.id}`);
     });
 
+    // ── Durable effect ops: place / dismiss / cancel ──
+
+    this.register("effect.place", (data) => {
+      const d = data as {
+        id: string;
+        templateId: string;
+        template?: any;
+        origin: { x: number; y: number };
+        direction?: number;
+        casterId?: string;
+        mapId: string;
+        impactedTargets?: any[];
+        groupId?: string;
+        castLevel?: number;
+        waypoints?: { x: number; y: number }[];
+        isAura?: boolean;
+        anchorTokenId?: string;
+      };
+      if (!d || !d.id || !d.templateId) return;
+      const store = useEffectStore.getState();
+      // Skip if effect already exists locally (echo from our own placement)
+      if (store.placedEffects.some(e => e.id === d.id)) return;
+
+      // Reconstruct template: use embedded snapshot if provided, else look up locally
+      let template = d.template ?? store.getTemplate(d.templateId);
+      if (!template) {
+        console.warn(`[OpBridge] effect.place: template ${d.templateId} not found`);
+        return;
+      }
+
+      const effect: any = {
+        id: d.id,
+        templateId: d.templateId,
+        template: { ...template },
+        origin: d.origin,
+        direction: d.direction,
+        casterId: d.casterId,
+        placedAt: performance.now(),
+        roundsRemaining: template.persistence === 'persistent' ? (template.durationRounds ?? 0) : undefined,
+        mapId: d.mapId,
+        impactedTargets: d.impactedTargets ?? [],
+        triggeredTokenIds: [],
+        groupId: d.groupId,
+        castLevel: d.castLevel,
+        waypoints: d.waypoints,
+        ...(d.isAura ? { isAura: true, anchorTokenId: d.anchorTokenId, tokensInsideArea: [] } : {}),
+      };
+
+      useEffectStore.setState((s) => ({
+        placedEffects: [...s.placedEffects, effect],
+      }));
+      triggerSound('effect.placed');
+      console.log(`🔄 [OpBridge] effect.place applied: ${d.id}`);
+    });
+
+    this.register("effect.dismiss", (data) => {
+      const d = data as { effectId: string };
+      if (!d?.effectId) return;
+      const store = useEffectStore.getState();
+      const existing = store.placedEffects.find(e => e.id === d.effectId);
+      if (!existing || existing.dismissedAt) return;
+      useEffectStore.setState((s) => ({
+        placedEffects: s.placedEffects.map(e =>
+          e.id === d.effectId ? { ...e, dismissedAt: performance.now() } : e
+        ),
+      }));
+      triggerSound('effect.removed');
+      console.log(`🔄 [OpBridge] effect.dismiss applied: ${d.effectId}`);
+    });
+
+    this.register("effect.cancel", (data) => {
+      const d = data as { effectId: string };
+      if (!d?.effectId) return;
+      const store = useEffectStore.getState();
+      const existing = store.placedEffects.find(e => e.id === d.effectId);
+      if (!existing || existing.cancelledAt) return;
+      useEffectStore.setState((s) => ({
+        placedEffects: s.placedEffects.map(e =>
+          e.id === d.effectId
+            ? { ...e, cancelledAt: performance.now(), dismissedAt: e.dismissedAt ?? performance.now() }
+            : e
+        ),
+      }));
+      console.log(`🔄 [OpBridge] effect.cancel applied: ${d.effectId}`);
+    });
+
+    this.register("effect.template.add", (data) => {
+      const d = data as { template: any };
+      if (!d?.template?.id) return;
+      const store = useEffectStore.getState();
+      // Skip if template already exists
+      if (store.customTemplates.some(t => t.id === d.template.id)) {
+        // Update instead
+        store.updateCustomTemplate(d.template.id, d.template);
+      } else {
+        // Direct setState to preserve the original ID (addCustomTemplate generates new ones)
+        useEffectStore.setState((s) => {
+          const newCustom = [...s.customTemplates, { ...d.template, isBuiltIn: false }];
+          const customIds = new Set(newCustom.map(t => t.id));
+          const hiddenSet = new Set(s.hiddenBuiltInIds);
+          const { BUILT_IN_EFFECT_TEMPLATES: builtIns } = require('@/lib/effectTemplateLibrary');
+          const visibleBuiltIns = builtIns.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
+          return {
+            customTemplates: newCustom,
+            allTemplates: [...visibleBuiltIns, ...newCustom],
+          };
+        });
+      }
+      console.log(`🔄 [OpBridge] effect.template.add applied: ${d.template.id}`);
+    });
+
     this.register("mapObject.update", (data) => {
       const d = data as Record<string, unknown>;
       if (!d || typeof d.id !== 'string') return;
