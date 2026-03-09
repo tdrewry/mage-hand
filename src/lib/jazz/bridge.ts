@@ -2396,35 +2396,65 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           if (!templates) return;
           const len = templates.length ?? 0;
 
+          // Guard: if outbound throttle is active, skip inbound
+          if (_fineGrainedTimers.has('customTemplates')) return;
+
+          const parsed: EffectTemplate[] = [];
+          for (let i = 0; i < len; i++) {
+            const jct = templates[i];
+            if (!jct?.templateJson) continue;
+            try {
+              parsed.push(JSON.parse(jct.templateJson));
+            } catch { /* invalid JSON */ }
+          }
+
+          // Use setState directly to avoid side effects from store CRUD methods
+          // (addCustomTemplate generates new IDs, deleteTemplate hides built-ins)
           runFromJazz(() => {
             const store = useEffectStore.getState();
-            const parsed: EffectTemplate[] = [];
-            for (let i = 0; i < len; i++) {
-              const jct = templates[i];
-              if (!jct?.templateJson) continue;
-              try {
-                parsed.push(JSON.parse(jct.templateJson));
-              } catch { /* invalid JSON */ }
-            }
+            const localIds = new Set(store.customTemplates.map(t => t.id));
+            const jazzIds = new Set(parsed.map(t => t.id));
 
-            // Upsert: add new ones, update existing
+            let changed = false;
+            let newCustom = [...store.customTemplates];
+
+            // Upsert: add or update templates from Jazz
             for (const t of parsed) {
-              const existing = store.customTemplates.find(ct => ct.id === t.id);
-              if (existing) {
-                store.updateCustomTemplate(t.id, t);
+              const idx = newCustom.findIndex(ct => ct.id === t.id);
+              if (idx >= 0) {
+                // Check for meaningful changes before updating
+                if (JSON.stringify(stripTemplateForSync(newCustom[idx])) !== JSON.stringify(stripTemplateForSync(t))) {
+                  // Preserve local texture data if the incoming template has none
+                  const merged = { ...t };
+                  if ((!merged.texture || merged.texture.length < 200) && newCustom[idx].texture && newCustom[idx].texture.length >= 200) {
+                    merged.texture = newCustom[idx].texture;
+                  }
+                  newCustom[idx] = merged;
+                  changed = true;
+                }
               } else {
-                store.addCustomTemplate(t);
+                newCustom.push(t);
+                changed = true;
               }
             }
 
             // Remove templates no longer in Jazz (non-creator only)
+            // Filter directly — do NOT call store.deleteTemplate which hides built-ins
             if (!_isCreator) {
-              const jazzIds = new Set(parsed.map(t => t.id));
-              for (const ct of store.customTemplates) {
-                if (!jazzIds.has(ct.id)) {
-                  store.deleteTemplate(ct.id);
-                }
-              }
+              const before = newCustom.length;
+              newCustom = newCustom.filter(ct => jazzIds.has(ct.id));
+              if (newCustom.length !== before) changed = true;
+            }
+
+            if (changed) {
+              const { buildAllTemplates: _buildAll } = _getEffectStoreHelpers();
+              useEffectStore.setState({
+                customTemplates: newCustom,
+                allTemplates: _buildAll(newCustom, store.hiddenBuiltInIds),
+              });
+
+              // Resolve textures for templates that have hashes but no data
+              _resolveEffectTextures(newCustom);
             }
           });
         },
