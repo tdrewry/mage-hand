@@ -3,20 +3,14 @@
  *
  * COORDINATE SPACE
  * ================
- * All canvases here (fogCanvas, illuminationCanvas, dimZoneCanvas) are sized
- * totalSize(contentW) × totalSize(contentH) — identical to the PixiJS canvas.
+ * All canvases here (fogCanvas, illuminationCanvas, dimZoneCanvas) are
+ * viewport-sized plus EDGE_PADDING on each side — identical to the PixiJS canvas.
  *
- * "Content" here means the bounding box of all regions + tokens in screen/CSS px,
- * possibly larger than the browser viewport when the map is zoomed out far.
- *
- * Content is rendered with:
- *   ctx.translate(FIXED_PADDING - originX + transform.x,
- *                 FIXED_PADDING - originY + transform.y)
+ * Content is rendered with the same transform as the main canvas:
+ *   ctx.translate(EDGE_PADDING + transform.x, EDGE_PADDING + transform.y)
  *   ctx.scale(transform.zoom, transform.zoom)
  *
- * originX/Y = CSS px position of the content bbox top-left relative to the container.
- * When content fits entirely inside the viewport both are 0 and the formula collapses
- * to the original FIXED_PADDING + pan.x / pan.y.
+ * This ensures pixel-perfect alignment with the main rendering canvas.
  *
  * CLIPPING ARCHITECTURE
  * =====================
@@ -32,9 +26,6 @@
  * Canvas clip regions are intersected when multiple ctx.clip() calls are made
  * inside a save/restore block.  We clip to the geometric shape first, then to
  * the visibility polygon, giving us visibilityPolygon ∩ clipShape.
- *
- * This design makes light cones trivial to add later: set clipShape = 'cone',
- * provide coneAngle + coneDirection, and the existing rendering code just works.
  */
 
 import {
@@ -44,10 +35,7 @@ import {
   getEffectSettings,
   isPostProcessingReady,
   renderPostProcessing,
-  setLastRenderTransform,
-  panOffsetPostProcessing,
-  resetPostProcessingOffset,
-  FIXED_PADDING,
+  EDGE_PADDING,
   type EffectSettings,
 } from './postProcessingLayer';
 import { calculateAnimationModifiers, type IlluminationSource } from '@/types/illumination';
@@ -77,43 +65,26 @@ let dimZoneCtx: CanvasRenderingContext2D | null = null;
 let lastUpdateTime = 0;
 const MIN_UPDATE_INTERVAL = 16; // ~60fps max
 
-// Fast-path tracking: when only pan changed, skip Canvas 2D redraw
-let _lastFogMasks: object | null = null;  // identity check
-let _lastIlluminationSources: object | null = null;  // identity check
-let _lastFullRenderTime = 0;
-const FULL_RENDER_INTERVAL = 100; // Force a full redraw at least every 100ms during pan
-let _lastZoom = 0; // Track zoom for throttle bypass on zoom changes
-const ZOOM_THROTTLE_INTERVAL = 50; // ~20fps cap during zoom to prevent GPU overload
-
-// Content bbox dimensions tracked so we can guard resize calls
-let _lastContentW = 0;
-let _lastContentH = 0;
+// Throttle tracking
+let _lastFogMasks: object | null = null;
+let _lastIlluminationSources: object | null = null;
+let _lastZoom = 0;
+const ZOOM_THROTTLE_INTERVAL = 50; // ~20fps cap during zoom
 
 /**
- * Returns the padding used by the coordinate system.
- * Always FIXED_PADDING — exposed for callers that previously read a dynamic value.
+ * Returns the edge padding used by the coordinate system.
  */
 export function getEdgePadding(): number {
-  return FIXED_PADDING;
+  return EDGE_PADDING;
 }
 
 /**
  * Initialize (or re-initialize) the off-screen canvases.
- * width/height = content bbox size in CSS px.
- * originX/Y   = CSS px position of the content bbox top-left inside the container.
+ * width/height = viewport size in CSS px.
  */
-export function initFogCanvas(
-  width: number,
-  height: number,
-  _padding?: number,
-  originX = 0,
-  originY = 0
-): void {
-  _lastContentW = width;
-  _lastContentH = height;
-
-  const totalW = width + FIXED_PADDING * 2;
-  const totalH = height + FIXED_PADDING * 2;
+export function initFogCanvas(width: number, height: number): void {
+  const totalW = width + EDGE_PADDING * 2;
+  const totalH = height + EDGE_PADDING * 2;
 
   if (!fogCanvas) fogCanvas = document.createElement('canvas');
   fogCanvas.width = totalW;
@@ -132,20 +103,11 @@ export function initFogCanvas(
 }
 
 /**
- * Resize the canvases when the content bbox or viewport changes.
+ * Resize the canvases when the viewport changes.
  */
-export function resizeFogCanvas(
-  width: number,
-  height: number,
-  _padding?: number,
-  originX = 0,
-  originY = 0
-): void {
-  _lastContentW = width;
-  _lastContentH = height;
-
-  const totalW = width + FIXED_PADDING * 2;
-  const totalH = height + FIXED_PADDING * 2;
+export function resizeFogCanvas(width: number, height: number): void {
+  const totalW = width + EDGE_PADDING * 2;
+  const totalH = height + EDGE_PADDING * 2;
 
   if (fogCanvas) { fogCanvas.width = totalW; fogCanvas.height = totalH; }
   if (illuminationCanvas) { illuminationCanvas.width = totalW; illuminationCanvas.height = totalH; }
@@ -176,17 +138,7 @@ function parseColorToRGB(color: string): { r: number; g: number; b: number } {
 }
 
 /**
- * Apply the geometric clip shape for an illumination source to the current context.
- *
- * This MUST be called while the world-space transform is active (translate + scale).
- * It clips the canvas to the source's geometric boundary (circle or cone).
- *
- * If a visibilityPolygon is also present, call ctx.clip(visibilityPolygon) AFTER
- * this function — Canvas 2D clips intersect, so the result is shape ∩ polygon.
- *
- * @param ctx      - 2D context already transformed to world space
- * @param source   - The illumination source
- * @param rangePixels - Radius in world pixels (range * gridSize, with any anim modifier)
+ * Apply the geometric clip shape for an illumination source.
  */
 function applyClipShape(
   ctx: CanvasRenderingContext2D,
@@ -201,12 +153,10 @@ function applyClipShape(
   if (clipShape === 'cone') {
     const halfAngle = (source.coneAngle ?? Math.PI / 2) / 2;
     const dir = source.coneDirection ?? 0;
-    // Draw a pie-slice sector from the source origin
     ctx.moveTo(x, y);
     ctx.arc(x, y, rangePixels, dir - halfAngle, dir + halfAngle);
     ctx.closePath();
   } else {
-    // Default: full circle
     ctx.arc(x, y, rangePixels, 0, Math.PI * 2);
   }
 
@@ -214,21 +164,14 @@ function applyClipShape(
 }
 
 /**
- * Render per-source illumination color gradients to the illumination canvas.
- *
- * Transform applied:
- *   translate(FIXED_PADDING - originX + pan.x, FIXED_PADDING - originY + pan.y)
- *   scale(zoom)
- *
- * This is identical to the fog canvas transform so the two canvases are pixel-aligned.
+ * Render per-source illumination color gradients.
+ * Uses the same viewport transform as the fog canvas.
  */
 function renderIlluminationOverlay(
   sources: IlluminationSource[],
   transform: { x: number; y: number; zoom: number },
   gridSize: number,
-  animationTime: number,
-  originX: number,
-  originY: number
+  animationTime: number
 ): void {
   if (!illuminationCtx || !illuminationCanvas) return;
 
@@ -248,18 +191,16 @@ function renderIlluminationOverlay(
     );
 
     ctx.save();
-    // Content-aware transform — matches fogCanvas exactly
-    ctx.translate(FIXED_PADDING - originX + transform.x, FIXED_PADDING - originY + transform.y);
+    // Same viewport transform as main canvas
+    ctx.translate(EDGE_PADDING + transform.x, EDGE_PADDING + transform.y);
     ctx.scale(transform.zoom, transform.zoom);
 
     const rangePixels = source.range * gridSize * animResult.radiusMod;
     const brightZone = source.brightZone ?? 0.5;
     const pos = source.position;
 
-    // Clip 1: geometric shape (circle or cone)
     applyClipShape(ctx, source, rangePixels);
 
-    // Clip 2: visibility polygon from wall occlusion (intersects with shape clip)
     if (source.visibilityPolygon) {
       ctx.clip(source.visibilityPolygon);
     }
@@ -288,8 +229,7 @@ function renderIlluminationOverlay(
 /**
  * Capture fog state and push it to the PixiJS GPU pipeline.
  *
- * canvasWidth/Height = content bbox size in CSS px (may be larger than viewport).
- * originX/Y          = CSS px offset of the content bbox top-left from the container origin.
+ * canvasWidth/Height = viewport dimensions in CSS px.
  */
 export function applyFogPostProcessing(
   sourceCtx: CanvasRenderingContext2D,
@@ -302,14 +242,10 @@ export function applyFogPostProcessing(
   canvasWidth: number,
   canvasHeight: number,
   transform: { x: number; y: number; zoom: number },
-  illuminationData?: IlluminationData,
-  originX = 0,
-  originY = 0
+  illuminationData?: IlluminationData
 ): void {
-  // Canvas2D fog canvases are managed exclusively by usePostProcessing
-  // (via initFogCanvas / resizeFogCanvas).  Do NOT auto-resize here.
   if (!fogCanvas) {
-    initFogCanvas(canvasWidth, canvasHeight, undefined, originX, originY);
+    initFogCanvas(canvasWidth, canvasHeight);
   }
 
   const totalW = fogCanvas!.width;
@@ -319,46 +255,21 @@ export function applyFogPostProcessing(
 
   const now = performance.now();
 
-  // ── CSS-offset fast path ──
-  // If fog masks and illumination sources haven't changed (same object identity),
-  // only the pan transform moved.  Skip the entire Canvas 2D redraw and just
-  // reposition the PixiJS canvas via CSS.  Force a full redraw every
-  // FULL_RENDER_INTERVAL ms to prevent long-term drift.
-  const masksUnchanged = fogMasks === _lastFogMasks;
-  const illuUnchanged = illuminationData?.sources === _lastIlluminationSources ||
-    (!illuminationData && !_lastIlluminationSources);
-  const timeSinceFullRender = now - _lastFullRenderTime;
-
-  if (masksUnchanged && illuUnchanged && timeSinceFullRender < FULL_RENDER_INTERVAL) {
-    // Try CSS-offset; falls back to full redraw if zoom changed
-    if (panOffsetPostProcessing(transform)) {
-      lastUpdateTime = now;
-      return;
-    }
-  }
-
-  // Throttle full redraws.  Zoom changes need a full redraw (CSS offset
-  // can't handle scale changes), but at a lower framerate (~30fps) to
-  // avoid GPU overload with expensive Canvas 2D + PixiJS texture uploads.
+  // Throttle redraws — zoom changes at lower framerate
   const zoomChanged = _lastZoom !== 0 && _lastZoom !== transform.zoom;
   const throttleMs = zoomChanged ? ZOOM_THROTTLE_INTERVAL : MIN_UPDATE_INTERVAL;
   if (now - lastUpdateTime < throttleMs) {
-    // Keep the PixiJS canvas aligned via CSS offset when possible
-    panOffsetPostProcessing(transform);
     return;
   }
 
   lastUpdateTime = now;
 
-  // Clear including overhang area
+  // Clear
   fogCtx.clearRect(0, 0, totalW, totalH);
 
-  // Content-aware transform:
-  //   FIXED_PADDING   — standard canvas overhang offset
-  //   - originX       — shifts so the content bbox top-left maps to canvas (FIXED_PADDING, FIXED_PADDING)
-  //   + transform.x   — pan offset from world origin to screen origin
+  // Viewport transform — same as main canvas, offset by EDGE_PADDING
   fogCtx.save();
-  fogCtx.translate(FIXED_PADDING - originX + transform.x, FIXED_PADDING - originY + transform.y);
+  fogCtx.translate(EDGE_PADDING + transform.x, EDGE_PADDING + transform.y);
   fogCtx.scale(transform.zoom, transform.zoom);
 
   // Render base fog layers
@@ -367,14 +278,13 @@ export function applyFogPostProcessing(
   fogCtx.fillStyle = `rgba(0, 0, 0, ${exploredOpacity})`;
   fogCtx.fill(fogMasks.exploredOnlyMask);
 
-  // Illumination: fill visibility areas then cut bright/dim gradients through them
+  // Illumination: fill visibility areas then cut bright/dim gradients
   const animationTime = now;
 
   if (illuminationData && illuminationData.sources.length > 0) {
     const gSize = illuminationData.gridSize;
 
-    // STEP 1: Fill the geometric shape + visibility polygon area with explored-level fog.
-    //         This ensures the dim zone never appears darker than explored fog.
+    // STEP 1: Fill geometric shape + visibility polygon area with explored-level fog
     for (const source of illuminationData.sources) {
       if (!source.enabled) continue;
 
@@ -383,10 +293,8 @@ export function applyFogPostProcessing(
 
       fogCtx.save();
 
-      // Clip 1: geometric shape (always enforced — fixes rectangular rendering on custom lights)
       applyClipShape(fogCtx, source, rangePixels);
 
-      // Clip 2: visibility polygon (wall occlusion), intersected with shape clip
       if (source.visibilityPolygon) {
         fogCtx.clip(source.visibilityPolygon);
       }
@@ -399,7 +307,7 @@ export function applyFogPostProcessing(
       fogCtx.restore();
     }
 
-    // STEP 2: destination-out gradients cut illuminated areas from fog.
+    // STEP 2: destination-out gradients cut illuminated areas from fog
     fogCtx.globalCompositeOperation = 'destination-out';
 
     for (const source of illuminationData.sources) {
@@ -422,10 +330,8 @@ export function applyFogPostProcessing(
 
       fogCtx.save();
 
-      // Clip 1: geometric shape
       applyClipShape(fogCtx, source, rangePixels);
 
-      // Clip 2: visibility polygon (wall occlusion)
       if (source.visibilityPolygon) {
         fogCtx.clip(source.visibilityPolygon);
       }
@@ -450,38 +356,29 @@ export function applyFogPostProcessing(
 
   fogCtx.restore();
 
-  // Render color overlays to the illumination canvas then push to PixiJS
+  // Render color overlays to illumination canvas then push to PixiJS
   if (illuminationData && illuminationData.sources.length > 0) {
     renderIlluminationOverlay(
       illuminationData.sources,
       transform,
       illuminationData.gridSize,
-      animationTime,
-      originX,
-      originY
+      animationTime
     );
   } else if (illuminationCtx && illuminationCanvas) {
-    // No illumination sources — clear stale color overlay to prevent
-    // ghost glow from a previous frame persisting on the PixiJS layer.
     illuminationCtx.clearRect(0, 0, illuminationCanvas.width, illuminationCanvas.height);
   }
-  // Always upload illumination texture (even when cleared) so stale content
-  // doesn't linger on the GPU sprite.
   if (illuminationCanvas) {
     updateIlluminationTexture(illuminationCanvas);
   }
 
   // Push fog mask to PixiJS
   updateFogTexture(fogCanvas);
-  resetPostProcessingOffset();
   renderPostProcessing();
 
-  // Track state for CSS-offset fast path
+  // Track state for throttle
   _lastFogMasks = fogMasks;
   _lastIlluminationSources = illuminationData?.sources ?? null;
-  _lastFullRenderTime = performance.now();
   _lastZoom = transform.zoom;
-  setLastRenderTransform(transform);
 }
 
 export function updateFogEffects(config: Partial<FogEffectConfig>): void {
@@ -520,5 +417,4 @@ export function cleanupFogPostProcessing(): void {
   dimZoneCanvas = null; dimZoneCtx = null;
   _lastFogMasks = null;
   _lastIlluminationSources = null;
-  _lastFullRenderTime = 0;
 }
