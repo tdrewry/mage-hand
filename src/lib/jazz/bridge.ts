@@ -2537,32 +2537,73 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   }
 
-  // ── Custom template sync: Zustand → Jazz (outbound) ──
+  // ── Custom template sync: Zustand → Jazz (outbound, diff-based) ──
   let prevCustomTemplates = useEffectStore.getState().customTemplates;
   const unsubCustomTemplatesZustand = useEffectStore.subscribe((state) => {
     const templates = state.customTemplates;
     if (templates === prevCustomTemplates) return;
     if (_fromJazz) { prevCustomTemplates = templates; return; }
+    const capturedPrev = prevCustomTemplates;
     prevCustomTemplates = templates;
     throttledPushFineGrained('customTemplates', () => {
       const effectState = _cachedEffects ?? _sessionRoot?.effects;
       if (!effectState?.customTemplates) return;
       const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
       const jazzTemplates = effectState.customTemplates;
-      const ctLen = jazzTemplates.length ?? 0;
-      for (let i = ctLen - 1; i >= 0; i--) {
-        try { jazzTemplates.$jazz.splice(i, 1); } catch { /* */ }
+      const currentTemplates = useEffectStore.getState().customTemplates;
+
+      const prevIds = new Set(capturedPrev.map(t => t.id));
+      const currentIds = new Set(currentTemplates.map(t => t.id));
+
+      // Added
+      for (const t of currentTemplates) {
+        if (!prevIds.has(t.id)) {
+          const stripped = stripTemplateForSync(t);
+          try {
+            const jt = JazzCustomTemplateSchema.create({
+              templateId: t.id,
+              templateJson: JSON.stringify(stripped),
+            } as any, group);
+            jazzTemplates.$jazz.push(jt);
+          } catch { /* */ }
+        }
       }
-      for (const t of templates) {
-        const stripped = stripTemplateForSync(t);
-        try {
-          const jt = JazzCustomTemplateSchema.create({
-            templateId: t.id,
-            templateJson: JSON.stringify(stripped),
-          } as any, group);
-          jazzTemplates.$jazz.push(jt);
-        } catch { /* */ }
+
+      // Updated
+      for (const t of currentTemplates) {
+        if (prevIds.has(t.id)) {
+          const prev = capturedPrev.find(pt => pt.id === t.id);
+          const strippedCurrent = stripTemplateForSync(t);
+          const strippedPrev = prev ? stripTemplateForSync(prev) : null;
+          if (strippedPrev && JSON.stringify(strippedCurrent) === JSON.stringify(strippedPrev)) continue;
+          const len = jazzTemplates.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const jt = jazzTemplates[i];
+            if (jt && jt.templateId === t.id) {
+              try {
+                jt.$jazz.set('templateJson', JSON.stringify(strippedCurrent));
+              } catch { /* */ }
+              break;
+            }
+          }
+        }
       }
+
+      // Removed
+      for (const prev of capturedPrev) {
+        if (!currentIds.has(prev.id)) {
+          const len = jazzTemplates.length ?? 0;
+          for (let i = 0; i < len; i++) {
+            const jt = jazzTemplates[i];
+            if (jt && jt.templateId === prev.id) {
+              try { jazzTemplates.$jazz.splice(i, 1); } catch { /* */ }
+              break;
+            }
+          }
+        }
+      }
+
+      prevCustomTemplates = currentTemplates;
     });
   });
   activeSubscriptions.push(unsubCustomTemplatesZustand);
