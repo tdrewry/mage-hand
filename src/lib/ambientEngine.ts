@@ -67,6 +67,7 @@ export async function playAmbientLoop(loopId: string, volume: number): Promise<v
   if (!state.enabled) return;
 
   const ctx = getCtx();
+  if (!ctx) return;
   const masterVol = state.masterVolume * (state.categoryVolumes['ambient'] ?? 1) * volume;
   const gainNode = ctx.createGain();
   gainNode.gain.value = Math.max(0, Math.min(1, masterVol));
