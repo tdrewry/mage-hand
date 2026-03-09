@@ -22,7 +22,7 @@ import { useEffectStore } from "@/stores/effectStore";
 import type { MapObject } from "@/types/mapObjectTypes";
 import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
 import { computeScaledTemplate } from "@/types/effectTypes";
-import { getBuiltInTemplate } from "@/lib/effectTemplateLibrary";
+import { getBuiltInTemplate, BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
   JazzRegion as JazzRegionSchema,
