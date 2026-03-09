@@ -1751,6 +1751,10 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
           clearSelection();
+          clearMapObjectSelection();
+          // Clear remote previews
+          emitGroupSelectPreview(null);
+          ephemeralBus.emit("selection.preview", {});
           redrawCanvas();
         }
       }
@@ -7904,6 +7908,7 @@ export const SimpleTabletop = () => {
             setSelectedTokenIds([]);
             clearSelection();
             setSelectedRegionIds([]);
+            emitGroupSelectPreview(null);
           }
         } else if (renderingMode === "play" && isDM && clickedMapObject.category === 'door') {
           // DM can toggle doors in play mode
@@ -7948,6 +7953,7 @@ export const SimpleTabletop = () => {
           if (!getGroupForEntity(clickedRegion.id)) {
             setSelectedTokenIds([]);
             clearMapObjectSelection();
+            emitGroupSelectPreview(null);
           }
         } else {
           // In play mode, clicking a region clears token selection and starts marquee
@@ -7973,6 +7979,7 @@ export const SimpleTabletop = () => {
           setSelectedRegionIds([]);
           setSelectedTokenIds([]);
           clearMapObjectSelection();
+          emitGroupSelectPreview(null);
           clearLightSelection();
         } else {
           // Play mode: clicking empty space — clear selection (unless shift held) then start marquee
@@ -11079,6 +11086,8 @@ export const SimpleTabletop = () => {
       selectedRegionIds.forEach(id => deselectRegion(id));
       setSelectedRegionIds([]);
       clearMapObjectSelection();
+      emitGroupSelectPreview(null);
+      ephemeralBus.emit("selection.preview", {});
       redrawCanvas();
     },
     onDragStart: (x, y, rect) => {
