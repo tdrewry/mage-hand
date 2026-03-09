@@ -486,6 +486,7 @@ export interface EphemeralPayloadMap {
   "effect.aura.state": EffectAuraStatePayload;
   "effect.placement.preview": EffectPlacementPreviewPayload;
   "map.dm.selectMap": MapDmSelectMapPayload;
+  "map.tree.sync": MapTreeSyncPayload;
   "portal.activate": PortalActivatePayload;
   "portal.teleport.request": PortalTeleportRequestPayload;
   "portal.teleport.approved": PortalTeleportApprovedPayload;
