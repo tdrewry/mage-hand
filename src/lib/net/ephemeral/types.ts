@@ -517,8 +517,8 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "token.handle.preview":   { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
   "token.hover":            { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
   "selection.preview":      { throttleMs: 50,  ttlMs: 400,  keyStrategy: "userId" },
-  "token.drag.begin":       { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
-  "token.drag.update":      { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
+  "token.drag.begin":       { throttleMs: 0,   ttlMs: 5000, keyStrategy: "entityId" },
+  "token.drag.update":      { throttleMs: 50,  ttlMs: 5000, keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
   "token.position.sync":    { throttleMs: 100, ttlMs: 500,  keyStrategy: "session" },
 
