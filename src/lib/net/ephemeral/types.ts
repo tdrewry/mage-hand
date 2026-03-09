@@ -25,7 +25,9 @@ export type EphemeralOpKind =
   | "region.drag.end"
   | "region.handle.preview"
   // Map Objects
+  | "mapObject.drag.begin"
   | "mapObject.drag.update"
+  | "mapObject.drag.end"
   | "mapObject.handle.preview"
   | "mapObject.door.preview"
   // Fog & Vision
