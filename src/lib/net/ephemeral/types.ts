@@ -189,6 +189,18 @@ export interface DiceRollingPayload {
   formula?: string;
 }
 
+export interface DiceResultPayload {
+  id: string;
+  formula: string;
+  groups: Array<{ count: number; sides: number; results: number[]; keptResults: number[]; keepHighest?: number; keepLowest?: number }>;
+  modifier: number;
+  total: number;
+  timestamp: number;
+  label?: string;
+  rolledBy?: string;
+  meta?: Record<string, unknown>;
+}
+
 // -- Initiative --
 
 export interface InitiativeDragPreviewPayload {
