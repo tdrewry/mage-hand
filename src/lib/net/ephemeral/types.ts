@@ -152,9 +152,18 @@ export interface RegionHandlePreviewPayload {
 
 // -- Map Objects --
 
+export interface MapObjectDragBeginPayload {
+  objectId: string;
+  startPos: Vec2;
+}
+
 export interface MapObjectDragUpdatePayload {
   objectId: string;
   pos: Vec2;
+}
+
+export interface MapObjectDragEndPayload {
+  objectId: string;
 }
 
 export interface MapObjectHandlePreviewPayload {
