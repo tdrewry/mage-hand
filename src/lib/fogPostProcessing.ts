@@ -46,6 +46,7 @@ import {
   renderPostProcessing,
   setLastRenderTransform,
   panOffsetPostProcessing,
+  repositionPostProcessing,
   resetPostProcessingOffset,
   FIXED_PADDING,
   type EffectSettings,
@@ -483,6 +484,13 @@ export function applyFogPostProcessing(
   if (illuminationCanvas) {
     updateIlluminationTexture(illuminationCanvas);
   }
+
+  // Sync PixiJS canvas CSS origin to match the origin used in the fog Canvas2D
+  // rendering above.  Without this, resetPostProcessingOffset uses a stale
+  // _originX/_originY from the last resize/reposition, causing misalignment
+  // when fogBounds origin changes during zoom but dimensions stay within the
+  // >10% resize threshold.
+  repositionPostProcessing(originX, originY);
 
   // Push fog mask to PixiJS
   updateFogTexture(fogCanvas);
