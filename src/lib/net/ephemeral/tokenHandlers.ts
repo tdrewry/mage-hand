@@ -53,21 +53,30 @@ export function registerTokenHandlers(): void {
     });
   });
 
-  // ── Token drag preview ops (migrated from durable OpBridge) ──
+  // ── Token drag preview ops ──
+  // Remote drags move the real token sprite AND track decoration metadata
+  // (start position + path) so remote clients render the same ghost/path visuals.
 
-  // token.drag.begin — no-op on receiver; token will move on updates
-  ephemeralBus.on("token.drag.begin", (_data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, _userId) => {
-    // Intentionally empty — real token sprite moves via drag.update
+  ephemeralBus.on("token.drag.begin", (data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, userId) => {
+    useRemoteDragStore.getState().beginDrag(
+      data.tokenId,
+      data.startPos,
+      data.mode || "freehand",
+      userId,
+    );
   });
 
   ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, _userId) => {
     // Move the actual token sprite so it renders via the normal pipeline
     useSessionStore.getState().updateTokenPosition(data.tokenId, data.pos.x, data.pos.y);
+    // Update path decoration data
+    if (data.path) {
+      useRemoteDragStore.getState().updateDrag(data.tokenId, data.path);
+    }
   });
 
-  // token.drag.end — no-op; final position arrives via durable sync
-  ephemeralBus.on("token.drag.end", (_data: { tokenId: string }, _userId) => {
-    // Intentionally empty
+  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
+    useRemoteDragStore.getState().endDrag(data.tokenId);
   });
 
   // ── Token position sync (10Hz delta broadcast) ──
