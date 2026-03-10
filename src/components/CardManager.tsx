@@ -248,6 +248,10 @@ function renderCardContent(
       return <ArtApprovalCardContent />;
     case CardType.SOUND_SETTINGS:
       return <SoundSettingsCardContent />;
+    case CardType.HANDOUT_CATALOG:
+      return <HandoutCatalogCardContent />;
+    case CardType.HANDOUT_VIEWER:
+      return <HandoutViewerCardContent handoutId={(metadata?.handoutId as string) || ''} />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

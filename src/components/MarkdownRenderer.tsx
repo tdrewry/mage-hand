@@ -40,7 +40,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
     if (headingMatch) {
       const level = headingMatch[1].length;
       const text = headingMatch[2];
-      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+      const Tag = (`h${level}`) as 'h1' | 'h2' | 'h3' | 'h4';
       const hClasses: Record<number, string> = {
         1: 'text-xl font-bold mt-6 mb-3 text-foreground',
         2: 'text-lg font-semibold mt-5 mb-2 text-foreground',
