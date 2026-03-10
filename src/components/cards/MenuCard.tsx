@@ -695,6 +695,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <Volume2 className="h-4 w-4 mr-2" />
           Sound Settings
         </Button>
+
+        <Button
+          variant={handoutCatalogCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (handoutCatalogCard) {
+              setVisibility(handoutCatalogCard.id, !handoutCatalogCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.HANDOUT_CATALOG,
+                title: 'Handouts',
+                defaultPosition: { x: 320, y: 80 },
+                defaultSize: { width: 340, height: 400 },
+                minSize: { width: 280, height: 300 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Handouts
+        </Button>
       </div>
 
       <Separator />
