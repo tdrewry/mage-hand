@@ -25,6 +25,8 @@ import { EffectsCardContent } from '@/components/cards/EffectsCard';
 import { ChatCardContent } from '@/components/cards/ChatCard';
 import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';
+import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard';
+import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
