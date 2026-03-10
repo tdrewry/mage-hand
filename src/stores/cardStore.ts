@@ -373,6 +373,24 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.HANDOUT_CATALOG]: {
+    title: 'Handouts',
+    defaultPosition: { x: 320, y: 80 },
+    defaultSize: { width: 340, height: 400 },
+    minSize: { width: 280, height: 300 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
+  [CardType.HANDOUT_VIEWER]: {
+    title: 'Handout',
+    defaultPosition: { x: 380, y: 60 },
+    defaultSize: { width: 500, height: 650 },
+    minSize: { width: 360, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

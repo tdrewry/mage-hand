@@ -31,6 +31,8 @@ export enum CardType {
   CHAT = 'chat',
   ART_APPROVAL = 'art_approval',
   SOUND_SETTINGS = 'sound_settings',
+  HANDOUT_CATALOG = 'handout_catalog',
+  HANDOUT_VIEWER = 'handout_viewer',
 }
 
 /** Card types that require DM role — players cannot open or see these */
