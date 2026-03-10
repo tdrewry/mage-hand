@@ -156,6 +156,8 @@ function getCardTitle(type: CardType): string {
     [CardType.CHAT]: 'Chat',
     [CardType.ART_APPROVAL]: 'Art Approval',
     [CardType.SOUND_SETTINGS]: 'Sound Settings',
+    [CardType.HANDOUT_CATALOG]: 'Handouts',
+    [CardType.HANDOUT_VIEWER]: 'Handout',
   };
   
   return titles[type] || type;
