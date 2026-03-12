@@ -5,6 +5,13 @@
 import type { BaseCampaign, BaseFlowNode, BaseNodeData } from '../types/base';
 import type { BaseNodeType, NodeResult } from '../types/execution';
 
+export interface GraphProgressSnapshot {
+  currentNodeId: string | null;
+  completedNodeIds: string[];
+  failedNodeIds: string[];
+  flags: Record<string, boolean>;
+}
+
 export interface GraphProgress {
   campaignId: string;
   currentNodeId: string | null;
@@ -15,6 +22,8 @@ export interface GraphProgress {
   lastPlayedAt: string;
   isComplete: boolean;
   isFailed: boolean;
+  /** Stack of previous states for back navigation */
+  history: GraphProgressSnapshot[];
 }
 
 export interface GraphRunnerOptions<
