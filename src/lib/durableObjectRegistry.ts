@@ -603,12 +603,8 @@ DurableObjectRegistry.register({
   extractor: () => ({ groups: useTokenGroupStore.getState().groups }),
   hydrator: (state: any) => {
     if (!state?.groups) return;
-    const store = useTokenGroupStore.getState();
-    store.clearAllGroups();
-    state.groups.forEach((g: any) => {
-      const created = store.addGroup(g.name, g.tokenIds, g.formation);
-      if (g.color) store.updateGroup(created.id, { color: g.color, icon: g.icon });
-    });
+    const normalizedGroups = normalizeImportedTokenGroups(state.groups);
+    useTokenGroupStore.setState({ groups: normalizedGroups });
   },
   summarizer: () => `${useTokenGroupStore.getState().groups.length} token groups`,
 });
