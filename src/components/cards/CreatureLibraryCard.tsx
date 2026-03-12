@@ -28,6 +28,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
 import { useItemStore } from '@/stores/itemStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
