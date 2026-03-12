@@ -144,7 +144,7 @@ export function CampaignSceneRunner() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 w-7 p-0 text-green-500 hover:text-green-400 hover:border-green-500/50"
+                className="h-7 w-7 p-0 hover:border-green-500/50"
                 onClick={handleResolveSuccess}
                 title="Resolve as success → advance"
               >
