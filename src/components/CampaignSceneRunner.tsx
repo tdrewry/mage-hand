@@ -128,7 +128,7 @@ export function CampaignSceneRunner() {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
-      <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 min-w-[320px] max-w-[560px]">
+      <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 min-w-[320px] max-w-[640px] flex-wrap">
         {/* Campaign name */}
         <div className="flex items-center gap-1.5 min-w-0 shrink">
           <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px]">
@@ -164,27 +164,48 @@ export function CampaignSceneRunner() {
                 Run
               </Button>
 
-              {/* Resolve success */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0 hover:border-green-500/50"
-                onClick={handleResolveSuccess}
-                title="Resolve as success → advance"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </Button>
+              {/* Decision node: show outcome branch buttons instead of success/fail */}
+              {nodeType === 'dialog' && decisionOutcomes.length > 0 ? (
+                <>
+                  {decisionOutcomes.map((outcome) => (
+                    <Button
+                      key={outcome.id}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleChooseOutcome(outcome.id, outcome.targetNodeId)}
+                      title={outcome.targetLabel ? `→ ${outcome.targetLabel}` : outcome.label}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-0.5" />
+                      {outcome.label}
+                    </Button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {/* Resolve success */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:border-primary/50"
+                    onClick={handleResolveSuccess}
+                    title="Resolve as success → advance"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </Button>
 
-              {/* Resolve failure */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0 text-destructive hover:border-destructive/50"
-                onClick={handleResolveFailure}
-                title="Resolve as failure"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+                  {/* Resolve failure */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-destructive hover:border-destructive/50"
+                    onClick={handleResolveFailure}
+                    title="Resolve as failure"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
             </div>
           </>
         ) : (
