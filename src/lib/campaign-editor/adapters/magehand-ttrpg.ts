@@ -23,6 +23,7 @@ import type {
 import type { CampaignEditorAdapter } from '../types/adapter';
 import type { BaseNodeType } from '../types/execution';
 import { useMapStore } from '@/stores/mapStore';
+import { useTokenGroupStore, getFormationOffsets } from '@/stores/tokenGroupStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useFogStore } from '@/stores/fogStore';
