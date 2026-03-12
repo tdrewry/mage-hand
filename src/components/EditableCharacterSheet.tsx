@@ -98,16 +98,10 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
             </Field>
             <Field label="Class">
               <Input
-                value={character.classes.map(c => `${c.name} ${c.level}`).join(' / ')}
-                onChange={e => {
-                  // Simple parse: "Fighter 5 / Wizard 3"
-                  const parts = e.target.value.split('/').map(s => s.trim());
-                  const classes = parts.map(p => {
-                    const match = p.match(/^(.+?)\s+(\d+)$/);
-                    return match ? { name: match[1], level: parseInt(match[2]) } : { name: p, level: 1 };
-                  });
-                  update({ classes });
-                }}
+                value={classText}
+                onChange={e => setClassText(e.target.value)}
+                onBlur={() => commitClassText(classText)}
+                placeholder="Fighter 5 / Wizard 3"
                 className="h-7 text-xs"
               />
             </Field>
