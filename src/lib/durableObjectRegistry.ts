@@ -32,6 +32,7 @@ import { useDiceStore } from '@/stores/diceStore';
 import { useActionStore } from '@/stores/actionStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
+import { useCampaignStore } from '@/stores/campaignStore';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
@@ -558,4 +559,38 @@ DurableObjectRegistry.register({
     });
   },
   summarizer: () => `${Object.keys(useSessionStore.getState().viewportTransforms).length} maps`,
+});
+
+// ── Campaigns ─────────────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'campaigns',
+  version: 1,
+  label: 'Campaigns',
+  extractor: () => {
+    const s = useCampaignStore.getState();
+    return {
+      campaigns: s.campaigns,
+      activeCampaignId: s.activeCampaignId,
+      activeProgress: s.activeProgress,
+      nodePositions: s.nodePositions,
+    };
+  },
+  hydrator: (state: any) => {
+    if (!state || typeof state !== 'object') return;
+    const store = useCampaignStore.getState();
+    // Clear existing campaigns
+    store.campaigns.forEach(c => store.removeCampaign(c.id));
+    // Restore
+    if (state.campaigns) state.campaigns.forEach((c: any) => store.addCampaign(c));
+    if (state.nodePositions) {
+      Object.entries(state.nodePositions).forEach(([campaignId, positions]: [string, any]) => {
+        Object.entries(positions).forEach(([nodeId, pos]: [string, any]) => {
+          store.setNodePosition(campaignId, nodeId, pos);
+        });
+      });
+    }
+    if (state.activeCampaignId) store.setActiveCampaign(state.activeCampaignId);
+    if (state.activeProgress) store.setProgress(state.activeProgress);
+  },
+  summarizer: () => `${useCampaignStore.getState().campaigns.length} campaigns`,
 });

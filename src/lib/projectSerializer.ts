@@ -110,6 +110,13 @@ export interface ProjectData {
   };
   // UI mode (play/edit)
   uiMode?: 'dm' | 'play';
+  // Campaign data
+  campaigns?: {
+    campaigns: any[];
+    activeCampaignId: string | null;
+    activeProgress: any | null;
+    nodePositions: Record<string, Record<string, { x: number; y: number }>>;
+  };
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }

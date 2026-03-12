@@ -26,6 +26,7 @@ import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
+import { useCampaignStore } from '@/stores/campaignStore';
 
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
@@ -56,6 +57,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
   const hatchingStore = useHatchingStore.getState();
   const effectStore = useEffectStore.getState();
   const uiModeStore = useUiModeStore.getState();
+  const campaignStore = useCampaignStore.getState();
 
   return {
     metadata: createProjectMetadata(
@@ -130,6 +132,12 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       customTemplates: effectStore.customTemplates,
     },
     uiMode: uiModeStore.currentMode === 'dm' ? 'dm' : 'play',
+    campaigns: {
+      campaigns: campaignStore.campaigns,
+      activeCampaignId: campaignStore.activeCampaignId,
+      activeProgress: campaignStore.activeProgress,
+      nodePositions: campaignStore.nodePositions,
+    },
   };
 }
 
@@ -306,5 +314,23 @@ export function applyProjectData(data: ProjectData): void {
   if (data.settings) {
     if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
     if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
+  }
+
+  // Campaigns
+  if (data.campaigns) {
+    const cd = data.campaigns;
+    const cs = useCampaignStore.getState();
+    // Clear existing
+    cs.campaigns.forEach(c => cs.removeCampaign(c.id));
+    if (cd.campaigns) cd.campaigns.forEach((c: any) => cs.addCampaign(c));
+    if (cd.nodePositions) {
+      Object.entries(cd.nodePositions).forEach(([campaignId, positions]: [string, any]) => {
+        Object.entries(positions).forEach(([nodeId, pos]: [string, any]) => {
+          cs.setNodePosition(campaignId, nodeId, pos);
+        });
+      });
+    }
+    if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
+    if (cd.activeProgress) cs.setProgress(cd.activeProgress);
   }
 }
