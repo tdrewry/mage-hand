@@ -142,6 +142,14 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
     tokenGroups: {
       groups: useTokenGroupStore.getState().groups,
     },
+    mapFocus: {
+      unfocusedOpacity: useMapFocusStore.getState().unfocusedOpacity,
+      unfocusedBlur: useMapFocusStore.getState().unfocusedBlur,
+      selectionLockEnabled: useMapFocusStore.getState().selectionLockEnabled,
+    },
+    mapStructures: mapStore.structures,
+    selectedMapId: mapStore.selectedMapId,
+    autoFocusFollowsToken: mapStore.autoFocusFollowsToken,
   };
 }
 
