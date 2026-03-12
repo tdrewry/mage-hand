@@ -30,7 +30,7 @@ import { useFogStore } from '@/stores/fogStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCampaignStore } from '@/stores/campaignStore';
-import { BUILTIN_HANDOUTS } from '@/lib/handouts';
+import { getHandoutById } from '@/lib/handouts';
 import { toast } from 'sonner';
 
 // ============= NODE TYPE CONFIGS =============

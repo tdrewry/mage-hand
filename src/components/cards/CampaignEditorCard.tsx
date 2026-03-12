@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { BUILTIN_HANDOUTS } from '@/lib/handouts';
+import { getAllHandouts } from '@/lib/handouts';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
