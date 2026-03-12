@@ -115,8 +115,9 @@ export interface SessionState {
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
   viewportTransforms: Record<string, ViewportTransform>;
+  projectName: string;
 
-  addToken: (token: Token) => void;
+  setProjectName: (name: string) => void;
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
