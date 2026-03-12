@@ -56,6 +56,23 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
     });
   }, [character, update]);
 
+  // Local state for the class field to avoid re-rendering the computed value mid-typing
+  const classDisplayValue = useMemo(
+    () => character.classes.map(c => `${c.name} ${c.level}`).join(' / '),
+    [character.classes]
+  );
+  const [classText, setClassText] = useState(classDisplayValue);
+  useEffect(() => { setClassText(classDisplayValue); }, [classDisplayValue]);
+
+  const commitClassText = useCallback((text: string) => {
+    const parts = text.split('/').map(s => s.trim()).filter(Boolean);
+    const classes = parts.map(p => {
+      const match = p.match(/^(.+?)\s+(\d+)$/);
+      return match ? { name: match[1], level: parseInt(match[2]) } : { name: p, level: 1 };
+    });
+    update({ classes });
+  }, [update]);
+
   return (
     <div className="p-3 space-y-1 text-sm">
       {/* ── Core Stats ── */}
