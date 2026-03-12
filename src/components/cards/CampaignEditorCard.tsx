@@ -197,6 +197,9 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
         <Button size="sm" onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-1" /> New
         </Button>
+        <Button size="sm" variant="outline" onClick={handleImport} title="Import scenario (.mhscenario)">
+          <Upload className="h-4 w-4" />
+        </Button>
       </div>
       <Separator />
       {campaigns.length === 0 ? (
