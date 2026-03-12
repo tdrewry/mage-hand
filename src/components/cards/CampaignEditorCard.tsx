@@ -466,15 +466,15 @@ export function CampaignEditorCardContent() {
       <div className="flex flex-1 min-h-0">
         <div className={selectedNode ? 'flex-1' : 'w-full'} style={{ minHeight: 200 }}>
           <GenericFlowCanvas
-            nodes={activeCampaign.nodes}
+            nodes={editingCampaign.nodes}
             positions={positions}
             selectedNodeId={selectedNodeId}
-            startNodeId={activeCampaign.startNodeId}
+            startNodeId={editingCampaign.startNodeId}
             adapter={adapter}
             onNodeSelect={setSelectedNodeId}
-            onNodeMove={(nodeId, pos) => setNodePosition(activeCampaignId!, nodeId, pos)}
-            onConnectionCreate={(src, tgt, type) => addConnection(activeCampaignId!, src, tgt, type)}
-            onConnectionDelete={(src, tgt, type) => removeConnection(activeCampaignId!, src, tgt, type)}
+            onNodeMove={(nodeId, pos) => setNodePosition(editingCampaignId!, nodeId, pos)}
+            onConnectionCreate={(src, tgt, type) => addConnection(editingCampaignId!, src, tgt, type)}
+            onConnectionDelete={(src, tgt, type) => removeConnection(editingCampaignId!, src, tgt, type)}
           />
         </div>
 
