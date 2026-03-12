@@ -5,8 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // GitHub Pages serves from /atlas-arcana/; local dev uses /
-  base: mode === "production" ? "/atlas-arcana/" : "/",
+  // GitHub Pages serves from /mage-hand/; local dev uses /
+  base: mode === "production" ? "/mage-hand/" : "/",
   server: {
     host: "::",
     port: 8080,
