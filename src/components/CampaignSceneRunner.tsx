@@ -184,16 +184,6 @@ export function CampaignSceneRunner() {
     toast.info('Campaign progress reset');
   };
 
-  const handleOpenEditor = useCallback(() => {
-    if (!activeCampaignId) return;
-    requestOpenEditor(activeCampaignId);
-    const card = getCardByType(CardType.CAMPAIGN_EDITOR);
-    if (card) {
-      setVisibility(card.id, true);
-      setMinimize(card.id, false);
-      bringToFront(card.id);
-    }
-  }, [activeCampaignId, requestOpenEditor, getCardByType, setVisibility, setMinimize, bringToFront]);
 
   const handleStop = () => {
     setActiveCampaign(null);
