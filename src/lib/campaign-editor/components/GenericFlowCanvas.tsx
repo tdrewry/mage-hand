@@ -22,6 +22,13 @@ interface DragConnection {
   currentY: number;
 }
 
+export interface FlowCanvasViewState {
+  scale: number;
+  offset: { x: number; y: number };
+  containerWidth: number;
+  containerHeight: number;
+}
+
 interface GenericFlowCanvasProps<TNodeData extends BaseNodeData = BaseNodeData, TNode extends BaseFlowNode<TNodeData> = BaseFlowNode<TNodeData>> {
   nodes: TNode[];
   positions: Record<string, FlowNodePosition>;
@@ -32,6 +39,7 @@ interface GenericFlowCanvasProps<TNodeData extends BaseNodeData = BaseNodeData, 
   onNodeMove: (nodeId: string, position: FlowNodePosition) => void;
   onConnectionCreate?: (sourceId: string, targetId: string, type: 'success' | 'failure') => void;
   onConnectionDelete?: (sourceId: string, targetId: string, type: 'success' | 'failure') => void;
+  viewStateRef?: React.MutableRefObject<FlowCanvasViewState | null>;
 }
 
 export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData, TNode extends BaseFlowNode<TNodeData> = BaseFlowNode<TNodeData>>({
@@ -44,10 +52,22 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
   onNodeMove,
   onConnectionCreate,
   onConnectionDelete,
+  viewStateRef,
 }: GenericFlowCanvasProps<TNodeData, TNode>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 50, y: 50 });
+
+  // Keep viewStateRef in sync so parent can read current view center
+  if (viewStateRef) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    viewStateRef.current = {
+      scale,
+      offset,
+      containerWidth: rect?.width ?? 800,
+      containerHeight: rect?.height ?? 600,
+    };
+  }
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [draggingNode, setDraggingNode] = useState<string | null>(null);

@@ -3,7 +3,7 @@
  * DM-only card for authoring branching story campaigns.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { getAllHandouts } from '@/lib/handouts';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useTokenGroupStore } from '@/stores/tokenGroupStore';
-import { GenericFlowCanvas } from '@/lib/campaign-editor/components/GenericFlowCanvas';
+import { GenericFlowCanvas, type FlowCanvasViewState } from '@/lib/campaign-editor/components/GenericFlowCanvas';
 import { createMagehandTTRPGAdapter, MAGEHAND_NODE_TYPE_CONFIGS } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import type { BaseCampaign, BaseFlowNode, BaseNodeData, FlowNodePosition } from '@/lib/campaign-editor/types/base';
 
@@ -751,6 +751,7 @@ export function CampaignEditorCardContent() {
 
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const canvasViewRef = useRef<FlowCanvasViewState | null>(null);
 
   // Auto-navigate when another component requests opening a specific campaign
   React.useEffect(() => {
@@ -786,7 +787,15 @@ export function CampaignEditorCardContent() {
       customData: {},
     };
     addNode(editingCampaignId, node);
-    setNodePosition(editingCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
+    // Place new node at the center of the current canvas view
+    const view = canvasViewRef.current;
+    let newX = 100 + count * 220;
+    let newY = 100 + (count % 3) * 120;
+    if (view) {
+      newX = (view.containerWidth / 2 - view.offset.x) / view.scale - 90;
+      newY = (view.containerHeight / 2 - view.offset.y) / view.scale - 40;
+    }
+    setNodePosition(editingCampaignId, id, { x: newX, y: newY });
     setSelectedNodeId(id);
   };
 
@@ -853,6 +862,7 @@ export function CampaignEditorCardContent() {
             onNodeMove={(nodeId, pos) => setNodePosition(editingCampaignId!, nodeId, pos)}
             onConnectionCreate={(src, tgt, type) => addConnection(editingCampaignId!, src, tgt, type)}
             onConnectionDelete={(src, tgt, type) => removeConnection(editingCampaignId!, src, tgt, type)}
+            viewStateRef={canvasViewRef}
           />
         </div>
 
