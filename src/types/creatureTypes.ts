@@ -70,6 +70,9 @@ export interface DndBeyondCharacter {
   // Equipment (optional)
   equipment?: Array<{ name: string; quantity: number; equipped?: boolean }>;
   
+  // Token icon
+  tokenIconUrl?: string;
+  
   // Source tracking
   sourceUrl: string;
   lastUpdated: string; // ISO date string for serialization
@@ -133,6 +136,7 @@ export interface Monster5eTools {
   
   // Images
   tokenUrl?: string;
+  tokenIconUrl?: string;  // User-assigned default token art
   fluffImages?: Array<{ url: string; type?: string }>;
   
   // Environment

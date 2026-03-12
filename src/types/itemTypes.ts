@@ -75,6 +75,7 @@ export interface LibraryItem {
   // Metadata
   source?: string;        // e.g. "DMG", "PHB", "Homebrew"
   imageUrl?: string;
+  tokenIconUrl?: string;  // Default token art when placed as token
   createdAt: string;
   updatedAt: string;
 }

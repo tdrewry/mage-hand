@@ -409,6 +409,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.LIBRARY_EDITOR]: {
+    title: 'Library Editor',
+    defaultPosition: { x: 400, y: 100 },
+    defaultSize: { width: 450, height: 650 },
+    minSize: { width: 380, height: 500 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: true,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

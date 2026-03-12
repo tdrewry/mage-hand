@@ -17,6 +17,7 @@ import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
+import { LibraryEditorCardContent } from '@/components/cards/LibraryEditorCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
 import { DiceCardContent } from '@/components/cards/DiceCard';
 import { ActionCardContent } from '@/components/cards/ActionCard';
@@ -162,6 +163,7 @@ function getCardTitle(type: CardType): string {
     [CardType.HANDOUT_VIEWER]: 'Handout',
     [CardType.CAMPAIGN_EDITOR]: 'Campaign Editor',
     [CardType.TOKEN_GROUP_MANAGER]: 'Token Groups',
+    [CardType.LIBRARY_EDITOR]: 'Library Editor',
   };
   
   return titles[type] || type;
@@ -260,6 +262,11 @@ function renderCardContent(
       return <CampaignEditorCardContent />;
     case CardType.TOKEN_GROUP_MANAGER:
       return <TokenGroupManagerCardContent />;
+    case CardType.LIBRARY_EDITOR:
+      return <LibraryEditorCardContent
+        entityId={(metadata?.entityId as string) || ''}
+        entityType={(metadata?.entityType as 'character' | 'monster') || 'monster'}
+      />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

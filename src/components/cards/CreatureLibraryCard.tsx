@@ -316,11 +316,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const center = getViewportCenter();
       
-      // Try to fetch token art if available - only use if it's a valid loadable URL
+      // Try to fetch token art if available
       let imageUrl = '';
-      const artUrl = monster.tokenUrl || monster.fluffImages?.[0]?.url;
+      const artUrl = monster.tokenIconUrl || monster.tokenUrl || monster.fluffImages?.[0]?.url;
       
-      // Only attempt to load if it looks like a full URL (not a 5e.tools reference)
+      // Only attempt to load if it looks like a full URL
       if (artUrl && (artUrl.startsWith('http://') || artUrl.startsWith('https://') || artUrl.startsWith('data:'))) {
         try {
           const img = new Image();
@@ -388,18 +388,19 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const center = getViewportCenter();
       
-      // Try to load portrait
+      // Try to load portrait / token icon
       let imageUrl = '';
-      if (character.portraitUrl) {
+      const artUrl = character.tokenIconUrl || character.portraitUrl;
+      if (artUrl) {
         try {
           const img = new Image();
           img.crossOrigin = 'anonymous';
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
             img.onerror = () => reject(new Error('Failed to load image'));
-            img.src = character.portraitUrl!;
+            img.src = artUrl;
           });
-          imageUrl = character.portraitUrl;
+          imageUrl = artUrl;
         } catch {
           console.warn(`Could not load portrait for ${character.name}`);
         }
@@ -678,7 +679,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 
   const handleOpenCharacterSheet = (character: DndBeyondCharacter) => {
     registerCard({
-      type: CardType.CHARACTER_SHEET,
+      type: CardType.LIBRARY_EDITOR,
       title: character.name,
       defaultPosition: { x: 400, y: 100 },
       defaultSize: { width: 450, height: 650 },
@@ -686,21 +687,21 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       isResizable: true,
       isClosable: true,
       defaultVisible: true,
-      metadata: { characterId: character.id },
+      metadata: { entityId: character.id, entityType: 'character' },
     });
   };
 
   const handleOpenMonsterStatBlock = (monster: Monster5eTools) => {
     registerCard({
-      type: CardType.MONSTER_STAT_BLOCK,
+      type: CardType.LIBRARY_EDITOR,
       title: monster.name,
       defaultPosition: { x: 400, y: 100 },
-      defaultSize: { width: 400, height: 600 },
-      minSize: { width: 350, height: 450 },
+      defaultSize: { width: 450, height: 650 },
+      minSize: { width: 380, height: 500 },
       isResizable: true,
       isClosable: true,
       defaultVisible: true,
-      metadata: { monsterId: monster.id },
+      metadata: { entityId: monster.id, entityType: 'monster' },
     });
   };
 
