@@ -116,6 +116,15 @@ export function createGraphRunner<
       const node = nodeMap.get(nodeId);
       if (!node) { console.warn(`[GraphRunner] Node not found: ${nodeId}`); return { ...progress }; }
 
+      // Save snapshot before mutation for back navigation
+      const snapshot: GraphProgressSnapshot = {
+        currentNodeId: progress.currentNodeId,
+        completedNodeIds: [...progress.completedNodeIds],
+        failedNodeIds: [...progress.failedNodeIds],
+        flags: { ...progress.flags },
+      };
+      progress.history = [...progress.history, snapshot];
+
       if (result.flagsSet) { progress.flags = { ...progress.flags, ...result.flagsSet }; }
 
       if (result.outcome === 'success' || result.outcome === 'choice') {
