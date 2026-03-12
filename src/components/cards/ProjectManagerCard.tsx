@@ -346,8 +346,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       const projects = getSavedProjects();
       setSavedProjects(projects);
       
-      // Reset form
-      setProjectName('');
+      // Reset description only, keep project name
       setProjectDescription('');
     } catch (error) {
       toast.error(`Failed to save project: ${error instanceof Error ? error.message : 'Unknown error'}`);
