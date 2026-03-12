@@ -649,8 +649,75 @@ function renderPortalShape(
 }
 
 /**
- * Render a single map object to the canvas
+ * Render a deployment zone — dashed-border rectangle with label badge (DM-only).
  */
+function renderDeploymentZoneShape(
+  ctx: CanvasRenderingContext2D,
+  mapObject: MapObject,
+  zoom: number,
+  isDMView: boolean = false
+) {
+  // Only render in DM view — deployment zones are invisible to players
+  if (!isDMView) return;
+
+  const { width, height, fillColor, strokeColor, deploymentZoneLabel } = mapObject;
+
+  // Filled rectangle
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(-width / 2, -height / 2, width, height);
+
+  // Dashed border
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([8 / zoom, 4 / zoom]);
+  ctx.strokeRect(-width / 2, -height / 2, width, height);
+  ctx.setLineDash([]);
+
+  // Corner markers (small filled squares at each corner)
+  const markerSize = 4 / zoom;
+  ctx.fillStyle = strokeColor;
+  const corners = [
+    [-width / 2, -height / 2],
+    [width / 2, -height / 2],
+    [-width / 2, height / 2],
+    [width / 2, height / 2],
+  ];
+  for (const [cx, cy] of corners) {
+    ctx.fillRect(cx - markerSize / 2, cy - markerSize / 2, markerSize, markerSize);
+  }
+
+  // Shield/flag icon at center
+  const iconSize = 10 / zoom;
+  ctx.save();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.globalAlpha = 0.8;
+  // Simple flag shape
+  ctx.beginPath();
+  ctx.moveTo(-iconSize * 0.3, -iconSize);
+  ctx.lineTo(-iconSize * 0.3, iconSize);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-iconSize * 0.3, -iconSize);
+  ctx.lineTo(iconSize * 0.7, -iconSize * 0.5);
+  ctx.lineTo(-iconSize * 0.3, 0);
+  ctx.fillStyle = strokeColor;
+  ctx.globalAlpha = 0.5;
+  ctx.fill();
+  ctx.restore();
+
+  // Label badge below
+  const label = deploymentZoneLabel || 'Deploy';
+  const fontSize = Math.max(9, 10 / zoom);
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = strokeColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.globalAlpha = 0.9;
+  ctx.fillText(label, 0, height / 2 + 4 / zoom);
+}
+
+
 export function renderMapObject(
   ctx: CanvasRenderingContext2D,
   mapObject: MapObject,
