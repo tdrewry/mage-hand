@@ -5,7 +5,7 @@
  * Clicking the node title opens a NodeSummaryCard popup.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
