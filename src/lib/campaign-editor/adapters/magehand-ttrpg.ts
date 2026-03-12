@@ -232,12 +232,11 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
       }
 
       // Place tokens using formation offsets or grid spread
-      const zoneX = zone.position.x;
-      const zoneY = zone.position.y;
+      // Note: MapObject position is the CENTER of the object
       const zoneW = zone.width;
       const zoneH = zone.height;
-      const centerX = zoneX + zoneW / 2;
-      const centerY = zoneY + zoneH / 2;
+      const centerX = zone.position.x;
+      const centerY = zone.position.y;
 
       // Determine grid size from the first token or default 50
       const gridSize = 50;
@@ -250,14 +249,16 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
           sessionStore.updateTokenPosition(token.id, newX, newY);
         });
       } else {
-        // Fallback: spread evenly within zone
+        // Fallback: spread evenly within zone, centered
         const cols = Math.max(1, Math.floor(Math.sqrt(tokens.length)));
+        const rows = Math.ceil(tokens.length / cols);
+        const spacingX = Math.min(zoneW / (cols + 1), gridSize);
+        const spacingY = Math.min(zoneH / (rows + 1), gridSize);
         tokens.forEach((token, i) => {
           const col = i % cols;
           const row = Math.floor(i / cols);
-          const spacing = Math.min(zoneW / (cols + 1), zoneH / (Math.ceil(tokens.length / cols) + 1));
-          const newX = zoneX + spacing * (col + 1);
-          const newY = zoneY + spacing * (row + 1);
+          const newX = centerX + (col - (cols - 1) / 2) * spacingX;
+          const newY = centerY + (row - (rows - 1) / 2) * spacingY;
           sessionStore.updateTokenPosition(token.id, newX, newY);
         });
       }
