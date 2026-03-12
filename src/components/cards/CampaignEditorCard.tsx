@@ -64,15 +64,14 @@ function TokenGroupPicker({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-// ── Campaign List View ──────────────────────────────────────────────────────
+// ── Scenario List View ──────────────────────────────────────────────────────
 
-
-function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
-  const { campaigns, addCampaign, removeCampaign } = useCampaignStore();
+function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
+  const { campaigns, addCampaign, removeCampaign, activeCampaignId, setActiveCampaign } = useCampaignStore();
   const [newName, setNewName] = useState('');
 
   const handleCreate = () => {
-    const name = newName.trim() || 'Untitled Campaign';
+    const name = newName.trim() || 'Untitled Scenario';
     const now = new Date().toISOString();
     const startNodeId = `scene-${Date.now()}`;
     const campaign: BaseCampaign = {
@@ -97,18 +96,22 @@ function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
       tags: ['ttrpg'],
     };
     addCampaign(campaign);
-    // Set default position for start node
     useCampaignStore.getState().setNodePosition(campaign.id, startNodeId, { x: 100, y: 100 });
     setNewName('');
     onSelect(campaign.id);
   };
 
+  const handleToggleActive = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveCampaign(activeCampaignId === id ? null : id);
+  };
+
   return (
     <div className="p-3 space-y-3">
-      <p className="text-xs text-muted-foreground">Create or load a campaign</p>
+      <p className="text-xs text-muted-foreground">Create or manage scenarios</p>
       <div className="flex gap-2">
         <Input
-          placeholder="Campaign name..."
+          placeholder="Scenario name..."
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -120,30 +123,55 @@ function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
       </div>
       <Separator />
       {campaigns.length === 0 ? (
-        <p className="text-xs text-muted-foreground text-center py-4">No campaigns yet</p>
+        <p className="text-xs text-muted-foreground text-center py-4">No scenarios yet</p>
       ) : (
         <ScrollArea className="max-h-[300px]">
           <div className="space-y-2">
-            {campaigns.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/50 cursor-pointer transition-colors"
-                onClick={() => onSelect(c.id)}
-              >
-                <div>
-                  <p className="text-sm font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+            {campaigns.map((c) => {
+              const isActive = activeCampaignId === c.id;
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center justify-between p-2 rounded-md border cursor-pointer transition-colors ${
+                    isActive
+                      ? 'border-primary/50 bg-primary/5'
+                      : 'border-border hover:bg-accent/50'
+                  }`}
+                  onClick={() => onSelect(c.id)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      {isActive && (
+                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
+                          Running
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant={isActive ? 'default' : 'ghost'}
+                      size="sm"
+                      className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={(e) => handleToggleActive(e, c.id)}
+                      title={isActive ? 'Stop scenario' : 'Run scenario'}
+                    >
+                      {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </ScrollArea>
       )}
