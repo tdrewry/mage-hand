@@ -251,6 +251,7 @@ export const HandoutCatalogCardContent: React.FC = () => {
                   />
                 </Suspense>
               </div>
+            )}
           </div>
 
           <DialogFooter>
