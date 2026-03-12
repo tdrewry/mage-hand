@@ -78,6 +78,10 @@ export interface MapObject {
   portalHiddenInPlay?: boolean;  // Hidden from players in play mode
   portalAutoActivateTarget?: boolean; // Auto-activate and focus target map on teleport (off by default)
 
+  // Deployment-zone-specific properties (category: 'deployment-zone')
+  deploymentZoneLabel?: string;  // Display label (e.g. "Party Start", "Reinforcements")
+  deploymentZoneGroup?: string;  // Role or token group name for auto-placement
+
   // Multi-map scoping — which map this object belongs to
   mapId?: string;
 }
