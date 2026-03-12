@@ -698,15 +698,19 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'characters' | 'monsters')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'characters' | 'monsters' | 'items')}>
         <TabsList className="w-full">
-          <TabsTrigger value="characters" className="flex-1 gap-1">
-            <Users className="h-4 w-4" />
+          <TabsTrigger value="characters" className="flex-1 gap-1 text-xs">
+            <Users className="h-3.5 w-3.5" />
             Characters ({characters.length})
           </TabsTrigger>
-          <TabsTrigger value="monsters" className="flex-1 gap-1">
-            <Skull className="h-4 w-4" />
+          <TabsTrigger value="monsters" className="flex-1 gap-1 text-xs">
+            <Skull className="h-3.5 w-3.5" />
             Monsters ({monsters.length})
+          </TabsTrigger>
+          <TabsTrigger value="items" className="flex-1 gap-1 text-xs">
+            <Package className="h-3.5 w-3.5" />
+            Items ({items.length})
           </TabsTrigger>
         </TabsList>
 
