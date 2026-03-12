@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { 
   Search, 
   Plus, 
@@ -20,7 +22,10 @@ import {
   Eye,
   Download,
   Globe,
-  Target
+  Target,
+  Gem,
+  Package,
+  Pencil,
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
