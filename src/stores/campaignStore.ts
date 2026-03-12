@@ -220,6 +220,9 @@ export const useCampaignStore = create<CampaignState>()(
           if (!campaign) return s;
           return { activeProgress: createEmptyGraphProgress(campaign.id, campaign.startNodeId) };
         }),
+
+      requestOpenEditor: (campaignId: string) => set({ requestedEditorCampaignId: campaignId }),
+      clearEditorRequest: () => set({ requestedEditorCampaignId: null }),
     }),
     {
       name: 'campaign-store',
