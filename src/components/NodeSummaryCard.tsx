@@ -99,6 +99,16 @@ export function NodeSummaryCard({
     });
   };
 
+  const sendLootToChat = () => {
+    const sceneName = node.nodeData.name || 'Treasure';
+    const lines = treasure.map((item) => {
+      const qty = item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : '';
+      const desc = item.description ? ` — ${item.description}` : '';
+      return `💎 **${item.name}**${qty}${desc}`;
+    });
+    addMessage('campaign-narrator', sceneName, `**Loot Found:**\n${lines.join('\n')}`);
+  };
+
   return (
     <div
       className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[380px] max-w-[90vw] max-h-[70vh] bg-card border border-border rounded-lg shadow-xl z-[31001] pointer-events-auto overflow-hidden flex flex-col"
