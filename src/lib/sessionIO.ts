@@ -26,6 +26,7 @@ import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
+import { useCampaignStore } from '@/stores/campaignStore';
 
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
