@@ -678,7 +678,7 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 
   const handleOpenCharacterSheet = (character: DndBeyondCharacter) => {
     registerCard({
-      type: CardType.CHARACTER_SHEET,
+      type: CardType.LIBRARY_EDITOR,
       title: character.name,
       defaultPosition: { x: 400, y: 100 },
       defaultSize: { width: 450, height: 650 },
@@ -686,21 +686,21 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       isResizable: true,
       isClosable: true,
       defaultVisible: true,
-      metadata: { characterId: character.id },
+      metadata: { entityId: character.id, entityType: 'character' },
     });
   };
 
   const handleOpenMonsterStatBlock = (monster: Monster5eTools) => {
     registerCard({
-      type: CardType.MONSTER_STAT_BLOCK,
+      type: CardType.LIBRARY_EDITOR,
       title: monster.name,
       defaultPosition: { x: 400, y: 100 },
-      defaultSize: { width: 400, height: 600 },
-      minSize: { width: 350, height: 450 },
+      defaultSize: { width: 450, height: 650 },
+      minSize: { width: 380, height: 500 },
       isResizable: true,
       isClosable: true,
       defaultVisible: true,
-      metadata: { monsterId: monster.id },
+      metadata: { entityId: monster.id, entityType: 'monster' },
     });
   };
 
