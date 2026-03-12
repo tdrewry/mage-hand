@@ -7,7 +7,7 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { BaseFlowNode, BaseNodeData, FlowNodePosition } from '../types/base';
 import { CampaignEditorAdapter } from '../types/adapter';
 import { cn } from '@/lib/utils';
-import { Circle, Diamond, Flag, Star, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Circle, Diamond, Flag, Star, ZoomIn, ZoomOut, Maximize, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const NODE_WIDTH = 180;
@@ -75,6 +75,72 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
     setScale(Math.min(scaleX, scaleY, 1));
     setOffset({ x: 50, y: 50 });
   }, [contentBounds]);
+
+  /** Topological auto-layout: arranges nodes in columns by graph depth. */
+  const autoLayout = useCallback(() => {
+    if (nodes.length === 0) return;
+
+    // Build adjacency
+    const successors = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+    nodes.forEach(n => {
+      successors.set(n.id, [...n.nextOnSuccess, ...(n.nextOnFailure && n.nextOnFailure !== 'end' ? [n.nextOnFailure] : [])]);
+      if (!inDegree.has(n.id)) inDegree.set(n.id, 0);
+    });
+    nodes.forEach(n => {
+      (successors.get(n.id) || []).forEach(t => {
+        inDegree.set(t, (inDegree.get(t) || 0) + 1);
+      });
+    });
+
+    // BFS from start node (or roots) to assign depth
+    const depth = new Map<string, number>();
+    const queue: string[] = [];
+
+    // Start with the designated start node first, then any zero-indegree roots
+    if (startNodeId) { depth.set(startNodeId, 0); queue.push(startNodeId); }
+    nodes.forEach(n => {
+      if (!depth.has(n.id) && (inDegree.get(n.id) || 0) === 0) {
+        depth.set(n.id, 0);
+        queue.push(n.id);
+      }
+    });
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const d = depth.get(current) || 0;
+      (successors.get(current) || []).forEach(t => {
+        if (!depth.has(t) || depth.get(t)! < d + 1) {
+          depth.set(t, d + 1);
+          queue.push(t);
+        }
+      });
+    }
+
+    // Any unreachable nodes get max depth + 1
+    const maxDepth = Math.max(0, ...Array.from(depth.values()));
+    nodes.forEach(n => { if (!depth.has(n.id)) depth.set(n.id, maxDepth + 1); });
+
+    // Group by depth column
+    const columns = new Map<number, string[]>();
+    depth.forEach((d, id) => {
+      if (!columns.has(d)) columns.set(d, []);
+      columns.get(d)!.push(id);
+    });
+
+    const H_SPACING = NODE_WIDTH + 60;
+    const V_SPACING = NODE_HEIGHT + 40;
+
+    columns.forEach((ids, col) => {
+      ids.forEach((id, row) => {
+        const totalHeight = ids.length * V_SPACING;
+        onNodeMove(id, {
+          x: 40 + col * H_SPACING,
+          y: 40 + row * V_SPACING + (300 - totalHeight) / 2, // Center vertically
+        });
+      });
+    });
+  }, [nodes, startNodeId, onNodeMove]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -201,6 +267,7 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
         <Button variant="secondary" size="sm" className="h-7 px-2 text-xs">{Math.round(scale * 100)}%</Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={zoomIn}><ZoomIn className="w-3 h-3" /></Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={fitToView}><Maximize className="w-3 h-3" /></Button>
+        <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={autoLayout} title="Auto Layout"><LayoutGrid className="w-3 h-3" /></Button>
       </div>
 
       {/* Grid background */}
