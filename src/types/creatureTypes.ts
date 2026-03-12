@@ -70,6 +70,9 @@ export interface DndBeyondCharacter {
   // Equipment (optional)
   equipment?: Array<{ name: string; quantity: number; equipped?: boolean }>;
   
+  // Token icon
+  tokenIconUrl?: string;
+  
   // Source tracking
   sourceUrl: string;
   lastUpdated: string; // ISO date string for serialization
