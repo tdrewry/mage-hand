@@ -253,7 +253,7 @@ function NodePropertyPanel({
   campaignId: string;
   node: BaseFlowNode;
 }) {
-  const { updateNode } = useCampaignStore();
+  const { updateNode, campaigns } = useCampaignStore();
   const maps = useMapStore((s) => s.maps);
   const mapObjects = useMapObjectStore((s) => s.mapObjects);
 
