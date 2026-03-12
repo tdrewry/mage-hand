@@ -225,13 +225,32 @@ export const HandoutCatalogCardContent: React.FC = () => {
                 )}
               </ScrollArea>
             ) : (
-              <Textarea
-                value={editMarkdown}
-                onChange={(e) => setEditMarkdown(e.target.value)}
-                placeholder="Write your handout content in markdown..."
-                className="flex-1 min-h-[250px] max-h-[400px] text-sm font-mono resize-none"
-              />
-            )}
+              <div className="flex-1 min-h-[250px] max-h-[400px] border rounded-md overflow-hidden">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                    Loading editor…
+                  </div>
+                }>
+                  <MonacoEditor
+                    height="100%"
+                    language="markdown"
+                    value={editMarkdown}
+                    onChange={(v) => setEditMarkdown(v ?? '')}
+                    theme="vs-dark"
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      lineNumbers: 'off',
+                      wordWrap: 'on',
+                      scrollBeyondLastLine: false,
+                      folding: true,
+                      renderLineHighlight: 'none',
+                      overviewRulerLanes: 0,
+                      padding: { top: 8, bottom: 8 },
+                    }}
+                  />
+                </Suspense>
+              </div>
           </div>
 
           <DialogFooter>
