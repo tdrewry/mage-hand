@@ -219,6 +219,28 @@ export function NodeSummaryCard({
           </div>
         </div>
       )}
+
+      {/* Handout buttons */}
+      {(node.handouts || []).length > 0 && (
+        <div className="px-3 py-2 border-t border-border">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Handouts</p>
+          <div className="flex flex-wrap gap-1.5">
+            {(node.handouts || []).map((h) => (
+              <Button
+                key={h.id}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => openHandoutById(h.handoutId, h.label)}
+                disabled={!h.handoutId}
+              >
+                <BookOpen className="h-3 w-3 mr-0.5" />
+                {h.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
