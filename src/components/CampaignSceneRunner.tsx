@@ -208,10 +208,16 @@ export function CampaignSceneRunner() {
         {/* ── Row 1: Standard tools ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Campaign name + progress */}
-          <div className="flex items-center gap-1.5 min-w-0 shrink">
-            <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px]">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 min-w-0 shrink hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+            onClick={handleOpenEditor}
+            title="Open scenario editor"
+          >
+            <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px] underline decoration-dotted underline-offset-2">
               {campaign.name}
             </span>
+          </button>
             <Badge variant="outline" className="text-[10px] shrink-0">
               {completedCount}/{totalCount}
             </Badge>
