@@ -118,6 +118,7 @@ export interface SessionState {
   projectName: string;
 
   setProjectName: (name: string) => void;
+  addToken: (token: Token) => void;
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
   updateTokenLabel: (tokenId: string, label: string) => void;
