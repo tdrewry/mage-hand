@@ -33,6 +33,7 @@ export enum CardType {
   SOUND_SETTINGS = 'sound_settings',
   HANDOUT_CATALOG = 'handout_catalog',
   HANDOUT_VIEWER = 'handout_viewer',
+  CAMPAIGN_EDITOR = 'campaign_editor',
 }
 
 /** Card types that require DM role — players cannot open or see these */
