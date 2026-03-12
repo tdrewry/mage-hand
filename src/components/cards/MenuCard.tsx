@@ -721,6 +721,33 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <BookOpen className="h-4 w-4 mr-2" />
           Handouts
         </Button>
+
+        {canControlUiMode && (
+          <Button
+            variant={campaignEditorCard?.isVisible ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (campaignEditorCard) {
+                setVisibility(campaignEditorCard.id, !campaignEditorCard.isVisible);
+              } else {
+                registerCard({
+                  type: CardType.CAMPAIGN_EDITOR,
+                  title: 'Campaign Editor',
+                  defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+                  defaultSize: { width: 800, height: 600 },
+                  minSize: { width: 600, height: 450 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+            }}
+            className="w-full"
+          >
+            <Route className="h-4 w-4 mr-2" />
+            Campaign
+          </Button>
+        )}
       </div>
 
       <Separator />
