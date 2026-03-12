@@ -132,6 +132,9 @@ export interface BaseFlowNode<D extends BaseNodeData = BaseNodeData> {
   outcomes?: { id: string; label: string; color: string; targetNodeId?: string; setsFlags?: Record<string, boolean> }[];
   narrativeReason?: string;
 
+  /** Handouts linked to this node — shown as buttons the DM can click to open/share */
+  handouts?: { id: string; label: string; handoutId: string }[];
+
   /** Game-specific data. Shape defined by adapter's NodeTypeConfig.customFields. */
   customData?: Record<string, unknown>;
 

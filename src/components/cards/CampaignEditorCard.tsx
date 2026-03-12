@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { BUILTIN_HANDOUTS } from '@/lib/handouts';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -492,6 +493,86 @@ function NodePropertyPanel({
               className="text-sm min-h-[80px] font-mono"
               rows={4}
             />
+          </div>
+        )}
+
+        {/* Narrative — linked handouts */}
+        {typeConfig?.features?.hasHandouts && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Linked Handouts</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-xs"
+                onClick={() => {
+                  const handouts = [...(node.handouts || [])];
+                  handouts.push({
+                    id: `handout-link-${Date.now()}`,
+                    label: `Handout ${handouts.length + 1}`,
+                    handoutId: '',
+                  });
+                  updateNode(campaignId, node.id, { handouts });
+                }}
+              >
+                <Plus className="h-3 w-3 mr-0.5" /> Add
+              </Button>
+            </div>
+            {(node.handouts || []).length === 0 && (
+              <p className="text-[10px] text-muted-foreground">No handouts linked — add handouts for the DM to share during play.</p>
+            )}
+            <div className="space-y-2">
+              {(node.handouts || []).map((handout, idx) => (
+                <div key={handout.id} className="space-y-1 p-2 rounded border border-border bg-muted/30">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      value={handout.label}
+                      onChange={(e) => {
+                        const handouts = [...(node.handouts || [])];
+                        handouts[idx] = { ...handouts[idx], label: e.target.value };
+                        updateNode(campaignId, node.id, { handouts });
+                      }}
+                      className="text-xs h-6 flex-1"
+                      placeholder="Button label..."
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-destructive"
+                      onClick={() => {
+                        const handouts = (node.handouts || []).filter((_, i) => i !== idx);
+                        updateNode(campaignId, node.id, { handouts });
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <Select
+                    value={handout.handoutId || '__none__'}
+                    onValueChange={(v) => {
+                      const handouts = [...(node.handouts || [])];
+                      handouts[idx] = { ...handouts[idx], handoutId: v === '__none__' ? '' : v };
+                      updateNode(campaignId, node.id, { handouts });
+                    }}
+                  >
+                    <SelectTrigger className="h-6 text-[11px]">
+                      <SelectValue placeholder="Select handout..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No handout selected</SelectItem>
+                      {BUILTIN_HANDOUTS.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="h-3 w-3" />
+                            {h.title}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

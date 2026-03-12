@@ -6,7 +6,7 @@
  *
  * Node types:
  * - encounter: activates a map + teleports tokens to deployment zone
- * - narrative: opens a handout viewer with dialog lines
+ * - narrative: presents handouts the DM can share on demand
  * - dialog: presents player choices via chat or modal
  * - rest: toast notification, no map change
  */
@@ -30,6 +30,7 @@ import { useFogStore } from '@/stores/fogStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCampaignStore } from '@/stores/campaignStore';
+import { BUILTIN_HANDOUTS } from '@/lib/handouts';
 import { toast } from 'sonner';
 
 // ============= NODE TYPE CONFIGS =============
@@ -96,6 +97,7 @@ export const MAGEHAND_NARRATIVE_CONFIG: NodeTypeConfig = {
   description: 'Present narrative content via handout viewer',
   features: {
     hasDialogLines: true,
+    hasHandouts: true,
     hasSceneSettings: true,
     hasAutoAdvance: true,
     hasContinue: true,
@@ -276,45 +278,40 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
 }
 
 function executeNarrativeNode(node: BaseFlowNode): void {
-  // Build markdown content from dialog lines
-  const lines = node.dialogLines || [];
-  const markdown = lines
-    .map((l) => (l.speaker ? `**${l.speaker}:** ${l.text}` : l.text))
-    .join('\n\n');
+  // Narrative nodes no longer auto-open handouts.
+  // The DM clicks handout buttons in the scene runner / summary card to share them.
+  toast.info(`📜 ${node.nodeData.name}`);
+}
 
-  if (!markdown) {
-    toast.info(`Scene: ${node.nodeData.name}`);
-    return;
-  }
+/**
+ * Open a specific handout by its registry ID.
+ * Called when the DM clicks a handout button in the scene runner or summary card.
+ */
+export function openHandoutById(handoutId: string, label?: string): void {
+  const entry = BUILTIN_HANDOUTS.find((h) => h.id === handoutId);
+  const title = entry?.title || label || 'Handout';
 
-  // Open a HandoutViewer card with inline content
   const cardStore = useCardStore.getState();
-  const existingCard = cardStore.cards.find(
-    (c) => c.type === CardType.HANDOUT_VIEWER && c.metadata?.campaignNodeId === node.id
+  const existing = cardStore.cards.find(
+    (c) => c.type === CardType.HANDOUT_VIEWER && c.metadata?.handoutId === handoutId
   );
 
-  if (existingCard) {
-    cardStore.setVisibility(existingCard.id, true);
+  if (existing) {
+    cardStore.setVisibility(existing.id, true);
+    cardStore.bringToFront(existing.id);
   } else {
     cardStore.registerCard({
       type: CardType.HANDOUT_VIEWER,
-      title: node.nodeData.name || 'Narrative',
-      defaultPosition: { x: window.innerWidth / 2 - 250, y: 100 },
-      defaultSize: { width: 500, height: 600 },
+      title,
+      defaultPosition: { x: Math.min(window.innerWidth - 520, 380), y: 60 },
+      defaultSize: { width: 500, height: 650 },
       minSize: { width: 360, height: 400 },
       isResizable: true,
       isClosable: true,
       defaultVisible: true,
-      metadata: {
-        handoutId: `__campaign_narrative__`,
-        campaignNodeId: node.id,
-        inlineContent: markdown,
-        title: node.nodeData.name,
-      },
+      metadata: { handoutId },
     });
   }
-
-  toast.info(`📜 ${node.nodeData.name}`);
 }
 
 function executeDialogNode(node: BaseFlowNode): void {

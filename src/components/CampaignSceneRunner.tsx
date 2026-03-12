@@ -16,7 +16,7 @@ import {
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
-import { executeNode } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
+import { executeNode, openHandoutById } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
 import { NodeSummaryCard } from '@/components/NodeSummaryCard';
 import {
@@ -31,6 +31,7 @@ import {
   Tent,
   Play,
   Square,
+  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -119,6 +120,12 @@ export function CampaignSceneRunner() {
     });
   }, [currentNode?.id, nodeType, campaign]);
 
+  // Linked handouts for the current node
+  const linkedHandouts = useMemo(() => {
+    if (!currentNode) return [];
+    return currentNode.handouts || [];
+  }, [currentNode?.id]);
+
   const handleOpenEditor = useCallback(() => {
     if (!activeCampaignId) return;
     requestOpenEditor(activeCampaignId);
@@ -203,6 +210,17 @@ export function CampaignSceneRunner() {
 
   const showDecisionRow =
     !isComplete && currentNode && nodeType === 'dialog' && decisionOutcomes.length > 0;
+
+  const showHandoutRow =
+    !isComplete && currentNode && linkedHandouts.length > 0;
+
+  const handleOpenHandout = (handoutId: string, label: string) => {
+    if (!handoutId) {
+      toast.error('No handout selected for this link');
+      return;
+    }
+    openHandoutById(handoutId, label);
+  };
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
@@ -316,6 +334,31 @@ export function CampaignSceneRunner() {
                 </TooltipTrigger>
                 <TooltipContent side="top" sideOffset={8}>
                   {outcome.targetLabel ? `→ ${outcome.targetLabel}` : outcome.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
+
+        {/* ── Row 3: Handout buttons ── */}
+        {showHandoutRow && (
+          <div className="flex items-center gap-1.5 flex-wrap border-t border-border pt-1.5">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Handouts</span>
+            {linkedHandouts.map((h) => (
+              <Tooltip key={h.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleOpenHandout(h.handoutId, h.label)}
+                  >
+                    <BookOpen className="h-3 w-3 mr-0.5" />
+                    {h.label}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Open handout: {h.label}
                 </TooltipContent>
               </Tooltip>
             ))}
