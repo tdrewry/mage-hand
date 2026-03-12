@@ -875,6 +875,80 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
             )}
           </ScrollArea>
         </TabsContent>
+
+        {/* Items Tab */}
+        <TabsContent value="items" className="flex-1 flex flex-col gap-3 mt-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="sm" onClick={handleCreateItem} className="gap-1">
+              <Plus className="h-4 w-4" />
+              New Item
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleImportItemsJson} className="gap-1">
+              <FileJson className="h-4 w-4" />
+              Import JSON
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2">
+            <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {(Object.keys(ITEM_CATEGORY_LABELS) as ItemCategory[]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>{ITEM_CATEGORY_LABELS[cat]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={itemRarityFilter} onValueChange={setItemRarityFilter}>
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Rarity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Rarities</SelectItem>
+                {(Object.keys(ITEM_RARITY_LABELS) as ItemRarity[]).map((r) => (
+                  <SelectItem key={r} value={r}>{ITEM_RARITY_LABELS[r]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <ScrollArea className="flex-1 min-h-0">
+            {filteredItems.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No items in library</p>
+                <p className="text-xs mt-1">Create or import JSON items to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-2 pr-4">
+                {filteredItems.slice(0, 100).map((item) => (
+                  <ItemListEntry
+                    key={item.id}
+                    item={item}
+                    isEditing={editingItemId === item.id}
+                    onEdit={() => setEditingItemId(editingItemId === item.id ? null : item.id)}
+                    onUpdate={(updates) => {
+                      useItemStore.getState().updateItem(item.id, updates);
+                    }}
+                    onRemove={() => {
+                      removeItem(item.id);
+                      if (editingItemId === item.id) setEditingItemId(null);
+                      toast.success(`Removed ${item.name}`);
+                    }}
+                  />
+                ))}
+                {filteredItems.length > 100 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Showing 100 of {filteredItems.length} results. Refine your search.
+                  </p>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </TabsContent>
       </Tabs>
 
       {/* 5e.tools Source Selection Dialog */}
