@@ -7,7 +7,7 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { BaseFlowNode, BaseNodeData, FlowNodePosition } from '../types/base';
 import { CampaignEditorAdapter } from '../types/adapter';
 import { cn } from '@/lib/utils';
-import { Circle, Diamond, Flag, Star, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Circle, Diamond, Flag, Star, ZoomIn, ZoomOut, Maximize, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const NODE_WIDTH = 180;
