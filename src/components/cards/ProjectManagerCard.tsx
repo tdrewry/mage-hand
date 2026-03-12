@@ -84,7 +84,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   viewport
 }) => {
   const [activeTab, setActiveTab] = useState('save');
-  const [projectName, setProjectName] = useState('');
+  const projectName = useSessionStore(s => s.projectName);
+  const setProjectName = useSessionStore(s => s.setProjectName);
   const [projectDescription, setProjectDescription] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
