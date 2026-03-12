@@ -1,53 +1,56 @@
 
 
-# UX Restructure: Effect Template Editor Tabs & Fields
+# Custom Handouts System
 
-## Changes Requested
+## Overview
+Add a Zustand store for custom handouts (title + markdown) that DMs can create, edit, and delete. These appear alongside built-in handouts in the catalog, are selectable in narrative node linking dropdowns, and persist via localStorage.
 
-1. **Move Category (type) outside tabs** — below Template Name, above the tab bar
-2. **Move Quantity to Shape tab** (from Damage tab)
-3. **Level & Scaling fields become their own tab** (extracted from Damage tab)
-4. **Granted Actions become their own tab** (extracted from Conditions tab)
-5. **Support texture/image on templates** — add optional texture field to Shape tab alongside color
-6. **Add Duration tab** — persistence, rounds, recurring extracted from Shape tab
+## Architecture
 
-## New Tab Structure
+### 1. New Store: `src/stores/handoutStore.ts`
+- Zustand store with `persist` middleware (localStorage key: `magehand-handouts`)
+- State: `customHandouts: HandoutEntry[]`
+- Actions: `addHandout`, `updateHandout`, `deleteHandout`
+- Each entry gets a unique ID (`custom-handout-{timestamp}`), `category: 'custom'`, `icon: 'FileText'`
 
-```text
-[Name input]
-[Category selector]  ← moved outside tabs
-┌───────┬────────┬───────┬──────────┬──────────┬───────────┬──────────┐
-│ Shape │ Damage │ Level │ Mods     │ Conds    │ Grants    │ Duration │
-└───────┴────────┴───────┴──────────┴──────────┴───────────┴──────────┘
-```
+### 2. Update `src/lib/handouts/index.ts`
+- Add `getAllHandouts()` function that merges `BUILTIN_HANDOUTS` with custom handouts from the store
+- Update `getHandoutById()` to also search custom handouts
+- Keep `BUILTIN_HANDOUTS` export unchanged for backward compatibility
 
-## Field Redistribution
+### 3. Update Handout Catalog Card (`HandoutCatalogCard.tsx`)
+- Add "New Handout" button at the top
+- Show custom handouts below built-in ones with edit/delete actions
+- Clicking "New Handout" opens a create/edit dialog
+- Add inline edit and delete buttons for custom entries
 
-| Tab | Contents |
-|-----|----------|
-| **Shape** | Shape type, dimensions, color, texture/image, opacity, animation, quantity (multi-drop), placement toggles (align, caster, ranged, skip rotation) |
-| **Damage** | Damage dice rows, attack roll toggle + config |
-| **Level** | Spell level, base level, scaling rules, level overrides |
-| **Mods** | Modifier rows (target property + operation + value) |
-| **Conds** | D&D 5e condition checkboxes |
-| **Grants** | Granted actions with type field (attack/spell/trait/feature) |
-| **Duration** | Persistence type (instant/persistent), duration rounds, recurring toggle |
+### 4. New Component: Handout Editor Dialog
+- Modal dialog with title input + markdown textarea
+- Live preview toggle using existing `MarkdownRenderer`
+- Used for both create and edit flows
+- Rendered inside the catalog card or as a standalone dialog
 
-## Files Changed
+### 5. Update Handout Viewer Card (`HandoutViewerCard.tsx`)
+- Update `getHandoutById` call to also search custom handouts from the store
 
-| File | Change |
-|------|--------|
-| `src/components/cards/EffectsCard.tsx` | Restructure tabs: add `level`, `grants`, `duration` tabs; move category above tabs; move quantity to Shape; move level/scaling out of Damage; split granted actions from Conditions; add texture input to Shape tab |
-| `src/types/effectTypes.ts` | Add `texture?: string` to `EffectTemplate` (already exists — just ensure form wires it) |
-| `src/lib/version.ts` | Bump to `0.6.35` |
-| `Plans/extended-effect-impacts.md` | Update with tab restructure |
+### 6. Update Campaign Editor Handout Dropdown
+- In `CampaignEditorCard.tsx`, change `BUILTIN_HANDOUTS` reference in the linked handouts Select to use `getAllHandouts()` so custom handouts appear as linkable options
 
-## Implementation Details
+### 7. Update `openHandoutById` in magehand-ttrpg adapter
+- Use the unified `getHandoutById` that searches both built-in and custom
 
-- `FormTab` union becomes: `'shape' | 'damage' | 'level' | 'modifiers' | 'conditions' | 'grants' | 'duration'`
-- `FORM_TABS` array updated with 7 entries (short labels to fit: Shape, Dmg, Level, Mods, Conds, Grants, Dur)
-- Category selector rendered between Name input and tab bar in `TemplateFormFields`
-- Texture field on Shape tab: text input for data URL / asset key (reuses existing `texture` property on `EffectTemplate`)
-- Granted actions get a `type` dropdown per row: attack, spell, trait, feature
-- Badge counts updated: Level tab shows scaling rule count, Grants tab shows action count, Duration tab shows no badge
+### 8. Session Persistence
+- Custom handouts persist in localStorage via Zustand persist middleware
+- Include in session export/import via the durable object registry (future enhancement, not blocking)
+
+## Files to Create
+- `src/stores/handoutStore.ts`
+
+## Files to Modify
+- `src/lib/handouts/index.ts` — add `getAllHandouts()`, update `getHandoutById()`
+- `src/components/cards/HandoutCatalogCard.tsx` — add create/edit/delete UI for custom handouts
+- `src/components/cards/HandoutViewerCard.tsx` — use updated `getHandoutById`
+- `src/components/cards/CampaignEditorCard.tsx` — use `getAllHandouts()` in dropdown
+- `src/lib/campaign-editor/adapters/magehand-ttrpg.ts` — use updated `getHandoutById` in `openHandoutById`
+- `src/lib/version.ts` — bump version
 
