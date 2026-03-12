@@ -461,6 +461,15 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
                   <Droplets className="h-3 w-3 mr-2" />
                   Water
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={() => handleConvertToMapObject('deployment-zone')}
+                >
+                  <Flag className="h-3 w-3 mr-2" />
+                  Deployment Zone
+                </Button>
               </div>
             </PopoverContent>
           </Popover>
