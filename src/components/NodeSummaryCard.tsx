@@ -61,6 +61,8 @@ export function NodeSummaryCard({
   onChooseOutcome,
   onClose,
 }: NodeSummaryCardProps) {
+  const addMessage = useChatStore((s) => s.addMessage);
+
   const nodeType = node.nodeType || 'encounter';
   const description = node.nodeData.description;
 
