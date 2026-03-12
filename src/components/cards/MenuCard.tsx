@@ -774,6 +774,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
         >
           <UsersRound className="h-4 w-4 mr-2" />
           Token Groups
+        </Button>
       </div>
 
       <Separator />
