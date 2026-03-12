@@ -27,7 +27,7 @@ import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
-import { useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
