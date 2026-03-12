@@ -358,12 +358,8 @@ export function applyProjectData(data: ProjectData): void {
 
   // Token Groups
   if (data.tokenGroups?.groups) {
-    const tgs = useTokenGroupStore.getState();
-    tgs.clearAllGroups();
-    data.tokenGroups.groups.forEach((g: any) => {
-      const created = tgs.addGroup(g.name, g.tokenIds, g.formation);
-      if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
-    });
+    const normalizedGroups = normalizeImportedTokenGroups(data.tokenGroups.groups);
+    useTokenGroupStore.setState({ groups: normalizedGroups });
   }
 
   // Map Focus settings
