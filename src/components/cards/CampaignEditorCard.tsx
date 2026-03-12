@@ -375,8 +375,6 @@ function NodePropertyPanel({
 export function CampaignEditorCardContent() {
   const {
     campaigns,
-    activeCampaignId,
-    setActiveCampaign,
     nodePositions,
     setNodePosition,
     addNode,
@@ -385,19 +383,20 @@ export function CampaignEditorCardContent() {
     removeConnection,
   } = useCampaignStore();
 
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const activeCampaign = campaigns.find((c) => c.id === activeCampaignId);
+  const editingCampaign = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId) : null;
 
   const handleBack = () => {
-    setActiveCampaign(null);
+    setEditingCampaignId(null);
     setSelectedNodeId(null);
   };
 
   const handleAddNode = (typeId: string) => {
-    if (!activeCampaignId) return;
+    if (!editingCampaignId) return;
     const id = `scene-${Date.now()}`;
-    const positions = nodePositions[activeCampaignId] || {};
+    const positions = nodePositions[editingCampaignId] || {};
     const count = Object.keys(positions).length;
     const node: BaseFlowNode = {
       id,
@@ -408,23 +407,23 @@ export function CampaignEditorCardContent() {
       prerequisites: [],
       customData: {},
     };
-    addNode(activeCampaignId, node);
-    setNodePosition(activeCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
+    addNode(editingCampaignId, node);
+    setNodePosition(editingCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
     setSelectedNodeId(id);
   };
 
   const handleRemoveNode = () => {
-    if (!activeCampaignId || !selectedNodeId) return;
-    removeNode(activeCampaignId, selectedNodeId);
+    if (!editingCampaignId || !selectedNodeId) return;
+    removeNode(editingCampaignId, selectedNodeId);
     setSelectedNodeId(null);
   };
 
-  if (!activeCampaign) {
-    return <CampaignListView onSelect={(id) => setActiveCampaign(id)} />;
+  if (!editingCampaign) {
+    return <ScenarioListView onSelect={(id) => setEditingCampaignId(id)} />;
   }
 
-  const positions = nodePositions[activeCampaignId!] || {};
-  const selectedNode = activeCampaign.nodes.find((n) => n.id === selectedNodeId);
+  const positions = nodePositions[editingCampaignId!] || {};
+  const selectedNode = editingCampaign.nodes.find((n) => n.id === selectedNodeId);
 
   return (
     <div className="flex flex-col h-full">
