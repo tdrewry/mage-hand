@@ -124,6 +124,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       characters: creatureStore.characters,
       monsters: creatureStore.monsters,
     },
+    items: useItemStore.getState().items,
     hatching: {
       enabled: hatchingStore.enabled,
       hatchingOptions: hatchingStore.hatchingOptions,
