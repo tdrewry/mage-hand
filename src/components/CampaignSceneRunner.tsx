@@ -119,6 +119,17 @@ export function CampaignSceneRunner() {
     });
   }, [currentNode?.id, nodeType, campaign]);
 
+  const handleOpenEditor = useCallback(() => {
+    if (!activeCampaignId) return;
+    requestOpenEditor(activeCampaignId);
+    const card = getCardByType(CardType.CAMPAIGN_EDITOR);
+    if (card) {
+      setVisibility(card.id, true);
+      setMinimize(card.id, false);
+      bringToFront(card.id);
+    }
+  }, [activeCampaignId, requestOpenEditor, getCardByType, setVisibility, setMinimize, bringToFront]);
+
   if (!campaign || !activeProgress || !runner) return null;
 
   const isComplete = activeProgress.isComplete || activeProgress.isFailed;
