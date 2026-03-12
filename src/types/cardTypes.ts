@@ -43,6 +43,7 @@ export const DM_ONLY_CARD_TYPES: ReadonlySet<CardType> = new Set([
   CardType.REGION_CONTROL,
   CardType.ACTION_CARD,
   CardType.ART_APPROVAL,
+  CardType.CAMPAIGN_EDITOR,
 ]);
 
 export interface CardPosition {
