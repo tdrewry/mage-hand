@@ -23,6 +23,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useItemStore } from '@/stores/itemStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
