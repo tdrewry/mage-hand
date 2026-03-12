@@ -57,6 +57,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
   const hatchingStore = useHatchingStore.getState();
   const effectStore = useEffectStore.getState();
   const uiModeStore = useUiModeStore.getState();
+  const campaignStore = useCampaignStore.getState();
 
   return {
     metadata: createProjectMetadata(
