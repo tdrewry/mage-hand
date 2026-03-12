@@ -268,7 +268,7 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
               <span className="font-mono break-all">{jsonError}</span>
             </div>
           )}
-          <div className="flex-1 min-h-0 border-y border-border overflow-hidden mt-2">
+          <div className="flex-1 min-h-0 border-y border-border overflow-hidden mt-2" onKeyDown={e => e.stopPropagation()} onKeyUp={e => e.stopPropagation()}>
             <Suspense fallback={
               <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                 Loading editor…
