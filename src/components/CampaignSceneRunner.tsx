@@ -211,11 +211,16 @@ export function CampaignSceneRunner() {
   const showDecisionRow =
     !isComplete && currentNode && nodeType === 'dialog' && decisionOutcomes.length > 0;
 
-  return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
-      {/* Node Summary Card popup (above the widget) */}
-      {showSummary && currentNode && !isComplete && (
-        <NodeSummaryCard
+  const showHandoutRow =
+    !isComplete && currentNode && linkedHandouts.length > 0;
+
+  const handleOpenHandout = (handoutId: string, label: string) => {
+    if (!handoutId) {
+      toast.error('No handout selected for this link');
+      return;
+    }
+    openHandoutById(handoutId, label);
+  };
           node={currentNode}
           decisionOutcomes={decisionOutcomes}
           onChooseOutcome={handleChooseOutcome}
