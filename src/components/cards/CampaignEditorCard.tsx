@@ -862,6 +862,7 @@ export function CampaignEditorCardContent() {
             onNodeMove={(nodeId, pos) => setNodePosition(editingCampaignId!, nodeId, pos)}
             onConnectionCreate={(src, tgt, type) => addConnection(editingCampaignId!, src, tgt, type)}
             onConnectionDelete={(src, tgt, type) => removeConnection(editingCampaignId!, src, tgt, type)}
+            viewStateRef={canvasViewRef}
           />
         </div>
 
