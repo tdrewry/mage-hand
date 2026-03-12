@@ -262,6 +262,13 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
         });
       }
 
+      // 4. Move tokens to the target map so they're visible
+      const { setTokens, tokens: allTokens } = useSessionStore.getState();
+      const movedIds = new Set(tokens.map((t) => t.id));
+      setTokens(
+        allTokens.map((t) => movedIds.has(t.id) ? { ...t, mapId } : t)
+      );
+
       toast.info(`Placed ${tokens.length} token${tokens.length !== 1 ? 's' : ''} in deployment zone`);
     }
   }
