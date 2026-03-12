@@ -424,6 +424,86 @@ function NodePropertyPanel({
           </div>
         )}
 
+        {/* Dialog — decision outcomes / branches */}
+        {nodeType === 'dialog' && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Decision Outcomes</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-xs"
+                onClick={() => {
+                  const outcomes = [...(node.outcomes || [])];
+                  outcomes.push({
+                    id: `outcome-${Date.now()}`,
+                    label: `Choice ${outcomes.length + 1}`,
+                    color: '#3b82f6',
+                  });
+                  updateNode(campaignId, node.id, { outcomes });
+                }}
+              >
+                <Plus className="h-3 w-3 mr-0.5" /> Add
+              </Button>
+            </div>
+            {(node.outcomes || []).length === 0 && (
+              <p className="text-[10px] text-muted-foreground">No outcomes yet — add choices for the DM to pick during play.</p>
+            )}
+            <div className="space-y-2">
+              {(node.outcomes || []).map((outcome, idx) => {
+                // Find all other nodes as potential targets
+                const campaign = campaigns.find((c) => c.id === campaignId);
+                const otherNodes = campaign?.nodes.filter((n) => n.id !== node.id) || [];
+                return (
+                  <div key={outcome.id} className="space-y-1 p-2 rounded border border-border bg-muted/30">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        value={outcome.label}
+                        onChange={(e) => {
+                          const outcomes = [...(node.outcomes || [])];
+                          outcomes[idx] = { ...outcomes[idx], label: e.target.value };
+                          updateNode(campaignId, node.id, { outcomes });
+                        }}
+                        className="text-xs h-6 flex-1"
+                        placeholder="Choice label..."
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive"
+                        onClick={() => {
+                          const outcomes = (node.outcomes || []).filter((_, i) => i !== idx);
+                          updateNode(campaignId, node.id, { outcomes });
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <Select
+                      value={outcome.targetNodeId || '__none__'}
+                      onValueChange={(v) => {
+                        const outcomes = [...(node.outcomes || [])];
+                        outcomes[idx] = { ...outcomes[idx], targetNodeId: v === '__none__' ? undefined : v };
+                        updateNode(campaignId, node.id, { outcomes });
+                      }}
+                    >
+                      <SelectTrigger className="h-6 text-[11px]">
+                        <SelectValue placeholder="→ Target scene..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No target (use connections)</SelectItem>
+                        {otherNodes.map((n) => (
+                          <SelectItem key={n.id} value={n.id}>{n.nodeData.name || n.id}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <Separator />
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline" className="text-[10px]">{node.id}</Badge>
