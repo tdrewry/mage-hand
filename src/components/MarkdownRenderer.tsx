@@ -111,7 +111,9 @@ export const MarkdownRenderer = forwardRef<HTMLDivElement, MarkdownRendererProps
               <td className="py-1.5 px-2 text-foreground">{children}</td>
             ),
           }}
-        />
+        >
+          {content}
+        </ReactMarkdown>
       </div>
     );
   }
