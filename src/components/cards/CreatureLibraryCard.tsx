@@ -466,6 +466,32 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     setShowImportModal(true);
   };
 
+  const handleCreateBlankCharacter = useCallback(() => {
+    const blank = generateBlankTemplate();
+    blank.name = 'New Character';
+    addCharacter(blank);
+    toast.success('Blank character created — open it to edit');
+  }, [addCharacter]);
+
+  const handleCreateBlankMonster = useCallback(() => {
+    const now = Date.now();
+    const monster: Monster5eTools = {
+      id: `monster-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      name: 'New Monster',
+      source: 'Homebrew',
+      size: 'M' as MonsterSize,
+      type: { type: 'humanoid' },
+      ac: [{ ac: 10 }],
+      hp: { average: 10, formula: '2d8+2' },
+      speed: { walk: 30 },
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+      cr: '0',
+      passive: 10,
+    };
+    addMonster(monster);
+    toast.success('Blank monster created — open it to edit');
+  }, [addMonster]);
+
   const handleCreateItem = () => {
     const now = new Date().toISOString();
     const item: LibraryItem = {
