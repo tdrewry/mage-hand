@@ -159,6 +159,7 @@ function getCardTitle(type: CardType): string {
     [CardType.SOUND_SETTINGS]: 'Sound Settings',
     [CardType.HANDOUT_CATALOG]: 'Handouts',
     [CardType.HANDOUT_VIEWER]: 'Handout',
+    [CardType.CAMPAIGN_EDITOR]: 'Campaign Editor',
   };
   
   return titles[type] || type;

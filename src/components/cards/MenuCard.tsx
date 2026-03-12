@@ -77,6 +77,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const artApprovalCard = cards.find((c) => c.type === CardType.ART_APPROVAL);
   const soundSettingsCard = cards.find((c) => c.type === CardType.SOUND_SETTINGS);
   const handoutCatalogCard = cards.find((c) => c.type === CardType.HANDOUT_CATALOG);
+  const campaignEditorCard = cards.find((c) => c.type === CardType.CAMPAIGN_EDITOR);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
