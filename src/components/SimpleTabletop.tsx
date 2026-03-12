@@ -7301,7 +7301,7 @@ export const SimpleTabletop = () => {
     redrawCanvas();
 
     toast.success(
-      "Pan/Zoom Tabletop Ready! Controls: Left-click=select, Shift+click=add token, Right-click=pan, Scroll=zoom, Right-click token=menu",
+      "Pan/Zoom Tabletop Ready! Controls: Left-click=select, Shift+click=add token, Middle-click=pan, Scroll=zoom, Right-click token=menu",
     );
 
     const handleResize = () => {
