@@ -76,6 +76,72 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
     setOffset({ x: 50, y: 50 });
   }, [contentBounds]);
 
+  /** Topological auto-layout: arranges nodes in columns by graph depth. */
+  const autoLayout = useCallback(() => {
+    if (nodes.length === 0) return;
+
+    // Build adjacency
+    const successors = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+    nodes.forEach(n => {
+      successors.set(n.id, [...n.nextOnSuccess, ...(n.nextOnFailure && n.nextOnFailure !== 'end' ? [n.nextOnFailure] : [])]);
+      if (!inDegree.has(n.id)) inDegree.set(n.id, 0);
+    });
+    nodes.forEach(n => {
+      (successors.get(n.id) || []).forEach(t => {
+        inDegree.set(t, (inDegree.get(t) || 0) + 1);
+      });
+    });
+
+    // BFS from start node (or roots) to assign depth
+    const depth = new Map<string, number>();
+    const queue: string[] = [];
+
+    // Start with the designated start node first, then any zero-indegree roots
+    if (startNodeId) { depth.set(startNodeId, 0); queue.push(startNodeId); }
+    nodes.forEach(n => {
+      if (!depth.has(n.id) && (inDegree.get(n.id) || 0) === 0) {
+        depth.set(n.id, 0);
+        queue.push(n.id);
+      }
+    });
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const d = depth.get(current) || 0;
+      (successors.get(current) || []).forEach(t => {
+        if (!depth.has(t) || depth.get(t)! < d + 1) {
+          depth.set(t, d + 1);
+          queue.push(t);
+        }
+      });
+    }
+
+    // Any unreachable nodes get max depth + 1
+    const maxDepth = Math.max(0, ...Array.from(depth.values()));
+    nodes.forEach(n => { if (!depth.has(n.id)) depth.set(n.id, maxDepth + 1); });
+
+    // Group by depth column
+    const columns = new Map<number, string[]>();
+    depth.forEach((d, id) => {
+      if (!columns.has(d)) columns.set(d, []);
+      columns.get(d)!.push(id);
+    });
+
+    const H_SPACING = NODE_WIDTH + 60;
+    const V_SPACING = NODE_HEIGHT + 40;
+
+    columns.forEach((ids, col) => {
+      ids.forEach((id, row) => {
+        const totalHeight = ids.length * V_SPACING;
+        onNodeMove(id, {
+          x: 40 + col * H_SPACING,
+          y: 40 + row * V_SPACING + (300 - totalHeight) / 2, // Center vertically
+        });
+      });
+    });
+  }, [nodes, startNodeId, onNodeMove]);
+
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (e.target === containerRef.current || target.classList.contains('canvas-bg')) {
