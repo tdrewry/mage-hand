@@ -146,6 +146,14 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     setBestiaryLoading,
   } = useCreatureStore();
 
+  const {
+    items,
+    addItem,
+    addItems,
+    removeItem,
+    searchItems,
+  } = useItemStore();
+
   const { addToken, getViewportTransform } = useSessionStore();
   const { selectedMapId } = useMapStore();
   const { registerCard } = useCardStore();
