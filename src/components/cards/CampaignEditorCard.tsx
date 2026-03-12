@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -104,6 +105,64 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
     onSelect(campaign.id);
   };
 
+  const handleExport = (e: React.MouseEvent, c: BaseCampaign) => {
+    e.stopPropagation();
+    const nodePos = useCampaignStore.getState().nodePositions[c.id] || {};
+    const payload = {
+      format: 'magehand-scenario',
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      scenario: c,
+      nodePositions: nodePos,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${c.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mhscenario`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported "${c.name}"`);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.mhscenario,.json';
+    input.onchange = async (ev) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const scenario: BaseCampaign = parsed.scenario ?? parsed;
+        if (!scenario.id || !scenario.nodes || !Array.isArray(scenario.nodes)) {
+          throw new Error('Invalid scenario format');
+        }
+        // Re-ID to avoid collisions
+        const newId = `campaign-${Date.now()}`;
+        const imported: BaseCampaign = {
+          ...scenario,
+          id: newId,
+          updatedAt: new Date().toISOString(),
+        };
+        // Remap startNodeId is fine — node IDs stay the same within the scenario
+        addCampaign(imported);
+        // Restore node positions if present
+        const positions = parsed.nodePositions as Record<string, FlowNodePosition> | undefined;
+        if (positions) {
+          Object.entries(positions).forEach(([nodeId, pos]) => {
+            useCampaignStore.getState().setNodePosition(newId, nodeId, pos);
+          });
+        }
+        toast.success(`Imported "${imported.name}" (${imported.nodes.length} scenes)`);
+      } catch (err) {
+        toast.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    };
+    input.click();
+  };
+
   const handleToggleActive = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setActiveCampaign(activeCampaignId === id ? null : id);
@@ -137,6 +196,9 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
         />
         <Button size="sm" onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-1" /> New
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleImport} title="Import scenario (.mhscenario)">
+          <Upload className="h-4 w-4" />
         </Button>
       </div>
       <Separator />
@@ -205,6 +267,15 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => handleExport(e, c)}
+                          title="Export scenario"
+                        >
+                          <Download className="h-3 w-3" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
