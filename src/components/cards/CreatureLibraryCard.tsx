@@ -449,11 +449,76 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     });
   }, [searchQuery, sizeFilter, typeFilter, crMinFilter, crMaxFilter, searchMonsters, monsters]);
 
+  const filteredItems = useMemo(() => {
+    return searchItems(searchQuery, {
+      category: itemCategoryFilter !== 'all' ? itemCategoryFilter as ItemCategory : undefined,
+      rarity: itemRarityFilter !== 'all' ? itemRarityFilter as ItemRarity : undefined,
+    });
+  }, [searchQuery, itemCategoryFilter, itemRarityFilter, searchItems, items]);
+
   // Character import modal state
   const [showImportModal, setShowImportModal] = useState(false);
 
   const handleImportCharacter = () => {
     setShowImportModal(true);
+  };
+
+  const handleCreateItem = () => {
+    const now = new Date().toISOString();
+    const item: LibraryItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: 'New Item',
+      category: 'other',
+      createdAt: now,
+      updatedAt: now,
+    };
+    addItem(item);
+    setEditingItemId(item.id);
+    toast.success('Item created — edit details below');
+  };
+
+  const handleImportItemsJson = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const arr: LibraryItem[] = Array.isArray(data) ? data : data.items ? data.items : [data];
+        const now = new Date().toISOString();
+        const imported = arr.map((raw: any) => ({
+          id: raw.id || `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: raw.name || 'Unnamed',
+          category: raw.category || 'other',
+          rarity: raw.rarity,
+          description: raw.description,
+          weight: raw.weight,
+          value: raw.value,
+          requiresAttunement: raw.requiresAttunement,
+          attunementRequirement: raw.attunementRequirement,
+          armorClass: raw.armorClass,
+          properties: raw.properties,
+          attacks: raw.attacks,
+          spells: raw.spells,
+          traits: raw.traits,
+          maxCharges: raw.maxCharges,
+          rechargeRule: raw.rechargeRule,
+          customFields: raw.customFields,
+          source: raw.source || file.name.replace('.json', ''),
+          imageUrl: raw.imageUrl,
+          createdAt: raw.createdAt || now,
+          updatedAt: now,
+        } as LibraryItem));
+        addItems(imported);
+        toast.success(`Imported ${imported.length} item(s)`);
+      } catch (err) {
+        toast.error('Failed to parse JSON file');
+      }
+    };
+    input.click();
   };
 
   const handleImportBestiary = () => {
