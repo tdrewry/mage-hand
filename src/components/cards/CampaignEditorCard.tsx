@@ -30,7 +30,42 @@ const NODE_TYPE_ICONS: Record<string, React.ReactNode> = {
   rest: <Tent className="h-3.5 w-3.5" />,
 };
 
+// ── Token Group Picker ──────────────────────────────────────────────────────
+
+function TokenGroupPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const tokenGroups = useTokenGroupStore((s) => s.groups);
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Token Group (optional)</Label>
+      {tokenGroups.length > 0 ? (
+        <Select value={value || '__none__'} onValueChange={(v) => onChange(v === '__none__' ? '' : v)}>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue placeholder="All player tokens" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">All player tokens</SelectItem>
+            {tokenGroups.map((g) => (
+              <SelectItem key={g.id} value={g.id}>
+                {g.name} ({g.tokenIds.length} tokens)
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="No groups defined — type a role name..."
+          className="text-sm h-8"
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Campaign List View ──────────────────────────────────────────────────────
+
 
 function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
   const { campaigns, addCampaign, removeCampaign } = useCampaignStore();
