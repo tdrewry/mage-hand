@@ -267,6 +267,7 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
         <Button variant="secondary" size="sm" className="h-7 px-2 text-xs">{Math.round(scale * 100)}%</Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={zoomIn}><ZoomIn className="w-3 h-3" /></Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={fitToView}><Maximize className="w-3 h-3" /></Button>
+        <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={autoLayout} title="Auto Layout"><LayoutGrid className="w-3 h-3" /></Button>
       </div>
 
       {/* Grid background */}
