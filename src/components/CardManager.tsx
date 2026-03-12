@@ -161,6 +161,7 @@ function getCardTitle(type: CardType): string {
     [CardType.HANDOUT_CATALOG]: 'Handouts',
     [CardType.HANDOUT_VIEWER]: 'Handout',
     [CardType.CAMPAIGN_EDITOR]: 'Campaign Editor',
+    [CardType.TOKEN_GROUP_MANAGER]: 'Token Groups',
   };
   
   return titles[type] || type;
