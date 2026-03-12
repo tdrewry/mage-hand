@@ -796,7 +796,16 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         {/* Monsters Tab */}
         <TabsContent value="monsters" className="flex-1 flex flex-col gap-3 mt-3">
           {/* Import Buttons */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCreateBlankMonster}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              New
+            </Button>
             <Button 
               variant="outline" 
               size="sm" 
@@ -804,11 +813,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
               disabled={bestiaryLoading}
             >
               {bestiaryLoading ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
               ) : (
-                <Globe className="h-4 w-4 mr-2" />
+                <Globe className="h-4 w-4 mr-1" />
               )}
-              {bestiaryLoading ? (importProgress || 'Loading...') : 'Fetch from 5e.tools'}
+              {bestiaryLoading ? 'Loading...' : '5e.tools'}
             </Button>
             
             <Button 
@@ -817,8 +826,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
               onClick={handleImportBestiary}
               disabled={bestiaryLoading}
             >
-              <FileJson className="h-4 w-4 mr-2" />
-              Import JSON
+              <FileJson className="h-4 w-4 mr-1" />
+              JSON
             </Button>
           </div>
 
