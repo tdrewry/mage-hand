@@ -603,40 +603,52 @@ function NodePropertyPanel({
             )}
             <div className="space-y-2">
               {(node.treasure || []).map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-1.5 p-1.5 rounded border border-border bg-muted/30">
-                  <Gem className="h-3.5 w-3.5 text-primary shrink-0" />
+                <div key={item.id} className="p-1.5 rounded border border-border bg-muted/30 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Gem className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <Input
+                      value={item.name}
+                      onChange={(e) => {
+                        const treasure = [...(node.treasure || [])];
+                        treasure[idx] = { ...treasure[idx], name: e.target.value };
+                        updateNode(campaignId, node.id, { treasure });
+                      }}
+                      className="text-xs h-6 flex-1"
+                      placeholder="Item name..."
+                    />
+                    <Input
+                      type="number"
+                      value={item.quantity ?? 1}
+                      onChange={(e) => {
+                        const treasure = [...(node.treasure || [])];
+                        treasure[idx] = { ...treasure[idx], quantity: Math.max(1, parseInt(e.target.value) || 1) };
+                        updateNode(campaignId, node.id, { treasure });
+                      }}
+                      className="text-xs h-6 w-12 text-center"
+                      min={1}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-destructive"
+                      onClick={() => {
+                        const treasure = (node.treasure || []).filter((_, i) => i !== idx);
+                        updateNode(campaignId, node.id, { treasure });
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <Input
-                    value={item.name}
+                    value={item.description || ''}
                     onChange={(e) => {
                       const treasure = [...(node.treasure || [])];
-                      treasure[idx] = { ...treasure[idx], name: e.target.value };
+                      treasure[idx] = { ...treasure[idx], description: e.target.value };
                       updateNode(campaignId, node.id, { treasure });
                     }}
-                    className="text-xs h-6 flex-1"
-                    placeholder="Item name..."
+                    className="text-xs h-6 ml-5"
+                    placeholder="Flavor text… e.g. A glowing sword humming with arcane energy"
                   />
-                  <Input
-                    type="number"
-                    value={item.quantity ?? 1}
-                    onChange={(e) => {
-                      const treasure = [...(node.treasure || [])];
-                      treasure[idx] = { ...treasure[idx], quantity: Math.max(1, parseInt(e.target.value) || 1) };
-                      updateNode(campaignId, node.id, { treasure });
-                    }}
-                    className="text-xs h-6 w-12 text-center"
-                    min={1}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-destructive"
-                    onClick={() => {
-                      const treasure = (node.treasure || []).filter((_, i) => i !== idx);
-                      updateNode(campaignId, node.id, { treasure });
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
                 </div>
               ))}
             </div>
