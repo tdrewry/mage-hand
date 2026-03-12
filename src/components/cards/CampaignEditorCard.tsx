@@ -271,6 +271,15 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => handleExport(e, c)}
+                          title="Export scenario"
+                        >
+                          <Download className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                           onClick={(e) => handleStartEdit(e, c)}
                           title="Rename / edit brief"
                         >
