@@ -302,8 +302,8 @@ function NodePropertyPanel({
         <Separator />
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline" className="text-[10px]">{node.id}</Badge>
-          {node.isStartNode && <Badge className="text-[10px] bg-green-500/20 text-green-400 border-green-500/30">Start</Badge>}
-          {node.isEndNode && <Badge className="text-[10px] bg-red-500/20 text-red-400 border-red-500/30">End</Badge>}
+          {node.isStartNode && <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-500">Start</Badge>}
+          {node.isEndNode && <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">End</Badge>}
         </div>
       </div>
     </ScrollArea>

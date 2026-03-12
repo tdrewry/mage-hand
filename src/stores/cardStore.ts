@@ -391,6 +391,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.CAMPAIGN_EDITOR]: {
+    title: 'Campaign Editor',
+    defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 600, height: 450 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({
