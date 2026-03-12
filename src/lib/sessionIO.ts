@@ -336,4 +336,14 @@ export function applyProjectData(data: ProjectData): void {
     if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
     if (cd.activeProgress) cs.setProgress(cd.activeProgress);
   }
+
+  // Token Groups
+  if (data.tokenGroups?.groups) {
+    const tgs = useTokenGroupStore.getState();
+    tgs.clearAllGroups();
+    data.tokenGroups.groups.forEach((g: any) => {
+      const created = tgs.addGroup(g.name, g.tokenIds, g.formation);
+      if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
+    });
+  }
 }
