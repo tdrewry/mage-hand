@@ -755,6 +755,8 @@ export function renderMapObject(
     renderLightShape(ctx, mapObject, zoom, isDMView);
   } else if (shape === 'portal') {
     renderPortalShape(ctx, mapObject, zoom, isDMView, portalActivationProgress);
+  } else if (shape === 'deployment-zone') {
+    renderDeploymentZoneShape(ctx, mapObject, zoom, isDMView);
   } else {
     ctx.beginPath();
     
