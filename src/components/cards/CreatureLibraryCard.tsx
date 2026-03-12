@@ -173,12 +173,15 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     return { x: worldX, y: worldY };
   };
 
-  const [activeTab, setActiveTab] = useState<'characters' | 'monsters'>('monsters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'monsters' | 'items'>('monsters');
   const [searchQuery, setSearchQuery] = useState('');
   const [sizeFilter, setSizeFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [crMinFilter, setCrMinFilter] = useState<string>('any');
   const [crMaxFilter, setCrMaxFilter] = useState<string>('any');
+  const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
+  const [itemRarityFilter, setItemRarityFilter] = useState<string>('all');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   
   // 5e.tools import dialog state
   const [showSourceDialog, setShowSourceDialog] = useState(false);
