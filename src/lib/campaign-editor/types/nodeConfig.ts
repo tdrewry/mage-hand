@@ -25,6 +25,7 @@ export interface NodeFeatureFlags {
   hasMap?: boolean;
   hasDialogLines?: boolean;
   hasOutcomes?: boolean;
+  hasHandouts?: boolean;
   hasSceneSettings?: boolean;
   hasAutoAdvance?: boolean;
   hasVictoryDefeat?: boolean;
