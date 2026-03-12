@@ -1182,3 +1182,211 @@ function MonsterListItem({ monster, onView, onCreateToken, isCreating, onRemove,
     </div>
   );
 }
+
+// Item List Entry Component
+interface ItemListEntryProps {
+  item: LibraryItem;
+  isEditing: boolean;
+  onEdit: () => void;
+  onUpdate: (updates: Partial<LibraryItem>) => void;
+  onRemove: () => void;
+}
+
+function ItemListEntry({ item, isEditing, onEdit, onUpdate, onRemove }: ItemListEntryProps) {
+  const rarityLabel = item.rarity ? ITEM_RARITY_LABELS[item.rarity] : null;
+  const categoryLabel = ITEM_CATEGORY_LABELS[item.category] || item.category;
+
+  return (
+    <div className="rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+      {/* Summary row */}
+      <div className="flex items-center gap-3 p-2">
+        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <Gem className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{item.name}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {categoryLabel}
+            {item.value ? ` · ${item.value}` : ''}
+          </p>
+        </div>
+        {rarityLabel && (
+          <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
+            {rarityLabel}
+          </Badge>
+        )}
+        {item.source && (
+          <span className="text-[10px] text-muted-foreground shrink-0">{item.source}</span>
+        )}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onRemove}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Inline editor */}
+      {isEditing && (
+        <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[10px]">Name</Label>
+              <Input className="h-7 text-xs" value={item.name} onChange={(e) => onUpdate({ name: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-[10px]">Value</Label>
+              <Input className="h-7 text-xs" value={item.value || ''} onChange={(e) => onUpdate({ value: e.target.value })} placeholder="e.g. 50 gp" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[10px]">Category</Label>
+              <Select value={item.category} onValueChange={(v) => onUpdate({ category: v as ItemCategory })}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(ITEM_CATEGORY_LABELS) as ItemCategory[]).map((cat) => (
+                    <SelectItem key={cat} value={cat}>{ITEM_CATEGORY_LABELS[cat]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-[10px]">Rarity</Label>
+              <Select value={item.rarity || 'common'} onValueChange={(v) => onUpdate({ rarity: v as ItemRarity })}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(ITEM_RARITY_LABELS) as ItemRarity[]).map((r) => (
+                    <SelectItem key={r} value={r}>{ITEM_RARITY_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[10px]">Weight (lbs)</Label>
+              <Input type="number" className="h-7 text-xs" value={item.weight ?? ''} onChange={(e) => onUpdate({ weight: e.target.value ? parseFloat(e.target.value) : undefined })} />
+            </div>
+            <div>
+              <Label className="text-[10px]">Source</Label>
+              <Input className="h-7 text-xs" value={item.source || ''} onChange={(e) => onUpdate({ source: e.target.value })} placeholder="e.g. DMG" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px]">Description / Flavor Text</Label>
+            <Textarea className="text-xs min-h-[60px]" value={item.description || ''} onChange={(e) => onUpdate({ description: e.target.value })} placeholder="A glowing sword humming with arcane energy..." />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox checked={item.requiresAttunement || false} onCheckedChange={(v) => onUpdate({ requiresAttunement: !!v })} />
+            <Label className="text-xs">Requires Attunement</Label>
+            {item.requiresAttunement && (
+              <Input className="h-7 text-xs flex-1" value={item.attunementRequirement || ''} onChange={(e) => onUpdate({ attunementRequirement: e.target.value })} placeholder="by a cleric or paladin" />
+            )}
+          </div>
+
+          {/* Attacks */}
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px]">Attacks</Label>
+              <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => {
+                const attacks = [...(item.attacks || []), { name: 'New Attack', description: '' }];
+                onUpdate({ attacks });
+              }}><Plus className="h-3 w-3" /></Button>
+            </div>
+            {(item.attacks || []).map((atk, i) => (
+              <div key={i} className="flex gap-1 mt-1">
+                <Input className="h-6 text-[10px] flex-1" value={atk.name} onChange={(e) => {
+                  const attacks = [...(item.attacks || [])];
+                  attacks[i] = { ...attacks[i], name: e.target.value };
+                  onUpdate({ attacks });
+                }} placeholder="Attack name" />
+                <Input className="h-6 text-[10px] w-16" value={atk.damage || ''} onChange={(e) => {
+                  const attacks = [...(item.attacks || [])];
+                  attacks[i] = { ...attacks[i], damage: e.target.value };
+                  onUpdate({ attacks });
+                }} placeholder="1d8+3" />
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => {
+                  const attacks = (item.attacks || []).filter((_, idx) => idx !== i);
+                  onUpdate({ attacks });
+                }}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Spells */}
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px]">Spells</Label>
+              <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => {
+                const spells = [...(item.spells || []), { name: 'New Spell' }];
+                onUpdate({ spells });
+              }}><Plus className="h-3 w-3" /></Button>
+            </div>
+            {(item.spells || []).map((spell, i) => (
+              <div key={i} className="flex gap-1 mt-1">
+                <Input className="h-6 text-[10px] flex-1" value={spell.name} onChange={(e) => {
+                  const spells = [...(item.spells || [])];
+                  spells[i] = { ...spells[i], name: e.target.value };
+                  onUpdate({ spells });
+                }} placeholder="Spell name" />
+                <Input type="number" className="h-6 text-[10px] w-12" value={spell.charges ?? ''} onChange={(e) => {
+                  const spells = [...(item.spells || [])];
+                  spells[i] = { ...spells[i], charges: e.target.value ? parseInt(e.target.value) : undefined };
+                  onUpdate({ spells });
+                }} placeholder="Ch." />
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => {
+                  const spells = (item.spells || []).filter((_, idx) => idx !== i);
+                  onUpdate({ spells });
+                }}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Traits */}
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px]">Traits</Label>
+              <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]" onClick={() => {
+                const traits = [...(item.traits || []), { name: 'New Trait', description: '' }];
+                onUpdate({ traits });
+              }}><Plus className="h-3 w-3" /></Button>
+            </div>
+            {(item.traits || []).map((trait, i) => (
+              <div key={i} className="flex gap-1 mt-1">
+                <Input className="h-6 text-[10px] w-24" value={trait.name} onChange={(e) => {
+                  const traits = [...(item.traits || [])];
+                  traits[i] = { ...traits[i], name: e.target.value };
+                  onUpdate({ traits });
+                }} placeholder="Trait name" />
+                <Input className="h-6 text-[10px] flex-1" value={trait.description} onChange={(e) => {
+                  const traits = [...(item.traits || [])];
+                  traits[i] = { ...traits[i], description: e.target.value };
+                  onUpdate({ traits });
+                }} placeholder="Description" />
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => {
+                  const traits = (item.traits || []).filter((_, idx) => idx !== i);
+                  onUpdate({ traits });
+                }}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Charges */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-[10px]">Max Charges</Label>
+              <Input type="number" className="h-7 text-xs" value={item.maxCharges ?? ''} onChange={(e) => onUpdate({ maxCharges: e.target.value ? parseInt(e.target.value) : undefined })} />
+            </div>
+            <div>
+              <Label className="text-[10px]">Recharge Rule</Label>
+              <Input className="h-7 text-xs" value={item.rechargeRule || ''} onChange={(e) => onUpdate({ rechargeRule: e.target.value })} placeholder="1d6+1 at dawn" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
