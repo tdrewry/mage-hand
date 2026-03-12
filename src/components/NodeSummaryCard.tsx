@@ -93,7 +93,7 @@ export function NodeSummaryCard({
 
   return (
     <div
-      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[380px] max-w-[90vw] bg-card border border-border rounded-lg shadow-xl z-[31001] pointer-events-auto"
+      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[380px] max-w-[90vw] max-h-[70vh] bg-card border border-border rounded-lg shadow-xl z-[31001] pointer-events-auto overflow-hidden flex flex-col"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
@@ -116,7 +116,7 @@ export function NodeSummaryCard({
       </div>
 
       {/* Body */}
-      <ScrollArea className="max-h-[300px]">
+      <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
         <div className="px-3 py-2 space-y-3">
           {/* Description */}
           {description && (
