@@ -317,8 +317,8 @@ export function applyProjectData(data: ProjectData): void {
   }
 
   // Campaigns
-  if ((data as any).campaigns) {
-    const cd = (data as any).campaigns;
+  if (data.campaigns) {
+    const cd = data.campaigns;
     const cs = useCampaignStore.getState();
     // Clear existing
     cs.campaigns.forEach(c => cs.removeCampaign(c.id));
