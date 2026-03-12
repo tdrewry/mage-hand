@@ -272,6 +272,15 @@ export function NodeSummaryCard({
                     )}
                   </div>
                 ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 h-7 text-xs gap-1.5"
+                  onClick={sendLootToChat}
+                >
+                  <SendHorizonal className="h-3 w-3" />
+                  Send loot to chat
+                </Button>
               </div>
             </ScrollArea>
           </TabsContent>
