@@ -33,7 +33,7 @@ import { useActionStore } from '@/stores/actionStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 import { useCampaignStore } from '@/stores/campaignStore';
-import { useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
   kind: 'tokens',
