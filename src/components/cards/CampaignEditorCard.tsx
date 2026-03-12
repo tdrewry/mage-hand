@@ -597,10 +597,24 @@ export function CampaignEditorCardContent() {
     removeNode,
     addConnection,
     removeConnection,
+    requestedEditorCampaignId,
+    clearEditorRequest,
   } = useCampaignStore();
 
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Auto-navigate when another component requests opening a specific campaign
+  React.useEffect(() => {
+    if (requestedEditorCampaignId) {
+      const exists = campaigns.some((c) => c.id === requestedEditorCampaignId);
+      if (exists) {
+        setEditingCampaignId(requestedEditorCampaignId);
+        setSelectedNodeId(null);
+      }
+      clearEditorRequest();
+    }
+  }, [requestedEditorCampaignId, campaigns, clearEditorRequest]);
 
   const editingCampaign = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId) : null;
 

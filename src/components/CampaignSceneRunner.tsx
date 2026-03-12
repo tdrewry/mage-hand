@@ -5,7 +5,7 @@
  * Clicking the node title opens a NodeSummaryCard popup.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,6 +14,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useCampaignStore } from '@/stores/campaignStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { executeNode } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
 import { NodeSummaryCard } from '@/components/NodeSummaryCard';
@@ -82,7 +84,10 @@ export function CampaignSceneRunner() {
     activeProgress,
     setProgress,
     setActiveCampaign,
+    requestOpenEditor,
   } = useCampaignStore();
+
+  const { getCardByType, setVisibility, bringToFront, setMinimize } = useCardStore();
 
   const [showSummary, setShowSummary] = useState(false);
 
@@ -113,6 +118,17 @@ export function CampaignSceneRunner() {
       return { ...o, targetLabel: targetNode?.nodeData.name };
     });
   }, [currentNode?.id, nodeType, campaign]);
+
+  const handleOpenEditor = useCallback(() => {
+    if (!activeCampaignId) return;
+    requestOpenEditor(activeCampaignId);
+    const card = getCardByType(CardType.CAMPAIGN_EDITOR);
+    if (card) {
+      setVisibility(card.id, true);
+      setMinimize(card.id, false);
+      bringToFront(card.id);
+    }
+  }, [activeCampaignId, requestOpenEditor, getCardByType, setVisibility, setMinimize, bringToFront]);
 
   if (!campaign || !activeProgress || !runner) return null;
 
@@ -168,6 +184,7 @@ export function CampaignSceneRunner() {
     toast.info('Campaign progress reset');
   };
 
+
   const handleStop = () => {
     setActiveCampaign(null);
   };
@@ -191,14 +208,19 @@ export function CampaignSceneRunner() {
         {/* ── Row 1: Standard tools ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Campaign name + progress */}
-          <div className="flex items-center gap-1.5 min-w-0 shrink">
-            <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px]">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 min-w-0 shrink hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+            onClick={handleOpenEditor}
+            title="Open scenario editor"
+          >
+            <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px] underline decoration-dotted underline-offset-2">
               {campaign.name}
             </span>
-            <Badge variant="outline" className="text-[10px] shrink-0">
-              {completedCount}/{totalCount}
-            </Badge>
-          </div>
+          </button>
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            {completedCount}/{totalCount}
+          </Badge>
 
           <div className="w-px h-5 bg-border shrink-0" />
 

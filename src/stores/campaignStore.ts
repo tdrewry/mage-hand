@@ -18,6 +18,9 @@ export interface CampaignState {
   /** Node positions for the flow canvas, keyed by campaignId → nodeId → position */
   nodePositions: Record<string, Record<string, FlowNodePosition>>;
 
+  /** When set, the Campaign Editor card should open to this campaign's editor view */
+  requestedEditorCampaignId: string | null;
+
   // CRUD
   addCampaign: (campaign: BaseCampaign) => void;
   updateCampaign: (id: string, patch: Partial<BaseCampaign>) => void;
@@ -41,6 +44,10 @@ export interface CampaignState {
   advanceNode: (nodeId: string) => void;
   resolveNode: (nodeId: string, outcome: 'success' | 'failure') => void;
   resetProgress: () => void;
+
+  // Editor navigation
+  requestOpenEditor: (campaignId: string) => void;
+  clearEditorRequest: () => void;
 }
 
 // Helper to access campaign node count
@@ -55,6 +62,7 @@ export const useCampaignStore = create<CampaignState>()(
       activeCampaignId: null,
       activeProgress: null,
       nodePositions: {},
+      requestedEditorCampaignId: null,
 
       addCampaign: (campaign) =>
         set((s) => ({ campaigns: [...s.campaigns, campaign] })),
@@ -212,6 +220,9 @@ export const useCampaignStore = create<CampaignState>()(
           if (!campaign) return s;
           return { activeProgress: createEmptyGraphProgress(campaign.id, campaign.startNodeId) };
         }),
+
+      requestOpenEditor: (campaignId: string) => set({ requestedEditorCampaignId: campaignId }),
+      clearEditorRequest: () => set({ requestedEditorCampaignId: null }),
     }),
     {
       name: 'campaign-store',
