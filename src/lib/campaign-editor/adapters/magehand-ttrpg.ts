@@ -232,12 +232,11 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
       }
 
       // Place tokens using formation offsets or grid spread
-      const zoneX = zone.position.x;
-      const zoneY = zone.position.y;
+      // Note: MapObject position is the CENTER of the object
       const zoneW = zone.width;
       const zoneH = zone.height;
-      const centerX = zoneX + zoneW / 2;
-      const centerY = zoneY + zoneH / 2;
+      const centerX = zone.position.x;
+      const centerY = zone.position.y;
 
       // Determine grid size from the first token or default 50
       const gridSize = 50;
