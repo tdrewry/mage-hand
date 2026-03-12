@@ -138,6 +138,9 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       activeProgress: campaignStore.activeProgress,
       nodePositions: campaignStore.nodePositions,
     },
+    tokenGroups: {
+      groups: useTokenGroupStore.getState().groups,
+    },
   };
 }
 
