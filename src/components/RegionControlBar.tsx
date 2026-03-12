@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets, ArrowRightLeft, Copy } from 'lucide-react';
+import { Grid3X3, Eye, EyeOff, Trash2, Palette, Image, CheckSquare, Lock, Unlock, CloudFog, Waypoints, Fence, Box, Armchair, Droplets, ArrowRightLeft, Copy, Flag } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -208,7 +208,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     toast.success(`Created ${selectedRegions.length} wall(s) from region edges`);
   };
   
-  const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water') => {
+  const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water' | 'deployment-zone') => {
     const preset = MAP_OBJECT_PRESETS[category];
     
     selectedRegions.forEach(region => {
@@ -254,7 +254,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     setShowConvertMenu(false);
     onClearSelection();
     onUpdateCanvas?.();
-    const labels = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)' };
+    const labels: Record<string, string> = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)', 'deployment-zone': 'deployment zone(s)' };
     toast.success(`Created ${selectedRegions.length} ${labels[category]} from region(s)`);
   };
   
@@ -460,6 +460,15 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
                 >
                   <Droplets className="h-3 w-3 mr-2" />
                   Water
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs justify-start"
+                  onClick={() => handleConvertToMapObject('deployment-zone')}
+                >
+                  <Flag className="h-3 w-3 mr-2" />
+                  Deployment Zone
                 </Button>
               </div>
             </PopoverContent>

@@ -34,6 +34,7 @@ export enum CardType {
   HANDOUT_CATALOG = 'handout_catalog',
   HANDOUT_VIEWER = 'handout_viewer',
   CAMPAIGN_EDITOR = 'campaign_editor',
+  TOKEN_GROUP_MANAGER = 'token_group_manager',
 }
 
 /** Card types that require DM role — players cannot open or see these */

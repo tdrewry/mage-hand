@@ -33,7 +33,7 @@ import { useActionStore } from '@/stores/actionStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 import { useCampaignStore } from '@/stores/campaignStore';
-
+import { useTokenGroupStore } from '@/stores/tokenGroupStore';
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
   kind: 'tokens',
@@ -593,4 +593,22 @@ DurableObjectRegistry.register({
     if (state.activeProgress) store.setProgress(state.activeProgress);
   },
   summarizer: () => `${useCampaignStore.getState().campaigns.length} campaigns`,
+});
+
+// ── Token Groups ──────────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'tokenGroups',
+  version: 1,
+  label: 'Token Groups',
+  extractor: () => ({ groups: useTokenGroupStore.getState().groups }),
+  hydrator: (state: any) => {
+    if (!state?.groups) return;
+    const store = useTokenGroupStore.getState();
+    store.clearAllGroups();
+    state.groups.forEach((g: any) => {
+      const created = store.addGroup(g.name, g.tokenIds, g.formation);
+      if (g.color) store.updateGroup(created.id, { color: g.color, icon: g.icon });
+    });
+  },
+  summarizer: () => `${useTokenGroupStore.getState().groups.length} token groups`,
 });

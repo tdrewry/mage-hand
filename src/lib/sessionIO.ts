@@ -27,7 +27,7 @@ import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
-
+import { useTokenGroupStore } from '@/stores/tokenGroupStore';
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
 // ---------------------------------------------------------------------------
@@ -138,6 +138,9 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       activeProgress: campaignStore.activeProgress,
       nodePositions: campaignStore.nodePositions,
     },
+    tokenGroups: {
+      groups: useTokenGroupStore.getState().groups,
+    },
   };
 }
 
@@ -166,6 +169,7 @@ export function clearAllStores(): void {
 
   const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
   effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
+  useTokenGroupStore.getState().clearAllGroups();
 }
 
 // ---------------------------------------------------------------------------
@@ -332,5 +336,15 @@ export function applyProjectData(data: ProjectData): void {
     }
     if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
     if (cd.activeProgress) cs.setProgress(cd.activeProgress);
+  }
+
+  // Token Groups
+  if (data.tokenGroups?.groups) {
+    const tgs = useTokenGroupStore.getState();
+    tgs.clearAllGroups();
+    data.tokenGroups.groups.forEach((g: any) => {
+      const created = tgs.addGroup(g.name, g.tokenIds, g.formation);
+      if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
+    });
   }
 }

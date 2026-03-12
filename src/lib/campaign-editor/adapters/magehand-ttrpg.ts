@@ -23,6 +23,7 @@ import type {
 import type { CampaignEditorAdapter } from '../types/adapter';
 import type { BaseNodeType } from '../types/execution';
 import { useMapStore } from '@/stores/mapStore';
+import { useTokenGroupStore, getFormationOffsets } from '@/stores/tokenGroupStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useFogStore } from '@/stores/fogStore';
@@ -78,9 +79,10 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
     {
       key: 'tokenGroupId',
       label: 'Token Group',
-      type: 'string',
+      type: 'select',
       defaultValue: '',
-      description: 'Optional token group or role to auto-place (empty = all party tokens)',
+      description: 'Token group to deploy (empty = all player tokens)',
+      options: [], // Populated dynamically from tokenGroupStore
       group: 'Tokens',
     },
   ],
@@ -210,28 +212,55 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
     );
     if (zone) {
       const sessionStore = useSessionStore.getState();
-      const tokens = sessionStore.tokens.filter((t) => {
-        if (tokenGroupId) {
-          return t.roleId === tokenGroupId || t.name === tokenGroupId;
-        }
-        return t.roleId === 'player';
-      });
 
-      // Spread tokens within the zone bounds
+      // Resolve tokens: check token group store first, then fall back to role/name match
+      let tokens = sessionStore.tokens;
+      let formation: ReturnType<typeof getFormationOffsets> | null = null;
+
+      if (tokenGroupId) {
+        const tokenGroup = useTokenGroupStore.getState().getGroupById(tokenGroupId);
+        if (tokenGroup) {
+          const idSet = new Set(tokenGroup.tokenIds);
+          tokens = tokens.filter((t) => idSet.has(t.id));
+          formation = getFormationOffsets(tokenGroup.formation, tokens.length);
+        } else {
+          // Legacy fallback: match by roleId or name
+          tokens = tokens.filter((t) => t.roleId === tokenGroupId || t.name === tokenGroupId);
+        }
+      } else {
+        tokens = tokens.filter((t) => t.roleId === 'player');
+      }
+
+      // Place tokens using formation offsets or grid spread
       const zoneX = zone.position.x;
       const zoneY = zone.position.y;
       const zoneW = zone.width;
       const zoneH = zone.height;
-      const cols = Math.max(1, Math.floor(Math.sqrt(tokens.length)));
+      const centerX = zoneX + zoneW / 2;
+      const centerY = zoneY + zoneH / 2;
 
-      tokens.forEach((token, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const spacing = Math.min(zoneW / (cols + 1), zoneH / (Math.ceil(tokens.length / cols) + 1));
-        const newX = zoneX + spacing * (col + 1);
-        const newY = zoneY + spacing * (row + 1);
-        sessionStore.updateTokenPosition(token.id, newX, newY);
-      });
+      // Determine grid size from the first token or default 50
+      const gridSize = 50;
+
+      if (formation && formation.length === tokens.length) {
+        tokens.forEach((token, i) => {
+          const offset = formation![i];
+          const newX = centerX + offset.dx * gridSize;
+          const newY = centerY + offset.dy * gridSize;
+          sessionStore.updateTokenPosition(token.id, newX, newY);
+        });
+      } else {
+        // Fallback: spread evenly within zone
+        const cols = Math.max(1, Math.floor(Math.sqrt(tokens.length)));
+        tokens.forEach((token, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const spacing = Math.min(zoneW / (cols + 1), zoneH / (Math.ceil(tokens.length / cols) + 1));
+          const newX = zoneX + spacing * (col + 1);
+          const newY = zoneY + spacing * (row + 1);
+          sessionStore.updateTokenPosition(token.id, newX, newY);
+        });
+      }
 
       toast.info(`Placed ${tokens.length} token${tokens.length !== 1 ? 's' : ''} in deployment zone`);
     }

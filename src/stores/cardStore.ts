@@ -400,6 +400,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.TOKEN_GROUP_MANAGER]: {
+    title: 'Token Groups',
+    defaultPosition: { x: window.innerWidth / 2 - 200, y: 100 },
+    defaultSize: { width: 380, height: 500 },
+    minSize: { width: 320, height: 350 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

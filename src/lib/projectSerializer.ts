@@ -117,6 +117,8 @@ export interface ProjectData {
     activeProgress: any | null;
     nodePositions: Record<string, Record<string, { x: number; y: number }>>;
   };
+  // Token groups
+  tokenGroups?: { groups: any[] };
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }

@@ -55,6 +55,7 @@ import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
+import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
@@ -294,7 +295,7 @@ export function getBridgedSessionRoot(): any {
 const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
   'fog', 'lights', 'dungeon', 'creatures',
-  'hatching', 'actions', 'dice', 'mapFocus', 'campaigns',
+  'hatching', 'actions', 'dice', 'mapFocus', 'campaigns', 'tokenGroups',
 ];
 
 // Kinds excluded from blob sync (fine-grained CoValue sync):
@@ -1568,6 +1569,7 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   dice: () => useDiceStore,
   mapFocus: () => useMapFocusStore,
   campaigns: () => useCampaignStore,
+  tokenGroups: () => useTokenGroupStore,
 };
 
 /** Throttle timers per kind */
