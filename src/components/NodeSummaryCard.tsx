@@ -99,6 +99,16 @@ export function NodeSummaryCard({
     });
   };
 
+  const sendLootToChat = () => {
+    const sceneName = node.nodeData.name || 'Treasure';
+    const lines = treasure.map((item) => {
+      const qty = item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : '';
+      const desc = item.description ? ` — ${item.description}` : '';
+      return `💎 **${item.name}**${qty}${desc}`;
+    });
+    addMessage('campaign-narrator', sceneName, `**Loot Found:**\n${lines.join('\n')}`);
+  };
+
   return (
     <div
       className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[380px] max-w-[90vw] max-h-[70vh] bg-card border border-border rounded-lg shadow-xl z-[31001] pointer-events-auto overflow-hidden flex flex-col"
@@ -262,6 +272,15 @@ export function NodeSummaryCard({
                     )}
                   </div>
                 ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 h-7 text-xs gap-1.5"
+                  onClick={sendLootToChat}
+                >
+                  <SendHorizonal className="h-3 w-3" />
+                  Send loot to chat
+                </Button>
               </div>
             </ScrollArea>
           </TabsContent>
