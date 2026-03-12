@@ -5,6 +5,13 @@
 import type { BaseCampaign, BaseFlowNode, BaseNodeData } from '../types/base';
 import type { BaseNodeType, NodeResult } from '../types/execution';
 
+export interface GraphProgressSnapshot {
+  currentNodeId: string | null;
+  completedNodeIds: string[];
+  failedNodeIds: string[];
+  flags: Record<string, boolean>;
+}
+
 export interface GraphProgress {
   campaignId: string;
   currentNodeId: string | null;
@@ -15,6 +22,8 @@ export interface GraphProgress {
   lastPlayedAt: string;
   isComplete: boolean;
   isFailed: boolean;
+  /** Stack of previous states for back navigation */
+  history: GraphProgressSnapshot[];
 }
 
 export interface GraphRunnerOptions<
@@ -36,6 +45,8 @@ export interface GraphRunner {
   getAvailableNodes(): BaseFlowNode[];
   setCurrentNode(nodeId: string): GraphProgress;
   isComplete(): boolean;
+  canGoBack(): boolean;
+  goBack(): GraphProgress;
   reset(): GraphProgress;
 }
 
@@ -105,6 +116,15 @@ export function createGraphRunner<
       const node = nodeMap.get(nodeId);
       if (!node) { console.warn(`[GraphRunner] Node not found: ${nodeId}`); return { ...progress }; }
 
+      // Save snapshot before mutation for back navigation
+      const snapshot: GraphProgressSnapshot = {
+        currentNodeId: progress.currentNodeId,
+        completedNodeIds: [...progress.completedNodeIds],
+        failedNodeIds: [...progress.failedNodeIds],
+        flags: { ...progress.flags },
+      };
+      progress.history = [...progress.history, snapshot];
+
       if (result.flagsSet) { progress.flags = { ...progress.flags, ...result.flagsSet }; }
 
       if (result.outcome === 'success' || result.outcome === 'choice') {
@@ -159,6 +179,26 @@ export function createGraphRunner<
 
     isComplete() { return progress.isComplete; },
 
+    canGoBack() { return progress.history.length > 0; },
+
+    goBack(): GraphProgress {
+      if (progress.history.length === 0) return { ...progress };
+      const prev = progress.history[progress.history.length - 1];
+      progress = {
+        ...progress,
+        currentNodeId: prev.currentNodeId,
+        completedNodeIds: prev.completedNodeIds,
+        failedNodeIds: prev.failedNodeIds,
+        flags: prev.flags,
+        history: progress.history.slice(0, -1),
+        isComplete: false,
+        isFailed: false,
+        lastPlayedAt: new Date().toISOString(),
+      };
+      notifyProgress();
+      return { ...progress };
+    },
+
     reset(): GraphProgress {
       progress = createEmptyGraphProgress(campaign.id, campaign.startNodeId);
       notifyProgress();
@@ -179,5 +219,6 @@ export function createEmptyGraphProgress(campaignId: string, startNodeId: string
     lastPlayedAt: now,
     isComplete: false,
     isFailed: false,
+    history: [],
   };
 }
