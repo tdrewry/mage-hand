@@ -480,7 +480,7 @@ export function CampaignEditorCardContent() {
 
         {selectedNode && (
           <div className="w-[260px] border-l border-border shrink-0">
-            <NodePropertyPanel campaignId={activeCampaignId!} node={selectedNode} />
+            <NodePropertyPanel campaignId={editingCampaignId!} node={selectedNode} />
           </div>
         )}
       </div>
