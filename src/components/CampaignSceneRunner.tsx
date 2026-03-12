@@ -40,7 +40,7 @@ export function CampaignSceneRunner() {
     setActiveCampaign,
   } = useCampaignStore();
 
-  const campaign = campaigns.find((c) => c.id === activeCampaignId);
+  const campaign = campaigns.find((c) => c.id === activeCampaignId) ?? null;
 
   // Build graph runner when campaign is active
   const runner = useMemo(() => {
@@ -58,27 +58,24 @@ export function CampaignSceneRunner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign?.id]);
 
-  if (!campaign || !activeProgress || !runner) return null;
-
-  const currentNode = runner.getCurrentNode();
-  const isComplete = activeProgress.isComplete || activeProgress.isFailed;
+  const currentNode = runner?.getCurrentNode() ?? null;
   const nodeType = currentNode?.nodeType || 'encounter';
-  const completedCount = activeProgress.completedNodeIds.length;
-  const totalCount = campaign.nodes.length;
-
-  // Get available next nodes for forward navigation
-  const availableNext = currentNode?.nextOnSuccess || [];
 
   // For decision nodes, collect the outcome choices with their target node labels
   const decisionOutcomes = useMemo(() => {
-    if (!currentNode || nodeType !== 'dialog') return [];
-    // Use unified outcomes from the node
+    if (!currentNode || nodeType !== 'dialog' || !campaign) return [];
     const outcomes = currentNode.outcomes || currentNode.dialogContent?.outcomes || [];
     return outcomes.map((o) => {
       const targetNode = o.targetNodeId ? campaign.nodes.find((n) => n.id === o.targetNodeId) : null;
       return { ...o, targetLabel: targetNode?.nodeData.name };
     });
-  }, [currentNode, nodeType, campaign.nodes]);
+  }, [currentNode?.id, nodeType, campaign]);
+
+  if (!campaign || !activeProgress || !runner) return null;
+
+  const isComplete = activeProgress.isComplete || activeProgress.isFailed;
+  const completedCount = activeProgress.completedNodeIds.length;
+  const totalCount = campaign.nodes.length;
 
   const handleExecuteCurrent = () => {
     if (!currentNode) return;
