@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { BUILTIN_HANDOUTS } from '@/lib/handouts';
+import { getAllHandouts } from '@/lib/handouts';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -560,7 +560,7 @@ function NodePropertyPanel({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">No handout selected</SelectItem>
-                      {BUILTIN_HANDOUTS.map((h) => (
+                      {getAllHandouts().map((h) => (
                         <SelectItem key={h.id} value={h.id}>
                           <span className="flex items-center gap-1.5">
                             <BookOpen className="h-3 w-3" />

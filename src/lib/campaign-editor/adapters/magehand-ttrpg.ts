@@ -30,7 +30,7 @@ import { useFogStore } from '@/stores/fogStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCampaignStore } from '@/stores/campaignStore';
-import { BUILTIN_HANDOUTS } from '@/lib/handouts';
+import { getHandoutById } from '@/lib/handouts';
 import { toast } from 'sonner';
 
 // ============= NODE TYPE CONFIGS =============
@@ -288,7 +288,7 @@ function executeNarrativeNode(node: BaseFlowNode): void {
  * Called when the DM clicks a handout button in the scene runner or summary card.
  */
 export function openHandoutById(handoutId: string, label?: string): void {
-  const entry = BUILTIN_HANDOUTS.find((h) => h.id === handoutId);
+  const entry = getHandoutById(handoutId);
   const title = entry?.title || label || 'Handout';
 
   const cardStore = useCardStore.getState();
