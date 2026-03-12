@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check } from 'lucide-react';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -67,8 +67,11 @@ function TokenGroupPicker({ value, onChange }: { value: string; onChange: (v: st
 // ── Scenario List View ──────────────────────────────────────────────────────
 
 function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
-  const { campaigns, addCampaign, removeCampaign, activeCampaignId, setActiveCampaign } = useCampaignStore();
+  const { campaigns, addCampaign, removeCampaign, updateCampaign, activeCampaignId, setActiveCampaign } = useCampaignStore();
   const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   const handleCreate = () => {
     const name = newName.trim() || 'Untitled Scenario';
@@ -106,6 +109,21 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
     setActiveCampaign(activeCampaignId === id ? null : id);
   };
 
+  const handleStartEdit = (e: React.MouseEvent, c: BaseCampaign) => {
+    e.stopPropagation();
+    setEditingId(c.id);
+    setEditName(c.name);
+    setEditDesc(c.description || '');
+  };
+
+  const handleSaveEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editingId) {
+      updateCampaign(editingId, { name: editName.trim() || 'Untitled Scenario', description: editDesc.trim() });
+      setEditingId(null);
+    }
+  };
+
   return (
     <div className="p-3 space-y-3">
       <p className="text-xs text-muted-foreground">Create or manage scenarios</p>
@@ -129,46 +147,93 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
           <div className="space-y-2">
             {campaigns.map((c) => {
               const isActive = activeCampaignId === c.id;
+              const isEditing = editingId === c.id;
               return (
                 <div
                   key={c.id}
-                  className={`flex items-center justify-between p-2 rounded-md border cursor-pointer transition-colors ${
+                  className={`p-2 rounded-md border cursor-pointer transition-colors ${
                     isActive
                       ? 'border-primary/50 bg-primary/5'
                       : 'border-border hover:bg-accent/50'
                   }`}
-                  onClick={() => onSelect(c.id)}
+                  onClick={() => !isEditing && onSelect(c.id)}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
-                      {isActive && (
-                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
-                          Running
-                        </Badge>
-                      )}
+                  {isEditing ? (
+                    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="text-sm h-7"
+                          placeholder="Scenario name..."
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(e as any)}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-7 p-0 shrink-0"
+                          onClick={handleSaveEdit}
+                          title="Save"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        className="text-xs min-h-[48px]"
+                        placeholder="Scenario summary / brief..."
+                        rows={2}
+                      />
                     </div>
-                    <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant={isActive ? 'default' : 'ghost'}
-                      size="sm"
-                      className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
-                      onClick={(e) => handleToggleActive(e, c.id)}
-                      title={isActive ? 'Stop scenario' : 'Run scenario'}
-                    >
-                      {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{c.name}</p>
+                          {isActive && (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
+                              Running
+                            </Badge>
+                          )}
+                        </div>
+                        {c.description ? (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => handleStartEdit(e, c)}
+                          title="Rename / edit brief"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant={isActive ? 'default' : 'ghost'}
+                          size="sm"
+                          className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={(e) => handleToggleActive(e, c.id)}
+                          title={isActive ? 'Stop scenario' : 'Run scenario'}
+                        >
+                          {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
