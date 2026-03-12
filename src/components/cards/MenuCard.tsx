@@ -171,7 +171,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
     } else {
       registerCard({
         type: CardType.CREATURE_LIBRARY,
-        title: 'Creature Library',
+        title: 'Library',
         defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
         defaultSize: { width: 600, height: 700 },
         minSize: { width: 500, height: 550 },
@@ -620,7 +620,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           className="w-full"
         >
           <BookOpen className="h-4 w-4 mr-2" />
-          Creature Library
+          Library
         </Button>
 
         <Button 
