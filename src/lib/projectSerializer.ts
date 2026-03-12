@@ -97,6 +97,8 @@ export interface ProjectData {
     characters: DndBeyondCharacter[];
     monsters: Monster5eTools[];
   };
+  // Item library snapshot
+  items?: LibraryItem[];
   // Edge hatching settings
   hatching?: {
     enabled: boolean;
