@@ -335,6 +335,19 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     blocksVision: false,
     revealedByLight: false,
   },
+  'deployment-zone': {
+    shape: 'deployment-zone',
+    width: 120,
+    height: 120,
+    fillColor: 'rgba(34, 197, 94, 0.2)',
+    strokeColor: '#22c55e',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
+  },
 };
 
 // Door type visual styles (from Watabou)
