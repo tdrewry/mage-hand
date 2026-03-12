@@ -84,7 +84,8 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   viewport
 }) => {
   const [activeTab, setActiveTab] = useState('save');
-  const [projectName, setProjectName] = useState('');
+  const projectName = useSessionStore(s => s.projectName);
+  const setProjectName = useSessionStore(s => s.setProjectName);
   const [projectDescription, setProjectDescription] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
@@ -345,8 +346,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       const projects = getSavedProjects();
       setSavedProjects(projects);
       
-      // Reset form
-      setProjectName('');
+      // Reset description only, keep project name
       setProjectDescription('');
     } catch (error) {
       toast.error(`Failed to save project: ${error instanceof Error ? error.message : 'Unknown error'}`);

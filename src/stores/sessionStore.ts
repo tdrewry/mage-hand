@@ -115,7 +115,9 @@ export interface SessionState {
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
   viewportTransforms: Record<string, ViewportTransform>;
+  projectName: string;
 
+  setProjectName: (name: string) => void;
   addToken: (token: Token) => void;
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
@@ -159,6 +161,9 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   tokenVisibility: 'all',
   labelVisibility: 'show',
   viewportTransforms: {},
+  projectName: '',
+
+  setProjectName: (name) => set({ projectName: name }),
   
   addToken: (token) => {
     set((state) => {
