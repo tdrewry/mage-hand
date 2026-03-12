@@ -22,6 +22,8 @@ import { CardType } from '@/types/cardTypes';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { toast } from 'sonner';
 
+const MonacoEditor = lazy(() => import('@monaco-editor/react'));
+
 const ICON_MAP: Record<string, React.ReactNode> = {
   BookOpen: <BookOpen className="h-4 w-4" />,
   Shield: <Shield className="h-4 w-4" />,
