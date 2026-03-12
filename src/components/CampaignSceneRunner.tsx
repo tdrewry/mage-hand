@@ -69,6 +69,17 @@ export function CampaignSceneRunner() {
   // Get available next nodes for forward navigation
   const availableNext = currentNode?.nextOnSuccess || [];
 
+  // For decision nodes, collect the outcome choices with their target node labels
+  const decisionOutcomes = useMemo(() => {
+    if (!currentNode || nodeType !== 'dialog') return [];
+    // Use unified outcomes from the node
+    const outcomes = currentNode.outcomes || currentNode.dialogContent?.outcomes || [];
+    return outcomes.map((o) => {
+      const targetNode = o.targetNodeId ? campaign.nodes.find((n) => n.id === o.targetNodeId) : null;
+      return { ...o, targetLabel: targetNode?.nodeData.name };
+    });
+  }, [currentNode, nodeType, campaign.nodes]);
+
   const handleExecuteCurrent = () => {
     if (!currentNode) return;
     executeNode(currentNode);
