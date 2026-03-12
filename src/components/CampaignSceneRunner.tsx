@@ -84,7 +84,10 @@ export function CampaignSceneRunner() {
     activeProgress,
     setProgress,
     setActiveCampaign,
+    requestOpenEditor,
   } = useCampaignStore();
+
+  const { getCardByType, setVisibility, bringToFront, setMinimize } = useCardStore();
 
   const [showSummary, setShowSummary] = useState(false);
 
