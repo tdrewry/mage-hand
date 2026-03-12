@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { DndBeyondCharacter } from '@/types/creatureTypes';
 import { formatModifier, getAbilityModifier } from '@/types/creatureTypes';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,23 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
     });
   }, [character, update]);
 
+  // Local state for the class field to avoid re-rendering the computed value mid-typing
+  const classDisplayValue = useMemo(
+    () => character.classes.map(c => `${c.name} ${c.level}`).join(' / '),
+    [character.classes]
+  );
+  const [classText, setClassText] = useState(classDisplayValue);
+  useEffect(() => { setClassText(classDisplayValue); }, [classDisplayValue]);
+
+  const commitClassText = useCallback((text: string) => {
+    const parts = text.split('/').map(s => s.trim()).filter(Boolean);
+    const classes = parts.map(p => {
+      const match = p.match(/^(.+?)\s+(\d+)$/);
+      return match ? { name: match[1], level: parseInt(match[2]) } : { name: p, level: 1 };
+    });
+    update({ classes });
+  }, [update]);
+
   return (
     <div className="p-3 space-y-1 text-sm">
       {/* ── Core Stats ── */}
@@ -81,16 +98,10 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
             </Field>
             <Field label="Class">
               <Input
-                value={character.classes.map(c => `${c.name} ${c.level}`).join(' / ')}
-                onChange={e => {
-                  // Simple parse: "Fighter 5 / Wizard 3"
-                  const parts = e.target.value.split('/').map(s => s.trim());
-                  const classes = parts.map(p => {
-                    const match = p.match(/^(.+?)\s+(\d+)$/);
-                    return match ? { name: match[1], level: parseInt(match[2]) } : { name: p, level: 1 };
-                  });
-                  update({ classes });
-                }}
+                value={classText}
+                onChange={e => setClassText(e.target.value)}
+                onBlur={() => commitClassText(classText)}
+                placeholder="Fighter 5 / Wizard 3"
                 className="h-7 text-xs"
               />
             </Field>
