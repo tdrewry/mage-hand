@@ -213,7 +213,8 @@ function NodePropertyPanel({
             {selectedMapId && (
               <div className="space-y-1.5">
                 <Label className="text-xs">Deployment Zone</Label>
-              <div className="flex items-center gap-1.5 text-xs text-yellow-500 dark:text-yellow-400">
+                {hasNoZones && (
+                  <div className="flex items-center gap-1.5 text-xs text-yellow-500 dark:text-yellow-400">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     No deployment zones on this map
                   </div>
