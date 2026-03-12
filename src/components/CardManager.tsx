@@ -258,6 +258,8 @@ function renderCardContent(
       return <HandoutViewerCardContent handoutId={(metadata?.handoutId as string) || ''} />;
     case CardType.CAMPAIGN_EDITOR:
       return <CampaignEditorCardContent />;
+    case CardType.TOKEN_GROUP_MANAGER:
+      return <TokenGroupManagerCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

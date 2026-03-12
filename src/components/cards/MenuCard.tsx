@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords, Home, Volume2, Route } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords, Home, Volume2, Route, UsersRound } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
