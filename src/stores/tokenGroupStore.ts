@@ -42,6 +42,47 @@ export const FORMATION_DESCRIPTIONS: Record<Formation, string> = {
   square: 'Grid / box arrangement',
 };
 
+const FORMATION_VALUES: Formation[] = ['freeform', 'line', 'column', 'wedge', 'circle', 'square'];
+
+function isFormation(value: unknown): value is Formation {
+  return typeof value === 'string' && FORMATION_VALUES.includes(value as Formation);
+}
+
+/**
+ * Normalize imported token groups while preserving IDs so campaign nodes can
+ * keep customData.tokenGroupId references after session/scenario restore.
+ */
+export function normalizeImportedTokenGroups(groups: unknown): TokenGroup[] {
+  if (!Array.isArray(groups)) return [];
+
+  const importStamp = Date.now();
+
+  return groups
+    .filter((group): group is Partial<TokenGroup> => !!group && typeof group === 'object')
+    .map((group, index) => {
+      const id = typeof group.id === 'string' && group.id.trim().length > 0
+        ? group.id
+        : `tg-import-${importStamp}-${index}`;
+
+      const name = typeof group.name === 'string' && group.name.trim().length > 0
+        ? group.name
+        : `Imported Group ${index + 1}`;
+
+      const tokenIds = Array.isArray(group.tokenIds)
+        ? group.tokenIds.filter((tokenId): tokenId is string => typeof tokenId === 'string')
+        : [];
+
+      return {
+        id,
+        name,
+        tokenIds,
+        formation: isFormation(group.formation) ? group.formation : 'freeform',
+        color: typeof group.color === 'string' ? group.color : undefined,
+        icon: typeof group.icon === 'string' ? group.icon : undefined,
+      };
+    });
+}
+
 // ============= Formation Geometry =============
 
 /**

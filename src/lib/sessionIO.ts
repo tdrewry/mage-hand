@@ -27,7 +27,7 @@ import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
-import { useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
@@ -358,12 +358,8 @@ export function applyProjectData(data: ProjectData): void {
 
   // Token Groups
   if (data.tokenGroups?.groups) {
-    const tgs = useTokenGroupStore.getState();
-    tgs.clearAllGroups();
-    data.tokenGroups.groups.forEach((g: any) => {
-      const created = tgs.addGroup(g.name, g.tokenIds, g.formation);
-      if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
-    });
+    const normalizedGroups = normalizeImportedTokenGroups(data.tokenGroups.groups);
+    useTokenGroupStore.setState({ groups: normalizedGroups });
   }
 
   // Map Focus settings
