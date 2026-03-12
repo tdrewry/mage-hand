@@ -45,6 +45,8 @@ export interface GraphRunner {
   getAvailableNodes(): BaseFlowNode[];
   setCurrentNode(nodeId: string): GraphProgress;
   isComplete(): boolean;
+  canGoBack(): boolean;
+  goBack(): GraphProgress;
   reset(): GraphProgress;
 }
 
