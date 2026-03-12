@@ -398,9 +398,9 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
             img.onerror = () => reject(new Error('Failed to load image'));
-            img.src = character.portraitUrl!;
+            img.src = artUrl;
           });
-          imageUrl = character.portraitUrl;
+          imageUrl = artUrl;
         } catch {
           console.warn(`Could not load portrait for ${character.name}`);
         }
