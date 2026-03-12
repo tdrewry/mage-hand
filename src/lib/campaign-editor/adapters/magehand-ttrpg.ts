@@ -212,16 +212,14 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
       const sessionStore = useSessionStore.getState();
       const tokens = sessionStore.tokens.filter((t) => {
         if (tokenGroupId) {
-          // Filter by group name or roleId
           return t.roleId === tokenGroupId || t.name === tokenGroupId;
         }
-        // Default: all player-role tokens
         return t.roleId === 'player';
       });
 
       // Spread tokens within the zone bounds
-      const zoneX = zone.x;
-      const zoneY = zone.y;
+      const zoneX = zone.position.x;
+      const zoneY = zone.position.y;
       const zoneW = zone.width;
       const zoneH = zone.height;
       const cols = Math.max(1, Math.floor(Math.sqrt(tokens.length)));
@@ -232,7 +230,7 @@ function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown
         const spacing = Math.min(zoneW / (cols + 1), zoneH / (Math.ceil(tokens.length / cols) + 1));
         const newX = zoneX + spacing * (col + 1);
         const newY = zoneY + spacing * (row + 1);
-        sessionStore.updateToken(token.id, { x: newX, y: newY });
+        sessionStore.updateTokenPosition(token.id, newX, newY);
       });
 
       toast.info(`Placed ${tokens.length} token${tokens.length !== 1 ? 's' : ''} in deployment zone`);
