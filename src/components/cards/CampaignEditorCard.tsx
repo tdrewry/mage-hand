@@ -751,6 +751,7 @@ export function CampaignEditorCardContent() {
 
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const canvasViewRef = useRef<FlowCanvasViewState | null>(null);
 
   // Auto-navigate when another component requests opening a specific campaign
   React.useEffect(() => {
