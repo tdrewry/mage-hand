@@ -177,7 +177,7 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - offset.x) / scale - dragOffset.x;
       const y = (e.clientY - rect.top - offset.y) / scale - dragOffset.y;
-      onNodeMove(draggingNode, { x: Math.max(0, x), y: Math.max(0, y) });
+      onNodeMove(draggingNode, { x, y });
     }
     if (dragConnection && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
