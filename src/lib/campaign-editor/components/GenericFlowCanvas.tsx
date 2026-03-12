@@ -240,11 +240,25 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
     }
   });
 
+  const NODE_TYPE_ICONS: Record<string, React.ReactNode> = {
+    encounter: <Swords className="w-3.5 h-3.5" />,
+    narrative: <ScrollText className="w-3.5 h-3.5" />,
+    dialog: <MessageSquare className="w-3.5 h-3.5" />,
+    rest: <Tent className="w-3.5 h-3.5" />,
+  };
+
   const getNodeIcon = (node: TNode) => {
-    if (node.isStartNode) return <Flag className="w-4 h-4" />;
-    if (node.isEndNode) return <Star className="w-4 h-4" />;
-    if (node.isChoicePoint) return <Diamond className="w-4 h-4" />;
-    return <Circle className="w-4 h-4" />;
+    const typeIcon = NODE_TYPE_ICONS[node.nodeType || 'encounter'] || <Circle className="w-3.5 h-3.5" />;
+    const isStart = node.id === startNodeId || node.isStartNode;
+    if (isStart) {
+      return (
+        <span className="flex items-center gap-1">
+          {typeIcon}
+          <Flag className="w-3 h-3 text-primary" />
+        </span>
+      );
+    }
+    return typeIcon;
   };
 
   const nodeLabel = adapter.labels?.node || 'Node';
