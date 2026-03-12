@@ -52,10 +52,22 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
   onNodeMove,
   onConnectionCreate,
   onConnectionDelete,
+  viewStateRef,
 }: GenericFlowCanvasProps<TNodeData, TNode>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 50, y: 50 });
+
+  // Keep viewStateRef in sync so parent can read current view center
+  if (viewStateRef) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    viewStateRef.current = {
+      scale,
+      offset,
+      containerWidth: rect?.width ?? 800,
+      containerHeight: rect?.height ?? 600,
+    };
+  }
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [draggingNode, setDraggingNode] = useState<string | null>(null);
