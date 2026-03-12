@@ -119,6 +119,16 @@ export interface ProjectData {
   };
   // Token groups
   tokenGroups?: { groups: any[] };
+  // Map focus settings (blur, opacity for non-focused maps)
+  mapFocus?: {
+    unfocusedOpacity: number;
+    unfocusedBlur: number;
+    selectionLockEnabled: boolean;
+  };
+  // Map hierarchy structures and selection
+  mapStructures?: any[];
+  selectedMapId?: string | null;
+  autoFocusFollowsToken?: boolean;
   // Embedded textures for self-contained exports
   embeddedTextures?: EmbeddedTextures;
 }
