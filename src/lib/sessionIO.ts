@@ -23,6 +23,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useItemStore } from '@/stores/itemStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
@@ -123,6 +124,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       characters: creatureStore.characters,
       monsters: creatureStore.monsters,
     },
+    items: useItemStore.getState().items,
     hatching: {
       enabled: hatchingStore.enabled,
       hatchingOptions: hatchingStore.hatchingOptions,
@@ -293,6 +295,11 @@ export function applyProjectData(data: ProjectData): void {
     const cs = useCreatureStore.getState();
     if (data.creatures.characters) data.creatures.characters.forEach(c => cs.addCharacter(c));
     if (data.creatures.monsters) cs.addMonsters(data.creatures.monsters);
+  }
+
+  // Items
+  if (data.items && data.items.length > 0) {
+    useItemStore.getState().addItems(data.items);
   }
 
   // Hatching

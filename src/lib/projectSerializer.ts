@@ -24,6 +24,7 @@ import { getAllTextures, getAllRegionMappings, importTextures } from './textureS
 import { getAllTokenMappings, importTokenTextures } from './textureStorage';
 import type { IlluminationSource } from '@/types/illumination';
 import type { DndBeyondCharacter, Monster5eTools } from '@/types/creatureTypes';
+import type { LibraryItem } from '@/types/itemTypes';
 import type { DysonHatchingOptions } from '@/lib/shaders/dysonHatchingFilter';
 
 export interface ProjectMetadata {
@@ -96,6 +97,8 @@ export interface ProjectData {
     characters: DndBeyondCharacter[];
     monsters: Monster5eTools[];
   };
+  // Item library snapshot
+  items?: LibraryItem[];
   // Edge hatching settings
   hatching?: {
     enabled: boolean;
