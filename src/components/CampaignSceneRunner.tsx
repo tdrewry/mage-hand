@@ -87,7 +87,7 @@ export function CampaignSceneRunner() {
     requestOpenEditor,
   } = useCampaignStore();
 
-  const { getCardByType, setVisibility, bringToFront, setMinimize } = useCardStore();
+  const { getCardByType, setVisibility, bringToFront, setMinimize, registerCard } = useCardStore();
 
   const [showSummary, setShowSummary] = useState(false);
 
@@ -127,8 +127,20 @@ export function CampaignSceneRunner() {
       setVisibility(card.id, true);
       setMinimize(card.id, false);
       bringToFront(card.id);
+    } else {
+      // Card not yet registered — create it visible
+      registerCard({
+        type: CardType.CAMPAIGN_EDITOR,
+        title: 'Campaign Editor',
+        defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 600, height: 450 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
     }
-  }, [activeCampaignId, requestOpenEditor, getCardByType, setVisibility, setMinimize, bringToFront]);
+  }, [activeCampaignId, requestOpenEditor, getCardByType, setVisibility, setMinimize, bringToFront, registerCard]);
 
   if (!campaign || !activeProgress || !runner) return null;
 
