@@ -79,9 +79,10 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
     {
       key: 'tokenGroupId',
       label: 'Token Group',
-      type: 'string',
+      type: 'select',
       defaultValue: '',
-      description: 'Optional token group or role to auto-place (empty = all party tokens)',
+      description: 'Token group to deploy (empty = all player tokens)',
+      options: [], // Populated dynamically from tokenGroupStore
       group: 'Tokens',
     },
   ],
