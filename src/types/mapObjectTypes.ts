@@ -121,6 +121,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   'imported-obstacle': 'Imported Obstacle',
   light: 'Light Source',
   portal: 'Portal',
+  'deployment-zone': 'Deployment Zone',
   custom: 'Custom',
 };
 
