@@ -22,6 +22,13 @@ interface DragConnection {
   currentY: number;
 }
 
+export interface FlowCanvasViewState {
+  scale: number;
+  offset: { x: number; y: number };
+  containerWidth: number;
+  containerHeight: number;
+}
+
 interface GenericFlowCanvasProps<TNodeData extends BaseNodeData = BaseNodeData, TNode extends BaseFlowNode<TNodeData> = BaseFlowNode<TNodeData>> {
   nodes: TNode[];
   positions: Record<string, FlowNodePosition>;
@@ -32,6 +39,7 @@ interface GenericFlowCanvasProps<TNodeData extends BaseNodeData = BaseNodeData, 
   onNodeMove: (nodeId: string, position: FlowNodePosition) => void;
   onConnectionCreate?: (sourceId: string, targetId: string, type: 'success' | 'failure') => void;
   onConnectionDelete?: (sourceId: string, targetId: string, type: 'success' | 'failure') => void;
+  viewStateRef?: React.MutableRefObject<FlowCanvasViewState | null>;
 }
 
 export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData, TNode extends BaseFlowNode<TNodeData> = BaseFlowNode<TNodeData>>({
