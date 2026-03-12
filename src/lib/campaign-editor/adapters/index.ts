@@ -14,4 +14,3 @@ export {
   type FantasyTerrainId,
 } from './fantasy-dungeon';
 export { FANTASY_NODE_TYPE_CONFIGS } from './fantasyNodeConfigs';
-export { FANTASY_NODE_TYPE_CONFIGS } from './fantasyNodeConfigs';
