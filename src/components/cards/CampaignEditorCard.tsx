@@ -3,7 +3,7 @@
  * DM-only card for authoring branching story campaigns.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { getAllHandouts } from '@/lib/handouts';
 import { Input } from '@/components/ui/input';
