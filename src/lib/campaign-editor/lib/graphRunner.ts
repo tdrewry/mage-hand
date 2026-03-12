@@ -179,6 +179,26 @@ export function createGraphRunner<
 
     isComplete() { return progress.isComplete; },
 
+    canGoBack() { return progress.history.length > 0; },
+
+    goBack(): GraphProgress {
+      if (progress.history.length === 0) return { ...progress };
+      const prev = progress.history[progress.history.length - 1];
+      progress = {
+        ...progress,
+        currentNodeId: prev.currentNodeId,
+        completedNodeIds: prev.completedNodeIds,
+        failedNodeIds: prev.failedNodeIds,
+        flags: prev.flags,
+        history: progress.history.slice(0, -1),
+        isComplete: false,
+        isFailed: false,
+        lastPlayedAt: new Date().toISOString(),
+      };
+      notifyProgress();
+      return { ...progress };
+    },
+
     reset(): GraphProgress {
       progress = createEmptyGraphProgress(campaign.id, campaign.startNodeId);
       notifyProgress();
