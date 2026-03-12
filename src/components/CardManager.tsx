@@ -149,7 +149,7 @@ function getCardTitle(type: CardType): string {
     [CardType.MAP_OBJECTS]: 'Map Objects',
     [CardType.CHARACTER_SHEET]: 'Character Sheet',
     [CardType.MONSTER_STAT_BLOCK]: 'Monster Stat Block',
-    [CardType.CREATURE_LIBRARY]: 'Creature Library',
+    [CardType.CREATURE_LIBRARY]: 'Library',
     [CardType.MAP_TREE]: 'Map Tree',
     [CardType.DICE_BOX]: 'Dice Box',
     [CardType.ACTION_CARD]: 'Action',

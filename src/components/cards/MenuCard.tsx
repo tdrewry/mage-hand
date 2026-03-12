@@ -620,7 +620,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           className="w-full"
         >
           <BookOpen className="h-4 w-4 mr-2" />
-          Creature Library
+          Library
         </Button>
 
         <Button 

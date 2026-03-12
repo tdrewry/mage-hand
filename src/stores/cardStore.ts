@@ -293,7 +293,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     defaultVisible: false,
   },
   [CardType.CREATURE_LIBRARY]: {
-    title: 'Creature Library',
+    title: 'Library',
     defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
     defaultSize: { width: 600, height: 700 },
     minSize: { width: 500, height: 550 },
