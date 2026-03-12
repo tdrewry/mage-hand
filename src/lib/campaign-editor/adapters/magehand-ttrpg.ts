@@ -377,7 +377,7 @@ export function createMagehandTTRPGAdapter(): CampaignEditorAdapter {
     },
 
     labels: {
-      campaign: 'Campaign',
+      campaign: 'Scenario',
       node: 'Scene',
       terrain: 'Map',
       objective: 'Goal',
