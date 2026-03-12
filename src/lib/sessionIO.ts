@@ -132,6 +132,12 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       customTemplates: effectStore.customTemplates,
     },
     uiMode: uiModeStore.currentMode === 'dm' ? 'dm' : 'play',
+    campaigns: {
+      campaigns: campaignStore.campaigns,
+      activeCampaignId: campaignStore.activeCampaignId,
+      activeProgress: campaignStore.activeProgress,
+      nodePositions: campaignStore.nodePositions,
+    },
   };
 }
 
