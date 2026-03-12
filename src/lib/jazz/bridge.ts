@@ -55,6 +55,7 @@ import { useActionStore } from "@/stores/actionStore";
 import { useDiceStore } from "@/stores/diceStore";
 import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
+import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
