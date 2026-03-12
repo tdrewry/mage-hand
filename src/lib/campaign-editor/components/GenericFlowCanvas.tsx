@@ -110,7 +110,8 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
       const current = queue.shift()!;
       const d = depth.get(current) || 0;
       (successors.get(current) || []).forEach(t => {
-        if (!depth.has(t) || depth.get(t)! < d + 1) {
+        // Only visit unvisited nodes — skip back-edges to avoid infinite loops in cyclic graphs
+        if (!depth.has(t)) {
           depth.set(t, d + 1);
           queue.push(t);
         }
