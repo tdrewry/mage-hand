@@ -21,6 +21,15 @@ import type {
   BaseCampaign,
 } from '../types/base';
 import type { CampaignEditorAdapter } from '../types/adapter';
+import type { BaseNodeType } from '../types/execution';
+import { useMapStore } from '@/stores/mapStore';
+import { useMapObjectStore } from '@/stores/mapObjectStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useFogStore } from '@/stores/fogStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
+import { useCampaignStore } from '@/stores/campaignStore';
+import { toast } from 'sonner';
 
 // ============= NODE TYPE CONFIGS =============
 
@@ -134,6 +143,167 @@ export const MAGEHAND_NODE_TYPE_CONFIGS: NodeTypeConfig[] = [
   MAGEHAND_REST_CONFIG,
 ];
 
+// ============= EXECUTION BRIDGE =============
+
+/**
+ * Execute a campaign node — called by the CampaignSceneRunner when the DM
+ * advances or activates a scene. Each node type triggers different Magehand
+ * store actions.
+ */
+export function executeNode(node: BaseFlowNode): void {
+  const nodeType = (node.nodeType || 'encounter') as BaseNodeType;
+  const custom = (node.customData || {}) as Record<string, unknown>;
+
+  switch (nodeType) {
+    case 'encounter':
+      executeEncounterNode(node, custom);
+      break;
+    case 'narrative':
+      executeNarrativeNode(node);
+      break;
+    case 'dialog':
+      executeDialogNode(node);
+      break;
+    case 'rest':
+      executeRestNode(node, custom);
+      break;
+    default:
+      toast.info(`Scene: ${node.nodeData.name}`);
+  }
+}
+
+function executeEncounterNode(node: BaseFlowNode, custom: Record<string, unknown>): void {
+  const mapId = custom.mapId as string;
+  const deploymentZoneId = custom.deploymentZoneId as string;
+  const fogPreset = (custom.fogPreset as string) || 'keep';
+  const tokenGroupId = custom.tokenGroupId as string;
+
+  // 1. Switch to target map
+  if (mapId) {
+    const mapStore = useMapStore.getState();
+    const map = mapStore.maps.find((m) => m.id === mapId);
+    if (map) {
+      mapStore.setSelectedMap(mapId);
+      // Activate the map if it isn't already
+      if (!map.active) mapStore.updateMap(mapId, { active: true });
+      toast.success(`Map: ${map.name}`);
+    } else {
+      toast.error(`Map not found: ${mapId}`);
+    }
+  }
+
+  // 2. Handle fog preset
+  if (fogPreset !== 'keep' && mapId) {
+    const fogStore = useFogStore.getState();
+    if (fogPreset === 'reveal-all') {
+      fogStore.setMapFogSettings(mapId, { enabled: true, revealAll: true });
+    } else if (fogPreset === 'reset') {
+      fogStore.setMapFogSettings(mapId, { enabled: true, revealAll: false });
+      fogStore.setSerializedExploredAreasForMap(mapId, '');
+    }
+  }
+
+  // 3. Place tokens in deployment zone
+  if (deploymentZoneId && mapId) {
+    const zone = useMapObjectStore.getState().mapObjects.find(
+      (o) => o.id === deploymentZoneId && o.category === 'deployment-zone'
+    );
+    if (zone) {
+      const sessionStore = useSessionStore.getState();
+      const tokens = sessionStore.tokens.filter((t) => {
+        if (tokenGroupId) {
+          return t.roleId === tokenGroupId || t.name === tokenGroupId;
+        }
+        return t.roleId === 'player';
+      });
+
+      // Spread tokens within the zone bounds
+      const zoneX = zone.position.x;
+      const zoneY = zone.position.y;
+      const zoneW = zone.width;
+      const zoneH = zone.height;
+      const cols = Math.max(1, Math.floor(Math.sqrt(tokens.length)));
+
+      tokens.forEach((token, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const spacing = Math.min(zoneW / (cols + 1), zoneH / (Math.ceil(tokens.length / cols) + 1));
+        const newX = zoneX + spacing * (col + 1);
+        const newY = zoneY + spacing * (row + 1);
+        sessionStore.updateTokenPosition(token.id, newX, newY);
+      });
+
+      toast.info(`Placed ${tokens.length} token${tokens.length !== 1 ? 's' : ''} in deployment zone`);
+    }
+  }
+}
+
+function executeNarrativeNode(node: BaseFlowNode): void {
+  // Build markdown content from dialog lines
+  const lines = node.dialogLines || [];
+  const markdown = lines
+    .map((l) => (l.speaker ? `**${l.speaker}:** ${l.text}` : l.text))
+    .join('\n\n');
+
+  if (!markdown) {
+    toast.info(`Scene: ${node.nodeData.name}`);
+    return;
+  }
+
+  // Open a HandoutViewer card with inline content
+  const cardStore = useCardStore.getState();
+  const existingCard = cardStore.cards.find(
+    (c) => c.type === CardType.HANDOUT_VIEWER && c.metadata?.campaignNodeId === node.id
+  );
+
+  if (existingCard) {
+    cardStore.setVisibility(existingCard.id, true);
+  } else {
+    cardStore.registerCard({
+      type: CardType.HANDOUT_VIEWER,
+      title: node.nodeData.name || 'Narrative',
+      defaultPosition: { x: window.innerWidth / 2 - 250, y: 100 },
+      defaultSize: { width: 500, height: 600 },
+      minSize: { width: 360, height: 400 },
+      isResizable: true,
+      isClosable: true,
+      defaultVisible: true,
+      metadata: {
+        handoutId: `__campaign_narrative__`,
+        campaignNodeId: node.id,
+        inlineContent: markdown,
+        title: node.nodeData.name,
+      },
+    });
+  }
+
+  toast.info(`📜 ${node.nodeData.name}`);
+}
+
+function executeDialogNode(node: BaseFlowNode): void {
+  // For now, present dialog choices as a toast with info about checking chat
+  const lines = node.dialogLines || [];
+  const outcomes = node.outcomes || [];
+
+  if (lines.length > 0) {
+    const firstLine = lines[0];
+    const speaker = firstLine.speaker ? `${firstLine.speaker}: ` : '';
+    toast.info(`💬 ${speaker}${firstLine.text}`);
+  }
+
+  if (outcomes.length > 0) {
+    toast.info(
+      `Decision: ${outcomes.map((o) => o.label).join(' / ')}`,
+      { duration: 8000 }
+    );
+  }
+}
+
+function executeRestNode(node: BaseFlowNode, custom: Record<string, unknown>): void {
+  const reason = (custom.narrativeReason as string) || node.nodeData.name || 'The party rests...';
+  toast.info(`🏕️ ${reason}`, { duration: 5000 });
+}
+
 // ============= ADAPTER FACTORY =============
 
 /**
@@ -176,7 +346,5 @@ export function createMagehandTTRPGAdapter(): CampaignEditorAdapter {
       terrain: 'Map',
       objective: 'Goal',
     },
-
-    // executionHandler wired in Phase 4 (runtime bridge)
   });
 }

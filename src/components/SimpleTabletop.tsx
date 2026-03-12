@@ -16,6 +16,7 @@ import { CardManager } from "./CardManager";
 import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
+import { CampaignSceneRunner } from "./CampaignSceneRunner";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
@@ -12004,6 +12005,9 @@ export const SimpleTabletop = () => {
 
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel selectedTokenIds={selectedTokenIds} />
+
+      {/* Campaign Scene Runner - Bottom center, above initiative */}
+      <CampaignSceneRunner />
 
       {/* Unified Selection Toolbar - Shows when 2+ entities or a group is selected */}
       <UnifiedSelectionToolbar
