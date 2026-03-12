@@ -139,16 +139,51 @@ export function NodeSummaryCard({
           {/* Dialog / Narrative lines */}
           {dialogLines.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                {nodeType === 'dialog' ? 'Dialog' : 'Narrative'}
-              </p>
-              <div className="space-y-1.5">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {nodeType === 'dialog' ? 'Dialog' : 'Narrative'}
+                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={sendAllToChat}
+                    >
+                      <SendHorizonal className="h-3 w-3 mr-0.5" />
+                      Send All
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={4}>
+                    Send all lines to chat
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="space-y-1">
                 {dialogLines.map((line, i) => (
-                  <div key={i} className="text-sm">
-                    {line.speaker && (
-                      <span className="font-semibold text-primary mr-1">{line.speaker}:</span>
-                    )}
-                    <span className="text-foreground">{line.text}</span>
+                  <div key={i} className="flex items-start gap-1 group">
+                    <div className="text-sm flex-1 min-w-0">
+                      {line.speaker && (
+                        <span className="font-semibold text-primary mr-1">{line.speaker}:</span>
+                      )}
+                      <span className="text-foreground">{line.text}</span>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                          onClick={() => sendLineToChat(line)}
+                        >
+                          <Send className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={4}>
+                        Send to chat as {line.speaker || 'Narrator'}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
