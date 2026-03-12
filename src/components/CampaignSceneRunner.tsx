@@ -218,10 +218,9 @@ export function CampaignSceneRunner() {
               {campaign.name}
             </span>
           </button>
-            <Badge variant="outline" className="text-[10px] shrink-0">
-              {completedCount}/{totalCount}
-            </Badge>
-          </div>
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            {completedCount}/{totalCount}
+          </Badge>
 
           <div className="w-px h-5 bg-border shrink-0" />
 
