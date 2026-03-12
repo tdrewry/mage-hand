@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent } from 'lucide-react';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -64,15 +64,14 @@ function TokenGroupPicker({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-// ── Campaign List View ──────────────────────────────────────────────────────
+// ── Scenario List View ──────────────────────────────────────────────────────
 
-
-function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
-  const { campaigns, addCampaign, removeCampaign } = useCampaignStore();
+function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
+  const { campaigns, addCampaign, removeCampaign, activeCampaignId, setActiveCampaign } = useCampaignStore();
   const [newName, setNewName] = useState('');
 
   const handleCreate = () => {
-    const name = newName.trim() || 'Untitled Campaign';
+    const name = newName.trim() || 'Untitled Scenario';
     const now = new Date().toISOString();
     const startNodeId = `scene-${Date.now()}`;
     const campaign: BaseCampaign = {
@@ -97,18 +96,22 @@ function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
       tags: ['ttrpg'],
     };
     addCampaign(campaign);
-    // Set default position for start node
     useCampaignStore.getState().setNodePosition(campaign.id, startNodeId, { x: 100, y: 100 });
     setNewName('');
     onSelect(campaign.id);
   };
 
+  const handleToggleActive = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveCampaign(activeCampaignId === id ? null : id);
+  };
+
   return (
     <div className="p-3 space-y-3">
-      <p className="text-xs text-muted-foreground">Create or load a campaign</p>
+      <p className="text-xs text-muted-foreground">Create or manage scenarios</p>
       <div className="flex gap-2">
         <Input
-          placeholder="Campaign name..."
+          placeholder="Scenario name..."
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -120,30 +123,55 @@ function CampaignListView({ onSelect }: { onSelect: (id: string) => void }) {
       </div>
       <Separator />
       {campaigns.length === 0 ? (
-        <p className="text-xs text-muted-foreground text-center py-4">No campaigns yet</p>
+        <p className="text-xs text-muted-foreground text-center py-4">No scenarios yet</p>
       ) : (
         <ScrollArea className="max-h-[300px]">
           <div className="space-y-2">
-            {campaigns.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/50 cursor-pointer transition-colors"
-                onClick={() => onSelect(c.id)}
-              >
-                <div>
-                  <p className="text-sm font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+            {campaigns.map((c) => {
+              const isActive = activeCampaignId === c.id;
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center justify-between p-2 rounded-md border cursor-pointer transition-colors ${
+                    isActive
+                      ? 'border-primary/50 bg-primary/5'
+                      : 'border-border hover:bg-accent/50'
+                  }`}
+                  onClick={() => onSelect(c.id)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      {isActive && (
+                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
+                          Running
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant={isActive ? 'default' : 'ghost'}
+                      size="sm"
+                      className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={(e) => handleToggleActive(e, c.id)}
+                      title={isActive ? 'Stop scenario' : 'Run scenario'}
+                    >
+                      {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </ScrollArea>
       )}
@@ -347,8 +375,6 @@ function NodePropertyPanel({
 export function CampaignEditorCardContent() {
   const {
     campaigns,
-    activeCampaignId,
-    setActiveCampaign,
     nodePositions,
     setNodePosition,
     addNode,
@@ -357,19 +383,20 @@ export function CampaignEditorCardContent() {
     removeConnection,
   } = useCampaignStore();
 
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const activeCampaign = campaigns.find((c) => c.id === activeCampaignId);
+  const editingCampaign = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId) : null;
 
   const handleBack = () => {
-    setActiveCampaign(null);
+    setEditingCampaignId(null);
     setSelectedNodeId(null);
   };
 
   const handleAddNode = (typeId: string) => {
-    if (!activeCampaignId) return;
+    if (!editingCampaignId) return;
     const id = `scene-${Date.now()}`;
-    const positions = nodePositions[activeCampaignId] || {};
+    const positions = nodePositions[editingCampaignId] || {};
     const count = Object.keys(positions).length;
     const node: BaseFlowNode = {
       id,
@@ -380,23 +407,23 @@ export function CampaignEditorCardContent() {
       prerequisites: [],
       customData: {},
     };
-    addNode(activeCampaignId, node);
-    setNodePosition(activeCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
+    addNode(editingCampaignId, node);
+    setNodePosition(editingCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
     setSelectedNodeId(id);
   };
 
   const handleRemoveNode = () => {
-    if (!activeCampaignId || !selectedNodeId) return;
-    removeNode(activeCampaignId, selectedNodeId);
+    if (!editingCampaignId || !selectedNodeId) return;
+    removeNode(editingCampaignId, selectedNodeId);
     setSelectedNodeId(null);
   };
 
-  if (!activeCampaign) {
-    return <CampaignListView onSelect={(id) => setActiveCampaign(id)} />;
+  if (!editingCampaign) {
+    return <ScenarioListView onSelect={(id) => setEditingCampaignId(id)} />;
   }
 
-  const positions = nodePositions[activeCampaignId!] || {};
-  const selectedNode = activeCampaign.nodes.find((n) => n.id === selectedNodeId);
+  const positions = nodePositions[editingCampaignId!] || {};
+  const selectedNode = editingCampaign.nodes.find((n) => n.id === selectedNodeId);
 
   return (
     <div className="flex flex-col h-full">
@@ -405,8 +432,8 @@ export function CampaignEditorCardContent() {
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium truncate flex-1">{activeCampaign.name}</span>
-        <Badge variant="outline" className="text-[10px]">{activeCampaign.nodes.length} scenes</Badge>
+        <span className="text-sm font-medium truncate flex-1">{editingCampaign.name}</span>
+        <Badge variant="outline" className="text-[10px]">{editingCampaign.nodes.length} scenes</Badge>
 
         {/* Add node buttons */}
         {MAGEHAND_NODE_TYPE_CONFIGS.map((cfg) => (
@@ -439,21 +466,21 @@ export function CampaignEditorCardContent() {
       <div className="flex flex-1 min-h-0">
         <div className={selectedNode ? 'flex-1' : 'w-full'} style={{ minHeight: 200 }}>
           <GenericFlowCanvas
-            nodes={activeCampaign.nodes}
+            nodes={editingCampaign.nodes}
             positions={positions}
             selectedNodeId={selectedNodeId}
-            startNodeId={activeCampaign.startNodeId}
+            startNodeId={editingCampaign.startNodeId}
             adapter={adapter}
             onNodeSelect={setSelectedNodeId}
-            onNodeMove={(nodeId, pos) => setNodePosition(activeCampaignId!, nodeId, pos)}
-            onConnectionCreate={(src, tgt, type) => addConnection(activeCampaignId!, src, tgt, type)}
-            onConnectionDelete={(src, tgt, type) => removeConnection(activeCampaignId!, src, tgt, type)}
+            onNodeMove={(nodeId, pos) => setNodePosition(editingCampaignId!, nodeId, pos)}
+            onConnectionCreate={(src, tgt, type) => addConnection(editingCampaignId!, src, tgt, type)}
+            onConnectionDelete={(src, tgt, type) => removeConnection(editingCampaignId!, src, tgt, type)}
           />
         </div>
 
         {selectedNode && (
           <div className="w-[260px] border-l border-border shrink-0">
-            <NodePropertyPanel campaignId={activeCampaignId!} node={selectedNode} />
+            <NodePropertyPanel campaignId={editingCampaignId!} node={selectedNode} />
           </div>
         )}
       </div>
