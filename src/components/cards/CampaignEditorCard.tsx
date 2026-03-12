@@ -787,7 +787,15 @@ export function CampaignEditorCardContent() {
       customData: {},
     };
     addNode(editingCampaignId, node);
-    setNodePosition(editingCampaignId, id, { x: 100 + count * 220, y: 100 + (count % 3) * 120 });
+    // Place new node at the center of the current canvas view
+    const view = canvasViewRef.current;
+    let newX = 100 + count * 220;
+    let newY = 100 + (count % 3) * 120;
+    if (view) {
+      newX = (view.containerWidth / 2 - view.offset.x) / view.scale - 90;
+      newY = (view.containerHeight / 2 - view.offset.y) / view.scale - 40;
+    }
+    setNodePosition(editingCampaignId, id, { x: newX, y: newY });
     setSelectedNodeId(id);
   };
 
