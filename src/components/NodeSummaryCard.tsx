@@ -9,12 +9,20 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useChatStore } from '@/stores/chatStore';
+import {
   X,
   ChevronRight,
   Swords,
   ScrollText,
   MessageSquare,
   Tent,
+  Send,
+  SendHorizonal,
 } from 'lucide-react';
 import type { BaseFlowNode } from '@/lib/campaign-editor/types/base';
 
