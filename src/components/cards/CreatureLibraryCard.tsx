@@ -140,6 +140,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     monsters, 
     searchCharacters, 
     searchMonsters,
+    addCharacter,
+    addMonster,
     removeCharacter,
     removeMonster,
     addMonsters,
