@@ -126,7 +126,7 @@ function NodePropertyPanel({
 }) {
   const { updateNode } = useCampaignStore();
   const maps = useMapStore((s) => s.maps);
-  const mapObjects = useMapObjectStore((s) => s.objects);
+  const mapObjects = useMapObjectStore((s) => s.mapObjects);
 
   const nodeType = node.nodeType || 'encounter';
   const typeConfig = MAGEHAND_NODE_TYPE_CONFIGS.find((c) => c.id === nodeType);
