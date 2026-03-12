@@ -18,6 +18,9 @@ export interface CampaignState {
   /** Node positions for the flow canvas, keyed by campaignId → nodeId → position */
   nodePositions: Record<string, Record<string, FlowNodePosition>>;
 
+  /** When set, the Campaign Editor card should open to this campaign's editor view */
+  requestedEditorCampaignId: string | null;
+
   // CRUD
   addCampaign: (campaign: BaseCampaign) => void;
   updateCampaign: (id: string, patch: Partial<BaseCampaign>) => void;
@@ -41,6 +44,10 @@ export interface CampaignState {
   advanceNode: (nodeId: string) => void;
   resolveNode: (nodeId: string, outcome: 'success' | 'failure') => void;
   resetProgress: () => void;
+
+  // Editor navigation
+  requestOpenEditor: (campaignId: string) => void;
+  clearEditorRequest: () => void;
 }
 
 // Helper to access campaign node count
