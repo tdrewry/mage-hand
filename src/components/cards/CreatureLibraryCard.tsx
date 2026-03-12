@@ -316,11 +316,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const center = getViewportCenter();
       
-      // Try to fetch token art if available - only use if it's a valid loadable URL
+      // Try to fetch token art if available
       let imageUrl = '';
-      const artUrl = monster.tokenUrl || monster.fluffImages?.[0]?.url;
+      const artUrl = monster.tokenIconUrl || monster.tokenUrl || monster.fluffImages?.[0]?.url;
       
-      // Only attempt to load if it looks like a full URL (not a 5e.tools reference)
+      // Only attempt to load if it looks like a full URL
       if (artUrl && (artUrl.startsWith('http://') || artUrl.startsWith('https://') || artUrl.startsWith('data:'))) {
         try {
           const img = new Image();
