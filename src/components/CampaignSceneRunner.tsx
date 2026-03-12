@@ -221,6 +221,12 @@ export function CampaignSceneRunner() {
     }
     openHandoutById(handoutId, label);
   };
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
+      {/* Node Summary Card popup (above the widget) */}
+      {showSummary && currentNode && !isComplete && (
+        <NodeSummaryCard
           node={currentNode}
           decisionOutcomes={decisionOutcomes}
           onChooseOutcome={handleChooseOutcome}
