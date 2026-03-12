@@ -120,6 +120,12 @@ export function CampaignSceneRunner() {
     });
   }, [currentNode?.id, nodeType, campaign]);
 
+  // Linked handouts for the current node
+  const linkedHandouts = useMemo(() => {
+    if (!currentNode) return [];
+    return currentNode.handouts || [];
+  }, [currentNode?.id]);
+
   const handleOpenEditor = useCallback(() => {
     if (!activeCampaignId) return;
     requestOpenEditor(activeCampaignId);
