@@ -232,7 +232,7 @@ export const HandoutCatalogCardContent: React.FC = () => {
                   </div>
                 }>
                   <MonacoEditor
-                    height="100%"
+                    height="350px"
                     language="markdown"
                     value={editMarkdown}
                     onChange={(v) => setEditMarkdown(v ?? '')}
