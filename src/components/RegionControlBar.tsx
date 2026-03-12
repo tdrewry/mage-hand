@@ -208,7 +208,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     toast.success(`Created ${selectedRegions.length} wall(s) from region edges`);
   };
   
-  const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water') => {
+  const handleConvertToMapObject = (category: 'obstacle' | 'furniture' | 'water' | 'deployment-zone') => {
     const preset = MAP_OBJECT_PRESETS[category];
     
     selectedRegions.forEach(region => {
