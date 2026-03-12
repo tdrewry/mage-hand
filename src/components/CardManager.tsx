@@ -27,6 +27,7 @@ import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';
 import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard';
 import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
+import { CampaignEditorCardContent } from '@/components/cards/CampaignEditorCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
