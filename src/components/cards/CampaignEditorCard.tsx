@@ -616,6 +616,8 @@ export function CampaignEditorCardContent() {
     }
   }, [requestedEditorCampaignId, campaigns, clearEditorRequest]);
 
+  const editingCampaign = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId) : null;
+
   const handleBack = () => {
     setEditingCampaignId(null);
     setSelectedNodeId(null);
