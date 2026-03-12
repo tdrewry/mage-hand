@@ -2,9 +2,10 @@
  * CampaignSceneRunner — persistent DM widget for advancing through campaign nodes.
  * Row 1: standard tools (name, current node, Run, ✓, ✗, Back, Reset, Stop)
  * Row 2 (conditional): decision choice buttons for dialog nodes
+ * Clicking the node title opens a NodeSummaryCard popup.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,6 +16,7 @@ import {
 import { useCampaignStore } from '@/stores/campaignStore';
 import { executeNode } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
+import { NodeSummaryCard } from '@/components/NodeSummaryCard';
 import {
   ChevronRight,
   ChevronLeft,
@@ -82,6 +84,8 @@ export function CampaignSceneRunner() {
     setActiveCampaign,
   } = useCampaignStore();
 
+  const [showSummary, setShowSummary] = useState(false);
+
   const campaign = campaigns.find((c) => c.id === activeCampaignId) ?? null;
 
   const runner = useMemo(() => {
@@ -126,6 +130,7 @@ export function CampaignSceneRunner() {
     if (!currentNode) return;
     const newProgress = runner.resolveNode(currentNode.id, { outcome: 'success' });
     setProgress(newProgress);
+    setShowSummary(false);
     const nextNode = runner.getCurrentNode();
     if (nextNode) executeNode(nextNode);
   };
@@ -134,6 +139,7 @@ export function CampaignSceneRunner() {
     if (!currentNode) return;
     const newProgress = runner.resolveNode(currentNode.id, { outcome: 'failure' });
     setProgress(newProgress);
+    setShowSummary(false);
   };
 
   const handleChooseOutcome = (outcomeId: string, targetNodeId?: string) => {
@@ -143,6 +149,7 @@ export function CampaignSceneRunner() {
       choiceId: targetNodeId || outcomeId,
     });
     setProgress(newProgress);
+    setShowSummary(false);
     const nextNode = runner.getCurrentNode();
     if (nextNode) executeNode(nextNode);
   };
@@ -150,12 +157,14 @@ export function CampaignSceneRunner() {
   const handleBack = () => {
     const newProgress = runner.goBack();
     setProgress(newProgress);
+    setShowSummary(false);
     toast.info('Returned to previous node');
   };
 
   const handleReset = () => {
     const newProgress = runner.reset();
     setProgress(newProgress);
+    setShowSummary(false);
     toast.info('Campaign progress reset');
   };
 
@@ -168,6 +177,16 @@ export function CampaignSceneRunner() {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
+      {/* Node Summary Card popup (above the widget) */}
+      {showSummary && currentNode && !isComplete && (
+        <NodeSummaryCard
+          node={currentNode}
+          decisionOutcomes={decisionOutcomes}
+          onChooseOutcome={handleChooseOutcome}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
+
       <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 flex flex-col gap-1.5 min-w-[320px] max-w-[640px]">
         {/* ── Row 1: Standard tools ── */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -186,12 +205,17 @@ export function CampaignSceneRunner() {
           {/* Current scene info */}
           {currentNode && !isComplete ? (
             <>
-              <div className="flex items-center gap-1.5 min-w-0">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 min-w-0 hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+                onClick={() => setShowSummary((v) => !v)}
+                title="Click to view node details"
+              >
                 <span className="text-muted-foreground shrink-0">{NODE_ICONS[nodeType]}</span>
-                <span className="text-sm font-medium truncate max-w-[140px]">
+                <span className="text-sm font-medium truncate max-w-[140px] underline decoration-dotted underline-offset-2">
                   {currentNode.nodeData.name}
                 </span>
-              </div>
+              </button>
 
               <div className="flex items-center gap-1 shrink-0">
                 {/* Run */}
