@@ -62,6 +62,7 @@ export const useCampaignStore = create<CampaignState>()(
       activeCampaignId: null,
       activeProgress: null,
       nodePositions: {},
+      requestedEditorCampaignId: null,
 
       addCampaign: (campaign) =>
         set((s) => ({ campaigns: [...s.campaigns, campaign] })),
