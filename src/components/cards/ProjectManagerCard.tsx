@@ -52,6 +52,7 @@ import {
   ProjectMetadata
 } from '../../lib/projectSerializer';
 import { cn, processInChunks } from '../../lib/utils';
+import { createCurrentProjectData as createProjectDataSnapshot } from '../../lib/sessionIO';
 
 import { useSessionStore } from '../../stores/sessionStore';
 import { useMapStore } from '../../stores/mapStore';
