@@ -136,6 +136,7 @@ export interface Monster5eTools {
   
   // Images
   tokenUrl?: string;
+  tokenIconUrl?: string;  // User-assigned default token art
   fluffImages?: Array<{ url: string; type?: string }>;
   
   // Environment
