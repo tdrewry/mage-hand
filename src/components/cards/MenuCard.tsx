@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords, Home, Volume2 } from 'lucide-react';
+import { Share2, Users, Map, Trash2, Castle, Save, FolderOpen, Layers, Sparkles, Shield, Network, Monitor, UserCircle, HardDrive, Box, BookOpen, GitBranch, Dices, Radio, MessageSquare, Swords, Home, Volume2, Route } from 'lucide-react';
 import { SessionManager } from '@/components/SessionManager';
 import { ConnectedUsersPanel } from '@/components/ConnectedUsersPanel';
 import { StorageManagerModal } from '@/components/StorageManagerModal';
@@ -77,6 +77,7 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
   const artApprovalCard = cards.find((c) => c.type === CardType.ART_APPROVAL);
   const soundSettingsCard = cards.find((c) => c.type === CardType.SOUND_SETTINGS);
   const handoutCatalogCard = cards.find((c) => c.type === CardType.HANDOUT_CATALOG);
+  const campaignEditorCard = cards.find((c) => c.type === CardType.CAMPAIGN_EDITOR);
 
   const handleToggleMapControlsCard = () => {
     if (mapControlsCard) {
@@ -720,6 +721,33 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
           <BookOpen className="h-4 w-4 mr-2" />
           Handouts
         </Button>
+
+        {canControlUiMode && (
+          <Button
+            variant={campaignEditorCard?.isVisible ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (campaignEditorCard) {
+                setVisibility(campaignEditorCard.id, !campaignEditorCard.isVisible);
+              } else {
+                registerCard({
+                  type: CardType.CAMPAIGN_EDITOR,
+                  title: 'Campaign Editor',
+                  defaultPosition: { x: window.innerWidth / 2 - 400, y: 80 },
+                  defaultSize: { width: 800, height: 600 },
+                  minSize: { width: 600, height: 450 },
+                  isResizable: true,
+                  isClosable: true,
+                  defaultVisible: true,
+                });
+              }
+            }}
+            className="w-full"
+          >
+            <Route className="h-4 w-4 mr-2" />
+            Campaign
+          </Button>
+        )}
       </div>
 
       <Separator />

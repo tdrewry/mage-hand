@@ -4,7 +4,7 @@
 
 import type { BaseTerrainTile, BaseObjective, DeploymentZone } from './base';
 
-export type BaseNodeType = 'combat' | 'cutscene' | 'dialog' | 'downtime';
+export type BaseNodeType = 'combat' | 'cutscene' | 'dialog' | 'downtime' | 'encounter' | 'narrative' | 'rest';
 
 export interface NodeResult {
   outcome: 'success' | 'failure' | 'choice';

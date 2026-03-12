@@ -27,6 +27,7 @@ import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';
 import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard';
 import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
+import { CampaignEditorCardContent } from '@/components/cards/CampaignEditorCard';
 import React, { Suspense } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
@@ -158,6 +159,7 @@ function getCardTitle(type: CardType): string {
     [CardType.SOUND_SETTINGS]: 'Sound Settings',
     [CardType.HANDOUT_CATALOG]: 'Handouts',
     [CardType.HANDOUT_VIEWER]: 'Handout',
+    [CardType.CAMPAIGN_EDITOR]: 'Campaign Editor',
   };
   
   return titles[type] || type;
@@ -252,6 +254,8 @@ function renderCardContent(
       return <HandoutCatalogCardContent />;
     case CardType.HANDOUT_VIEWER:
       return <HandoutViewerCardContent handoutId={(metadata?.handoutId as string) || ''} />;
+    case CardType.CAMPAIGN_EDITOR:
+      return <CampaignEditorCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
