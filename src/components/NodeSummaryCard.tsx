@@ -77,6 +77,18 @@ export function NodeSummaryCard({
   const hasTextContent = dialogLines.length > 0 || !!prologue;
   const isDialog = nodeType === 'dialog' && decisionOutcomes.length > 0;
 
+  const sendLineToChat = (line: { speaker?: string; text: string }) => {
+    const speaker = line.speaker || node.nodeData.name || 'Narrator';
+    addMessage('campaign-narrator', speaker, line.text);
+  };
+
+  const sendAllToChat = () => {
+    dialogLines.forEach((line) => {
+      const speaker = line.speaker || node.nodeData.name || 'Narrator';
+      addMessage('campaign-narrator', speaker, line.text);
+    });
+  };
+
   return (
     <div
       className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[380px] max-w-[90vw] bg-card border border-border rounded-lg shadow-xl z-[31001] pointer-events-auto"
