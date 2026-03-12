@@ -6,7 +6,7 @@
  *
  * Node types:
  * - encounter: activates a map + teleports tokens to deployment zone
- * - narrative: opens a handout viewer with dialog lines
+ * - narrative: presents handouts the DM can share on demand
  * - dialog: presents player choices via chat or modal
  * - rest: toast notification, no map change
  */
@@ -30,6 +30,7 @@ import { useFogStore } from '@/stores/fogStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { useCampaignStore } from '@/stores/campaignStore';
+import { BUILTIN_HANDOUTS } from '@/lib/handouts';
 import { toast } from 'sonner';
 
 // ============= NODE TYPE CONFIGS =============
