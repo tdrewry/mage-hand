@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
 import { useItemStore } from '@/stores/itemStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -139,6 +140,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     monsters, 
     searchCharacters, 
     searchMonsters,
+    addCharacter,
+    addMonster,
     removeCharacter,
     removeMonster,
     addMonsters,
@@ -463,6 +466,32 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     setShowImportModal(true);
   };
 
+  const handleCreateBlankCharacter = useCallback(() => {
+    const blank = generateBlankTemplate();
+    blank.name = 'New Character';
+    addCharacter(blank);
+    toast.success('Blank character created — open it to edit');
+  }, [addCharacter]);
+
+  const handleCreateBlankMonster = useCallback(() => {
+    const now = Date.now();
+    const monster: Monster5eTools = {
+      id: `monster-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      name: 'New Monster',
+      source: 'Homebrew',
+      size: 'M' as MonsterSize,
+      type: { type: 'humanoid' },
+      ac: [{ ac: 10 }],
+      hp: { average: 10, formula: '2d8+2' },
+      speed: { walk: 30 },
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+      cr: '0',
+      passive: 10,
+    };
+    addMonster(monster);
+    toast.success('Blank monster created — open it to edit');
+  }, [addMonster]);
+
   const handleCreateItem = () => {
     const now = new Date().toISOString();
     const item: LibraryItem = {
@@ -716,15 +745,26 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 
         {/* Characters Tab */}
         <TabsContent value="characters" className="flex-1 flex flex-col gap-3 mt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleImportCharacter}
-            className="w-full"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Import from D&D Beyond
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCreateBlankCharacter}
+              className="w-full gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              New Character
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleImportCharacter}
+              className="w-full gap-1"
+            >
+              <UserPlus className="h-4 w-4" />
+              Import
+            </Button>
+          </div>
 
           <ScrollArea className="flex-1 min-h-0">
             {filteredCharacters.length === 0 ? (
@@ -756,7 +796,16 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
         {/* Monsters Tab */}
         <TabsContent value="monsters" className="flex-1 flex flex-col gap-3 mt-3">
           {/* Import Buttons */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCreateBlankMonster}
+              className="gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              New
+            </Button>
             <Button 
               variant="outline" 
               size="sm" 
@@ -764,11 +813,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
               disabled={bestiaryLoading}
             >
               {bestiaryLoading ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
               ) : (
-                <Globe className="h-4 w-4 mr-2" />
+                <Globe className="h-4 w-4 mr-1" />
               )}
-              {bestiaryLoading ? (importProgress || 'Loading...') : 'Fetch from 5e.tools'}
+              {bestiaryLoading ? 'Loading...' : '5e.tools'}
             </Button>
             
             <Button 
@@ -777,8 +826,8 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
               onClick={handleImportBestiary}
               disabled={bestiaryLoading}
             >
-              <FileJson className="h-4 w-4 mr-2" />
-              Import JSON
+              <FileJson className="h-4 w-4 mr-1" />
+              JSON
             </Button>
           </div>
 
