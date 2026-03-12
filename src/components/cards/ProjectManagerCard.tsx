@@ -52,6 +52,7 @@ import {
   ProjectMetadata
 } from '../../lib/projectSerializer';
 import { cn, processInChunks } from '../../lib/utils';
+import { createCurrentProjectData as createProjectDataSnapshot } from '../../lib/sessionIO';
 
 import { useSessionStore } from '../../stores/sessionStore';
 import { useMapStore } from '../../stores/mapStore';
@@ -269,65 +270,13 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     }
   };
 
-  const createCurrentProjectData = (): ProjectData => ({
-    metadata: createProjectMetadata(
-      projectName || `Project ${Date.now()}`,
+  const createCurrentProjectData = (): ProjectData =>
+    createProjectDataSnapshot({
+      projectName: projectName || `Project ${Date.now()}`,
       projectDescription,
-      authorName
-    ),
-    tokens: sessionStore.tokens,
-    players: sessionStore.players,
-    maps: mapStore.maps,
-    regions: regionStore.regions,
-    groups: groupStore.groups,
-    viewport,
-    settings: {
-      gridSnappingEnabled: false,
-      tokenVisibility: sessionStore.tokenVisibility,
-      labelVisibility: sessionStore.labelVisibility,
-      gridColor: '#333333',
-      backgroundColor: '#1a1a1a',
-      defaultGridSize: 50
-    },
-    // Capture all store states
-    initiative: {
-      isInCombat: initiativeStore.isInCombat,
-      currentTurnIndex: initiativeStore.currentTurnIndex,
-      roundNumber: initiativeStore.roundNumber,
-      initiativeOrder: initiativeStore.initiativeOrder,
-      restrictMovement: initiativeStore.restrictMovement,
-    },
-    roles: roleStore.roles,
-    visionProfiles: visionProfileStore.profiles,
-    fogData: {
-      ...(fogStore.fogSettingsPerMap['default-map'] || {}),
-      serializedExploredAreas: fogStore.serializedExploredAreas,
-      serializedExploredAreasPerMap: fogStore.serializedExploredAreasPerMap,
-      fogVersion: fogStore.fogVersion,
-      realtimeVisionDuringDrag: fogStore.realtimeVisionDuringDrag,
-      realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
-      fogSettingsPerMap: fogStore.fogSettingsPerMap,
-    },
-    lights: lightStore.lights,
-    cardStates: cardStore.cards,
-    dungeonData: {
-      doors: dungeonStore.doors,
-      // annotations are now MapObjects — serialized with mapObjects
-      importedWallSegments: dungeonStore.importedWallSegments,
-      watabouStyle: dungeonStore.watabouStyle,
-      wallEdgeStyle: dungeonStore.wallEdgeStyle,
-      wallThickness: dungeonStore.wallThickness,
-      textureScale: dungeonStore.textureScale,
-      lightDirection: dungeonStore.lightDirection,
-      shadowDistance: dungeonStore.shadowDistance,
-    },
-    mapObjects: mapObjectStore.mapObjects,
-    effects: {
-      placedEffects: useEffectStore.getState().placedEffects,
-      customTemplates: useEffectStore.getState().customTemplates,
-    },
-    uiMode: useUiModeStore.getState().currentMode === 'dm' ? 'dm' : 'play',
-  });
+      authorName,
+      viewport,
+    });
 
   const handleSaveToStorage = async () => {
     if (!projectName.trim()) {
