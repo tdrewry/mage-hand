@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { DndBeyondCharacter } from '@/types/creatureTypes';
 import { formatModifier, getAbilityModifier } from '@/types/creatureTypes';
 import { Input } from '@/components/ui/input';
