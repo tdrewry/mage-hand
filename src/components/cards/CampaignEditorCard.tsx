@@ -358,7 +358,7 @@ function NodePropertyPanel({
                   <SelectContent>
                     {deploymentZones.map((z) => (
                       <SelectItem key={z.id} value={z.id}>
-                        {z.deploymentZoneLabel || z.id}
+                        {z.label || z.deploymentZoneLabel || z.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
