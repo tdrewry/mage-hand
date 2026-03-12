@@ -17,6 +17,7 @@ import RoleManagerCard from '@/components/cards/RoleManagerCard';
 import { HistoryCard } from '@/components/cards/HistoryCard';
 import { CreatureLibraryCardContent } from '@/components/cards/CreatureLibraryCard';
 import { MonsterStatBlockCardContent } from '@/components/cards/MonsterStatBlockCard';
+import { LibraryEditorCardContent } from '@/components/cards/LibraryEditorCard';
 import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard';
 import { DiceCardContent } from '@/components/cards/DiceCard';
 import { ActionCardContent } from '@/components/cards/ActionCard';
