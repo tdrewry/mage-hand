@@ -255,15 +255,10 @@ function NodePropertyPanel({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs">Token Group (optional)</Label>
-              <Input
-                value={customData.tokenGroupId as string || ''}
-                onChange={(e) => updateCustom('tokenGroupId', e.target.value)}
-                placeholder="Group or role name..."
-                className="text-sm h-8"
-              />
-            </div>
+            <TokenGroupPicker
+              value={customData.tokenGroupId as string || ''}
+              onChange={(v) => updateCustom('tokenGroupId', v)}
+            />
           </div>
         )}
 
