@@ -254,7 +254,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
     setShowConvertMenu(false);
     onClearSelection();
     onUpdateCanvas?.();
-    const labels = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)' };
+    const labels: Record<string, string> = { obstacle: 'obstacle(s)', furniture: 'furniture piece(s)', water: 'water feature(s)', 'deployment-zone': 'deployment zone(s)' };
     toast.success(`Created ${selectedRegions.length} ${labels[category]} from region(s)`);
   };
   
