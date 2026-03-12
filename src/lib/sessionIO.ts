@@ -297,6 +297,11 @@ export function applyProjectData(data: ProjectData): void {
     if (data.creatures.monsters) cs.addMonsters(data.creatures.monsters);
   }
 
+  // Items
+  if (data.items && data.items.length > 0) {
+    useItemStore.getState().addItems(data.items);
+  }
+
   // Hatching
   if (data.hatching) {
     const hs = useHatchingStore.getState();
