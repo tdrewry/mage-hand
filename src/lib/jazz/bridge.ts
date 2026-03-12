@@ -1567,6 +1567,7 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   actions: () => useActionStore,
   dice: () => useDiceStore,
   mapFocus: () => useMapFocusStore,
+  campaigns: () => useCampaignStore,
 };
 
 /** Throttle timers per kind */

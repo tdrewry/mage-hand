@@ -315,4 +315,22 @@ export function applyProjectData(data: ProjectData): void {
     if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
     if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
   }
+
+  // Campaigns
+  if ((data as any).campaigns) {
+    const cd = (data as any).campaigns;
+    const cs = useCampaignStore.getState();
+    // Clear existing
+    cs.campaigns.forEach(c => cs.removeCampaign(c.id));
+    if (cd.campaigns) cd.campaigns.forEach((c: any) => cs.addCampaign(c));
+    if (cd.nodePositions) {
+      Object.entries(cd.nodePositions).forEach(([campaignId, positions]: [string, any]) => {
+        Object.entries(positions).forEach(([nodeId, pos]: [string, any]) => {
+          cs.setNodePosition(campaignId, nodeId, pos);
+        });
+      });
+    }
+    if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
+    if (cd.activeProgress) cs.setProgress(cd.activeProgress);
+  }
 }
