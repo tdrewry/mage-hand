@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen, Gem } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -570,6 +570,73 @@ function NodePropertyPanel({
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Treasure / Loot */}
+        {typeConfig?.features?.hasTreasure && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Treasure / Loot</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-xs"
+                onClick={() => {
+                  const treasure = [...(node.treasure || [])];
+                  treasure.push({
+                    id: `treasure-${Date.now()}`,
+                    name: '',
+                    quantity: 1,
+                  });
+                  updateNode(campaignId, node.id, { treasure });
+                }}
+              >
+                <Plus className="h-3 w-3 mr-0.5" /> Add
+              </Button>
+            </div>
+            {(node.treasure || []).length === 0 && (
+              <p className="text-[10px] text-muted-foreground">No treasure — add items the party can find.</p>
+            )}
+            <div className="space-y-2">
+              {(node.treasure || []).map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-1.5 p-1.5 rounded border border-border bg-muted/30">
+                  <Gem className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <Input
+                    value={item.name}
+                    onChange={(e) => {
+                      const treasure = [...(node.treasure || [])];
+                      treasure[idx] = { ...treasure[idx], name: e.target.value };
+                      updateNode(campaignId, node.id, { treasure });
+                    }}
+                    className="text-xs h-6 flex-1"
+                    placeholder="Item name..."
+                  />
+                  <Input
+                    type="number"
+                    value={item.quantity ?? 1}
+                    onChange={(e) => {
+                      const treasure = [...(node.treasure || [])];
+                      treasure[idx] = { ...treasure[idx], quantity: Math.max(1, parseInt(e.target.value) || 1) };
+                      updateNode(campaignId, node.id, { treasure });
+                    }}
+                    className="text-xs h-6 w-12 text-center"
+                    min={1}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-destructive"
+                    onClick={() => {
+                      const treasure = (node.treasure || []).filter((_, i) => i !== idx);
+                      updateNode(campaignId, node.id, { treasure });
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               ))}
             </div>

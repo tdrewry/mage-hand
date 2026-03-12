@@ -135,6 +135,9 @@ export interface BaseFlowNode<D extends BaseNodeData = BaseNodeData> {
   /** Handouts linked to this node — shown as buttons the DM can click to open/share */
   handouts?: { id: string; label: string; handoutId: string }[];
 
+  /** Treasure / loot items associated with this node */
+  treasure?: { id: string; name: string; quantity?: number; description?: string }[];
+
   /** Game-specific data. Shape defined by adapter's NodeTypeConfig.customFields. */
   customData?: Record<string, unknown>;
 

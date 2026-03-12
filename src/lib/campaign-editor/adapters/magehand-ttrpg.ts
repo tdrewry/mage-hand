@@ -42,9 +42,11 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
   color: '0 70% 50%',
   description: 'Activate a map and place tokens in a deployment zone',
   features: {
-    hasMap: false, // We use mapId picker instead of terrain painter
+    hasMap: false,
     hasVictoryDefeat: true,
     hasBriefing: true,
+    hasHandouts: true,
+    hasTreasure: true,
   },
   customFields: [
     {
@@ -53,7 +55,7 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
       type: 'select',
       defaultValue: '',
       description: 'The Magehand map to activate for this encounter',
-      options: [], // Populated dynamically from mapStore
+      options: [],
       group: 'Map',
     },
     {
@@ -62,7 +64,7 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
       type: 'select',
       defaultValue: '',
       description: 'The deployment zone MapObject to place tokens in',
-      options: [], // Populated dynamically, filtered by selected mapId
+      options: [],
       group: 'Map',
     },
     {
@@ -83,7 +85,7 @@ export const MAGEHAND_ENCOUNTER_CONFIG: NodeTypeConfig = {
       type: 'select',
       defaultValue: '',
       description: 'Token group to deploy (empty = all player tokens)',
-      options: [], // Populated dynamically from tokenGroupStore
+      options: [],
       group: 'Tokens',
     },
   ],
@@ -98,6 +100,7 @@ export const MAGEHAND_NARRATIVE_CONFIG: NodeTypeConfig = {
   features: {
     hasDialogLines: true,
     hasHandouts: true,
+    hasTreasure: true,
     hasSceneSettings: true,
     hasAutoAdvance: true,
     hasContinue: true,
@@ -113,6 +116,8 @@ export const MAGEHAND_DIALOG_CONFIG: NodeTypeConfig = {
   features: {
     hasDialogLines: true,
     hasOutcomes: true,
+    hasHandouts: true,
+    hasTreasure: true,
     hasSceneSettings: true,
     hasContinue: true,
   },
@@ -127,6 +132,8 @@ export const MAGEHAND_REST_CONFIG: NodeTypeConfig = {
   features: {
     hasAutoAdvance: true,
     hasContinue: true,
+    hasHandouts: true,
+    hasTreasure: true,
   },
   customFields: [
     {
