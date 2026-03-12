@@ -103,6 +103,22 @@ export function CampaignSceneRunner() {
     setProgress(newProgress);
   };
 
+  const handleChooseOutcome = (outcomeId: string, targetNodeId?: string) => {
+    if (!currentNode) return;
+    // Resolve as choice with the selected outcome
+    const newProgress = runner.resolveNode(currentNode.id, {
+      outcome: 'choice',
+      choiceId: targetNodeId || outcomeId,
+    });
+    setProgress(newProgress);
+
+    // Auto-execute the next node
+    const nextNode = runner.getCurrentNode();
+    if (nextNode) {
+      executeNode(nextNode);
+    }
+  };
+
   const handleReset = () => {
     const newProgress = runner.reset();
     setProgress(newProgress);
