@@ -745,15 +745,26 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
 
         {/* Characters Tab */}
         <TabsContent value="characters" className="flex-1 flex flex-col gap-3 mt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleImportCharacter}
-            className="w-full"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Import from D&D Beyond
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCreateBlankCharacter}
+              className="w-full gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              New Character
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleImportCharacter}
+              className="w-full gap-1"
+            >
+              <UserPlus className="h-4 w-4" />
+              Import
+            </Button>
+          </div>
 
           <ScrollArea className="flex-1 min-h-0">
             {filteredCharacters.length === 0 ? (
