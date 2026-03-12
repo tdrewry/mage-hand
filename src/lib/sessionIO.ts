@@ -28,6 +28,7 @@ import { useEffectStore } from '@/stores/effectStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { useMapFocusStore } from '@/stores/mapFocusStore';
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
 // ---------------------------------------------------------------------------
@@ -141,6 +142,14 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
     tokenGroups: {
       groups: useTokenGroupStore.getState().groups,
     },
+    mapFocus: {
+      unfocusedOpacity: useMapFocusStore.getState().unfocusedOpacity,
+      unfocusedBlur: useMapFocusStore.getState().unfocusedBlur,
+      selectionLockEnabled: useMapFocusStore.getState().selectionLockEnabled,
+    },
+    mapStructures: mapStore.structures,
+    selectedMapId: mapStore.selectedMapId,
+    autoFocusFollowsToken: mapStore.autoFocusFollowsToken,
   };
 }
 
@@ -186,8 +195,17 @@ export function applyProjectData(data: ProjectData): void {
       const { regions, ...mapData } = m;
       useMapStore.getState().restoreMap({ ...mapData, regions: regions || [] });
     });
-    if (data.maps.length > 0) {
-      useMapStore.getState().setSelectedMap(data.maps[0].id);
+    // Restore structures before selecting a map
+    if (data.mapStructures) {
+      useMapStore.setState({ structures: data.mapStructures });
+    }
+    // Restore selected map (prefer saved, fallback to first)
+    const targetSelectedId = data.selectedMapId || (data.maps.length > 0 ? data.maps[0].id : null);
+    if (targetSelectedId) {
+      useMapStore.getState().setSelectedMap(targetSelectedId);
+    }
+    if (data.autoFocusFollowsToken !== undefined) {
+      useMapStore.getState().setAutoFocusFollowsToken(data.autoFocusFollowsToken);
     }
   }
   if (data.regions) data.regions.forEach(r => useRegionStore.getState().addRegion(r));
@@ -346,5 +364,13 @@ export function applyProjectData(data: ProjectData): void {
       const created = tgs.addGroup(g.name, g.tokenIds, g.formation);
       if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
     });
+  }
+
+  // Map Focus settings
+  if (data.mapFocus) {
+    const mf = useMapFocusStore.getState();
+    if (data.mapFocus.unfocusedOpacity !== undefined) mf.setUnfocusedOpacity(data.mapFocus.unfocusedOpacity);
+    if (data.mapFocus.unfocusedBlur !== undefined) mf.setUnfocusedBlur(data.mapFocus.unfocusedBlur);
+    if (data.mapFocus.selectionLockEnabled !== undefined) mf.setSelectionLockEnabled(data.mapFocus.selectionLockEnabled);
   }
 }
