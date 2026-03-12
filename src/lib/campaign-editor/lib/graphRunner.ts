@@ -65,10 +65,17 @@ export function createGraphRunner<
       return failurePath;
     }
     if (result.outcome === 'choice' && result.choiceId) {
-      const dialogContent = currentNode.dialogContent;
-      if (dialogContent) {
-        const outcome = dialogContent.outcomes.find((o: any) => o.id === result.choiceId);
+      // Check unified outcomes field first, then deprecated dialogContent
+      const outcomes = currentNode.outcomes || currentNode.dialogContent?.outcomes;
+      if (outcomes) {
+        // Match by outcome id first, then by targetNodeId matching the choiceId
+        const outcome = outcomes.find((o: any) => o.id === result.choiceId)
+          || outcomes.find((o: any) => o.targetNodeId === result.choiceId);
         if (outcome?.targetNodeId) return outcome.targetNodeId;
+      }
+      // Direct node ID match in successPaths (choiceId IS the target node)
+      if (currentNode.nextOnSuccess.includes(result.choiceId)) {
+        return result.choiceId;
       }
     }
     const successPaths = currentNode.nextOnSuccess;
