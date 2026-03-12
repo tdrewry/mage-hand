@@ -96,6 +96,7 @@ export const MAGEHAND_NARRATIVE_CONFIG: NodeTypeConfig = {
   description: 'Present narrative content via handout viewer',
   features: {
     hasDialogLines: true,
+    hasHandouts: true,
     hasSceneSettings: true,
     hasAutoAdvance: true,
     hasContinue: true,
