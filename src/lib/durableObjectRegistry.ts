@@ -32,6 +32,7 @@ import { useDiceStore } from '@/stores/diceStore';
 import { useActionStore } from '@/stores/actionStore';
 import { useEffectStore } from '@/stores/effectStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
+import { useCampaignStore } from '@/stores/campaignStore';
 
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
