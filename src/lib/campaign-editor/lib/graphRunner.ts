@@ -219,5 +219,6 @@ export function createEmptyGraphProgress(campaignId: string, startNodeId: string
     lastPlayedAt: now,
     isComplete: false,
     isFailed: false,
+    history: [],
   };
 }
