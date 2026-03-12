@@ -16,6 +16,7 @@ import { CardManager } from "./CardManager";
 import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
+import { CampaignSceneRunner } from "./CampaignSceneRunner";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
