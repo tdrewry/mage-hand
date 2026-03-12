@@ -288,7 +288,7 @@ function executeNarrativeNode(node: BaseFlowNode): void {
  * Called when the DM clicks a handout button in the scene runner or summary card.
  */
 export function openHandoutById(handoutId: string, label?: string): void {
-  const entry = BUILTIN_HANDOUTS.find((h) => h.id === handoutId);
+  const entry = getHandoutById(handoutId);
   const title = entry?.title || label || 'Handout';
 
   const cardStore = useCardStore.getState();

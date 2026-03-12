@@ -560,7 +560,7 @@ function NodePropertyPanel({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">No handout selected</SelectItem>
-                      {BUILTIN_HANDOUTS.map((h) => (
+                      {getAllHandouts().map((h) => (
                         <SelectItem key={h.id} value={h.id}>
                           <span className="flex items-center gap-1.5">
                             <BookOpen className="h-3 w-3" />
