@@ -161,6 +161,9 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   tokenVisibility: 'all',
   labelVisibility: 'show',
   viewportTransforms: {},
+  projectName: '',
+
+  setProjectName: (name) => set({ projectName: name }),
   
   addToken: (token) => {
     set((state) => {
