@@ -16,7 +16,7 @@ import {
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
-import { executeNode } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
+import { executeNode, openHandoutById } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
 import { NodeSummaryCard } from '@/components/NodeSummaryCard';
 import {
