@@ -225,14 +225,14 @@ export const HandoutCatalogCardContent: React.FC = () => {
                 )}
               </ScrollArea>
             ) : (
-              <div className="flex-1 min-h-[250px] max-h-[400px] border rounded-md overflow-hidden" onKeyDown={e => e.stopPropagation()} onKeyUp={e => e.stopPropagation()}>
+              <div className="min-h-[250px] h-[350px] max-h-[400px] border rounded-md overflow-hidden" onKeyDown={e => e.stopPropagation()} onKeyUp={e => e.stopPropagation()}>
                 <Suspense fallback={
                   <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                     Loading editor…
                   </div>
                 }>
                   <MonacoEditor
-                    height="100%"
+                    height="350px"
                     language="markdown"
                     value={editMarkdown}
                     onChange={(v) => setEditMarkdown(v ?? '')}
