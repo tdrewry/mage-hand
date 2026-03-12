@@ -262,6 +262,11 @@ function renderCardContent(
       return <CampaignEditorCardContent />;
     case CardType.TOKEN_GROUP_MANAGER:
       return <TokenGroupManagerCardContent />;
+    case CardType.LIBRARY_EDITOR:
+      return <LibraryEditorCardContent
+        entityId={(metadata?.entityId as string) || ''}
+        entityType={(metadata?.entityType as 'character' | 'monster') || 'monster'}
+      />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
