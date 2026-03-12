@@ -116,7 +116,7 @@ export function NodeSummaryCard({
       </div>
 
       {/* Body */}
-      <ScrollArea className="max-h-[300px]">
+      <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
         <div className="px-3 py-2 space-y-3">
           {/* Description */}
           {description && (
