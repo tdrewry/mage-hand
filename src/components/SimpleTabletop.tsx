@@ -12005,6 +12005,9 @@ export const SimpleTabletop = () => {
       {/* Initiative Tracker Panel - Bottom middle */}
       <InitiativePanel selectedTokenIds={selectedTokenIds} />
 
+      {/* Campaign Scene Runner - Bottom center, above initiative */}
+      <CampaignSceneRunner />
+
       {/* Unified Selection Toolbar - Shows when 2+ entities or a group is selected */}
       <UnifiedSelectionToolbar
         selectedTokenIds={selectedTokenIds}
