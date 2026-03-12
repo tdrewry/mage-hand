@@ -339,6 +339,31 @@ export function CampaignSceneRunner() {
             ))}
           </div>
         )}
+
+        {/* ── Row 3: Handout buttons ── */}
+        {showHandoutRow && (
+          <div className="flex items-center gap-1.5 flex-wrap border-t border-border pt-1.5">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Handouts</span>
+            {linkedHandouts.map((h) => (
+              <Tooltip key={h.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleOpenHandout(h.handoutId, h.label)}
+                  >
+                    <BookOpen className="h-3 w-3 mr-0.5" />
+                    {h.label}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Open handout: {h.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
