@@ -365,4 +365,12 @@ export function applyProjectData(data: ProjectData): void {
       if (g.color || g.icon) tgs.updateGroup(created.id, { color: g.color, icon: g.icon });
     });
   }
+
+  // Map Focus settings
+  if (data.mapFocus) {
+    const mf = useMapFocusStore.getState();
+    if (data.mapFocus.unfocusedOpacity !== undefined) mf.setUnfocusedOpacity(data.mapFocus.unfocusedOpacity);
+    if (data.mapFocus.unfocusedBlur !== undefined) mf.setUnfocusedBlur(data.mapFocus.unfocusedBlur);
+    if (data.mapFocus.selectionLockEnabled !== undefined) mf.setSelectionLockEnabled(data.mapFocus.selectionLockEnabled);
+  }
 }
