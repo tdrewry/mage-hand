@@ -432,8 +432,8 @@ export function CampaignEditorCardContent() {
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium truncate flex-1">{activeCampaign.name}</span>
-        <Badge variant="outline" className="text-[10px]">{activeCampaign.nodes.length} scenes</Badge>
+        <span className="text-sm font-medium truncate flex-1">{editingCampaign.name}</span>
+        <Badge variant="outline" className="text-[10px]">{editingCampaign.nodes.length} scenes</Badge>
 
         {/* Add node buttons */}
         {MAGEHAND_NODE_TYPE_CONFIGS.map((cfg) => (
