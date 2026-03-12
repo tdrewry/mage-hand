@@ -23,8 +23,10 @@ import {
   Tent,
   Send,
   SendHorizonal,
+  BookOpen,
 } from 'lucide-react';
 import type { BaseFlowNode } from '@/lib/campaign-editor/types/base';
+import { openHandoutById } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 
 const NODE_ICONS: Record<string, React.ReactNode> = {
   encounter: <Swords className="h-4 w-4" />,
