@@ -169,6 +169,7 @@ export function clearAllStores(): void {
 
   const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
   effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
+  useTokenGroupStore.getState().clearAllGroups();
 }
 
 // ---------------------------------------------------------------------------
