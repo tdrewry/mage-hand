@@ -388,9 +388,10 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       const tokenId = `token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const center = getViewportCenter();
       
-      // Try to load portrait
+      // Try to load portrait / token icon
       let imageUrl = '';
-      if (character.portraitUrl) {
+      const artUrl = character.tokenIconUrl || character.portraitUrl;
+      if (artUrl) {
         try {
           const img = new Image();
           img.crossOrigin = 'anonymous';
