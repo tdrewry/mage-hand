@@ -105,6 +105,64 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
     onSelect(campaign.id);
   };
 
+  const handleExport = (e: React.MouseEvent, c: BaseCampaign) => {
+    e.stopPropagation();
+    const nodePos = useCampaignStore.getState().nodePositions[c.id] || {};
+    const payload = {
+      format: 'magehand-scenario',
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      scenario: c,
+      nodePositions: nodePos,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${c.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mhscenario`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported "${c.name}"`);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.mhscenario,.json';
+    input.onchange = async (ev) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const scenario: BaseCampaign = parsed.scenario ?? parsed;
+        if (!scenario.id || !scenario.nodes || !Array.isArray(scenario.nodes)) {
+          throw new Error('Invalid scenario format');
+        }
+        // Re-ID to avoid collisions
+        const newId = `campaign-${Date.now()}`;
+        const imported: BaseCampaign = {
+          ...scenario,
+          id: newId,
+          updatedAt: new Date().toISOString(),
+        };
+        // Remap startNodeId is fine — node IDs stay the same within the scenario
+        addCampaign(imported);
+        // Restore node positions if present
+        const positions = parsed.nodePositions as Record<string, FlowNodePosition> | undefined;
+        if (positions) {
+          Object.entries(positions).forEach(([nodeId, pos]) => {
+            useCampaignStore.getState().setNodePosition(newId, nodeId, pos);
+          });
+        }
+        toast.success(`Imported "${imported.name}" (${imported.nodes.length} scenes)`);
+      } catch (err) {
+        toast.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    };
+    input.click();
+  };
+
   const handleToggleActive = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setActiveCampaign(activeCampaignId === id ? null : id);
