@@ -5,13 +5,14 @@
  * The provider is a thin wrapper that can be swapped for Jazz Cloud later.
  *
  * IMPORTANT: This is an OPTIONAL transport module. The app works without it.
- * It only activates when the user explicitly selects Jazz as their transport.
+ * Jazz only connects when the user explicitly selects Jazz as their transport.
  */
 
 import React, { useEffect } from "react";
 import { JazzReactProvider } from "jazz-tools/react";
 import { MageHandAccount } from "./schema";
 import { toast } from "sonner";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 /** Default self-hosted sync server URL */
 const DEFAULT_SYNC_URL: `ws://${string}` = "ws://localhost:4200";
@@ -101,28 +102,37 @@ function useJazzConnectionMonitor(syncUrl: string) {
 }
 
 /**
- * Wraps children in the Jazz sync context with anonymous auth.
- * When the sync server is unreachable, Jazz operates in offline-first mode —
- * local mutations are queued and replayed once the connection is established.
- *
- * Includes error boundary and connection monitoring for user-friendly
- * feedback on sync failures.
+ * Inner component that only mounts the JazzReactProvider when jazz transport is active.
  */
-export function JazzSessionProvider({ children, syncUrl }: JazzProviderProps) {
-  const peer = syncUrl || DEFAULT_SYNC_URL;
-
-  useJazzConnectionMonitor(peer);
+function JazzActiveProvider({ children, syncUrl }: { children: React.ReactNode; syncUrl: `ws://${string}` | `wss://${string}` }) {
+  useJazzConnectionMonitor(syncUrl);
 
   return (
-    <JazzErrorBoundary syncUrl={peer}>
+    <JazzErrorBoundary syncUrl={syncUrl}>
       <JazzReactProvider
-        sync={{ peer }}
+        sync={{ peer: syncUrl }}
         AccountSchema={MageHandAccount}
       >
         {children}
       </JazzReactProvider>
     </JazzErrorBoundary>
   );
+}
+
+/**
+ * Wraps children in the Jazz sync context ONLY when the Jazz transport is active.
+ * When no Jazz session is running, children render without any WebSocket connections.
+ */
+export function JazzSessionProvider({ children, syncUrl }: JazzProviderProps) {
+  const activeTransport = useMultiplayerStore((s) => s.activeTransport);
+  const peer = syncUrl || DEFAULT_SYNC_URL;
+
+  if (activeTransport === 'jazz') {
+    return <JazzActiveProvider syncUrl={peer}>{children}</JazzActiveProvider>;
+  }
+
+  // No Jazz transport active — render children without any WebSocket overhead
+  return <>{children}</>;
 }
 
 export type { JazzProviderProps };
