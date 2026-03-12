@@ -253,6 +253,8 @@ function renderCardContent(
       return <HandoutCatalogCardContent />;
     case CardType.HANDOUT_VIEWER:
       return <HandoutViewerCardContent handoutId={(metadata?.handoutId as string) || ''} />;
+    case CardType.CAMPAIGN_EDITOR:
+      return <CampaignEditorCardContent />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }
