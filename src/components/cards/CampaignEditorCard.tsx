@@ -19,7 +19,7 @@ import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useTokenGroupStore } from '@/stores/tokenGroupStore';
-import { GenericFlowCanvas } from '@/lib/campaign-editor/components/GenericFlowCanvas';
+import { GenericFlowCanvas, type FlowCanvasViewState } from '@/lib/campaign-editor/components/GenericFlowCanvas';
 import { createMagehandTTRPGAdapter, MAGEHAND_NODE_TYPE_CONFIGS } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import type { BaseCampaign, BaseFlowNode, BaseNodeData, FlowNodePosition } from '@/lib/campaign-editor/types/base';
 
