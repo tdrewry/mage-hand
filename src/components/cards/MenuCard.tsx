@@ -749,6 +749,31 @@ export const MenuCardContent: React.FC<MenuCardContentProps> = ({ sessionId }) =
             Campaign
           </Button>
         )}
+
+        {/* Token Groups — available to all */}
+        <Button
+          variant={tokenGroupCard?.isVisible ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (tokenGroupCard) {
+              setVisibility(tokenGroupCard.id, !tokenGroupCard.isVisible);
+            } else {
+              registerCard({
+                type: CardType.TOKEN_GROUP_MANAGER,
+                title: 'Token Groups',
+                defaultPosition: { x: window.innerWidth / 2 - 190, y: 100 },
+                defaultSize: { width: 380, height: 500 },
+                minSize: { width: 320, height: 350 },
+                isResizable: true,
+                isClosable: true,
+                defaultVisible: true,
+              });
+            }
+          }}
+          className="w-full"
+        >
+          <UsersRound className="h-4 w-4 mr-2" />
+          Token Groups
       </div>
 
       <Separator />
