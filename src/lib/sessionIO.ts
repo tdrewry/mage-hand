@@ -195,8 +195,17 @@ export function applyProjectData(data: ProjectData): void {
       const { regions, ...mapData } = m;
       useMapStore.getState().restoreMap({ ...mapData, regions: regions || [] });
     });
-    if (data.maps.length > 0) {
-      useMapStore.getState().setSelectedMap(data.maps[0].id);
+    // Restore structures before selecting a map
+    if (data.mapStructures) {
+      useMapStore.setState({ structures: data.mapStructures });
+    }
+    // Restore selected map (prefer saved, fallback to first)
+    const targetSelectedId = data.selectedMapId || (data.maps.length > 0 ? data.maps[0].id : null);
+    if (targetSelectedId) {
+      useMapStore.getState().setSelectedMap(targetSelectedId);
+    }
+    if (data.autoFocusFollowsToken !== undefined) {
+      useMapStore.getState().setAutoFocusFollowsToken(data.autoFocusFollowsToken);
     }
   }
   if (data.regions) data.regions.forEach(r => useRegionStore.getState().addRegion(r));
