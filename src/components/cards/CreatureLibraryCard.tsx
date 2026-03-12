@@ -28,6 +28,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useItemStore } from '@/stores/itemStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useCardStore } from '@/stores/cardStore';
@@ -42,6 +43,8 @@ import {
   type DndBeyondCharacter,
   type MonsterSize
 } from '@/types/creatureTypes';
+import type { LibraryItem, ItemCategory, ItemRarity } from '@/types/itemTypes';
+import { ITEM_RARITY_LABELS, ITEM_CATEGORY_LABELS } from '@/types/itemTypes';
 import type { IlluminationSource } from '@/types/illumination';
 import { toast } from 'sonner';
 import {
