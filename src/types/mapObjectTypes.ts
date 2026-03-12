@@ -3,7 +3,7 @@
  * (columns, statues, furniture, doors, etc.)
  */
 
-export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light' | 'annotation' | 'portal';
+export type MapObjectShape = 'circle' | 'rectangle' | 'custom' | 'door' | 'stairs' | 'wall' | 'light' | 'annotation' | 'portal' | 'deployment-zone';
 
 export interface MapObject {
   id: string;
@@ -78,6 +78,10 @@ export interface MapObject {
   portalHiddenInPlay?: boolean;  // Hidden from players in play mode
   portalAutoActivateTarget?: boolean; // Auto-activate and focus target map on teleport (off by default)
 
+  // Deployment-zone-specific properties (category: 'deployment-zone')
+  deploymentZoneLabel?: string;  // Display label (e.g. "Party Start", "Reinforcements")
+  deploymentZoneGroup?: string;  // Role or token group name for auto-placement
+
   // Multi-map scoping — which map this object belongs to
   mapId?: string;
 }
@@ -98,6 +102,7 @@ export type MapObjectCategory =
   | 'imported-obstacle'
   | 'light'
   | 'portal'
+  | 'deployment-zone'
   | 'custom';
 
 export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
@@ -116,6 +121,7 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   'imported-obstacle': 'Imported Obstacle',
   light: 'Light Source',
   portal: 'Portal',
+  'deployment-zone': 'Deployment Zone',
   custom: 'Custom',
 };
 
@@ -322,6 +328,19 @@ export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> =
     height: 60,
     fillColor: 'rgba(139, 92, 246, 0.25)',
     strokeColor: '#8b5cf6',
+    strokeWidth: 2,
+    opacity: 1,
+    castsShadow: false,
+    blocksMovement: false,
+    blocksVision: false,
+    revealedByLight: false,
+  },
+  'deployment-zone': {
+    shape: 'deployment-zone',
+    width: 120,
+    height: 120,
+    fillColor: 'rgba(34, 197, 94, 0.2)',
+    strokeColor: '#22c55e',
     strokeWidth: 2,
     opacity: 1,
     castsShadow: false,
