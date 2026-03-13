@@ -350,9 +350,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-card border-border">
+      <DialogContent className="sm:max-w-[500px] border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-background/80 backdrop-blur-xl ring-1 ring-black/5">
         <DialogHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-8">
             <DialogTitle className="text-foreground">Multiplayer Sessions</DialogTitle>
             {getConnectionStatusBadge()}
           </div>
@@ -372,8 +372,8 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
         {currentSession ? (
           // Active Session View
-          <div className="space-y-4">
-            <div className="p-4 bg-secondary/50 rounded-lg border border-border space-y-3">
+          <div className="space-y-4 pt-4">
+            <div className="p-5 bg-background/40 rounded-xl border border-white/5 shadow-inner space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="space-y-1 min-w-0 flex-1">
                   <Label className="text-xs text-muted-foreground">Session Code</Label>
@@ -450,13 +450,13 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
             {/* Connected Users List */}
             {connectedUsers.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Connected Users</Label>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
+              <div className="space-y-3 pt-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Connected Users</Label>
+                <div className="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                   {connectedUsers.map((user) => (
                     <div
                       key={user.userId}
-                      className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm"
+                      className="flex items-center justify-between p-3 rounded-xl bg-background/30 border border-white/5 backdrop-blur-sm text-sm"
                     >
                       <span className="font-medium text-foreground">{user.username}</span>
                       <Badge variant="outline" className="text-xs">
@@ -469,9 +469,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
             )}
 
             {/* Debug Section */}
-            <Collapsible open={showDebug} onOpenChange={setShowDebug}>
+            <Collapsible open={showDebug} onOpenChange={setShowDebug} className="pt-2">
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full">
+                <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5">
                   <Zap className="h-4 w-4 mr-2" />
                   Debug Tools
                 </Button>
@@ -495,25 +495,27 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </CollapsibleContent>
             </Collapsible>
 
-            <Button
-              variant="outline"
-              onClick={handleLeaveSession}
-              className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            >
-              Leave Session
-            </Button>
+            <div className="pt-4 border-t border-white/5">
+              <Button
+                variant="outline"
+                onClick={handleLeaveSession}
+                className="w-full h-10 border-destructive/50 text-destructive bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all"
+              >
+                Leave Session
+              </Button>
+            </div>
           </div>
         ) : (
           // Session Creation/Join View
-          <Tabs defaultValue="create" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-muted">
-              <TabsTrigger value="create">Create Session</TabsTrigger>
-              <TabsTrigger value="join">Join Session</TabsTrigger>
+          <Tabs defaultValue="create" className="w-full pt-2">
+            <TabsList className="grid w-full grid-cols-2 bg-background/50 border border-white/5 p-1 rounded-lg">
+              <TabsTrigger value="create" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Create Session</TabsTrigger>
+              <TabsTrigger value="join" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Join Session</TabsTrigger>
             </TabsList>
 
             <TabsContent value="create" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="create-username">Username</Label>
+                <Label htmlFor="create-username" className="pl-1 text-muted-foreground">Username</Label>
                 <Input
                   id="create-username"
                   placeholder="Enter your username"
@@ -521,18 +523,18 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
                   disabled={isConnecting}
-                  className="bg-input border-border text-foreground"
+                  className="bg-background/50 border-white/10 focus-visible:ring-primary h-10"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Transport</Label>
+              <div className="space-y-2 pt-2">
+                <Label className="pl-1 text-muted-foreground">Transport</Label>
                 <Select
                   value={transport}
                   onValueChange={(v) => setTransport(v as TransportType)}
                   disabled={isConnecting}
                 >
-                  <SelectTrigger className="bg-input border-border text-foreground">
+                  <SelectTrigger className="bg-background/50 border-white/10 h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -574,44 +576,49 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               )}
 
               {transport === 'opbridge' && (
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced} className="pt-2">
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-full">
+                  <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5">
                     <Settings className="h-4 w-4 mr-2" />
                     Advanced Settings
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <Label htmlFor="create-server-url">Server URL</Label>
-                  <Input
-                    id="create-server-url"
-                    placeholder="ws://localhost:3001"
-                    value={localServerUrl}
-                    onChange={(e) => setLocalServerUrl(e.target.value)}
-                    disabled={isConnecting}
-                    className="bg-input border-border text-foreground font-mono text-sm"
-                  />
-                  <Label htmlFor="create-invite-token">Invite Token (Optional)</Label>
-                  <Input
-                    id="create-invite-token"
-                    placeholder="Enter invite token"
-                    value={inviteToken}
-                    onChange={(e) => setInviteToken(e.target.value)}
-                    disabled={isConnecting}
-                    className="bg-input border-border text-foreground text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
+                <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-server-url" className="text-xs text-muted-foreground">Server URL</Label>
+                    <Input
+                      id="create-server-url"
+                      placeholder="ws://localhost:3001"
+                      value={localServerUrl}
+                      onChange={(e) => setLocalServerUrl(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
+                    <Input
+                      id="create-invite-token"
+                      placeholder="Enter invite token"
+                      value={inviteToken}
+                      onChange={(e) => setInviteToken(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-background/50 border-white/10 text-sm h-9"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground/70">
                     Change server URL to connect to a remote server
                   </p>
                 </CollapsibleContent>
               </Collapsible>
               )}
 
-              <Button
-                onClick={handleCreateSession}
-                disabled={isConnecting || !username.trim()}
-                className="w-full"
-              >
+              <div className="pt-4 border-t border-white/5">
+                <Button
+                  onClick={handleCreateSession}
+                  disabled={isConnecting || !username.trim()}
+                  className="w-full h-10 font-bold shadow-lg shadow-primary/20"
+                >
                 {isConnecting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -623,24 +630,25 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                     Create Session
                   </>
                 )}
-              </Button>
+                </Button>
+              </div>
             </TabsContent>
 
-            <TabsContent value="join" className="space-y-4 mt-4">
+            <TabsContent value="join" className="space-y-6 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="join-username">Username</Label>
+                <Label htmlFor="join-username" className="pl-1 text-muted-foreground">Username</Label>
                 <Input
                   id="join-username"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isConnecting}
-                  className="bg-input border-border text-foreground"
+                  className="bg-background/50 border-white/10 focus-visible:ring-primary h-10"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="join-code">Session Code</Label>
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="join-code" className="pl-1 text-muted-foreground">Session Code</Label>
                 <Input
                   id="join-code"
                   placeholder="e.g. A3BK7Z or J-a8F2c9Xk"
@@ -653,7 +661,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
                   maxLength={64}
                   disabled={isConnecting}
-                  className="bg-input border-border text-foreground font-mono text-lg tracking-wider"
+                  className="bg-background/50 border-white/10 focus-visible:ring-primary font-mono text-xl tracking-widest text-center h-14 uppercase"
                 />
                 <p className="text-xs text-muted-foreground">
                   Paste the code shared by your host — the connection type is detected automatically.
@@ -686,34 +694,39 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                       Advanced Settings
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 mt-2">
-                    <Label htmlFor="join-server-url">Server URL</Label>
-                    <Input
-                      id="join-server-url"
-                      placeholder="ws://localhost:3001"
-                      value={localServerUrl}
-                      onChange={(e) => setLocalServerUrl(e.target.value)}
-                      disabled={isConnecting}
-                      className="bg-input border-border text-foreground font-mono text-sm"
-                    />
-                    <Label htmlFor="join-invite-token">Invite Token (Optional)</Label>
-                    <Input
-                      id="join-invite-token"
-                      placeholder="Enter invite token"
-                      value={inviteToken}
-                      onChange={(e) => setInviteToken(e.target.value)}
-                      disabled={isConnecting}
-                      className="bg-input border-border text-foreground text-sm"
-                    />
+                  <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="join-server-url" className="text-xs text-muted-foreground">Server URL</Label>
+                      <Input
+                        id="join-server-url"
+                        placeholder="ws://localhost:3001"
+                        value={localServerUrl}
+                        onChange={(e) => setLocalServerUrl(e.target.value)}
+                        disabled={isConnecting}
+                        className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="join-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
+                      <Input
+                        id="join-invite-token"
+                        placeholder="Enter invite token"
+                        value={inviteToken}
+                        onChange={(e) => setInviteToken(e.target.value)}
+                        disabled={isConnecting}
+                        className="bg-background/50 border-white/10 text-sm h-9"
+                      />
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               )}
 
-              <Button
-                onClick={handleJoinSession}
-                disabled={isConnecting || !username.trim() || !sessionCode.trim()}
-                className="w-full"
-              >
+              <div className="pt-4 border-t border-white/5">
+                <Button
+                  onClick={handleJoinSession}
+                  disabled={isConnecting || !username.trim() || !sessionCode.trim()}
+                  className="w-full h-12 text-lg font-bold shadow-lg shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
                 {isConnecting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -725,7 +738,8 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                     Join Session
                   </>
                 )}
-              </Button>
+                </Button>
+              </div>
             </TabsContent>
           </Tabs>
         )}
