@@ -21,6 +21,10 @@ import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 import { MovementLockIndicator } from "./MovementLockIndicator";
+import { LeftSidebar } from "./LeftSidebar";
+import { RightSidebar } from "./RightSidebar";
+import { TopNavbar } from "./TopNavbar";
+import { useUiStateStore } from "@/stores/uiStateStore";
 import { useSessionStore, type Token } from "../stores/sessionStore";
 import { emitLocalOp } from "@/lib/net";
 import { markTokenDragStart, markTokenDragEnd } from "@/lib/jazz/bridge";
@@ -7305,7 +7309,11 @@ export const SimpleTabletop = () => {
     );
 
     const handleResize = () => {
-      const rect = canvas.getBoundingClientRect();
+      if (!canvasContainerRef.current) return;
+      // Get the bounding box of the flex container, rather than the canvas itself,
+      // so we correctly size WebGL to the newly allocated flex space.
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      
       canvas.width = rect.width;
       canvas.height = rect.height;
       if (overlayCanvas) {
@@ -7313,12 +7321,24 @@ export const SimpleTabletop = () => {
         overlayCanvas.height = rect.height;
       }
       setCanvasDimensions({ width: rect.width, height: rect.height });
-      redrawCanvas();
+      
+      // Batch redraw to avoid ResizeObserver loop limits
+      requestAnimationFrame(() => redrawCanvas());
     };
 
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (canvasContainerRef.current) {
+      resizeObserver.observe(canvasContainerRef.current);
+    }
+    
+    // Keep window resize as a fallback for viewport rotations or maximize
     window.addEventListener("resize", handleResize);
 
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
     };
   }, []);
@@ -11808,67 +11828,14 @@ export const SimpleTabletop = () => {
     }
   };
 
+  // UI Layout State
+  const { isFocusMode } = useUiStateStore();
+
   return (
-    <div className="w-full h-screen bg-surface flex flex-col relative">
-      {/* Texture Download Progress Indicator */}
-      <TextureDownloadProgress />
-
-      {/* Floor Navigation Widget */}
-      <FloorNavigationWidget />
-
-      {/* Circular Button Bar - Always visible at top */}
-      <CircularButtonBar
-        mode={renderingMode}
-        onToggleMode={() => setRenderingMode(renderingMode === "edit" ? "play" : "edit")}
-      />
-
-      {/* Vertical Toolbar - Middle left of viewport (controlled by CircularButtonBar) */}
-      <VerticalToolbar
-        mode={renderingMode}
-        fabricCanvas={null}
-        onAddRegion={addNewRegion}
-        onStartPolygonDraw={() => startPathDrawing("polygon")}
-        onStartFreehandDraw={() => startPathDrawing("freehand")}
-        onFinishPolygonDraw={finishPathDrawing}
-        isDrawingPolygon={pathDrawingMode === "drawing" && pathDrawingType === "polygon"}
-        isDrawingFreehand={pathDrawingMode === "drawing" && pathDrawingType === "freehand"}
-        isDrawingDoor={doorDrawingActive}
-        onStartDoorDraw={toggleDoorDrawing}
-        isGridSnappingEnabled={isGridSnappingEnabled}
-        onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
-        showRegions={showRegions}
-        onToggleRegions={() => setShowRegions(!showRegions)}
-        onFitToView={handleFitToView}
-        fogRevealBrushActive={fogRevealBrushActive}
-        onToggleFogRevealBrush={() => {
-          setFogRevealBrushActive(prev => {
-            const next = !prev;
-            if (next) {
-              // Clear all selections to prevent selection flashing during brush use
-              setSelectedTokenIds([]);
-              selectedRegionIds.forEach(id => deselectRegion(id));
-              setSelectedRegionIds([]);
-              clearMapObjectSelection();
-              clearLightSelection();
-              // Seed reticle position from last known mouse pos
-              if (lastMousePosRef.current) {
-                fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
-              }
-              requestAnimationFrame(() => redrawCanvas());
-            }
-            return next;
-          });
-        }}
-        isDM={isDM}
-      />
-
-      {/* Per-Region Snap Button (shows when region is selected) - REMOVED */}
-
-      {/* Region Control Panel - removed, now using Region Controls Card */}
-
-      {/* Main Canvas Container — outer div clips UI; inner div allows PixiJS canvas to overhang via negative CSS offset */}
-      <div className="flex-1 relative overflow-hidden" style={{ isolation: 'isolate' }}>
-      <div ref={canvasContainerRef} className="absolute inset-0 overflow-visible">
+    <div className="relative w-full h-screen bg-surface overflow-hidden">
+      
+      {/* 1. Base Layer: Full-Bleed Canvas */}
+      <div ref={canvasContainerRef} className="absolute inset-0 z-0 overflow-visible">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full touch-none"
@@ -11985,8 +11952,88 @@ export const SimpleTabletop = () => {
             boxSizing: 'border-box',
           }}
         />
-      </div>
-      </div>
+      </div>{/* End Base Layer */}
+
+      {/* 2. Top Layer: UI Overlay */}
+      <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
+        
+        {/* Full-width Top Navbar Row (includes sidebar toggles) */}
+        <div className="pointer-events-auto w-full flex-shrink-0 z-50 relative">
+          <TopNavbar />
+        </div>
+
+        {/* Main Body Row */}
+        <div className="flex-1 flex w-full relative pointer-events-none overflow-hidden isolate">
+          
+          {/* Left Sidebar Content */}
+          <div className="pointer-events-auto h-full flex items-start isolate z-40 relative">
+            <LeftSidebar />
+          </div>
+
+          {/* Center UI Column (Floating Toolbars) */}
+          <div className="flex-1 relative isolate [&>*]:pointer-events-auto">
+            {/* Texture Download Progress Indicator */}
+            <TextureDownloadProgress />
+
+            {/* Floor Navigation Widget */}
+            <FloorNavigationWidget />
+
+            {/* Circular Button Bar - Always visible at top (Pending Migration) */}
+            {!isFocusMode && (
+              <CircularButtonBar
+                mode={renderingMode}
+                onToggleMode={() => setRenderingMode(renderingMode === "edit" ? "play" : "edit")}
+              />
+            )}
+
+            {/* Vertical Toolbar - Middle left of viewport (controlled by CircularButtonBar) */}
+            {!isFocusMode && (
+              <VerticalToolbar
+                mode={renderingMode}
+                fabricCanvas={null}
+                onAddRegion={addNewRegion}
+                onStartPolygonDraw={() => startPathDrawing("polygon")}
+                onStartFreehandDraw={() => startPathDrawing("freehand")}
+                onFinishPolygonDraw={finishPathDrawing}
+                isDrawingPolygon={pathDrawingMode === "drawing" && pathDrawingType === "polygon"}
+                isDrawingFreehand={pathDrawingMode === "drawing" && pathDrawingType === "freehand"}
+                isDrawingDoor={doorDrawingActive}
+                onStartDoorDraw={toggleDoorDrawing}
+                isGridSnappingEnabled={isGridSnappingEnabled}
+                onToggleGridSnapping={() => setIsGridSnappingEnabled(!isGridSnappingEnabled)}
+                showRegions={showRegions}
+                onToggleRegions={() => setShowRegions(!showRegions)}
+                onFitToView={handleFitToView}
+                fogRevealBrushActive={fogRevealBrushActive}
+                onToggleFogRevealBrush={() => {
+                  setFogRevealBrushActive(prev => {
+                    const next = !prev;
+                    if (next) {
+                      setSelectedTokenIds([]);
+                      selectedRegionIds.forEach(id => deselectRegion(id));
+                      setSelectedRegionIds([]);
+                      clearMapObjectSelection();
+                      clearLightSelection();
+                      if (lastMousePosRef.current) {
+                        fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+                      }
+                      requestAnimationFrame(() => redrawCanvas());
+                    }
+                    return next;
+                  });
+                }}
+                isDM={isDM}
+              />
+            )}
+          </div>
+
+          {/* Right Sidebar Content */}
+          <div className="pointer-events-auto h-full flex items-start isolate z-40 relative">
+            <RightSidebar />
+          </div>
+
+        </div>
+      </div>{/* End UI Overlay */}
 
       {/* Token Context Manager */}
       <TokenContextManager
@@ -12298,6 +12345,7 @@ export const SimpleTabletop = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 };

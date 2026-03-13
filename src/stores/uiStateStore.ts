@@ -1,0 +1,39 @@
+import { create } from 'zustand';
+
+interface UiState {
+  // Focus Mode collapses all sidebars to maximize the canvas
+  isFocusMode: boolean;
+  setFocusMode: (focus: boolean) => void;
+  toggleFocusMode: () => void;
+
+  // Individual sidebar visibility states
+  isLeftSidebarOpen: boolean;
+  setLeftSidebarOpen: (open: boolean) => void;
+  toggleLeftSidebar: () => void;
+
+  isRightSidebarOpen: boolean;
+  setRightSidebarOpen: (open: boolean) => void;
+  toggleRightSidebar: () => void;
+
+  isTopNavbarOpen: boolean;
+  setTopNavbarOpen: (open: boolean) => void;
+  toggleTopNavbar: () => void;
+}
+
+export const useUiStateStore = create<UiState>((set) => ({
+  isFocusMode: false,
+  setFocusMode: (focus) => set({ isFocusMode: focus }),
+  toggleFocusMode: () => set((state) => ({ isFocusMode: !state.isFocusMode })),
+
+  isLeftSidebarOpen: true,
+  setLeftSidebarOpen: (open) => set({ isLeftSidebarOpen: open }),
+  toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
+
+  isRightSidebarOpen: true,
+  setRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
+  toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+
+  isTopNavbarOpen: true,
+  setTopNavbarOpen: (open) => set({ isTopNavbarOpen: open }),
+  toggleTopNavbar: () => set((state) => ({ isTopNavbarOpen: !state.isTopNavbarOpen })),
+}));
