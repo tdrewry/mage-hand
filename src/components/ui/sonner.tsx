@@ -1,16 +1,23 @@
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
+import { useUiStateStore } from "@/stores/uiStateStore";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
+  const { isRightSidebarOpen, isTopNavbarOpen, isFocusMode } = useUiStateStore();
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       position="top-right"
       className="toaster group"
+      style={{
+        marginTop: isTopNavbarOpen && !isFocusMode ? '56px' : '0px',
+        marginRight: isRightSidebarOpen && !isFocusMode ? '320px' : '0px',
+        transition: 'margin 300ms ease-in-out',
+      }}
       toastOptions={{
         classNames: {
           toast:

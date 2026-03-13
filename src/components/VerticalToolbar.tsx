@@ -35,6 +35,7 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
+import { useUiStateStore } from '@/stores/uiStateStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
@@ -97,6 +98,7 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const { enforceMovementBlocking, enforceRegionBounds, setEnforceMovementBlocking, setEnforceRegionBounds } = useDungeonStore();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
   const { animationsPaused, toggleAnimationsPaused } = useUiModeStore();
+  const { isLeftSidebarOpen, isFocusMode } = useUiStateStore();
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);

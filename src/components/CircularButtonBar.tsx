@@ -13,6 +13,7 @@ import { useCardStore } from '@/stores/cardStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapEphemeralStore } from '@/stores/mapEphemeralStore';
+import { useUiStateStore } from '@/stores/uiStateStore';
 import { ephemeralBus } from '@/lib/net';
 import { CardType } from '@/types/cardTypes';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
@@ -30,6 +31,7 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   const registerCard = useCardStore((state) => state.registerCard);
+  const { isTopNavbarOpen, isFocusMode } = useUiStateStore();
   
   const movementLocked = useInitiativeStore((state) => state.restrictMovement);
   const setMovementLocked = useInitiativeStore((state) => state.setRestrictMovement);
@@ -76,7 +78,7 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = ({
   };
 
   return (
-    <Toolbar position="top" className="gap-0.5 px-1.5 py-1">
+    <Toolbar position="top" className="gap-0.5 px-1.5 py-1 mt-4">
       <ToolbarButton
         icon={MenuIcon}
         label="Menu"

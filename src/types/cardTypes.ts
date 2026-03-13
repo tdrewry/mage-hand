@@ -72,6 +72,7 @@ export interface CardConfig {
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
   metadata?: Record<string, unknown>;
+  dockPosition?: 'left' | 'right' | 'floating';
 }
 
 export interface CardState {
@@ -85,4 +86,5 @@ export interface CardState {
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
   metadata?: Record<string, unknown>;
+  dockPosition: 'left' | 'right' | 'floating';
 }

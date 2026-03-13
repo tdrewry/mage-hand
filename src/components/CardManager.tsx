@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { BaseCard } from '@/components/cards/BaseCard';
 import { RosterCardContent } from '@/components/cards/RosterCard';
 import { FogControlCardContent } from '@/components/cards/FogControlCard';
@@ -30,7 +29,8 @@ import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard
 import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
 import { CampaignEditorCardContent } from '@/components/cards/CampaignEditorCard';
 import { TokenGroupManagerCardContent } from '@/components/cards/TokenGroupManagerCard';
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore, type LabelPosition } from '@/stores/sessionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
@@ -65,9 +65,14 @@ export function CardManager({
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
 
+  // Force a re-render after initial mount so portals can find the sidebar DOM nodes
+  const [isMounted, setIsMounted] = useState(false);
+
   // Load saved layout on mount
   useEffect(() => {
     loadLayout();
+    // Allow the DOM to render the sidebars first before we attempt to query their portals
+    requestAnimationFrame(() => setIsMounted(true));
   }, [loadLayout]);
 
   // Wrapper function to convert token panel params to Token object
@@ -102,7 +107,7 @@ export function CardManager({
       {children}
       
       {/* Render all registered cards */}
-      {cards.filter(card => isDM || !DM_ONLY_CARD_TYPES.has(card.type)).map((card) => {
+      {isMounted && cards.filter(card => isDM || !DM_ONLY_CARD_TYPES.has(card.type)).map((card) => {
         const content = renderCardContent(
           card,
           handleAddToken, 
@@ -111,7 +116,8 @@ export function CardManager({
           onToggleSnapping,
           onToggleGridVisibility
         );
-        return (
+        
+        const cardComponent = (
           <BaseCard
             key={card.id}
             id={card.id}
@@ -124,6 +130,18 @@ export function CardManager({
             {content}
           </BaseCard>
         );
+
+        if (card.dockPosition === 'left') {
+          const leftNode = document.getElementById('left-sidebar-content');
+          if (leftNode) return createPortal(cardComponent, leftNode);
+        }
+        
+        if (card.dockPosition === 'right') {
+          const rightNode = document.getElementById('right-sidebar-content');
+          if (rightNode) return createPortal(cardComponent, rightNode);
+        }
+
+        return cardComponent;
       })}
     </>
   );

@@ -8,6 +8,7 @@ interface ToolbarProps {
   position: ToolbarPosition;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 const positionStyles: Record<ToolbarPosition, string> = {
@@ -21,15 +22,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   position,
   children,
   className,
+  style,
 }) => {
   return (
     <div
       className={cn(
-        'fixed flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg',
+        'absolute flex items-center gap-2 bg-background/95 backdrop-blur border border-border rounded-full px-3 py-2 shadow-lg transition-transform duration-300 ease-in-out',
         positionStyles[position],
         className
       )}
-      style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
+      style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS, ...style }}
     >
       {children}
     </div>

@@ -12025,6 +12025,97 @@ export const SimpleTabletop = () => {
                 isDM={isDM}
               />
             )}
+
+            {/* DM Cursor Sharing Toggle — only visible to DMs */}
+            {isDM && (
+              <div
+                className="absolute bottom-4 left-28 select-none pointer-events-auto"
+                style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+              >
+                <CursorToggleButton />
+              </div>
+            )}
+
+            {/* Client Cursor Sharing Status — non-interactive indicator for non-DMs */}
+            {!isDM && (
+              <div
+                className="absolute bottom-4 left-28 select-none pointer-events-none pointer-events-auto"
+                style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+              >
+                <CursorStatusIndicator />
+              </div>
+            )}
+
+            {/* Version Indicator - Bottom Left */}
+            <div
+              className="absolute bottom-4 left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-sm select-none pointer-events-none"
+              style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+            >
+              v{APP_VERSION}
+            </div>
+
+            {/* Zoom Level Indicator with Menu */}
+            <div
+              className="absolute bottom-4 right-4 pointer-events-auto"
+              style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground shadow-sm select-none hover:bg-card/90 transition-colors cursor-pointer"
+                  >
+                    {Math.round(transform.zoom * 100)}%
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="top" className="min-w-[100px]">
+                  <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 4.0 }))}>
+                    400%
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 2.0 }))}>
+                    200%
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 1.0 }))}>
+                    100%
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.5 }))}>
+                    50%
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.25 }))}>
+                    25%
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    // Fit to view - calculate zoom to fit all regions
+                    if (regions.length === 0) return;
+                    const bounds = regions.reduce((acc, r) => ({
+                      minX: Math.min(acc.minX, r.x),
+                      minY: Math.min(acc.minY, r.y),
+                      maxX: Math.max(acc.maxX, r.x + r.width),
+                      maxY: Math.max(acc.maxY, r.y + r.height),
+                    }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+
+                    const contentWidth = bounds.maxX - bounds.minX;
+                    const contentHeight = bounds.maxY - bounds.minY;
+                    const padding = 50;
+
+                    const zoomX = (window.innerWidth - padding * 2) / contentWidth;
+                    const zoomY = (window.innerHeight - padding * 2) / contentHeight;
+                    const newZoom = Math.min(zoomX, zoomY, 2.0);
+
+                    const centerX = (bounds.minX + bounds.maxX) / 2;
+                    const centerY = (bounds.minY + bounds.maxY) / 2;
+
+                    setTransform({
+                      zoom: newZoom,
+                      x: window.innerWidth / 2 - centerX * newZoom,
+                      y: window.innerHeight / 2 - centerY * newZoom,
+                    });
+                  }}>
+                    Fit to View
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Right Sidebar Content */}
@@ -12127,97 +12218,6 @@ export const SimpleTabletop = () => {
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
       <MovementLockIndicator />
-
-      {/* DM Cursor Sharing Toggle — only visible to DMs */}
-      {isDM && (
-        <div
-          className="absolute bottom-4 left-28 select-none"
-          style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-        >
-          <CursorToggleButton />
-        </div>
-      )}
-
-      {/* Client Cursor Sharing Status — non-interactive indicator for non-DMs */}
-      {!isDM && (
-        <div
-          className="absolute bottom-4 left-28 select-none pointer-events-none"
-          style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-        >
-          <CursorStatusIndicator />
-        </div>
-      )}
-
-      {/* Version Indicator - Bottom Left */}
-      <div
-        className="absolute bottom-4 left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-sm select-none pointer-events-none"
-        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-      >
-        v{APP_VERSION}
-      </div>
-
-      {/* Zoom Level Indicator with Menu */}
-      <div 
-        className="absolute bottom-4 right-4"
-        style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button 
-              className="bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground shadow-sm select-none hover:bg-card/90 transition-colors cursor-pointer"
-            >
-              {Math.round(transform.zoom * 100)}%
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" className="min-w-[100px]">
-            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 4.0 }))}>
-              400%
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 2.0 }))}>
-              200%
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 1.0 }))}>
-              100%
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.5 }))}>
-              50%
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTransform(prev => ({ ...prev, zoom: 0.25 }))}>
-              25%
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => {
-              // Fit to view - calculate zoom to fit all regions
-              if (regions.length === 0) return;
-              const bounds = regions.reduce((acc, r) => ({
-                minX: Math.min(acc.minX, r.x),
-                minY: Math.min(acc.minY, r.y),
-                maxX: Math.max(acc.maxX, r.x + r.width),
-                maxY: Math.max(acc.maxY, r.y + r.height),
-              }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-              
-              const contentWidth = bounds.maxX - bounds.minX;
-              const contentHeight = bounds.maxY - bounds.minY;
-              const padding = 50;
-              
-              const zoomX = (window.innerWidth - padding * 2) / contentWidth;
-              const zoomY = (window.innerHeight - padding * 2) / contentHeight;
-              const newZoom = Math.min(zoomX, zoomY, 2.0);
-              
-              const centerX = (bounds.minX + bounds.maxX) / 2;
-              const centerY = (bounds.minY + bounds.maxY) / 2;
-              
-              setTransform({
-                zoom: newZoom,
-                x: window.innerWidth / 2 - centerX * newZoom,
-                y: window.innerHeight / 2 - centerY * newZoom,
-              });
-            }}>
-              Fit to View
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
 
       {selectedAnnotationId &&
         (() => {

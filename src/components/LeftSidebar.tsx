@@ -15,11 +15,7 @@ export const LeftSidebar: React.FC = () => {
         isOpen ? "w-[320px]" : "w-0 overflow-hidden border-r-0"
       )}
     >
-      <div className="flex-1 p-4 min-w-[320px] overflow-y-auto custom-scrollbar">
-        {/* Future tools go here */}
-        <div className="text-center text-muted-foreground mt-10 text-xs italic">
-          Left Sidebar Placeholder
-        </div>
+      <div id="left-sidebar-content" className="flex-1 p-4 min-w-[320px] overflow-y-auto custom-scrollbar">
       </div>
     </div>
   );

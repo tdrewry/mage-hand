@@ -1,9 +1,30 @@
 import React from 'react';
 import { useUiStateStore } from '@/stores/uiStateStore';
+import { useCardStore } from '@/stores/cardStore';
+import { useUiModeStore } from '@/stores/uiModeStore';
+import { useDungeonStore } from '@/stores/dungeonStore';
+import { useLaunchStore } from '@/stores/launchStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
-import { Focus, Maximize, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  Focus, Maximize, ChevronLeft, ChevronRight, Settings, FolderOpen, Monitor, 
+  Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { SessionManager } from '@/components/SessionManager';
+import { StorageManagerModal } from '@/components/StorageManagerModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export const TopNavbar: React.FC = () => {
   const { 
@@ -15,6 +36,55 @@ export const TopNavbar: React.FC = () => {
     isRightSidebarOpen,
     toggleRightSidebar
   } = useUiStateStore();
+
+  const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+  const [storageManagerOpen, setStorageManagerOpen] = useState(false);
+
+  const { currentMode, setMode, lockedByDm } = useUiModeStore();
+  const { renderingMode, setRenderingMode } = useDungeonStore();
+  const setLaunched = useLaunchStore((s) => s.setLaunched);
+  const { isConnected, currentSession } = useMultiplayerStore();
+  
+  const registerCard = useCardStore((state) => state.registerCard);
+  const cards = useCardStore((state) => state.cards);
+  const setVisibility = useCardStore((state) => state.setVisibility);
+
+  const projectManagerCard = cards.find((c) => c.type === CardType.PROJECT_MANAGER);
+  const soundSettingsCard = cards.find((c) => c.type === CardType.SOUND_SETTINGS);
+
+  const handleOpenProjectManager = () => {
+    if (projectManagerCard) {
+      setVisibility(projectManagerCard.id, true);
+    } else {
+      registerCard({
+        type: CardType.PROJECT_MANAGER,
+        title: 'Project Manager',
+        defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
+        defaultSize: { width: 600, height: 700 },
+        minSize: { width: 500, height: 600 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
+
+  const handleOpenSoundSettings = () => {
+    if (soundSettingsCard) {
+      setVisibility(soundSettingsCard.id, true);
+    } else {
+      registerCard({
+        type: CardType.SOUND_SETTINGS,
+        title: 'Sound Settings',
+        defaultPosition: { x: window.innerWidth / 2 - 190, y: 80 },
+        defaultSize: { width: 380, height: 600 },
+        minSize: { width: 320, height: 400 },
+        isResizable: true,
+        isClosable: true,
+        defaultVisible: true,
+      });
+    }
+  };
 
   const isOpen = isTopNavbarOpen && !isFocusMode;
 
@@ -81,7 +151,101 @@ export const TopNavbar: React.FC = () => {
         </div>
 
         {/* Right side: Global settings and views */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="hover:bg-white/10 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                    <Monitor className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-background/90 backdrop-blur border-white/10">Mode settings</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10">
+              <DropdownMenuLabel>UI Mode</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setMode('dm')} disabled={lockedByDm}>
+                <UserCircle className="mr-2 h-4 w-4" />
+                <span>DM View</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMode('play')} disabled={lockedByDm}>
+                <Play className="mr-2 h-4 w-4" />
+                <span>Player View</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Rendering Pipeline</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => { setRenderingMode('edit'); toast.success('Switched to Edit mode'); }}>
+                <Castle className="mr-2 h-4 w-4" />
+                <span>Edit Mode</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setRenderingMode('play'); toast.success('Switched to Play mode'); }}>
+                <Play className="mr-2 h-4 w-4" />
+                <span>Play Mode</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="hover:bg-white/10 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-background/90 backdrop-blur border-white/10">Project files</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10">
+              <DropdownMenuLabel>Project</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleOpenProjectManager}>
+                <Save className="mr-2 h-4 w-4" />
+                <span>Save Session</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenProjectManager}>
+                <Download className="mr-2 h-4 w-4" />
+                <span>Load Session</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="hover:bg-white/10 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-background/90 backdrop-blur border-white/10">System settings</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10">
+              <DropdownMenuLabel>System Overview</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setSessionManagerOpen(true)}>
+                <Network className="mr-2 h-4 w-4" />
+                <span>{isConnected ? 'Session Settings' : 'Connect to Session'}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStorageManagerOpen(true)}>
+                <HardDrive className="mr-2 h-4 w-4" />
+                <span>Storage Manager</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenSoundSettings}>
+                <Volume2 className="mr-2 h-4 w-4" />
+                <span>Sound Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setLaunched(false)} className="text-red-400 focus:text-red-400">
+                <Home className="mr-2 h-4 w-4" />
+                <span>Return to Home Menu</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="w-px h-6 bg-white/10 mx-1" />
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -119,6 +283,19 @@ export const TopNavbar: React.FC = () => {
         )}
       </div>
 
+      {sessionManagerOpen && (
+        <SessionManager
+          open={sessionManagerOpen}
+          onOpenChange={setSessionManagerOpen}
+        />
+      )}
+      
+      {storageManagerOpen && (
+        <StorageManagerModal
+          open={storageManagerOpen}
+          onOpenChange={setStorageManagerOpen}
+        />
+      )}
     </div>
   );
 };

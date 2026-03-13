@@ -60,6 +60,13 @@ interface CardStore {
   updateCardSize: (id: string, size: CardSize) => void;
   
   /**
+   * Docks or floats a card.
+   * @param id The ID of the card.
+   * @param position The dock position.
+   */
+  dockCard: (id: string, position: 'left' | 'right' | 'floating') => void;
+
+  /**
    * Brings a card to the front by increasing its Z-index.
    * @param id The ID of the card.
    */
@@ -161,6 +168,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 300, height: 400 },
     isResizable: true,
     isClosable: true,
+    dockPosition: 'left',
   },
   [CardType.MAP_CONTROLS]: {
     title: 'Map Controls',
@@ -177,6 +185,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 500, height: 500 },
     isResizable: true,
     isClosable: true,
+    dockPosition: 'left',
   },
   [CardType.GROUP_MANAGER]: {
     title: 'Group Manager',
@@ -185,6 +194,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 350, height: 400 },
     isResizable: true,
     isClosable: true,
+    dockPosition: 'left',
   },
   [CardType.PROJECT_MANAGER]: {
     title: 'Project Manager',
@@ -201,6 +211,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     minSize: { width: 300, height: 350 },
     isResizable: true,
     isClosable: true,
+    dockPosition: 'left',
   },
   [CardType.WATABOU_IMPORT]: {
     title: 'Import',
@@ -228,6 +239,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     defaultVisible: false, // Only show when combat starts
     hideHeader: true,
     fullCardDraggable: true,
+    dockPosition: 'right',
   },
   [CardType.STYLES]: {
     title: 'Map',
@@ -237,6 +249,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'left',
   },
   [CardType.VISION_PROFILE_MANAGER]: {
     title: 'Vision Profile Manager',
@@ -246,6 +259,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'left',
   },
   [CardType.ROLE_MANAGER]: {
     title: 'Role Manager',
@@ -264,6 +278,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'right',
   },
   [CardType.MAP_OBJECTS]: {
     title: 'Map Objects',
@@ -309,6 +324,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'left',
   },
   [CardType.DICE_BOX]: {
     title: 'Dice Box',
@@ -318,6 +334,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'right',
   },
   [CardType.ACTION_CARD]: {
     title: 'Action',
@@ -354,6 +371,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'right',
   },
   [CardType.ART_APPROVAL]: {
     title: 'Art Approval',
@@ -408,6 +426,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    dockPosition: 'left',
   },
   [CardType.LIBRARY_EDITOR]: {
     title: 'Library Editor',
@@ -442,6 +461,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
           hideHeader: config.hideHeader ?? defaultConfig.hideHeader,
           fullCardDraggable: config.fullCardDraggable ?? defaultConfig.fullCardDraggable,
           metadata: config.metadata,
+          dockPosition: config.dockPosition || defaultConfig.dockPosition || 'floating',
         },
       ],
       nextZIndex: state.nextZIndex + 1,
@@ -504,6 +524,14 @@ export const useCardStore = create<CardStore>((set, get) => ({
     }));
   },
 
+  dockCard: (id: string, position: 'left' | 'right' | 'floating') => {
+    set((state) => ({
+      cards: state.cards.map((card) =>
+        card.id === id ? { ...card, dockPosition: position } : card
+      ),
+    }));
+  },
+
   bringToFront: (id: string) => {
     set((state) => {
       const card = state.cards.find((c) => c.id === id);
@@ -543,7 +571,8 @@ export const useCardStore = create<CardStore>((set, get) => ({
           const isDeprecated = deprecatedTypes.includes(card.type);
           const exists = acc.some(c => c.type === card.type);
           if (!isDeprecated && !exists) {
-            acc.push(card);
+            // Ensure legacy saved cards have a default dockPosition
+            acc.push({ ...card, dockPosition: card.dockPosition || 'floating' });
           }
           return acc;
         }, []);

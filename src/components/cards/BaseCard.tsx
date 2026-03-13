@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Minus, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2, PanelLeft, PanelRight, ArrowUpRight } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCardStore } from '@/stores/cardStore';
@@ -44,6 +44,7 @@ export function BaseCard({
   const toggleMinimize = useCardStore((state) => state.toggleMinimize);
   const unregisterCard = useCardStore((state) => state.unregisterCard);
   const bringToFront = useCardStore((state) => state.bringToFront);
+  const dockCard = useCardStore((state) => state.dockCard);
   const saveLayout = useCardStore((state) => state.saveLayout);
 
   // Handle mouse move for dragging and resizing
@@ -137,10 +138,66 @@ export function BaseCard({
     }
   };
 
+  const handleDockLeft = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dockCard(id, 'left');
+    saveLayout();
+  };
+
+  const handleDockRight = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dockCard(id, 'right');
+    saveLayout();
+  };
+
+  const handlePopOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dockCard(id, 'floating');
+    saveLayout();
+  };
+
   const handleCardClick = () => {
     bringToFront(id);
   };
 
+  const isFloating = card.dockPosition === 'floating';
+
+  // If docked, we render a static block (no drag/drop absolute positioning).
+  if (!isFloating) {
+    return (
+      <div className={cn("relative w-full mb-4", className)}>
+        <Card className="flex flex-col shadow-sm border-border bg-card/95 backdrop-blur">
+          {!hideHeader && (
+            <CardHeader
+              className="flex flex-row items-center justify-between space-y-0 p-3 border-b border-border bg-card/50"
+            >
+              <h3 className="text-sm font-semibold text-card-foreground truncate">{title}</h3>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePopOut} title="Pop Out to Map">
+                  <ArrowUpRight className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleMinimize}>
+                  {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                </Button>
+                {isClosable && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleClose}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+          )}
+          {!isMinimized && (
+            <CardContent className={cn("flex-1 overflow-auto p-4", hideHeader && "scrollbar-hide")}>
+              {children}
+            </CardContent>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // Otherwise, render full floating card
   return (
     <div
       ref={cardRef}
@@ -169,7 +226,13 @@ export function BaseCard({
             onMouseDown={!fullCardDraggable ? handleMouseDown : undefined}
           >
             <h3 className="text-sm font-semibold text-card-foreground">{title}</h3>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockLeft} title="Dock Left">
+                <PanelLeft className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockRight} title="Dock Right">
+                <PanelRight className="h-3 w-3" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
