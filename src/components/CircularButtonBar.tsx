@@ -13,14 +13,13 @@ import { ephemeralBus } from '@/lib/net';
 import { CardType } from '@/types/cardTypes';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface CircularButtonBarProps {}
 
 export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
   const { isTopNavbarOpen, isFocusMode } = useUiStateStore();
-  
-  const movementLocked = useInitiativeStore((state) => state.restrictMovement);
-  const setMovementLocked = useInitiativeStore((state) => state.setRestrictMovement);
+  const { restrictMovement: movementLocked, setRestrictMovement: setMovementLocked, isInCombat } = useInitiativeStore();
 
   const currentPlayer = useSessionStore((state) =>
     state.players.find(p => p.id === state.currentPlayerId)
@@ -38,7 +37,7 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
   };
 
   return (
-    <Toolbar position="top" className="gap-0.5 px-1.5 py-1 mt-4">
+    <Toolbar position="top" className={cn("gap-0.5 px-1.5 py-1 transition-all duration-300", isInCombat ? "mt-[72px]" : "mt-4")}>
 
       <ToolbarButton
         icon={Footprints}

@@ -16,6 +16,7 @@ interface InitiativeState {
   initiativeOrder: InitiativeEntry[];
   isTrackerVisible: boolean;
   restrictMovement: boolean;
+  layoutFormat: 'vertical' | 'horizontal' | 'mini';
   
   startCombat: () => void;
   endCombat: () => void;
@@ -29,6 +30,7 @@ interface InitiativeState {
   updateInitiative: (tokenId: string, newInitiative: number) => void;
   setTrackerVisible: (visible: boolean) => void;
   setRestrictMovement: (restrict: boolean) => void;
+  setLayoutFormat: (format: 'vertical' | 'horizontal' | 'mini') => void;
   resetRound: () => void;
 }
 
@@ -39,6 +41,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
   initiativeOrder: [],
   isTrackerVisible: true,
   restrictMovement: false,
+  layoutFormat: 'vertical',
   
   startCombat: () => {
     const order = get().initiativeOrder;
@@ -147,6 +150,7 @@ const initiativeStoreCreator: StateCreator<InitiativeState> = (set, get) => ({
   
   setTrackerVisible: (visible) => set({ isTrackerVisible: visible }),
   setRestrictMovement: (restrict) => set({ restrictMovement: restrict }),
+  setLayoutFormat: (format) => set({ layoutFormat: format }),
   
   resetRound: () => {
     set((state) => ({
@@ -170,6 +174,7 @@ const persistOptions: PersistOptions<InitiativeState, Partial<InitiativeState>> 
     roundNumber: state.roundNumber,
     initiativeOrder: state.initiativeOrder,
     isTrackerVisible: state.isTrackerVisible,
+    layoutFormat: state.layoutFormat,
   }),
   onRehydrateStorage: () => (state) => {
     if (state) {
