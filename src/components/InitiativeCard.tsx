@@ -21,6 +21,7 @@ interface InitiativeCardProps {
   isCompact?: boolean;
   size?: number;
   layout?: 'vertical' | 'horizontal' | 'mini';
+  isSelected?: boolean;
 }
 
 export const InitiativeCard: React.FC<InitiativeCardProps> = ({
@@ -37,7 +38,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   onDrop,
   isCompact = false,
   size,
-  layout = 'vertical'
+  layout = 'vertical',
+  isSelected = false
 }) => {
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
   const [initiativeValue, setInitiativeValue] = useState(initiative.toString());
@@ -67,10 +69,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           className={cn(
             "flex items-center gap-2 p-1 pr-3 h-10 min-w-10 rounded-xl transition-all border cursor-pointer",
             isActive 
-              ? "bg-[#1a252f] border-[#38bdf8] shadow-[0_0_10px_rgba(56,189,248,0.3)] ring-1 ring-[#38bdf8]" 
+              ? "bg-[#2D2D2D] border-[#38bdf8] shadow-[0_0_10px_rgba(56,189,248,0.3)] ring-1 ring-[#38bdf8]" 
               : hasGone
                 ? "bg-transparent border-transparent opacity-60"
-                : "bg-[#1a1e23] border-[#2a2f35] hover:border-[#38bdf8]/50"
+                : "bg-[#1A1A1A] border-[#333333] hover:border-[#38bdf8]/50",
+            isSelected && !isActive ? "ring-2 ring-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.4)]" : ""
           )}
         >
           {/* Avatar Circle */}
@@ -115,8 +118,9 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           className={cn(
             "relative flex flex-col items-center p-2 rounded-2xl border transition-all cursor-pointer w-[90px] h-[130px]",
             isActive 
-              ? "bg-[#161f28] border-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
-              : "bg-[#1a1e23] border-[#2a2f35] hover:border-[#38bdf8]/50 outline-none"
+              ? "bg-[#2D2D2D] border-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
+              : "bg-[#1A1A1A] border-[#333333] hover:border-[#38bdf8]/50 outline-none",
+            isSelected && !isActive ? "ring-2 ring-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.4)]" : ""
           )}
         >
           {/* Top Row: Score & Status Dot */}
@@ -199,8 +203,9 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         className={cn(
           "group relative flex items-center gap-3 p-2 px-3 rounded-2xl border transition-all cursor-pointer w-full max-w-[300px]",
           isActive 
-            ? "bg-[#161f28] border-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-[#38bdf8]" 
-            : "bg-[#1a1e23] border-[#2a2f35] hover:border-[#38bdf8]/50"
+            ? "bg-[#2D2D2D] border-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-[#38bdf8]" 
+            : "bg-[#1A1A1A] border-[#333333] hover:border-[#38bdf8]/50",
+          isSelected && !isActive ? "ring-2 ring-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.4)]" : ""
         )}
       >
         {/* Avatar Circle */}

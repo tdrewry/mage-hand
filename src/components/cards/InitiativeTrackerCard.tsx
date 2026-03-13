@@ -12,10 +12,10 @@ import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
 import { ephemeralBus } from '@/lib/net';
 
 interface InitiativeTrackerCardContentProps {
-  selectedTokenIds?: string[];
+  // Empty props for now
 }
 
-export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: InitiativeTrackerCardContentProps) {
+export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardContentProps) {
   const {
     currentTurnIndex,
     roundNumber,
@@ -31,7 +31,7 @@ export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: Initiati
     setLayoutFormat
   } = useInitiativeStore();
 
-  const { tokens, players, currentPlayerId } = useSessionStore();
+  const { tokens, players, currentPlayerId, selectedTokenIds } = useSessionStore();
   const { roles } = useRoleStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -265,6 +265,7 @@ export function InitiativeTrackerCardContent({ selectedTokenIds = [] }: Initiati
                 onDragStart={(e) => handleDragStart(e, actualIndex)}
                 onDragOver={(e) => handleDragOver(e, actualIndex)}
                 onDrop={(e) => handleDrop(e, actualIndex)}
+                isSelected={selectedTokenIds.includes(entry.tokenId)}
                 layout="vertical"
               />
             </div>

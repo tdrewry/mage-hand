@@ -246,7 +246,7 @@ export function CampaignSceneRunner() {
         />
       )}
 
-      <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 flex flex-col gap-1.5 min-w-[320px] max-w-[640px]">
+      <div className="bg-[#1A1A1A]/80 backdrop-blur-md border border-[#333333] rounded-lg shadow-lg px-3 py-2 flex flex-col gap-1.5 min-w-[320px] max-w-[640px]">
         {/* ── Row 1: Standard tools ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Campaign name + progress */}
