@@ -75,6 +75,7 @@ export interface CardConfig {
   defaultVisible?: boolean;
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
+  autoCenter?: boolean;
   metadata?: Record<string, unknown>;
   dockPosition?: 'left' | 'right' | 'floating';
 }
@@ -89,6 +90,7 @@ export interface CardState {
   zIndex: number;
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
+  autoCenter?: boolean;
   metadata?: Record<string, unknown>;
   dockPosition: 'left' | 'right' | 'floating';
 }

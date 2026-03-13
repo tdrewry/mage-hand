@@ -19,6 +19,7 @@ import { CardType } from '@/types/cardTypes';
 import { executeNode, openHandoutById } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
 import { NodeSummaryCard } from '@/components/NodeSummaryCard';
+import { useUiStateStore } from '@/stores/uiStateStore';
 import {
   ChevronRight,
   ChevronLeft,
@@ -89,6 +90,7 @@ export function CampaignSceneRunner() {
   } = useCampaignStore();
 
   const { getCardByType, setVisibility, bringToFront, setMinimize, registerCard } = useCardStore();
+  const { isLeftSidebarOpen, isRightSidebarOpen, isFocusMode } = useUiStateStore();
 
   const [showSummary, setShowSummary] = useState(false);
 
@@ -222,8 +224,18 @@ export function CampaignSceneRunner() {
     openHandoutById(handoutId, label);
   };
 
+  const leftOffset = isLeftSidebarOpen && !isFocusMode ? 320 : 0;
+  const rightOffset = isRightSidebarOpen && !isFocusMode ? 320 : 0;
+  const calculateCenterLeft = () => `calc(${leftOffset}px + (100vw - ${leftOffset}px - ${rightOffset}px) / 2)`;
+
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[31000] pointer-events-auto">
+    <div 
+      className="fixed bottom-4 z-[31000] pointer-events-auto transition-all duration-300 ease-in-out"
+      style={{
+        left: calculateCenterLeft(),
+        transform: 'translateX(-50%)'
+      }}
+    >
       {/* Node Summary Card popup (above the widget) */}
       {showSummary && currentNode && !isComplete && (
         <NodeSummaryCard

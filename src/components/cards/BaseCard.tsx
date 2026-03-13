@@ -4,6 +4,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCardStore } from '@/stores/cardStore';
 import { CardPosition, CardSize } from '@/types/cardTypes';
+import { useUiStateStore } from '@/stores/uiStateStore';
 import { cn } from '@/lib/utils';
 
 interface BaseCardProps {
@@ -46,6 +47,9 @@ export function BaseCard({
   const bringToFront = useCardStore((state) => state.bringToFront);
   const dockCard = useCardStore((state) => state.dockCard);
   const saveLayout = useCardStore((state) => state.saveLayout);
+  const disableAutoCenter = useCardStore((state) => state.disableAutoCenter);
+
+  const { isLeftSidebarOpen, isRightSidebarOpen, isFocusMode } = useUiStateStore();
 
   // Handle mouse move for dragging and resizing
   useEffect(() => {
@@ -128,9 +132,18 @@ export function BaseCard({
       });
       dockCard(id, 'floating');
     } else {
+      const rect = cardRef.current?.getBoundingClientRect();
+      const currentX = rect ? rect.left : card.position.x;
+      const currentY = rect ? rect.top : card.position.y;
+
+      if (card.autoCenter) {
+        updateCardPosition(id, { x: currentX, y: currentY });
+        disableAutoCenter(id);
+      }
+
       setDragOffset({
-        x: e.clientX - card.position.x,
-        y: e.clientY - card.position.y,
+        x: e.clientX - currentX,
+        y: e.clientY - currentY,
       });
     }
 
@@ -216,7 +229,7 @@ export function BaseCard({
             </CardHeader>
           )}
           {!isMinimized && (
-            <CardContent className={cn("flex-1 overflow-auto p-4 bg-background/30", hideHeader && "scrollbar-hide", size.height ? { 'max-h-[500px]': true } : {})}>
+            <CardContent className={cn("flex-1 overflow-auto px-2 py-4 bg-background/30", hideHeader && "scrollbar-hide", size.height ? { 'max-h-[500px]': true } : {})}>
               {children}
             </CardContent>
           )}
@@ -226,17 +239,22 @@ export function BaseCard({
   }
 
   // Otherwise, render full floating card
+  const leftOffset = isLeftSidebarOpen && !isFocusMode ? 320 : 0;
+  const rightOffset = isRightSidebarOpen && !isFocusMode ? 320 : 0;
+  const calculateCenterLeft = () => `calc(${leftOffset}px + (100vw - ${leftOffset}px - ${rightOffset}px) / 2)`;
+
   return (
     <div
       ref={cardRef}
       className={cn(
-        'fixed transition-shadow',
-        isDragging && 'cursor-move',
+        'fixed transition-shadow duration-200',
+        isDragging && 'cursor-move transition-none',
         className
       )}
       style={{
-        left: `${position.x}px`,
+        left: card.autoCenter ? calculateCenterLeft() : `${position.x}px`,
         top: `${position.y}px`,
+        transform: card.autoCenter ? 'translateX(-50%)' : undefined,
         width: isMinimized ? 'auto' : `${size.width}px`,
         height: isMinimized ? 'auto' : `${size.height}px`,
         zIndex,

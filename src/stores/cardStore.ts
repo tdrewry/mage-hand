@@ -73,6 +73,12 @@ interface CardStore {
   bringToFront: (id: string) => void;
   
   /**
+   * Disables auto-centering for a specific card.
+   * @param id The ID of the card.
+   */
+  disableAutoCenter: (id: string) => void;
+  
+  /**
    * Saves the current card layout to local storage.
    */
   saveLayout: () => void;
@@ -466,6 +472,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isResizable: true,
     isClosable: true,
     defaultVisible: false,
+    autoCenter: true,
     dockPosition: 'right',
   },
 };
@@ -491,6 +498,7 @@ export const useCardStore = create<CardStore>((set, get) => ({
           zIndex: state.nextZIndex,
           hideHeader: config.hideHeader ?? defaultConfig.hideHeader,
           fullCardDraggable: config.fullCardDraggable ?? defaultConfig.fullCardDraggable,
+          autoCenter: config.autoCenter ?? defaultConfig.autoCenter,
           metadata: config.metadata,
           dockPosition: config.dockPosition || defaultConfig.dockPosition || 'floating',
         },
@@ -583,6 +591,14 @@ export const useCardStore = create<CardStore>((set, get) => ({
         nextZIndex: Math.min(newZ + 1, Z_INDEX.CARDS.MAX),
       };
     });
+  },
+
+  disableAutoCenter: (id: string) => {
+    set((state) => ({
+      cards: state.cards.map((card) =>
+        card.id === id ? { ...card, autoCenter: false } : card
+      ),
+    }));
   },
 
   saveLayout: () => {
