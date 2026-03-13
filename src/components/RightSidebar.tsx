@@ -1,6 +1,10 @@
 import React from 'react';
 import { useUiStateStore } from '@/stores/uiStateStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export const RightSidebar: React.FC = () => {
   const { isRightSidebarOpen, isFocusMode } = useUiStateStore();

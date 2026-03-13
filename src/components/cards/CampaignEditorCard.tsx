@@ -524,7 +524,7 @@ function NodePropertyPanel({
             <div className="space-y-2">
               {(node.handouts || []).map((handout, idx) => (
                 <div key={handout.id} className="space-y-1 p-2 rounded border border-border bg-muted/30">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Input
                       value={handout.label}
                       onChange={(e) => {
@@ -604,7 +604,7 @@ function NodePropertyPanel({
             <div className="space-y-2">
               {(node.treasure || []).map((item, idx) => (
                 <div key={item.id} className="p-1.5 rounded border border-border bg-muted/30 space-y-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Gem className="h-3.5 w-3.5 text-primary shrink-0" />
                     <Input
                       value={item.name}
@@ -687,7 +687,7 @@ function NodePropertyPanel({
                 const otherNodes = campaign?.nodes.filter((n) => n.id !== node.id) || [];
                 return (
                   <div key={outcome.id} className="space-y-1 p-2 rounded border border-border bg-muted/30">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Input
                         value={outcome.label}
                         onChange={(e) => {

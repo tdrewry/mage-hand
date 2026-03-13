@@ -65,6 +65,8 @@ import { ImportCharacterModal } from '@/components/modals/ImportCharacterModal';
 
 interface CreatureLibraryCardContentProps {
   cardId: string;
+  onSelectEntity?: (id: string, type: 'character' | 'monster' | 'item') => void;
+  forcedTab?: 'characters' | 'monsters' | 'items';
 }
 
 // Monster type list for filtering
@@ -134,7 +136,7 @@ const BESTIARY_SOURCES = [
   { id: 'dmg', name: "Dungeon Master's Guide", file: 'bestiary-dmg.json' },
 ];
 
-export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardContentProps) {
+export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }: CreatureLibraryCardContentProps) {
   const { 
     characters, 
     monsters, 
@@ -176,7 +178,9 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
     return { x: worldX, y: worldY };
   };
 
-  const [activeTab, setActiveTab] = useState<'characters' | 'monsters' | 'items'>('monsters');
+  const [internalActiveTab, setInternalActiveTab] = useState<'characters' | 'monsters' | 'items'>('monsters');
+  const activeTab = forcedTab || internalActiveTab;
+  const setActiveTab = forcedTab ? () => {} : setInternalActiveTab;
   const [searchQuery, setSearchQuery] = useState('');
   const [sizeFilter, setSizeFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -678,6 +682,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
   };
 
   const handleOpenCharacterSheet = (character: DndBeyondCharacter) => {
+    if (onSelectEntity) {
+      onSelectEntity(character.id, 'character');
+      return;
+    }
+    
     registerCard({
       type: CardType.LIBRARY_EDITOR,
       title: character.name,
@@ -692,6 +701,11 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
   };
 
   const handleOpenMonsterStatBlock = (monster: Monster5eTools) => {
+    if (onSelectEntity) {
+      onSelectEntity(monster.id, 'monster');
+      return;
+    }
+    
     registerCard({
       type: CardType.LIBRARY_EDITOR,
       title: monster.name,
@@ -728,8 +742,12 @@ export function CreatureLibraryCardContent({ cardId }: CreatureLibraryCardConten
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'characters' | 'monsters' | 'items')}>
-        <TabsList className="w-full">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={(v) => setActiveTab(v as 'characters' | 'monsters' | 'items')} 
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <TabsList className={forcedTab ? "hidden" : "w-full"}>
           <TabsTrigger value="characters" className="flex-1 gap-1 text-xs">
             <Users className="h-3.5 w-3.5" />
             Characters ({characters.length})

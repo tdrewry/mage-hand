@@ -210,7 +210,7 @@ function DamageDiceRows({
     <div className="space-y-1">
       <label className="text-[10px] text-muted-foreground font-medium">Damage Dice</label>
       {rows.map((row, i) => (
-        <div key={i} className="flex gap-1 items-center">
+        <div key={i} className="flex flex-wrap gap-1 items-center">
           <Input
             value={row.formula}
             onChange={(e) => updateRow(i, 'formula', e.target.value)}
@@ -263,7 +263,7 @@ function ScalingRulesEditor({
     <div className="space-y-1">
       <label className="text-[10px] text-muted-foreground font-medium">Scaling Rules (per upcast level)</label>
       {rules.map((rule, i) => (
-        <div key={i} className="flex gap-1 items-center">
+        <div key={i} className="flex flex-wrap gap-1 items-center">
           <Select value={rule.property} onValueChange={(v) => updateRule(i, { property: v as ScalingRule['property'] })}>
             <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -358,7 +358,7 @@ function LevelOverridesEditor({
       <label className="text-[10px] text-muted-foreground font-medium">Level Overrides (explicit per-level config)</label>
       {overrides.map((ov, i) => (
         <div key={i} className="border border-border rounded p-1.5 space-y-1">
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">L{ov.level}</Badge>
             <div className="w-12">
               <NumericInput
@@ -377,7 +377,7 @@ function LevelOverridesEditor({
           <div className="space-y-0.5">
             <span className="text-[9px] text-muted-foreground">Damage Dice (leave empty to use scaling)</span>
             {(ov.damageDice ?? []).map((d, di) => (
-              <div key={di} className="flex gap-1 items-center">
+              <div key={di} className="flex flex-wrap gap-1 items-center">
                 <Input
                   value={d.formula}
                   onChange={(e) => updateOverrideDice(i, di, 'formula', e.target.value)}
@@ -400,7 +400,7 @@ function LevelOverridesEditor({
             </Button>
           </div>
           {/* Override dimensions */}
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             <div className="flex-1">
               <label className="text-[9px] text-muted-foreground">Radius</label>
               <NumericInput
@@ -491,7 +491,7 @@ function ModifiersEditor({
       <label className="text-[10px] text-muted-foreground font-medium">Stat Modifiers</label>
       {modifiers.map((mod, i) => (
         <div key={mod.id} className="space-y-0.5">
-          <div className="flex gap-1 items-center">
+          <div className="flex flex-wrap gap-1 items-center">
             <Select value={mod.target} onValueChange={(v) => updateMod(i, { target: v })}>
               <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -629,7 +629,7 @@ function GrantedActionsEditor({
       <label className="text-[10px] text-muted-foreground font-medium">Granted Actions</label>
       {actions.map((action, i) => (
         <div key={i} className="border border-border rounded p-1.5 space-y-1">
-          <div className="flex gap-1 items-center">
+          <div className="flex flex-wrap gap-1 items-center">
             <Select value={action.type ?? 'attack'} onValueChange={(v) => updateAction(i, { type: v as EffectGrantedAction['type'] })}>
               <SelectTrigger className="h-5 text-[10px] w-20"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -649,7 +649,7 @@ function GrantedActionsEditor({
               <X className="w-3 h-3 text-destructive" />
             </Button>
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             <Input
               value={action.damageFormula ?? ''}
               onChange={(e) => updateAction(i, { damageFormula: e.target.value || undefined })}
@@ -765,7 +765,7 @@ function TemplateFormFields({
             </SelectContent>
           </Select>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {needsRadius && (
               <div className="flex-1">
                 <label className="text-[10px] text-muted-foreground">Radius</label>

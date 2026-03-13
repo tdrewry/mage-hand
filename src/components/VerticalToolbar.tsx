@@ -1,26 +1,17 @@
 import React, { useState } from 'react';
 import {
-  MapPlus,
   Square,
   Pen,
   LineSquiggle,
   DoorClosed,
   Magnet,
-  Settings2,
   Eye,
   EyeOff,
-  FileDown,
-  Layers,
-  CirclePlus,
-  Palette,
   CloudFog,
   Swords,
-  Sparkles,
-  Zap,
   
   Undo,
   Redo,
-  History,
   Pause,
   Play,
   Maximize,
@@ -104,173 +95,11 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
   
-  const mapTreeCard = cards.find((c) => c.type === CardType.MAP_TREE);
-  const tokenCard = cards.find((c) => c.type === CardType.TOKENS);
-  const watabouCard = cards.find((c) => c.type === CardType.WATABOU_IMPORT);
-  const fogCard = cards.find((c) => c.type === CardType.FOG);
-  const rosterCard = cards.find((c) => c.type === CardType.ROSTER);
-  const stylesCard = cards.find((c) => c.type === CardType.STYLES);
-  const historyCard = cards.find((c) => c.type === CardType.HISTORY);
-  const effectsCard = cards.find((c) => c.type === CardType.EFFECTS);
-  const actionCard = cards.find((c) => c.type === CardType.ACTION_CARD);
-
-  const handleToggleActionCard = () => {
-    if (actionCard) {
-      setVisibility(actionCard.id, !actionCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.ACTION_CARD,
-        title: 'Action',
-        defaultPosition: { x: window.innerWidth - 420, y: 80 },
-        defaultSize: { width: 400, height: 500 },
-        minSize: { width: 340, height: 400 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
-  const handleToggleEffectsCard = () => {
-    if (effectsCard) {
-      setVisibility(effectsCard.id, !effectsCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.EFFECTS,
-        title: 'Effects',
-        defaultPosition: { x: 320, y: 80 },
-        defaultSize: { width: 320, height: 500 },
-        minSize: { width: 280, height: 350 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
-  const handleToggleStylesCard = () => {
-    if (stylesCard) {
-      setVisibility(stylesCard.id, !stylesCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.STYLES,
-        title: 'Map',
-        defaultPosition: { x: 320, y: 80 },
-        defaultSize: { width: 400, height: 600 },
-        minSize: { width: 350, height: 500 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
-  const handleToggleHistoryCard = () => {
-    if (historyCard) {
-      setVisibility(historyCard.id, !historyCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.HISTORY,
-        title: 'History',
-        defaultPosition: { x: window.innerWidth - 380, y: 80 },
-        defaultSize: { width: 360, height: 500 },
-        minSize: { width: 320, height: 400 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: false,
-      });
-    }
-  };
-
-  const handleToggleMapTreeCard = () => {
-    if (mapTreeCard) {
-      setVisibility(mapTreeCard.id, !mapTreeCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.MAP_TREE,
-        title: 'Map Tree',
-        defaultPosition: { x: 20, y: 80 },
-        defaultSize: { width: 460, height: 500 },
-        minSize: { width: 260, height: 300 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
-  const handleToggleTokenCard = () => {
-    if (tokenCard) {
-      setVisibility(tokenCard.id, !tokenCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.TOKENS,
-        title: 'Token Panel',
-        defaultPosition: { x: window.innerWidth - 420, y: 80 },
-        defaultSize: { width: 400, height: 500 },
-        minSize: { width: 300, height: 400 },
-        isResizable: true,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleToggleWatabouCard = () => {
-    if (watabouCard) {
-      setVisibility(watabouCard.id, !watabouCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.WATABOU_IMPORT,
-        title: 'Import Dungeon',
-        defaultPosition: { x: window.innerWidth / 2 - 250, y: 100 },
-        defaultSize: { width: 500, height: 550 },
-        minSize: { width: 400, height: 500 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
   const handleToggleFog = () => {
     const mapId = selectedMapId || 'default-map';
     const currentSettings = useFogStore.getState().getMapFogSettings(mapId);
     useFogStore.getState().setMapFogSettings(mapId, { enabled: !currentSettings.enabled });
     toast.success(`Fog of War ${!currentSettings.enabled ? 'enabled' : 'disabled'} for current map`);
-  };
-
-  const handleToggleFogCard = () => {
-    if (fogCard) {
-      setVisibility(fogCard.id, !fogCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.FOG,
-        title: 'Fog Control',
-        defaultPosition: { x: 320, y: 80 },
-        defaultSize: { width: 350, height: 520 },
-        minSize: { width: 300, height: 450 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
-  };
-
-  const handleToggleRosterCard = () => {
-    if (rosterCard) {
-      setVisibility(rosterCard.id, !rosterCard.isVisible);
-    } else {
-      registerCard({
-        type: CardType.ROSTER,
-        title: 'Roster',
-        defaultPosition: { x: window.innerWidth - 320, y: 80 },
-        defaultSize: { width: 300, height: 500 },
-        minSize: { width: 250, height: 300 },
-        isResizable: true,
-        isClosable: true,
-        defaultVisible: true,
-      });
-    }
   };
 
   const handleCombatToggle = () => {
@@ -294,41 +123,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     <Toolbar position="left" className="gap-0.5 px-1.5 py-2">
       {mode === 'edit' ? (
         <>
-          <ToolbarButton
-            icon={MapPlus}
-            label="Map Manager"
-            onClick={() => {
-              const mapManagerCard = cards.find((c) => c.type === CardType.MAP_MANAGER);
-              if (mapManagerCard) {
-                setVisibility(mapManagerCard.id, !mapManagerCard.isVisible);
-              } else {
-                registerCard({
-                  type: CardType.MAP_MANAGER,
-                  title: 'Map Manager',
-                  defaultPosition: { x: window.innerWidth / 2 - 300, y: 80 },
-                  defaultSize: { width: 600, height: 500 },
-                  minSize: { width: 400, height: 300 },
-                  isResizable: true,
-                  isClosable: true,
-                  defaultVisible: true,
-                });
-              }
-            }}
-            isActive={cards.find((c) => c.type === CardType.MAP_MANAGER)?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={CirclePlus}
-            label="Tokens"
-            onClick={handleToggleTokenCard}
-            isActive={tokenCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
             icon={Square}
@@ -380,15 +174,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
           />
 
           <ToolbarButton
-            icon={Settings2}
-            label="Map"
-            onClick={handleToggleStylesCard}
-            isActive={stylesCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
             icon={animationsPaused ? Play : Pause}
             label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
             onClick={toggleAnimationsPaused}
@@ -417,24 +202,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             className="text-orange-600 hover:bg-orange-600/10"
           />
 
-          <ToolbarButton
-            icon={FileDown}
-            label="Import Dungeon"
-            onClick={handleToggleWatabouCard}
-            isActive={watabouCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={Layers}
-            label="Map Tree"
-            onClick={handleToggleMapTreeCard}
-            isActive={mapTreeCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
@@ -451,15 +218,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Redo (Ctrl+Shift+Z)"
             onClick={redo}
             disabled={!canRedo}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={History}
-            label="History"
-            onClick={handleToggleHistoryCard}
-            isActive={historyCard?.isVisible}
             variant="ghost"
             size="xs"
           />
@@ -482,15 +240,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
         </>
       ) : (
         <>
-          <ToolbarButton
-            icon={Palette}
-            label="Map"
-            onClick={handleToggleStylesCard}
-            isActive={stylesCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
           <ToolbarButton
             icon={animationsPaused ? Play : Pause}
             label={animationsPaused ? 'Resume Animations' : 'Pause Animations'}
@@ -562,33 +311,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             size="xs"
           />
 
-          <ToolbarButton
-            icon={Sparkles}
-            label="Effects"
-            onClick={handleToggleEffectsCard}
-            isActive={effectsCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={Zap}
-            label="Actions"
-            onClick={handleToggleActionCard}
-            isActive={actionCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={Layers}
-            label="Map Tree"
-            onClick={handleToggleMapTreeCard}
-            isActive={mapTreeCard?.isVisible}
-            variant="ghost"
-            size="xs"
-          />
-
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
@@ -605,15 +327,6 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             label="Redo (Ctrl+Shift+Z)"
             onClick={redo}
             disabled={!canRedo}
-            variant="ghost"
-            size="xs"
-          />
-
-          <ToolbarButton
-            icon={History}
-            label="History"
-            onClick={handleToggleHistoryCard}
-            isActive={historyCard?.isVisible}
             variant="ghost"
             size="xs"
           />

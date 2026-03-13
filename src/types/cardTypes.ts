@@ -1,5 +1,4 @@
 export enum CardType {
-  MENU = 'menu',
   ROSTER = 'roster',
   TOOLS = 'tools',
   FOG = 'fog',
@@ -36,6 +35,11 @@ export enum CardType {
   CAMPAIGN_EDITOR = 'campaign_editor',
   TOKEN_GROUP_MANAGER = 'token_group_manager',
   LIBRARY_EDITOR = 'library_editor',
+  // Mega-Panels
+  COMPENDIUM = 'compendium',
+  ENVIRONMENT = 'environment',
+  PLAY = 'play',
+  CAMPAIGN = 'campaign',
 }
 
 /** Card types that require DM role — players cannot open or see these */

@@ -7,7 +7,6 @@ import { MapManagerCardContent } from '@/components/cards/MapManagerCard';
 import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 import { ProjectManagerCardContent } from '@/components/cards/ProjectManagerCard';
 import { InitiativeTrackerCardContent } from '@/components/cards/InitiativeTrackerCard';
-import { MenuCardContent } from '@/components/cards/MenuCard';
 import { StylesCardContent } from '@/components/cards/StylesCard';
 import { RegionControlsCardContent } from '@/components/cards/RegionControlsCard';
 import { VisionProfileManagerCardContent } from '@/components/cards/VisionProfileManagerCard';
@@ -29,6 +28,10 @@ import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard
 import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
 import { CampaignEditorCardContent } from '@/components/cards/CampaignEditorCard';
 import { TokenGroupManagerCardContent } from '@/components/cards/TokenGroupManagerCard';
+import { CompendiumCardContent } from '@/components/cards/CompendiumCard';
+import { EnvironmentCardContent } from '@/components/cards/EnvironmentCard';
+import { PlayCardContent } from '@/components/cards/PlayCard';
+import { CampaignCardContent } from '@/components/cards/CampaignCard';
 import React, { Suspense, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useCardStore } from '@/stores/cardStore';
@@ -123,7 +126,7 @@ export function CardManager({
             id={card.id}
             title={getCardTitle(card.type)}
             isResizable={true}
-            isClosable={card.type !== CardType.MENU}
+            isClosable={true}
             hideHeader={card.hideHeader}
             fullCardDraggable={card.fullCardDraggable}
           >
@@ -150,7 +153,6 @@ export function CardManager({
 // Helper function to get card titles
 function getCardTitle(type: CardType): string {
   const titles: Partial<Record<CardType, string>> = {
-    [CardType.MENU]: 'Menu',
     [CardType.ROSTER]: 'Roster',
     [CardType.FOG]: 'Fog Control',
     [CardType.TOKENS]: 'Token Panel',
@@ -182,6 +184,10 @@ function getCardTitle(type: CardType): string {
     [CardType.CAMPAIGN_EDITOR]: 'Campaign Editor',
     [CardType.TOKEN_GROUP_MANAGER]: 'Token Groups',
     [CardType.LIBRARY_EDITOR]: 'Library Editor',
+    [CardType.COMPENDIUM]: 'Compendium',
+    [CardType.ENVIRONMENT]: 'Environment',
+    [CardType.PLAY]: 'Play',
+    [CardType.CAMPAIGN]: 'Campaign',
   };
   
   return titles[type] || type;
@@ -199,8 +205,6 @@ function renderCardContent(
   const { id: cardId, type, metadata } = card;
   
   switch (type) {
-    case CardType.MENU:
-      return <MenuCardContent sessionId={sessionId} />;
     case CardType.ROSTER:
       return <RosterCardContent cardId={cardId} />;
     case CardType.FOG:
@@ -285,6 +289,14 @@ function renderCardContent(
         entityId={(metadata?.entityId as string) || ''}
         entityType={(metadata?.entityType as 'character' | 'monster') || 'monster'}
       />;
+    case CardType.COMPENDIUM:
+      return <CompendiumCardContent cardId={cardId} onAddToken={addToken} />;
+    case CardType.ENVIRONMENT:
+      return <EnvironmentCardContent cardId={cardId} />;
+    case CardType.PLAY:
+      return <PlayCardContent cardId={cardId} />;
+    case CardType.CAMPAIGN:
+      return <CampaignCardContent cardId={cardId} />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

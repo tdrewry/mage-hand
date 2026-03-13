@@ -116,15 +116,6 @@ interface CardStore {
 const STORAGE_KEY = 'vtt-card-layout';
 
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
-  [CardType.MENU]: {
-    title: 'Menu',
-    defaultPosition: { x: 70, y: 20 }, // Offset to clear the left vertical toolbar
-    defaultSize: { width: 340, height: 520 },
-    minSize: { width: 280, height: 300 },
-    isResizable: true,
-    isClosable: false,
-    defaultVisible: true,
-  },
   [CardType.ROSTER]: {
     title: 'Roster',
     defaultPosition: { x: window.innerWidth - 320, y: 80 },
@@ -437,6 +428,46 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: true,
   },
+  [CardType.COMPENDIUM]: {
+    title: 'Compendium',
+    defaultPosition: { x: 0, y: 80 },
+    defaultSize: { width: 360, height: 600 },
+    minSize: { width: 320, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+    dockPosition: 'left',
+  },
+  [CardType.ENVIRONMENT]: {
+    title: 'Environment',
+    defaultPosition: { x: 60, y: 80 },
+    defaultSize: { width: 420, height: 650 },
+    minSize: { width: 360, height: 500 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+    dockPosition: 'left',
+  },
+  [CardType.PLAY]: {
+    title: 'Play Tools',
+    defaultPosition: { x: window.innerWidth - 380, y: 80 },
+    defaultSize: { width: 380, height: 600 },
+    minSize: { width: 320, height: 450 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+    dockPosition: 'right',
+  },
+  [CardType.CAMPAIGN]: {
+    title: 'Campaign',
+    defaultPosition: { x: window.innerWidth / 2 - 200, y: 80 },
+    defaultSize: { width: 400, height: 600 },
+    minSize: { width: 320, height: 450 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+    dockPosition: 'right',
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({
@@ -565,7 +596,10 @@ export const useCardStore = create<CardStore>((set, get) => ({
       try {
         const cards = JSON.parse(stored);
         // Filter out deprecated card types (replaced by new toolbar components or removed)
-        const deprecatedTypes = [CardType.TOOLS, CardType.INITIATIVE_TRACKER, CardType.LAYERS, CardType.BACKGROUND_GRID];
+        const deprecatedTypes = [
+          CardType.TOOLS, CardType.INITIATIVE_TRACKER, CardType.LAYERS, CardType.BACKGROUND_GRID,
+          CardType.MAP_MANAGER, CardType.MAP_TREE, CardType.CREATURE_LIBRARY, CardType.CHAT, CardType.DICE_BOX, CardType.FOG, CardType.ROSTER, CardType.MONSTER_STAT_BLOCK, CardType.STYLES, CardType.HISTORY
+        ];
         // Filter out any duplicate cards by type (keep only the first of each type)
         const uniqueCards = cards.reduce((acc: CardState[], card: CardState) => {
           const isDeprecated = deprecatedTypes.includes(card.type);

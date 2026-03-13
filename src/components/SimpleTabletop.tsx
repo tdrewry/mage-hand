@@ -156,7 +156,7 @@ import {
   drawTargetingLineHelper as drawTargetingLineHelperFn,
   drawOffScreenIndicator as drawOffScreenIndicatorFn,
   drawMapPings as drawMapPingsFn,
-  
+
   drawRemoteSelectionPreviews as drawRemoteSelectionPreviewsFn,
   drawRemoteActionTargets as drawRemoteActionTargetsFn,
 } from "../lib/canvasDrawHelpers";
@@ -198,11 +198,10 @@ const CursorStatusIndicator: React.FC = () => {
   const enabled = useCursorStore((s) => s.cursorSharingEnabled);
   return (
     <div
-      className={`inline-flex items-center h-8 gap-1.5 text-xs px-3 rounded-md border ${
-        enabled
+      className={`inline-flex items-center h-8 gap-1.5 text-xs px-3 rounded-md border ${enabled
           ? "bg-primary/15 border-primary/30 text-primary"
           : "bg-muted/50 border-border text-muted-foreground"
-      }`}
+        }`}
     >
       <MousePointer2 className="h-3.5 w-3.5" />
       Cursors {enabled ? "On" : "Off"}
@@ -241,7 +240,7 @@ export const SimpleTabletop = () => {
 
   // Helper function to check if transform state has changed
   const hasTransformChanged = (
-    initial: Partial<CanvasRegion>, 
+    initial: Partial<CanvasRegion>,
     current: Partial<CanvasRegion>
   ): boolean => {
     return (
@@ -271,17 +270,17 @@ export const SimpleTabletop = () => {
     const paddingX = 4 / zoom;
     const paddingY = 2 / zoom;
     const borderRadius = 3 / zoom;
-    
+
     ctx.font = `${fontSize}px Arial`;
     const textMetrics = ctx.measureText(text);
     const textWidth = textMetrics.width;
     const textHeight = fontSize;
-    
+
     // Calculate label position
     let labelX = x;
     let labelY: number;
     let textBaseline: CanvasTextBaseline;
-    
+
     if (labelPos === 'center') {
       labelY = y;
       textBaseline = 'middle';
@@ -293,19 +292,19 @@ export const SimpleTabletop = () => {
       labelY = y + radius + 4 / zoom + textHeight / 2;
       textBaseline = 'middle';
     }
-    
+
     // Draw rounded rect background
     const bgColor = labelBackgroundColor || 'rgba(30, 30, 30, 0.75)';
     const bgX = labelX - textWidth / 2 - paddingX;
     const bgY = labelY - textHeight / 2 - paddingY;
     const bgWidth = textWidth + paddingX * 2;
     const bgHeight = textHeight + paddingY * 2;
-    
+
     ctx.fillStyle = bgColor;
     ctx.beginPath();
     ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius);
     ctx.fill();
-    
+
     // Draw text
     ctx.fillStyle = labelColor || '#FFFFFF';
     ctx.textAlign = 'center';
@@ -316,7 +315,7 @@ export const SimpleTabletop = () => {
   const [showRegions, setShowRegions] = useState(true); // Debug toggle for testing wall-based light blocking
   const [gridColor, setGridColor] = useState("#333");
   const [gridOpacity, setGridOpacity] = useState(80);
-  
+
   // Canvas dimensions for post-processing
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
@@ -327,7 +326,7 @@ export const SimpleTabletop = () => {
   const selectedMapId = useMapStore((state) => state.selectedMapId);
   const viewportTransforms = useSessionStore((state) => state.viewportTransforms);
   const setViewportTransform = useSessionStore((state) => state.setViewportTransform);
-  
+
   const [transform, setTransformState] = useState(() => {
     // Try to restore from session store on initial load
     if (selectedMapId && viewportTransforms[selectedMapId]) {
@@ -335,13 +334,13 @@ export const SimpleTabletop = () => {
     }
     return { x: 0, y: 0, zoom: 1 };
   });
-  
+
   // Wrapper that saves to session store
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const setTransform = useCallback((updater: React.SetStateAction<{ x: number; y: number; zoom: number }>) => {
     setTransformState(prev => {
       const newTransform = typeof updater === 'function' ? updater(prev) : updater;
-      
+
       // Save to session store (throttled)
       if (selectedMapId) {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -355,19 +354,19 @@ export const SimpleTabletop = () => {
       if (currentPlayer2?.roleIds?.includes('dm')) {
         ephemeralBus.emit("map.dm.viewport", { x: newTransform.x, y: newTransform.y, zoom: newTransform.zoom });
       }
-      
+
       return newTransform;
     });
   }, [selectedMapId, setViewportTransform]);
-  
+
   // Restore transform when map changes or on hydration
   const lastMapIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedMapId && viewportTransforms[selectedMapId]) {
       const persisted = viewportTransforms[selectedMapId];
       // Only restore if map changed or this is initial hydration with data
-      if (selectedMapId !== lastMapIdRef.current || 
-          (persisted.x !== 0 || persisted.y !== 0 || persisted.zoom !== 1)) {
+      if (selectedMapId !== lastMapIdRef.current ||
+        (persisted.x !== 0 || persisted.y !== 0 || persisted.zoom !== 1)) {
         lastMapIdRef.current = selectedMapId;
         setTransformState(persisted);
       }
@@ -466,14 +465,14 @@ export const SimpleTabletop = () => {
   // Store wall geometry separately for fog computation
   const wallGeometryRef = useRef<any>(null);
   const wallGeometryInitializedRef = useRef(false);
-  
+
   // Combined visibility-blocking segments (walls + map objects)
   const combinedSegmentsRef = useRef<ReturnType<typeof mapObjectsToSegments>>([]);
-  
+
   // Aura tick throttle — recompute aura targets at ~5Hz (200ms)
   const lastAuraTickRef = useRef<number>(0);
   const AURA_TICK_INTERVAL = 200;
-  
+
   // Track previous map objects blocking state to detect changes (e.g., door toggle)
   const prevMapObjectsBlockingRef = useRef<string>('');
 
@@ -581,7 +580,7 @@ export const SimpleTabletop = () => {
   const setFogRevealAll = useCallback((revealAll: boolean) => {
     setMapFogSettings(selectedMapId || 'default-map', { revealAll });
   }, [selectedMapId, setMapFogSettings]);
-  
+
   // ---------------------------------------------------------------------------
   // Content-aware fog canvas bounds
   // ---------------------------------------------------------------------------
@@ -613,13 +612,13 @@ export const SimpleTabletop = () => {
 
   // Role store
   const { roles } = useRoleStore();
-  
+
   // Enable undo/redo with keyboard shortcuts
   useUndoRedo(true);
-  
+
   // Undoable actions
   const { moveTokenUndoable, moveRegionUndoable, transformRegionUndoable } = useUndoableActions();
-  
+
   // Texture loader for persistent region backgrounds
   useTextureLoader();
 
@@ -666,7 +665,7 @@ export const SimpleTabletop = () => {
       const { currentPlayerId: cpId, players: pls } = useSessionStore.getState();
       const cp = pls.find(p => p.id === cpId);
       if (!cp?.roleIds?.includes('dm')) return; // Only DM handles requests
-      
+
       setPendingTeleport({
         tokenId: data.tokenId,
         tokenName: data.tokenName,
@@ -749,7 +748,7 @@ export const SimpleTabletop = () => {
     requestingPlayerName?: string;
   } | null>(null);
   const fogScopeRef = useRef<paper.PaperScope | null>(null);
-  
+
   // Real-time vision preview during drag
   const dragPreviewVisibilityRef = useRef<Path2D | null>(null);
   const [dragPreviewPosition, setDragPreviewPosition] = useState<{ x: number; y: number; range: number } | null>(null);
@@ -803,12 +802,12 @@ export const SimpleTabletop = () => {
   // Performance optimization: Cache for token drawing to reduce redundant renders
   const tokenDrawCache = useRef<Map<string, { lastDrawn: number; data: any }>>(new Map());
 
-   // Track if fog needs recomputation
+  // Track if fog needs recomputation
   const [fogNeedsUpdate, setFogNeedsUpdate] = useState(false);
-  
+
   // Track previous dragging state to detect drag-end transitions
   const wasDraggingTokenRef = useRef(false);
-  
+
   // Counter to force re-render when images load
   const [imageLoadCounter, setImageLoadCounter] = useState(0);
 
@@ -904,7 +903,7 @@ export const SimpleTabletop = () => {
   // Ref mirror of rotationStartAngle — readable in mousemove without stale-closure issues.
   const rotationStartAngleRef = useRef(0);
   const [tempRegionRotation, setTempRegionRotation] = useState<{ [regionId: string]: number }>({});
-  
+
   // Marquee selection — use refs to avoid React re-renders (eliminates flicker)
   const isMarqueeSelectingRef = useRef(false);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -914,12 +913,12 @@ export const SimpleTabletop = () => {
   const marqueeStart = marqueeStartRef.current;
   const marqueeEnd = marqueeEndRef.current;
   const marqueeDivRef = useRef<HTMLDivElement>(null);
-  
+
   // Undo/Redo: Track initial states before transformations
   const [initialTokenState, setInitialTokenState] = useState<{ id: string; x: number; y: number } | null>(null);
   const [initialRegionState, setInitialRegionState] = useState<Partial<CanvasRegion> | null>(null);
   const [transformingRegionId, setTransformingRegionId] = useState<string | null>(null);
-  
+
   // MapObject dragging state (for edit mode)
   const [isDraggingMapObject, setIsDraggingMapObject] = useState(false);
   const [draggedMapObjectId, setDraggedMapObjectId] = useState<string | null>(null);
@@ -948,7 +947,7 @@ export const SimpleTabletop = () => {
   // Wall vertex dragging state
   const [isDraggingVertex, setIsDraggingVertex] = useState(false);
   const [draggedVertexInfo, setDraggedVertexInfo] = useState<{ mapObjectId: string; vertexIndex: number } | null>(null);
-  
+
   // Wall point edit mode - reset when selection changes
   const [wallPointEditMode, setWallPointEditMode] = useState(false);
   const prevSelectedMapObjectIdsRef = useRef<string[]>([]);
@@ -959,7 +958,7 @@ export const SimpleTabletop = () => {
       prevSelectedMapObjectIdsRef.current = selectedMapObjectIds;
     }
   }, [selectedMapObjectIds]);
-  
+
   // MapObject context menu state
   const [mapObjectContextMenu, setMapObjectContextMenu] = useState<{
     x: number;
@@ -982,7 +981,7 @@ export const SimpleTabletop = () => {
   // Check if current user is a DM (bypasses fog visibility restrictions)
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
-  
+
   // Get DM fog visibility preference
   const { dmFogVisibility } = useUiModeStore();
 
@@ -1104,26 +1103,22 @@ export const SimpleTabletop = () => {
     return true;
   }, [clearSelection, selectRegion, selectMultipleLights]);
 
-  // Register MENU, TOOLS, and MAP cards on mount (only once)
+  // Register Mega-Panels on mount (only once)
   useEffect(() => {
     // Small delay to ensure layout is loaded first
     const timer = setTimeout(() => {
-      // Register MENU card if it doesn't exist
-      if (!getCardByType(CardType.MENU)) {
-        registerCard({
-          type: CardType.MENU,
-          title: "Menu",
-          defaultPosition: { x: 20, y: 20 },
-          defaultSize: { width: 280, height: 500 },
-          minSize: { width: 250, height: 400 },
-          isResizable: true,
-          isClosable: false,
-          defaultVisible: true,
-        });
+      if (!getCardByType(CardType.ENVIRONMENT)) {
+        registerCard({ type: CardType.ENVIRONMENT, title: 'Environment' });
       }
-
-      // TOOLS card removed - replaced by VerticalToolbar component
-      // MAP card removed - deprecated Player View panel
+      if (!getCardByType(CardType.COMPENDIUM)) {
+        registerCard({ type: CardType.COMPENDIUM, title: 'Compendium' });
+      }
+      if (!getCardByType(CardType.PLAY)) {
+        registerCard({ type: CardType.PLAY, title: 'Play' });
+      }
+      if (!getCardByType(CardType.CAMPAIGN)) {
+        registerCard({ type: CardType.CAMPAIGN, title: 'Campaign' });
+      }
     }, 100);
 
     return () => clearTimeout(timer);
@@ -1366,22 +1361,22 @@ export const SimpleTabletop = () => {
           // Check for collision before finalizing the move
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
           const shouldEnforceCollisions = renderingMode === 'play';
-          
+
           console.log('[Collision Debug] Token drag ended', { enforceMovementBlocking, enforceRegionBounds, renderingMode });
-          
+
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
             const draggedToken = tokens.find(t => t.id === draggedTokenId);
             if (draggedToken) {
               // Use center point only (radius = 0) - allows tokens to pass through corridors
               // as long as their center can fit, regardless of token visual size
               const tokenRadius = 0;
-              
+
               const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
               const checkRegions = enforceRegionBounds ? regions : [];
-              
+
               console.log('[Collision Debug] Checking path', dragStartPos, '->', { x: draggedToken.x, y: draggedToken.y });
               console.log('[Collision Debug] Blocking objects:', blockingObjects.length);
-              
+
               const collisionResult = checkMovementCollision(
                 dragStartPos,
                 { x: draggedToken.x, y: draggedToken.y },
@@ -1390,9 +1385,9 @@ export const SimpleTabletop = () => {
                 checkRegions,
                 { enforceMovementBlocking, enforceRegionBounds }
               );
-              
+
               console.log('[Collision Debug] Result:', collisionResult);
-              
+
               if (collisionResult.blocked) {
                 // Show toast with details
                 let blockReason = '';
@@ -1400,26 +1395,26 @@ export const SimpleTabletop = () => {
                 if (collisionResult.collidedWith && collisionResult.collidedWith !== 'region_bounds') {
                   const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
                   const objName = blockingObj?.label || blockingObj?.category || 'obstacle';
-                  blockReason = blockingObj?.category === 'door' 
-                    ? `Blocked by closed door` 
+                  blockReason = blockingObj?.category === 'door'
+                    ? `Blocked by closed door`
                     : `Blocked by ${objName}`;
                   blockDetails = `Object: ${blockingObj?.category}${blockingObj?.label ? ` "${blockingObj.label}"` : ''} (ID: ${collisionResult.collidedWith?.slice(0, 8)}...)`;
                 } else {
                   blockReason = 'Left region boundary';
                   blockDetails = `Token tried to exit all regions (obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds})`;
                 }
-                
-                toast.error(blockReason, { 
+
+                toast.error(blockReason, {
                   duration: 3000,
                   description: blockDetails
                 });
                 triggerSound('movement.collision');
-                
+
                 // Snap back to original position
                 updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
               } else {
                 toast.success('Movement valid', { duration: 800 });
-                
+
                 // Check for portal teleportation after valid movement
                 checkPortalTeleport(draggedTokenId);
               }
@@ -1428,7 +1423,7 @@ export const SimpleTabletop = () => {
             // No collision enforcement — still check portal teleport
             checkPortalTeleport(draggedTokenId);
           }
-          
+
           emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
           markTokenDragEnd(draggedTokenId);
           unmarkDraggedForSync(draggedTokenId);
@@ -1572,27 +1567,27 @@ export const SimpleTabletop = () => {
   // Keyboard zoom with + and - keys, and panning with arrow keys/WASD
   useEffect(() => {
     const PAN_SPEED = 50; // Pixels to pan per keypress
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-      
+
       const canvas = canvasRef.current;
       if (!canvas) return;
-      
+
       // + or = (with or without shift) to zoom in
       if (e.key === '+' || e.key === '=' || (e.key === '=' && e.shiftKey)) {
         e.preventDefault();
         const zoomFactor = 1.15;
         const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
-        
+
         // Zoom towards center of viewport
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const zoomRatio = newZoom / transform.zoom;
-        
+
         setTransform({
           x: centerX - (centerX - transform.x) * zoomRatio,
           y: centerY - (centerY - transform.y) * zoomRatio,
@@ -1604,12 +1599,12 @@ export const SimpleTabletop = () => {
         e.preventDefault();
         const zoomFactor = 0.87;
         const newZoom = Math.max(0.1, Math.min(5, transform.zoom * zoomFactor));
-        
+
         // Zoom towards center of viewport
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const zoomRatio = newZoom / transform.zoom;
-        
+
         setTransform({
           x: centerX - (centerX - transform.x) * zoomRatio,
           y: centerY - (centerY - transform.y) * zoomRatio,
@@ -1779,7 +1774,7 @@ export const SimpleTabletop = () => {
       hasContent = true;
       const tokenCenterX = token.x;
       const tokenCenterY = token.y;
-      
+
       // Get illumination radius (use the largest one if multiple sources)
       let maxRadius = 0;
       if (token.illuminationSources && token.illuminationSources.length > 0) {
@@ -1797,10 +1792,10 @@ export const SimpleTabletop = () => {
       if (maxRadius === 0 && token.hasVision) {
         maxRadius = fogVisionRange * 40;
       }
-      
+
       const tokenRadius = Math.max(token.gridWidth, token.gridHeight) * 20;
       const totalRadius = tokenRadius + maxRadius;
-      
+
       minX = Math.min(minX, tokenCenterX - totalRadius);
       minY = Math.min(minY, tokenCenterY - totalRadius);
       maxX = Math.max(maxX, tokenCenterX + totalRadius);
@@ -1832,12 +1827,12 @@ export const SimpleTabletop = () => {
     // Include visible regions
     scopedRegions.forEach(region => {
       hasContent = true;
-      
+
       const regionX = region.x;
       const regionY = region.y;
       const regionW = region.width;
       const regionH = region.height;
-      
+
       minX = Math.min(minX, regionX);
       minY = Math.min(minY, regionY);
       maxX = Math.max(maxX, regionX + regionW);
@@ -2096,12 +2091,12 @@ export const SimpleTabletop = () => {
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
       combinedSegmentsRef.current = [...wallGeometryRef.current.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     }
-    
+
     // Clear visibility caches so fog recalculates with new segments
     notifyObstaclesChanged();
     tokenVisibilityCacheRef.current.clear();
     clearVisibilityCache(); // Also clear the global visibility cache
-    
+
     // Use requestAnimationFrame to ensure redraw happens after React's state update cycle
     // This prevents stale closures from causing out-of-sync renders
     requestAnimationFrame(() => {
@@ -2242,7 +2237,7 @@ export const SimpleTabletop = () => {
       wasDraggingTokenRef.current = true;
       return;
     }
-    
+
     // When drag just ended, clear all caches to force full recomputation
     // Paper.js cached paths can become stale after drag operations
     if (wasDraggingTokenRef.current) {
@@ -2285,7 +2280,7 @@ export const SimpleTabletop = () => {
 
           // Only consider tokens with vision enabled
           const tokensWithVision = tokensForVision.filter((t) => t.hasVision !== false);
-          
+
           console.log(`[Fog] Vision tokens: ${tokensWithVision.length}/${tokens.length}, cache: ${tokenVisibilityCacheRef.current.size}, visData: ${tokenVisibilityDataRef.current.length}`);
           const movedTokens: typeof tokens = [];
           const illuminationChangedTokens: typeof tokens = [];
@@ -2300,7 +2295,7 @@ export const SimpleTabletop = () => {
             if (!prevPos || prevPos.x !== token.x || prevPos.y !== token.y) {
               movedTokens.push(token);
             }
-            
+
             // Check if illumination range changed (requires visibility polygon recomputation)
             const prevIllum = prevTokenIlluminationRef.current.get(token.id);
             const currentRange = token.illuminationSources?.[0]?.range ?? token.visionRange ?? fogVisionRange;
@@ -2310,23 +2305,23 @@ export const SimpleTabletop = () => {
                 illuminationChangedTokens.push(token);
               }
             }
-            
+
             // Check if other illumination settings changed (doesn't require polygon recomputation)
             // Create a simple hash of relevant settings for comparison
-            const settingsHash = token.illuminationSources?.[0] 
+            const settingsHash = token.illuminationSources?.[0]
               ? JSON.stringify({
-                  brightZone: token.illuminationSources[0].brightZone,
-                  brightIntensity: token.illuminationSources[0].brightIntensity,
-                  dimIntensity: token.illuminationSources[0].dimIntensity,
-                  color: token.illuminationSources[0].color,
-                  colorEnabled: token.illuminationSources[0].colorEnabled,
-                  animation: token.illuminationSources[0].animation,
-                })
+                brightZone: token.illuminationSources[0].brightZone,
+                brightIntensity: token.illuminationSources[0].brightIntensity,
+                dimIntensity: token.illuminationSources[0].dimIntensity,
+                color: token.illuminationSources[0].color,
+                colorEnabled: token.illuminationSources[0].colorEnabled,
+                animation: token.illuminationSources[0].animation,
+              })
               : '';
             if (prevIllum?.settingsHash !== settingsHash) {
               illuminationSettingsChanged = true;
             }
-            
+
             // Update tracking for next comparison
             prevTokenIlluminationRef.current.set(token.id, {
               range: currentRange,
@@ -2364,17 +2359,17 @@ export const SimpleTabletop = () => {
           }
 
           // Determine what needs to be recomputed
-          const tokensNeedingVisibilityRecompute = mapObjectsBlockingChanged 
+          const tokensNeedingVisibilityRecompute = mapObjectsBlockingChanged
             ? tokensWithVision  // All tokens need recompute if blocking geometry changed
             : [...movedTokens, ...illuminationChangedTokens];
-          
+
           // Get light MapObjects as light sources for fog (only from active maps)
           const lightMapObjectSources = filteredMapObjects.filter(
             (obj) => obj.category === 'light' && obj.lightEnabled !== false
           );
-          
+
           // Check if token visibility data ref is stale (wrong count vs cache)
-          const visDataStale = tokenVisibilityDataRef.current.length !== 
+          const visDataStale = tokenVisibilityDataRef.current.length !==
             (tokenVisibilityCacheRef.current.size + lights.filter(l => l.enabled).length + lightMapObjectSources.length);
 
           // If no tokens need visibility recomputation AND illumination settings didn't change,
@@ -2403,61 +2398,61 @@ export const SimpleTabletop = () => {
             !mapObjectsBlockingChanged &&
             tokenVisibilityCacheRef.current.size === tokensWithVision.length
           );
-          
+
           console.log(`[Fog] Computing: recompute=${tokensNeedingVisibilityRecompute.length}, visionChanged=${visionStateChanged}, illuminChanged=${illuminationSettingsChanged}, visDataStale=${visDataStale}, skipPolygons=${skipPolygonRecomputation}`);
 
           // Compute visibility only for tokens that moved or had illumination range changes
           // Skip if all polygons are already cached and only vis data needs rebuilding
           if (!skipPolygonRecomputation) {
-          for (const token of tokensNeedingVisibilityRecompute) {
-            // Find token's region to get grid size
-            const tokenRegion = regions.find(
-              (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height,
-            );
-            const gridSize = tokenRegion?.gridSize || 40;
-            // Priority: per-token illumination range > token visionRange > global fogVisionRange
-            // illuminationSources[0].range is in grid units
-            const perTokenIlluminationRange = token.illuminationSources?.[0]?.range;
-            const tokenVisionRange = perTokenIlluminationRange ?? token.visionRange ?? fogVisionRange;
-            const visionRangePixels = tokenVisionRange * gridSize;
-
-            // Remove old cached vision for this token
-            const oldCached = tokenVisibilityCacheRef.current.get(token.id);
-            if (oldCached?.visionPath?.remove) oldCached.visionPath.remove();
-
-            // Compute new visibility for this token
-            // Use combined segments (walls + vision-blocking map objects)
-            const tokenVision = await computeTokenVisibilityPaper(
-              [token],
-              combinedSegmentsRef.current,
-              wallGeometry,
-              visionRangePixels,
-            );
-
-            // Cache the new vision path with illumination range for change detection.
-            // Also store a raw (non-circle-clipped) wall-occlusion Path2D for illumination.
-            // This avoids the paper.js scope mismatch that caused diagonal wedge clipping.
-            let wallOcclusionPath: Path2D | undefined;
-            if (combinedSegmentsRef.current.length > 0) {
-              const rawVis = computeVisibilityFromSegments(
-                { x: token.x, y: token.y },
-                combinedSegmentsRef.current,
-                visionRangePixels
+            for (const token of tokensNeedingVisibilityRecompute) {
+              // Find token's region to get grid size
+              const tokenRegion = regions.find(
+                (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height,
               );
-              if (rawVis.polygon.length > 2) {
-                wallOcclusionPath = visibilityPolygonToPath2D(rawVis.polygon);
-              }
-            }
-            tokenVisibilityCacheRef.current.set(token.id, {
-              position: { x: token.x, y: token.y },
-              visionPath: tokenVision,
-              illuminationRange: visionRangePixels,
-              wallOcclusionPath,
-            });
+              const gridSize = tokenRegion?.gridSize || 40;
+              // Priority: per-token illumination range > token visionRange > global fogVisionRange
+              // illuminationSources[0].range is in grid units
+              const perTokenIlluminationRange = token.illuminationSources?.[0]?.range;
+              const tokenVisionRange = perTokenIlluminationRange ?? token.visionRange ?? fogVisionRange;
+              const visionRangePixels = tokenVisionRange * gridSize;
 
-            // Update previous position
-            prevTokenPositionsRef.current.set(token.id, { x: token.x, y: token.y });
-          }
+              // Remove old cached vision for this token
+              const oldCached = tokenVisibilityCacheRef.current.get(token.id);
+              if (oldCached?.visionPath?.remove) oldCached.visionPath.remove();
+
+              // Compute new visibility for this token
+              // Use combined segments (walls + vision-blocking map objects)
+              const tokenVision = await computeTokenVisibilityPaper(
+                [token],
+                combinedSegmentsRef.current,
+                wallGeometry,
+                visionRangePixels,
+              );
+
+              // Cache the new vision path with illumination range for change detection.
+              // Also store a raw (non-circle-clipped) wall-occlusion Path2D for illumination.
+              // This avoids the paper.js scope mismatch that caused diagonal wedge clipping.
+              let wallOcclusionPath: Path2D | undefined;
+              if (combinedSegmentsRef.current.length > 0) {
+                const rawVis = computeVisibilityFromSegments(
+                  { x: token.x, y: token.y },
+                  combinedSegmentsRef.current,
+                  visionRangePixels
+                );
+                if (rawVis.polygon.length > 2) {
+                  wallOcclusionPath = visibilityPolygonToPath2D(rawVis.polygon);
+                }
+              }
+              tokenVisibilityCacheRef.current.set(token.id, {
+                position: { x: token.x, y: token.y },
+                visionPath: tokenVision,
+                illuminationRange: visionRangePixels,
+                wallOcclusionPath,
+              });
+
+              // Update previous position
+              prevTokenPositionsRef.current.set(token.id, { x: token.x, y: token.y });
+            }
           } // end skipPolygonRecomputation check
 
           // Merge all cached token visions
@@ -2589,7 +2584,7 @@ export const SimpleTabletop = () => {
               if (lightVision.remove) lightVision.remove();
             }
           }
-          
+
           // Add enabled light MapObjects to fog revelation
           for (const lightObj of lightMapObjectSources) {
             const radius = lightObj.lightRadius || 100;
@@ -2726,7 +2721,7 @@ export const SimpleTabletop = () => {
             getActiveExploredArea(),
             currentVisibilityRef.current
           );
-          
+
           if (!isRevealed) {
             // Token is in fog - check if DM can interact based on visibility setting
             if (!isDM || dmFogVisibility === 'hidden') {
@@ -2735,7 +2730,7 @@ export const SimpleTabletop = () => {
             // DM with 'semi-transparent' or 'full' mode can interact
           }
         }
-        
+
         return token;
       }
     }
@@ -3127,33 +3122,33 @@ export const SimpleTabletop = () => {
   // For animated GIFs, returns the current frame's ImageBitmap
   const getCachedImage = (url: string): HTMLImageElement | ImageBitmap | null => {
     if (!url) return null;
-    
+
     // Check for animated texture first - returns current frame if animated
     const animatedFrame = animatedTextureManager.getCurrentFrame(url);
     if (animatedFrame) return animatedFrame;
-    
+
     // If it might be animated but not loaded yet, preload it
     if (animatedTextureManager.mightBeAnimated(url)) {
       animatedTextureManager.preload(url);
     }
-    
+
     // Fall back to static image cache
     let img = imageCache.current.get(url);
-    
+
     if (!img) {
       img = new Image();
       img.crossOrigin = "anonymous";
       imageCache.current.set(url, img);
-      
+
       img.onload = () => {
         // Increment counter to trigger re-render when image loads
         setImageLoadCounter(c => c + 1);
       };
-      
+
       img.src = url;
       return null; // Image not ready yet
     }
-    
+
     if (!img.complete || img.naturalHeight === 0) return null;
     return img;
   };
@@ -3297,7 +3292,7 @@ export const SimpleTabletop = () => {
     // Skip region strokes since decorative walls will handle the edges
     // Use viewport culling for performance optimization
     const viewport: ViewportBounds = { x: viewX, y: viewY, width: viewWidth, height: viewHeight };
-    
+
     if (showRegions) {
       regions.forEach((region) => {
         // Get region bounds for viewport culling
@@ -3316,7 +3311,7 @@ export const SimpleTabletop = () => {
         } else {
           regionBounds = { x: region.x, y: region.y, width: region.width, height: region.height };
         }
-        
+
         // Skip rendering if region is outside viewport.
         // Use a zoom-aware margin so partially-visible large regions are never culled.
         // The margin is at least 200 world units, but scales up at low zoom so large
@@ -3325,12 +3320,12 @@ export const SimpleTabletop = () => {
         if (!isInViewport(regionBounds, viewport, viewportMargin)) {
           return;
         }
-        
+
         const dimmed = applyFocusDim(ctx, region.mapId);
         drawRegion(ctx, region, true); // skipStroke = true for both modes
         if (dimmed) restoreFocusDim(ctx);
       });
-      
+
       // Apply GPU-accelerated edge hatching if enabled
       if (isRegionEdgeReady) {
         applyRegionEdgeEffects(regions, transform);
@@ -3363,7 +3358,7 @@ export const SimpleTabletop = () => {
       wallGeometryRef.current = wallGeometry; // Update ref for fog computation
       cachedCanvas = wallDecorationCacheRef.current.canvas;
       cachedShadowCanvas = wallDecorationCacheRef.current.shadowCanvas;
-      
+
       // Update combined segments (walls + vision-blocking map objects + imported walls) - even with cached walls
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
       combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
@@ -3489,7 +3484,7 @@ export const SimpleTabletop = () => {
             window.dispatchEvent(new Event('fog:force-refresh'));
           });
         }
-        
+
         // Update combined segments (walls + vision-blocking map objects + imported walls)
         const mapObjectSegments = mapObjectsToSegments(mapObjects);
         combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
@@ -3545,7 +3540,7 @@ export const SimpleTabletop = () => {
         'rgba(0, 0, 0, 0.25)'
       );
     }
-    
+
     // Compute portal activation flash progress (0-1, 600ms duration)
     const now = performance.now();
     const FLASH_DURATION = 600;
@@ -3605,13 +3600,13 @@ export const SimpleTabletop = () => {
         // 8 handle positions (local, before rotation)
         const rawHandles = [
           { x: cx - hw, y: cy - hh }, // nw
-          { x: cx,      y: cy - hh }, // n
+          { x: cx, y: cy - hh }, // n
           { x: cx + hw, y: cy - hh }, // ne
-          { x: cx + hw, y: cy      }, // e
+          { x: cx + hw, y: cy }, // e
           { x: cx + hw, y: cy + hh }, // se
-          { x: cx,      y: cy + hh }, // s
+          { x: cx, y: cy + hh }, // s
           { x: cx - hw, y: cy + hh }, // sw
-          { x: cx - hw, y: cy      }, // w
+          { x: cx - hw, y: cy }, // w
         ];
 
         ctx.save();
@@ -3679,7 +3674,7 @@ export const SimpleTabletop = () => {
 
     // Draw highlighted grids (if any) - below tokens in z-order
     drawHighlightedGrids(ctx);
-    
+
     // Marquee is now rendered as a DOM div above the fog layer (see marqueeDivRef in JSX)
     // No canvas drawing needed here — this avoids z-order issues with fog post-processing.
 
@@ -3689,7 +3684,7 @@ export const SimpleTabletop = () => {
       const annotationObjs = mapObjects.filter(o => o.category === 'annotation');
       annotationObjs.forEach((annotation) => {
         const { x, y } = annotation.position;
-        
+
         // Check if annotation is in revealed area (for visibility and DM effects)
         let isInFog = false;
         if (isPlayModeForAnnotations && fogEnabled && !fogRevealAll) {
@@ -3710,14 +3705,14 @@ export const SimpleTabletop = () => {
             isInFog = dmFogVisibility === 'semi-transparent'; // Only fade if semi-transparent mode
           }
         }
-        
+
         targetCtx.save();
-        
+
         // Apply semi-transparency for DM viewing fog-covered annotations (only in semi-transparent mode)
         if (isInFog) {
           targetCtx.globalAlpha = 0.4;
         }
-        
+
         const radius = 12 / transform.zoom;
         const fontSize = 10 / transform.zoom;
         const isSelected = selectedAnnotationId === annotation.id;
@@ -3759,7 +3754,7 @@ export const SimpleTabletop = () => {
         // Use temporary position if available (during region drag)
         const tempPos = tempTokenPositions?.[token.id];
         const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
-        
+
         // Check if token is in fog (for DM visibility modes)
         // "Darkness returns" rule: tokens require active illumination to be visible
         // Exception: players always see their own (friendly) tokens
@@ -3767,24 +3762,24 @@ export const SimpleTabletop = () => {
         let shouldSkipToken = false;
         if (isPlayMode && fogEnabled && !fogRevealAll) {
           const tokenPoint = { x: renderToken.x, y: renderToken.y };
-          
+
           // Use stable visibility snapshot during drag to prevent flashing
           // The stable snapshot is captured at drag start and doesn't change during movement
           const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
             ? stableVisibilityRef.current
             : currentVisibilityRef.current;
-          
+
           // Check if token is currently illuminated (in active light/vision)
           const isCurrentlyIlluminated = isPointInVisibleArea(
             tokenPoint,
             visibilityToCheck
           );
-          
+
           // Check token ownership - friendly tokens always visible to their owner
           const tokenPlayer = players.find((p) => p.id === currentPlayerId);
           const relationship = tokenPlayer ? getTokenRelationship(renderToken, tokenPlayer, roles) : 'neutral';
           const isFriendlyToken = relationship === 'friendly';
-          
+
           if (!isCurrentlyIlluminated) {
             if (!isDM) {
               // Players always see their own (friendly) tokens, even in darkness
@@ -3802,9 +3797,9 @@ export const SimpleTabletop = () => {
             }
           }
         }
-        
+
         if (shouldSkipToken) return;
-        
+
         // Apply focus dim for tokens on non-focused maps
         const tokenDimmed = applyFocusDim(targetCtx, renderToken.mapId);
         drawTokenToContext(targetCtx, renderToken, tokenInFog);
@@ -3892,18 +3887,18 @@ export const SimpleTabletop = () => {
 
       // Draw main token (image or color fill)
       const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
-      
+
       if (tokenImg) {
         // Draw elliptical clipped image
         targetCtx.save();
         targetCtx.beginPath();
         targetCtx.ellipse(token.x, token.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         targetCtx.clip();
-        
+
         // Draw image centered and scaled to fit the ellipse bounds
         targetCtx.drawImage(tokenImg, token.x - radiusX, token.y - radiusY, tokenWidth, tokenHeight);
         targetCtx.restore();
-        
+
         // Draw border on top
         targetCtx.strokeStyle = roleBorderColor;
         targetCtx.lineWidth = 3 / transform.zoom;
@@ -4071,7 +4066,7 @@ export const SimpleTabletop = () => {
         // IMPORTANT: Render fog to an offscreen canvas first, then composite onto main canvas.
         // This prevents destination-out from cutting through the floor textures beneath fog.
         // Without this, destination-out would make holes through the ENTIRE canvas (including regions).
-        
+
         // Create or reuse offscreen fog canvas
         let fogOffscreenCanvas = (window as any).__fogOffscreenCanvas as HTMLCanvasElement | undefined;
         if (!fogOffscreenCanvas || fogOffscreenCanvas.width !== canvas.width || fogOffscreenCanvas.height !== canvas.height) {
@@ -4080,17 +4075,17 @@ export const SimpleTabletop = () => {
           fogOffscreenCanvas.height = Math.max(1, canvas.height);
           (window as any).__fogOffscreenCanvas = fogOffscreenCanvas;
         }
-        
+
         const fogCtx = fogOffscreenCanvas.getContext('2d');
         if (fogCtx) {
           // Clear the offscreen fog canvas
           fogCtx.clearRect(0, 0, fogOffscreenCanvas.width, fogOffscreenCanvas.height);
-          
+
           // Apply the same transform as main canvas
           fogCtx.save();
           fogCtx.translate(transform.x, transform.y);
           fogCtx.scale(transform.zoom, transform.zoom);
-          
+
           // Render base fog layers to offscreen canvas
           fogCtx.fillStyle = `rgba(0, 0, 0, ${effectiveFogOpacity})`;
           fogCtx.fill(fogMasksRef.current.unexploredMask);
@@ -4107,7 +4102,7 @@ export const SimpleTabletop = () => {
               fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
               fogCtx.fill(visibilityPath);
             });
-            
+
             // Composite real-time drag preview visibility (when feature enabled)
             if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current) {
               fogCtx.fillStyle = "rgba(255, 255, 255, 1)";
@@ -4116,9 +4111,9 @@ export const SimpleTabletop = () => {
 
             fogCtx.globalCompositeOperation = "source-over";
           }
-          
+
           fogCtx.restore();
-          
+
           // Now composite the fog canvas onto the main canvas
           // The main canvas still has regions/textures intact; we're just overlaying fog with transparent holes
           if (fogOffscreenCanvas.width > 0 && fogOffscreenCanvas.height > 0) {
@@ -4178,7 +4173,7 @@ export const SimpleTabletop = () => {
         // in applyFogPostProcessing (identity check avoids expensive Canvas 2D redraws).
         // Only create a new array when adding drag preview sources below.
         let illuminationSources = illuminationSourcesCacheRef.current!;
-        
+
         // Add real-time drag preview as an additional illumination source
         if (isDraggingToken && realtimeVisionDuringDrag && dragPreviewVisibilityRef.current && dragPreviewPosition && draggedTokenId) {
           const draggedToken = tokens.find(t => t.id === draggedTokenId);
@@ -4209,7 +4204,7 @@ export const SimpleTabletop = () => {
             }];
           }
         }
-        
+
         applyPostProcessingEffects(
           ctx,
           fogMasksRef.current,
@@ -4301,7 +4296,7 @@ export const SimpleTabletop = () => {
       }
       // Draw remote drag paths before tokens too
       drawRemoteDragDecorations(ctx, 'path');
-      
+
       drawTokensToContext(ctx);
 
       // ── Pinned above-token effects ──
@@ -4327,7 +4322,7 @@ export const SimpleTabletop = () => {
           }
         }
       }
-      
+
       // Draw drag ghost on top of tokens (only for non-overlay mode)
       if (isDraggingToken && draggedTokenId) {
         drawDragGhostAndPath(ctx);
@@ -4354,19 +4349,19 @@ export const SimpleTabletop = () => {
     // When post-processing is enabled with fog, also draw tokens/annotations to overlay canvas
     const usePostProcessing = isPostProcessingReadyRef.current && effectSettings.postProcessingEnabled;
     const overlayCanvas = overlayCanvasRef.current;
-    
+
     if (overlayCanvas) {
       const overlayCtx = overlayCanvas.getContext('2d');
       if (overlayCtx) {
         // Clear overlay canvas
         overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        
+
         if (usePostProcessing) {
           // Draw off-screen indicators to overlay
           offScreenTokens.forEach((token) => {
             drawOffScreenIndicator(overlayCtx, token, viewX, viewY, viewWidth, viewHeight);
           });
-          
+
           // When fog is enabled with post-processing, draw tokens/annotations to overlay
           // so they appear above the PixiJS fog layer
           if (fogEnabled) {
@@ -4374,10 +4369,10 @@ export const SimpleTabletop = () => {
             overlayCtx.save();
             overlayCtx.translate(transform.x, transform.y);
             overlayCtx.scale(transform.zoom, transform.zoom);
-            
+
             // Draw annotations first (below tokens)
             drawAnnotationsToContext(overlayCtx);
-            
+
             // ── Placed spell/trap effects BELOW tokens on overlay ──
             {
               const effectState = useEffectStore.getState();
@@ -4416,7 +4411,7 @@ export const SimpleTabletop = () => {
               drawDragPathOnly(overlayCtx);
             }
             drawRemoteDragDecorations(overlayCtx, 'path');
-            
+
             // Draw tokens on top of effects
             drawTokensToContext(overlayCtx);
 
@@ -4443,7 +4438,7 @@ export const SimpleTabletop = () => {
                 }
               }
             }
-            
+
             // Draw drag ghost on overlay so it appears above tokens
             if (isDraggingToken && draggedTokenId) {
               drawDragGhostAndPath(overlayCtx);
@@ -4594,7 +4589,7 @@ export const SimpleTabletop = () => {
 
     // Draw ghost token at original position (on top of everything)
     drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
-    
+
     // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
   };
 
@@ -5258,7 +5253,7 @@ export const SimpleTabletop = () => {
     // TODO: For grid movement, this will use grid-based pathfinding algorithms
 
     const gridSize = 40; // Grid unit size in pixels
-    
+
     // Get token path styling settings (use defaults if not set)
     const pathStyle = token.pathStyle || 'dashed';
     const pathColor = token.pathColor || token.color || '#ffffff';
@@ -5330,7 +5325,7 @@ export const SimpleTabletop = () => {
         const baseTokenSize = 40;
         const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
         const footprintSize = tokenSize * 0.3 * (pathWeight / 3); // Scale with pathWeight
-        
+
         drawFootprintPath(
           ctx,
           dragPath,
@@ -5801,14 +5796,14 @@ export const SimpleTabletop = () => {
     // Use preview data if available, otherwise use region data
     const effectiveRegion = preview
       ? {
-          ...region,
-          x: preview.x ?? region.x,
-          y: preview.y ?? region.y,
-          width: preview.width ?? region.width,
-          height: preview.height ?? region.height,
-          pathPoints: preview.pathPoints ?? region.pathPoints,
-          bezierControlPoints: preview.bezierControlPoints ?? region.bezierControlPoints,
-        }
+        ...region,
+        x: preview.x ?? region.x,
+        y: preview.y ?? region.y,
+        width: preview.width ?? region.width,
+        height: preview.height ?? region.height,
+        pathPoints: preview.pathPoints ?? region.pathPoints,
+        bezierControlPoints: preview.bezierControlPoints ?? region.bezierControlPoints,
+      }
       : region;
 
     if (effectiveRegion.regionType === "path" && effectiveRegion.pathPoints && effectiveRegion.pathPoints.length > 2) {
@@ -6012,13 +6007,13 @@ export const SimpleTabletop = () => {
     // Check for animated texture first
     const animatedFrame = animatedTextureManager.getCurrentFrame(region.backgroundImage);
     const isAnimated = animatedFrame !== null;
-    
+
     // For animated textures, use the current frame directly
     // For static textures, use the image cache
     let img: HTMLImageElement | ImageBitmap | null = null;
     let imgWidth: number;
     let imgHeight: number;
-    
+
     if (isAnimated) {
       img = animatedFrame;
       imgWidth = animatedFrame.width;
@@ -6028,7 +6023,7 @@ export const SimpleTabletop = () => {
       if (animatedTextureManager.mightBeAnimated(region.backgroundImage)) {
         animatedTextureManager.preload(region.backgroundImage);
       }
-      
+
       let staticImg = imageCache.current.get(region.backgroundImage);
 
       if (!staticImg) {
@@ -6044,13 +6039,13 @@ export const SimpleTabletop = () => {
           // Trigger re-render when image loads
           setImageLoadCounter(c => c + 1);
         };
-        
+
         staticImg.onerror = () => {
           console.warn('Failed to load region background image:', region.backgroundImage?.substring(0, 50));
         };
 
         staticImg.src = region.backgroundImage;
-        
+
         // Draw placeholder while loading (blue = loading)
         ctx.fillStyle = "rgba(100, 100, 200, 0.5)";
         ctx.fillRect(region.x, region.y, region.width, region.height);
@@ -6064,7 +6059,7 @@ export const SimpleTabletop = () => {
         ctx.fillRect(region.x, region.y, region.width, region.height);
         return;
       }
-      
+
       img = staticImg;
       imgWidth = staticImg.naturalWidth;
       imgHeight = staticImg.naturalHeight;
@@ -6156,7 +6151,7 @@ export const SimpleTabletop = () => {
       const startY = y + offsetY - scaledHeight;
       const endX = x + width + scaledWidth;
       const endY = y + height + scaledHeight;
-      
+
       for (let tileY = startY; tileY < endY; tileY += scaledHeight) {
         for (let tileX = startX; tileX < endX; tileX += scaledWidth) {
           ctx.drawImage(img, tileX, tileY, scaledWidth, scaledHeight);
@@ -6171,7 +6166,7 @@ export const SimpleTabletop = () => {
         scale,
         repeat
       );
-      
+
       if (pattern) {
         // Apply world-space positioning for continuous texture tiling
         // offsetX/offsetY are pre-calculated to align with world origin (0,0)
@@ -6473,8 +6468,8 @@ export const SimpleTabletop = () => {
     const liveMapObjects = useMapObjectStore.getState().mapObjects;
     // Read regions from BOTH the live Zustand store AND the React closure to handle
     // cases where store rehydration or dragPreview lag causes mismatches.
-    const liveRegions    = useRegionStore.getState().regions;
-    const liveLights     = useLightStore.getState().lights;
+    const liveRegions = useRegionStore.getState().regions;
+    const liveLights = useLightStore.getState().lights;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const expand = (x: number, y: number) => {
       if (x < minX) minX = x; if (y < minY) minY = y;
@@ -6503,9 +6498,9 @@ export const SimpleTabletop = () => {
       } else {
         const cx = rx + rw / 2;
         const cy = ry + rh / 2;
-        expandRotated(cx, cy, rx,      ry,      rot);
-        expandRotated(cx, cy, rx + rw, ry,      rot);
-        expandRotated(cx, cy, rx,      ry + rh, rot);
+        expandRotated(cx, cy, rx, ry, rot);
+        expandRotated(cx, cy, rx + rw, ry, rot);
+        expandRotated(cx, cy, rx, ry + rh, rot);
         expandRotated(cx, cy, rx + rw, ry + rh, rot);
       }
     };
@@ -6606,14 +6601,14 @@ export const SimpleTabletop = () => {
     const groupW = b.maxX - b.minX;
     const groupH = b.maxY - b.minY;
     const resizeHandles = [
-      { x: b.minX,           y: b.minY },            // nw
-      { x: b.minX + groupW/2, y: b.minY },           // n
-      { x: b.maxX,           y: b.minY },            // ne
-      { x: b.maxX,           y: b.minY + groupH/2 }, // e
-      { x: b.maxX,           y: b.maxY },            // se
-      { x: b.minX + groupW/2, y: b.maxY },           // s
-      { x: b.minX,           y: b.maxY },            // sw
-      { x: b.minX,           y: b.minY + groupH/2 }, // w
+      { x: b.minX, y: b.minY },            // nw
+      { x: b.minX + groupW / 2, y: b.minY },           // n
+      { x: b.maxX, y: b.minY },            // ne
+      { x: b.maxX, y: b.minY + groupH / 2 }, // e
+      { x: b.maxX, y: b.maxY },            // se
+      { x: b.minX + groupW / 2, y: b.maxY },           // s
+      { x: b.minX, y: b.maxY },            // sw
+      { x: b.minX, y: b.minY + groupH / 2 }, // w
     ];
     ctx.fillStyle = '#4f46e5';
     ctx.strokeStyle = '#ffffff';
@@ -6697,13 +6692,13 @@ export const SimpleTabletop = () => {
     const hh = obj.height / 2;
     const handles: [string, number, number][] = [
       ['nw', cx - hw, cy - hh],
-      ['n',  cx,      cy - hh],
+      ['n', cx, cy - hh],
       ['ne', cx + hw, cy - hh],
-      ['e',  cx + hw, cy     ],
+      ['e', cx + hw, cy],
       ['se', cx + hw, cy + hh],
-      ['s',  cx,      cy + hh],
+      ['s', cx, cy + hh],
       ['sw', cx - hw, cy + hh],
-      ['w',  cx - hw, cy     ],
+      ['w', cx - hw, cy],
     ];
     for (const [name, hx, hy] of handles) {
       if (Math.abs(lx - hx) <= hitSize && Math.abs(ly - hy) <= hitSize) return name;
@@ -7133,19 +7128,19 @@ export const SimpleTabletop = () => {
 
     // Draw main token (image or color fill)
     const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
-    
+
     if (tokenImg) {
       // Draw circular clipped image
       ctx.save();
       ctx.beginPath();
       ctx.arc(token.x, token.y, radius, 0, 2 * Math.PI);
       ctx.clip();
-      
+
       // Draw image centered and scaled to fit
       const size = radius * 2;
       ctx.drawImage(tokenImg, token.x - radius, token.y - radius, size, size);
       ctx.restore();
-      
+
       // Draw border on top
       if (isSelected) {
         ctx.strokeStyle = "#ffffff";
@@ -7313,7 +7308,7 @@ export const SimpleTabletop = () => {
       // Get the bounding box of the flex container, rather than the canvas itself,
       // so we correctly size WebGL to the newly allocated flex space.
       const rect = canvasContainerRef.current.getBoundingClientRect();
-      
+
       canvas.width = rect.width;
       canvas.height = rect.height;
       if (overlayCanvas) {
@@ -7321,7 +7316,7 @@ export const SimpleTabletop = () => {
         overlayCanvas.height = rect.height;
       }
       setCanvasDimensions({ width: rect.width, height: rect.height });
-      
+
       // Batch redraw to avoid ResizeObserver loop limits
       requestAnimationFrame(() => redrawCanvas());
     };
@@ -7333,7 +7328,7 @@ export const SimpleTabletop = () => {
     if (canvasContainerRef.current) {
       resizeObserver.observe(canvasContainerRef.current);
     }
-    
+
     // Keep window resize as a fallback for viewport rotations or maximize
     window.addEventListener("resize", handleResize);
 
@@ -7381,12 +7376,12 @@ export const SimpleTabletop = () => {
 
   // Animation loop for hostile tokens, hover effects, and illumination animations
   const animationsPaused = useUiModeStore((state) => state.animationsPaused);
-  
+
   useEffect(() => {
     // If animations are paused or in edit mode, don't run the loop
     // Edit mode needs stable rendering for region controls
     if (animationsPaused || renderingMode === 'edit') return;
-    
+
     const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
     // Check if there are any hostile tokens
@@ -7394,21 +7389,21 @@ export const SimpleTabletop = () => {
       const relationship = getTokenRelationship(token, currentPlayer, roles);
       return relationship === "hostile";
     }) : false;
-    
+
     // Check if there are any animated illumination sources (on tokens or standalone)
-    const hasAnimatedIllumination = tokens.some((token) => 
+    const hasAnimatedIllumination = tokens.some((token) =>
       token.illuminationSources?.some((source) => source.animation && source.animation !== 'none')
     );
-    
+
     // Check for active effect animations or placement preview
     const effectState = useEffectStore.getState();
     const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant' || !!e.dismissedAt);
     const hasEffectPlacement = !!effectState.placement;
 
     // Check if there are any animated textures (GIFs) on tokens, regions, or effects
-    const hasAnimatedTextures = tokens.some((token) => 
+    const hasAnimatedTextures = tokens.some((token) =>
       token.imageUrl && animatedTextureManager.isAnimated(token.imageUrl)
-    ) || regions.some((region) => 
+    ) || regions.some((region) =>
       region.backgroundImage && animatedTextureManager.isAnimated(region.backgroundImage)
     ) || effectState.placedEffects.some(e =>
       e.template.texture && animatedTextureManager.isAnimated(e.template.texture)
@@ -7467,14 +7462,14 @@ export const SimpleTabletop = () => {
     const en = toScreen(end.x, end.y);
 
     const left = Math.min(s.sx, en.sx);
-    const top  = Math.min(s.sy, en.sy);
-    const w    = Math.abs(en.sx - s.sx);
-    const h    = Math.abs(en.sy - s.sy);
+    const top = Math.min(s.sy, en.sy);
+    const w = Math.abs(en.sx - s.sx);
+    const h = Math.abs(en.sy - s.sy);
 
-    div.style.left    = `${left}px`;
-    div.style.top     = `${top}px`;
-    div.style.width   = `${w}px`;
-    div.style.height  = `${h}px`;
+    div.style.left = `${left}px`;
+    div.style.top = `${top}px`;
+    div.style.width = `${w}px`;
+    div.style.height = `${h}px`;
     div.style.display = 'block';
   };
 
@@ -8082,20 +8077,20 @@ export const SimpleTabletop = () => {
     // In play mode with fog enabled, check visibility before showing context menus
     const isPlayMode = renderingMode === 'play';
     const currentPlayer = players.find(p => p.id === currentPlayerId);
-    
+
     if (isPlayMode && fogEnabled && currentPlayer) {
       // Check if player has DM-level permissions to bypass fog
-      const hasFogBypass = roles.some(role => 
+      const hasFogBypass = roles.some(role =>
         currentPlayer.roleIds.includes(role.id) && role.permissions.canSeeAllFog
       );
-      
+
       if (!hasFogBypass) {
         const point = { x: worldPos.x, y: worldPos.y };
         const isVisible = isPointInVisibleArea(point, currentVisibilityRef.current);
-        const isExplored = getActiveExploredArea() 
+        const isExplored = getActiveExploredArea()
           ? isPointInRevealedArea(point, getActiveExploredArea(), currentVisibilityRef.current)
           : false;
-        
+
         // For tokens and regions hidden by fog, block context menu for players
         if (!isVisible && !isExplored) {
           return; // Block context menu entirely
@@ -8263,11 +8258,9 @@ export const SimpleTabletop = () => {
 
       const isDisabled = "disabled" in item && item.disabled;
       const menuItem = document.createElement("div");
-      menuItem.className = `px-3 py-2 text-sm rounded flex items-center gap-2 ${
-        isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-accent"
-      } ${
-        "danger" in item && item.danger ? "text-destructive" : ""
-      } ${"active" in item && item.active ? "bg-accent font-medium" : ""}`;
+      menuItem.className = `px-3 py-2 text-sm rounded flex items-center gap-2 ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-accent"
+        } ${"danger" in item && item.danger ? "text-destructive" : ""
+        } ${"active" in item && item.active ? "bg-accent font-medium" : ""}`;
       menuItem.innerHTML = `<span>${"icon" in item ? item.icon : ""}</span> ${"label" in item ? item.label : ""}${"active" in item && item.active ? " ✓" : ""}`;
       menuItem.onclick = () => {
         if (isDisabled) return;
@@ -8496,7 +8489,7 @@ export const SimpleTabletop = () => {
         const dy = worldPos.y - ann.position.y;
         const radius = 12;
         if (Math.sqrt(dx * dx + dy * dy) > radius) return false;
-        
+
         // In play mode with fog enabled, check if annotation is in revealed area
         if (renderingMode === 'play' && fogEnabled && !fogRevealAll) {
           const annotationPoint = { x: ann.position.x, y: ann.position.y };
@@ -8511,7 +8504,7 @@ export const SimpleTabletop = () => {
             }
           }
         }
-        
+
         return true;
       });
 
@@ -8598,84 +8591,84 @@ export const SimpleTabletop = () => {
           if (selectedRegion.locked) {
             // Allow clicking but no transformations
           } else {
-          // Check for resize/anchor/bezier handles
-          const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
-          if (handle) {
-            // All handles (node, cp, and resize) use the same resizing mechanism
-            setIsResizingRegion(true);
-            setResizeHandle(handle);
-            setDraggedRegionId(selectedRegion.id);
-            return;
-          }
-
-          // Check for rotation handle
-          if (isOverRotationHandle(worldPos.x, worldPos.y, selectedRegion)) {
-            setIsRotatingRegion(true);
-            setDraggedRegionId(selectedRegion.id);
-
-            // Snapshot all group siblings at rotation start
-            const rotGroup1 = useGroupStore.getState().getGroupForEntity(selectedRegion.id);
-            if (rotGroup1) {
-              // Compute FRESH centroid from ALL members as the single shared pivot
-              const pivot = computeGroupCentroid(rotGroup1);
-              groupRotationPivotRef.current = pivot;
-              // start angle set below alongside the ref update
-
-              const snap: typeof groupSiblingSnapshotsRef.current = {};
-              for (const m of rotGroup1.members) {
-                if (m.type === 'mapObject') {
-                  const o = mapObjects.find(x => x.id === m.id);
-                  if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
-                } else if (m.type === 'region') {
-                  const r = regions.find(x => x.id === m.id);
-                  if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined, regRotation: r.rotation || 0 };
-                } else if (m.type === 'light') {
-                  const l = useLightStore.getState().lights.find(x => x.id === m.id);
-                  if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
-                } else if (m.type === 'token') {
-                  const t = tokens.find(x => x.id === m.id);
-                  if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
-                }
-              }
-              groupSiblingSnapshotsRef.current = snap;
-              groupFrozenAABBRef.current = computeGroupAABB(rotGroup1);
-              rotationStartAngleRef.current = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
-              setRotationStartAngle(rotationStartAngleRef.current);
-            } else {
-              // No group — use the region's own center. Still snapshot the primary region so
-              // mousemove always uses a stable ref baseline (avoids the compounding-delta bug).
-              const centerX = selectedRegion.x + selectedRegion.width / 2;
-              const centerY = selectedRegion.y + selectedRegion.height / 2;
-              groupRotationPivotRef.current = null;
-              const startAngle = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
-              rotationStartAngleRef.current = startAngle;
-              setRotationStartAngle(startAngle);
-              // Snapshot the solo region so primarySnap is available in mousemove
-              groupSiblingSnapshotsRef.current = {
-                [selectedRegion.id]: {
-                  type: 'region',
-                  x: selectedRegion.x, y: selectedRegion.y,
-                  width: selectedRegion.width, height: selectedRegion.height,
-                  pathPoints: selectedRegion.pathPoints ? selectedRegion.pathPoints.map(p => ({ ...p })) : undefined,
-                  regRotation: selectedRegion.rotation || 0,
-                }
-              };
+            // Check for resize/anchor/bezier handles
+            const handle = getResizeHandle(selectedRegion, worldPos.x, worldPos.y);
+            if (handle) {
+              // All handles (node, cp, and resize) use the same resizing mechanism
+              setIsResizingRegion(true);
+              setResizeHandle(handle);
+              setDraggedRegionId(selectedRegion.id);
+              return;
             }
 
-            // Group tokens for rotation
-            const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
-            tokens.forEach((token) => {
-              if (isPointInRegion(token.x, token.y, selectedRegion)) {
-                tokensInRegion.push({
-                  tokenId: token.id,
-                  startX: token.x,
-                  startY: token.y,
-                });
+            // Check for rotation handle
+            if (isOverRotationHandle(worldPos.x, worldPos.y, selectedRegion)) {
+              setIsRotatingRegion(true);
+              setDraggedRegionId(selectedRegion.id);
+
+              // Snapshot all group siblings at rotation start
+              const rotGroup1 = useGroupStore.getState().getGroupForEntity(selectedRegion.id);
+              if (rotGroup1) {
+                // Compute FRESH centroid from ALL members as the single shared pivot
+                const pivot = computeGroupCentroid(rotGroup1);
+                groupRotationPivotRef.current = pivot;
+                // start angle set below alongside the ref update
+
+                const snap: typeof groupSiblingSnapshotsRef.current = {};
+                for (const m of rotGroup1.members) {
+                  if (m.type === 'mapObject') {
+                    const o = mapObjects.find(x => x.id === m.id);
+                    if (o) snap[m.id] = { type: 'mapObject', position: { ...o.position }, rotation: o.rotation || 0, wallPoints: o.wallPoints ? o.wallPoints.map(p => ({ ...p })) : undefined };
+                  } else if (m.type === 'region') {
+                    const r = regions.find(x => x.id === m.id);
+                    if (r) snap[m.id] = { type: 'region', x: r.x, y: r.y, width: r.width, height: r.height, pathPoints: r.pathPoints ? r.pathPoints.map(p => ({ ...p })) : undefined, regRotation: r.rotation || 0 };
+                  } else if (m.type === 'light') {
+                    const l = useLightStore.getState().lights.find(x => x.id === m.id);
+                    if (l) snap[m.id] = { type: 'light', lightPos: { ...l.position } };
+                  } else if (m.type === 'token') {
+                    const t = tokens.find(x => x.id === m.id);
+                    if (t) snap[m.id] = { type: 'token', position: { x: t.x, y: t.y } };
+                  }
+                }
+                groupSiblingSnapshotsRef.current = snap;
+                groupFrozenAABBRef.current = computeGroupAABB(rotGroup1);
+                rotationStartAngleRef.current = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
+                setRotationStartAngle(rotationStartAngleRef.current);
+              } else {
+                // No group — use the region's own center. Still snapshot the primary region so
+                // mousemove always uses a stable ref baseline (avoids the compounding-delta bug).
+                const centerX = selectedRegion.x + selectedRegion.width / 2;
+                const centerY = selectedRegion.y + selectedRegion.height / 2;
+                groupRotationPivotRef.current = null;
+                const startAngle = calculateAngle(centerX, centerY, worldPos.x, worldPos.y);
+                rotationStartAngleRef.current = startAngle;
+                setRotationStartAngle(startAngle);
+                // Snapshot the solo region so primarySnap is available in mousemove
+                groupSiblingSnapshotsRef.current = {
+                  [selectedRegion.id]: {
+                    type: 'region',
+                    x: selectedRegion.x, y: selectedRegion.y,
+                    width: selectedRegion.width, height: selectedRegion.height,
+                    pathPoints: selectedRegion.pathPoints ? selectedRegion.pathPoints.map(p => ({ ...p })) : undefined,
+                    regRotation: selectedRegion.rotation || 0,
+                  }
+                };
               }
-            });
-            setGroupedTokens(tokensInRegion);
-            return;
-          }
+
+              // Group tokens for rotation
+              const tokensInRegion: { tokenId: string; startX: number; startY: number }[] = [];
+              tokens.forEach((token) => {
+                if (isPointInRegion(token.x, token.y, selectedRegion)) {
+                  tokensInRegion.push({
+                    tokenId: token.id,
+                    startX: token.x,
+                    startY: token.y,
+                  });
+                }
+              });
+              setGroupedTokens(tokensInRegion);
+              return;
+            }
           } // end locked check
         }
       }
@@ -8696,7 +8689,7 @@ export const SimpleTabletop = () => {
       if (!clickedMapObject && renderingMode === 'edit' && selectedMapObjectIds.length === 1) {
         const selMObj = mapObjects.find(
           o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape !== 'wall' &&
-               !useGroupStore.getState().isEntityInAnyGroup(o.id)
+            !useGroupStore.getState().isEntityInAnyGroup(o.id)
         );
         if (selMObj) {
           const overRot = isOverMapObjectRotationHandle(selMObj, worldPos.x, worldPos.y);
@@ -8738,12 +8731,12 @@ export const SimpleTabletop = () => {
         // Store original position for ghost and path
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
         dragPathRef.current = [{ x: clickedToken.x, y: clickedToken.y }];
-        
+
         // Capture stable visibility snapshot at drag start to prevent flashing
         if (currentVisibilityRef.current) {
           stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
         }
-        
+
         // Capture initial state for undo
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
@@ -9320,24 +9313,24 @@ export const SimpleTabletop = () => {
         hasWallGeometry: !!wallGeometryRef.current,
         wallSegmentsCount: wallGeometryRef.current?.wallSegments?.length ?? 0
       });
-      
+
       if (realtimeVisionDuringDrag && fogEnabled && !fogRevealAll) {
         const draggedToken = tokens.find((t) => t.id === draggedTokenId);
         console.log('[DRAG VISION] Found token:', draggedToken?.name, 'hasVision:', draggedToken?.hasVision);
-        
+
         if (draggedToken && draggedToken.hasVision !== false) {
           // Compute vision range in pixels
           // Illumination source range is already in pixels
           // Token visionRange and fogVisionRange are in grid units - need conversion using region's gridSize
           const tokenRegion = regions.find(
-            (r) => draggedToken.x >= r.x && draggedToken.x <= r.x + r.width && 
-                   draggedToken.y >= r.y && draggedToken.y <= r.y + r.height,
+            (r) => draggedToken.x >= r.x && draggedToken.x <= r.x + r.width &&
+              draggedToken.y >= r.y && draggedToken.y <= r.y + r.height,
           );
           const gridSize = tokenRegion?.gridSize || 40;
           const illuminationRange = draggedToken.illuminationSources?.[0]?.range;
           const gridBasedRange = (draggedToken.visionRange ?? fogVisionRange) * gridSize;
           const tokenVisionRange = illuminationRange || gridBasedRange;
-          
+
           console.log('[DRAG VISION] Range calculation:', {
             illuminationRange,
             gridBasedRange,
@@ -9345,26 +9338,26 @@ export const SimpleTabletop = () => {
             gridSize,
             fogVisionRange
           });
-          
+
           // Throttled visibility computation
           const now = Date.now();
           const lastUpdateKey = 'lastVisionUpdate';
           const lastUpdate = (window as any)[lastUpdateKey] || 0;
-          
+
           if (now - lastUpdate >= realtimeVisionThrottleMs) {
             (window as any)[lastUpdateKey] = now;
-            
+
             // Compute visibility for the dragged token at its new position
             const tokenCenterX = newX + (draggedToken.gridWidth || 1) * gridSize / 2;
             const tokenCenterY = newY + (draggedToken.gridHeight || 1) * gridSize / 2;
-            
+
             // Store the position for rendering (post-processing path needs this) - use state to trigger re-render
             setDragPreviewPosition({ x: tokenCenterX, y: tokenCenterY, range: tokenVisionRange });
-            
+
             // Get combined segments (walls + vision-blocking map objects)
             const combinedSegments = combinedSegmentsRef.current;
             console.log('[DRAG VISION] Computing visibility at:', { tokenCenterX, tokenCenterY, tokenVisionRange, segmentsCount: combinedSegments.length });
-            
+
             // Always use circular fallback for now to verify rendering works
             // TODO: Re-enable wall-based visibility once basic rendering is confirmed
             if (combinedSegments.length > 0) {
@@ -9375,7 +9368,7 @@ export const SimpleTabletop = () => {
                   tokenVisionRange
                 );
                 console.log('[DRAG VISION] Visibility computed, polygon points:', visibility.polygon?.length, 'boundingBox:', visibility.boundingBox);
-                
+
                 if (visibility.polygon && visibility.polygon.length > 2) {
                   dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
                   console.log('[DRAG VISION] Path2D created from wall visibility');
@@ -9410,7 +9403,7 @@ export const SimpleTabletop = () => {
       if (obj && obj.wallPoints) {
         const newPoints = [...obj.wallPoints];
         newPoints[draggedVertexInfo.vertexIndex] = { x: worldPos.x, y: worldPos.y };
-        
+
         // Recalculate bounding box
         const xs = newPoints.map(p => p.x);
         const ys = newPoints.map(p => p.y);
@@ -9418,7 +9411,7 @@ export const SimpleTabletop = () => {
         const minY = Math.min(...ys);
         const maxX = Math.max(...xs);
         const maxY = Math.max(...ys);
-        
+
         updateMapObject(draggedVertexInfo.mapObjectId, {
           wallPoints: newPoints,
           position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
@@ -9441,27 +9434,27 @@ export const SimpleTabletop = () => {
       const lx = cx + cos * (worldPos.x - cx) - sin * (worldPos.y - cy);
       const ly = cy + sin * (worldPos.x - cx) + cos * (worldPos.y - cy);
 
-      let newLeft   = cx - snap.width / 2;
-      let newRight  = cx + snap.width / 2;
-      let newTop    = cy - snap.height / 2;
+      let newLeft = cx - snap.width / 2;
+      let newRight = cx + snap.width / 2;
+      let newTop = cy - snap.height / 2;
       let newBottom = cy + snap.height / 2;
 
       switch (mapObjectResizeHandle) {
-        case 'nw': newLeft = lx;  newTop    = ly; break;
-        case 'n':                  newTop    = ly; break;
-        case 'ne': newRight = lx; newTop    = ly; break;
-        case 'e':  newRight = lx;                 break;
+        case 'nw': newLeft = lx; newTop = ly; break;
+        case 'n': newTop = ly; break;
+        case 'ne': newRight = lx; newTop = ly; break;
+        case 'e': newRight = lx; break;
         case 'se': newRight = lx; newBottom = ly; break;
-        case 's':                  newBottom = ly; break;
-        case 'sw': newLeft = lx;  newBottom = ly; break;
-        case 'w':  newLeft = lx;                  break;
+        case 's': newBottom = ly; break;
+        case 'sw': newLeft = lx; newBottom = ly; break;
+        case 'w': newLeft = lx; break;
       }
 
       const newW = Math.max(10, newRight - newLeft);
       const newH = Math.max(10, newBottom - newTop);
       // New center in local space, then rotate back to world space
       const newLocalCx = (newLeft + newRight) / 2;
-      const newLocalCy = (newTop  + newBottom) / 2;
+      const newLocalCy = (newTop + newBottom) / 2;
       const radBack = (rotation * Math.PI) / 180;
       const cosB = Math.cos(radBack); const sinB = Math.sin(radBack);
       const newWorldCx = cx + cosB * (newLocalCx - cx) - sinB * (newLocalCy - cy);
@@ -10169,7 +10162,7 @@ export const SimpleTabletop = () => {
           lastEmittedHoverRef.current = null;
           ephemeralBus.emit("token.hover", { tokenId: null });
         }
-        
+
         // Check if hovering over a door (DM in play mode)
         if (isDM && renderingMode === 'play') {
           const hoveredMapObject = findMapObjectAtPoint(worldPos.x, worldPos.y, mapObjects, true, transform.zoom);
@@ -10254,23 +10247,23 @@ export const SimpleTabletop = () => {
       const maxX = Math.max(marqueeStart.x, marqueeEnd.x);
       const minY = Math.min(marqueeStart.y, marqueeEnd.y);
       const maxY = Math.max(marqueeStart.y, marqueeEnd.y);
-      
+
       // Only select if marquee is large enough (not just a click)
       const marqueeWidth = maxX - minX;
       const marqueeHeight = maxY - minY;
-      
+
       if (marqueeWidth > 5 && marqueeHeight > 5) {
         const selectedRegionIdsList: string[] = [];
         const selectedTokenIdsList: string[] = [];
         const selectedMapObjectIdsList: string[] = [];
         const selectedLightIdsList: string[] = [];
-        
+
         // Select regions (in edit mode)
         if (renderingMode === 'edit') {
           regions.forEach(region => {
             // Get region bounds
             let regionMinX: number, regionMinY: number, regionMaxX: number, regionMaxY: number;
-            
+
             if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
               const xs = region.pathPoints.map(p => p.x);
               const ys = region.pathPoints.map(p => p.y);
@@ -10284,35 +10277,35 @@ export const SimpleTabletop = () => {
               regionMaxX = region.x + region.width;
               regionMaxY = region.y + region.height;
             }
-            
+
             // Check if region intersects with marquee (AABB intersection)
-            const intersects = !(regionMaxX < minX || regionMinX > maxX || 
-                                regionMaxY < minY || regionMinY > maxY);
-            
+            const intersects = !(regionMaxX < minX || regionMinX > maxX ||
+              regionMaxY < minY || regionMinY > maxY);
+
             if (intersects) {
               selectedRegionIdsList.push(region.id);
               selectRegion(region.id);
             }
           });
         }
-        
+
         // Select tokens (both edit and play mode)
         // In play mode: only tokens that are visible to the current player can be selected.
         const baseTokenSize = 40; // Base size for 1x1 token
         tokens.forEach(token => {
           const tokenSize = Math.max(token.gridWidth || 1, token.gridHeight || 1) * baseTokenSize;
           const radius = tokenSize / 2;
-          
+
           // Token bounds (circle approximated as square for intersection)
           const tokenMinX = token.x - radius;
           const tokenMinY = token.y - radius;
           const tokenMaxX = token.x + radius;
           const tokenMaxY = token.y + radius;
-          
+
           // Check if token intersects with marquee
-          const intersects = !(tokenMaxX < minX || tokenMinX > maxX || 
-                              tokenMaxY < minY || tokenMinY > maxY);
-          
+          const intersects = !(tokenMaxX < minX || tokenMinX > maxX ||
+            tokenMaxY < minY || tokenMinY > maxY);
+
           if (!intersects) return;
 
           if (renderingMode === 'play') {
@@ -10336,12 +10329,12 @@ export const SimpleTabletop = () => {
             }
           }
         });
-        
+
         // Select map objects (in edit mode)
         if (renderingMode === 'edit') {
           mapObjects.forEach(obj => {
             let objMinX: number, objMinY: number, objMaxX: number, objMaxY: number;
-            
+
             if (obj.shape === 'wall' && obj.wallPoints && obj.wallPoints.length > 0) {
               // Wall polyline bounds
               const xs = obj.wallPoints.map(p => p.x);
@@ -10359,16 +10352,16 @@ export const SimpleTabletop = () => {
               objMaxX = obj.position.x + halfW;
               objMaxY = obj.position.y + halfH;
             }
-            
-            const intersects = !(objMaxX < minX || objMinX > maxX || 
-                                objMaxY < minY || objMinY > maxY);
-            
+
+            const intersects = !(objMaxX < minX || objMinX > maxX ||
+              objMaxY < minY || objMinY > maxY);
+
             if (intersects) {
               selectedMapObjectIdsList.push(obj.id);
             }
           });
         }
-        
+
         // Select lights (in edit mode)
         if (renderingMode === 'edit') {
           lights.forEach(light => {
@@ -10378,16 +10371,16 @@ export const SimpleTabletop = () => {
             const lMinY = light.position.y - lightSize;
             const lMaxX = light.position.x + lightSize;
             const lMaxY = light.position.y + lightSize;
-            
-            const intersects = !(lMaxX < minX || lMinX > maxX || 
-                                lMaxY < minY || lMinY > maxY);
-            
+
+            const intersects = !(lMaxX < minX || lMinX > maxX ||
+              lMaxY < minY || lMinY > maxY);
+
             if (intersects) {
               selectedLightIdsList.push(light.id);
             }
           });
         }
-        
+
         // Update state based on what was selected
         if (selectedRegionIdsList.length > 0) {
           setSelectedRegionIds(selectedRegionIdsList);
@@ -10406,7 +10399,7 @@ export const SimpleTabletop = () => {
         if (selectedLightIdsList.length > 0) {
           selectMultipleLights(selectedLightIdsList);
         }
-        
+
         // Show feedback
         const parts: string[] = [];
         if (selectedRegionIdsList.length > 0) {
@@ -10425,7 +10418,7 @@ export const SimpleTabletop = () => {
           toast.success(`Selected ${parts.join(', ')}`);
         }
       }
-      
+
       // Reset marquee state
       isMarqueeSelectingRef.current = false;
       marqueeStartRef.current = null;
@@ -10435,7 +10428,7 @@ export const SimpleTabletop = () => {
       redrawCanvas();
       return;
     }
-    
+
     // Handle freehand drawing completion
     if (isFreehandDrawing && pathDrawingMode === "drawing" && pathDrawingType === "freehand") {
       setIsFreehandDrawing(false);
@@ -10455,17 +10448,17 @@ export const SimpleTabletop = () => {
           // === COLLISION CHECK FIRST ===
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
           const shouldEnforceCollisions = renderingMode === 'play';
-          
+
           let movementBlocked = false;
-          
+
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
             // Use center point only (radius = 0) - allows tokens to pass through corridors
             // as long as their center can fit, regardless of token visual size
             const tokenRadius = 0;
-            
+
             const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
             const checkRegions = enforceRegionBounds ? regions : [];
-            
+
             const collisionResult = checkMovementCollision(
               dragStartPos,
               { x: token.x, y: token.y },
@@ -10474,30 +10467,30 @@ export const SimpleTabletop = () => {
               checkRegions,
               { enforceMovementBlocking, enforceRegionBounds }
             );
-            
+
             if (collisionResult.blocked) {
               movementBlocked = true;
-              
+
               let blockReason = '';
               let blockDetails = '';
               if (collisionResult.collidedWith && collisionResult.collidedWith !== 'region_bounds') {
                 const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
                 const objName = blockingObj?.label || blockingObj?.category || 'obstacle';
-                blockReason = blockingObj?.category === 'door' 
-                  ? `Blocked by closed door` 
+                blockReason = blockingObj?.category === 'door'
+                  ? `Blocked by closed door`
                   : `Blocked by ${objName}`;
                 blockDetails = `Object: ${blockingObj?.category}${blockingObj?.label ? ` "${blockingObj.label}"` : ''} (ID: ${collisionResult.collidedWith?.slice(0, 8)}...)`;
               } else {
                 blockReason = 'Cannot leave region boundary';
                 blockDetails = `Token tried to exit all regions (obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds})`;
               }
-              
-              toast.error(blockReason, { 
+
+              toast.error(blockReason, {
                 duration: 3000,
                 description: blockDetails
               });
               triggerSound('movement.collision');
-              
+
               // Snap back primary token and all multi-dragged tokens to their start positions
               const startPositions = multiDragStartPositionsRef.current;
               updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
@@ -10508,7 +10501,7 @@ export const SimpleTabletop = () => {
               });
             }
           }
-          
+
           // Only proceed with snapping if movement wasn't blocked
           if (!movementBlocked) {
             // Find local region at token position (our local regions in SimpleTabletop)
@@ -10556,7 +10549,7 @@ export const SimpleTabletop = () => {
             // - Token is in a region but region snapping is disabled
             // - Token is in world space but world snapping is disabled
             // - Token is in a 'free' grid region
-            
+
             // Create undo command for token movement (only if not blocked)
             if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
               moveTokenUndoable(
@@ -10579,7 +10572,7 @@ export const SimpleTabletop = () => {
                 }
               });
             }
-            
+
             // Check for portal teleportation after valid movement
             checkPortalTeleport(draggedTokenId);
             // Check if token entered a persistent effect (trap trigger)
@@ -10606,7 +10599,7 @@ export const SimpleTabletop = () => {
       }
       pendingDeselectRef.current = null;
       dragMovedRef.current = false;
-      
+
       // Clear stable visibility snapshot after drag ends
       if (stableVisibilityRef.current) {
         stableVisibilityRef.current.remove();
@@ -10755,7 +10748,7 @@ export const SimpleTabletop = () => {
         setIsDraggingMapObject(false);
         setDraggedMapObjectId(null);
         setMapObjectDragOffset({ x: 0, y: 0 });
-        
+
         // Notify visibility system that obstacles have changed
         notifyObstaclesChanged();
         toast.success("Map object moved");
@@ -10775,7 +10768,7 @@ export const SimpleTabletop = () => {
         const draggedRegion = regions.find((r) => r.id === draggedRegionId);
         if (draggedRegion) {
           let finalState: Partial<CanvasRegion>;
-          
+
           // Update region in store with recalculated bounds for grid
           if (draggedRegion.regionType === "path" && dragPreview.pathPoints) {
             // Recalculate bounds to ensure grid is properly updated
@@ -10793,7 +10786,7 @@ export const SimpleTabletop = () => {
               // Preserve rotation when dragging
               rotation: draggedRegion.rotation,
             };
-            
+
             updateRegion(draggedRegionId, finalState);
           } else {
             finalState = {
@@ -10804,7 +10797,7 @@ export const SimpleTabletop = () => {
               // Preserve rotation when dragging
               rotation: draggedRegion.rotation,
             };
-            
+
             updateRegion(draggedRegionId, finalState);
           }
         }
@@ -11001,7 +10994,7 @@ export const SimpleTabletop = () => {
 
       // Clear tokens moved by region tracking
       setTokensMovedByRegion([]);
-      
+
       // Clear stable visibility snapshot after drag ends
       if (stableVisibilityRef.current) {
         stableVisibilityRef.current.remove();
@@ -11195,11 +11188,11 @@ export const SimpleTabletop = () => {
 
         // ── Emit drag begin (touch path) ──
         emitDragBegin({ tokenId: clickedToken.id, startPos: { x: clickedToken.x, y: clickedToken.y }, mode: "freehand" });
-        
+
         if (currentVisibilityRef.current) {
           stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
         }
-        
+
         setInitialTokenState({ id: clickedToken.id, x: clickedToken.x, y: clickedToken.y });
 
         if (!selectedTokenIds.includes(clickedToken.id)) {
@@ -11215,11 +11208,11 @@ export const SimpleTabletop = () => {
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
           ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
-          
+
           if (currentVisibilityRef.current) {
             stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
           }
-          
+
           setInitialRegionState(captureRegionTransformState(clickedRegion));
           setTransformingRegionId(clickedRegion.id);
 
@@ -11281,7 +11274,7 @@ export const SimpleTabletop = () => {
             cp1: { x: bp.cp1.x + dx, y: bp.cp1.y + dy },
             cp2: { x: bp.cp2.x + dx, y: bp.cp2.y + dy },
           }));
-          
+
           setDragPreview({
             regionId: draggedRegionId,
             pathPoints: newPathPoints,
@@ -11325,14 +11318,14 @@ export const SimpleTabletop = () => {
           // Check collision using correct store state
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
           const shouldEnforceCollisions = renderingMode === 'play';
-          
+
           let movementBlocked = false;
-          
+
           if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
             const tokenRadius = 0;
             const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
             const checkRegions = enforceRegionBounds ? regions : [];
-            
+
             const collisionResult = checkMovementCollision(
               dragStartPos,
               { x: token.x, y: token.y },
@@ -11341,23 +11334,23 @@ export const SimpleTabletop = () => {
               checkRegions,
               { enforceMovementBlocking, enforceRegionBounds }
             );
-            
+
             if (collisionResult.blocked) {
               movementBlocked = true;
-              const blockReason = collisionResult.collidedWith === 'region_bounds' 
-                ? 'Cannot leave region boundary' 
+              const blockReason = collisionResult.collidedWith === 'region_bounds'
+                ? 'Cannot leave region boundary'
                 : 'Movement blocked by obstacle';
               toast.error(blockReason);
               triggerSound('movement.collision');
               updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
             }
           }
-          
+
           // Only apply snapping if movement wasn't blocked
           if (!movementBlocked) {
             // Find local region at token position
             const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
-            
+
             // Priority 1: Local region snapping
             if (localRegion && localRegion.gridSnapping && localRegion.gridType !== "free") {
               let regionPoints: Array<{ x: number; y: number }>;
@@ -11404,7 +11397,7 @@ export const SimpleTabletop = () => {
               // ── Emit drag end (touch path) ──
               emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
             }
-            
+
             // Check for portal teleportation after valid movement
             checkPortalTeleport(draggedTokenId);
             // Check if token entered a persistent effect (trap trigger)
@@ -11419,7 +11412,7 @@ export const SimpleTabletop = () => {
         setDragStartPos({ x: 0, y: 0 });
         dragPathRef.current = [];
         setInitialTokenState(null);
-        
+
         if (stableVisibilityRef.current) {
           stableVisibilityRef.current.remove();
           stableVisibilityRef.current = null;
@@ -11434,7 +11427,7 @@ export const SimpleTabletop = () => {
           const draggedRegion = regions.find(r => r.id === draggedRegionId);
           if (draggedRegion) {
             let finalState: Partial<CanvasRegion>;
-            
+
             if (draggedRegion.regionType === "path" && dragPreview.pathPoints) {
               const finalBounds = dragPreview.bezierControlPoints
                 ? getBezierBounds(dragPreview.pathPoints, dragPreview.bezierControlPoints)
@@ -11449,7 +11442,7 @@ export const SimpleTabletop = () => {
                 bezierControlPoints: dragPreview.bezierControlPoints,
                 rotation: draggedRegion.rotation,
               };
-              
+
               updateRegion(draggedRegionId, finalState);
             } else {
               finalState = {
@@ -11459,7 +11452,7 @@ export const SimpleTabletop = () => {
                 height: dragPreview.height,
                 rotation: draggedRegion.rotation,
               };
-              
+
               updateRegion(draggedRegionId, finalState);
             }
           }
@@ -11491,7 +11484,7 @@ export const SimpleTabletop = () => {
         setDragPreview(null);
         setGroupedTokens([]);
         setTempTokenPositions(undefined);
-        
+
         if (stableVisibilityRef.current) {
           stableVisibilityRef.current.remove();
           stableVisibilityRef.current = null;
@@ -11539,8 +11532,8 @@ export const SimpleTabletop = () => {
     circle.remove();
   }, [fogEnabled, fogRevealBrushRadius, fogBrushMode, getActiveExploredArea, setActiveExploredArea]);
 
-   // Poll fog mask refresh while painting — fixed 90ms interval
-   const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Poll fog mask refresh while painting — fixed 90ms interval
+  const fogBrushPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Recompute fog masks from current explored+visible state (used during brush painting)
   const recomputeFogMasksInline = useCallback(() => {
@@ -11833,7 +11826,7 @@ export const SimpleTabletop = () => {
 
   return (
     <div className="relative w-full h-screen bg-surface overflow-hidden">
-      
+
       {/* 1. Base Layer: Full-Bleed Canvas */}
       <div ref={canvasContainerRef} className="absolute inset-0 z-0 overflow-visible">
         <canvas
@@ -11847,9 +11840,9 @@ export const SimpleTabletop = () => {
                 ? "crosshair"
                 : isDraggingToken
                   ? "move"
-                   : pathDrawingMode === "drawing" || doorDrawingActive
-                     ? "crosshair"
-                     : "auto",
+                  : pathDrawingMode === "drawing" || doorDrawingActive
+                    ? "crosshair"
+                    : "auto",
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -11922,7 +11915,7 @@ export const SimpleTabletop = () => {
             // Existing polygon path drawing
             if (pathDrawingMode === "drawing" && pathDrawingType === "polygon") finishPathDrawing();
           }}
-          
+
           onContextMenu={handleContextMenu}
           onTouchStart={touchHandlers.handleTouchStart}
           onTouchMove={touchHandlers.handleTouchMove}
@@ -11956,7 +11949,7 @@ export const SimpleTabletop = () => {
 
       {/* 2. Top Layer: UI Overlay */}
       <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
-        
+
         {/* Full-width Top Navbar Row (includes sidebar toggles) */}
         <div className="pointer-events-auto w-full flex-shrink-0 z-50 relative">
           <TopNavbar />
@@ -11964,7 +11957,7 @@ export const SimpleTabletop = () => {
 
         {/* Main Body Row */}
         <div className="flex-1 flex w-full relative pointer-events-none overflow-hidden isolate">
-          
+
           {/* Left Sidebar Content */}
           <div className="pointer-events-auto h-full flex items-start isolate z-40 relative">
             <LeftSidebar />
@@ -11979,24 +11972,18 @@ export const SimpleTabletop = () => {
             <FloorNavigationWidget />
 
             {/* Circular Button Bar - Always visible at top (Pending Migration) */}
-            {!isFocusMode && (
-              <CircularButtonBar
-                mode={renderingMode}
-                onToggleMode={() => setRenderingMode(renderingMode === "edit" ? "play" : "edit")}
-              />
-            )}
+            <CircularButtonBar />
 
             {/* Vertical Toolbar - Middle left of viewport (controlled by CircularButtonBar) */}
-            {!isFocusMode && (
-              <VerticalToolbar
-                mode={renderingMode}
-                fabricCanvas={null}
-                onAddRegion={addNewRegion}
-                onStartPolygonDraw={() => startPathDrawing("polygon")}
-                onStartFreehandDraw={() => startPathDrawing("freehand")}
-                onFinishPolygonDraw={finishPathDrawing}
-                isDrawingPolygon={pathDrawingMode === "drawing" && pathDrawingType === "polygon"}
-                isDrawingFreehand={pathDrawingMode === "drawing" && pathDrawingType === "freehand"}
+            <VerticalToolbar
+              mode={renderingMode}
+              fabricCanvas={null}
+              onAddRegion={addNewRegion}
+              onStartPolygonDraw={() => startPathDrawing("polygon")}
+              onStartFreehandDraw={() => startPathDrawing("freehand")}
+              onFinishPolygonDraw={finishPathDrawing}
+              isDrawingPolygon={pathDrawingMode === "drawing" && pathDrawingType === "polygon"}
+              isDrawingFreehand={pathDrawingMode === "drawing" && pathDrawingType === "freehand"}
                 isDrawingDoor={doorDrawingActive}
                 onStartDoorDraw={toggleDoorDrawing}
                 isGridSnappingEnabled={isGridSnappingEnabled}
@@ -12024,7 +12011,6 @@ export const SimpleTabletop = () => {
                 }}
                 isDM={isDM}
               />
-            )}
 
             {/* DM Cursor Sharing Toggle — only visible to DMs */}
             {isDM && (
@@ -12290,12 +12276,14 @@ export const SimpleTabletop = () => {
 
 
       {/* Portal Teleport DM Confirmation Dialog */}
-      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => { if (!open) { 
-        if (pendingTeleport?.requestId) {
-          emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM dismissed the request' });
+      <AlertDialog open={!!pendingTeleport} onOpenChange={(open) => {
+        if (!open) {
+          if (pendingTeleport?.requestId) {
+            emitPortalTeleportDenied({ requestId: pendingTeleport.requestId, reason: 'DM dismissed the request' });
+          }
+          setPendingTeleport(null);
         }
-        setPendingTeleport(null); 
-      }}}>
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Teleportation</AlertDialogTitle>
@@ -12321,10 +12309,10 @@ export const SimpleTabletop = () => {
               if (pendingTeleport) {
                 // Execute teleport locally on DM
                 executeTeleport(pendingTeleport.tokenId, pendingTeleport.sourcePortalId, pendingTeleport.targetPortalId, pendingTeleport.dropPosition);
-                
+
                 // Broadcast approval to all clients — always include full map tree state
                 const maps = useMapStore.getState().maps;
-                
+
                 const approvalPayload: any = {
                   requestId: pendingTeleport.requestId || '',
                   tokenId: pendingTeleport.tokenId,

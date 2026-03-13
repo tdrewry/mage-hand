@@ -72,8 +72,18 @@ export function BaseCard({
       }
     };
 
-    const handleMouseUp = () => {
-      if (isDragging || isResizing) {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (isDragging) {
+        if (card) {
+          const dropX = e.clientX - dragOffset.x;
+          if (dropX < 50) {
+            dockCard(id, 'left');
+          } else if (dropX > window.innerWidth - card.size.width - 50) {
+            dockCard(id, 'right');
+          }
+        }
+        saveLayout();
+      } else if (isResizing) {
         saveLayout();
       }
       setIsDragging(false);
@@ -89,7 +99,7 @@ export function BaseCard({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, isResizing, dragOffset, resizeStart, id, card, minSize, maxSize, updateCardPosition, updateCardSize, saveLayout]);
+  }, [isDragging, isResizing, dragOffset, resizeStart, id, card, minSize, maxSize, updateCardPosition, updateCardSize, saveLayout, dockCard]);
 
   if (!card || !card.isVisible) return null;
 
@@ -104,11 +114,27 @@ export function BaseCard({
     if (target.closest('button, input, textarea, select, [draggable="true"]')) return;
     
     bringToFront(id);
+
+    if (card.dockPosition !== 'floating') {
+      // Calculate exact screen position of the docked element
+      const el = e.currentTarget as HTMLElement;
+      const cardEl = el.closest('.w-full') || el;
+      const rect = cardEl.getBoundingClientRect();
+      
+      updateCardPosition(id, { x: rect.left, y: rect.top });
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      dockCard(id, 'floating');
+    } else {
+      setDragOffset({
+        x: e.clientX - card.position.x,
+        y: e.clientY - card.position.y,
+      });
+    }
+
     setIsDragging(true);
-    setDragOffset({
-      x: e.clientX - card.position.x,
-      y: e.clientY - card.position.y,
-    });
   };
 
   // Handle resize start
@@ -165,14 +191,16 @@ export function BaseCard({
   // If docked, we render a static block (no drag/drop absolute positioning).
   if (!isFloating) {
     return (
-      <div className={cn("relative w-full mb-4", className)}>
-        <Card className="flex flex-col shadow-sm border-border bg-card/95 backdrop-blur">
+      <div className={cn("w-full", className)}>
+        <Card className="flex flex-col rounded-none border-x-0 border-t-0 border-b border-border bg-transparent shadow-none">
           {!hideHeader && (
             <CardHeader
-              className="flex flex-row items-center justify-between space-y-0 p-3 border-b border-border bg-card/50"
+              className="flex flex-row items-center justify-between space-y-0 p-3 bg-transparent cursor-grab hover:bg-accent/30 transition-colors"
+              onClick={handleMinimize}
+              onMouseDown={handleMouseDown}
             >
-              <h3 className="text-sm font-semibold text-card-foreground truncate">{title}</h3>
-              <div className="flex items-center gap-1 shrink-0">
+              <h3 className="text-sm font-semibold text-card-foreground select-none truncate">{title}</h3>
+              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePopOut} title="Pop Out to Map">
                   <ArrowUpRight className="h-3 w-3" />
                 </Button>
@@ -180,7 +208,7 @@ export function BaseCard({
                   {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                 </Button>
                 {isClosable && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleClose}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive hover:text-destructive-foreground" onClick={handleClose}>
                     <X className="h-3 w-3" />
                   </Button>
                 )}
@@ -188,7 +216,7 @@ export function BaseCard({
             </CardHeader>
           )}
           {!isMinimized && (
-            <CardContent className={cn("flex-1 overflow-auto p-4", hideHeader && "scrollbar-hide")}>
+            <CardContent className={cn("flex-1 overflow-auto p-4 bg-background/30", hideHeader && "scrollbar-hide", size.height ? { 'max-h-[500px]': true } : {})}>
               {children}
             </CardContent>
           )}
@@ -222,10 +250,10 @@ export function BaseCard({
         {!hideHeader && (
           <CardHeader
             ref={headerRef}
-            className="flex flex-row items-center justify-between space-y-0 p-3 cursor-move border-b border-border bg-card"
+            className="flex flex-row items-center justify-between space-y-0 p-3 cursor-grab border-b border-border bg-card"
             onMouseDown={!fullCardDraggable ? handleMouseDown : undefined}
           >
-            <h3 className="text-sm font-semibold text-card-foreground">{title}</h3>
+            <h3 className="text-sm font-semibold text-card-foreground select-none">{title}</h3>
             <div className="flex items-center gap-1 shrink-0">
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockLeft} title="Dock Left">
                 <PanelLeft className="h-3 w-3" />

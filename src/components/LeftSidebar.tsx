@@ -1,11 +1,14 @@
 import React from 'react';
 import { useUiStateStore } from '@/stores/uiStateStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export const LeftSidebar: React.FC = () => {
   const { isLeftSidebarOpen, isFocusMode } = useUiStateStore();
 
-  // If focus mode is active, override local state to closed
   const isOpen = isLeftSidebarOpen && !isFocusMode;
 
   return (
