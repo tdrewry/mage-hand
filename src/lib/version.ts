@@ -2,4 +2,4 @@
  * Application version number.
  * Increment this whenever a significant change is made.
  */
-export const APP_VERSION = '0.7.251';
+export const APP_VERSION = '0.7.253';

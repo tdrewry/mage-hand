@@ -201,7 +201,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "group relative flex items-center w-[315px] ml-4 mb-0",
+          "group relative flex items-center w-[285px] ml-4 mb-0",
           isSelected && !isActive ? "ring-2 ring-[#38bdf8] rounded-lg shadow-[0_0_8px_rgba(56,189,248,0.4)]" : ""
         )}
       >
@@ -223,7 +223,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
             {/* Background Image with fade to right */}
             {token.imageUrl && (
               <div 
-                className="absolute inset-y-0 left-0 w-[65%] transition-opacity"
+                className="absolute inset-y-0 left-0 w-[45%] transition-opacity"
                 style={{
                   backgroundImage: `url(${token.imageUrl})`,
                   backgroundSize: 'cover',
@@ -289,7 +289,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
         {/* Initiative Score Circle - Floating on the right edge */}
         <div className={cn(
-           "absolute -right-[8px] top-1/2 -translate-y-1/2 w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-full text-[14px] font-bold border-2 transition-colors z-30 shadow-[0_4px_6px_rgba(0,0,0,0.4)]",
+           "absolute -right-[17px] top-1/2 -translate-y-1/2 w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-full text-[14px] font-bold border-2 transition-colors z-30 shadow-[0_4px_6px_rgba(0,0,0,0.4)]",
            isActive ? "border-[#4ade80] text-[#4ade80] bg-[#182329] shadow-[0_0_10px_rgba(74,222,128,0.3)]" : "border-[#4ade80]/40 text-[#4ade80] bg-[#13181C]"
         )}>
           {isEditingInitiative && !isCompact ? (
