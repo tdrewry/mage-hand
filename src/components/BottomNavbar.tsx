@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Group, Trash2, X, Lock, Unlock, Ungroup, Download,
-  Shield, Eye, EyeOff, Plus, Palette, Lightbulb, Sparkles, Dices 
+  Shield, Eye, EyeOff, Plus, Palette, Lightbulb, Sparkles, Dices, Compass, Navigation, Activity 
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -14,6 +14,8 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useGroupStore } from '@/stores/groupStore';
 import { useRegionStore } from '@/stores/regionStore';
@@ -43,7 +45,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   children
 }) => {
   const { 
-    tokens, currentPlayerId, players, removeToken, updateTokenIllumination,
+    tokens, currentPlayerId, players, removeToken, updateTokenIllumination, updateTokenRotation, updateTokenElevation, updateTokenStatuses,
     selectedTokenIds, selectedRegionIds, selectedMapObjectIds, selectedLightIds
   } = useSessionStore();
   
@@ -425,6 +427,95 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
               
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Compass className="h-4 w-4 mr-2" />
+                    Orientation
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 bg-background/95 backdrop-blur border-white/10 p-4" side="top">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="facing-switch" className="flex items-center gap-2 cursor-pointer">
+                        <Navigation className="h-4 w-4" />
+                        Show Facing Indicator
+                      </Label>
+                      <Switch 
+                        id="facing-switch" 
+                        checked={selectedTokens[0]?.showFacing ?? false} 
+                        onCheckedChange={(checked) => {
+                          selectedTokens.forEach(t => updateTokenRotation(t.id, t.rotation || 0, checked));
+                          onUpdateCanvas?.();
+                        }} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Rotation ({selectedTokens[0]?.rotation || 0}°)</Label>
+                        <Button variant="ghost" className="h-6 w-12 p-0 text-xs" onClick={() => {
+                          selectedTokens.forEach(t => updateTokenRotation(t.id, 0, t.showFacing));
+                          onUpdateCanvas?.();
+                        }}>Reset</Button>
+                      </div>
+                      <Slider 
+                        value={[selectedTokens[0]?.rotation || 0]} 
+                        min={0} 
+                        max={360} 
+                        step={1} 
+                        onValueChange={([val]) => {
+                          selectedTokens.forEach(t => updateTokenRotation(t.id, val, t.showFacing));
+                          onUpdateCanvas?.();
+                        }} 
+                      />
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Activity className="h-4 w-4 mr-2" />
+                    State
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 bg-background/95 backdrop-blur border-white/10 p-4" side="top">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="elevation-input">Elevation (Units)</Label>
+                      <Input 
+                        id="elevation-input" 
+                        type="number" 
+                        className="bg-black/20 border-white/10 h-8"
+                        value={selectedTokens[0]?.elevation || 0}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          selectedTokens.forEach(t => updateTokenElevation(t.id, val));
+                          onUpdateCanvas?.();
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status-input">Statuses (comma separated)</Label>
+                      <Input 
+                        id="status-input" 
+                        type="text"
+                        placeholder="e.g. Poisoned, Prone"
+                        className="bg-black/20 border-white/10 h-8"
+                        value={(selectedTokens[0]?.statuses || []).join(', ')}
+                        onChange={(e) => {
+                          const str = e.target.value;
+                          const arr = str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                          selectedTokens.forEach(t => updateTokenStatuses(t.id, arr));
+                          onUpdateCanvas?.();
+                        }}
+                      />
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button variant="ghost" size="sm" onClick={() => setShowColorModal(true)}>
                 <Palette className="h-4 w-4 mr-2" /> Color
               </Button>

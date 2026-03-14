@@ -3913,6 +3913,15 @@ export const SimpleTabletop = () => {
       // Draw main token (image or color fill)
       const tokenImg = token.imageUrl ? getCachedImage(token.imageUrl) : null;
 
+      targetCtx.save();
+      
+      // Apply token rotation
+      if (token.rotation) {
+        targetCtx.translate(token.x, token.y);
+        targetCtx.rotate((token.rotation * Math.PI) / 180);
+        targetCtx.translate(-token.x, -token.y);
+      }
+
       if (tokenImg) {
         // Draw elliptical clipped image
         targetCtx.save();
@@ -3941,6 +3950,104 @@ export const SimpleTabletop = () => {
         targetCtx.strokeStyle = roleBorderColor;
         targetCtx.lineWidth = 3 / transform.zoom;
         targetCtx.stroke();
+      }
+
+      // Draw facing indicator if enabled
+      if (token.showFacing) {
+        targetCtx.fillStyle = roleBorderColor;
+        targetCtx.beginPath();
+        // Draw a small triangle pointing "down" (+Y) at the bottom edge of the token
+        const arrowOffsetY = radiusY + (4 / transform.zoom);
+        const arrowSize = 10 / transform.zoom;
+        
+        targetCtx.moveTo(token.x, token.y + arrowOffsetY + arrowSize); // Tip
+        targetCtx.lineTo(token.x - arrowSize / 1.5, token.y + arrowOffsetY); // Top left
+        targetCtx.lineTo(token.x + arrowSize / 1.5, token.y + arrowOffsetY); // Top right
+        targetCtx.closePath();
+        targetCtx.fill();
+        
+        // Add a small outline for visibility
+        targetCtx.strokeStyle = "rgba(0,0,0,0.5)";
+        targetCtx.lineWidth = 1 / transform.zoom;
+        targetCtx.stroke();
+      }
+
+      // Restore rotation context
+      targetCtx.restore();
+
+      // Draw elevation indicator if set
+      if (token.elevation !== undefined && token.elevation !== 0) {
+        targetCtx.save();
+        const boxSize = 20 / transform.zoom;
+        const boxX = token.x - radiusX - (boxSize / 2);
+        const boxY = token.y - (boxSize / 2);
+        
+        // Gray box background
+        targetCtx.fillStyle = "rgba(75, 85, 99, 0.9)"; // Gray-600
+        targetCtx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+        targetCtx.lineWidth = 1.5 / transform.zoom;
+        targetCtx.beginPath();
+        targetCtx.roundRect(boxX, boxY, boxSize, boxSize, 4 / transform.zoom);
+        targetCtx.fill();
+        targetCtx.stroke();
+        
+        // Elevation text
+        targetCtx.fillStyle = "white";
+        targetCtx.font = `bold ${10 / transform.zoom}px Inter, sans-serif`;
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText(token.elevation.toString(), boxX + (boxSize / 2), boxY + (boxSize / 2) + (1 / transform.zoom));
+        targetCtx.restore();
+      }
+
+      // Draw status flyout indicator if set
+      if (token.statuses && token.statuses.length > 0) {
+        targetCtx.save();
+        const circleRadius = 6 / transform.zoom;
+        // Positioned top-right
+        const cx = token.x + radiusX * 0.85;
+        const cy = token.y - radiusY * 0.85;
+        
+        targetCtx.fillStyle = "rgba(34, 197, 94, 0.9)"; // Green-500
+        targetCtx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+        targetCtx.lineWidth = 1.5 / transform.zoom;
+        
+        targetCtx.beginPath();
+        targetCtx.arc(cx, cy, circleRadius, 0, 2 * Math.PI);
+        targetCtx.fill();
+        targetCtx.stroke();
+        
+        // Draw the text of the statuses if hovered
+        if (isHovered) {
+          const statusText = token.statuses.join(', ');
+          const paddingX = 6 / transform.zoom;
+          const paddingY = 4 / transform.zoom;
+          const fontSize = 10 / transform.zoom;
+          
+          targetCtx.font = `bold ${fontSize}px Inter, sans-serif`;
+          const textMetrics = targetCtx.measureText(statusText);
+          const textWidth = textMetrics.width;
+          const boxHeight = fontSize + (paddingY * 2);
+          const boxWidth = textWidth + (paddingX * 2);
+          
+          const boxX = cx + circleRadius + (4 / transform.zoom);
+          const boxY = cy - (boxHeight / 2);
+          
+          // Background box
+          targetCtx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          targetCtx.beginPath();
+          targetCtx.roundRect(boxX, boxY, boxWidth, boxHeight, 4 / transform.zoom);
+          targetCtx.fill();
+          targetCtx.stroke();
+          
+          // Status text
+          targetCtx.fillStyle = "white";
+          targetCtx.textAlign = "left";
+          targetCtx.textBaseline = "middle";
+          targetCtx.fillText(statusText, boxX + paddingX, boxY + (boxHeight / 2) + (1 / transform.zoom));
+        }
+        
+        targetCtx.restore();
       }
 
       // Draw token label based on position setting

@@ -59,6 +59,10 @@ export interface Token {
   footprintType?: FootprintType; // Type of footprint when pathStyle is 'footprint' (default: 'barefoot')
   initiative?: number; // Initiative value
   inCombat?: boolean;  // Whether token is in combat
+  rotation?: number;   // Rotation in degrees (0-360)
+  showFacing?: boolean; // Whether to show a directional facing indicator
+  elevation?: number;  // Elevation in units (e.g. 5, -10)
+  statuses?: string[]; // Array of active status condition strings
   
   // Unified illumination system - array of attached light/vision sources
   illuminationSources?: IlluminationSource[];
@@ -130,6 +134,9 @@ export interface SessionState {
   updateTokenLabelStyle: (tokenId: string, labelColor?: string, labelBackgroundColor?: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
   updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
+  updateTokenRotation: (tokenId: string, rotation: number, showFacing?: boolean) => void;
+  updateTokenElevation: (tokenId: string, elevation: number) => void;
+  updateTokenStatuses: (tokenId: string, statuses: string[]) => void;
   updateTokenVision: (tokenId: string, hasVision: boolean) => void;
   updateTokenVisionRange: (tokenId: string, visionRange: number | undefined) => void;
   updateTokenIllumination: (tokenId: string, illumination: Partial<IlluminationSource>) => void;
@@ -243,6 +250,36 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, imageUrl, imageHash } : token
+      ),
+    }));
+  },
+
+  updateTokenRotation: (tokenId, rotation, showFacing) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId 
+          ? { 
+              ...token, 
+              rotation, 
+              showFacing: showFacing !== undefined ? showFacing : token.showFacing 
+            } 
+          : token
+      ),
+    }));
+  },
+
+  updateTokenElevation: (tokenId, elevation) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, elevation } : token
+      ),
+    }));
+  },
+
+  updateTokenStatuses: (tokenId, statuses) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, statuses } : token
       ),
     }));
   },

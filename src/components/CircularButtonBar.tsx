@@ -29,36 +29,31 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
     toast.info('Hand raised!');
   };
 
+  if (isDM) return null;
+
   return (
     <Toolbar position="top" className={cn("gap-0.5 px-1.5 py-1 transition-all duration-300", isInCombat ? "mt-[72px]" : "mt-4")}>
+      <ToolbarSeparator />
+      <ToolbarButton
+        icon={Eye}
+        label={followDM ? 'Stop Following DM' : 'Follow DM Viewport'}
+        onClick={() => {
+          setFollowDM(!followDM);
+          toast.info(followDM ? 'Stopped following DM' : 'Following DM viewport');
+        }}
+        isActive={followDM}
+        variant={followDM ? 'active' : 'ghost'}
+        size="xs"
+        className={followDM ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
+      />
 
-      {!isDM && (
-        <>
-          <ToolbarSeparator />
-          <ToolbarButton
-            icon={Eye}
-            label={followDM ? 'Stop Following DM' : 'Follow DM Viewport'}
-            onClick={() => {
-              setFollowDM(!followDM);
-              toast.info(followDM ? 'Stopped following DM' : 'Following DM viewport');
-            }}
-            isActive={followDM}
-            variant={followDM ? 'active' : 'ghost'}
-            size="xs"
-            className={followDM ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
-          />
-        </>
-      )}
-
-      {!isDM && (
-        <ToolbarButton
-          icon={Hand}
-          label="Raise Hand"
-          onClick={handleHandRaise}
-          variant="ghost"
-          size="xs"
-        />
-      )}
+      <ToolbarButton
+        icon={Hand}
+        label="Raise Hand"
+        onClick={handleHandRaise}
+        variant="ghost"
+        size="xs"
+      />
     </Toolbar>
   );
 };
