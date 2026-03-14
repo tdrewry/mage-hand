@@ -1560,6 +1560,11 @@ export const SimpleTabletop = () => {
     };
   }, [remoteHovers, remoteSelections, remoteActionTargets, remoteTokenHandlePreviews, remoteMapHandlePreviews, remoteGroupSelects, remoteGroupDrags, remoteDrags]);
 
+  // ── Redraw canvas when initiative state changes (e.g., active turn highlight) ──
+  useEffect(() => {
+    redrawCanvas();
+  }, [isInCombat, currentTurnIndex, initiativeOrder]);
+
   // Clear grid highlights when drag ends (footprints only shown during active drag)
   useEffect(() => {
     if (!isDraggingToken) {
@@ -3841,17 +3846,21 @@ export const SimpleTabletop = () => {
       const radiusY = tokenHeight / 2;
       // For label positioning, use the larger radius
       const maxRadius = Math.max(radiusX, radiusY);
-      const isSelected = selectedTokenIds.includes(token.id);
+      const sessionStoreState = useSessionStore.getState();
+      const initStoreState = useInitiativeStore.getState();
+      const roleStoreState = useRoleStore.getState();
+
+      const isSelected = sessionStoreState.selectedTokenIds.includes(token.id);
       const isHovered = hoveredTokenId === token.id;
 
-      const tokenPlayer = players.find((p) => p.id === currentPlayerId);
-      const isControllable = tokenPlayer ? canControlToken(token, tokenPlayer, roles) : false;
-      const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roles) : "neutral";
+      const tokenPlayer = sessionStoreState.players.find((p) => p.id === sessionStoreState.currentPlayerId);
+      const isControllable = tokenPlayer ? canControlToken(token, tokenPlayer, roleStoreState.roles) : false;
+      const relationship = tokenPlayer ? getTokenRelationship(token, tokenPlayer, roleStoreState.roles) : "neutral";
       const isHostile = relationship === "hostile";
-      const role = roles.find((r) => r.id === token.roleId);
+      const role = roleStoreState.roles.find((r) => r.id === token.roleId);
       const roleBorderColor = role?.color || "#000000";
-      const currentEntry = initiativeOrder[currentTurnIndex];
-      const isActiveInCombat = isInCombat && currentEntry?.tokenId === token.id;
+      const currentEntry = initStoreState.initiativeOrder[initStoreState.currentTurnIndex];
+      const isActiveInCombat = initStoreState.isInCombat && currentEntry?.tokenId === token.id;
 
       targetCtx.save();
       if (isInFog) {
