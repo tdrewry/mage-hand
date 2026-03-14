@@ -190,6 +190,47 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       </TokenContextMenu>
     );
   }
+  // Initiative Orb Dynamic Colors based on label styling
+  let orbBgColor = isActive ? '#182329' : '#13181C';
+  let orbTextColor = isActive ? '#ffffff' : '#f3f4f6';
+  let orbBorderColor = isActive ? '#38bdf8' : '#3A4A52';
+  let orbGlow = isActive ? 'rgba(56,189,248,0.5)' : 'transparent';
+
+  if (token.labelBackgroundColor) {
+    if (token.labelBackgroundColor.startsWith('rgba') || token.labelBackgroundColor.startsWith('rgb')) {
+      const match = token.labelBackgroundColor.match(/rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/);
+      if (match) {
+        const r = parseInt(match[1], 10);
+        const g = parseInt(match[2], 10);
+        const b = parseInt(match[3], 10);
+        
+        // Solid background (no transparency)
+        orbBgColor = `rgb(${r}, ${g}, ${b})`;
+        
+        // Brighter border color
+        const brightR = Math.min(255, r + 70);
+        const brightG = Math.min(255, g + 70);
+        const brightB = Math.min(255, b + 70);
+        orbBorderColor = `rgb(${brightR}, ${brightG}, ${brightB})`;
+        
+        if (isActive) {
+          orbGlow = `rgba(${brightR}, ${brightG}, ${brightB}, 0.6)`;
+        } else {
+          orbGlow = 'transparent';
+        }
+      } else {
+        orbBgColor = token.labelBackgroundColor.replace(/[\d.]+(?=\))/, '1');
+        orbBorderColor = orbBgColor;
+      }
+    } else {
+       orbBgColor = token.labelBackgroundColor;
+       orbBorderColor = orbBgColor;
+    }
+    
+    if (token.labelColor) {
+      orbTextColor = token.labelColor;
+    }
+  }
 
   // Vertical layout (default) aligned with the mockup
   return (
@@ -214,8 +255,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         <div className={cn(
           "relative flex items-center justify-between p-2 pl-3 rounded-lg border transition-all cursor-pointer w-full min-h-[76px]",
           isActive 
-            ? "bg-[#182329] border-[#38bdf8]/60 shadow-[0_inset_0_15px_rgba(56,189,248,0.1)]" 
-            : "bg-[#13181C] border-[#2A3439] hover:border-[#38bdf8]/40"
+            ? "bg-[#182329] border-[#38bdf8]/60 shadow-[0_8px_16px_rgba(0,0,0,0.8),0_0_12px_rgba(56,189,248,0.3)] ring-1 ring-[#38bdf8]/40" 
+            : "bg-[#13181C] border-[#2A3439] shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:border-[#38bdf8]/40 hover:shadow-[0_4px_12px_rgba(0,0,0,0.5),0_0_8px_rgba(56,189,248,0.15)]"
         )}>
           
           {/* Inner clipped area for background art to protect border radius */}
@@ -244,7 +285,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
           {/* Current Turn Badge - Overlapping frame perfectly */}
           {isActive && (
-            <div className="absolute -bottom-[1px] -left-[1px] z-20 bg-[#38bdf8] text-[#0A1A24] text-[9.5px] font-bold px-2.5 py-[3px] rounded-tr-md rounded-bl-lg uppercase tracking-wider backdrop-blur-sm shadow-sm border-t border-r border-[#38bdf8]/80">
+            <div className="absolute -bottom-[1px] -left-[1px] z-20 bg-[#38bdf8]/20 text-[#38bdf8] text-[9.5px] font-bold px-2.5 py-[3px] rounded-tr-md rounded-bl-lg uppercase tracking-wider backdrop-blur-md shadow-sm border-t border-r border-[#38bdf8]/50">
               Current Turn
             </div>
           )}
@@ -288,10 +329,15 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         </div>
 
         {/* Initiative Score Circle - Floating on the right edge */}
-        <div className={cn(
-           "absolute -right-[17px] top-1/2 -translate-y-1/2 w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-full text-[14px] font-bold border-2 transition-colors z-30 shadow-[0_4px_6px_rgba(0,0,0,0.4)]",
-           isActive ? "border-[#4ade80] text-[#4ade80] bg-[#182329] shadow-[0_0_10px_rgba(74,222,128,0.3)]" : "border-[#4ade80]/40 text-[#4ade80] bg-[#13181C]"
-        )}>
+        <div 
+          className="absolute -right-[17px] top-1/2 -translate-y-1/2 w-[34px] h-[34px] shrink-0 flex items-center justify-center rounded-full text-[14px] font-bold border-[1.5px] transition-colors z-30"
+          style={{
+            backgroundColor: orbBgColor,
+            color: orbTextColor,
+            borderColor: orbBorderColor,
+            boxShadow: isActive ? `0 0 12px ${orbGlow}, 0 4px 6px rgba(0,0,0,0.4)` : '0 4px 6px rgba(0,0,0,0.4)'
+          }}
+        >
           {isEditingInitiative && !isCompact ? (
             <Input
               type="number"
@@ -302,7 +348,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
                 if (e.key === 'Enter') handleInitiativeSubmit();
                 if (e.key === 'Escape') setIsEditingInitiative(false);
               }}
-              className="w-10 h-6 text-center text-sm font-bold p-0 border-0 bg-transparent text-[#4ade80]"
+              className="w-10 h-6 text-center text-sm font-bold p-0 border-0 bg-transparent"
+              style={{ color: orbTextColor }}
               autoFocus
               onClick={(e) => e.stopPropagation()}
             />

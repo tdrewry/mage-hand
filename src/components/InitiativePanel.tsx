@@ -211,21 +211,24 @@ export const InitiativePanel: React.FC = () => {
         )}
 
         {layoutFormat === 'vertical' && (
-          <div className="flex flex-col gap-2 pb-2 border-b border-[#1A2733] shrink-0 px-1">
-             <div className="flex items-center justify-between">
-               <div className="flex items-center gap-2 pl-1">
-                 <Swords className="h-4 w-4 text-gray-300" />
-                 <span className="text-sm font-extrabold text-[#e2a899] uppercase tracking-widest">Round {roundNumber}</span>
+          <div className="relative shrink-0 rounded-lg overflow-hidden border border-white/5 bg-[#13181C]/40 backdrop-blur-md mb-1 shadow-inner">
+            {/* Header Content */}
+            <div className="relative z-10 flex flex-col gap-2 p-2 px-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-2 pl-1">
+                   <Swords className="h-4 w-4 text-gray-400" />
+                   <span className="text-sm font-extrabold text-[#e2a899] uppercase tracking-widest">Round {roundNumber}</span>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                   <Button variant="ghost" size="icon" onClick={previousTurn} disabled={currentTurnIndex === 0 && roundNumber === 1} className="h-6 w-6 rounded bg-[#1A2733]/50 hover:bg-[#1E2528] text-gray-400 hover:text-white border border-transparent hover:border-[#38bdf8]/30">
+                     <ChevronUp className="h-3 w-3" />
+                   </Button>
+                   <Button variant="ghost" size="icon" onClick={handleNextTurn} className="h-6 w-6 rounded bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/20">
+                     <ChevronDown className="h-3 w-3" />
+                   </Button>
+                 </div>
                </div>
-               <div className="flex items-center gap-1.5">
-                 <Button variant="ghost" size="icon" onClick={previousTurn} disabled={currentTurnIndex === 0 && roundNumber === 1} className="h-6 w-6 rounded bg-[#13181C] hover:bg-[#1E2528] text-gray-400 hover:text-white border border-transparent hover:border-[#38bdf8]/30">
-                   <ChevronUp className="h-3 w-3" />
-                 </Button>
-                 <Button variant="ghost" size="icon" onClick={handleNextTurn} className="h-6 w-6 rounded bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/20">
-                   <ChevronDown className="h-3 w-3" />
-                 </Button>
-               </div>
-             </div>
+            </div>
           </div>
         )}
 
