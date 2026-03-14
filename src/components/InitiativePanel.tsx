@@ -146,9 +146,9 @@ export const InitiativePanel: React.FC = () => {
       }}
     >
       <div className={cn(
-        "flex shadow-2xl pointer-events-auto transition-all animate-in fade-in border border-[#333333] bg-[#1a1a1a]/80 backdrop-blur-md",
-        layoutFormat === 'vertical' ? "flex-col rounded-2xl p-3 gap-3 w-[345px] max-h-[80vh] slide-in-from-right-5" : "items-center slide-in-from-top-5",
-        layoutFormat === 'horizontal' ? "rounded-3xl p-3 px-4 gap-4" : "",
+        "flex shadow-2xl pointer-events-auto transition-all animate-in fade-in border border-[#1A2733] bg-[#0B1318]/40 backdrop-blur-2xl",
+        layoutFormat === 'vertical' ? "flex-col rounded-xl p-3 gap-2.5 w-[365px] max-h-[85vh] slide-in-from-right-5" : "items-center slide-in-from-top-5",
+        layoutFormat === 'horizontal' ? "rounded-2xl p-3 px-4 gap-4" : "",
         layoutFormat === 'mini' ? "rounded-full p-1.5 px-3 gap-2" : ""
       )}>
         {/* MULTI-SELECT GROUP INITIATIVE */}
@@ -211,15 +211,20 @@ export const InitiativePanel: React.FC = () => {
         )}
 
         {layoutFormat === 'vertical' && (
-          <div className="flex items-center justify-between px-1 pb-2 border-b border-[#333333] shrink-0">
-             <span className="text-xl font-bold text-[#e2a899] font-serif tracking-wide">Round {roundNumber}</span>
-             <div className="flex items-center gap-2">
-               <Button variant="ghost" size="icon" onClick={previousTurn} disabled={currentTurnIndex === 0 && roundNumber === 1} className="h-7 w-7 rounded-full bg-[#2D2D2D]/50 hover:bg-[#333333]">
-                 <ChevronUp className="h-4 w-4" />
-               </Button>
-               <Button variant="ghost" size="icon" onClick={handleNextTurn} className="h-7 w-7 rounded-full bg-[#2D2D2D]/50 hover:bg-[#333333] text-[#38bdf8]">
-                 <ChevronDown className="h-4 w-4" />
-               </Button>
+          <div className="flex flex-col gap-2 pb-2 border-b border-[#1A2733] shrink-0 px-1">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-2 pl-1">
+                 <Swords className="h-4 w-4 text-gray-300" />
+                 <span className="text-sm font-extrabold text-[#e2a899] uppercase tracking-widest">Round {roundNumber}</span>
+               </div>
+               <div className="flex items-center gap-1.5">
+                 <Button variant="ghost" size="icon" onClick={previousTurn} disabled={currentTurnIndex === 0 && roundNumber === 1} className="h-6 w-6 rounded bg-[#13181C] hover:bg-[#1E2528] text-gray-400 hover:text-white border border-transparent hover:border-[#38bdf8]/30">
+                   <ChevronUp className="h-3 w-3" />
+                 </Button>
+                 <Button variant="ghost" size="icon" onClick={handleNextTurn} className="h-6 w-6 rounded bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/20">
+                   <ChevronDown className="h-3 w-3" />
+                 </Button>
+               </div>
              </div>
           </div>
         )}
@@ -252,13 +257,17 @@ export const InitiativePanel: React.FC = () => {
 
         <div 
           className={cn(
-            "flex overflow-auto scrollbar-hide flex-1",
-            layoutFormat === 'vertical' ? "flex-col gap-2 px-1" : "items-center overflow-x-auto",
+            "relative flex overflow-auto scrollbar-hide flex-1 px-2",
+            layoutFormat === 'vertical' ? "flex-col gap-1.5 py-1" : "items-center overflow-x-auto",
             layoutFormat === 'horizontal' ? "gap-2 max-w-[75vw] px-2" : "",
             layoutFormat === 'mini' ? "gap-1.5 max-w-[50vw] px-1" : ""
           )}
           ref={scrollContainerRef}
         >
+          {/* Continuous vertical track line behind the active token highlights */}
+          {layoutFormat === 'vertical' && (
+            <div className="absolute left-2 top-1 bottom-1 w-[2px] rounded-full bg-white/10 z-0" />
+          )}
           {visibleInitiativeOrder.map((entry, index) => {
              const token = tokens.find(t => t.id === entry.tokenId);
              if (!token) return null;
