@@ -71,12 +71,15 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     permissions,
     lastError,
     activeTransport,
+    customJazzUrl,
     setServerUrl,
     setCurrentUsername,
     setActiveTransport,
+    setCustomJazzUrl,
   } = useMultiplayerStore();
 
   const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
+  const [localJazzUrl, setLocalJazzUrl] = useState(customJazzUrl || '');
   const sessionPlayers = useSessionStore((s) => s.players);
   const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
   const landingUsername = React.useMemo(() => {
@@ -151,6 +154,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     if (transport === 'jazz') {
       setIsConnecting(true);
       try {
+        if (localJazzUrl.trim()) {
+          setCustomJazzUrl(localJazzUrl.trim());
+        } else {
+          setCustomJazzUrl(null);
+        }
+
         setCurrentUsername(username.trim());
         const info = createJazzSession(username.trim());
         const shortCode = encodeJazzCode(info.sessionCoId);
@@ -217,6 +226,12 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       const resolved = resolveSessionCode(sessionCode);
 
       if (resolved.transport === 'jazz') {
+        if (localJazzUrl.trim()) {
+          setCustomJazzUrl(localJazzUrl.trim());
+        } else {
+          setCustomJazzUrl(null);
+        }
+
         setCurrentUsername(username.trim());
 
         // Capture the player's landing-screen roles BEFORE joinJazzSession,
@@ -575,7 +590,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
               )}
 
-              {transport === 'opbridge' && (
+              {/* Advanced Settings — handles both OpBridge and Jazz dynamically */}
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced} className="pt-2">
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5">
@@ -584,34 +599,54 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="create-server-url" className="text-xs text-muted-foreground">Server URL</Label>
-                    <Input
-                      id="create-server-url"
-                      placeholder="ws://localhost:3001"
-                      value={localServerUrl}
-                      onChange={(e) => setLocalServerUrl(e.target.value)}
-                      disabled={isConnecting}
-                      className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="create-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
-                    <Input
-                      id="create-invite-token"
-                      placeholder="Enter invite token"
-                      value={inviteToken}
-                      onChange={(e) => setInviteToken(e.target.value)}
-                      disabled={isConnecting}
-                      className="bg-background/50 border-white/10 text-sm h-9"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground/70">
-                    Change server URL to connect to a remote server
-                  </p>
+                  {transport === 'opbridge' ? (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="create-server-url" className="text-xs text-muted-foreground">Server URL</Label>
+                        <Input
+                          id="create-server-url"
+                          placeholder="ws://localhost:3001"
+                          value={localServerUrl}
+                          onChange={(e) => setLocalServerUrl(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="create-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
+                        <Input
+                          id="create-invite-token"
+                          placeholder="Enter invite token"
+                          value={inviteToken}
+                          onChange={(e) => setInviteToken(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 text-sm h-9"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground/70">
+                        Change server URL to connect to a remote server
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="create-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
+                        <Input
+                          id="create-jazz-url"
+                          placeholder="wss://your-project.mesh.jazz.workers.dev"
+                          value={localJazzUrl}
+                          onChange={(e) => setLocalJazzUrl(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground/70">
+                        Leave blank to use the default or environment variable synchronization mesh.
+                      </p>
+                    </>
+                  )}
                 </CollapsibleContent>
               </Collapsible>
-              )}
 
               <div className="pt-4 border-t border-white/5">
                 <Button
@@ -685,41 +720,60 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 </div>
               )}
 
-              {/* Only show advanced settings for non-Jazz codes */}
-              {!isJazzCode(sessionCode) && (
-                <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Advanced Settings
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="join-server-url" className="text-xs text-muted-foreground">Server URL</Label>
-                      <Input
-                        id="join-server-url"
-                        placeholder="ws://localhost:3001"
-                        value={localServerUrl}
-                        onChange={(e) => setLocalServerUrl(e.target.value)}
-                        disabled={isConnecting}
-                        className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="join-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
-                      <Input
-                        id="join-invite-token"
-                        placeholder="Enter invite token"
-                        value={inviteToken}
-                        onChange={(e) => setInviteToken(e.target.value)}
-                        disabled={isConnecting}
-                        className="bg-background/50 border-white/10 text-sm h-9"
-                      />
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
+              {/* Advanced Settings — both Jazz and OpBridge */}
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Advanced Settings
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
+                  {!isJazzCode(sessionCode) && sessionCode !== '' ? (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="join-server-url" className="text-xs text-muted-foreground">Server URL</Label>
+                        <Input
+                          id="join-server-url"
+                          placeholder="ws://localhost:3001"
+                          value={localServerUrl}
+                          onChange={(e) => setLocalServerUrl(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="join-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
+                        <Input
+                          id="join-invite-token"
+                          placeholder="Enter invite token"
+                          value={inviteToken}
+                          onChange={(e) => setInviteToken(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 text-sm h-9"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="join-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
+                        <Input
+                          id="join-jazz-url"
+                          placeholder="wss://your-project.mesh.jazz.workers.dev"
+                          value={localJazzUrl}
+                          onChange={(e) => setLocalJazzUrl(e.target.value)}
+                          disabled={isConnecting}
+                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground/70">
+                        Leave blank to use the default or environment variable synchronization mesh.
+                      </p>
+                    </>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
 
               <div className="pt-4 border-t border-white/5">
                 <Button

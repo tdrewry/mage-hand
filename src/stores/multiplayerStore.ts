@@ -30,6 +30,7 @@ export interface MultiplayerState {
   permissions: string[];
   lastError: string | null;
   activeTransport: TransportType | null;
+  customJazzUrl: string | null;
   
   // Sync state
   isSyncing: boolean;
@@ -56,6 +57,7 @@ export interface MultiplayerState {
   setPermissions: (permissions: string[]) => void;
   setLastError: (error: string | null) => void;
   setActiveTransport: (transport: TransportType | null) => void;
+  setCustomJazzUrl: (url: string | null) => void;
   setSyncing: (syncing: boolean) => void;
   setSyncReady: (ready: boolean) => void;
   updateLastSyncTimestamp: () => void;
@@ -81,6 +83,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       permissions: [],
       lastError: null,
       activeTransport: null,
+      customJazzUrl: null,
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
@@ -136,6 +139,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setPermissions: (permissions) => set({ permissions }),
       setLastError: (error) => set({ lastError: error }),
       setActiveTransport: (transport) => set({ activeTransport: transport }),
+      setCustomJazzUrl: (url) => set({ customJazzUrl: url }),
       
       setSyncing: (syncing) => set({ isSyncing: syncing }),
       setSyncReady: (ready) => set({ syncReady: ready }),
@@ -171,6 +175,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         currentSession: state.currentSession,
         currentUserId: state.currentUserId,
         roles: state.roles,
+        customJazzUrl: state.customJazzUrl,
       }),
       onRehydrateStorage: () => {
         return (state) => {

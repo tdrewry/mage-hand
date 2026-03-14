@@ -125,10 +125,12 @@ function JazzActiveProvider({ children, syncUrl }: { children: React.ReactNode; 
  */
 export function JazzSessionProvider({ children, syncUrl }: JazzProviderProps) {
   const activeTransport = useMultiplayerStore((s) => s.activeTransport);
-  const peer = syncUrl || DEFAULT_SYNC_URL;
+  const customJazzUrl = useMultiplayerStore((s) => s.customJazzUrl);
+  
+  const peer = customJazzUrl || syncUrl || import.meta.env.VITE_JAZZ_SYNC_URL || DEFAULT_SYNC_URL;
 
   if (activeTransport === 'jazz') {
-    return <JazzActiveProvider syncUrl={peer}>{children}</JazzActiveProvider>;
+    return <JazzActiveProvider syncUrl={peer as `ws://${string}` | `wss://${string}`}>{children}</JazzActiveProvider>;
   }
 
   // No Jazz transport active — render children without any WebSocket overhead
