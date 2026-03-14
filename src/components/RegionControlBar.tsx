@@ -260,16 +260,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
   
   return (
     <>
-      <div 
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
-        style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
-      >
-        <div className="flex items-center gap-1">
-          <span className="text-xs font-medium text-foreground px-1.5">
-            {selectedRegions.length} region{selectedRegions.length > 1 ? 's' : ''}
-          </span>
-          
-          <div className="h-4 w-px bg-border" />
+      <div className="flex items-center gap-1">
           
           {/* Select All */}
           {onSelectAll && (
@@ -474,30 +465,7 @@ export const RegionControlBar: React.FC<RegionControlBarProps> = ({
             </PopoverContent>
           </Popover>
           
-          <div className="h-4 w-px bg-border" />
-          
-          {/* Delete */}
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setShowDeleteModal(true)}
-          >
-            <Trash2 className="h-3 w-3 mr-1" />
-            Del
-          </Button>
-          
-          {/* Clear Selection */}
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={onClearSelection}
-          >
-            ✕
-          </Button>
         </div>
-      </div>
       
       {/* Delete Confirmation Modal */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>

@@ -93,17 +93,7 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
   };
 
   return (
-    <div
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg px-2 py-1.5"
-      style={{ zIndex: Z_INDEX.FIXED_UI.TOOLBARS }}
-    >
-      <div className="flex items-center gap-1">
-        {/* Label */}
-        <span className="text-xs font-medium text-foreground px-1.5 max-w-[120px] truncate">
-          {categoryLabel}
-        </span>
-
-        <div className="h-4 w-px bg-border" />
+    <div className="flex items-center gap-1">
 
         {/* Tool selector: Drag | Rotate | Points */}
         <Button
@@ -244,31 +234,8 @@ export const MapObjectControlBar: React.FC<MapObjectControlBarProps> = ({
             >
               <Moon className="h-3 w-3" />
             </Button>
-            <div className="h-4 w-px bg-border" />
           </>
         )}
-
-        {/* Delete */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={handleDelete}
-        >
-          <Trash2 className="h-3 w-3 mr-1" />
-          Del
-        </Button>
-
-        {/* Clear Selection */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={() => clearSelection()}
-        >
-          ✕
-        </Button>
-      </div>
     </div>
   );
 };

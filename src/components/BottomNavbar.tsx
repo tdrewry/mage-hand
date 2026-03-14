@@ -34,11 +34,13 @@ import { useUiStateStore } from '@/stores/uiStateStore';
 interface BottomNavbarProps {
   onClearSelection: () => void;
   onUpdateCanvas?: () => void;
+  children?: React.ReactNode;
 }
 
 export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   onClearSelection,
-  onUpdateCanvas
+  onUpdateCanvas,
+  children
 }) => {
   const { 
     tokens, currentPlayerId, players, removeToken, updateTokenIllumination,
@@ -280,13 +282,19 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
     selectedTokens.forEach(token => {
       removeToken(token.id);
     });
-    
-    // For other entities, we would call their respective store removals...
-    
+    // Delete remaining selected map objects
+    if (selectedMapObjectIds.length > 0) {
+      const { mapObjects } = useMapObjectStore.getState();
+      const unlockedMapObjects = mapObjects.filter(o => selectedMapObjectIds.includes(o.id) && !o.locked);
+      if (unlockedMapObjects.length > 0) {
+        useMapObjectStore.getState().removeMultipleMapObjects(unlockedMapObjects.map(o => o.id));
+      }
+    }
+
     setShowDeleteModal(false);
     onClearSelection();
     onUpdateCanvas?.();
-    toast.success(`Deleted ${selectedTokens.length} token(s)`); // Adjust msg if deleting other entities
+    toast.success(`Deleted ${totalCount} selected item(s)`);
   };
 
   const handleClear = () => {
@@ -428,6 +436,9 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
               <div className="h-4 w-px bg-white/10 mx-2" />
             </>
           )}
+
+          {/* Embedded Type-Specific Toolbars (Regions, Objects) */}
+          {children}
 
           {/* Delete Action */}
           <Button 

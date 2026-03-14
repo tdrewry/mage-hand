@@ -12040,7 +12040,10 @@ export const SimpleTabletop = () => {
             {/* DM Cursor Sharing Toggle — only visible to DMs */}
             {isDM && (
               <div
-                className="absolute bottom-4 left-28 select-none pointer-events-auto"
+                className={cn(
+                  "absolute left-28 select-none pointer-events-auto transition-all duration-300 ease-in-out",
+                  isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+                )}
                 style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
               >
                 <CursorToggleButton />
@@ -12050,7 +12053,10 @@ export const SimpleTabletop = () => {
             {/* Client Cursor Sharing Status — non-interactive indicator for non-DMs */}
             {!isDM && (
               <div
-                className="absolute bottom-4 left-28 select-none pointer-events-none pointer-events-auto"
+                className={cn(
+                  "absolute left-28 select-none pointer-events-none pointer-events-auto transition-all duration-300 ease-in-out",
+                  isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+                )}
                 style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
               >
                 <CursorStatusIndicator />
@@ -12059,7 +12065,10 @@ export const SimpleTabletop = () => {
 
             {/* Version Indicator - Bottom Left */}
             <div
-              className="absolute bottom-4 left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-sm select-none pointer-events-none"
+              className={cn(
+                "absolute left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-muted-foreground shadow-sm select-none pointer-events-none transition-all duration-300 ease-in-out",
+                isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+              )}
               style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
             >
               v{APP_VERSION}
@@ -12067,7 +12076,10 @@ export const SimpleTabletop = () => {
 
             {/* Zoom Level Indicator with Menu */}
             <div
-              className="absolute bottom-4 right-4 pointer-events-auto"
+              className={cn(
+                "absolute right-4 pointer-events-auto transition-all duration-300 ease-in-out",
+                isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+              )}
               style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
             >
               <DropdownMenu>
@@ -12169,43 +12181,41 @@ export const SimpleTabletop = () => {
           redrawCanvas();
         }}
         onUpdateCanvas={handleCanvasUpdate}
-      />
+      >
+        {/* Type-specific toolbars - injected right into the middle area of bottom navbar */}
+        {(selectedRegionIds.length > 0 && selectedTokenIds.length === 0 && selectedMapObjectIds.length === 0) && (
+          <RegionControlBar
+            selectedRegionIds={selectedRegionIds}
+            onClearSelection={() => {
+              selectedRegionIds.forEach(id => deselectRegion(id));
+              setSelectedRegionIds([]);
+              redrawCanvas();
+            }}
+            onUpdateCanvas={handleCanvasUpdate}
+            onSelectAll={() => {
+              regions.forEach(region => selectRegion(region.id));
+              setSelectedRegionIds(regions.map(r => r.id));
+              redrawCanvas();
+            }}
+            isDM={isDM}
+            onMarkExplored={handleMarkRegionsExplored}
+            onUnmarkExplored={handleUnmarkRegionsExplored}
+          />
+        )}
 
-      {/* Type-specific toolbars - always rendered alongside unified bar */}
-      <>
-
-        {/* Region Control Bar - Shows when region(s) are selected */}
-        <RegionControlBar
-          selectedRegionIds={selectedRegionIds}
-          onClearSelection={() => {
-            selectedRegionIds.forEach(id => deselectRegion(id));
-            setSelectedRegionIds([]);
-            redrawCanvas();
-          }}
-          onUpdateCanvas={handleCanvasUpdate}
-          onSelectAll={() => {
-            regions.forEach(region => selectRegion(region.id));
-            setSelectedRegionIds(regions.map(r => r.id));
-            redrawCanvas();
-          }}
-          isDM={isDM}
-          onMarkExplored={handleMarkRegionsExplored}
-          onUnmarkExplored={handleUnmarkRegionsExplored}
-        />
-
-        {/* Map Object Control Bar - Shows when map object(s) are selected */}
-        <MapObjectControlBar
-          pointEditMode={wallPointEditMode}
-          onTogglePointEditMode={() => {
-            setWallPointEditMode(prev => !prev);
-            setMapObjectTool('points');
-          }}
-          mapObjectTool={mapObjectTool}
-          onSetMapObjectTool={setMapObjectTool}
-          onUpdateCanvas={handleCanvasUpdate}
-        />
-      </>
-
+        {(selectedMapObjectIds.length > 0 && selectedTokenIds.length === 0 && selectedRegionIds.length === 0) && (
+          <MapObjectControlBar
+            pointEditMode={wallPointEditMode}
+            onTogglePointEditMode={() => {
+              setWallPointEditMode(prev => !prev);
+              setMapObjectTool('points');
+            }}
+            mapObjectTool={mapObjectTool}
+            onSetMapObjectTool={setMapObjectTool}
+            onUpdateCanvas={handleCanvasUpdate}
+          />
+        )}
+      </BottomNavbar>
 
       {/* Fog Brush Toolbar - Shows when fog brush is active */}
       {fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play' && (
