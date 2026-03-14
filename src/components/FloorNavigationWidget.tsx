@@ -3,6 +3,8 @@ import { ChevronUp, ChevronDown, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMapStore, type GameMap } from '@/stores/mapStore';
 import { toast } from 'sonner';
+import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
+import { cn } from '@/lib/utils';
 
 /**
  * Small overlay widget showing up/down floor navigation when the focused map
@@ -13,6 +15,7 @@ export const FloorNavigationWidget: React.FC = () => {
   const selectedMapId = useMapStore(s => s.selectedMapId);
   const structures = useMapStore(s => s.structures);
   const navigateFloor = useMapStore(s => s.navigateFloor);
+  const isBottomNavbarVisible = useBottomNavbarVisible();
 
   const currentMap = maps.find(m => m.id === selectedMapId);
   if (!currentMap?.structureId) return null;
@@ -39,7 +42,12 @@ export const FloorNavigationWidget: React.FC = () => {
   };
 
   return (
-    <div className="absolute bottom-20 right-4 z-50 flex flex-col items-center gap-0.5 bg-background/90 backdrop-blur-sm border border-border rounded-lg p-1 shadow-lg">
+    <div 
+      className={cn(
+        "absolute right-4 z-50 flex flex-col items-center gap-0.5 bg-background/90 backdrop-blur-sm border border-border rounded-lg p-1 shadow-lg transition-all duration-300 ease-in-out",
+        isBottomNavbarVisible ? "bottom-36" : "bottom-20"
+      )}
+    >
       <Button
         variant="ghost"
         size="sm"
