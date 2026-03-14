@@ -19,6 +19,7 @@ import { InitiativePanel } from "./InitiativePanel";
 import { CampaignSceneRunner } from "./CampaignSceneRunner";
 import { BottomNavbar } from "./BottomNavbar";
 import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
+import { cn } from '@/lib/utils';
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 
 import { LeftSidebar } from "./LeftSidebar";
@@ -210,6 +211,9 @@ const CursorStatusIndicator: React.FC = () => {
 };
 
 export const SimpleTabletop = () => {
+  // Check if selection action bar is visible for layout padding
+  const isBottomNavbarVisible = useBottomNavbarVisible();
+
   // Auto-broadcast map tree state changes from DM to all clients
   useMapTreeSync();
   // Register ephemeral handlers once
