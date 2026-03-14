@@ -146,7 +146,7 @@ export const InitiativePanel: React.FC = () => {
       }}
     >
       <div className={cn(
-        "flex shadow-2xl pointer-events-auto transition-all animate-in fade-in bg-[#1A1A1A]/80 backdrop-blur-md border border-[#333333]",
+        "flex shadow-2xl pointer-events-auto transition-all animate-in fade-in border border-[#333333] bg-[#1a1a1a]/80 backdrop-blur-md",
         layoutFormat === 'vertical' ? "flex-col rounded-2xl p-3 gap-3 w-[320px] max-h-[80vh] slide-in-from-right-5" : "items-center slide-in-from-top-5",
         layoutFormat === 'horizontal' ? "rounded-3xl p-3 px-4 gap-4" : "",
         layoutFormat === 'mini' ? "rounded-full p-1.5 px-3 gap-2" : ""
