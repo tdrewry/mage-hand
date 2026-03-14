@@ -182,6 +182,9 @@ export const TokenContextMenu = ({
   const [labelValue, setLabelValue] = useState('');
   const [labelPositionValue, setLabelPositionValue] = useState<LabelPosition>('below');
   const [imageUrlValue, setImageUrlValue] = useState('');
+  const [imageScaleValue, setImageScaleValue] = useState<number | undefined>(undefined);
+  const [imageOffsetXValue, setImageOffsetXValue] = useState<number | undefined>(undefined);
+  const [imageOffsetYValue, setImageOffsetYValue] = useState<number | undefined>(undefined);
   const [labelColorValue, setLabelColorValue] = useState('#FFFFFF');
   const [labelBackgroundValue, setLabelBackgroundValue] = useState('rgba(30, 30, 30, 0.75)');
   const [gridWidthValue, setGridWidthValue] = useState(1);
@@ -270,6 +273,9 @@ export const TokenContextMenu = ({
       setLabelBackgroundValue(token.labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
       // Appearance tab fields
       setImageUrlValue(token.imageUrl || '');
+      setImageScaleValue(token.imageScale);
+      setImageOffsetXValue(token.imageOffsetX);
+      setImageOffsetYValue(token.imageOffsetY);
       setGridWidthValue(token.gridWidth || 1);
       setGridHeightValue(token.gridHeight || 1);
       // Details tab fields
@@ -310,6 +316,9 @@ export const TokenContextMenu = ({
       setLabelColorValue('#FFFFFF');
       setLabelBackgroundValue('rgba(30, 30, 30, 0.75)');
       setImageUrlValue('');
+      setImageScaleValue(undefined);
+      setImageOffsetXValue(undefined);
+      setImageOffsetYValue(undefined);
       // For size, show "Mixed" if different, otherwise use common value
       const allSameSizeW = targetTokens.every(t => t.gridWidth === targetTokens[0].gridWidth);
       const allSameSizeH = targetTokens.every(t => t.gridHeight === targetTokens[0].gridHeight);
@@ -348,6 +357,9 @@ export const TokenContextMenu = ({
       setLabelColorValue(token.labelColor || '#FFFFFF');
       setLabelBackgroundValue(token.labelBackgroundColor || 'rgba(30, 30, 30, 0.75)');
       setImageUrlValue(token.imageUrl || '');
+      setImageScaleValue(token.imageScale);
+      setImageOffsetXValue(token.imageOffsetX);
+      setImageOffsetYValue(token.imageOffsetY);
       setGridWidthValue(token.gridWidth || 1);
       setGridHeightValue(token.gridHeight || 1);
       setNotesValue(token.notes || '');
@@ -601,7 +613,9 @@ export const TokenContextMenu = ({
   const handleImageImportConfirm = (result: ImageImportResult) => {
     console.log('ImageImportModal confirmed with URL:', result.imageUrl?.substring(0, 50) + '...');
     setImageUrlValue(result.imageUrl);
-    // Note: scale and offset could be stored on the token if needed for texture tiling
+    setImageScaleValue(result.scale);
+    setImageOffsetXValue(result.offsetX);
+    setImageOffsetYValue(result.offsetY);
   };
 
   const openImageImport = () => {
@@ -610,6 +624,9 @@ export const TokenContextMenu = ({
 
   const clearImage = () => {
     setImageUrlValue('');
+    setImageScaleValue(undefined);
+    setImageOffsetXValue(undefined);
+    setImageOffsetYValue(undefined);
   };
 
   const handleColorClick = () => {
@@ -676,16 +693,16 @@ export const TokenContextMenu = ({
           // Upload to server for multiplayer sync with compression
           await uploadTexture(hash, imageUrlValue, maxTokenWidth, maxTokenHeight);
           // Update token with both imageUrl and hash
-          updateTokenImage(token.id, imageUrlValue, hash);
+          updateTokenImage(token.id, imageUrlValue, hash, imageScaleValue, imageOffsetXValue, imageOffsetYValue);
           console.log('Updated token', token.id, 'with imageUrl and hash:', hash);
         } catch (error) {
           console.error('Failed to sync token texture:', error);
           // Still update the local image
-          updateTokenImage(token.id, imageUrlValue);
+          updateTokenImage(token.id, imageUrlValue, undefined, imageScaleValue, imageOffsetXValue, imageOffsetYValue);
         }
       } else if (token.imageUrl && !imageUrlValue) {
         // Clear image only if there was an image and now it's cleared
-        updateTokenImage(token.id, '', undefined);
+        updateTokenImage(token.id, '', undefined, undefined, undefined, undefined);
       }
       
       // Details tab updates
@@ -1508,16 +1525,21 @@ export const TokenContextMenu = ({
                 {/* Image Preview */}
                 {imageUrlValue && (
                   <div className="mt-2">
-                    <div className="border rounded-lg p-2 bg-muted/50">
-                      <img 
-                        src={imageUrlValue} 
-                        alt="Token preview" 
-                        className="w-16 h-16 object-cover rounded-full mx-auto"
-                        onError={() => {
-                          toast.error('Failed to load image');
-                          setImageUrlValue('');
-                        }}
-                      />
+                    <div className="border rounded-lg p-2 bg-muted/50 flex justify-center items-center">
+                      <div className="w-16 h-16 rounded-full overflow-hidden relative shadow-inner bg-black/20">
+                        <img 
+                          src={imageUrlValue} 
+                          alt="Token preview" 
+                          className="w-full h-full object-cover"
+                          style={{
+                            transform: `translate(${((imageOffsetXValue || 0) * 100).toFixed(1)}%, ${((imageOffsetYValue || 0) * 100).toFixed(1)}%) scale(${imageScaleValue || 1})`
+                          }}
+                          onError={() => {
+                            toast.error('Failed to load image');
+                            setImageUrlValue('');
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1962,6 +1984,9 @@ export const TokenContextMenu = ({
         title="Import Token Image"
         description="Select an image and position it within the token circle."
         initialImageUrl={imageUrlValue}
+        initialScale={imageScaleValue}
+        initialOffsetX={imageOffsetXValue}
+        initialOffsetY={imageOffsetYValue}
       />
     </>
   );

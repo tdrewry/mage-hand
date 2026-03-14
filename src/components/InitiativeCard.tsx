@@ -201,37 +201,39 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "group relative flex items-center gap-3 p-2 px-3 rounded-2xl border transition-all cursor-pointer w-full max-w-[300px]",
+          "group relative flex items-center gap-3 p-2 px-3 rounded-2xl border transition-all cursor-pointer w-full max-w-[300px] overflow-hidden",
           isActive 
             ? "bg-[#2D2D2D] border-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.15)] ring-1 ring-[#38bdf8]" 
             : "bg-[#1A1A1A] border-[#333333] hover:border-[#38bdf8]/50",
           isSelected && !isActive ? "ring-2 ring-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.4)]" : ""
         )}
       >
-        {/* Avatar Circle */}
-        <div 
-          className={cn(
-            "w-10 h-10 rounded-full overflow-hidden shrink-0 border-2",
-            isActive ? "border-[#38bdf8]" : "border-transparent"
-          )}
-          style={{
-            backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
-            backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}
-        >
-          {isHidden && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <EyeOff className="h-4 w-4 text-white/70" />
-            </div>
-          )}
-        </div>
+        {/* Background Image with fade to right */}
+        {token.imageUrl && (
+          <div 
+            className="absolute inset-y-0 left-0 w-3/4 z-0 pointer-events-none transition-opacity"
+            style={{
+              backgroundImage: `url(${token.imageUrl})`,
+              backgroundSize: '150%',
+              backgroundPosition: 'top left',
+              backgroundRepeat: 'no-repeat',
+              maskImage: 'linear-gradient(to right, black 30%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to right, black 30%, transparent 100%)',
+              opacity: isActive ? 1 : 0.6
+            }}
+          />
+        )}
+
+        {isHidden && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10 pointer-events-none">
+            <EyeOff className="h-4 w-4 text-white/70" />
+          </div>
+        )}
 
         {/* Name */}
-        <div className="flex-1 min-w-0 flex items-center gap-2">
+        <div className="flex-1 min-w-0 flex items-center justify-end pr-3 z-10">
           <span className={cn(
-            "text-base font-bold truncate",
+            "text-base font-bold truncate text-right",
             isActive ? "text-[#38bdf8]" : "text-muted-foreground"
           )}>
             {token.label || token.name}
@@ -239,7 +241,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         </div>
 
         {/* Status indicator & Score */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 z-10">
           <div className="flex flex-col items-center gap-0.5">
              <div className="flex text-muted-foreground/50">
                 {/* Stand-in for tiny icons in mockup */}

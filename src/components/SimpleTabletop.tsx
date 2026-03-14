@@ -3938,8 +3938,41 @@ export const SimpleTabletop = () => {
         targetCtx.ellipse(token.x, token.y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         targetCtx.clip();
 
-        // Draw image centered and scaled to fit the ellipse bounds
-        targetCtx.drawImage(tokenImg, token.x - radiusX, token.y - radiusY, tokenWidth, tokenHeight);
+        // Draw image maintaining aspect ratio, applying user scale and offset
+        const sourceW = tokenImg instanceof HTMLVideoElement ? tokenImg.videoWidth : 
+                        tokenImg instanceof HTMLImageElement ? (tokenImg.naturalWidth || tokenImg.width) : 
+                        tokenImg.width;
+        const sourceH = tokenImg instanceof HTMLVideoElement ? tokenImg.videoHeight : 
+                        tokenImg instanceof HTMLImageElement ? (tokenImg.naturalHeight || tokenImg.height) : 
+                        tokenImg.height;
+        
+        // Default to 1 to avoid NaN if image hasn't loaded yet
+        const imgAspect = (sourceH > 0 ? sourceW / sourceH : 1);
+        const shapeAspect = tokenWidth / tokenHeight;
+        let drawW: number, drawH: number;
+        
+        if (imgAspect > shapeAspect) {
+          drawH = tokenHeight;
+          drawW = tokenHeight * imgAspect;
+        } else {
+          drawW = tokenWidth;
+          drawH = tokenWidth / imgAspect;
+        }
+        
+        const scale = token.imageScale ?? 1.0;
+        const offsetX = (token.imageOffsetX ?? 0) * tokenWidth;
+        const offsetY = (token.imageOffsetY ?? 0) * tokenHeight;
+        
+        drawW *= scale;
+        drawH *= scale;
+
+        targetCtx.drawImage(
+          tokenImg, 
+          token.x - drawW / 2 + offsetX, 
+          token.y - drawH / 2 + offsetY, 
+          drawW, 
+          drawH
+        );
         targetCtx.restore();
 
         // Draw border on top

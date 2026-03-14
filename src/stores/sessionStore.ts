@@ -38,6 +38,9 @@ export interface Token {
   name: string;
   imageUrl: string; // In-memory image data (excluded from sync)
   imageHash?: string; // Hash for texture sync - this is what gets synced to other clients
+  imageScale?: number; // Scale factor for the token image
+  imageOffsetX?: number; // X offset for the token image (panning)
+  imageOffsetY?: number; // Y offset for the token image (panning)
   x: number;
   y: number;
   gridWidth: number;  // Width in grid units
@@ -133,7 +136,7 @@ export interface SessionState {
   updateTokenLabelPosition: (tokenId: string, labelPosition: LabelPosition) => void;
   updateTokenLabelStyle: (tokenId: string, labelColor?: string, labelBackgroundColor?: string) => void;
   updateTokenColor: (tokenId: string, color: string) => void;
-  updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string) => void;
+  updateTokenImage: (tokenId: string, imageUrl: string, imageHash?: string, imageScale?: number, imageOffsetX?: number, imageOffsetY?: number) => void;
   updateTokenRotation: (tokenId: string, rotation: number, showFacing?: boolean) => void;
   updateTokenElevation: (tokenId: string, elevation: number) => void;
   updateTokenStatuses: (tokenId: string, statuses: string[]) => void;
@@ -246,10 +249,19 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     }));
   },
 
-  updateTokenImage: (tokenId, imageUrl, imageHash) => {
+  updateTokenImage: (tokenId, imageUrl, imageHash, imageScale, imageOffsetX, imageOffsetY) => {
     set((state) => ({
       tokens: state.tokens.map((token) =>
-        token.id === tokenId ? { ...token, imageUrl, imageHash } : token
+        token.id === tokenId 
+          ? { 
+              ...token, 
+              imageUrl, 
+              imageHash,
+              imageScale: imageScale ?? token.imageScale,
+              imageOffsetX: imageOffsetX ?? token.imageOffsetX,
+              imageOffsetY: imageOffsetY ?? token.imageOffsetY
+            } 
+          : token
       ),
     }));
   },

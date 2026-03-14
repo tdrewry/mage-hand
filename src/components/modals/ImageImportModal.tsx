@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -70,8 +70,8 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
   const [urlInput, setUrlInput] = useState('');
   const [scale, setScale] = useState(initialScale);
-  const [offsetX, setOffsetX] = useState(initialOffsetX);
-  const [offsetY, setOffsetY] = useState(initialOffsetY);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
   const [repeat, setRepeat] = useState(initialRepeat);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -85,18 +85,31 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   // Preview area size
   const PREVIEW_SIZE = 300;
 
+  const shapeDimensions = useMemo(() => {
+    const shapeAspect = shape.width / shape.height;
+    if (shapeAspect > 1) {
+      const w = PREVIEW_SIZE * 0.8;
+      return { shapeW: w, shapeH: w / shapeAspect };
+    } else {
+      const h = PREVIEW_SIZE * 0.8;
+      return { shapeW: h * shapeAspect, shapeH: h };
+    }
+  }, [shape.width, shape.height]);
+
+  const { shapeW, shapeH } = shapeDimensions;
+
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setImageUrl(initialImageUrl);
       setUrlInput(initialImageUrl);
       setScale(initialScale);
-      setOffsetX(initialOffsetX);
-      setOffsetY(initialOffsetY);
+      setOffsetX((initialOffsetX || 0) * shapeW);
+      setOffsetY((initialOffsetY || 0) * shapeH);
       setRepeat(initialRepeat);
       setImageLoaded(false);
     }
-  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY, initialRepeat]);
+  }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY, initialRepeat, shapeW, shapeH]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,18 +209,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
 
-    // Calculate shape dimensions to fit in preview
-    const shapeAspect = shape.width / shape.height;
-    let shapeW: number, shapeH: number;
-    
-    if (shapeAspect > 1) {
-      shapeW = PREVIEW_SIZE * 0.8;
-      shapeH = shapeW / shapeAspect;
-    } else {
-      shapeH = PREVIEW_SIZE * 0.8;
-      shapeW = shapeH * shapeAspect;
-    }
-    
+    // Use memoized shape dimensions
     const shapeX = (PREVIEW_SIZE - shapeW) / 2;
     const shapeY = (PREVIEW_SIZE - shapeH) / 2;
 
@@ -313,7 +315,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       ctx.fillRect(shapeX - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
       ctx.fillRect(shapeX + shapeW - markerSize/2, shapeY + shapeH - markerSize/2, markerSize, markerSize);
     }
-  }, [shape, imageSize, scale, offsetX, offsetY, repeat]);
+  }, [shape, imageSize, scale, offsetX, offsetY, repeat, shapeW, shapeH]);
 
   // Store loaded image reference for redrawing
   const loadedImageRef = useRef<HTMLImageElement | null>(null);
@@ -371,8 +373,8 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
     onConfirm({
       imageUrl,
       scale,
-      offsetX,
-      offsetY,
+      offsetX: offsetX / shapeW,
+      offsetY: offsetY / shapeH,
       repeat: repeat || undefined,
     });
     onOpenChange(false);
