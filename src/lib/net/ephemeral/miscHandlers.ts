@@ -20,8 +20,6 @@ import type {
   FogRevealPreviewPayload,
   ChatTypingPayload,
   ChatMessagePayload,
-  DiceRollingPayload,
-  DiceResultPayload,
   InitiativeDragPreviewPayload,
   InitiativeHoverPayload,
   GroupSelectPreviewPayload,
@@ -95,16 +93,6 @@ export function registerMiscHandlers(): void {
       triggerSound('chat.message');
     }
     useChatStore.getState().addRemoteMessage(data.id, userId, data.senderName, data.text, data.timestamp, data.whisperTo);
-  });
-
-  ephemeralBus.on("dice.rolling", (data: DiceRollingPayload, userId) => {
-    triggerSound('dice.roll');
-    store.getState().setDiceRolling(userId, data.formula);
-  });
-
-  // Dice result: add to chat log for all peers
-  ephemeralBus.on("dice.result", (data: DiceResultPayload, _userId) => {
-    useChatStore.getState().addDiceEntry(data as any);
   });
 
   // ── Initiative ──
@@ -256,8 +244,6 @@ export function registerMiscHandlers(): void {
       store.getState().removeFogCursor(key.replace("fog.cursor.preview::", ""));
     } else if (key.startsWith("chat.typing::")) {
       store.getState().removeChatTyping(key.replace("chat.typing::", ""));
-    } else if (key.startsWith("dice.rolling::")) {
-      store.getState().removeDiceRolling(key.replace("dice.rolling::", ""));
     } else if (key.startsWith("initiative.drag.preview::")) {
       store.getState().removeInitiativeDrag(key.replace("initiative.drag.preview::", ""));
     } else if (key.startsWith("initiative.hover::")) {

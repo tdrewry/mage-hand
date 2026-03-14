@@ -9,10 +9,16 @@
  */
 
 import React, { useEffect } from "react";
-import { JazzReactProvider } from "jazz-tools/react";
+import { JazzReactProvider, useAccount } from "jazz-tools/react";
+import { useDemoAuth, DemoAuthBasicUI } from 'jazz-tools/react';
 import { MageHandAccount } from "./schema";
 import { toast } from "sonner";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { createJazzSession, joinJazzSession } from "./session";
+import { encodeJazzCode } from "../sessionCodeResolver";
+import { netManager } from "../net/index";
+import { JazzTransport } from "../net/transports/JazzTransport";
 
 /** Default self-hosted sync server URL */
 const DEFAULT_SYNC_URL: `ws://${string}` = "ws://localhost:4200";
@@ -102,6 +108,106 @@ function useJazzConnectionMonitor(syncUrl: string) {
 }
 
 /**
+ * Worker component that runs inside the Jazz Provider.
+ * Waits for `me` to be initialized by `guestMode`, then performs
+ * pending create/join actions. 
+ */
+function JazzSetupWorker() {
+  const me = useAccount();
+
+  useEffect(() => {
+    console.log('[JazzSetupWorker] Check me:', { me, isLoaded: (me as any)?.$isLoaded, type: me?.[Symbol.for('cojson.TypeSym')] || (me as any)?.$type$ });
+    // Wait for the local agent to be fully initialized by guestMode
+    if (!me || !(me as any).$isLoaded) return;
+
+    const state = useMultiplayerStore.getState();
+    const action = state.pendingJazzAction;
+    if (!action) return;
+
+    // Clear the action so we don't double-fire
+    state.setPendingJazzAction(null);
+
+    const runSetup = async () => {
+      try {
+        const { type, username, sessionCoId } = action;
+
+        // Resolve local roles
+        const sessionState = useSessionStore.getState();
+        const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+        let playerRoles = currentPlayer?.roleIds;
+        if (!playerRoles || playerRoles.length === 0) {
+          playerRoles = type === 'create' ? ['dm'] : ['player'];
+        }
+
+        let info;
+        if (type === 'create') {
+          info = createJazzSession(username);
+        } else if (type === 'join' && sessionCoId) {
+          info = await joinJazzSession(sessionCoId);
+        } else {
+          return;
+        }
+
+        const shortCode = encodeJazzCode(info.sessionCoId);
+        
+        // Hydration stores
+        useMultiplayerStore.getState().setRoles(playerRoles);
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: shortCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+
+        // Spin up tandem ephemeral presence
+        const transport = new JazzTransport(info.root);
+        netManager.connectWithTransport({
+          transport,
+          sessionCode: shortCode,
+          username,
+          roles: playerRoles,
+        }).then(() => {
+          console.log('✅ [JazzSetupWorker] Jazz Ephemeral Transport injected');
+        }).catch((err) => {
+          console.warn('⚠️ [JazzSetupWorker] Transport injection failed:', err);
+        });
+
+        if (type === 'create') {
+          toast.success(`Jazz session created — code: ${shortCode}`);
+        } else {
+          toast.success(`Joined Jazz session ${shortCode}`);
+        }
+
+      } catch (err: any) {
+        console.error('[JazzSetupWorker] Setup failed:', err);
+        toast.error(`Session setup failed: ${err.message}`);
+        useMultiplayerStore.getState().setActiveTransport(null);
+      }
+    };
+
+    runSetup();
+  }, [me]);
+
+  return null;
+}
+
+function AuthWrapper({ children }: { children: React.ReactNode }) {
+  const me = useAccount();
+
+  if (!me || !(me as any).$isLoaded) {
+    // @ts-expect-error DemoAuthBasicUI is typed natively but TS 5.1/React 18 rejects its return signature occasionally
+    return <DemoAuthBasicUI appName="Owlbear" />;
+  }
+
+  return (
+    <>
+      <JazzSetupWorker />
+      {children}
+    </>
+  );
+}
+
+/**
  * Inner component that only mounts the JazzReactProvider when jazz transport is active.
  */
 function JazzActiveProvider({ children, syncUrl }: { children: React.ReactNode; syncUrl: `ws://${string}` | `wss://${string}` }) {
@@ -113,7 +219,9 @@ function JazzActiveProvider({ children, syncUrl }: { children: React.ReactNode; 
         sync={{ peer: syncUrl }}
         AccountSchema={MageHandAccount}
       >
-        {children}
+        <AuthWrapper>
+          {children}
+        </AuthWrapper>
       </JazzReactProvider>
     </JazzErrorBoundary>
   );

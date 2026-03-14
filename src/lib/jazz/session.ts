@@ -45,10 +45,10 @@ export function getCoValueGroup(coValue: any): any {
  * Create a new Jazz session and push current Zustand state into it.
  * Returns the session info including the CoValue ID that peers use to join.
  */
-export function createJazzSession(name: string): JazzSessionInfo {
+export function createJazzSession(name: string, owner?: any): JazzSessionInfo {
   console.log(`[jazz-session] Creating session "${name}"`);
 
-  const root = createSessionRoot(name) as any;
+  const root = createSessionRoot(name, owner) as any;
   
   // Extract the real CoValue ID
   const coId = getCoValueId(root);

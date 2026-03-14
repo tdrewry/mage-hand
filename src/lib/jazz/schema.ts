@@ -5,7 +5,7 @@
  * Optional primitives use z.optional(). Optional CoValue refs use co.optional().
  */
 
-import { co, z, Group } from "jazz-tools";
+import { co, z, Group, type Account } from "jazz-tools";
 
 // ── Token ──────────────────────────────────────────────────────────────────
 
@@ -265,6 +265,26 @@ export type JazzTextureEntry = co.loaded<typeof JazzTextureEntry>;
 export const JazzTextureList = co.list(JazzTextureEntry);
 export type JazzTextureList = co.loaded<typeof JazzTextureList>;
 
+// ── Ephemeral Data (Pings, Cursors, Chat) ──────────────────────────────────
+// These bypass the traditional NetManager durability pipeline
+
+export const JazzCursor = co.map({
+  userId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  color: z.string(),
+  state: z.string(), 
+});
+export type JazzCursor = co.loaded<typeof JazzCursor>;
+
+export const JazzCursorMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify(JazzCursor)>
+// We use a simple JSON string value for Cursors to minimize tree traversal depth for very transient events
+
+export const JazzPingMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify({ x, y, color, timestamp })>
+// We use a simple JSON string value for Pings to minimize tree traversal depth for very transient events
+
+export const JazzChatList = co.list(z.string()); // Append-only list of JSON chat payloads
+
 // ── Session Root ───────────────────────────────────────────────────────────
 
 export const JazzSessionRoot = co.map({
@@ -277,6 +297,10 @@ export const JazzSessionRoot = co.map({
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
   illuminationSources: co.optional(JazzIlluminationSourceList),
+  // Ephemeral Data
+  cursors: co.optional(JazzCursorMap),
+  pings: co.optional(JazzPingMap),
+  chat: co.optional(JazzChatList),
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
@@ -312,11 +336,11 @@ export type MageHandAccount = co.loaded<typeof MageHandAccount>;
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Create a new JazzSessionRoot with empty lists, owned by a shared group.
+ * Creates the root CoValue that holds the entire session state.
  * The group is public-readable so any peer can join via the session ID.
  */
-export function createSessionRoot(sessionName: string): JazzSessionRoot {
-  const group = Group.create();
+export function createSessionRoot(sessionName: string, owner?: any): JazzSessionRoot {
+  const group = owner ? Group.create({ owner }) : Group.create();
   group.addMember("everyone", "writer");
 
   const tokens = JazzTokenList.create([], group);
@@ -330,8 +354,25 @@ export function createSessionRoot(sessionName: string): JazzSessionRoot {
   const textures = JazzTextureList.create([], group);
   const illuminationSources = JazzIlluminationSourceList.create([], group);
 
+  const cursors = JazzCursorMap.create({} as any, group);
+  const pings = JazzPingMap.create({} as any, group);
+  const chat = JazzChatList.create([], group);
+
   return JazzSessionRoot.create(
-    { sessionName, tokens, maps, regions, mapObjects, effects, blobs, textures, illuminationSources },
+    { 
+      sessionName, 
+      tokens, 
+      maps, 
+      regions: regions as any, 
+      mapObjects: mapObjects as any, 
+      effects: effects as any, 
+      blobs: blobs as any, 
+      textures: textures as any, 
+      illuminationSources: illuminationSources as any,
+      cursors: cursors as any, 
+      pings: pings as any, 
+      chat: chat as any
+    } as any,
     group,
-  );
+  ) as unknown as JazzSessionRoot;
 }

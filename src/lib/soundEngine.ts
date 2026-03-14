@@ -32,7 +32,6 @@ export type SoundEvent =
   | 'chat.whisper'
   // Dice
   | 'dice.roll'
-  | 'dice.result'
   // Initiative
   | 'initiative.turnChange'
   | 'initiative.combatStart'
@@ -82,12 +81,11 @@ const SYNTH_DEFAULTS: Record<SoundEvent, SynthDef> = {
   'action.claim':      { type: 'sine', frequency: 500, duration: 0.12, gain: 0.2 },
 
   // Chat — soft ping
-  'chat.message':      { type: 'sine', frequency: 1200, duration: 0.08, gain: 0.15 },
-  'chat.whisper':      { type: 'sine', frequency: 1400, duration: 0.06, gain: 0.1 },
+  'chat.message':      { type: 'sine', frequency: 600, duration: 0.1, gain: 0.1 },
+  'chat.whisper':      { type: 'sine', frequency: 400, duration: 0.1, gain: 0.05 },
 
   // Dice
   'dice.roll':         { type: 'triangle', frequency: 300, duration: 0.2, gain: 0.2 },
-  'dice.result':       { type: 'triangle', frequency: 500, duration: 0.15, gain: 0.2 },
 
   // Initiative
   'initiative.turnChange':  { type: 'sine', frequency: 700, frequency2: 900, duration: 0.2, gain: 0.25 },

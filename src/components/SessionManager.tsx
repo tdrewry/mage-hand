@@ -161,44 +161,19 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         }
 
         setCurrentUsername(username.trim());
-        const info = createJazzSession(username.trim());
-        const shortCode = encodeJazzCode(info.sessionCoId);
-        setActiveTransport('jazz');
-
-        // Propagate landing-screen role selection to multiplayerStore
-        // so dmOnly ephemeral gates (cursor.visibility etc.) work
-        const currentPlayer = useSessionStore.getState().players.find(
-          p => p.id === useSessionStore.getState().currentPlayerId
-        );
-        const playerRoles = currentPlayer?.roleIds ?? ['dm']; // creator defaults to DM
-        useMultiplayerStore.getState().setRoles(playerRoles);
-
-        // Store the short code as the session code so players can copy it
-        useMultiplayerStore.getState().setCurrentSession({
-          sessionCode: shortCode,
-          sessionId: info.sessionCoId,
-          createdAt: Date.now(),
-          hasPassword: false,
-        });
-
-        // Also open ephemeral WebSocket in tandem (non-blocking)
-        // Pass roles so the WS server knows our role for presence
-        netManager.connectEphemeralOnly({
-          serverUrl: localServerUrl,
-          sessionCode: shortCode,
+        
+        useMultiplayerStore.getState().setPendingJazzAction({
+          type: 'create',
           username: username.trim(),
-          roles: playerRoles,
-        }).then(() => {
-          console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
-        }).catch((err) => {
-          console.warn('⚠️ [SessionManager] Ephemeral WS failed (non-fatal):', err);
         });
-
-        toast.success(`Jazz session created — code: ${shortCode}`);
+        
+        setActiveTransport('jazz');
+        // Reset local connecting lock; let the global UI know we handed off to JazzProvider
+        setTimeout(() => setIsConnecting(false), 500);
       } catch (error) {
-        console.error('Failed to create Jazz session:', error);
-        toast.error('Failed to create Jazz session');
-      } finally {
+        console.error('Failed to init Jazz session setup:', error);
+        toast.error('Failed to init Jazz session');
+        useMultiplayerStore.getState().setActiveTransport(null);
         setIsConnecting(false);
       }
       return;
@@ -231,53 +206,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         } else {
           setCustomJazzUrl(null);
         }
-
         setCurrentUsername(username.trim());
 
-        // Capture the player's landing-screen roles BEFORE joinJazzSession,
-        // because the join process hydrates stores and may overwrite player data
-        const currentPlayer = useSessionStore.getState().players.find(
-          p => p.id === useSessionStore.getState().currentPlayerId
-        );
-        const playerRoles = currentPlayer?.roleIds?.length 
-          ? [...currentPlayer.roleIds] 
-          : ['player'];
-        console.log('[SessionManager] Pre-join roles captured:', playerRoles);
-
-        const info = await joinJazzSession(resolved.connectionId);
-        setActiveTransport('jazz');
-
-        // Apply the captured roles to multiplayerStore (post-hydration)
-        useMultiplayerStore.getState().setRoles(playerRoles);
-
-        useMultiplayerStore.getState().setCurrentSession({
-          sessionCode: resolved.displayCode,
-          sessionId: info.sessionCoId,
-          createdAt: Date.now(),
-          hasPassword: false,
-        });
-
-        // Also open ephemeral WebSocket in tandem (non-blocking)
-        // Pass roles so the WS server knows our role for presence
-        netManager.connectEphemeralOnly({
-          serverUrl: localServerUrl,
-          sessionCode: resolved.displayCode,
+        useMultiplayerStore.getState().setPendingJazzAction({
+          type: 'join',
           username: username.trim(),
-          roles: playerRoles,
-        }).then(() => {
-          console.log('✅ [SessionManager] Ephemeral WebSocket connected in tandem');
-        }).catch((err) => {
-          console.warn('⚠️ [SessionManager] Ephemeral WS failed (non-fatal):', err);
+          sessionCoId: resolved.connectionId,
         });
-
-        toast.success(`Joined Jazz session: ${resolved.displayCode}`);
+        
+        setActiveTransport('jazz');
+        setTimeout(() => setIsConnecting(false), 500);
       } else {
         // OpBridge join
         await handleConnect(resolved.connectionId);
       }
     } catch (error) {
-      console.error('Failed to join session:', error);
-      toast.error('Invalid or expired session code');
+      console.error('Failed to prep Jazz join:', error);
+      toast.error('Failed to prepare Jazz join');
     } finally {
       setIsConnecting(false);
     }

@@ -31,6 +31,7 @@ export interface MultiplayerState {
   lastError: string | null;
   activeTransport: TransportType | null;
   customJazzUrl: string | null;
+  pendingJazzAction: { type: 'create' | 'join', username: string, sessionCoId?: string, roles?: string[] } | null;
   
   // Sync state
   isSyncing: boolean;
@@ -57,6 +58,7 @@ export interface MultiplayerState {
   setPermissions: (permissions: string[]) => void;
   setLastError: (error: string | null) => void;
   setActiveTransport: (transport: TransportType | null) => void;
+  setPendingJazzAction: (action: { type: 'create' | 'join', username: string, sessionCoId?: string, roles?: string[] } | null) => void;
   setCustomJazzUrl: (url: string | null) => void;
   setSyncing: (syncing: boolean) => void;
   setSyncReady: (ready: boolean) => void;
@@ -83,6 +85,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       permissions: [],
       lastError: null,
       activeTransport: null,
+      pendingJazzAction: null,
       customJazzUrl: null,
       isSyncing: false,
       lastSyncTimestamp: 0,
@@ -139,6 +142,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setPermissions: (permissions) => set({ permissions }),
       setLastError: (error) => set({ lastError: error }),
       setActiveTransport: (transport) => set({ activeTransport: transport }),
+      setPendingJazzAction: (action) => set({ pendingJazzAction: action }),
       setCustomJazzUrl: (url) => set({ customJazzUrl: url }),
       
       setSyncing: (syncing) => set({ isSyncing: syncing }),
@@ -161,6 +165,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         permissions: [],
         lastError: null,
         activeTransport: null,
+        pendingJazzAction: null,
         isSyncing: false,
         lastSyncTimestamp: 0,
         syncErrors: [],

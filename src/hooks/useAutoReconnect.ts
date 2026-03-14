@@ -3,6 +3,7 @@ import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { netManager } from '@/lib/net';
 import { isJazzCode, decodeJazzCode } from '@/lib/sessionCodeResolver';
 import { joinJazzSession } from '@/lib/jazz';
+import { JazzTransport } from '@/lib/net/transports/JazzTransport';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
@@ -50,25 +51,24 @@ export function useAutoReconnect() {
             store.setConnectionStatus('connected');
             store.setActiveTransport('jazz');
             console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
+            
+            // 2. Inject ephemeral transport
+            const transport = new JazzTransport(info.root);
+            netManager.connectWithTransport({
+              transport,
+              sessionCode: code,
+              username,
+              roles: store.roles.length > 0 ? store.roles : undefined,
+            }).then(() => {
+              console.log('✅ [AutoReconnect] Jazz Ephemeral Transport injected');
+            }).catch((err) => {
+              console.warn('⚠️ [AutoReconnect] Transport injection failed:', err);
+            });
           })
           .catch((err) => {
             console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
             useMultiplayerStore.getState().reset();
           });
-
-        // 2. Also reconnect ephemeral WebSocket in tandem (non-blocking)
-        if (state.serverUrl) {
-          netManager.connectEphemeralOnly({
-            serverUrl: state.serverUrl,
-            sessionCode: code,
-            username,
-            roles: state.roles.length > 0 ? state.roles : undefined,
-          }).then(() => {
-            console.log('✅ [AutoReconnect] Ephemeral WS reconnected in tandem');
-          }).catch((err) => {
-            console.warn('⚠️ [AutoReconnect] Ephemeral WS reconnect failed (non-fatal):', err);
-          });
-        }
 
         return;
       }

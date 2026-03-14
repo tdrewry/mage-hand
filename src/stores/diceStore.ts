@@ -37,31 +37,16 @@ const storeCreator: StateCreator<DiceStore, [], []> = (set, get) => ({
 
   roll: (formula: string, label?: string, meta?: RollMetadata) => {
     const username = useMultiplayerStore.getState().currentUsername || 'You';
-    ephemeralBus.emit("dice.rolling", { formula });
     const result = rollDice(formula, label, meta);
     result.rolledBy = username;
     set((state) => ({
       rollHistory: [result, ...state.rollHistory].slice(0, MAX_HISTORY),
     }));
-    triggerSound('dice.result');
     // Feed into chat log locally
     try {
       useChatStore.getState().addDiceEntry(result);
     } catch { /* chat store may not be available */ }
-    // Broadcast result to all peers
-    try {
-      ephemeralBus.emit("dice.result", {
-        id: result.id,
-        formula: result.formula,
-        groups: result.groups,
-        modifier: result.modifier,
-        total: result.total,
-        timestamp: result.timestamp,
-        label: result.label,
-        rolledBy: result.rolledBy,
-        meta: result.meta as Record<string, unknown> | undefined,
-      });
-    } catch { /* net may not be available */ }
+    
     return result;
   },
 

@@ -138,7 +138,16 @@ export class NetworkSession {
     return this.transport.state === "open" && !!this.connectedInfo;
   }
 
-  connect(params: ConnectParams): Promise<NetworkSessionInfo> {
+  connect(params: ConnectParams, transportOverride?: ITransport): Promise<NetworkSessionInfo> {
+    if (transportOverride) {
+      if (this.transport) {
+        // Unbind previous listeners if we are swapping
+        this.transport.close();
+      }
+      this.transport = transportOverride;
+      this.wireTransport();
+    }
+
     this.serverUrl = normalizeWsUrl(params.serverUrl);
     this.sessionCode = params.sessionCode;
     this.lastAppliedSeq = params.lastSeenSeq ?? 0;

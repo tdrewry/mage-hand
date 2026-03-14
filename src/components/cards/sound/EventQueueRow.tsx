@@ -17,7 +17,6 @@ const EVENT_LABELS: Partial<Record<SoundEvent, string>> = {
   'chat.message':           'Message',
   'chat.whisper':           'Whisper',
   'dice.roll':              'Roll',
-  'dice.result':            'Result',
   'initiative.turnChange':  'Turn Change',
   'initiative.combatStart': 'Combat Start',
   'initiative.combatEnd':   'Combat End',

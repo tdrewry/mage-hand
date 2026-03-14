@@ -2,6 +2,7 @@
 // Singleton wrapper around NetworkSession for the new WebSocket JSON protocol.
 
 import { NetworkSession, type ConnectParams, type NetworkSessionInfo } from "../../../networking/client";
+import type { ITransport } from "../../../networking/client/transport";
 import type { EngineOp, OpBatchPayload, PresencePayload } from "../../../networking/contract/v1";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
@@ -122,18 +123,47 @@ export class NetManager {
   }
 
   /**
-   * Connect in ephemeral-only mode — WebSocket opens normally but
-   * inbound durable ops are ignored (Jazz handles durable state).
-   * Presence and ephemeral messages still flow.
+   * Connect using a custom injected transport (e.g. JazzTransport).
+   * In this mode, we mark it as ephemeralOnly internally if it's meant to
+   * run tandem to another data source, but the transport manages all the events.
    */
-  async connectEphemeralOnly(params: {
-    serverUrl: string;
+  async connectWithTransport(params: {
+    transport: ITransport;
+    serverUrl?: string; // Optional since custom transports may not use it
     sessionCode: string;
     username: string;
     roles?: string[];
   }): Promise<NetworkSessionInfo> {
     this._ephemeralOnly = true;
-    return this.connect(params);
+
+    const store = useMultiplayerStore.getState();
+    store.setConnectionStatus("connecting");
+    store.setLastError(null);
+
+    this._sessionCode = params.sessionCode;
+    this._lastConnectParams = params as any;
+    this._intentionalDisconnect = false;
+    this._reconnectAttempt = 0;
+    this.clearReconnectTimer();
+
+    const connectParams: ConnectParams = {
+      serverUrl: params.serverUrl || "custom://transport",
+      sessionCode: params.sessionCode,
+      username: params.username,
+      roles: params.roles,
+    };
+
+    try {
+      const info = await this.session.connect(connectParams, params.transport);
+      this._reconnectAttempt = 0;
+      return info;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const s = useMultiplayerStore.getState();
+      s.setConnectionStatus("error");
+      s.setLastError(msg);
+      throw err;
+    }
   }
 
   /** Whether this connection is in ephemeral-only mode (tandem with Jazz). */
