@@ -39,11 +39,11 @@ export const InitiativePanel: React.FC = () => {
   if (!isInCombat) return null;
 
   const rightOffset = isRightSidebarOpen && !isFocusMode ? '340px' : '16px';
-  const leftOffset = isLeftSidebarOpen && !isFocusMode ? '320px' : '0px';
+  const leftOffset = isLeftSidebarOpen && !isFocusMode ? '345px' : '0px';
   const calculateCenter = () => {
     if (layoutFormat === 'vertical') return undefined; // Handled by rightOffset
     const leftNum = parseInt(leftOffset);
-    const rightNum = isRightSidebarOpen && !isFocusMode ? 320 : 0;
+    const rightNum = isRightSidebarOpen && !isFocusMode ? 345 : 0;
     
     // Total width is 100vw. Center point is (100vw - leftNum - rightNum) / 2 + leftNum
     return `calc(${leftNum}px + (100vw - ${leftNum}px - ${rightNum}px) / 2)`;
@@ -147,7 +147,7 @@ export const InitiativePanel: React.FC = () => {
     >
       <div className={cn(
         "flex shadow-2xl pointer-events-auto transition-all animate-in fade-in border border-[#333333] bg-[#1a1a1a]/80 backdrop-blur-md",
-        layoutFormat === 'vertical' ? "flex-col rounded-2xl p-3 gap-3 w-[320px] max-h-[80vh] slide-in-from-right-5" : "items-center slide-in-from-top-5",
+        layoutFormat === 'vertical' ? "flex-col rounded-2xl p-3 gap-3 w-[345px] max-h-[80vh] slide-in-from-right-5" : "items-center slide-in-from-top-5",
         layoutFormat === 'horizontal' ? "rounded-3xl p-3 px-4 gap-4" : "",
         layoutFormat === 'mini' ? "rounded-full p-1.5 px-3 gap-2" : ""
       )}>

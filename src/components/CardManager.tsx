@@ -129,6 +129,7 @@ export function CardManager({
             isClosable={true}
             hideHeader={card.hideHeader}
             fullCardDraggable={card.fullCardDraggable}
+            scrollable={getCardScrollable(card.type)}
           >
             {content}
           </BaseCard>
@@ -189,8 +190,25 @@ function getCardTitle(type: CardType): string {
     [CardType.PLAY]: 'Play',
     [CardType.CAMPAIGN]: 'Campaign',
   };
-  
   return titles[type] || type;
+}
+
+// Helper to determine if a card type should let BaseCard handle scrolling, or if it manages its own.
+function getCardScrollable(type: CardType): boolean {
+  const nonScrollableTypes = new Set<CardType>([
+    CardType.ENVIRONMENT,
+    CardType.MAP_MANAGER,
+    CardType.MAP_TREE,
+    CardType.STYLES,
+    CardType.FOG,
+    CardType.VISION_PROFILE_MANAGER,
+    CardType.MAP_OBJECTS,
+    CardType.CAMPAIGN_EDITOR,
+    CardType.PLAY,
+    CardType.CAMPAIGN,
+  ]);
+  
+  return !nonScrollableTypes.has(type);
 }
 
 // Helper function to render card-specific content

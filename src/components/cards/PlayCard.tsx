@@ -85,7 +85,6 @@ export function PlayCardContent({ cardId }: PlayCardContentProps) {
             </Tooltip>
           </TooltipProvider>
         </TabsList>
-        
         <TabsContent value="chat" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <ChatCardContent />
         </TabsContent>

@@ -87,15 +87,15 @@ export const StylesCardContent: React.FC = () => {
   };
 
   return (
-    <Tabs defaultValue="utilities" className="w-full h-full">
-      <TabsList className="w-full grid grid-cols-2">
+    <Tabs defaultValue="utilities" className="w-full h-full flex flex-col">
+      <TabsList className="w-full grid grid-cols-2 shrink-0">
         <TabsTrigger value="utilities">Utilities</TabsTrigger>
         <TabsTrigger value="styles">Styles</TabsTrigger>
       </TabsList>
       
       {/* Utilities Tab */}
-      <TabsContent value="utilities" className="mt-0">
-        <div className="p-4 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto">
+      <TabsContent value="utilities" className="flex-1 min-h-0 overflow-y-auto m-0">
+        <div className="p-4 space-y-4">
           {/* Doors Section */}
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Doors</Label>
@@ -124,8 +124,8 @@ export const StylesCardContent: React.FC = () => {
       </TabsContent>
       
       {/* Styles Tab */}
-      <TabsContent value="styles" className="mt-0">
-        <div className="p-4 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto">
+      <TabsContent value="styles" className="flex-1 min-h-0 overflow-y-auto m-0">
+        <div className="p-4 space-y-4">
           {/* Edge Hatching Section */}
           <div className="space-y-3 border-b border-border pb-4">
             <div className="flex items-center justify-between">

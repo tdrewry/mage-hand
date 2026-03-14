@@ -97,7 +97,6 @@ export function CompendiumCardContent({ cardId, onAddToken }: CompendiumCardCont
             forcedTab="characters"
           />
         </TabsContent>
-
         <TabsContent value="monsters" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <CreatureLibraryCardContent 
             cardId={cardId} 

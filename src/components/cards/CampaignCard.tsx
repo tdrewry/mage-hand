@@ -60,7 +60,7 @@ export function CampaignCardContent({ cardId }: CampaignCardContentProps) {
         </TabsList>
         
         <TabsContent value="editor" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">
-          <CampaignEditorCardContent />
+          <CampaignEditorCardContent cardId={cardId} />
         </TabsContent>
 
         <TabsContent value="handouts" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">

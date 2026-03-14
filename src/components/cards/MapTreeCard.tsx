@@ -1576,171 +1576,177 @@ export const MapTreeCardContent: React.FC = () => {
                 >
                   {/* Map header */}
                   <div
-                    className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
+                    className="flex flex-col gap-1.5 px-2 py-1.5 cursor-pointer hover:bg-accent/30 group"
                     onClick={() => toggleMapNode(map.id)}
                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); handleDragOverMap(e, map.id); }}
                     onDragLeave={() => handleDragLeaveMap()}
                     onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnMap(map.id); }}
                   >
-                    {isExpanded
-                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                    <Map className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    {/* Row 1: Name and Badges */}
+                    <div className="flex items-center gap-1 w-full min-w-0">
+                      {isExpanded
+                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                      <Map className="h-3.5 w-3.5 shrink-0 text-primary" />
 
-                    {renamingMapId === map.id ? (
-                      <div onClick={e => e.stopPropagation()} className="flex-1 min-w-0">
-                        <RenameInput
-                          value={map.name}
-                          onCommit={name => { updateMap(map.id, { name }); setRenamingMapId(null); }}
-                          onCancel={() => setRenamingMapId(null)}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
-                    )}
+                      {renamingMapId === map.id ? (
+                        <div onClick={e => e.stopPropagation()} className="flex-1 min-w-0">
+                          <RenameInput
+                            value={map.name}
+                            onCommit={name => { updateMap(map.id, { name }); setRenamingMapId(null); }}
+                            onCancel={() => setRenamingMapId(null)}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium truncate flex-1 text-foreground">{map.name}</span>
+                      )}
 
-                    {map.structureId && (
-                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 shrink-0 text-muted-foreground">
-                        F{map.floorNumber ?? '?'}
+                      {map.structureId && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 shrink-0 text-muted-foreground">
+                          F{map.floorNumber ?? '?'}
+                        </Badge>
+                      )}
+
+                      <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
+                        {entityCount}
                       </Badge>
-                    )}
 
-                    <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 shrink-0">
-                      {entityCount}
-                    </Badge>
+                      {/* Texture indicator */}
+                      {regions.some(r => r.mapId === map.id && (r.backgroundImage || r.textureHash)) && (
+                        <span title="Has textured regions"><Image className="h-3 w-3 shrink-0 text-muted-foreground" /></span>
+                      )}
 
-                    {/* Texture indicator */}
-                    {regions.some(r => r.mapId === map.id && (r.backgroundImage || r.textureHash)) && (
-                      <span title="Has textured regions"><Image className="h-3 w-3 shrink-0 text-muted-foreground" /></span>
-                    )}
-
-                    {/* Collapse/expand groups within this map */}
-                    {(() => {
-                      const entityIds = new Set(mapEntities.map(e => e.id));
-                      const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
-                      if (!hasGroups) return null;
-                      const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
-                      const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
-                      return (
-                        <button
-                          className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
-                          title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
-                          onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
-                        >
-                          {anyExpanded
-                            ? <ChevronsUp className="h-3.5 w-3.5" />
-                            : <ChevronsDown className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })()}
-
-                    {/* Reorder arrows */}
-                    <div className="flex flex-col gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                      {structureContext ? (() => {
-                        const sMaps = structureContext.maps;
-                        const sIdx = sMaps.findIndex(m => m.id === map.id);
+                      {/* Collapse/expand groups within this map */}
+                      {(() => {
+                        const entityIds = new Set(mapEntities.map(e => e.id));
+                        const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
+                        if (!hasGroups) return null;
+                        const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
+                        const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
                         return (
+                          <button
+                            className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                            title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
+                            onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
+                          >
+                            {anyExpanded
+                              ? <ChevronsUp className="h-3.5 w-3.5" />
+                              : <ChevronsDown className="h-3.5 w-3.5" />}
+                          </button>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Row 2: Toggles and Actions */}
+                    <div className="flex items-center justify-end gap-1.5 w-full pr-1">
+                      <div className="flex items-center gap-1 transition-opacity text-muted-foreground" onClick={e => e.stopPropagation()}>
+                        {structureContext ? (() => {
+                          const sMaps = structureContext.maps;
+                          const sIdx = sMaps.findIndex(m => m.id === map.id);
+                          return (
+                            <>
+                              <button
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                disabled={sIdx <= 0}
+                                onClick={() => {
+                                  const prev = sMaps[sIdx - 1];
+                                  const curFloor = map.floorNumber ?? sIdx;
+                                  const prevFloor = prev.floorNumber ?? (sIdx - 1);
+                                  updateMap(map.id, { floorNumber: prevFloor });
+                                  updateMap(prev.id, { floorNumber: curFloor });
+                                  toast.success('Floor order updated');
+                                }}
+                                title="Move floor up"
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                disabled={sIdx >= sMaps.length - 1}
+                                onClick={() => {
+                                  const next = sMaps[sIdx + 1];
+                                  const curFloor = map.floorNumber ?? sIdx;
+                                  const nextFloor = next.floorNumber ?? (sIdx + 1);
+                                  updateMap(map.id, { floorNumber: nextFloor });
+                                  updateMap(next.id, { floorNumber: curFloor });
+                                  toast.success('Floor order updated');
+                                }}
+                                title="Move floor down"
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          );
+                        })() : (
                           <>
                             <button
                               className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                              disabled={sIdx <= 0}
-                              onClick={() => {
-                                const prev = sMaps[sIdx - 1];
-                                const curFloor = map.floorNumber ?? sIdx;
-                                const prevFloor = prev.floorNumber ?? (sIdx - 1);
-                                updateMap(map.id, { floorNumber: prevFloor });
-                                updateMap(prev.id, { floorNumber: curFloor });
-                                toast.success('Floor order updated');
-                              }}
-                              title="Move floor up"
+                              disabled={index === 0}
+                              onClick={() => reorderMaps(index, index - 1)}
+                              title="Move map up"
                             >
-                              <ArrowUp className="h-3 w-3" />
+                              <ArrowUp className="h-3.5 w-3.5" />
                             </button>
                             <button
                               className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                              disabled={sIdx >= sMaps.length - 1}
-                              onClick={() => {
-                                const next = sMaps[sIdx + 1];
-                                const curFloor = map.floorNumber ?? sIdx;
-                                const nextFloor = next.floorNumber ?? (sIdx + 1);
-                                updateMap(map.id, { floorNumber: nextFloor });
-                                updateMap(next.id, { floorNumber: curFloor });
-                                toast.success('Floor order updated');
-                              }}
-                              title="Move floor down"
+                              disabled={index >= maps.length - 1}
+                              onClick={() => reorderMaps(index, index + 1)}
+                              title="Move map down"
                             >
-                              <ArrowDown className="h-3 w-3" />
+                              <ArrowDown className="h-3.5 w-3.5" />
                             </button>
                           </>
+                        )}
+                      </div>
+
+                      <div className="w-px h-3.5 bg-border mx-1" />
+
+                      <button
+                        className={`shrink-0 p-0.5 rounded transition-colors ${
+                          isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        title="Set as focused map"
+                        onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
+                      >
+                        <MousePointer2 className="h-3.5 w-3.5" />
+                      </button>
+
+                      {/* Fog toggle button */}
+                      {(() => {
+                        const mapFog = useFogStore.getState().getMapFogSettings(map.id);
+                        const isFogOn = mapFog.enabled;
+                        return (
+                          <button
+                            className={`shrink-0 p-0.5 rounded transition-colors ${
+                              isFogOn ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title={isFogOn ? 'Fog enabled — click to open fog controls' : 'Fog disabled — click to open fog controls'}
+                            onClick={e => {
+                              e.stopPropagation();
+                              const cardStore = useCardStore.getState();
+                              cardStore.registerCard({
+                                type: CardType.FOG,
+                                title: `Fog - ${map.name}`,
+                                defaultPosition: { x: 345, y: 80 },
+                                defaultSize: { width: 350, height: 400 },
+                                defaultVisible: true,
+                                metadata: { targetMapId: map.id, targetLabel: map.name },
+                              });
+                            }}
+                          >
+                            {isFogOn ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+                          </button>
                         );
-                      })() : (
-                        <>
-                          <button
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                            disabled={index === 0}
-                            onClick={() => reorderMaps(index, index - 1)}
-                            title="Move map up"
-                          >
-                            <ArrowUp className="h-3 w-3" />
-                          </button>
-                          <button
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                            disabled={index >= maps.length - 1}
-                            onClick={() => reorderMaps(index, index + 1)}
-                            title="Move map down"
-                          >
-                            <ArrowDown className="h-3 w-3" />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                      })()}
 
-                    {/* Focus button */}
-                    <button
-                      className={`shrink-0 p-0.5 rounded transition-colors ${
-                        isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
-                      }`}
-                      title="Set as focused map"
-                      onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
-                    >
-                      <MousePointer2 className="h-3.5 w-3.5" />
-                    </button>
-
-                    {/* Fog toggle button */}
-                    {(() => {
-                      const mapFog = useFogStore.getState().getMapFogSettings(map.id);
-                      const isFogOn = mapFog.enabled;
-                      return (
-                        <button
-                          className={`shrink-0 p-0.5 rounded transition-colors ${
-                            isFogOn ? 'text-primary' : 'text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80'
-                          }`}
-                          title={isFogOn ? 'Fog enabled — click to open fog controls' : 'Fog disabled — click to open fog controls'}
-                          onClick={e => {
-                            e.stopPropagation();
-                            const cardStore = useCardStore.getState();
-                            cardStore.registerCard({
-                              type: CardType.FOG,
-                              title: `Fog - ${map.name}`,
-                              defaultPosition: { x: 320, y: 80 },
-                              defaultSize: { width: 350, height: 400 },
-                              defaultVisible: true,
-                              metadata: { targetMapId: map.id, targetLabel: map.name },
-                            });
-                          }}
-                        >
-                          {isFogOn ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })()}
-
-                    {/* Active toggle */}
-                    <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'}>
-                      <Switch
-                        checked={map.active}
-                        onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
-                        className="scale-[0.6]"
-                      />
+                      {/* Active toggle */}
+                      <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'} className="ml-1 transition-opacity">
+                        <Switch
+                          checked={map.active}
+                          onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
+                          className="scale-[0.7]"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1931,7 +1937,7 @@ export const MapTreeCardContent: React.FC = () => {
                           cardStore.registerCard({
                             type: CardType.FOG,
                             title: `Fog - ${structure.name}`,
-                            defaultPosition: { x: 320, y: 80 },
+                            defaultPosition: { x: 345, y: 80 },
                             defaultSize: { width: 350, height: 400 },
                             defaultVisible: true,
                             metadata: { isStructureMode: true, structureId: structure.id, targetLabel: structure.name },

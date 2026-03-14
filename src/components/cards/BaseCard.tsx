@@ -7,6 +7,8 @@ import { CardPosition, CardSize } from '@/types/cardTypes';
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { cn } from '@/lib/utils';
 
+import { THEME } from '@/lib/theme';
+
 interface BaseCardProps {
   id: string;
   title: string;
@@ -18,6 +20,7 @@ interface BaseCardProps {
   className?: string;
   hideHeader?: boolean;
   fullCardDraggable?: boolean;
+  scrollable?: boolean;
 }
 
 export function BaseCard({
@@ -31,6 +34,7 @@ export function BaseCard({
   className,
   hideHeader = false,
   fullCardDraggable = false,
+  scrollable = true,
 }: BaseCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -229,7 +233,12 @@ export function BaseCard({
             </CardHeader>
           )}
           {!isMinimized && (
-            <CardContent className={cn("flex-1 overflow-auto px-2 py-4 bg-background/30", hideHeader && "scrollbar-hide", size.height ? { 'max-h-[500px]': true } : {})}>
+            <CardContent className={cn(
+              "flex-1 px-2 py-4 bg-background/30",
+              scrollable ? "overflow-x-hidden overflow-y-auto" : "min-h-0 min-w-0 flex flex-col p-1",
+              hideHeader && "scrollbar-hide",
+              size.height ? { 'max-h-[500px]': true } : {}
+            )}>
               {children}
             </CardContent>
           )}
@@ -239,8 +248,8 @@ export function BaseCard({
   }
 
   // Otherwise, render full floating card
-  const leftOffset = isLeftSidebarOpen && !isFocusMode ? 320 : 0;
-  const rightOffset = isRightSidebarOpen && !isFocusMode ? 320 : 0;
+  const leftOffset = isLeftSidebarOpen && !isFocusMode ? THEME.sidebarWidth : 0;
+  const rightOffset = isRightSidebarOpen && !isFocusMode ? THEME.sidebarWidth : 0;
   const calculateCenterLeft = () => `calc(${leftOffset}px + (100vw - ${leftOffset}px - ${rightOffset}px) / 2)`;
 
   return (
@@ -308,7 +317,8 @@ export function BaseCard({
         {!isMinimized && (
           <>
             <CardContent className={cn(
-              "flex-1 overflow-auto p-4",
+              "flex-1 p-4",
+              scrollable ? "overflow-x-hidden overflow-y-auto" : "min-h-0 min-w-0 flex flex-col p-1",
               hideHeader && "scrollbar-hide"
             )}>
               {children}

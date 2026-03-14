@@ -173,7 +173,7 @@ export const TopNavbar: React.FC = () => {
       {/* Left Segment: World Builder Header / Toggle */}
       <div className={cn(
         "flex flex-shrink-0 items-center overflow-hidden transition-all duration-300 ease-in-out border-r border-white/10 h-full",
-        isLeftSidebarOpen ? "w-[320px] justify-between px-4" : "w-14 justify-center"
+        isLeftSidebarOpen ? "w-[345px] justify-between px-4" : "w-14 justify-center"
       )}>
         {isLeftSidebarOpen ? (
           <>
@@ -497,7 +497,7 @@ export const TopNavbar: React.FC = () => {
       {/* Right Segment: Campaign Log Header / Toggle */}
       <div className={cn(
         "flex flex-shrink-0 items-center overflow-hidden transition-all duration-300 ease-in-out border-l border-white/10 h-full",
-        isRightSidebarOpen ? "w-[320px] justify-between px-4" : "w-14 justify-center"
+        isRightSidebarOpen ? "w-[345px] justify-between px-4" : "w-14 justify-center"
       )}>
         {isRightSidebarOpen ? (
           <>

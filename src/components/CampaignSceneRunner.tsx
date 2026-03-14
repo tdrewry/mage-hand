@@ -23,6 +23,7 @@ import { executeNode, openHandoutById } from '@/lib/campaign-editor/adapters/mag
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
 import { NodeSummaryCard } from '@/components/NodeSummaryCard';
 import { useUiStateStore } from '@/stores/uiStateStore';
+import { THEME } from '@/lib/theme';
 import {
   ChevronRight,
   ChevronLeft,
@@ -230,8 +231,8 @@ export function CampaignSceneRunner() {
     openHandoutById(handoutId, label);
   };
 
-  const leftOffset = isLeftSidebarOpen && !isFocusMode ? 320 : 0;
-  const rightOffset = isRightSidebarOpen && !isFocusMode ? 320 : 0;
+  const leftOffset = isLeftSidebarOpen && !isFocusMode ? THEME.sidebarWidth : 0;
+  const rightOffset = isRightSidebarOpen && !isFocusMode ? THEME.sidebarWidth : 0;
   const calculateCenterLeft = () => `calc(${leftOffset}px + (100vw - ${leftOffset}px - ${rightOffset}px) / 2)`;
 
   return (

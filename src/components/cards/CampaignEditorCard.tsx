@@ -19,6 +19,7 @@ import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { useCardStore } from '@/stores/cardStore';
 import { GenericFlowCanvas, type FlowCanvasViewState } from '@/lib/campaign-editor/components/GenericFlowCanvas';
 import { createMagehandTTRPGAdapter, MAGEHAND_NODE_TYPE_CONFIGS } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import type { BaseCampaign, BaseFlowNode, BaseNodeData, FlowNodePosition } from '@/lib/campaign-editor/types/base';
@@ -206,8 +207,8 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
       {campaigns.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4">No scenarios yet</p>
       ) : (
-        <ScrollArea className="max-h-[300px]">
-          <div className="space-y-2">
+        <ScrollArea className="flex-1 min-h-[100px] h-[300px]">
+          <div className="space-y-2 pr-4 mr-1 pb-4">
             {campaigns.map((c) => {
               const isActive = activeCampaignId === c.id;
               const isEditing = editingId === c.id;
@@ -251,58 +252,68 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                       />
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{c.name}</p>
-                          {isActive && (
-                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
-                              Running
-                            </Badge>
-                          )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 w-full min-w-0">
+                      {/* Column 1: Title & Buttons */}
+                      <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                        {/* Row 1: Title & Tags */}
+                        <div className="flex items-start justify-between min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-sm font-medium truncate">{c.name}</p>
+                            {isActive && (
+                              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
+                                Running
+                              </Badge>
+                            )}
+                          </div>
                         </div>
+                        
+                        {/* Row 2: Buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => handleExport(e, c)}
+                            title="Export scenario"
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => handleStartEdit(e, c)}
+                            title="Rename / edit brief"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant={isActive ? 'default' : 'ghost'}
+                            size="sm"
+                            className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
+                            onClick={(e) => handleToggleActive(e, c.id)}
+                            title={isActive ? 'Stop scenario' : 'Run scenario'}
+                          >
+                            {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Column 2: Description */}
+                      <div className="min-w-[150px] flex-[1.5] min-w-0 pr-1 flex items-center">
                         {c.description ? (
-                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{c.description}</p>
                         ) : (
                           <p className="text-xs text-muted-foreground">{c.nodes.length} scene{c.nodes.length !== 1 ? 's' : ''}</p>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => handleExport(e, c)}
-                          title="Export scenario"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={(e) => handleStartEdit(e, c)}
-                          title="Rename / edit brief"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant={isActive ? 'default' : 'ghost'}
-                          size="sm"
-                          className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
-                          onClick={(e) => handleToggleActive(e, c.id)}
-                          title={isActive ? 'Stop scenario' : 'Run scenario'}
-                        >
-                          {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                          onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
                       </div>
                     </div>
                   )}
@@ -748,7 +759,7 @@ function NodePropertyPanel({
 
 // ── Main Card Content ───────────────────────────────────────────────────────
 
-export function CampaignEditorCardContent() {
+export function CampaignEditorCardContent({ cardId }: { cardId?: string }) {
   const {
     campaigns,
     nodePositions,
@@ -761,6 +772,8 @@ export function CampaignEditorCardContent() {
     clearEditorRequest,
   } = useCampaignStore();
 
+  const { expandCardToCenter, bringToFront } = useCardStore();
+
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const canvasViewRef = useRef<FlowCanvasViewState | null>(null);
@@ -772,10 +785,14 @@ export function CampaignEditorCardContent() {
       if (exists) {
         setEditingCampaignId(requestedEditorCampaignId);
         setSelectedNodeId(null);
+        if (cardId) {
+          expandCardToCenter(cardId, 1200, 800);
+          bringToFront(cardId);
+        }
       }
       clearEditorRequest();
     }
-  }, [requestedEditorCampaignId, campaigns, clearEditorRequest]);
+  }, [requestedEditorCampaignId, campaigns, clearEditorRequest, cardId, expandCardToCenter, bringToFront]);
 
   const editingCampaign = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId) : null;
 
@@ -818,7 +835,13 @@ export function CampaignEditorCardContent() {
   };
 
   if (!editingCampaign) {
-    return <ScenarioListView onSelect={(id) => setEditingCampaignId(id)} />;
+    return <ScenarioListView onSelect={(id) => {
+      setEditingCampaignId(id);
+      if (cardId) {
+        expandCardToCenter(cardId, 1200, 800);
+        bringToFront(cardId);
+      }
+    }} />;
   }
 
   const positions = nodePositions[editingCampaignId!] || {};

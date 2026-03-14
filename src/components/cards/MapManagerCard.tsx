@@ -191,62 +191,67 @@ export const MapManagerCardContent = () => {
   };
 
   return (
-    <div className="max-h-[60vh] overflow-y-auto space-y-3">
-      {/* ── Actions row ── */}
-      <div className="flex gap-1 flex-wrap">
-        <Button variant="outline" size="sm" onClick={handleAddBlankMap}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Blank Map
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setImageImportOpen(true)}>
-          <ImagePlus className="h-3.5 w-3.5 mr-1" /> From Image
-        </Button>
-        <Button
-          variant={compoundSelectMode ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            setCompoundSelectMode(!compoundSelectMode);
-            setCompoundSelectedIds(new Set());
-          }}
-        >
-          <Layers className="h-3.5 w-3.5 mr-1" /> Compound
-        </Button>
+    <div className="flex flex-col h-full w-full gap-3">
+      {/* ── Locked Top Controls ── */}
+      <div className="shrink-0 space-y-3">
+        {/* ── Actions row ── */}
+        <div className="flex gap-1 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleAddBlankMap}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Blank Map
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setImageImportOpen(true)}>
+            <ImagePlus className="h-3.5 w-3.5 mr-1" /> From Image
+          </Button>
+          <Button
+            variant={compoundSelectMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setCompoundSelectMode(!compoundSelectMode);
+              setCompoundSelectedIds(new Set());
+            }}
+          >
+            <Layers className="h-3.5 w-3.5 mr-1" /> Compound
+          </Button>
+        </div>
+
+        {/* Optional name input for blank maps */}
+        {!compoundSelectMode && (
+          <Input
+            value={newMapName}
+            onChange={(e) => setNewMapName(e.target.value)}
+            placeholder="New map name (optional)"
+            className="h-7 text-xs"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddBlankMap()}
+          />
+        )}
+
+        {/* Compound mode controls */}
+        {compoundSelectMode && (
+          <div className="p-2 border rounded-md border-primary/40 bg-primary/5 space-y-2">
+            <Label className="text-xs font-medium">Select maps for compound:</Label>
+            <Input
+              value={compoundName}
+              onChange={(e) => setCompoundName(e.target.value)}
+              placeholder="Compound map name"
+              className="h-7 text-xs"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveCompound} disabled={compoundSelectedIds.size < 2}>
+                Save Compound ({compoundSelectedIds.size})
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setCompoundSelectMode(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Optional name input for blank maps */}
-      {!compoundSelectMode && (
-        <Input
-          value={newMapName}
-          onChange={(e) => setNewMapName(e.target.value)}
-          placeholder="New map name (optional)"
-          className="h-7 text-xs"
-          onKeyDown={(e) => e.key === 'Enter' && handleAddBlankMap()}
-        />
-      )}
-
-      {/* Compound mode controls */}
-      {compoundSelectMode && (
-        <div className="p-2 border rounded-md border-primary/40 bg-primary/5 space-y-2">
-          <Label className="text-xs font-medium">Select maps for compound:</Label>
-          <Input
-            value={compoundName}
-            onChange={(e) => setCompoundName(e.target.value)}
-            placeholder="Compound map name"
-            className="h-7 text-xs"
-          />
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleSaveCompound} disabled={compoundSelectedIds.size < 2}>
-              Save Compound ({compoundSelectedIds.size})
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setCompoundSelectMode(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Maps list ── */}
-      <div className="space-y-1.5">
-        {maps.map((map, index) => {
+      {/* ── Scrolling Maps List & Focus Settings ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+        {/* ── Maps list ── */}
+        <div className="space-y-1.5">
+          {maps.map((map, index) => {
           const isSelected = selectedMapId === map.id;
           const gridInfo = getGridInfo(map);
           const isCompoundSelected = compoundSelectedIds.has(map.id);
@@ -387,10 +392,13 @@ export const MapManagerCardContent = () => {
             </div>
           );
         })}
-      </div>
+        </div>
 
-      {/* Map Focus Settings */}
-      <MapFocusSettings />
+        {/* Map Focus Settings */}
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <MapFocusSettings />
+        </div>
+      </div>
 
       {/* Map Image Import Modal */}
       <MapImageImportModal

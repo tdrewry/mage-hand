@@ -100,7 +100,7 @@ export function EnvironmentCardContent({ cardId }: EnvironmentCardContentProps) 
           </TooltipProvider>
         </TabsList>
         
-        <TabsContent value="manager" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">
+        <TabsContent value="manager" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <MapManagerCardContent />
         </TabsContent>
         <TabsContent value="tree" className="flex-1 min-h-0 flex flex-col m-0 p-0">
@@ -109,10 +109,10 @@ export function EnvironmentCardContent({ cardId }: EnvironmentCardContentProps) 
         <TabsContent value="objects" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <MapObjectPanelCardContent />
         </TabsContent>
-        <TabsContent value="styles" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">
+        <TabsContent value="styles" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <StylesCardContent />
         </TabsContent>
-        <TabsContent value="fog" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">
+        <TabsContent value="fog" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <FogControlCardContent
             targetMapId={metadata?.targetMapId as string}
             targetLabel={metadata?.targetLabel as string}
@@ -120,7 +120,7 @@ export function EnvironmentCardContent({ cardId }: EnvironmentCardContentProps) 
             structureId={metadata?.structureId as string}
           />
         </TabsContent>
-        <TabsContent value="vision" className="flex-1 min-h-0 overflow-y-auto m-0 p-0">
+        <TabsContent value="vision" className="flex-1 min-h-0 flex flex-col m-0 p-0">
           <VisionProfileManagerCardContent />
         </TabsContent>
       </Tabs>

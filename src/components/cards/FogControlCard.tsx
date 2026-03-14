@@ -69,7 +69,7 @@ export function FogControlCardContent({
   const displayLabel = targetLabel || maps.find(m => m.id === effectiveMapId)?.name || effectiveMapId;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full w-full flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1">
       {/* Target indicator */}
       {(targetMapId || isStructureMode) && (
         <div className="flex items-center gap-2 px-2 py-1.5 bg-primary/10 rounded-md">

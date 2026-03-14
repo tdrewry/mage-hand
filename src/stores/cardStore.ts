@@ -79,6 +79,14 @@ interface CardStore {
   disableAutoCenter: (id: string) => void;
   
   /**
+   * Expands a card to a specific size, centers it in the viewport, and sets it to floating.
+   * @param id The ID of the card.
+   * @param width The target width.
+   * @param height The target height.
+   */
+  expandCardToCenter: (id: string, width: number, height: number) => void;
+  
+  /**
    * Saves the current card layout to local storage.
    */
   saveLayout: () => void;
@@ -124,7 +132,7 @@ const STORAGE_KEY = 'vtt-card-layout';
 const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   [CardType.ROSTER]: {
     title: 'Roster',
-    defaultPosition: { x: window.innerWidth - 320, y: 80 },
+    defaultPosition: { x: window.innerWidth - 345, y: 80 },
     defaultSize: { width: 300, height: 500 },
     minSize: { width: 250, height: 300 },
     isResizable: true,
@@ -144,7 +152,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.FOG]: {
     title: 'Fog Control',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 350, height: 400 },
     minSize: { width: 300, height: 350 },
     isResizable: true,
@@ -160,7 +168,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.TOKENS]: {
     title: 'Token Panel',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 400, height: 500 },
     minSize: { width: 300, height: 400 },
     isResizable: true,
@@ -186,7 +194,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.GROUP_MANAGER]: {
     title: 'Group Manager',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 400, height: 500 },
     minSize: { width: 350, height: 400 },
     isResizable: true,
@@ -203,7 +211,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.REGION_CONTROL]: {
     title: 'Region Control',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 350, height: 400 },
     minSize: { width: 300, height: 350 },
     isResizable: true,
@@ -220,7 +228,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.BACKGROUND_GRID]: {
     title: 'Background Grid',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 400, height: 450 },
     minSize: { width: 350, height: 400 },
     isResizable: true,
@@ -240,7 +248,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.STYLES]: {
     title: 'Map',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 400, height: 600 },
     minSize: { width: 350, height: 500 },
     isResizable: true,
@@ -250,7 +258,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.VISION_PROFILE_MANAGER]: {
     title: 'Vision Profile Manager',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 450, height: 650 },
     minSize: { width: 400, height: 550 },
     isResizable: true,
@@ -260,7 +268,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.ROLE_MANAGER]: {
     title: 'Role Manager',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 600, height: 700 },
     minSize: { width: 500, height: 600 },
     isResizable: true,
@@ -279,7 +287,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.MAP_OBJECTS]: {
     title: 'Map Objects',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 350, height: 550 },
     minSize: { width: 300, height: 400 },
     isResizable: true,
@@ -288,7 +296,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.CHARACTER_SHEET]: {
     title: 'Character Sheet',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 400, height: 600 },
     minSize: { width: 350, height: 500 },
     isResizable: true,
@@ -315,7 +323,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.MAP_TREE]: {
     title: 'Map Tree',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 460, height: 500 },
     minSize: { width: 260, height: 300 },
     isResizable: true,
@@ -325,7 +333,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.DICE_BOX]: {
     title: 'Dice Box',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 350, height: 500 },
     minSize: { width: 280, height: 350 },
     isResizable: true,
@@ -344,7 +352,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.NETWORK_DEMO]: {
     title: 'Network Demo',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 380, height: 550 },
     minSize: { width: 320, height: 400 },
     isResizable: true,
@@ -353,7 +361,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.EFFECTS]: {
     title: 'Effects',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 320, height: 500 },
     minSize: { width: 280, height: 350 },
     isResizable: true,
@@ -362,7 +370,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.CHAT]: {
     title: 'Chat',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 360, height: 500 },
     minSize: { width: 300, height: 350 },
     isResizable: true,
@@ -390,7 +398,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
   },
   [CardType.HANDOUT_CATALOG]: {
     title: 'Handouts',
-    defaultPosition: { x: 320, y: 80 },
+    defaultPosition: { x: 345, y: 80 },
     defaultSize: { width: 340, height: 400 },
     minSize: { width: 280, height: 300 },
     isResizable: true,
@@ -597,6 +605,23 @@ export const useCardStore = create<CardStore>((set, get) => ({
     set((state) => ({
       cards: state.cards.map((card) =>
         card.id === id ? { ...card, autoCenter: false } : card
+      ),
+    }));
+  },
+
+  expandCardToCenter: (id: string, width: number, height: number) => {
+    set((state) => ({
+      cards: state.cards.map((card) =>
+        card.id === id ? {
+          ...card,
+          size: { width, height },
+          position: {
+            x: Math.max(0, (window.innerWidth - width) / 2),
+            y: Math.max(20, (window.innerHeight - height) / 2)
+          },
+          dockPosition: 'floating',
+          autoCenter: false, // Turn off autoCenter so it uses our exact coordinates
+        } : card
       ),
     }));
   },

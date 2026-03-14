@@ -15,7 +15,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       style={{
         marginTop: isTopNavbarOpen && !isFocusMode ? '56px' : '0px',
-        marginRight: isRightSidebarOpen && !isFocusMode ? '320px' : '0px',
+        marginRight: isRightSidebarOpen && !isFocusMode ? '345px' : '0px',
         transition: 'margin 300ms ease-in-out',
       }}
       toastOptions={{

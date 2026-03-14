@@ -402,7 +402,7 @@ function rollInDiceBox(formula: string, label?: string, meta?: RollMetadata) {
     const newId = cardStore.registerCard({
       type: CardType.DICE_BOX,
       title: 'Dice Box',
-      defaultPosition: { x: 320, y: 80 },
+      defaultPosition: { x: 345, y: 80 },
       defaultSize: { width: 350, height: 500 },
     });
     diceCard = cardStore.getCard(newId) ?? undefined;

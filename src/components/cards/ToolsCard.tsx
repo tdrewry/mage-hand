@@ -152,7 +152,7 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
       registerCard({
         type: CardType.FOG,
         title: 'Fog Control',
-        defaultPosition: { x: 320, y: 80 },
+        defaultPosition: { x: 345, y: 80 },
         defaultSize: { width: 350, height: 520 },
         minSize: { width: 300, height: 450 },
         isResizable: true,
@@ -168,7 +168,7 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
       registerCard({
         type: CardType.ROSTER,
         title: 'Roster',
-        defaultPosition: { x: window.innerWidth - 320, y: 80 },
+        defaultPosition: { x: window.innerWidth - 345, y: 80 },
         defaultSize: { width: 300, height: 500 },
         minSize: { width: 250, height: 300 },
         isResizable: true,

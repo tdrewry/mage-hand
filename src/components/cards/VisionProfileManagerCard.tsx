@@ -454,7 +454,7 @@ export function VisionProfileManagerCardContent() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full w-full flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Create and manage custom vision profiles for tokens
