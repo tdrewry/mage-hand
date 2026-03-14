@@ -17,8 +17,8 @@ import { CircularButtonBar } from "./CircularButtonBar";
 import { VerticalToolbar } from "./VerticalToolbar";
 import { InitiativePanel } from "./InitiativePanel";
 import { CampaignSceneRunner } from "./CampaignSceneRunner";
-import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
-import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
+import { BottomNavbar } from "./BottomNavbar";
+import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
 
 import { LeftSidebar } from "./LeftSidebar";
@@ -416,10 +416,25 @@ export const SimpleTabletop = () => {
   // Token interaction state
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const setSessionSelectedTokens = useSessionStore(state => state.setSelectedTokens);
+  const setSessionSelectedRegions = useSessionStore(state => state.setSelectedRegions);
+  const setSessionSelectedMapObjects = useSessionStore(state => state.setSelectedMapObjects);
+  const setSessionSelectedLights = useSessionStore(state => state.setSelectedLights);
   
   useEffect(() => {
     setSessionSelectedTokens(selectedTokenIds);
   }, [selectedTokenIds, setSessionSelectedTokens]);
+  
+  useEffect(() => {
+    setSessionSelectedRegions(selectedRegionIds);
+  }, [selectedRegionIds, setSessionSelectedRegions]);
+
+  useEffect(() => {
+    setSessionSelectedMapObjects(selectedMapObjectIds);
+  }, [selectedMapObjectIds, setSessionSelectedMapObjects]);
+
+  useEffect(() => {
+    setSessionSelectedLights(selectedLightIds);
+  }, [selectedLightIds, setSessionSelectedLights]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
   const [fogRefreshTick, setFogRefreshTick] = useState(0);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
@@ -11964,7 +11979,7 @@ export const SimpleTabletop = () => {
         <div className="flex-1 flex w-full relative pointer-events-none overflow-hidden isolate">
 
           {/* Left Sidebar Content */}
-          <div className="pointer-events-auto h-full flex items-start isolate z-40 relative">
+          <div className={cn("pointer-events-auto h-full flex items-start isolate z-40 relative transition-all duration-300", isBottomNavbarVisible && "pb-14")}>
             <LeftSidebar />
           </div>
 
@@ -12110,7 +12125,7 @@ export const SimpleTabletop = () => {
           </div>
 
           {/* Right Sidebar Content */}
-          <div className="pointer-events-auto h-full flex items-start isolate z-40 relative">
+          <div className={cn("pointer-events-auto h-full flex items-start isolate z-40 relative transition-all duration-300", isBottomNavbarVisible && "pb-14")}>
             <RightSidebar />
           </div>
 
@@ -12139,12 +12154,8 @@ export const SimpleTabletop = () => {
       <CampaignSceneRunner />
 
       {/* Unified Selection Toolbar - Shows when 2+ entities or a group is selected */}
-      <UnifiedSelectionToolbar
-        selectedTokenIds={selectedTokenIds}
-        selectedRegionIds={selectedRegionIds}
-        selectedMapObjectIds={selectedMapObjectIds}
-        selectedLightIds={selectedLightIds}
-        onClearAll={() => {
+      <BottomNavbar
+        onClearSelection={() => {
           setSelectedTokenIds([]);
           selectedRegionIds.forEach(id => deselectRegion(id));
           setSelectedRegionIds([]);
@@ -12152,16 +12163,11 @@ export const SimpleTabletop = () => {
           clearLightSelection();
           redrawCanvas();
         }}
+        onUpdateCanvas={handleCanvasUpdate}
       />
 
       {/* Type-specific toolbars - always rendered alongside unified bar */}
       <>
-        {/* Bulk Operations Toolbar - Shows when multiple tokens selected */}
-        <BulkOperationsToolbar
-          selectedTokenIds={selectedTokenIds}
-          onClearSelection={() => setSelectedTokenIds([])}
-          onUpdateCanvas={handleCanvasUpdate}
-        />
 
         {/* Region Control Bar - Shows when region(s) are selected */}
         <RegionControlBar

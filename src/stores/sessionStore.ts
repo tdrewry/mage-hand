@@ -112,6 +112,9 @@ export interface SessionState {
   players: Player[];
   currentPlayerId: string;
   selectedTokenIds: string[];
+  selectedRegionIds: string[];
+  selectedMapObjectIds: string[];
+  selectedLightIds: string[];
   tokenVisibility: TokenVisibility;
   labelVisibility: LabelVisibility;
   viewportTransforms: Record<string, ViewportTransform>;
@@ -142,6 +145,9 @@ export interface SessionState {
   removeToken: (tokenId: string) => void;
   clearAllTokens: () => void;
   setSelectedTokens: (tokenIds: string[]) => void;
+  setSelectedRegions: (regionIds: string[]) => void;
+  setSelectedMapObjects: (objectIds: string[]) => void;
+  setSelectedLights: (lightIds: string[]) => void;
   setTokenVisibility: (visibility: TokenVisibility) => void;
   setLabelVisibility: (visibility: LabelVisibility) => void;
   addPlayer: (player: Player) => void;
@@ -158,6 +164,9 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   players: [],
   currentPlayerId: '',
   selectedTokenIds: [],
+  selectedRegionIds: [],
+  selectedMapObjectIds: [],
+  selectedLightIds: [],
   tokenVisibility: 'all',
   labelVisibility: 'show',
   viewportTransforms: {},
@@ -413,6 +422,15 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   setSelectedTokens: (tokenIds) =>
     set({ selectedTokenIds: tokenIds }),
 
+  setSelectedRegions: (regionIds) =>
+    set({ selectedRegionIds: regionIds }),
+
+  setSelectedMapObjects: (objectIds) =>
+    set({ selectedMapObjectIds: objectIds }),
+
+  setSelectedLights: (lightIds) =>
+    set({ selectedLightIds: lightIds }),
+
   setTokenVisibility: (visibility) =>
     set({ tokenVisibility: visibility }),
 
@@ -486,7 +504,7 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
 const withSyncPatch = syncPatch<SessionState>({ 
   channel: 'tokens',
   throttleMs: 50, // Throttle for position updates
-  excludePaths: ['selectedTokenIds', 'viewportTransforms', 'currentPlayerId', 'tokens.*.imageUrl'], // Local-only state + large image data
+  excludePaths: ['selectedTokenIds', 'selectedRegionIds', 'selectedMapObjectIds', 'selectedLightIds', 'viewportTransforms', 'currentPlayerId', 'tokens.*.imageUrl'], // Local-only state + large image data
   debug: true, // Enable debug logging to diagnose sync issues
 })(sessionStoreCreator);
 

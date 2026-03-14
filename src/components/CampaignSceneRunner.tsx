@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/tooltip';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useCardStore } from '@/stores/cardStore';
+import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
+import { cn } from '@/lib/utils';
+
 import { CardType } from '@/types/cardTypes';
 import { executeNode, openHandoutById } from '@/lib/campaign-editor/adapters/magehand-ttrpg';
 import { createGraphRunner } from '@/lib/campaign-editor/lib/graphRunner';
@@ -85,7 +88,6 @@ export function CampaignSceneRunner() {
     activeCampaignId,
     activeProgress,
     setProgress,
-    setActiveCampaign,
     requestOpenEditor,
   } = useCampaignStore();
 
@@ -93,6 +95,10 @@ export function CampaignSceneRunner() {
   const { isLeftSidebarOpen, isRightSidebarOpen, isFocusMode } = useUiStateStore();
 
   const [showSummary, setShowSummary] = useState(false);
+
+  const setActiveCampaign = useCampaignStore(state => state.setActiveCampaign);
+  
+  const isBottomNavbarVisible = useBottomNavbarVisible();
 
   const campaign = campaigns.find((c) => c.id === activeCampaignId) ?? null;
 
@@ -230,7 +236,10 @@ export function CampaignSceneRunner() {
 
   return (
     <div 
-      className="fixed bottom-4 z-[31000] pointer-events-auto transition-all duration-300 ease-in-out"
+      className={cn(
+        "fixed z-[31000] pointer-events-auto transition-all duration-300 ease-in-out",
+        isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+      )}
       style={{
         left: calculateCenterLeft(),
         transform: 'translateX(-50%)'
