@@ -45,7 +45,7 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
     nextTurn();
     setTimeout(() => {
       const activeCard = scrollContainerRef.current?.querySelector('[data-active="true"]');
-      activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
   };
 
@@ -267,6 +267,7 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
                 onDrop={(e) => handleDrop(e, actualIndex)}
                 isSelected={selectedTokenIds.includes(entry.tokenId)}
                 layout="vertical"
+                variant="docked"
               />
             </div>
           );

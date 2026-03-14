@@ -20,7 +20,7 @@ export const RightSidebar: React.FC = () => {
       )}
       style={{ width: isOpen ? THEME.sidebarWidth : 0 }}
     >
-      <div id="right-sidebar-content" className="flex-1 p-4 overflow-y-auto custom-scrollbar" style={{ minWidth: THEME.sidebarWidth }}>
+      <div id="right-sidebar-content" className="flex-1 p-4 flex flex-col min-h-0 gap-4" style={{ minWidth: THEME.sidebarWidth }}>
       </div>
     </div>
   );

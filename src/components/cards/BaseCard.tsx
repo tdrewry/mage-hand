@@ -208,11 +208,15 @@ export function BaseCard({
   // If docked, we render a static block (no drag/drop absolute positioning).
   if (!isFloating) {
     return (
-      <div className={cn("w-full", className)}>
-        <Card className="flex flex-col rounded-none border-x-0 border-t-0 border-b border-border bg-transparent shadow-none">
+      <div className={cn(
+        "w-full flex flex-col min-h-0", // min-h-0 is critical for flex child scrolling
+        isMinimized ? "shrink-0" : "flex-1", 
+        className
+      )}>
+        <Card className="flex flex-col flex-1 min-h-0 rounded-none border-x-0 border-t-0 border-b border-border bg-transparent shadow-none">
           {!hideHeader && (
             <CardHeader
-              className="flex flex-row items-center justify-between space-y-0 p-3 bg-transparent cursor-grab hover:bg-accent/30 transition-colors"
+              className="flex flex-row items-center justify-between space-y-0 p-3 bg-transparent cursor-grab hover:bg-accent/30 transition-colors shrink-0"
               onClick={handleMinimize}
               onMouseDown={handleMouseDown}
             >
@@ -234,10 +238,9 @@ export function BaseCard({
           )}
           {!isMinimized && (
             <CardContent className={cn(
-              "flex-1 px-2 py-4 bg-background/30",
-              scrollable ? "overflow-x-hidden overflow-y-auto" : "min-h-0 min-w-0 flex flex-col p-1",
-              hideHeader && "scrollbar-hide",
-              size.height ? { 'max-h-[500px]': true } : {}
+              "flex-1 px-2 py-4 bg-background/30 min-h-0", // min-h-0 ensures this element shrinks 
+              scrollable ? "overflow-x-hidden overflow-y-auto custom-scrollbar" : "flex flex-col p-1",
+              hideHeader && "scrollbar-hide"
             )}>
               {children}
             </CardContent>

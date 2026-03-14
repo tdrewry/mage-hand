@@ -21,6 +21,7 @@ interface InitiativeCardProps {
   isCompact?: boolean;
   size?: number;
   layout?: 'vertical' | 'horizontal' | 'mini';
+  variant?: 'docked' | 'widget';
   isSelected?: boolean;
 }
 
@@ -39,6 +40,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   isCompact = false,
   size,
   layout = 'vertical',
+  variant = 'widget',
   isSelected = false
 }) => {
   const [isEditingInitiative, setIsEditingInitiative] = useState(false);
