@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { 
   Focus, Maximize, ChevronLeft, ChevronRight, Settings, FolderOpen, Monitor, 
   Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle, Plus, Shield,
-  Gamepad2, Footprints, ScanEye
+  Gamepad2, Footprints, ScanEye, Lock
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -232,17 +232,55 @@ export const TopNavbar: React.FC = () => {
 
         {/* Center: Future map selector or core global toggles */}
         <div className="flex flex-1 items-center justify-center pointer-events-none">
-            {/* Top Center Placeholder */}
+          {movementLocked && (
+            <Badge 
+              variant="destructive" 
+              className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto"
+              onClick={() => setMovementLocked(false)}
+              title="Click to unlock movement"
+            >
+              <Lock className="h-3 w-3" />
+              <span>Movement Locked — click to unlock</span>
+            </Badge>
+          )}
         </div>
 
         {/* Right side: Global settings and views */}
         <div className="flex items-center gap-2">
           
-          {/* DM Mode Status Indicator */}
+          {/* DM Mode Status Indicators */}
           {isDM && (
-            <Badge variant="outline" className="hidden md:flex ml-1 h-6 px-2 text-[10px] uppercase font-bold tracking-wider border-white/10 bg-black/20 text-muted-foreground/80">
-              {renderingMode === 'edit' ? 'Edit Mode' : 'Play Mode'}
-            </Badge>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={cn(
+                      "h-6 w-6 rounded-full shrink-0 transition-colors", 
+                      enforceFollowDM 
+                        ? "bg-primary/20 text-primary border border-primary/50 hover:bg-primary/30" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+                    )}
+                    onClick={() => {
+                      const newVal = !enforceFollowDM;
+                      setEnforceFollowDM(newVal);
+                      ephemeralBus.emit('map.dm.enforceFollow', { enforce: newVal });
+                      toast.info(newVal ? 'Players locked to your viewport' : 'Players released from viewport lock');
+                    }}
+                  >
+                    <ScanEye className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">
+                  {enforceFollowDM ? 'Players locked to your viewport (Click to release)' : 'Lock Players to DM Viewport'}
+                </TooltipContent>
+              </Tooltip>
+
+              <Badge variant="outline" className="hidden md:flex ml-1 h-6 px-2 text-[10px] uppercase font-bold tracking-wider border-white/10 bg-black/20 text-muted-foreground/80">
+                {renderingMode === 'edit' ? 'Edit Mode' : 'Play Mode'}
+              </Badge>
+            </>
           )}
 
           <DropdownMenu>

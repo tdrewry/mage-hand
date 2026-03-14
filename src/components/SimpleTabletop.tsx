@@ -20,7 +20,7 @@ import { CampaignSceneRunner } from "./CampaignSceneRunner";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { UnifiedSelectionToolbar } from "./UnifiedSelectionToolbar";
 import { MapObjectContextMenuWrapper } from "./MapObjectContextMenu";
-import { MovementLockIndicator } from "./MovementLockIndicator";
+
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
 import { TopNavbar } from "./TopNavbar";
@@ -12208,7 +12208,7 @@ export const SimpleTabletop = () => {
       )}
 
       {/* Movement Lock Indicator - Shows when token movement is locked */}
-      <MovementLockIndicator />
+
 
       {selectedAnnotationId &&
         (() => {
