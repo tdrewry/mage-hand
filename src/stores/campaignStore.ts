@@ -25,6 +25,7 @@ export interface CampaignState {
   addCampaign: (campaign: BaseCampaign) => void;
   updateCampaign: (id: string, patch: Partial<BaseCampaign>) => void;
   removeCampaign: (id: string) => void;
+  clearAllCampaigns: () => void;
 
   // Activation
   setActiveCampaign: (id: string | null) => void;
@@ -80,6 +81,15 @@ export const useCampaignStore = create<CampaignState>()(
           activeCampaignId: s.activeCampaignId === id ? null : s.activeCampaignId,
           activeProgress: s.activeCampaignId === id ? null : s.activeProgress,
         })),
+
+      clearAllCampaigns: () =>
+        set({
+          campaigns: [],
+          activeCampaignId: null,
+          activeProgress: null,
+          nodePositions: {},
+          requestedEditorCampaignId: null,
+        }),
 
       setActiveCampaign: (id) => {
         const campaign = id ? get().campaigns.find((c) => c.id === id) : null;
