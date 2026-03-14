@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  Footprints,
-  Eye,
-  Hand,
-  ScanEye,
-} from 'lucide-react';
+import { Eye, Hand } from 'lucide-react';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapEphemeralStore } from '@/stores/mapEphemeralStore';
@@ -19,7 +14,7 @@ interface CircularButtonBarProps {}
 
 export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
   const { isTopNavbarOpen, isFocusMode } = useUiStateStore();
-  const { restrictMovement: movementLocked, setRestrictMovement: setMovementLocked, isInCombat } = useInitiativeStore();
+  const { isInCombat } = useInitiativeStore();
 
   const currentPlayer = useSessionStore((state) =>
     state.players.find(p => p.id === state.currentPlayerId)
@@ -28,8 +23,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
 
   const followDM = useMapEphemeralStore((s) => s.followDM);
   const setFollowDM = useMapEphemeralStore((s) => s.setFollowDM);
-  const enforceFollowDM = useMapEphemeralStore((s) => s.enforceFollowDM);
-  const setEnforceFollowDM = useMapEphemeralStore((s) => s.setEnforceFollowDM);
 
   const handleHandRaise = () => {
     ephemeralBus.emit('role.handRaise', {});
@@ -38,31 +31,6 @@ export const CircularButtonBar: React.FC<CircularButtonBarProps> = () => {
 
   return (
     <Toolbar position="top" className={cn("gap-0.5 px-1.5 py-1 transition-all duration-300", isInCombat ? "mt-[72px]" : "mt-4")}>
-
-      <ToolbarButton
-        icon={Footprints}
-        label={movementLocked ? 'Unlock Token Movement' : 'Lock All Token Movement'}
-        onClick={() => setMovementLocked(!movementLocked)}
-        variant={movementLocked ? 'destructive' : 'ghost'}
-        size="xs"
-      />
-
-      {isDM && (
-        <ToolbarButton
-          icon={ScanEye}
-          label={enforceFollowDM ? 'Release Player Viewports' : 'Lock Players to DM Viewport'}
-          onClick={() => {
-            const newVal = !enforceFollowDM;
-            setEnforceFollowDM(newVal);
-            ephemeralBus.emit('map.dm.enforceFollow', { enforce: newVal });
-            toast.info(newVal ? 'Players locked to your viewport' : 'Players released from viewport lock');
-          }}
-          isActive={enforceFollowDM}
-          variant={enforceFollowDM ? 'active' : 'ghost'}
-          size="xs"
-          className={enforceFollowDM ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90' : ''}
-        />
-      )}
 
       {!isDM && (
         <>

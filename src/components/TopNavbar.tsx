@@ -7,11 +7,15 @@ import { useLaunchStore } from '@/stores/launchStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRegionStore } from '@/stores/regionStore';
+import { useInitiativeStore } from '@/stores/initiativeStore';
+import { useMapEphemeralStore } from '@/stores/mapEphemeralStore';
+import { ephemeralBus } from '@/lib/net';
 import { CardType } from '@/types/cardTypes';
 import { cn } from '@/lib/utils';
 import { 
   Focus, Maximize, ChevronLeft, ChevronRight, Settings, FolderOpen, Monitor, 
-  Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle, Plus, Shield
+  Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle, Plus, Shield,
+  Gamepad2, Footprints, ScanEye
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -51,6 +55,10 @@ export const TopNavbar: React.FC = () => {
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isDM = currentPlayer?.roleIds?.includes('dm') || false;
   const { regions } = useRegionStore();
+  
+  const { restrictMovement: movementLocked, setRestrictMovement: setMovementLocked } = useInitiativeStore();
+  const enforceFollowDM = useMapEphemeralStore((s) => s.enforceFollowDM);
+  const setEnforceFollowDM = useMapEphemeralStore((s) => s.setEnforceFollowDM);
   
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
@@ -384,6 +392,47 @@ export const TopNavbar: React.FC = () => {
                 </TooltipTrigger>
                 <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Exit tabletop to main screen</TooltipContent>
               </Tooltip>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="hover:bg-white/10 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                    <Gamepad2 className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end" sideOffset={24} className="bg-background/90 backdrop-blur border-white/10">Tabletop Controls</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10">
+              <DropdownMenuLabel>Tabletop Controls</DropdownMenuLabel>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem onClick={() => setMovementLocked(!movementLocked)}>
+                    <Footprints className="mr-2 h-4 w-4" />
+                    <span>{movementLocked ? 'Unlock Token Movement' : 'Lock Token Movement'}</span>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Prevent players from moving tokens</TooltipContent>
+              </Tooltip>
+              {isDM && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuItem onClick={() => {
+                      const newVal = !enforceFollowDM;
+                      setEnforceFollowDM(newVal);
+                      ephemeralBus.emit('map.dm.enforceFollow', { enforce: newVal });
+                      toast.info(newVal ? 'Players locked to your viewport' : 'Players released from viewport lock');
+                    }}>
+                      <ScanEye className="mr-2 h-4 w-4" />
+                      <span>{enforceFollowDM ? 'Release Player Viewports' : 'Lock Players to DM Viewport'}</span>
+                    </DropdownMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Force players' camera to follow your view</TooltipContent>
+                </Tooltip>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
