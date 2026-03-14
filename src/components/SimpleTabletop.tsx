@@ -423,18 +423,6 @@ export const SimpleTabletop = () => {
   useEffect(() => {
     setSessionSelectedTokens(selectedTokenIds);
   }, [selectedTokenIds, setSessionSelectedTokens]);
-  
-  useEffect(() => {
-    setSessionSelectedRegions(selectedRegionIds);
-  }, [selectedRegionIds, setSessionSelectedRegions]);
-
-  useEffect(() => {
-    setSessionSelectedMapObjects(selectedMapObjectIds);
-  }, [selectedMapObjectIds, setSessionSelectedMapObjects]);
-
-  useEffect(() => {
-    setSessionSelectedLights(selectedLightIds);
-  }, [selectedLightIds, setSessionSelectedLights]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
   const [fogRefreshTick, setFogRefreshTick] = useState(0);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
@@ -1122,6 +1110,19 @@ export const SimpleTabletop = () => {
 
     return true;
   }, [clearSelection, selectRegion, selectMultipleLights]);
+
+  // Sync specific map entity selections with sessionStore for external UI
+  useEffect(() => {
+    setSessionSelectedRegions(selectedRegionIds);
+  }, [selectedRegionIds, setSessionSelectedRegions]);
+
+  useEffect(() => {
+    setSessionSelectedMapObjects(selectedMapObjectIds);
+  }, [selectedMapObjectIds, setSessionSelectedMapObjects]);
+
+  useEffect(() => {
+    setSessionSelectedLights(selectedLightIds);
+  }, [selectedLightIds, setSessionSelectedLights]);
 
   // Register Mega-Panels on mount (only once)
   useEffect(() => {
