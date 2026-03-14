@@ -26,50 +26,60 @@ export function PlayCardContent({ cardId }: PlayCardContentProps) {
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="chat" className="p-1 px-2 gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  {!isDocked && <span>Chat</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="chat" className="w-full p-1 px-2 gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    {!isDocked && <span>Chat</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Chat</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="history" className="p-1 px-2 gap-2">
-                  <ScrollText className="w-4 h-4" />
-                  {!isDocked && <span>History</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="history" className="w-full p-1 px-2 gap-2">
+                    <ScrollText className="w-4 h-4" />
+                    {!isDocked && <span>History</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>History</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="dice" className="p-1 px-2 gap-2">
-                  <Dices className="w-4 h-4" />
-                  {!isDocked && <span>Dice</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="dice" className="w-full p-1 px-2 gap-2">
+                    <Dices className="w-4 h-4" />
+                    {!isDocked && <span>Dice</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Dice</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="initiative" className="p-1 px-2 gap-2">
-                  <ShieldAlert className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Init</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="initiative" className="w-full p-1 px-2 gap-2">
+                    <ShieldAlert className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Init</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Initiative</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="action" className="p-1 px-2 gap-2">
-                  <Swords className="w-4 h-4" />
-                  {!isDocked && <span>Actions</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="action" className="w-full p-1 px-2 gap-2">
+                    <Swords className="w-4 h-4" />
+                    {!isDocked && <span>Actions</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Actions</TooltipContent>}
             </Tooltip>

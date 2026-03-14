@@ -23,30 +23,36 @@ export function CampaignCardContent({ cardId }: CampaignCardContentProps) {
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="editor" className="p-1 px-2 gap-2">
-                  <Feather className="w-4 h-4" />
-                  {!isDocked && <span>Campaign Editor</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="editor" className="w-full p-1 px-2 gap-2">
+                    <Feather className="w-4 h-4" />
+                    {!isDocked && <span>Campaign Editor</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Campaign Editor</TooltipContent>}
             </Tooltip>
             
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="handouts" className="p-1 px-2 gap-2">
-                  <FileText className="w-4 h-4" />
-                  {!isDocked && <span>Handouts</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="handouts" className="w-full p-1 px-2 gap-2">
+                    <FileText className="w-4 h-4" />
+                    {!isDocked && <span>Handouts</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Handouts</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="art" className="p-1 px-2 gap-2">
-                  <ImageIcon className="w-4 h-4" />
-                  {!isDocked && <span>Art Approval</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="art" className="w-full p-1 px-2 gap-2">
+                    <ImageIcon className="w-4 h-4" />
+                    {!isDocked && <span>Art Approval</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Art Approval</TooltipContent>}
             </Tooltip>

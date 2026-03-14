@@ -31,50 +31,60 @@ export function CompendiumCardContent({ cardId, onAddToken }: CompendiumCardCont
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="characters" className="p-1 px-2 gap-2">
-                  <Users className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Characters</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="characters" className="w-full p-1 px-2 gap-2">
+                    <Users className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Characters</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Characters</TooltipContent>}
             </Tooltip>
             
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="monsters" className="p-1 px-2 gap-2">
-                  <Ghost className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Monsters</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="monsters" className="w-full p-1 px-2 gap-2">
+                    <Ghost className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Monsters</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Monsters</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="items" className="p-1 px-2 gap-2">
-                  <Backpack className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Items</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="items" className="w-full p-1 px-2 gap-2">
+                    <Backpack className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Items</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Items</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="effects" className="p-1 px-2 gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Effects</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="effects" className="w-full p-1 px-2 gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Effects</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Effects</TooltipContent>}
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="tokens" className="p-1 px-2 gap-2">
-                  <CircleUser className="w-4 h-4" />
-                  {!isDocked && <span className="truncate">Tokens</span>}
-                </TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="tokens" className="w-full p-1 px-2 gap-2">
+                    <CircleUser className="w-4 h-4" />
+                    {!isDocked && <span className="truncate">Tokens</span>}
+                  </TabsTrigger>
+                </div>
               </TooltipTrigger>
               {isDocked && <TooltipContent side="top" sideOffset={8}>Tokens</TooltipContent>}
             </Tooltip>

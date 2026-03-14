@@ -28,7 +28,7 @@ export function EnvironmentCardContent({ cardId }: EnvironmentCardContentProps) 
         {/* Left Column: Map Structure */}
         <div className="w-1/2 flex flex-col min-h-0 border-r border-border pr-4 shrink-0">
           <Tabs value={['manager', 'tree', 'objects'].includes(activeTab) ? activeTab : 'manager'} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList className="grid w-full grid-cols-3 mb-4 bg-muted/50">
               <TabsTrigger value="manager" className="gap-2"><MapIcon className="w-4 h-4" /> Manager</TabsTrigger>
               <TabsTrigger value="tree" className="gap-2"><Layers className="w-4 h-4" /> Elements</TabsTrigger>
               <TabsTrigger value="objects" className="gap-2"><Box className="w-4 h-4" /> Objects</TabsTrigger>
@@ -81,42 +81,54 @@ export function EnvironmentCardContent({ cardId }: EnvironmentCardContentProps) 
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="manager" className="p-1 px-2"><MapIcon className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="manager" className="w-full p-1 px-2"><MapIcon className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Map Manager</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="tree" className="p-1 px-2"><Layers className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="tree" className="w-full p-1 px-2"><Layers className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Map Elements</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="objects" className="p-1 px-2"><Box className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="objects" className="w-full p-1 px-2"><Box className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Map Objects</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="styles" className="p-1 px-2"><Paintbrush className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="styles" className="w-full p-1 px-2"><Paintbrush className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Visual Styles</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="fog" className="p-1 px-2"><CloudFog className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="fog" className="w-full p-1 px-2"><CloudFog className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Fog of War</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <TabsTrigger value="vision" className="p-1 px-2"><Eye className="w-4 h-4" /></TabsTrigger>
+                <div className="flex w-full">
+                  <TabsTrigger value="vision" className="w-full p-1 px-2"><Eye className="w-4 h-4" /></TabsTrigger>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>Vision Profiles</TooltipContent>
             </Tooltip>
