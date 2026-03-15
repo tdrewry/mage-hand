@@ -1,0 +1,393 @@
+{
+  "format": "magehand-scenario",
+  "formatVersion": 1,
+  "exportedAt": "2026-03-15T05:01:19.158Z",
+  "scenario": {
+    "id": "campaign-1773550568478",
+    "name": "Test Scenario",
+    "description": "The party arrives at the Forest Village.",
+    "author": "DM",
+    "version": "1.0.0",
+    "createdAt": "2026-03-12T03:00:32.435Z",
+    "updatedAt": "2026-03-15T05:00:37.662Z",
+    "nodes": [
+      {
+        "id": "scene-1773284432435",
+        "nodeData": {
+          "name": "Landing",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": [],
+          "description": "Welcome to the village"
+        },
+        "nodeType": "dialog",
+        "nextOnSuccess": [
+          "scene-1773289644941"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "isStartNode": true,
+        "customData": {
+          "mapId": "map-1772938455120-di6g68idf",
+          "deploymentZoneId": "map-object-1773284620282-x70230hl7",
+          "tokenGroupId": "tg-1773288981768-78mhxb"
+        },
+        "outcomes": [
+          {
+            "id": "outcome-1773289694549",
+            "label": "Start ",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773289644941"
+          },
+          {
+            "id": "outcome-1773289713852",
+            "label": "Monster DZ",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773289709893"
+          },
+          {
+            "id": "outcome-1773289794340",
+            "label": "Player DZ",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773289769637"
+          },
+          {
+            "id": "outcome-1773417345725",
+            "label": "support",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773417315333"
+          }
+        ]
+      },
+      {
+        "id": "scene-1773284453139",
+        "nodeData": {
+          "name": "Talk to the person",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "dialog",
+        "nextOnSuccess": [
+          "scene-1773284473722",
+          "scene-1773284486954",
+          "scene-1773285507294"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {},
+        "dialogLines": [
+          {
+            "speaker": "Elder",
+            "text": "Help us!"
+          }
+        ],
+        "outcomes": [
+          {
+            "id": "outcome-1773285781237",
+            "label": "Explore",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773284486954"
+          },
+          {
+            "id": "outcome-1773285797237",
+            "label": "Dungeon!",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773284473722"
+          },
+          {
+            "id": "outcome-1773285810781",
+            "label": "Encounter",
+            "color": "#3b82f6",
+            "targetNodeId": "scene-1773285507294"
+          }
+        ]
+      },
+      {
+        "id": "scene-1773284473722",
+        "nodeData": {
+          "name": "Dungeon!",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [
+          "scene-1773290045563"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773109109619-utm2x002v",
+          "deploymentZoneId": "map-object-1773287450742-dfcpfrg1e",
+          "tokenGroupId": "tg-1773291886569-fpm8zt",
+          "fogPreset": "reset"
+        }
+      },
+      {
+        "id": "scene-1773284486954",
+        "nodeData": {
+          "name": "Explore",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": [],
+          "description": "Non-combat"
+        },
+        "nodeType": "narrative",
+        "nextOnSuccess": [
+          "scene-1773284473722"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {}
+      },
+      {
+        "id": "scene-1773285507294",
+        "nodeData": {
+          "name": "Encounter some monsters",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [
+          "scene-1773284473722"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773108513656-zt9giw16l",
+          "deploymentZoneId": "map-object-1773287644965-0x3ra35b9",
+          "tokenGroupId": "tg-1773550786887-kyn1jc"
+        }
+      },
+      {
+        "id": "scene-1773289644941",
+        "nodeData": {
+          "name": "Non Combat Enc",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [
+          "scene-1773284453139"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773108513656-zt9giw16l",
+          "deploymentZoneId": "map-object-1773287561822-8gc8wkfj2",
+          "tokenGroupId": "tg-1773550764855-tfihv7",
+          "fogPreset": "reset"
+        }
+      },
+      {
+        "id": "scene-1773289709893",
+        "nodeData": {
+          "name": "Monster DZ",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [
+          "scene-1773284432435"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773289534338-b6sxj6bkf",
+          "deploymentZoneId": "map-object-1773289613069-59cotr26g",
+          "tokenGroupId": "tg-1773550786887-kyn1jc"
+        }
+      },
+      {
+        "id": "scene-1773289769637",
+        "nodeData": {
+          "name": "Player DZ",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [
+          "scene-1773284432435"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773289534338-b6sxj6bkf",
+          "deploymentZoneId": "map-object-1773289597038-z0s35ix5j",
+          "tokenGroupId": "tg-1773550764855-tfihv7"
+        }
+      },
+      {
+        "id": "scene-1773290045563",
+        "nodeData": {
+          "name": "Encounter",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "encounter",
+        "nextOnSuccess": [],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {
+          "mapId": "map-1773109109619-utm2x002v",
+          "deploymentZoneId": "map-object-1773289981364-r1em5c4ak",
+          "tokenGroupId": "tg-1773550786887-kyn1jc"
+        }
+      },
+      {
+        "id": "scene-1773417315333",
+        "nodeData": {
+          "name": "Support",
+          "gridWidth": 1,
+          "gridHeight": 1,
+          "terrain": [],
+          "deploymentZone": {
+            "minX": 0,
+            "maxX": 1,
+            "minY": 0,
+            "maxY": 1
+          },
+          "objectives": []
+        },
+        "nodeType": "narrative",
+        "nextOnSuccess": [
+          "scene-1773284432435"
+        ],
+        "nextOnFailure": "end",
+        "prerequisites": [],
+        "customData": {},
+        "handouts": [
+          {
+            "id": "handout-link-1773417327597",
+            "label": "User Guide",
+            "handoutId": "user-guide"
+          },
+          {
+            "id": "handout-link-1773417335094",
+            "label": "DM/Host Guide",
+            "handoutId": "dm-guide"
+          }
+        ]
+      }
+    ],
+    "startNodeId": "scene-1773284432435",
+    "tags": [
+      "ttrpg"
+    ]
+  },
+  "nodePositions": {
+    "scene-1773284432435": {
+      "x": 40,
+      "y": 10
+    },
+    "scene-1773284453139": {
+      "x": 520,
+      "y": 130
+    },
+    "scene-1773284473722": {
+      "x": 999,
+      "y": 134
+    },
+    "scene-1773284478506": {
+      "x": 519,
+      "y": 290
+    },
+    "scene-1773284486954": {
+      "x": 758,
+      "y": 70
+    },
+    "scene-1773285507294": {
+      "x": 757.7777777777778,
+      "y": 188.88888888888889
+    },
+    "scene-1773289644941": {
+      "x": 280,
+      "y": 130
+    },
+    "scene-1773289709893": {
+      "x": 40,
+      "y": 130
+    },
+    "scene-1773289769637": {
+      "x": 40,
+      "y": 250
+    },
+    "scene-1773290045563": {
+      "x": 1408,
+      "y": 200
+    },
+    "scene-1773417315333": {
+      "x": 45.802469135802426,
+      "y": 372.8943758573388
+    }
+  }
+}

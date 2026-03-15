@@ -1,4 +1,3 @@
-import { startWorker } from 'jazz-nodejs';
 import { createWebSocketPeer } from "cojson-transport-ws";
 import { WasmCrypto } from "cojson/crypto/WasmCrypto";
 import { Account, co, z } from "jazz-tools";
@@ -48,26 +47,30 @@ async function spawnClient(index: number) {
         crypto,
     });
     
-    const accountID = account.$jazz.id;
-    const agentSecret = account.$jazz.localNode.getCurrentAgent().agentSecret;
-
-    const { worker, waitForConnection } = await startWorker({
-      accountID,
-      accountSecret: agentSecret,
-      syncServer: options.url,
-      WebSocket: WebSocket as any,
-    });
+    // Wait for the immediate account creation sync, but don't strictly fail if it's slow
+    await account.$jazz.waitForAllCoValuesSync({ timeout: 2000 }).catch(() => {});
     
-    await waitForConnection();
-    console.log(`[Bot ${index}] Connected to server!`);
+    console.log(`[Bot ${index}] Connected to server as bot!`);
 
     // Load the root session dynamically to subscribe to updates using raw cojson 
     // to bypass all jazz-tools schema mismatch issues between node/browser.
     console.log(`[Bot ${index}] Subscribing to ${options.sessionRoot}...`);
     
-    // worker._raw.core.node is the underlying LocalNode in cojson
-    const localNode = (worker as any)._raw.core.node;
-    const root = await localNode.load(options.sessionRoot);
+    // account.$jazz.localNode is the underlying LocalNode in cojson
+    const localNode = account.$jazz.localNode;
+    
+    // Add retry logic for load since server might be under load
+    let root;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        root = await localNode.load(options.sessionRoot);
+        if (root !== "unavailable") break;
+        console.warn(`[Bot ${index}] Session unavailable on attempt ${attempt}. Retrying in 1s...`);
+        await new Promise(r => setTimeout(r, 1000));
+    }
+
+    if (root === "unavailable") {
+        throw new Error("Session unavailable from all peers");
+    }
     
     console.log(`[Bot ${index}] Loaded session! Listening for traffic...`);
     
@@ -84,8 +87,8 @@ async function spawnClient(index: number) {
 async function run() {
   for (let i = 0; i < options.clients; i++) {
     spawnClient(i); // Run concurrently rather than blocking sequentially if we want them fast
-    // Stagger boots by 500ms to avoid thundering herd memory spikes
-    await new Promise(r => setTimeout(r, 500)); 
+    // Stagger boots by 800ms to avoid thundering herd memory spikes on localhost
+    await new Promise(r => setTimeout(r, 800)); 
   }
   console.log(`\n✅ All ${options.clients} bots spawned. Listening for sync traffic...`);
 }
