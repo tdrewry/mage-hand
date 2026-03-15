@@ -213,7 +213,15 @@ function _pushTokenFinalPosition(tokenId: string): void {
       try {
         const init = tokenToJazzInit(token);
         for (const [key, val] of Object.entries(init)) {
-          if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
+          if (key !== 'tokenId') {
+            const v = val ?? undefined;
+            jt.$jazz.set(key, v);
+            
+            // Profiler tracking
+            import('./profiler').then(({ syncProfiler }) => {
+              syncProfiler.measureOutbound({ [key]: v }, 'token');
+            });
+          }
         }
       } catch (err) {
         console.error(`[jazz-bridge] Failed to push final token position:`, err);
@@ -799,6 +807,10 @@ function pushBlobToJazz(kind: string): void {
           updatedAt: new Date().toISOString(),
         } as any, group);
         blobs.$jazz.push(blob);
+        
+        import('./profiler').then(({ syncProfiler }) => {
+          syncProfiler.measureOutbound(blob, 'blob');
+        });
       } catch (err) {
         console.error(`[jazz-bridge] Failed to create blob ${kind}:`, err);
       }
@@ -820,6 +832,10 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
   try {
     const state = JSON.parse(stateJson);
     const hash = quickHash(stateJson);
+
+    import('./profiler').then(({ syncProfiler }) => {
+      syncProfiler.measureInbound(state, 'blob');
+    });
 
     // ── Guard against destructive hydration (creator only) ──
     if (_isCreator) {
@@ -1416,7 +1432,12 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
       const je = jazzPlaced[i];
       if (!je) continue;
       const effect = jazzToZustandPlacedEffect(je, lookup);
-      if (effect) restored.push(effect);
+      if (effect) {
+        restored.push(effect);
+        import('./profiler').then(({ syncProfiler }) => {
+          syncProfiler.measureInbound(je, 'effect');
+        });
+      }
     }
     if (restored.length > 0) {
       useEffectStore.setState({ placedEffects: restored });

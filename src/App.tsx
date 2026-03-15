@@ -10,6 +10,7 @@ import { useAutoReconnect } from "./hooks/useAutoReconnect";
 import { useCardStore } from "./stores/cardStore";
 import { startDiceRollNotifier, stopDiceRollNotifier } from "./lib/diceRollNotifier";
 import { JazzSessionProvider } from "./lib/jazz/provider";
+import { SyncProfilerPanel } from "./components/SyncProfilerPanel";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const AppInner = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      <SyncProfilerPanel />
     </>
   );
 };
