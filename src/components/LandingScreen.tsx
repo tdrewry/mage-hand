@@ -37,6 +37,8 @@ import {
   ScrollText,
   Edit2,
   Globe,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
@@ -63,6 +65,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [pendingLoadData, setPendingLoadData] = useState<ProjectData | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -166,6 +169,16 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   // Multiplayer state
   const { isConnected, connectionStatus, currentSession, connectedUsers, syncReady } = useMultiplayerStore();
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+  const [sessionManagerTab, setSessionManagerTab] = useState<'create' | 'join'>('create');
+
+  const handleCopySessionCode = () => {
+    if (currentSession?.sessionCode) {
+      navigator.clipboard.writeText(currentSession.sessionCode);
+      setCopiedCode(true);
+      toast.success('Session code copied!');
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
 
   // --- Session Handlers ---
   const handleNewSession = () => {
@@ -366,7 +379,19 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-green-400 flex items-center gap-2">
-                        Connected to Session <span className="font-mono bg-green-500/20 px-2 py-0.5 rounded text-xs">{currentSession.sessionCode}</span>
+                        Connected to Session 
+                        <div className="flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded">
+                          <span className="font-mono text-[10px] sm:text-xs leading-tight break-all max-w-[150px] sm:max-w-xs text-wrap" title={currentSession.sessionCode}>
+                            {currentSession.sessionCode}
+                          </span>
+                          <button
+                            onClick={handleCopySessionCode}
+                            className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400"
+                            title="Copy Code"
+                          >
+                            {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </h4>
                       <p className="text-sm text-green-400/80">
                         {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
@@ -406,7 +431,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                     <>
                       {/* DM ACTION 1: Host Multiplayer */}
                       <button
-                        onClick={() => setSessionManagerOpen(true)}
+                        onClick={() => { setSessionManagerTab('create'); setSessionManagerOpen(true); }}
                         className="group flex flex-col items-start gap-3 p-6 rounded-2xl border border-white/5 bg-background/40 hover:bg-white/5 hover:border-white/20 transition-all text-left"
                       >
                         <div className="h-10 w-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
@@ -451,7 +476,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                     <>
                       {/* PLAYER ACTION: Join Multiplayer */}
                       <button
-                        onClick={() => setSessionManagerOpen(true)}
+                        onClick={() => { setSessionManagerTab('join'); setSessionManagerOpen(true); }}
                         className="group md:col-span-2 flex flex-col items-center text-center gap-3 p-8 rounded-2xl border border-white/5 bg-background/40 hover:bg-white/5 hover:border-white/20 transition-all"
                       >
                         <div className="h-16 w-16 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white transition-colors group-hover:scale-110 duration-300">
@@ -501,7 +526,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
       </div>
 
       {/* OVERLAYS AND MODALS */}
-      <SessionManager open={sessionManagerOpen} onOpenChange={setSessionManagerOpen} />
+      <SessionManager open={sessionManagerOpen} onOpenChange={setSessionManagerOpen} defaultTab={sessionManagerTab} />
       <input ref={fileInputRef} type="file" accept=".mhsession,.json" className="hidden" onChange={handleFileSelected} />
 
       <AlertDialog open={showNewConfirm} onOpenChange={setShowNewConfirm}>
@@ -549,13 +574,24 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 try {
                   clearAllStores();
-                  const keysToRemove = Object.keys(localStorage).filter(k =>
+                  const keysToRemove = Object.keys(localStorage).filter(k => 
                     k.startsWith('vtt-') || k.startsWith('magehand-') || k.startsWith('dungeon-')
                   );
                   keysToRemove.forEach(k => localStorage.removeItem(k));
+                  
+                  // Wipe all IndexedDB databases (this catches Jazz's hidden cojson DBs, plus texture databases)
+                  if (indexedDB.databases) {
+                    const dbs = await indexedDB.databases();
+                    dbs.forEach(db => {
+                      if (db.name) indexedDB.deleteDatabase(db.name);
+                    });
+                  } else {
+                     console.warn("indexedDB.databases() not supported by this browser. Manual indexedDB cleanup may be required.");
+                  }
+
                   toast.success('All data has been deleted');
                 } catch (err) {
                   toast.error('Failed to delete all data');

@@ -559,7 +559,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "mapObject.door.preview": { throttleMs: 0,   ttlMs: 500,  keyStrategy: "entityId" },
 
   // Fog & Vision
-  "fog.cursor.preview":     { throttleMs: 50,  ttlMs: 500,  keyStrategy: "userId", dmOnly: true },
+  "fog.cursor.preview":     { throttleMs: 100,  ttlMs: 500,  keyStrategy: "userId", dmOnly: true },
   "fog.reveal.preview":     { throttleMs: 50,  ttlMs: 500,  keyStrategy: "userId", dmOnly: true },
 
   // Chat
@@ -580,7 +580,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "presence.activity":      { throttleMs: 200, ttlMs: 5000,  keyStrategy: "userId" },
 
   // UI / Cursors
-  "cursor.update":          { throttleMs: 67,  ttlMs: 500,  keyStrategy: "userId" },
+  "cursor.update":          { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
   "cursor.visibility":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "session", dmOnly: true },
   "presence.viewingMap":    { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },
 

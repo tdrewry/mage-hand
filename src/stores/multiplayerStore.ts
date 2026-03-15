@@ -51,6 +51,7 @@ export interface MultiplayerState {
   setCurrentUserId: (userId: string | null) => void;
   setCurrentUsername: (username: string) => void;
   setConnectedUsers: (users: ConnectedUser[]) => void;
+  syncPresenceHeartbeats: (users: ConnectedUser[]) => void;
   addConnectedUser: (user: ConnectedUser) => void;
   removeConnectedUser: (userId: string) => void;
   updateUserRoles: (userId: string, roleIds: string[]) => void;
@@ -104,24 +105,69 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setCurrentSession: (session) => set({ currentSession: session }),
       setCurrentUserId: (userId) => set({ currentUserId: userId }),
       setCurrentUsername: (username) => set({ currentUsername: username }),
-      setConnectedUsers: (users) => {
-        // Deduplicate by userId — first occurrence wins (preserves priority of selfUser)
+      setConnectedUsers: (users) => set((state) => {
+        // Merge the incoming array with the existing users to avoid dropping early presence events
+        const combined = [...users, ...state.connectedUsers];
+        // Deduplicate by username — first occurrence wins (preserves priority of new array and selfUser)
         const seen = new Set<string>();
-        const deduped = users.filter(u => {
-          if (seen.has(u.userId)) return false;
-          seen.add(u.userId);
+        const deduped = combined.filter(u => {
+          if (!u.username) return false;
+          const uname = u.username.toLowerCase();
+          if (seen.has(uname)) return false;
+          seen.add(uname);
           return true;
         });
-        set({ connectedUsers: deduped });
-      },
+        return { connectedUsers: deduped };
+      }),
       
+      syncPresenceHeartbeats: (users) => set((state) => {
+        const now = Date.now();
+        // Create lookup map of incoming sync payload
+        const incomingMap = new Map<string, ConnectedUser>();
+        for (const u of users) {
+          if (u.username) incomingMap.set(u.username.toLowerCase(), u);
+        }
+
+        const merged: ConnectedUser[] = [];
+        Array.from(incomingMap.entries()).forEach(([uname, inc]) => {
+          const existing = state.connectedUsers.find(e => e.username?.toLowerCase() === uname);
+          merged.push({
+            userId: inc.userId,
+            username: inc.username,
+            roleIds: inc.roleIds,
+            connectedAt: existing?.connectedAt || inc.lastPing || now,
+            lastPing: inc.lastPing || now
+          });
+        });
+
+        // Cull any entries older than 25 seconds unless it's the local user
+        const CUTOFF_MS = 25000;
+        const activeOnly = merged.filter(u => {
+           if (u.username.toLowerCase() === state.currentUsername.toLowerCase()) return true;
+           return (now - (u.lastPing || 0)) < CUTOFF_MS;
+        });
+        
+        // Optimisation: Skip UI re-render if connection counts/contents are identical
+        if (activeOnly.length === state.connectedUsers.length) {
+            const hasChanges = activeOnly.some((u, i) => 
+               u.userId !== state.connectedUsers[i].userId || 
+               u.roleIds.join() !== state.connectedUsers[i].roleIds.join()
+            );
+            if (!hasChanges) return state;
+        }
+
+        return { connectedUsers: activeOnly };
+      }),
+
       addConnectedUser: (user) => set((state) => {
-        const existing = state.connectedUsers.find(u => u.userId === user.userId);
+        if (!user.username) return state;
+        const uname = user.username.toLowerCase();
+        const existing = state.connectedUsers.find(u => u.username?.toLowerCase() === uname);
         if (existing) {
           // Update existing entry (e.g. username or roles changed on reconnect)
           return {
             connectedUsers: state.connectedUsers.map(u =>
-              u.userId === user.userId ? { ...u, ...user, connectedAt: u.connectedAt } : u
+              u.username?.toLowerCase() === uname ? { ...u, ...user, connectedAt: u.connectedAt } : u
             ),
           };
         }
@@ -129,6 +175,9 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       }),
       
       removeConnectedUser: (userId) => set((state) => ({
+        // We still support removing by userId primarily because the presence leave event provides it.
+        // However, we ideally should remove by username if transport IDs drift.
+        // For safety, let's just use the strict userId here since it's targeted.
         connectedUsers: state.connectedUsers.filter(u => u.userId !== userId)
       })),
       

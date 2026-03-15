@@ -161,6 +161,15 @@ export interface PresencePayload {
   connectionId?: ConnectionId;
 }
 
+export interface PresenceSyncPayload {
+  users: Array<{
+    userId: string;
+    username: string;
+    roles: string[];
+    lastPing: number;
+  }>;
+}
+
 export interface NeedSnapshotPayload {
   reason: "too_far_behind" | "no_history" | "server_restarted" | "protocol_mismatch";
   snapshot: SnapshotPointer;
@@ -211,6 +220,7 @@ export type ServerToClientMessage =
   | Msg<"reject", RejectPayload>
   | Msg<"op_batch", OpBatchPayload>
   | Msg<"presence", PresencePayload>
+  | Msg<"presence_sync", PresenceSyncPayload>
   | Msg<"need_snapshot", NeedSnapshotPayload>
   | Msg<"snapshot_pointer", SnapshotPointerPayload>
   | Msg<"ephemeral", EphemeralPayload & { userId: UserId }>;

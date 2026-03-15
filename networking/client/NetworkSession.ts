@@ -13,6 +13,7 @@ import type {
   OpBatchPayload,
   OpSeq,
   PresencePayload,
+  PresenceSyncPayload,
   RejectPayload,
   ServerToClientMessage,
   SessionCode,
@@ -47,11 +48,11 @@ function randomId(prefix = ""): string {
 }
 
 export function getOrCreateClientId(storageKey = "vtt.clientId"): ClientId {
-  if (typeof localStorage === "undefined") return randomId("c_");
-  const existing = localStorage.getItem(storageKey);
+  if (typeof sessionStorage === "undefined") return randomId("c_");
+  const existing = sessionStorage.getItem(storageKey);
   if (existing) return existing;
   const created = randomId("c_");
-  localStorage.setItem(storageKey, created);
+  sessionStorage.setItem(storageKey, created);
   return created;
 }
 
@@ -85,6 +86,7 @@ export interface NetworkSessionEvents {
   ack: AckPayload;
   opBatch: OpBatchPayload;
   presence: PresencePayload;
+  presence_sync: PresenceSyncPayload;
   ephemeral: { kind: string; data: unknown; userId: string };
   snapshotPointer: SnapshotPointer;
   rawMessage: ServerToClientMessage;
@@ -148,7 +150,7 @@ export class NetworkSession {
       this.wireTransport();
     }
 
-    this.serverUrl = normalizeWsUrl(params.serverUrl);
+    this.serverUrl = normalizeWsUrl(params.serverUrl || "ws://localhost");
     this.sessionCode = params.sessionCode;
     this.lastAppliedSeq = params.lastSeenSeq ?? 0;
 
@@ -371,6 +373,10 @@ export class NetworkSession {
 
       case "presence":
         this.emitter.emit("presence", msg.p as PresencePayload);
+        return;
+
+      case "presence_sync":
+        this.emitter.emit("presence_sync", msg.p as PresenceSyncPayload);
         return;
 
       case "ephemeral": {

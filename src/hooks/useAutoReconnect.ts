@@ -53,7 +53,7 @@ export function useAutoReconnect() {
             console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
             
             // 2. Inject ephemeral transport
-            const transport = new JazzTransport(info.root);
+            const transport = new JazzTransport(info.root, store.currentUserId || "unknown", username, store.roles);
             netManager.connectWithTransport({
               transport,
               sessionCode: code,

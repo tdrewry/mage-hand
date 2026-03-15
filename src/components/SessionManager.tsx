@@ -57,9 +57,10 @@ export { type TransportType } from '@/stores/multiplayerStore';
 interface SessionManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: 'create' | 'join';
 }
 
-export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChange }) => {
+export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChange, defaultTab }) => {
   const {
     isConnected,
     connectionStatus,
@@ -338,11 +339,14 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 <div className="space-y-1 min-w-0 flex-1">
                   <Label className="text-xs text-muted-foreground">Session Code</Label>
                   <div className="flex items-center gap-2">
-                    <code className={`font-bold tracking-wider text-primary break-all ${
-                      (currentSession.sessionCode?.length ?? 0) > 12 
-                        ? 'text-xs leading-tight' 
-                        : 'text-2xl'
-                    }`}>
+                    <code 
+                      className={`font-bold tracking-wider text-primary break-all ${
+                        (currentSession.sessionCode?.length ?? 0) > 12 
+                          ? 'text-[11px] leading-tight max-w-[200px] text-wrap' 
+                          : 'text-2xl'
+                      }`}
+                      title={currentSession.sessionCode}
+                    >
                       {currentSession.sessionCode}
                     </code>
                     <Button
@@ -467,7 +471,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           </div>
         ) : (
           // Session Creation/Join View
-          <Tabs defaultValue="create" className="w-full pt-2">
+          <Tabs defaultValue={defaultTab || "create"} className="w-full pt-2">
             <TabsList className="grid w-full grid-cols-2 bg-background/50 border border-white/5 p-1 rounded-lg">
               <TabsTrigger value="create" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Create Session</TabsTrigger>
               <TabsTrigger value="join" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Join Session</TabsTrigger>
@@ -641,7 +645,9 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
                   maxLength={64}
                   disabled={isConnecting}
-                  className="bg-background/50 border-white/10 focus-visible:ring-primary font-mono text-xl tracking-widest text-center h-14 uppercase"
+                  className={`bg-background/50 border-white/10 focus-visible:ring-primary font-mono text-center h-14 ${
+                    sessionCode.length > 12 ? 'text-sm tracking-normal' : 'text-xl tracking-widest uppercase'
+                  }`}
                 />
                 <p className="text-xs text-muted-foreground">
                   Paste the code shared by your host — the connection type is detected automatically.

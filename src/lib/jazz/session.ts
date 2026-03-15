@@ -135,6 +135,11 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
           blobs: { $each: true },
           textures: { $each: true },
           illuminationSources: { $each: true },
+          cursors: [],
+          pings: [],
+          chat: [],
+          tokenStates: [],
+          connectedUsers: {},
         },
       });
       break; // success
@@ -258,6 +263,11 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
           blobs: { $each: true },
           textures: { $each: true },
           illuminationSources: { $each: true },
+          cursors: [],
+          pings: [],
+          chat: [],
+          tokenStates: [],
+          connectedUsers: {},
         },
       });
 

@@ -3,7 +3,7 @@
 
 import { NetworkSession, type ConnectParams, type NetworkSessionInfo } from "../../../networking/client";
 import type { ITransport } from "../../../networking/client/transport";
-import type { EngineOp, OpBatchPayload, PresencePayload } from "../../../networking/contract/v1";
+import type { EngineOp, OpBatchPayload, PresencePayload, PresenceSyncPayload } from "../../../networking/contract/v1";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { opBridge } from "./OpBridge";
 import { isEphemeralOp } from "./ephemeral";
@@ -337,6 +337,11 @@ export class NetManager {
 
       switch (p.kind) {
         case "join":
+          // Prevent duplicate local user entry if transport uses a different internal ID
+          if (p.user.username === store.currentUsername) {
+            break;
+          }
+          
           store.addConnectedUser(user);
           // Don't toast for our own join
           if (p.user.userId !== store.currentUserId) {
@@ -386,7 +391,19 @@ export class NetManager {
       }
     });
 
-    this.cleanups.push(off1, off2, off3, off4, off5, off6, off7);
+    const off8 = this.session.on("presence_sync", (p: PresenceSyncPayload) => {
+      const store = useMultiplayerStore.getState();
+      const mapped = p.users.map(u => ({
+        userId: u.userId,
+        username: u.username,
+        roleIds: u.roles,
+        connectedAt: u.lastPing,
+        lastPing: u.lastPing
+      }));
+      store.syncPresenceHeartbeats(mapped);
+    });
+
+    this.cleanups.push(off1, off2, off3, off4, off5, off6, off7, off8);
   }
 
   // ── Reconnection ──────────────────────────────────────────
@@ -427,7 +444,12 @@ export class NetManager {
       this.cleanups = [];
       this.wireEvents();
 
-      await this.connect(params);
+      if (this._ephemeralOnly && (params as any).transport) {
+        await this.connectWithTransport(params as any);
+      } else {
+        await this.connect(params);
+      }
+      
       console.log("✅ [NetManager] Reconnected successfully");
     } catch (err) {
       console.warn("⚠️ [NetManager] Reconnect attempt failed:", err);

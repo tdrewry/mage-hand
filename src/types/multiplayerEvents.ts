@@ -142,6 +142,7 @@ export interface ConnectedUser {
   username: string;
   roleIds: string[];
   connectedAt: number;
+  lastPing?: number;
   socketId?: string; // Server-side only
 }
 

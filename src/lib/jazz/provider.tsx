@@ -18,6 +18,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { createJazzSession, joinJazzSession } from "./session";
 import { encodeJazzCode } from "../sessionCodeResolver";
 import { netManager } from "../net/index";
+import { getOrCreateClientId } from "../../../networking/client/NetworkSession";
 import { JazzTransport } from "../net/transports/JazzTransport";
 
 /** Default self-hosted sync server URL */
@@ -159,8 +160,10 @@ function JazzSetupWorker() {
           hasPassword: false,
         });
 
-        // Spin up tandem ephemeral presence
-        const transport = new JazzTransport(info.root);
+        // Spin up tandem ephemeral presence using a tab-specific client ID 
+        // to prevent local testing tabs from overwriting each other's presence.
+        const clientId = getOrCreateClientId();
+        const transport = new JazzTransport(info.root, clientId, username, playerRoles || []);
         netManager.connectWithTransport({
           transport,
           sessionCode: shortCode,

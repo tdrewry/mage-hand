@@ -277,13 +277,15 @@ export const JazzCursor = co.map({
 });
 export type JazzCursor = co.loaded<typeof JazzCursor>;
 
-export const JazzCursorMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify(JazzCursor)>
-// We use a simple JSON string value for Cursors to minimize tree traversal depth for very transient events
+export const JazzCursorFeed = co.feed(z.string()); // Feed of JSON.stringify(JazzCursor)
 
-export const JazzPingMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify({ x, y, color, timestamp })>
-// We use a simple JSON string value for Pings to minimize tree traversal depth for very transient events
+export const JazzPingFeed = co.feed(z.string()); // Feed of JSON.stringify({ x, y, color, timestamp })
 
 export const JazzChatList = co.list(z.string()); // Append-only list of JSON chat payloads
+
+export const JazzTokenStateFeed = co.feed(z.string()); // Feed of JSON.stringify({ kind, data, timestamp })
+
+export const JazzConnectedUsersMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify({ status: "connected" | "disconnected", timestamp })>
 
 // ── Session Root ───────────────────────────────────────────────────────────
 
@@ -298,9 +300,11 @@ export const JazzSessionRoot = co.map({
   textures: co.optional(JazzTextureList),
   illuminationSources: co.optional(JazzIlluminationSourceList),
   // Ephemeral Data
-  cursors: co.optional(JazzCursorMap),
-  pings: co.optional(JazzPingMap),
+  cursors: co.optional(JazzCursorFeed),
+  pings: co.optional(JazzPingFeed),
   chat: co.optional(JazzChatList),
+  tokenStates: co.optional(JazzTokenStateFeed),
+  connectedUsers: co.optional(JazzConnectedUsersMap),
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
@@ -354,9 +358,11 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
   const textures = JazzTextureList.create([], group);
   const illuminationSources = JazzIlluminationSourceList.create([], group);
 
-  const cursors = JazzCursorMap.create({} as any, group);
-  const pings = JazzPingMap.create({} as any, group);
+  const cursors = JazzCursorFeed.create([], group);
+  const pings = JazzPingFeed.create([], group);
   const chat = JazzChatList.create([], group);
+  const tokenStates = JazzTokenStateFeed.create([], group);
+  const connectedUsers = JazzConnectedUsersMap.create({} as any, group);
 
   return JazzSessionRoot.create(
     { 
@@ -371,7 +377,9 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
       illuminationSources: illuminationSources as any,
       cursors: cursors as any, 
       pings: pings as any, 
-      chat: chat as any
+      chat: chat as any,
+      tokenStates: tokenStates as any,
+      connectedUsers: connectedUsers as any
     } as any,
     group,
   ) as unknown as JazzSessionRoot;
