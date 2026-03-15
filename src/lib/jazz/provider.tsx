@@ -11,15 +11,11 @@
 import React, { useEffect } from "react";
 import { JazzReactProvider, useAccount } from "jazz-tools/react";
 import { useDemoAuth, DemoAuthBasicUI } from 'jazz-tools/react';
-import { MageHandAccount } from "./schema";
 import { toast } from "sonner";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
-import { useSessionStore } from "@/stores/sessionStore";
-import { createJazzSession, joinJazzSession } from "./session";
-import { encodeJazzCode } from "../sessionCodeResolver";
 import { netManager } from "../net/index";
-import { getOrCreateClientId } from "../../../networking/client/NetworkSession";
 import { JazzTransport } from "../net/transports/JazzTransport";
+import { MageHandAccount } from "./schema";
 
 /** Default self-hosted sync server URL */
 const DEFAULT_SYNC_URL: `ws://${string}` = "ws://localhost:4200";
@@ -108,92 +104,6 @@ function useJazzConnectionMonitor(syncUrl: string) {
   }, [syncUrl]);
 }
 
-/**
- * Worker component that runs inside the Jazz Provider.
- * Waits for `me` to be initialized by `guestMode`, then performs
- * pending create/join actions. 
- */
-function JazzSetupWorker() {
-  const me = useAccount();
-
-  useEffect(() => {
-    console.log('[JazzSetupWorker] Check me:', { me, isLoaded: (me as any)?.$isLoaded, type: me?.[Symbol.for('cojson.TypeSym')] || (me as any)?.$type$ });
-    // Wait for the local agent to be fully initialized by guestMode
-    if (!me || !(me as any).$isLoaded) return;
-
-    const state = useMultiplayerStore.getState();
-    const action = state.pendingJazzAction;
-    if (!action) return;
-
-    // Clear the action so we don't double-fire
-    state.setPendingJazzAction(null);
-
-    const runSetup = async () => {
-      try {
-        const { type, username, sessionCoId } = action;
-
-        // Resolve local roles
-        const sessionState = useSessionStore.getState();
-        const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
-        let playerRoles = currentPlayer?.roleIds;
-        if (!playerRoles || playerRoles.length === 0) {
-          playerRoles = type === 'create' ? ['dm'] : ['player'];
-        }
-
-        let info;
-        if (type === 'create') {
-          info = createJazzSession(username);
-        } else if (type === 'join' && sessionCoId) {
-          info = await joinJazzSession(sessionCoId);
-        } else {
-          return;
-        }
-
-        const shortCode = encodeJazzCode(info.sessionCoId);
-        
-        // Hydration stores
-        useMultiplayerStore.getState().setRoles(playerRoles);
-        useMultiplayerStore.getState().setCurrentSession({
-          sessionCode: shortCode,
-          sessionId: info.sessionCoId,
-          createdAt: Date.now(),
-          hasPassword: false,
-        });
-
-        // Spin up tandem ephemeral presence using a tab-specific client ID 
-        // to prevent local testing tabs from overwriting each other's presence.
-        const clientId = getOrCreateClientId();
-        const transport = new JazzTransport(info.root, clientId, username, playerRoles || []);
-        netManager.connectWithTransport({
-          transport,
-          sessionCode: shortCode,
-          username,
-          roles: playerRoles,
-        }).then(() => {
-          console.log('✅ [JazzSetupWorker] Jazz Ephemeral Transport injected');
-        }).catch((err) => {
-          console.warn('⚠️ [JazzSetupWorker] Transport injection failed:', err);
-        });
-
-        if (type === 'create') {
-          toast.success(`Jazz session created — code: ${shortCode}`);
-        } else {
-          toast.success(`Joined Jazz session ${shortCode}`);
-        }
-
-      } catch (err: any) {
-        console.error('[JazzSetupWorker] Setup failed:', err);
-        toast.error(`Session setup failed: ${err.message}`);
-        useMultiplayerStore.getState().setActiveTransport(null);
-      }
-    };
-
-    runSetup();
-  }, [me]);
-
-  return null;
-}
-
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const me = useAccount();
 
@@ -204,7 +114,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <JazzSetupWorker />
       {children}
     </>
   );

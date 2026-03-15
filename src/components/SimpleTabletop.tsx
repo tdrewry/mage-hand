@@ -149,6 +149,7 @@ import { useMapFocusStore, isFocusEffectActive } from "@/stores/mapFocusStore";
 
 import { Z_INDEX } from "../lib/zIndex";
 import { APP_VERSION } from "../lib/version";
+import { ConnectionIndicator } from "./ConnectionIndicator";
 import { setPostProcessingVisible } from "../lib/postProcessingLayer";
 import {
   drawTokenLabel as drawTokenLabelHelper,
@@ -12222,6 +12223,9 @@ export const SimpleTabletop = () => {
             >
               v{APP_VERSION}
             </div>
+
+            {/* Network Widget */}
+            <ConnectionIndicator />
 
             {/* Zoom Level Indicator with Menu */}
             <div

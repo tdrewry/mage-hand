@@ -15,10 +15,11 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = React.memo(({ transfo
   const cursors = useCursorStore((s) => s.cursors);
   const cursorSharingEnabled = useCursorStore((s) => s.cursorSharingEnabled);
   const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
 
   if (!cursorSharingEnabled) return null;
 
-  const cursorEntries = Object.values(cursors);
+  const cursorEntries = Object.values(cursors).filter(c => c.userId !== currentUserId);
   if (cursorEntries.length === 0) return null;
 
   return (

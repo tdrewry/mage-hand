@@ -5,6 +5,8 @@ import { netManager } from '@/lib/net';
 import { Badge } from './ui/badge';
 import { Z_INDEX } from '@/lib/zIndex';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
+import { cn } from '@/lib/utils';
 
 type LayerStatus = 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'error';
 
@@ -53,6 +55,7 @@ function statusLabel(status: LayerStatus): string {
 
 export const ConnectionIndicator: React.FC = () => {
   const { isTandem, jazzStatus, wsStatus, connectionStatus, currentSession, connectedUsers, activeTransport } = useTransportStates();
+  const isBottomNavbarVisible = useBottomNavbarVisible();
 
   // Don't show anything if disconnected and no session
   if (connectionStatus === 'disconnected' && !currentSession) {
@@ -74,14 +77,17 @@ export const ConnectionIndicator: React.FC = () => {
 
   return (
     <div
-      className="fixed top-4 right-4 pointer-events-auto"
+      className={cn(
+        "absolute right-[100px] pointer-events-auto transition-all duration-300 ease-in-out",
+        isBottomNavbarVisible ? "bottom-20" : "bottom-4"
+      )}
       style={{ zIndex: Z_INDEX.FIXED_UI.FLOATING_MENUS }}
     >
       <Tooltip>
         <TooltipTrigger asChild>
           <Badge
             variant={badgeVariant}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer"
+            className="flex items-center gap-2 px-3 py-2 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer"
           >
             <Icon
               className={`h-3.5 w-3.5 ${iconColor} ${anyLoading ? 'animate-spin' : ''}`}
@@ -98,7 +104,7 @@ export const ConnectionIndicator: React.FC = () => {
             )}
           </Badge>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="end" className="max-w-xs">
+        <TooltipContent side="top" align="end" className="max-w-xs mb-2">
           <div className="space-y-2">
             <div className="font-semibold text-sm">Multiplayer Status</div>
 

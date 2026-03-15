@@ -7,7 +7,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useStorageWarning } from "./hooks/useStorageWarning";
 import { useAutoReconnect } from "./hooks/useAutoReconnect";
-import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { useCardStore } from "./stores/cardStore";
 import { startDiceRollNotifier, stopDiceRollNotifier } from "./lib/diceRollNotifier";
 import { JazzSessionProvider } from "./lib/jazz/provider";
@@ -54,7 +53,6 @@ const AppInner = () => {
   return (
     <>
       <Toaster />
-      <ConnectionIndicator />
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<Index />} />

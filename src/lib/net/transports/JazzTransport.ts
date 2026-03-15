@@ -262,7 +262,7 @@ export class JazzTransport implements ITransport {
                 const payload = JSON.parse(entry.value);
                 this.emitInbound({
                   v: PROTOCOL_VERSION, t: "ephemeral", 
-                  p: { kind: payload.kind || "cursor.update", data: payload.data || payload, userId: accId } // Strict mapping to actual Jazz Account ID
+                  p: { kind: payload.kind || "cursor.update", data: payload.data || payload, userId: payload.userId || accId } // Use packed clientId
                 } as unknown as ServerToClientMessage);
               } catch (e) {
                 console.warn("[JazzTransport] Cursor parse fail:", e);
@@ -288,7 +288,7 @@ export class JazzTransport implements ITransport {
                 const data = JSON.parse(entry.value);
                 this.emitInbound({
                   v: PROTOCOL_VERSION, t: "ephemeral", 
-                  p: { kind: "map.ping", data, userId: accId }
+                  p: { kind: "map.ping", data, userId: data.userId || accId }
                 } as unknown as ServerToClientMessage);
               } catch {}
             }
@@ -341,7 +341,7 @@ export class JazzTransport implements ITransport {
                   p: { 
                     kind: payload.kind, 
                     data: payload.data, 
-                    userId: accId 
+                    userId: payload.userId || accId 
                   }
                 } as unknown as ServerToClientMessage);
               } catch (e) {

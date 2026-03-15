@@ -42,6 +42,7 @@ import { Separator } from '@/components/ui/separator';
 import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
+import { getOrCreateClientId } from '../../networking/client/NetworkSession';
 import { sendPing, sendChat } from '@/lib/net/demo';
 import { createJazzSession, joinJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
@@ -162,18 +163,53 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         }
 
         setCurrentUsername(username.trim());
+        useMultiplayerStore.getState().setActiveTransport('jazz');
         
-        useMultiplayerStore.getState().setPendingJazzAction({
-          type: 'create',
-          username: username.trim(),
-        });
-        
-        setActiveTransport('jazz');
-        // Reset local connecting lock; let the global UI know we handed off to JazzProvider
-        setTimeout(() => setIsConnecting(false), 500);
+        // Wait briefly for the UI to update / unmount the connecting state globally
+        setTimeout(async () => {
+             try {
+                const { createJazzSession } = await import('@/lib/jazz/session');
+                const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
+                const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+                
+                const sessionState = useSessionStore.getState();
+                const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+                const playerRoles = currentPlayer?.roleIds || ['dm'];
+                
+                const info = createJazzSession(username.trim());
+                const shortCode = encodeJazzCode(info.sessionCoId);
+                
+                // Hydration stores
+                useMultiplayerStore.getState().setRoles(playerRoles);
+                useMultiplayerStore.getState().setCurrentSession({
+                  sessionCode: shortCode,
+                  sessionId: info.sessionCoId,
+                  createdAt: Date.now(),
+                  hasPassword: false,
+                });
+                
+                const clientId = getOrCreateClientId();
+                const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+                
+                await netManager.connectWithTransport({
+                  transport,
+                  sessionCode: shortCode,
+                  username: username.trim(),
+                  roles: playerRoles,
+                });
+                
+                toast.success(`Jazz session created — code: ${shortCode}`);
+             } catch (err: any) {
+                console.error('Failed to init Jazz session setup:', err);
+                toast.error(`Session setup failed: ${err.message}`);
+                useMultiplayerStore.getState().setActiveTransport(null);
+             } finally {
+                setIsConnecting(false);
+             }
+        }, 100);
       } catch (error) {
-        console.error('Failed to init Jazz session setup:', error);
-        toast.error('Failed to init Jazz session');
+        console.error('Failed to setup transport state:', error);
+        toast.error('Failed to init Jazz session state');
         useMultiplayerStore.getState().setActiveTransport(null);
         setIsConnecting(false);
       }
@@ -208,15 +244,50 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
           setCustomJazzUrl(null);
         }
         setCurrentUsername(username.trim());
+        useMultiplayerStore.getState().setActiveTransport('jazz');
 
-        useMultiplayerStore.getState().setPendingJazzAction({
-          type: 'join',
-          username: username.trim(),
-          sessionCoId: resolved.connectionId,
-        });
-        
-        setActiveTransport('jazz');
-        setTimeout(() => setIsConnecting(false), 500);
+        // Wait briefly before resolving the connection payload
+        setTimeout(async () => {
+             try {
+                const { joinJazzSession } = await import('@/lib/jazz/session');
+                const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
+                const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+                
+                const sessionState = useSessionStore.getState();
+                const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+                const playerRoles = currentPlayer?.roleIds || ['player'];
+                
+                const info = await joinJazzSession(resolved.connectionId);
+                const shortCode = encodeJazzCode(info.sessionCoId);
+                
+                // Hydration stores
+                useMultiplayerStore.getState().setRoles(playerRoles);
+                useMultiplayerStore.getState().setCurrentSession({
+                  sessionCode: shortCode,
+                  sessionId: info.sessionCoId,
+                  createdAt: Date.now(),
+                  hasPassword: false,
+                });
+                
+                const clientId = getOrCreateClientId();
+                const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+                
+                await netManager.connectWithTransport({
+                  transport,
+                  sessionCode: shortCode,
+                  username: username.trim(),
+                  roles: playerRoles,
+                });
+                
+                toast.success(`Joined Jazz session ${shortCode}`);
+             } catch (err: any) {
+                console.error('Failed to prep Jazz join:', err);
+                toast.error(`Session join failed: ${err.message}`);
+                useMultiplayerStore.getState().setActiveTransport(null);
+             } finally {
+                setIsConnecting(false);
+             }
+        }, 100);
       } else {
         // OpBridge join
         await handleConnect(resolved.connectionId);

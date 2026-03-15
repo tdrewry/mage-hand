@@ -4,6 +4,7 @@ import { netManager } from '@/lib/net';
 import { isJazzCode, decodeJazzCode } from '@/lib/sessionCodeResolver';
 import { joinJazzSession } from '@/lib/jazz';
 import { JazzTransport } from '@/lib/net/transports/JazzTransport';
+import { getOrCreateClientId } from '../../networking/client/NetworkSession';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
@@ -34,6 +35,16 @@ export function useAutoReconnect() {
 
       // ── Jazz reconnect (tandem: CRDT + ephemeral WS) ─────────────
       if (isJazzCode(code)) {
+        if (state.activeTransport !== 'jazz') {
+          // Phase 1: Trigger the global provider tree to swap to <JazzActiveProvider>
+          // This will unmount THIS component and remount it inside AuthWrapper.
+          console.log('🔄 [AutoReconnect] Phase 1: Requesting Jazz Provider mount');
+          useMultiplayerStore.getState().setActiveTransport('jazz');
+          return;
+        }
+
+        // Phase 2: If we are here, activeTransport === 'jazz', meaning the provider 
+        // has fully mounted us inside <AuthWrapper> and the node is ready!
         const coValueId = decodeJazzCode(code);
         if (!coValueId) {
           console.warn('⚠️ [AutoReconnect] Invalid Jazz code, clearing session');
@@ -41,19 +52,20 @@ export function useAutoReconnect() {
           return;
         }
 
-        console.log('🔄 [AutoReconnect] Reconnecting Jazz session', code);
+        hasAttemptedReconnect.current = true;
+        console.log('🔄 [AutoReconnect] Phase 2: Reconnecting Jazz session', code);
         useMultiplayerStore.getState().setConnectionStatus('reconnecting');
 
-        // 1. Reconnect Jazz CRDT bridge
+        // 1. Reconnect Jazz CRDT bridge directly
         joinJazzSession(coValueId)
           .then((info) => {
             const store = useMultiplayerStore.getState();
             store.setConnectionStatus('connected');
-            store.setActiveTransport('jazz');
             console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
             
             // 2. Inject ephemeral transport
-            const transport = new JazzTransport(info.root, store.currentUserId || "unknown", username, store.roles);
+            const clientId = getOrCreateClientId();
+            const transport = new JazzTransport(info.root, clientId, username, store.roles);
             netManager.connectWithTransport({
               transport,
               sessionCode: code,
