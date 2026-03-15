@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   Plus,
   Trash2,
@@ -20,10 +21,12 @@ import {
   MousePointer2,
   ArrowUp,
   ArrowDown,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MapImageImportModal, type MapImageImportResult } from '@/components/modals/MapImageImportModal';
 import { useRegionStore } from '@/stores/regionStore';
+import { WatabouImportCardContent } from '@/components/cards/WatabouImportCard';
 
 export const MapManagerCardContent = () => {
   const {
@@ -42,6 +45,7 @@ export const MapManagerCardContent = () => {
   const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([selectedMapId || '']));
   const [newMapName, setNewMapName] = useState('');
   const [imageImportOpen, setImageImportOpen] = useState(false);
+  const [vttImportOpen, setVttImportOpen] = useState(false);
   const [compoundName, setCompoundName] = useState('');
   const [compoundSelectMode, setCompoundSelectMode] = useState(false);
   const [compoundSelectedIds, setCompoundSelectedIds] = useState<Set<string>>(new Set());
@@ -201,6 +205,9 @@ export const MapManagerCardContent = () => {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setImageImportOpen(true)}>
             <ImagePlus className="h-3.5 w-3.5 mr-1" /> From Image
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setVttImportOpen(true)}>
+            <Upload className="h-3.5 w-3.5 mr-1" /> Import VTT
           </Button>
           <Button
             variant={compoundSelectMode ? 'default' : 'outline'}
@@ -406,6 +413,19 @@ export const MapManagerCardContent = () => {
         onOpenChange={setImageImportOpen}
         onConfirm={handleImageImportConfirm}
       />
+
+      {/* VTT/Watabou Import Modal */}
+      <Dialog open={vttImportOpen} onOpenChange={setVttImportOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Import Map Data</DialogTitle>
+            <DialogDescription>
+              Import Watabou json, Dungeondraft dd2vtt, or d20prefab files.
+            </DialogDescription>
+          </DialogHeader>
+          <WatabouImportCardContent />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

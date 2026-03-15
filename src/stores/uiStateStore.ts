@@ -18,6 +18,10 @@ interface UiState {
   isTopNavbarOpen: boolean;
   setTopNavbarOpen: (open: boolean) => void;
   toggleTopNavbar: () => void;
+
+  isProfilerVisible: boolean;
+  setProfilerVisible: (visible: boolean) => void;
+  toggleProfiler: () => void;
 }
 
 export const useUiStateStore = create<UiState>((set) => ({
@@ -36,4 +40,8 @@ export const useUiStateStore = create<UiState>((set) => ({
   isTopNavbarOpen: true,
   setTopNavbarOpen: (open) => set({ isTopNavbarOpen: open }),
   toggleTopNavbar: () => set((state) => ({ isTopNavbarOpen: !state.isTopNavbarOpen })),
+
+  isProfilerVisible: false,
+  setProfilerVisible: (visible) => set({ isProfilerVisible: visible }),
+  toggleProfiler: () => set((state) => ({ isProfilerVisible: !state.isProfilerVisible })),
 }));

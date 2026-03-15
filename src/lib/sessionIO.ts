@@ -190,8 +190,7 @@ export function clearAllStores(): void {
 export function applyProjectData(data: ProjectData): void {
   const sessionStore = useSessionStore.getState();
 
-  // Core entities
-  if (data.tokens) sessionStore.setTokens(data.tokens);
+  // 1. Base Containers: Maps & Structures
   if (data.maps) {
     data.maps.forEach(m => {
       const { regions, ...mapData } = m;
@@ -210,24 +209,56 @@ export function applyProjectData(data: ProjectData): void {
       useMapStore.getState().setAutoFocusFollowsToken(data.autoFocusFollowsToken);
     }
   }
+
+  // 2. Map Sub-Entities: Regions, Objects, Lighting
   if (data.regions) data.regions.forEach(r => useRegionStore.getState().addRegion(r));
-  if (data.groups) data.groups.forEach(g => useGroupStore.getState().restoreGroup(g));
   if (data.mapObjects) useMapObjectStore.getState().setMapObjects(data.mapObjects);
   if (data.lights) useLightStore.getState().setLights(data.lights);
-
-  // Roles & vision profiles
+  
+  // 3. Organizational Entities: Base Groups, Roles, Token Groups
+  if (data.groups) data.groups.forEach(g => useGroupStore.getState().restoreGroup(g));
   if (data.roles) {
     const roleStore = useRoleStore.getState();
     roleStore.clearRoles();
     data.roles.forEach(r => roleStore.addRole(r));
   }
+  if (data.tokenGroups?.groups) {
+    const normalizedGroups = normalizeImportedTokenGroups(data.tokenGroups.groups);
+    useTokenGroupStore.setState({ groups: normalizedGroups });
+  }
+
+  // 4. Core Entities: Tokens & Creatures
+  if (data.tokens) sessionStore.setTokens(data.tokens);
+  if (data.creatures) {
+    const cs = useCreatureStore.getState();
+    if (data.creatures.characters) data.creatures.characters.forEach(c => cs.addCharacter(c));
+    if (data.creatures.monsters) cs.addMonsters(data.creatures.monsters);
+  }
+
+  // 5. Dependent Systems: Campaigns (depend on Maps, Objects, TokenGroups)
+  if (data.campaigns) {
+    const cd = data.campaigns;
+    const cs = useCampaignStore.getState();
+    // Clear existing
+    cs.campaigns.forEach(c => cs.removeCampaign(c.id));
+    if (cd.campaigns) cd.campaigns.forEach((c: any) => cs.addCampaign(c));
+    if (cd.nodePositions) {
+      Object.entries(cd.nodePositions).forEach(([campaignId, positions]: [string, any]) => {
+        Object.entries(positions).forEach(([nodeId, pos]: [string, any]) => {
+          cs.setNodePosition(campaignId, nodeId, pos);
+        });
+      });
+    }
+    if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
+    if (cd.activeProgress) cs.setProgress(cd.activeProgress);
+  }
+
+  // 6. State & Environs: Vision, Fog, Dungeon, Illumination, Initiative
   if (data.visionProfiles) {
     const vps = useVisionProfileStore.getState();
     vps.clearProfiles();
     data.visionProfiles.forEach(vp => vps.addProfile(vp));
   }
-
-  // Initiative
   if (data.initiative) {
     const initStore = useInitiativeStore.getState();
     initStore.setInitiativeOrder(data.initiative.initiativeOrder || []);
@@ -237,8 +268,6 @@ export function applyProjectData(data: ProjectData): void {
     }
     initStore.setRestrictMovement(data.initiative.restrictMovement ?? false);
   }
-
-  // Fog of war
   if (data.fogData) {
     const fs = useFogStore.getState();
     if (data.fogData.fogSettingsPerMap) {
@@ -263,8 +292,6 @@ export function applyProjectData(data: ProjectData): void {
       fs.setRealtimeVisionThrottleMs(data.fogData.realtimeVisionThrottleMs);
     }
   }
-
-  // Dungeon data
   if (data.dungeonData) {
     const ds = useDungeonStore.getState();
     if (data.dungeonData.doors) ds.setDoors(data.dungeonData.doors);
@@ -280,8 +307,6 @@ export function applyProjectData(data: ProjectData): void {
     if (data.dungeonData.enforceMovementBlocking !== undefined) ds.setEnforceMovementBlocking(data.dungeonData.enforceMovementBlocking);
     if (data.dungeonData.enforceRegionBounds !== undefined) ds.setEnforceRegionBounds(data.dungeonData.enforceRegionBounds);
   }
-
-  // Illumination
   if (data.illumination) {
     const illumStore = useIlluminationStore.getState();
     illumStore.setLights(data.illumination.lights || []);
@@ -290,33 +315,20 @@ export function applyProjectData(data: ProjectData): void {
     }
   }
 
-  // Creatures
-  if (data.creatures) {
-    const cs = useCreatureStore.getState();
-    if (data.creatures.characters) data.creatures.characters.forEach(c => cs.addCharacter(c));
-    if (data.creatures.monsters) cs.addMonsters(data.creatures.monsters);
-  }
-
-  // Items
+  // 7. Other Accessories: Items, Effects, Viewport
   if (data.items && data.items.length > 0) {
     useItemStore.getState().addItems(data.items);
   }
-
-  // Hatching
   if (data.hatching) {
     const hs = useHatchingStore.getState();
     hs.setEnabled(data.hatching.enabled);
     if (data.hatching.hatchingOptions) hs.setOptions(data.hatching.hatchingOptions);
   }
-
-  // Viewport transforms
   if (data.viewportTransforms) {
     Object.entries(data.viewportTransforms).forEach(([mapId, transform]) => {
       useSessionStore.getState().setViewportTransform(mapId, transform);
     });
   }
-
-  // Effects
   if (data.effects) {
     const es = useEffectStore.getState();
     (data.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
@@ -334,42 +346,14 @@ export function applyProjectData(data: ProjectData): void {
     }
   }
 
-  // UI mode
+  // 8. Visual & Settings: UI Mode, Token Visibility, Map Focus
   if (data.uiMode) {
     useUiModeStore.getState().setMode(data.uiMode === 'play' ? 'play' : 'dm');
   }
-
-  // Settings
   if (data.settings) {
     if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
     if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
   }
-
-  // Campaigns
-  if (data.campaigns) {
-    const cd = data.campaigns;
-    const cs = useCampaignStore.getState();
-    // Clear existing
-    cs.campaigns.forEach(c => cs.removeCampaign(c.id));
-    if (cd.campaigns) cd.campaigns.forEach((c: any) => cs.addCampaign(c));
-    if (cd.nodePositions) {
-      Object.entries(cd.nodePositions).forEach(([campaignId, positions]: [string, any]) => {
-        Object.entries(positions).forEach(([nodeId, pos]: [string, any]) => {
-          cs.setNodePosition(campaignId, nodeId, pos);
-        });
-      });
-    }
-    if (cd.activeCampaignId) cs.setActiveCampaign(cd.activeCampaignId);
-    if (cd.activeProgress) cs.setProgress(cd.activeProgress);
-  }
-
-  // Token Groups
-  if (data.tokenGroups?.groups) {
-    const normalizedGroups = normalizeImportedTokenGroups(data.tokenGroups.groups);
-    useTokenGroupStore.setState({ groups: normalizedGroups });
-  }
-
-  // Map Focus settings
   if (data.mapFocus) {
     const mf = useMapFocusStore.getState();
     if (data.mapFocus.unfocusedOpacity !== undefined) mf.setUnfocusedOpacity(data.mapFocus.unfocusedOpacity);

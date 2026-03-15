@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { 
   Focus, Maximize, ChevronLeft, ChevronRight, Settings, FolderOpen, Monitor, 
   Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle, Plus, Shield,
-  Gamepad2, Footprints, ScanEye, Lock
+  Gamepad2, Footprints, ScanEye, Lock, Activity
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -41,7 +41,9 @@ export const TopNavbar: React.FC = () => {
     isLeftSidebarOpen,
     toggleLeftSidebar,
     isRightSidebarOpen,
-    toggleRightSidebar
+    toggleRightSidebar,
+    isProfilerVisible,
+    toggleProfiler
   } = useUiStateStore();
 
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
@@ -419,6 +421,15 @@ export const TopNavbar: React.FC = () => {
                   </DropdownMenuItem>
                 </TooltipTrigger>
                 <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Adjust volumes and audio output options</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem onClick={toggleProfiler}>
+                    <Activity className="mr-2 h-4 w-4" />
+                    <span>{isProfilerVisible ? 'Hide Sync Profiler' : 'Show Sync Profiler'}</span>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Monitor live network bandwidth and operations</TooltipContent>
               </Tooltip>
               <DropdownMenuSeparator />
               <Tooltip>

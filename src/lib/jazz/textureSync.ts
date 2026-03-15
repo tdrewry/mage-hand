@@ -192,9 +192,12 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
       );
       textures.$jazz.push(entry);
       _uploadedHashes.set(hash, fileStreamId);
-      uploaded++;
-
       console.log(`[jazz-texture] → Uploaded texture ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
+      
+      // Profile the outgoing FileStream bytes
+      import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
+        syncProfiler.measureStream(blob.size);
+      });
     } catch (err) {
       console.error(`[jazz-texture] Failed to upload texture ${hash}:`, err);
     }
@@ -265,10 +268,14 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
         await saveTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         downloaded++;
-        // Apply to entities immediately so textures appear without refresh
         _applyTextureToEntities(hash, dataUrl);
         notifyTextureDownloadComplete(hash);
         console.log(`[jazz-texture] ← Downloaded texture ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
+        
+        // Profile the incoming FileStream bytes
+        import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
+          syncProfiler.measureStream(blob.size);
+        });
       } else {
         console.warn(`[jazz-texture] FileStream for ${hash} returned null blob`);
         notifyTextureDownloadError(hash);
@@ -331,75 +338,103 @@ function _applyTextureToEntities(hash: string, dataUrl: string): void {
 // ── Subscription for live texture updates ──────────────────────────────────
 
 let _textureUnsubscribe: (() => void) | null = null;
+let _rootUnsubscribe: (() => void) | null = null;
 
 /**
  * Subscribe to the session root's texture list for live additions.
  * When the DM uploads a new texture, players auto-download it.
  */
 export function subscribeToTextureChanges(sessionRoot: any): () => void {
+  if (_rootUnsubscribe) _rootUnsubscribe();
   if (_textureUnsubscribe) _textureUnsubscribe();
 
-  const textures = sessionRoot?.textures;
-  _cachedTextureList = textures ?? null;
-  if (!textures?.$jazz?.subscribe) {
-    console.log("[jazz-texture] Textures list not available or does not support subscribe — skipping");
+  if (!sessionRoot?.$jazz?.subscribe) {
+    console.log("[jazz-texture] Session root not available or does not support subscribe — skipping");
     return () => {};
   }
 
-  try {
-    _textureUnsubscribe = textures.$jazz.subscribe(
-      { resolve: { $each: true } },
-      async (textureList: any) => {
-        if (!textureList) return;
-        const len = textureList.length ?? 0;
+  const subscribeToTextureList = (textures: any) => {
+    if (!textures?.$jazz?.subscribe || _textureUnsubscribe) return;
+    
+    _cachedTextureList = textures;
+    try {
+      _textureUnsubscribe = textures.$jazz.subscribe(
+        [{}],
+        async (textureList: any) => {
+          if (!textureList) return;
+          const len = textureList.length ?? 0;
 
-        for (let i = 0; i < len; i++) {
-          const entry = textureList[i];
-          if (!entry?.hash || !entry?.fileStreamId) continue;
-          if (_downloadedHashes.has(entry.hash)) continue;
+          for (let i = 0; i < len; i++) {
+            const entry = textureList[i];
+            if (!entry?.hash || !entry?.fileStreamId) continue;
+            if (_downloadedHashes.has(entry.hash)) continue;
 
-          // Check unified texture storage
-          const existing = await loadTextureByHash(entry.hash);
-          if (existing) {
-            _downloadedHashes.add(entry.hash);
-            _applyTextureToEntities(entry.hash, existing);
-            continue;
-          }
-
-          // New texture — download it with timeout
-          notifyTextureDownloadStart(entry.hash);
-          try {
-            const downloadPromise = co.fileStream().loadAsBlob(entry.fileStreamId);
-            const timeoutPromise = new Promise<null>((resolve) =>
-              setTimeout(() => resolve(null), 15000) // 15s timeout
-            );
-            const blob = await Promise.race([downloadPromise, timeoutPromise]);
-            if (blob) {
-              const dataUrl = await blobToDataUri(blob);
-              await saveTextureByHash(entry.hash, dataUrl);
+            // Check unified texture storage
+            const existing = await loadTextureByHash(entry.hash);
+            if (existing) {
               _downloadedHashes.add(entry.hash);
-              _applyTextureToEntities(entry.hash, dataUrl);
-              notifyTextureDownloadComplete(entry.hash);
-              console.log(`[jazz-texture] ← Live download: ${entry.hash} (${(blob.size / 1024).toFixed(1)}KB)`);
-            } else {
-              console.warn(`[jazz-texture] FileStream download returned null/timed out for ${entry.hash}`);
+              _applyTextureToEntities(entry.hash, existing);
+              continue;
+            }
+
+            // New texture — download it with timeout
+            notifyTextureDownloadStart(entry.hash);
+            try {
+              const downloadPromise = co.fileStream().loadAsBlob(entry.fileStreamId);
+              const timeoutPromise = new Promise<null>((resolve) =>
+                setTimeout(() => resolve(null), 15000) // 15s timeout
+              );
+              const blob = await Promise.race([downloadPromise, timeoutPromise]);
+              if (blob) {
+                const dataUrl = await blobToDataUri(blob);
+                await saveTextureByHash(entry.hash, dataUrl);
+                _downloadedHashes.add(entry.hash);
+                _applyTextureToEntities(entry.hash, dataUrl);
+                notifyTextureDownloadComplete(entry.hash);
+                console.log(`[jazz-texture] ← Live download: ${entry.hash} (${(blob.size / 1024).toFixed(1)}KB)`);
+                
+                // Profile the incoming FileStream bytes
+                import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
+                  syncProfiler.measureStream(blob.size);
+                });
+              } else {
+                console.warn(`[jazz-texture] FileStream download returned null/timed out for ${entry.hash}`);
+                notifyTextureDownloadError(entry.hash);
+              }
+            } catch (err) {
+              console.error(`[jazz-texture] Live download failed for ${entry.hash}:`, err);
               notifyTextureDownloadError(entry.hash);
             }
-          } catch (err) {
-            console.error(`[jazz-texture] Live download failed for ${entry.hash}:`, err);
-            notifyTextureDownloadError(entry.hash);
           }
+        }
+      );
+    } catch (err) {
+      console.warn("[jazz-texture] Failed to subscribe to texture changes:", err);
+    }
+  };
+
+  try {
+    _rootUnsubscribe = sessionRoot.$jazz.subscribe(
+      { textures: {} },
+      (rootUpdate: any) => {
+        if (rootUpdate?.textures && !_textureUnsubscribe) {
+          // Pass the actual proxy object (sessionRoot.textures) so $jazz methods are available
+          subscribeToTextureList(sessionRoot.textures);
         }
       }
     );
   } catch (err) {
-    console.warn("[jazz-texture] Failed to subscribe to texture changes:", err);
+    console.warn("[jazz-texture] Failed to subscribe to session root:", err);
   }
 
   return () => {
     if (_textureUnsubscribe) {
       _textureUnsubscribe();
       _textureUnsubscribe = null;
+    }
+    if (_rootUnsubscribe) {
+      _rootUnsubscribe();
+      _rootUnsubscribe = null;
     }
   };
 }
@@ -428,10 +463,15 @@ export async function requestTextureViaJazz(hash: string): Promise<string | null
       const blob = await Promise.race([downloadPromise, timeoutPromise]);
       if (blob) {
         const dataUrl = await blobToDataUri(blob);
-        await saveTextureByHash(hash, dataUrl);
         _downloadedHashes.add(hash);
         _applyTextureToEntities(hash, dataUrl);
         console.log(`[jazz-texture] ← On-demand download: ${hash} (${(blob.size / 1024).toFixed(1)}KB)`);
+        
+        // Profile the incoming FileStream bytes
+        import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
+          syncProfiler.measureStream(blob.size);
+        });
+        
         return dataUrl;
       }
     } catch (err) {

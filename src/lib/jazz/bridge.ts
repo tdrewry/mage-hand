@@ -2131,12 +2131,16 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                     x: posChanged ? jt.x : existing.x,
                     y: posChanged ? jt.y : existing.y,
                   };
-                  // If imageHash changed, flag for async texture resolution
                   if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
                     tokensNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
                   }
                   updatedTokens[localIdx] = merged;
                   tokensChanged = true;
+                  
+                  // Profile inbound token traffic
+                  import('./profiler').then(({ syncProfiler }) => {
+                    syncProfiler.measureInbound(incoming, 'token');
+                  });
                 }
               } else {
                 const newToken = jazzToZustandToken(jt);
@@ -2145,6 +2149,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 }
                 updatedTokens.push(newToken);
                 tokensChanged = true;
+                
+                // Profile inbound token creation traffic
+                import('./profiler').then(({ syncProfiler }) => {
+                  syncProfiler.measureInbound(newToken, 'token');
+                });
               }
             }
 
