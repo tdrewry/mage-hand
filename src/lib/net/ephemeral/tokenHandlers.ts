@@ -75,16 +75,14 @@ export function registerTokenHandlers(): void {
   });
 
   ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, _userId) => {
-    // Move the actual token sprite so it renders via the normal pipeline
-    useSessionStore.getState().updateTokenPosition(data.tokenId, data.pos.x, data.pos.y);
-    // Update path decoration data
-    if (data.path) {
-      useRemoteDragStore.getState().updateDrag(data.tokenId, data.path);
-    }
+    // Write exclusively to the remote drag state; do NOT mutate durable sessionStore here
+    useRemoteDragStore.getState().updateDrag(data.tokenId, data.pos, data.path || []);
+    ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });
 
   ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
     useRemoteDragStore.getState().endDrag(data.tokenId);
+    ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });
 
   // ── Staleness auto-clear ──

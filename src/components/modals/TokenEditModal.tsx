@@ -805,16 +805,14 @@ export function TokenEditModal({
           </TabsContent>
         </Tabs>
 
-        {isMultiSelection && (
-          <div className="mt-4 pt-4 border-t flex justify-end gap-2 shrink-0">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={applyChanges}>
-              Apply Changes
-            </Button>
-          </div>
-        )}
+        <div className="mt-4 pt-4 border-t flex justify-end gap-2 shrink-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={applyChanges}>
+            Apply Changes
+          </Button>
+        </div>
       </DialogContent>
 
       <ImageImportModal

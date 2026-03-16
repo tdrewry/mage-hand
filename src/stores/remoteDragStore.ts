@@ -7,6 +7,7 @@ import { create } from 'zustand';
 
 export interface RemoteDragState {
   startPos: { x: number; y: number };
+  pos?: { x: number; y: number }; // Current drag position
   path: { x: number; y: number }[];
   mode: 'freehand' | 'directLine';
   userId: string;
@@ -19,7 +20,7 @@ interface RemoteDragStore {
   drags: Record<string, RemoteDragState>;
 
   beginDrag: (tokenId: string, startPos: { x: number; y: number }, mode: 'freehand' | 'directLine', userId: string) => void;
-  updateDrag: (tokenId: string, path: { x: number; y: number }[]) => void;
+  updateDrag: (tokenId: string, pos: { x: number; y: number }, path: { x: number; y: number }[]) => void;
   endDrag: (tokenId: string) => void;
   /** Remove any drags older than maxAgeMs with no updates */
   expireStale: (maxAgeMs: number) => void;
@@ -33,18 +34,18 @@ export const useRemoteDragStore = create<RemoteDragStore>((set) => ({
     set((state) => ({
       drags: {
         ...state.drags,
-        [tokenId]: { startPos, path: [startPos], mode, userId, lastUpdateMs: Date.now() },
+        [tokenId]: { startPos, pos: startPos, path: [startPos], mode, userId, lastUpdateMs: Date.now() },
       },
     })),
 
-  updateDrag: (tokenId, path) =>
+  updateDrag: (tokenId, pos, path) =>
     set((state) => {
       const existing = state.drags[tokenId];
       if (!existing) return state;
       return {
         drags: {
           ...state.drags,
-          [tokenId]: { ...existing, path: path && path.length > 0 ? path : existing.path, lastUpdateMs: Date.now() },
+          [tokenId]: { ...existing, pos, path: path && path.length > 0 ? path : existing.path, lastUpdateMs: Date.now() },
         },
       };
     }),

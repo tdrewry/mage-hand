@@ -671,6 +671,15 @@ export const SimpleTabletop = () => {
     return unsub;
   }, []);
 
+  // ── Listen for remote drag updates to trigger canvas repaint ──
+  useEffect(() => {
+    const unsub = ephemeralBus.on("remote.drag.update", () => {
+      requestAnimationFrame(() => redrawCanvas());
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Listen for portal teleport requests (DM) and approvals/denials (players) ──
   useEffect(() => {
     // DM receives teleport requests from players
@@ -3784,8 +3793,14 @@ export const SimpleTabletop = () => {
     // Helper to draw tokens to a given context (with world-space transform applied)
     const drawTokensToContext = (targetCtx: CanvasRenderingContext2D) => {
       visibleTokens.forEach((token) => {
-        // Use temporary position if available (during region drag)
-        const tempPos = tempTokenPositions?.[token.id];
+        // Use temporary position if available (during local drag)
+        let tempPos = tempTokenPositions?.[token.id];
+        
+        // Alternatively, use remote drag position if available (during remote drag)
+        if (!tempPos && remoteDrags[token.id]?.pos) {
+          tempPos = remoteDrags[token.id].pos;
+        }
+
         const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
 
         // Check if token is in fog (for DM visibility modes)
@@ -4800,9 +4815,17 @@ export const SimpleTabletop = () => {
 
         ctx.save();
 
+        // Use real-time ephemeral position from remote user, fallback to durable token pos
+        const currentPos = dragState.pos || { x: token.x, y: token.y };
+
+        // Hide decorations if the token has actually been dropped here natively
+        // (This prevents the path from lingering for a split second after the durable CoValue updates)
+        const isDroppedAtPos = currentPos.x === dragState.startPos.x && currentPos.y === dragState.startPos.y;
+        if (isDroppedAtPos) continue;
+
         // Straight line distance indicator
-        const dx = token.x - dragState.startPos.x;
-        const dy = token.y - dragState.startPos.y;
+        const dx = currentPos.x - dragState.startPos.x;
+        const dy = currentPos.y - dragState.startPos.y;
         const distancePixels = Math.sqrt(dx * dx + dy * dy);
         const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
 
@@ -4812,14 +4835,14 @@ export const SimpleTabletop = () => {
         ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
         ctx.beginPath();
         ctx.moveTo(dragState.startPos.x, dragState.startPos.y);
-        ctx.lineTo(token.x, token.y);
+        ctx.lineTo(currentPos.x, currentPos.y);
         ctx.stroke();
         ctx.setLineDash([]);
 
         // Distance text at midpoint
         if (distancePixels > 10) {
-          const midX = (dragState.startPos.x + token.x) / 2;
-          const midY = (dragState.startPos.y + token.y) / 2;
+          const midX = (dragState.startPos.x + currentPos.x) / 2;
+          const midY = (dragState.startPos.y + currentPos.y) / 2;
 
           ctx.globalAlpha = 0.9;
           ctx.font = `${14 / transform.zoom}px Arial`;
@@ -9464,8 +9487,10 @@ export const SimpleTabletop = () => {
       // ── Emit drag update to network on every move (throttled 50ms by EphemeralBus) ──
       emitDragUpdate({ tokenId: draggedTokenId, pos: { x: newX, y: newY }, path: dragPathRef.current });
 
-      // Update primary token position
-      updateTokenPosition(draggedTokenId, newX, newY);
+      // Instead of durable updateTokenPosition, use ephemeral tempTokenPositions
+      const newTempPositions: { [id: string]: { x: number; y: number } } = {
+        [draggedTokenId]: { x: newX, y: newY }
+      };
 
       // --- Multi-token drag: move all other selected tokens by the same delta ---
       const startPositions = multiDragStartPositionsRef.current;
@@ -9477,10 +9502,12 @@ export const SimpleTabletop = () => {
           if (tid === draggedTokenId) return;
           const tStart = startPositions[tid];
           if (tStart) {
-            updateTokenPosition(tid, tStart.x + dx, tStart.y + dy);
+            newTempPositions[tid] = { x: tStart.x + dx, y: tStart.y + dy };
           }
         });
       }
+      setTempTokenPositions(newTempPositions);
+      requestAnimationFrame(() => redrawCanvas());
 
       // Real-time vision preview during drag (if enabled)
       console.log('[DRAG VISION] Checking conditions:', {
@@ -10620,7 +10647,9 @@ export const SimpleTabletop = () => {
       // Left click
       // Handle token snapping on drag end
       if (isDraggingToken && draggedTokenId && !tokensMovedByRegion.includes(draggedTokenId)) {
-        const token = tokens.find((t) => t.id === draggedTokenId);
+        const storeToken = tokens.find((t) => t.id === draggedTokenId);
+        const tempPos = tempTokenPositions?.[draggedTokenId];
+        const token = storeToken && tempPos ? { ...storeToken, x: tempPos.x, y: tempPos.y } : storeToken;
         if (token) {
           // === COLLISION CHECK FIRST ===
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
@@ -10681,6 +10710,8 @@ export const SimpleTabletop = () => {
 
           // Only proceed with snapping if movement wasn't blocked
           if (!movementBlocked) {
+            let finalX = token.x;
+            let finalY = token.y;
             // Find local region at token position (our local regions in SimpleTabletop)
             const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
 
@@ -10712,33 +10743,33 @@ export const SimpleTabletop = () => {
               const isRectWithRotation = localRegion.regionType !== 'path' && !!localRegion.rotation;
               const rectCenter = isRectWithRotation ? { x: localRegion.x + localRegion.width / 2, y: localRegion.y + localRegion.height / 2 } : undefined;
               const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap, isRectWithRotation ? localRegion.rotation : undefined, rectCenter);
-              updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+              finalX = snappedPos.x;
+              finalY = snappedPos.y;
             }
             // Priority 2: World space snapping (only if not in a region and world snapping is enabled)
             else if (isGridSnappingEnabled && !localRegion) {
               // World space uses the background grid (40 unit grid)
               const worldGridSize = 40;
-              const snappedX = Math.round(token.x / worldGridSize) * worldGridSize;
-              const snappedY = Math.round(token.y / worldGridSize) * worldGridSize;
-              updateTokenPosition(draggedTokenId, snappedX, snappedY);
+              finalX = Math.round(token.x / worldGridSize) * worldGridSize;
+              finalY = Math.round(token.y / worldGridSize) * worldGridSize;
             }
-            // No snapping applied if:
-            // - Token is in a region but region snapping is disabled
-            // - Token is in world space but world snapping is disabled
-            // - Token is in a 'free' grid region
+
+            // Commit primary
+            updateTokenPosition(draggedTokenId, finalX, finalY);
 
             // Create undo command for token movement (only if not blocked)
-            if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
+            if (initialTokenState && (initialTokenState.x !== finalX || initialTokenState.y !== finalY)) {
               moveTokenUndoable(
                 draggedTokenId,
                 { x: initialTokenState.x, y: initialTokenState.y },
-                { x: token.x, y: token.y },
+                { x: finalX, y: finalY },
                 token.label || token.name
               );
               // Emit token move to network
-              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
+              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: finalX, y: finalY } });
               // ── Emit drag end to network ──
-              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
+              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: finalX, y: finalY } });
+              
               // Also emit moves for multi-dragged tokens
               const startPositions = multiDragStartPositionsRef.current;
               selectedTokenIds.forEach(tid => {
@@ -10746,6 +10777,7 @@ export const SimpleTabletop = () => {
                 const t = tokens.find(tk => tk.id === tid);
                 if (t && startPositions[tid] && (startPositions[tid].x !== t.x || startPositions[tid].y !== t.y)) {
                   emitLocalOp({ kind: 'token.move', data: { tokenId: tid, x: t.x, y: t.y } });
+                  emitDragEnd({ tokenId: tid, finalPos: { x: t.x, y: t.y } });
                 }
               });
             }
@@ -10767,6 +10799,13 @@ export const SimpleTabletop = () => {
       setDragStartPos({ x: 0, y: 0 });
       dragPathRef.current = [];
       setInitialTokenState(null);
+
+      // Defensively keep the temp position for 1000ms while the CoMap syncs over the network.
+      // This prevents the token from visually flashing back to its start position.
+      // Eagerly clear if another drag starts before this fires.
+      setTimeout(() => {
+        setTempTokenPositions((prev) => prev ? undefined : prev);
+      }, 1000);
 
       // If a modifier-click on an already-selected token happened and no drag occurred,
       // now remove that token from the selection (deferred deselect).
@@ -11430,8 +11469,10 @@ export const SimpleTabletop = () => {
         // Update drag path
         dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
 
-        // Update token position
-        updateTokenPosition(draggedTokenId, newX, newY);
+        // Update token position temporarily
+        setTempTokenPositions({
+          [draggedTokenId]: { x: newX, y: newY }
+        });
         requestAnimationFrame(() => redrawCanvas());
       } else if (isDraggingRegion && draggedRegionId) {
         const region = regions.find(r => r.id === draggedRegionId);
@@ -11490,7 +11531,9 @@ export const SimpleTabletop = () => {
 
       // Token drag end - reuse existing logic from handleMouseUp
       if (isDraggingToken && draggedTokenId) {
-        const token = tokens.find(t => t.id === draggedTokenId);
+        const storeToken = tokens.find(t => t.id === draggedTokenId);
+        const tempPos = tempTokenPositions?.[draggedTokenId];
+        const token = storeToken && tempPos ? { ...storeToken, x: tempPos.x, y: tempPos.y } : storeToken;
         if (token) {
           // Check collision using correct store state
           const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
@@ -11525,6 +11568,8 @@ export const SimpleTabletop = () => {
 
           // Only apply snapping if movement wasn't blocked
           if (!movementBlocked) {
+            let finalX = token.x;
+            let finalY = token.y;
             // Find local region at token position
             const localRegion = regions.find((r) => isPointInRegion(token.x, token.y, r));
 
@@ -11552,27 +11597,41 @@ export const SimpleTabletop = () => {
               const isRectWithRotation = localRegion.regionType !== 'path' && !!localRegion.rotation;
               const rectCenter = isRectWithRotation ? { x: localRegion.x + localRegion.width / 2, y: localRegion.y + localRegion.height / 2 } : undefined;
               const snappedPos = snapToMapGrid(token.x, token.y, regionForSnap, isRectWithRotation ? localRegion.rotation : undefined, rectCenter);
-              updateTokenPosition(draggedTokenId, snappedPos.x, snappedPos.y);
+              finalX = snappedPos.x;
+              finalY = snappedPos.y;
             }
             // Priority 2: World space snapping
             else if (isGridSnappingEnabled && !localRegion) {
               const worldGridSize = 40;
-              const snappedX = Math.round(token.x / worldGridSize) * worldGridSize;
-              const snappedY = Math.round(token.y / worldGridSize) * worldGridSize;
-              updateTokenPosition(draggedTokenId, snappedX, snappedY);
+              finalX = Math.round(token.x / worldGridSize) * worldGridSize;
+              finalY = Math.round(token.y / worldGridSize) * worldGridSize;
             }
 
-            if (initialTokenState && (initialTokenState.x !== token.x || initialTokenState.y !== token.y)) {
+            // Commit final position
+            updateTokenPosition(draggedTokenId, finalX, finalY);
+
+            if (initialTokenState && (initialTokenState.x !== finalX || initialTokenState.y !== finalY)) {
               moveTokenUndoable(
                 draggedTokenId,
                 { x: initialTokenState.x, y: initialTokenState.y },
-                { x: token.x, y: token.y },
+                { x: finalX, y: finalY },
                 token.label || token.name
               );
               // Emit token move to network
-              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: token.x, y: token.y } });
+              emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: finalX, y: finalY } });
               // ── Emit drag end (touch path) ──
-              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: token.x, y: token.y } });
+              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: finalX, y: finalY } });
+              
+              // Also emit moves for multi-dragged tokens
+              const startPositions = multiDragStartPositionsRef.current;
+              selectedTokenIds.forEach(tid => {
+                if (tid === draggedTokenId) return;
+                const t = tokens.find(tk => tk.id === tid);
+                if (t && startPositions[tid] && (startPositions[tid].x !== t.x || startPositions[tid].y !== t.y)) {
+                  emitLocalOp({ kind: 'token.move', data: { tokenId: tid, x: t.x, y: t.y } });
+                  emitDragEnd({ tokenId: tid, finalPos: { x: t.x, y: t.y } });
+                }
+              });
             }
 
             // Check for portal teleportation after valid movement
@@ -11589,6 +11648,12 @@ export const SimpleTabletop = () => {
         setDragStartPos({ x: 0, y: 0 });
         dragPathRef.current = [];
         setInitialTokenState(null);
+        
+        // Defensively keep the temp position for 1000ms while the CoMap syncs over the network.
+        // Eagerly clear if another drag starts before this fires.
+        setTimeout(() => {
+          setTempTokenPositions((prev) => prev ? undefined : prev);
+        }, 1000);
 
         if (stableVisibilityRef.current) {
           stableVisibilityRef.current.remove();
