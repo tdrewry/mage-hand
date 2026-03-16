@@ -4,6 +4,47 @@ import { Account, co, z } from "jazz-tools";
 // Polyfill WebSocket before loading Jazz
 import WebSocket from 'ws';
 (global as any).WebSocket = WebSocket;
+
+// --- MOCK WebRTC Environment ---
+let globalWebRTCMessages = 0;
+let globalJazzOperations = 0;
+
+class MockRTCDataChannel {
+    readyState = "open";
+    onmessage: ((ev: any) => void) | null = null;
+    send(data: string) {
+        globalWebRTCMessages++;
+    }
+}
+(global as any).RTCSessionDescription = class MockRTCSessionDescription {
+    type: string; sdp: string;
+    constructor(init: any) { this.type = init.type; this.sdp = init.sdp; }
+};
+(global as any).RTCIceCandidate = class MockRTCIceCandidate {
+    candidate: string; sdpMid: string; sdpMLineIndex: number;
+    constructor(init: any) { this.candidate = init.candidate; this.sdpMid = init.sdpMid; this.sdpMLineIndex = init.sdpMLineIndex; }
+    toJSON() { return { candidate: this.candidate, sdpMid: this.sdpMid, sdpMLineIndex: this.sdpMLineIndex }; }
+};
+(global as any).RTCPeerConnection = class MockRTCPeerConnection {
+    connectionState = "connected";
+    signalingState = "stable";
+    onicecandidate: any = null;
+    onconnectionstatechange: any = null;
+    ondatachannel: any = null;
+    
+    mockDc = new MockRTCDataChannel();
+
+    createDataChannel(label: string) { return this.mockDc; }
+    async createOffer() { return { type: "offer", sdp: "mock-offer" }; }
+    async createAnswer() { return { type: "answer", sdp: "mock-answer" }; }
+    async setLocalDescription(desc: any) {}
+    async setRemoteDescription(desc: any) {}
+    async addIceCandidate(cand: any) {}
+};
+// ------------------------------------------------
+
+// Note: To fully stress-test WebRTC P2P in Node, a wrtc or node-webrtc polyfill
+// is required. For now, this script focuses on the Jazz CRDT dual-path baseline.
 import { JazzMapObject, JazzTextureEntry } from '../src/lib/jazz/schema.js';
 
 const args = process.argv.slice(2);
@@ -37,9 +78,48 @@ async function spawnClient(index: number) {
   
   try {
     const crypto = await WasmCrypto.create();
+    
+    // Track outbound bytes for this bot
+    let outboundBytes = 0;
+    
+    const ws = new WebSocket(options.url);
+    if (isHostBot) {
+        // Intercept sending messages to count outbound bytes
+        const originalSend = ws.send;
+        ws.send = function(data: any) {
+            if (data) {
+                if (typeof data === 'string') {
+                    outboundBytes += Buffer.byteLength(data, 'utf8');
+                } else if (data instanceof ArrayBuffer) {
+                    outboundBytes += data.byteLength;
+                } else if (ArrayBuffer.isView(data)) {
+                    outboundBytes += data.byteLength;
+                } else if (Buffer.isBuffer(data)) {
+                    outboundBytes += data.length;
+                } else if (data.length) {
+                    outboundBytes += data.length;
+                }
+            }
+            return originalSend.apply(this, [data] as any);
+        };
+        
+        // Log host outbound metrics periodically
+        setInterval(() => {
+            console.log(`\n================================`);
+            console.log(`📊 HOST METRICS (Bot ${index})`);
+            console.log(`   Outbound Sync: ${(outboundBytes / 1024 / 1024).toFixed(2)} MB`);
+            const totalOps = globalWebRTCMessages + globalJazzOperations;
+            const ratio = totalOps > 0 ? ((globalWebRTCMessages / totalOps) * 100).toFixed(1) : "0.0";
+            console.log(`   WebRTC Messages (Ephemeral): ${globalWebRTCMessages}`);
+            console.log(`   Jazz Operations (Durable):   ${globalJazzOperations}`);
+            console.log(`   Ephemeral Ratio:             ${ratio}%`);
+            console.log(`================================\n`);
+        }, 10000);
+    }
+
     const peer = createWebSocketPeer({
         id: "upstream",
-        websocket: new WebSocket(options.url) as any,
+        websocket: ws as any,
         role: "server",
     });
     
@@ -62,6 +142,15 @@ async function spawnClient(index: number) {
     // account.$jazz.localNode is the underlying LocalNode in cojson
     const localNode = account.$jazz.localNode;
     
+    const mockWebRtcChannel = new MockRTCDataChannel();
+    
+    const dragState = {
+        tokenId: null as string | null,
+        targetX: 0,
+        targetY: 0,
+        ticks: 0
+    };
+    
     // Add retry logic for load since server might be under load
     let root: any;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -76,6 +165,23 @@ async function spawnClient(index: number) {
     }
     
     console.log(`[Bot ${index}] Loaded session! Listening for traffic...`);
+    
+    // Simulate WebRTC Signaling interaction (Phase 1 Dual-Path)
+    try {
+        const signalingRoomId = root.get("signalingRoom");
+        if (signalingRoomId) {
+            const signalingRoom = await localNode.load(signalingRoomId as any);
+            if (signalingRoom && signalingRoom !== "unavailable") {
+                // If this is the host, announce presence in the signaling room
+                if (isHostBot) {
+                    (signalingRoom as any).set("hostId", peer.id, "trusting");
+                } 
+                // We mock the signaling handshake simply confirming connection open
+            }
+        }
+    } catch (e: any) {
+        // Non-fatal, older sessions might not have signalingRoom yet
+    }
     
     // Keep the process alive and simulate sporadic activity to stress the mesh network
     setInterval(async () => {
@@ -127,7 +233,7 @@ async function spawnClient(index: number) {
                                 } else {
                                     throw new Error("Could not find append/push method on CoList proxy");
                                 }
-                                
+                                globalJazzOperations++;
                                 console.log(`[Bot ${index}] Spawned & pushed MapObject DO: ${newMapNode.objectId}`);
                             } catch (e: any) {
                                 console.warn(`[Bot ${index}] Failed to append DO: ${e.message}`);
@@ -165,6 +271,7 @@ async function spawnClient(index: number) {
                                             } else if (typeof texturesCoList.append === 'function') {
                                                 texturesCoList.append((entry as any).id, undefined, "trusting");
                                             }
+                                            globalJazzOperations++;
                                             console.log(`[Bot ${index}] Spawned FileStream (STR): ${fileStreamId}`);
                                         } catch(e: any) {}
                                     }
@@ -184,25 +291,54 @@ async function spawnClient(index: number) {
                     }
                 }
             } else {
-                // Client Bot: Find a token to jitter so it registers as valid inbound React traffic
+                // Client Bot: Simulate DRAGGING a token (ephemeral updates) then COMMITTING (durable update)
                 const tokensListId = root.get("tokens");
                 if (tokensListId) {
                     const tokensCoList = await localNode.load(tokensListId as any) as any;
                     if (tokensCoList && typeof tokensCoList.asArray === 'function') {
                         const tokensArray = tokensCoList.asArray();
                         if (tokensArray.length > 0) {
-                            // Pick a random token
-                            const randomTokenId = tokensArray[Math.floor(Math.random() * tokensArray.length)];
-                            if (randomTokenId) {
-                                const tokenObj = await localNode.load(randomTokenId as any) as any;
+                            
+                            if (!dragState.tokenId) {
+                                // 20% chance to start dragging a token each tick
+                                if (Math.random() < 0.2) {
+                                    dragState.tokenId = tokensArray[Math.floor(Math.random() * tokensArray.length)];
+                                    dragState.targetX = (Math.random() * 10 - 5);
+                                    dragState.targetY = (Math.random() * 10 - 5);
+                                    dragState.ticks = 0;
+                                } else {
+                                    return; // Idling this tick
+                                }
+                            }
+                            
+                            if (dragState.tokenId) {
+                                const tokenObj = await localNode.load(dragState.tokenId as any) as any;
                                 if (tokenObj && typeof tokenObj.get === 'function') {
-                                    // Jitter its X/Y position by -5 to 5 pixels
                                     const currentX = (tokenObj.get("x") as number) || 0;
                                     const currentY = (tokenObj.get("y") as number) || 0;
-                                    tokenObj.set("x", currentX + (Math.random() * 10 - 5), "trusting");
-                                    tokenObj.set("y", currentY + (Math.random() * 10 - 5), "trusting");
-                                    console.log(`[Bot ${index}] Jittered Token DO: ${randomTokenId}`);
+                                    
+                                    dragState.ticks++;
+                                    
+                                    if (dragState.ticks < 10) {
+                                        // 🏎️ SEND EPHEMERAL VIA WEBRTC
+                                        const newX = currentX + dragState.targetX * dragState.ticks;
+                                        const newY = currentY + dragState.targetY * dragState.ticks;
+                                        
+                                        mockWebRtcChannel.send(JSON.stringify({ 
+                                            t: "ephemeral", 
+                                            p: { kind: "token.position.sync", data: { positions: [{ tokenId: dragState.tokenId, x: newX, y: newY }] } }
+                                        }));
+                                    } else {
+                                        // 💾 COMMITTED DURABLE UPDATE TO JAZZ
+                                        tokenObj.set("x", currentX + dragState.targetX * 10, "trusting");
+                                        tokenObj.set("y", currentY + dragState.targetY * 10, "trusting");
+                                        globalJazzOperations++;
+                                        console.log(`[Bot ${index}] Dropped Token DO: ${dragState.tokenId}`);
+                                        dragState.tokenId = null;
+                                    }
                                     return; // Jitter success!
+                                } else {
+                                    dragState.tokenId = null;
                                 }
                             }
                         }
@@ -212,6 +348,7 @@ async function spawnClient(index: number) {
             
             // Fallback: Just write to the root CoMap to broadcast a state change if no tokens exist
             root.set(`stressBot_${index}_ping`, Date.now(), "trusting");
+            globalJazzOperations++;
         } catch (e: any) {
             console.warn(`[Bot ${index}] Failed to ping:`, e.message);
         }

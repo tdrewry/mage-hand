@@ -56,6 +56,7 @@ import { useDiceStore } from "@/stores/diceStore";
 import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
 import { useTokenGroupStore } from "@/stores/tokenGroupStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
@@ -756,9 +757,12 @@ function pushBlobToJazz(kind: string): void {
   const reg = DurableObjectRegistry.get(kind);
   if (!reg) return;
 
-  // Authoritative guard: only the session creator may push authoritative blobs
+  // Authoritative guard: only the session creator or DM may push authoritative blobs
   if (reg.authoritative && !_isCreator) {
-    return;
+    const roles = useMultiplayerStore.getState().roles;
+    if (!roles.includes('dm') && !roles.includes('host')) {
+      return;
+    }
   }
 
   try {
@@ -1877,6 +1881,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   _cachedBlobs = sessionRoot.blobs ?? null;
   _cachedIllumination = sessionRoot.illuminationSources ?? null;
   _cachedGroup = sessionRoot.$jazz?.owner ?? sessionRoot._owner ?? sessionRoot.$jazz?.group ?? null;
+  _isCreator = isCreator;
   console.log("[jazz-bridge] Starting bridge, cached refs:", {
     tokens: !!_cachedTokens,
     regions: !!_cachedRegions,

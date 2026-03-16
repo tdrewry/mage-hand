@@ -2110,7 +2110,9 @@ export const SimpleTabletop = () => {
     } else if (!serializedExploredAreasPerMap || Object.keys(serializedExploredAreasPerMap).length === 0) {
       exploredAreasMapRef.current.clear();
     }
-    fogMasksRef.current = null; // Force fog mask recomputation
+    // Trigger fog recomputation so new explored areas are masked
+    // We don't set fogMasksRef.current = null to avoid black flicker
+    setFogRefreshTick(t => t + 1);
     redrawCanvas();
   }, [serializedExploredAreasPerMap]);
 
@@ -7492,8 +7494,8 @@ export const SimpleTabletop = () => {
       }
       setCanvasDimensions({ width: rect.width, height: rect.height });
 
-      // Batch redraw to avoid ResizeObserver loop limits
-      requestAnimationFrame(() => redrawCanvas());
+      // Batch redraw is now handled natively by the state change triggering the redraw useEffect below.
+      // requestAnimationFrame(() => redrawCanvas());
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -7525,7 +7527,7 @@ export const SimpleTabletop = () => {
     return () => {
       if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
     };
-  }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter]);
+  }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter, canvasDimensions.width, canvasDimensions.height]);
 
   // --- Auto-pause animations while panning or fog brush is active ---
   const setAnimationsPaused = useUiModeStore((state) => state.setAnimationsPaused);

@@ -56,6 +56,9 @@ export class NetManager {
   /** When true, inbound durable ops are ignored (Jazz handles them). */
   private _ephemeralOnly = false;
 
+  /** Transport for ephemeral messages (e.g. WebRTC) running parallel to the primary session transport */
+  private _ephemeralTransport?: ITransport;
+
   // Reconnection state
   private _lastConnectParams?: {
     serverUrl: string;
@@ -129,6 +132,7 @@ export class NetManager {
    */
   async connectWithTransport(params: {
     transport: ITransport;
+    ephemeralTransport?: ITransport;
     serverUrl?: string; // Optional since custom transports may not use it
     sessionCode: string;
     username: string;
@@ -154,6 +158,26 @@ export class NetManager {
     };
 
     try {
+      if (params.ephemeralTransport) {
+        this._ephemeralTransport = params.ephemeralTransport;
+        
+        // Wire up inbound ephemeral messages
+        const offEph = this._ephemeralTransport.on("message", ({ data }) => {
+           try {
+              const msg = JSON.parse(data);
+              if (msg.t === "ephemeral" && _ephemeralBus) {
+                 _ephemeralBus.receive(msg.p.kind, msg.p.data, msg.userId || "unknown");
+              }
+           } catch(e) {
+              console.error("[NetManager] Error processing inbound ephemeral data:", e, data);
+           }
+        });
+        this.cleanups.push(offEph);
+        
+        // connect WebRTC sidecar
+        this._ephemeralTransport.connect("webrtc://tandem");
+      }
+
       const info = await this.session.connect(connectParams, params.transport);
       this._reconnectAttempt = 0;
       return info;
@@ -175,6 +199,12 @@ export class NetManager {
   disconnect(): void {
     this._intentionalDisconnect = true;
     this._ephemeralOnly = false;
+    
+    if (this._ephemeralTransport) {
+       this._ephemeralTransport.close();
+       this._ephemeralTransport = undefined;
+    }
+
     this.clearReconnectTimer();
     this.session.disconnect(1000, "user_disconnect");
   }
@@ -213,7 +243,21 @@ export class NetManager {
   /** Send an ephemeral message — no batching, no sequencing, no persistence. */
   sendEphemeral(kind: string, data: unknown): void {
     if (!this.isConnected) return;
-    this.session.sendEphemeral(kind, data);
+    
+    if (this._ephemeralTransport && this._ephemeralTransport.state === "open") {
+       const store = useMultiplayerStore.getState();
+       const msg = {
+          v: "1",
+          t: "ephemeral",
+          userId: store.currentUserId,
+          ts: new Date().toISOString(),
+          p: { kind, data }
+       };
+       this._ephemeralTransport.send(JSON.stringify(msg));
+    } else {
+       // Fallback to primary transport if ephemeral is not present or closed
+       this.session.sendEphemeral(kind, data);
+    }
   }
 
   /** Flush any batched outgoing ops immediately. */

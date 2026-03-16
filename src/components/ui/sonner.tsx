@@ -6,17 +6,17 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
-  const { isRightSidebarOpen, isTopNavbarOpen, isFocusMode } = useUiStateStore();
+  const { isLeftSidebarOpen, isRightSidebarOpen, isTopNavbarOpen, isFocusMode } = useUiStateStore();
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      position="top-right"
-      className="toaster group"
+      position="top-left"
+      className="toaster group transition-all duration-300 ease-in-out"
       style={{
         marginTop: isTopNavbarOpen && !isFocusMode ? '56px' : '0px',
         marginRight: isRightSidebarOpen && !isFocusMode ? '345px' : '0px',
-        transition: 'margin 300ms ease-in-out',
+        marginLeft: isLeftSidebarOpen && !isFocusMode ? '345px' : '0px',
       }}
       toastOptions={{
         classNames: {

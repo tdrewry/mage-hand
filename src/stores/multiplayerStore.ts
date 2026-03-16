@@ -32,6 +32,9 @@ export interface MultiplayerState {
   activeTransport: TransportType | null;
   customJazzUrl: string | null;
   
+  // WebRTC Ephemeral State
+  webRtcConnections: Array<{ peerId: string; status: RTCPeerConnectionState | 'new' }>;
+  
   // Sync state
   isSyncing: boolean;
   lastSyncTimestamp: number;
@@ -59,6 +62,8 @@ export interface MultiplayerState {
   setLastError: (error: string | null) => void;
   setActiveTransport: (transport: TransportType | null) => void;
   setCustomJazzUrl: (url: string | null) => void;
+  setWebRtcConnection: (peerId: string, status: RTCPeerConnectionState | 'new') => void;
+  removeWebRtcConnection: (peerId: string) => void;
   setSyncing: (syncing: boolean) => void;
   setSyncReady: (ready: boolean) => void;
   updateLastSyncTimestamp: () => void;
@@ -85,6 +90,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       lastError: null,
       activeTransport: null,
       customJazzUrl: null,
+      webRtcConnections: [],
       isSyncing: false,
       lastSyncTimestamp: 0,
       syncErrors: [],
@@ -190,6 +196,18 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setActiveTransport: (transport) => set({ activeTransport: transport }),
       setCustomJazzUrl: (url) => set({ customJazzUrl: url }),
       
+      setWebRtcConnection: (peerId, status) => set((state) => {
+         const existing = state.webRtcConnections.find(c => c.peerId === peerId);
+         if (existing) {
+             return { webRtcConnections: state.webRtcConnections.map(c => c.peerId === peerId ? { ...c, status } : c) };
+         }
+         return { webRtcConnections: [...state.webRtcConnections, { peerId, status }] };
+      }),
+      
+      removeWebRtcConnection: (peerId) => set((state) => ({
+         webRtcConnections: state.webRtcConnections.filter(c => c.peerId !== peerId)
+      })),
+      
       setSyncing: (syncing) => set({ isSyncing: syncing }),
       setSyncReady: (ready) => set({ syncReady: ready }),
       updateLastSyncTimestamp: () => set({ lastSyncTimestamp: Date.now() }),
@@ -208,8 +226,8 @@ export const useMultiplayerStore = create<MultiplayerState>()(
         currentUserId: null,
         roles: [],
         permissions: [],
-        lastError: null,
         activeTransport: null,
+        webRtcConnections: [],
         isSyncing: false,
         lastSyncTimestamp: 0,
         syncErrors: [],
@@ -229,10 +247,9 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       onRehydrateStorage: () => {
         return (state) => {
           if (state) {
-            // Reset runtime connection state — we're not connected after a page load
-            state.isConnected = false;
             state.connectionStatus = 'disconnected';
             state.connectedUsers = [];
+            state.webRtcConnections = [];
             state.permissions = [];
             state.lastError = null;
             state.isSyncing = false;

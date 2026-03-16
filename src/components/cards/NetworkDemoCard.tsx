@@ -32,7 +32,7 @@ import {
 import { toast } from "sonner";
 
 export const NetworkDemoCardContent: React.FC = () => {
-  const { isConnected, connectionStatus } = useMultiplayerStore();
+  const { isConnected, connectionStatus, webRtcConnections } = useMultiplayerStore();
   const tokens = useSessionStore((s) => s.tokens);
   const [pingMsg, setPingMsg] = useState("hello");
   const [chatMsg, setChatMsg] = useState("");
@@ -92,7 +92,6 @@ export const NetworkDemoCardContent: React.FC = () => {
 
   return (
     <div className="p-3 space-y-3">
-      {/* OpBridge Status */}
       <div className="flex items-center gap-2">
         <Badge
           variant={isConnected ? "default" : "outline"}
@@ -106,6 +105,22 @@ export const NetworkDemoCardContent: React.FC = () => {
           </span>
         )}
       </div>
+
+      {webRtcConnections.length > 0 && (
+        <div className="pt-2 space-y-1">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">WebRTC Peers</p>
+          <div className="space-y-1">
+            {webRtcConnections.map((conn) => (
+              <div key={conn.peerId} className="flex items-center justify-between text-xs bg-background/50 border border-white/5 rounded px-2 py-1">
+                <span className="truncate max-w-[120px]" title={conn.peerId}>{conn.peerId}</span>
+                <Badge variant="outline" className={`text-[10px] h-4 ${conn.status === 'connected' ? 'bg-success/20 text-success border-success/30' : ''}`}>
+                  {conn.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Separator />
 

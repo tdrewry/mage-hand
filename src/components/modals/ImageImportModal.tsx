@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw, Repeat } from 'lucide-react';
+import { Upload, Link, ZoomIn, ZoomOut, Move, RotateCcw, Repeat, Database, Check } from 'lucide-react';
+import { getAllTextures, type TextureDetails } from '@/lib/textureStorage';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 export interface ImageImportResult {
   imageUrl: string;
+  imageHash?: string;
   scale: number;
   offsetX: number;
   offsetY: number;
@@ -40,9 +42,13 @@ interface ImageImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (result: ImageImportResult) => void;
-  shape: ShapeConfig;
   title?: string;
   description?: string;
+  // Multi-select mode
+  multiSelect?: boolean;
+  onConfirmMultiple?: (images: { url: string; hash?: string }[]) => void;
+  // Configuration options
+  shape?: ShapeConfig; // Changed from ShapeConfig to PreviewShape in the prompt, but PreviewShape is not defined. Assuming ShapeConfig is intended.
   initialImageUrl?: string;
   initialScale?: number;
   initialOffsetX?: number;
@@ -65,10 +71,17 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   initialOffsetY = 0,
   initialRepeat = false,
   showRepeatToggle = false,
+  multiSelect = false,
+  onConfirmMultiple,
 }) => {
-  const [inputMode, setInputMode] = useState<'file' | 'url'>('file');
+  const [inputMode, setInputMode] = useState<'file' | 'url' | 'storage'>('file');
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
   const [urlInput, setUrlInput] = useState('');
+  
+  // Storage tab state
+  const [storedTextures, setStoredTextures] = useState<TextureDetails[]>([]);
+  const [loadingStored, setLoadingStored] = useState(false);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [scale, setScale] = useState(initialScale);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
@@ -108,31 +121,60 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
       setOffsetY((initialOffsetY || 0) * shapeH);
       setRepeat(initialRepeat);
       setImageLoaded(false);
+      setSelectedUrls([]);
     }
   }, [open, initialImageUrl, initialScale, initialOffsetX, initialOffsetY, initialRepeat, shapeW, shapeH]);
 
+  // Load from local storage if requested
+  useEffect(() => {
+    if (open && inputMode === 'storage' && storedTextures.length === 0 && !loadingStored) {
+      setLoadingStored(true);
+      getAllTextures().then(textures => {
+        setStoredTextures(textures.sort((a, b) => b.createdAt - a.createdAt));
+        setLoadingStored(false);
+      });
+    }
+  }, [open, inputMode, storedTextures.length, loadingStored]);
+
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
+    const validFiles = files.filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024);
+    if (validFiles.length < files.length) {
+      toast.error('Some files were ignored (must be images under 10MB)');
     }
+    if (validFiles.length === 0) return;
     
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image must be less than 10MB');
-      return;
+    if (multiSelect) {
+      // Process multiple files
+      const newUrls: string[] = [];
+      let loadedCount = 0;
+      
+      validFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          newUrls.push(dataUrl);
+          loadedCount++;
+          if (loadedCount === validFiles.length) {
+            setSelectedUrls(prev => [...prev, ...newUrls]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    } else {
+      // Process single file
+      const file = validFiles[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setImageUrl(dataUrl);
+        setImageLoaded(false);
+      };
+      reader.readAsDataURL(file);
     }
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setImageUrl(dataUrl);
-      setImageLoaded(false);
-    };
-    reader.readAsDataURL(file);
   };
 
   // Handle URL submit
@@ -365,13 +407,32 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
   }, [scale, offsetX, offsetY, repeat, imageLoaded, drawCanvas]);
 
   const handleConfirm = () => {
+    if (multiSelect) {
+      if (selectedUrls.length === 0) {
+        toast.error('Please select at least one image');
+        return;
+      }
+      
+      const imagesWithHashes = selectedUrls.map(url => {
+        const stored = storedTextures.find(t => t.dataUrl === url);
+        return { url, hash: stored?.hash };
+      });
+      
+      onConfirmMultiple?.(imagesWithHashes);
+      onOpenChange(false);
+      return;
+    }
+
     if (!imageUrl) {
       toast.error('Please select an image first');
       return;
     }
     
+    const stored = storedTextures.find(t => t.dataUrl === imageUrl);
+    
     onConfirm({
       imageUrl,
+      imageHash: stored?.hash,
       scale,
       offsetX: offsetX / shapeW,
       offsetY: offsetY / shapeH,
@@ -400,14 +461,25 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               <Upload className="mr-1 h-3 w-3" />
               Upload
             </Button>
+            {!multiSelect && (
+              <Button
+                variant={inputMode === 'url' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setInputMode('url')}
+                className="flex-1"
+              >
+                <Link className="mr-1 h-3 w-3" />
+                URL
+              </Button>
+            )}
             <Button
-              variant={inputMode === 'url' ? 'default' : 'outline'}
+              variant={inputMode === 'storage' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setInputMode('url')}
+              onClick={() => setInputMode('storage')}
               className="flex-1"
             >
-              <Link className="mr-1 h-3 w-3" />
-              URL
+              <Database className="mr-1 h-3 w-3" />
+              Storage
             </Button>
           </div>
 
@@ -418,6 +490,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple={multiSelect}
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -428,10 +501,10 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Choose Image File
+                {multiSelect ? 'Choose Image Files' : 'Choose Image File'}
               </Button>
             </div>
-          ) : (
+          ) : inputMode === 'url' ? (
             <div className="flex gap-2">
               <Input
                 value={urlInput}
@@ -444,10 +517,56 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
                 Load
               </Button>
             </div>
+          ) : (
+            <div className="h-64 overflow-y-auto border rounded-lg bg-black/20 p-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {loadingStored ? (
+                <div className="col-span-full flex h-full items-center justify-center text-muted-foreground text-sm">
+                  Loading textures...
+                </div>
+              ) : storedTextures.length === 0 ? (
+                <div className="col-span-full flex h-full items-center justify-center text-muted-foreground text-sm">
+                  No stored textures found.
+                </div>
+              ) : (
+                storedTextures.map((tex) => {
+                  const isSelected = multiSelect 
+                    ? selectedUrls.includes(tex.dataUrl)
+                    : imageUrl === tex.dataUrl;
+
+                  return (
+                    <div 
+                      key={tex.hash}
+                      className={`relative aspect-square rounded-md overflow-hidden border-2 cursor-pointer transition-all ${
+                        isSelected ? 'border-primary' : 'border-transparent hover:border-white/20'
+                      }`}
+                      onClick={() => {
+                        if (multiSelect) {
+                          setSelectedUrls(prev => 
+                            prev.includes(tex.dataUrl)
+                              ? prev.filter(url => url !== tex.dataUrl)
+                              : [...prev, tex.dataUrl]
+                          );
+                        } else {
+                          setImageUrl(tex.dataUrl);
+                        }
+                      }}
+                    >
+                      <img src={tex.dataUrl} alt="Stored texture" className="w-full h-full object-cover" />
+                      {isSelected && (
+                        <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           )}
 
           {/* Preview area */}
-          <div
+          {!multiSelect && (
+            <div
             ref={previewRef}
             className="relative mx-auto border rounded-lg overflow-hidden bg-muted cursor-move"
             style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
@@ -475,9 +594,10 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               </div>
             )}
           </div>
+        )}
 
           {/* Scale control */}
-          {imageLoaded && (
+          {!multiSelect && imageLoaded && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Scale: {scale.toFixed(2)}x</Label>
@@ -518,7 +638,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={!imageUrl || !imageLoaded}>
+          <Button onClick={handleConfirm} disabled={(multiSelect ? selectedUrls.length === 0 : (!imageUrl || !imageLoaded))}>
             Apply Image
           </Button>
         </DialogFooter>

@@ -171,6 +171,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 const { createJazzSession } = await import('@/lib/jazz/session');
                 const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
                 const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+                const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
                 
                 const sessionState = useSessionStore.getState();
                 const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
@@ -190,9 +191,11 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 
                 const clientId = getOrCreateClientId();
                 const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+                const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles);
                 
                 await netManager.connectWithTransport({
                   transport,
+                  ephemeralTransport,
                   sessionCode: shortCode,
                   username: username.trim(),
                   roles: playerRoles,
@@ -252,6 +255,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 const { joinJazzSession } = await import('@/lib/jazz/session');
                 const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
                 const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+                const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
                 
                 const sessionState = useSessionStore.getState();
                 const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
@@ -271,9 +275,11 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 
                 const clientId = getOrCreateClientId();
                 const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+                const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles);
                 
                 await netManager.connectWithTransport({
                   transport,
+                  ephemeralTransport,
                   sessionCode: shortCode,
                   username: username.trim(),
                   roles: playerRoles,

@@ -287,6 +287,8 @@ export const JazzTokenStateFeed = co.feed(z.string()); // Feed of JSON.stringify
 
 export const JazzConnectedUsersMap = co.record(z.string(), z.string()); // Record<UserId, JSON.stringify({ status: "connected" | "disconnected", timestamp })>
 
+export const JazzSignalingRoom = co.record(z.string(), z.string()); // Record<PeerId, JSON.stringify(SignalingData)>
+
 // ── Session Root ───────────────────────────────────────────────────────────
 
 export const JazzSessionRoot = co.map({
@@ -305,6 +307,7 @@ export const JazzSessionRoot = co.map({
   chat: co.optional(JazzChatList),
   tokenStates: co.optional(JazzTokenStateFeed),
   connectedUsers: co.optional(JazzConnectedUsersMap),
+  signalingRoom: co.optional(JazzSignalingRoom),
 });
 export type JazzSessionRoot = co.loaded<typeof JazzSessionRoot>;
 
@@ -363,6 +366,7 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
   const chat = JazzChatList.create([], group);
   const tokenStates = JazzTokenStateFeed.create([], group);
   const connectedUsers = JazzConnectedUsersMap.create({} as any, group);
+  const signalingRoom = JazzSignalingRoom.create({} as any, group);
 
   return JazzSessionRoot.create(
     { 
@@ -379,7 +383,8 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
       pings: pings as any, 
       chat: chat as any,
       tokenStates: tokenStates as any,
-      connectedUsers: connectedUsers as any
+      connectedUsers: connectedUsers as any,
+      signalingRoom: signalingRoom as any
     } as any,
     group,
   ) as unknown as JazzSessionRoot;

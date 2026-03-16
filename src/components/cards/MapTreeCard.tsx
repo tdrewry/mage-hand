@@ -1566,10 +1566,9 @@ export const MapTreeCardContent: React.FC = () => {
           const isMapDropTarget = dropMapTarget === map.id;
 
           return (
-            <ContextMenu>
+            <ContextMenu key={map.id}>
               <ContextMenuTrigger asChild>
                 <div
-                  key={map.id}
                   className={`border rounded-lg overflow-hidden transition-colors ${
                     isFocused ? 'border-primary/50 bg-primary/5' : 'border-border/60'
                   } ${isMapDropTarget ? 'ring-2 ring-primary/60 bg-primary/10' : ''}`}
@@ -1903,7 +1902,17 @@ export const MapTreeCardContent: React.FC = () => {
                     <ContextMenuSeparator />
                     <ContextMenuItem
                       className="text-xs gap-2 text-destructive focus:text-destructive"
-                      onClick={() => { removeMap(map.id); toast.success(`Deleted map "${map.name}"`); }}
+                      onClick={() => {
+                        const ents = entitiesByMap.byMap[map.id] || [];
+                        ents.forEach(e => {
+                          if (e.type === 'token') removeToken(e.id);
+                          if (e.type === 'region') removeRegion(e.id);
+                          if (e.type === 'mapObject') removeMapObject(e.id);
+                          if (e.type === 'light') removeLight(e.id);
+                        });
+                        removeMap(map.id);
+                        toast.success(`Deleted map "${map.name}" and ${ents.length} entities`);
+                      }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Delete Map
@@ -2005,6 +2014,27 @@ export const MapTreeCardContent: React.FC = () => {
               <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">
                 {entitiesByMap.unassigned.length}
               </Badge>
+              <div onClick={e => e.stopPropagation()}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-5 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive ml-1"
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to permanently delete ${entitiesByMap.unassigned.length} detached entities? This cannot be undone.`)) {
+                      entitiesByMap.unassigned.forEach(e => {
+                        if (e.type === 'token') removeToken(e.id);
+                        if (e.type === 'region') removeRegion(e.id);
+                        if (e.type === 'mapObject') removeMapObject(e.id);
+                        if (e.type === 'light') removeLight(e.id);
+                      });
+                      toast.success(`Cleaned up ${entitiesByMap.unassigned.length} detached entities`);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clean Up All
+                </Button>
+              </div>
             </div>
             {unassignedExpanded && (
               <div className="px-1 pb-1.5">

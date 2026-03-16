@@ -12,6 +12,7 @@ import { startDiceRollNotifier, stopDiceRollNotifier } from "./lib/diceRollNotif
 import { JazzSessionProvider } from "./lib/jazz/provider";
 import { SyncProfilerPanel } from "./components/SyncProfilerPanel";
 
+
 const queryClient = new QueryClient();
 
 /**
@@ -49,6 +50,32 @@ const AppInner = () => {
   React.useEffect(() => {
     startDiceRollNotifier();
     return () => stopDiceRollNotifier();
+  }, []);
+
+  // Register ephemeral networking handlers once on boot
+  React.useEffect(() => {
+    const registerHandlers = async () => {
+      try {
+        const { registerTokenHandlers } = await import("@/lib/net/ephemeral/tokenHandlers");
+        const { registerCursorHandlers } = await import("@/lib/net/ephemeral/cursorHandlers");
+        const { registerPresenceHandlers } = await import("@/lib/net/ephemeral/presenceHandlers");
+        const { registerMiscHandlers } = await import("@/lib/net/ephemeral/miscHandlers");
+        const { registerMapHandlers } = await import("@/lib/net/ephemeral/mapHandlers");
+        const { registerEffectHandlers } = await import("@/lib/net/ephemeral/effectHandlers");
+        const { registerAmbientHandlers } = await import("@/lib/net/ephemeral/ambientHandlers");
+        
+        registerTokenHandlers();
+        registerCursorHandlers();
+        registerPresenceHandlers();
+        registerMiscHandlers();
+        registerMapHandlers();
+        registerEffectHandlers();
+        registerAmbientHandlers();
+      } catch (err) {
+        console.error("Failed to register ephemeral handlers:", err);
+      }
+    };
+    registerHandlers();
   }, []);
 
   return (

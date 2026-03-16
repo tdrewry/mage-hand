@@ -196,7 +196,7 @@ export async function pushTexturesToJazz(sessionRoot: any): Promise<void> {
       
       // Profile the outgoing FileStream bytes
       import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
-        syncProfiler.measureStream(blob.size);
+        syncProfiler.measureStreamOut(blob.size);
       });
     } catch (err) {
       console.error(`[jazz-texture] Failed to upload texture ${hash}:`, err);
@@ -274,7 +274,7 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
         
         // Profile the incoming FileStream bytes
         import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
-          syncProfiler.measureStream(blob.size);
+          syncProfiler.measureStreamIn(blob.size);
         });
       } else {
         console.warn(`[jazz-texture] FileStream for ${hash} returned null blob`);
@@ -395,7 +395,7 @@ export function subscribeToTextureChanges(sessionRoot: any): () => void {
                 
                 // Profile the incoming FileStream bytes
                 import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
-                  syncProfiler.measureStream(blob.size);
+                  syncProfiler.measureStreamIn(blob.size);
                 });
               } else {
                 console.warn(`[jazz-texture] FileStream download returned null/timed out for ${entry.hash}`);
@@ -469,7 +469,7 @@ export async function requestTextureViaJazz(hash: string): Promise<string | null
         
         // Profile the incoming FileStream bytes
         import("@/lib/jazz/profiler").then(({ syncProfiler }) => {
-          syncProfiler.measureStream(blob.size);
+          syncProfiler.measureStreamIn(blob.size);
         });
         
         return dataUrl;

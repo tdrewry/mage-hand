@@ -140,6 +140,7 @@ export async function joinJazzSession(sessionCoId: string): Promise<JazzSessionI
           chat: [],
           tokenStates: [],
           connectedUsers: {},
+          signalingRoom: {},
         },
       });
       break; // success
@@ -268,6 +269,7 @@ function scheduleRetryPull(root: any, sessionCoId: string, attempt = 1): void {
           chat: [],
           tokenStates: [],
           connectedUsers: {},
+          signalingRoom: {},
         },
       });
 

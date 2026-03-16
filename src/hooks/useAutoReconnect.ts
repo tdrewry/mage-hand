@@ -4,6 +4,7 @@ import { netManager } from '@/lib/net';
 import { isJazzCode, decodeJazzCode } from '@/lib/sessionCodeResolver';
 import { joinJazzSession } from '@/lib/jazz';
 import { JazzTransport } from '@/lib/net/transports/JazzTransport';
+import { WebRTCTransport } from '@/lib/net/transports/WebRTCTransport';
 import { getOrCreateClientId } from '../../networking/client/NetworkSession';
 
 /**
@@ -66,8 +67,11 @@ export function useAutoReconnect() {
             // 2. Inject ephemeral transport
             const clientId = getOrCreateClientId();
             const transport = new JazzTransport(info.root, clientId, username, store.roles);
+            const ephemeralTransport = new WebRTCTransport(info.root, clientId, store.roles);
+            
             netManager.connectWithTransport({
               transport,
+              ephemeralTransport,
               sessionCode: code,
               username,
               roles: store.roles.length > 0 ? store.roles : undefined,

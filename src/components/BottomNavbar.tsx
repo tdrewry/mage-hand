@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Group, Trash2, X, Lock, Unlock, Ungroup, Download,
-  Shield, Eye, EyeOff, Plus, Palette, Lightbulb, Sparkles, Dices, Compass, Navigation, Activity 
+  Shield, Eye, EyeOff, Plus, Palette, Lightbulb, Sparkles, Dices, Compass, Navigation, Activity, Edit3 
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -29,6 +29,7 @@ import { exportGroupToPrefab, downloadPrefab } from '@/lib/groupSerializer';
 import { toast } from 'sonner';
 import { Z_INDEX } from '@/lib/zIndex';
 import { TokenIlluminationModal } from './modals/TokenIlluminationModal';
+import { TokenEditModal } from './modals/TokenEditModal';
 import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '@/lib/illuminationPresets';
 import { cn } from '@/lib/utils';
 import { useUiStateStore } from '@/stores/uiStateStore';
@@ -70,6 +71,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [initiativeValues, setInitiativeValues] = useState<Record<string, string>>({});
   const [showColorModal, setShowColorModal] = useState(false);
+  const [showTokenEditModal, setShowTokenEditModal] = useState(false);
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
 
@@ -516,9 +518,15 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="ghost" size="sm" onClick={() => setShowColorModal(true)}>
-                <Palette className="h-4 w-4 mr-2" /> Color
-              </Button>
+              {selectedTokens.length > 1 ? (
+                <Button variant="ghost" size="sm" onClick={() => setShowTokenEditModal(true)}>
+                  <Edit3 className="h-4 w-4 mr-2" /> Edit
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setShowColorModal(true)}>
+                  <Palette className="h-4 w-4 mr-2" /> Color
+                </Button>
+              )}
               
               <Button variant="ghost" size="sm" onClick={() => setShowInitiativeModal(true)}>
                 <Plus className="h-4 w-4 mr-2" /> Init
@@ -679,6 +687,13 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
           onUpdateCanvas?.();
           toast.success(`Updated illumination for ${selectedTokens.length} token(s)`);
         }}
+      />
+      
+      <TokenEditModal
+        open={showTokenEditModal}
+        onOpenChange={setShowTokenEditModal}
+        targetTokens={selectedTokens}
+        onUpdateCanvas={onUpdateCanvas}
       />
     </>
   );

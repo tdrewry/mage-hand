@@ -13,7 +13,8 @@ class SyncProfiler {
   
   // Jazz Billing Metrics
   public activeDOs = 0;      // Roughly correlates to unique CoValues modified/watched
-  public streamBytes = 0;    // FileStream bytes in current window
+  public streamOutBytes = 0; // FileStream outbound bytes in current window
+  public streamInBytes = 0;  // FileStream inbound bytes in current window
   public totalStreamBytes = 0; // Cumulative FileStream bytes across session
   private _trackedDOs = new Set<string>();
 
@@ -21,7 +22,7 @@ class SyncProfiler {
   private intervalId: NodeJS.Timeout | null = null;
   
   // Store historical data for export
-  public history: { timestamp: string, outKb: string, inKb: string, outOps: number, inOps: number, activeDOs: number, streamKb: string }[] = [];
+  public history: { timestamp: string, outKb: string, inKb: string, outOps: number, inOps: number, activeDOs: number, streamOutKb: string, streamInKb: string }[] = [];
 
   start() {
     if (this.intervalId) return;
@@ -48,7 +49,7 @@ class SyncProfiler {
    */
   measureOutbound(patch: any, channel: string) {
     try {
-      const size = new Blob([JSON.stringify(patch)]).size;
+      const size = this.approximateSize(patch);
       this.outKb += size / 1024;
       this.outOps++;
       
@@ -58,7 +59,7 @@ class SyncProfiler {
         this.activeDOs++;
       }
     } catch (e) {
-      // Ignore cyclic structure errors
+      // Ignore errors
     }
   }
 
@@ -67,7 +68,7 @@ class SyncProfiler {
    */
   measureInbound(patch: any, channel: string) {
     try {
-      const size = new Blob([JSON.stringify(patch)]).size;
+      const size = this.approximateSize(patch);
       this.inKb += size / 1024;
       this.inOps++;
       
@@ -80,10 +81,46 @@ class SyncProfiler {
   }
   
   /**
+   * Fast, non-blocking heuristic to estimate object byte size without JSON.stringify
+   * JSON.stringify on thousands of Jazz CoValues during sync blocks the main thread
+   */
+  private approximateSize(obj: any): number {
+    if (obj === null || obj === undefined) return 0;
+    if (typeof obj === 'string') return obj.length * 2; // UTF-16 approx
+    if (typeof obj === 'number') return 8;
+    if (typeof obj === 'boolean') return 4;
+    
+    // Quick heuristic for objects/arrays to avoid deep traversal timeout
+    // Average 50 bytes per key + string length footprint
+    let size = 0;
+    try {
+      if (Array.isArray(obj)) {
+        size += obj.length * 50;
+      } else if (typeof obj === 'object') {
+        const keys = Object.keys(obj);
+        size += keys.length * 50;
+        // Sample a few keys if string-heavy (like image hashes)
+        if (obj.id) size += 64;
+        if (obj.imageHash) size += 64;
+      }
+    } catch (e) {
+      // Catch proxy access errors
+      return 100; 
+    }
+    
+    return size || 100; // fallback arbitrary size if estimation fails
+  }
+  
+  /**
    * Track FileStream operations
    */
-  measureStream(bytes: number) {
-      this.streamBytes += bytes;
+  measureStreamOut(bytes: number) {
+      this.streamOutBytes += bytes;
+      this.totalStreamBytes += bytes;
+  }
+
+  measureStreamIn(bytes: number) {
+      this.streamInBytes += bytes;
       this.totalStreamBytes += bytes;
   }
 
@@ -93,15 +130,17 @@ class SyncProfiler {
     this.outOps = 0;
     this.inOps = 0;
     // activeDOs and streamBytes stay cumulative for the session or get reset per window depending on reporting needs
-    this.streamBytes = 0; 
+    this.streamOutBytes = 0;
+    this.streamInBytes = 0; 
   }
 
   private report() {
-    if (this.inOps === 0 && this.outOps === 0 && this.streamBytes === 0) return;
+    if (this.inOps === 0 && this.outOps === 0 && this.streamOutBytes === 0 && this.streamInBytes === 0) return;
 
     const outKbs = this.outKb.toFixed(2);
     const inKbs = this.inKb.toFixed(2);
-    const streamKb = (this.streamBytes / 1024).toFixed(2);
+    const streamOutKb = (this.streamOutBytes / 1024).toFixed(2);
+    const streamInKb = (this.streamInBytes / 1024).toFixed(2);
     
     // Store in history
     this.history.push({
@@ -111,11 +150,12 @@ class SyncProfiler {
       outOps: this.outOps,
       inOps: this.inOps,
       activeDOs: this.activeDOs,
-      streamKb
+      streamOutKb,
+      streamInKb
     });
     
     console.log(
-      `%c[SyncProfiler] 10s Window: %cOut %c${outKbs} KB%c (${this.outOps} ops) | %cIn %c${inKbs} KB%c (${this.inOps} ops) | %cDOs %c${this.activeDOs}%c | %cStream %c${streamKb} KB`,
+      `%c[SyncProfiler] 10s Window: %cOut %c${outKbs} KB%c (${this.outOps} ops) | %cIn %c${inKbs} KB%c (${this.inOps} ops) | %cDOs %c${this.activeDOs}%c | %cSTR Out %c${streamOutKb} KB%c | %cSTR In %c${streamInKb} KB`,
       'color: #888',
       'color: #eab308; font-weight: bold', // Yellow for out
       'color: #fff',
@@ -126,7 +166,10 @@ class SyncProfiler {
       'color: #a855f7; font-weight: bold', // Purple for DOs
       'color: #fff',
       'color: #888',
-      'color: #10b981; font-weight: bold', // Green for Streams
+      'color: #eab308; font-weight: bold', // Yellow for out
+      'color: #fff',
+      'color: #888',
+      'color: #3b82f6; font-weight: bold', // Blue for in
       'color: #fff'
     );
   }
@@ -140,7 +183,7 @@ class SyncProfiler {
       return;
     }
 
-    const headers = ["Timestamp", "Out (KB)", "In (KB)", "Out (Ops)", "In (Ops)", "Active DOs", "Stream (KB)"];
+    const headers = ["Timestamp", "Out (KB)", "In (KB)", "Out (Ops)", "In (Ops)", "Active DOs", "Stream Out (KB)", "Stream In (KB)"];
     const rows = this.history.map(row => [
       row.timestamp,
       row.outKb,
@@ -148,7 +191,8 @@ class SyncProfiler {
       row.outOps,
       row.inOps,
       row.activeDOs,
-      row.streamKb
+      row.streamOutKb,
+      row.streamInKb
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 

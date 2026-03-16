@@ -186,7 +186,7 @@ export const TopNavbar: React.FC = () => {
                   Dock Tool
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="z-[10000]">
                 <DropdownMenuItem onClick={() => handleDockTool(CardType.COMPENDIUM, 'Compendium', 'left')}>
                   Compendium
                 </DropdownMenuItem>
@@ -296,7 +296,7 @@ export const TopNavbar: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" sideOffset={24} className="bg-background/90 backdrop-blur border-white/10">Mode settings</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10">
+            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10 z-[10000]">
               <DropdownMenuLabel>View Role</DropdownMenuLabel>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -350,7 +350,7 @@ export const TopNavbar: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" sideOffset={24} className="bg-background/90 backdrop-blur border-white/10">Project files</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10">
+            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur border-white/10 z-[10000]">
               <DropdownMenuLabel>Project</DropdownMenuLabel>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -384,7 +384,7 @@ export const TopNavbar: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" sideOffset={24} className="bg-background/90 backdrop-blur border-white/10">System settings</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10">
+            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10 z-[10000]">
               <DropdownMenuLabel>System Overview</DropdownMenuLabel>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -455,7 +455,7 @@ export const TopNavbar: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" sideOffset={24} className="bg-background/90 backdrop-blur border-white/10">Tabletop Controls</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10">
+            <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur border-white/10 z-[10000]">
               <DropdownMenuLabel>Tabletop Controls</DropdownMenuLabel>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -522,7 +522,7 @@ export const TopNavbar: React.FC = () => {
                   Dock Tool
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-[10000]">
                 <DropdownMenuItem onClick={() => handleDockTool(CardType.COMPENDIUM, 'Compendium', 'right')}>
                   Compendium
                 </DropdownMenuItem>

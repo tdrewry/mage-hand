@@ -34,17 +34,14 @@ export class JazzTransport implements ITransport {
     this.state = "connecting";
 
     if ((this.sessionRoot as any).connectedUsers?.$jazz?.set) {
-      const pulseHeartbeat = () => {
-        try {
-          ((this.sessionRoot as any).connectedUsers as any).$jazz.set(this.userId, JSON.stringify({ 
-            status: "connected", timestamp: Date.now(), username: this.username, roles: this.roles 
-          }));
-        } catch (e) {}
-      };
-      
-      pulseHeartbeat();
-      // Send heartbeat every 10 seconds
-      this.heartbeatInterval = window.setInterval(pulseHeartbeat, 10000);
+      try {
+        // Set connected status once on join.
+        // We do NOT use a 10s interval here to avoid massive "Chatter" syncing 
+        // across the Jazz network. WebRTC ICE will handle real-time drop detection.
+        ((this.sessionRoot as any).connectedUsers as any).$jazz.set(this.userId, JSON.stringify({ 
+          status: "connected", timestamp: Date.now(), username: this.username, roles: this.roles 
+        }));
+      } catch (e) {}
     }
 
     // Jazz connection is intrinsically handled by the Jazz SessionProvider earlier in the boot sequence.
@@ -126,9 +123,10 @@ export class JazzTransport implements ITransport {
         return;
       }
 
+      // Ephemeral messages are now routed exclusively through WebRTCTransport
+      // CIRCUIT BREAKER: Drop all ephemeral fallbacks to prevent 
+      // token jitter from exhausting Jazz free tier bandwidth.
       if (msg.t === "ephemeral") {
-        // Route Ephemeral payloads specifically to the CoValues
-        this.handleOutboundEphemeral(msg);
         return;
       }
 
@@ -178,34 +176,7 @@ export class JazzTransport implements ITransport {
     this.emitter.emit("message", { data: JSON.stringify(msg) });
   }
 
-  private handleOutboundEphemeral(msg: Extract<ClientToServerMessage, { t: 'ephemeral' }>): void {
-    const { kind, data } = msg.p;
-    const userId = msg.userId || "unknown";
-
-    if ((kind === "cursor.update" || kind === "cursor.visibility") && this.sessionRoot.cursors) {
-      if ((this.sessionRoot.cursors as any).$jazz?.push) {
-        const payload = { kind, data, timestamp: Date.now(), userId };
-        (this.sessionRoot.cursors as any).$jazz.push(JSON.stringify(payload));
-      }
-    } 
-    else if (kind === "map.ping" && this.sessionRoot.pings) {
-      if ((this.sessionRoot.pings as any).$jazz?.push) {
-        const payload = { ...data as Record<string,any>, timestamp: Date.now(), userId };
-        (this.sessionRoot.pings as any).$jazz.push(JSON.stringify(payload));
-      }
-    }
-    else if (kind === "chat.message" && this.sessionRoot.chat) {
-      if ((this.sessionRoot.chat as any).$jazz?.push) {
-        (this.sessionRoot.chat as any).$jazz.push(JSON.stringify(data));
-      }
-    }
-    else if ((kind === "token.drag.begin" || kind === "token.drag.update" || kind === "token.drag.end" || kind === "token.position.sync") && (this.sessionRoot as any).tokenStates) {
-      if (((this.sessionRoot as any).tokenStates as any).$jazz?.push) {
-        const payload = { kind, data, timestamp: Date.now(), userId };
-        ((this.sessionRoot as any).tokenStates as any).$jazz.push(JSON.stringify(payload));
-      }
-    }
-  }
+  // (Ephemeral routing removed; Phase 1 Architecture Split)
 
   private wireSubscriptions(): void {
     // When remote peers change the Jazz CoValues, we funnel them back into NetManager
@@ -246,111 +217,7 @@ export class JazzTransport implements ITransport {
       );
     }
 
-    // Cursors
-    if ((this.sessionRoot.cursors as any)?.$jazz?.subscribe) {
-      const knownTx: Record<string, string> = {};
-      this.unsubs.push(
-        (this.sessionRoot.cursors as any).$jazz.subscribe([], (feed: any) => {
-          if (!feed || !feed.perAccount) return;
-          for (const accId of Object.keys(feed.perAccount)) {
-            const entry = feed.perAccount[accId];
-            if (!entry || !entry.value || typeof entry.value !== "string") continue;
-            if (entry.tx !== knownTx[accId]) {
-              knownTx[accId] = entry.tx;
-              try {
-                // Also log unpacked
-                const payload = JSON.parse(entry.value);
-                this.emitInbound({
-                  v: PROTOCOL_VERSION, t: "ephemeral", 
-                  p: { kind: payload.kind || "cursor.update", data: payload.data || payload, userId: payload.userId || accId } // Use packed clientId
-                } as unknown as ServerToClientMessage);
-              } catch (e) {
-                console.warn("[JazzTransport] Cursor parse fail:", e);
-              }
-            }
-          }
-        })
-      );
-    }
-
-    // Pings
-    if ((this.sessionRoot.pings as any)?.$jazz?.subscribe) {
-      const knownTx: Record<string, string> = {};
-      this.unsubs.push(
-        (this.sessionRoot.pings as any).$jazz.subscribe([], (feed: any) => {
-          if (!feed || !feed.perAccount) return;
-          for (const accId of Object.keys(feed.perAccount)) {
-            const entry = feed.perAccount[accId];
-            if (!entry || !entry.value || typeof entry.value !== "string") continue;
-            if (entry.tx !== knownTx[accId]) {
-              knownTx[accId] = entry.tx;
-              try {
-                const data = JSON.parse(entry.value);
-                this.emitInbound({
-                  v: PROTOCOL_VERSION, t: "ephemeral", 
-                  p: { kind: "map.ping", data, userId: data.userId || accId }
-                } as unknown as ServerToClientMessage);
-              } catch {}
-            }
-          }
-        })
-      );
-    }
-
-    // Chat
-    if ((this.sessionRoot.chat as any)?.$jazz?.subscribe) {
-      let lastProcessedLength = 0;
-      this.unsubs.push(
-        (this.sessionRoot.chat as any).$jazz.subscribe([], (chatList: any) => {
-          if (!chatList) return;
-          if (chatList.length > lastProcessedLength) {
-            for (let i = lastProcessedLength; i < chatList.length; i++) {
-               try {
-                  const val = chatList[i];
-                  if (typeof val === "string") {
-                    const data = JSON.parse(val);
-                    this.emitInbound({
-                      v: PROTOCOL_VERSION, t: "ephemeral", 
-                      p: { kind: "chat.message", data, userId: data.userId || "unknown" }
-                    } as unknown as ServerToClientMessage);
-                  }
-               } catch {}
-            }
-            lastProcessedLength = chatList.length;
-          }
-        })
-      );
-    }
-
-    // Token States (Drags, Syncs)
-    if ((this.sessionRoot as any).tokenStates?.$jazz?.subscribe) {
-      const knownTx: Record<string, string> = {};
-      this.unsubs.push(
-        ((this.sessionRoot as any).tokenStates as any).$jazz.subscribe([], (feed: any) => {
-          if (!feed || !feed.perAccount) return;
-          for (const accId of Object.keys(feed.perAccount)) {
-            const entry = feed.perAccount[accId];
-            if (!entry || !entry.value || typeof entry.value !== "string") continue;
-            if (entry.tx !== knownTx[accId]) {
-              knownTx[accId] = entry.tx;
-              try {
-                const payload = JSON.parse(entry.value);
-                this.emitInbound({
-                  v: PROTOCOL_VERSION, 
-                  t: "ephemeral", 
-                  p: { 
-                    kind: payload.kind, 
-                    data: payload.data, 
-                    userId: payload.userId || accId 
-                  }
-                } as unknown as ServerToClientMessage);
-              } catch (e) {
-                console.warn("[JazzTransport] Token state parse fail:", e);
-              }
-            }
-          }
-        })
-      );
-    }
+    // Ephemeral subscriptions (Cursors, Pings, Chat, TokenStates) have been removed 
+    // and are now explicitly routed via WebRTCTransport.
   }
 }
