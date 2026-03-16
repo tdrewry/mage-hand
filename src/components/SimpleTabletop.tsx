@@ -4557,13 +4557,24 @@ export const SimpleTabletop = () => {
           // When fog is enabled with post-processing, draw tokens/annotations to overlay
           // so they appear above the PixiJS fog layer
           if (fogEnabled) {
+            // Helper to prevent 60fps render loops from spamming console and locking the thread (e.g. freezing WebRTC)
+            const logErrorOnce = (msg: string, e: any) => {
+              const key = msg + (e.message || String(e));
+              if (!(window as any)._loggedRenderFailures) { (window as any)._loggedRenderFailures = new Set<string>(); }
+              const errSet = (window as any)._loggedRenderFailures as Set<string>;
+              if (!errSet.has(key)) {
+                console.error(msg, e);
+                errSet.add(key);
+              }
+            };
+
             // Apply world-space transform for tokens/annotations
             overlayCtx.save();
             overlayCtx.translate(transform.x, transform.y);
             overlayCtx.scale(transform.zoom, transform.zoom);
 
             // Draw annotations first (below tokens)
-            drawAnnotationsToContext(overlayCtx);
+            try { drawAnnotationsToContext(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawAnnotationsToContext error:', e); }
 
             // ── Placed spell/trap effects BELOW tokens on overlay ──
             {
@@ -4573,10 +4584,14 @@ export const SimpleTabletop = () => {
               const effectGridSize = regions[0]?.gridSize || 40;
               const belowTokenEffects = mapEffects.filter(e => !e.template?.renderAboveTokens);
               if (belowTokenEffects.length > 0) {
-                renderPlacedEffects(
-                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
-                  belowTokenEffects,
-                );
+                try {
+                  renderPlacedEffects(
+                    { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+                    belowTokenEffects,
+                  );
+                } catch (e) {
+                  logErrorOnce('[RENDER FAILED] overlay renderPlacedEffects (below token) error:', e);
+                }
               }
               if (mapEffects.length > 0) {
                 effectState.cleanupDismissedEffects();
@@ -4587,10 +4602,14 @@ export const SimpleTabletop = () => {
               if (belowAuras.length > 0) {
                 const tokenPosMap = new Map<string, { x: number; y: number }>();
                 for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
-                renderAuraEffects(
-                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
-                  belowAuras,
-                );
+                try {
+                  renderAuraEffects(
+                    { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+                    belowAuras,
+                  );
+                } catch (e) {
+                  logErrorOnce('[RENDER FAILED] overlay renderAuraEffects (below token) error:', e);
+                }
               }
               if (effectState.placement?.previewOrigin) {
                 renderPlacementPreview({ ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize }, effectState.placement);
@@ -4600,12 +4619,12 @@ export const SimpleTabletop = () => {
 
             // Draw drag path BEFORE tokens so footprints appear below token art
             if (isDraggingToken && draggedTokenId) {
-              drawDragPathOnly(overlayCtx);
+              try { drawDragPathOnly(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawDragPathOnly error:', e); }
             }
-            drawRemoteDragDecorations(overlayCtx, 'path');
+            try { drawRemoteDragDecorations(overlayCtx, 'path'); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteDragDecorations (path) error:', e); }
 
             // Draw tokens on top of effects
-            drawTokensToContext(overlayCtx);
+            try { drawTokensToContext(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawTokensToContext error:', e); }
 
             // ── Pinned above-token effects on overlay ──
             {
@@ -4615,33 +4634,41 @@ export const SimpleTabletop = () => {
               const effectGridSize = regions[0]?.gridSize || 40;
               const aboveTokenEffects = mapEffects.filter(e => !!e.template?.renderAboveTokens);
               if (aboveTokenEffects.length > 0) {
-                renderPlacedEffects(
-                  { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
-                  aboveTokenEffects,
-                );
+                try {
+                  renderPlacedEffects(
+                    { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom },
+                    aboveTokenEffects,
+                  );
+                } catch (e) {
+                  logErrorOnce('[RENDER FAILED] overlay renderPlacedEffects (above token) error:', e);
+                }
                 const aboveAuras = aboveTokenEffects.filter(e => e.isAura);
                 if (aboveAuras.length > 0) {
                   const tokenPosMap = new Map<string, { x: number; y: number }>();
                   for (const t of filteredTokens) tokenPosMap.set(t.id, { x: t.x, y: t.y });
-                  renderAuraEffects(
-                    { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
-                    aboveAuras,
-                  );
+                  try {
+                    renderAuraEffects(
+                      { ctx: overlayCtx, time: performance.now(), gridSize: effectGridSize, zoom: transform.zoom, wallSegments: combinedSegmentsRef.current, tokenPositions: tokenPosMap },
+                      aboveAuras,
+                    );
+                  } catch (e) {
+                    logErrorOnce('[RENDER FAILED] overlay renderAuraEffects (above token) error:', e);
+                  }
                 }
               }
             }
 
             // Draw drag ghost on overlay so it appears above tokens
             if (isDraggingToken && draggedTokenId) {
-              drawDragGhostAndPath(overlayCtx);
+              try { drawDragGhostAndPath(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawDragGhostAndPath error:', e); }
             }
-            drawRemoteDragDecorations(overlayCtx, 'ghost');
+            try { drawRemoteDragDecorations(overlayCtx, 'ghost'); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteDragDecorations (ghost) error:', e); }
             // ── Remote ephemeral overlays on overlay ──
-            drawRemoteTokenHovers(overlayCtx);
-            drawRemoteSelectionPreviews(overlayCtx);
-            drawRemoteActionTargets(overlayCtx);
-            drawRemoteHandlePreviews(overlayCtx);
-            drawRemoteGroupPreviews(overlayCtx);
+            try { drawRemoteTokenHovers(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteTokenHovers error:', e); }
+            try { drawRemoteSelectionPreviews(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteSelectionPreviews error:', e); }
+            try { drawRemoteActionTargets(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteActionTargets error:', e); }
+            try { drawRemoteHandlePreviews(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteHandlePreviews error:', e); }
+            try { drawRemoteGroupPreviews(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteGroupPreviews error:', e); }
 
             overlayCtx.restore();
           }

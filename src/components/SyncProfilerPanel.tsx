@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
+import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
 import { toast } from 'sonner';
 
 export const SyncProfilerPanel: React.FC = () => {
@@ -16,6 +17,7 @@ export const SyncProfilerPanel: React.FC = () => {
   const isProfilerVisible = useUiStateStore(s => s.isProfilerVisible);
   const currentSession = useMultiplayerStore(s => s.currentSession);
   const activeTransport = useMultiplayerStore((s) => s.activeTransport);
+  const isBottomNavbarVisible = useBottomNavbarVisible();
   
   // WebRTC Diagnostics
   const peers = useNetworkDiagnosticsStore((s) => s.peers);
@@ -64,7 +66,10 @@ export const SyncProfilerPanel: React.FC = () => {
   const sessionId = currentSession?.sessionId || currentSession?.sessionCode;
 
   return (
-    <div className="fixed bottom-[100px] left-1/2 -translate-x-1/2 z-[9999] bg-slate-900/95 text-xs text-white p-3 rounded-md border border-slate-700 shadow-2xl flex items-stretch space-x-6 backdrop-blur-md">
+    <div 
+      className="fixed right-[100px] z-[9999] bg-slate-900/95 text-xs text-white p-3 rounded-md border border-slate-700 shadow-2xl flex items-stretch space-x-6 backdrop-blur-md transition-all duration-300 ease-in-out"
+      style={{ bottom: isBottomNavbarVisible ? '120px' : '56px' }}
+    >
       {/* SECTION 1: Jazz Network State */}
       <div className="flex flex-col min-w-[240px]">
         <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800">

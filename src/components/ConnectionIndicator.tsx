@@ -1,6 +1,7 @@
 import React from 'react';
 import { Wifi, WifiOff, Loader2, AlertCircle, Users, Database, Radio } from 'lucide-react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useUiStateStore } from '@/stores/uiStateStore';
 import { netManager } from '@/lib/net';
 import { Badge } from './ui/badge';
 import { Z_INDEX } from '@/lib/zIndex';
@@ -88,6 +89,7 @@ export const ConnectionIndicator: React.FC = () => {
           <Badge
             variant={badgeVariant}
             className="flex items-center gap-2 px-3 py-2 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer"
+            onClick={useUiStateStore.getState().toggleProfiler}
           >
             <Icon
               className={`h-3.5 w-3.5 ${iconColor} ${anyLoading ? 'animate-spin' : ''}`}
