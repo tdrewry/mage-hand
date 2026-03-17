@@ -66,6 +66,7 @@ export function registerTokenHandlers(): void {
   // (start position + path) so remote clients render the same ghost/path visuals.
 
   ephemeralBus.on("token.drag.begin", (data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, userId) => {
+    if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     useRemoteDragStore.getState().beginDrag(
       data.tokenId,
       data.startPos,
@@ -74,13 +75,15 @@ export function registerTokenHandlers(): void {
     );
   });
 
-  ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, _userId) => {
+  ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
+    if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     // Write exclusively to the remote drag state; do NOT mutate durable sessionStore here
     useRemoteDragStore.getState().updateDrag(data.tokenId, data.pos, data.path || []);
     ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });
 
-  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, _userId) => {
+  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, userId) => {
+    if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     useRemoteDragStore.getState().endDrag(data.tokenId);
     ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });

@@ -3098,6 +3098,35 @@ export const SimpleTabletop = () => {
     return img;
   };
 
+  const redrawRafRef = useRef<number | null>(null);
+  const latestRedrawRef = useRef<() => void>(() => {});
+
+  const scheduleRedraw = useCallback(() => {
+    if (redrawRafRef.current === null) {
+      redrawRafRef.current = requestAnimationFrame(() => {
+        redrawRafRef.current = null;
+        try {
+          latestRedrawRef.current();
+        } catch (e) {
+          console.error("[RENDER CRASH] Error escaped redrawCanvas. Resetting context to prevent matrix corruption:", e);
+          if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) {
+              ctx.resetTransform();
+              ctx.globalAlpha = 1.0;
+            }
+          }
+        }
+      });
+    }
+  }, []);
+
+  // Update latestRedrawRef on every render so scheduleRedraw ALWAYS has the freshest closure
+  // without needing dependency arrays that break throttles.
+  useEffect(() => {
+    latestRedrawRef.current = redrawCanvas;
+  });
+
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
 
@@ -4439,8 +4468,8 @@ export const SimpleTabletop = () => {
       drawMapPings(ctx);
     }
 
-    // ── Fog Reveal Brush: ghost circle is now drawn on the overlay canvas (see below)
-    // so it appears above the PixiJS fog post-processing layer.
+      // ── Fog Reveal Brush: ghost circle is now drawn on the overlay canvas (see below)
+      // so it appears above the PixiJS fog post-processing layer.
 
     // Restore context after all world-space rendering
     ctx.restore();
@@ -4567,7 +4596,7 @@ export const SimpleTabletop = () => {
             }
 
             // Draw drag ghost on overlay so it appears above tokens
-            if (isDraggingToken && draggedTokenId) {
+            if (isDraggingTokenRef.current && draggedTokenIdRef.current) {
               try { drawDragGhostAndPath(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawDragGhostAndPath error:', e); }
             }
             try { drawRemoteDragDecorations(overlayCtx, 'ghost'); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteDragDecorations (ghost) error:', e); }
@@ -4706,7 +4735,7 @@ export const SimpleTabletop = () => {
       // Continuously re-render while flashes are active
       const hasActiveFlashes = actionState.resolutionFlashes.some(f => now - f.startTime < 1500);
       if (hasActiveFlashes) {
-        requestAnimationFrame(() => redrawCanvas());
+        scheduleRedraw();
       }
     }
   };
@@ -7467,7 +7496,7 @@ export const SimpleTabletop = () => {
       setCanvasDimensions({ width: rect.width, height: rect.height });
 
       // Batch redraw is now handled natively by the state change triggering the redraw useEffect below.
-      // requestAnimationFrame(() => redrawCanvas());
+      // scheduleRedraw();
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -9466,7 +9495,7 @@ export const SimpleTabletop = () => {
         });
       }
       tempTokenPositionsRef.current = newTempPositions;
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
 
       // Real-time vision preview during drag (if enabled)
       console.log('[DRAG VISION] Checking conditions:', {
@@ -9557,8 +9586,8 @@ export const SimpleTabletop = () => {
         }
       }
 
-      // Force immediate redraw for smooth dragging feedback
-      redrawCanvas();
+      // Use throttled schedule redraw instead of synchronous call
+      scheduleRedraw();
     } else if (isDraggingVertex && draggedVertexInfo) {
       // Wall vertex dragging
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -9740,7 +9769,7 @@ export const SimpleTabletop = () => {
           }
         }
       }
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     } else if (isDraggingMapObject && draggedMapObjectId) {
 
       // MapObject dragging in edit mode
@@ -9826,7 +9855,7 @@ export const SimpleTabletop = () => {
       }
 
       // Force immediate redraw for smooth dragging feedback
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     } else if (isDraggingRegion && draggedRegionId) {
       // Region dragging - move tokens in real-time for smooth preview
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -9959,7 +9988,7 @@ export const SimpleTabletop = () => {
       }
 
       // Use requestAnimationFrame for smooth rendering
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     } else if (isRotatingRegion && draggedRegionId) {
       // Group rotation — ALL entities (primary region + siblings) orbit the SAME pivot.
       // The pivot is the group's fresh bounding-box centroid, computed at mousedown and
@@ -10124,7 +10153,7 @@ export const SimpleTabletop = () => {
       }
 
       // Use requestAnimationFrame for smooth rendering
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     } else if (isResizingRegion && draggedRegionId && resizeHandle) {
       // Region resizing or path node editing - use preview for smooth updates
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -10286,7 +10315,7 @@ export const SimpleTabletop = () => {
       }
 
       // Use requestAnimationFrame for smooth rendering
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     } else {
       // Mouse hover - detect token hover and update cursor
       const worldPos = screenToWorld(mouseX, mouseY);
@@ -10727,17 +10756,21 @@ export const SimpleTabletop = () => {
               );
               // Emit token move to network
               emitLocalOp({ kind: 'token.move', data: { tokenId: draggedTokenId, x: finalX, y: finalY } });
-              // ── Emit drag end to network ──
-              emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: finalX, y: finalY } });
               
               // Also emit moves for multi-dragged tokens
+              const dx = finalX - initialTokenState.x;
+              const dy = finalY - initialTokenState.y;
               const startPositions = multiDragStartPositionsRef.current;
               selectedTokenIds.forEach(tid => {
                 if (tid === draggedTokenId) return;
-                const t = tokens.find(tk => tk.id === tid);
-                if (t && startPositions[tid] && (startPositions[tid].x !== t.x || startPositions[tid].y !== t.y)) {
-                  emitLocalOp({ kind: 'token.move', data: { tokenId: tid, x: t.x, y: t.y } });
-                  emitDragEnd({ tokenId: tid, finalPos: { x: t.x, y: t.y } });
+                const tokenStart = startPositions[tid];
+                if (tokenStart) {
+                  const finalTidX = tokenStart.x + dx;
+                  const finalTidY = tokenStart.y + dy;
+                  if (finalTidX !== tokenStart.x || finalTidY !== tokenStart.y) {
+                    updateTokenPosition(tid, finalTidX, finalTidY);
+                    emitLocalOp({ kind: 'token.move', data: { tokenId: tid, x: finalTidX, y: finalTidY } });
+                  }
                 }
               });
             }
@@ -10752,7 +10785,21 @@ export const SimpleTabletop = () => {
       // Clear multi-drag start positions
       multiDragStartPositionsRef.current = {};
 
-      if (draggedTokenId) { markTokenDragEnd(draggedTokenId); unmarkDraggedForSync(draggedTokenId); }
+      if (draggedTokenId) { 
+        // Always emit drag end to clear remote states, regardless of whether the token actually moved
+        const storeToken = tokens.find((t) => t.id === draggedTokenId);
+        if (storeToken) {
+          emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: storeToken.x, y: storeToken.y } });
+        }
+        selectedTokenIds.forEach(tid => {
+           if (tid === draggedTokenId) return;
+           const tk = tokens.find(t => t.id === tid);
+           if (tk) emitDragEnd({ tokenId: tid, finalPos: { x: tk.x, y: tk.y } });
+        });
+
+        markTokenDragEnd(draggedTokenId); 
+        unmarkDraggedForSync(draggedTokenId); 
+      }
       setIsDraggingToken(false);
       isDraggingTokenRef.current = false;
       setDraggedTokenId(null);
@@ -10765,9 +10812,11 @@ export const SimpleTabletop = () => {
 
       // Defensively keep the temp position for 1000ms while the CoMap syncs over the network.
       // This prevents the token from visually flashing back to its start position.
-      // Eagerly clear if another drag starts before this fires.
+      // Defend against race conditions: only clear if we haven't started a NEW drag!
       setTimeout(() => {
-        tempTokenPositionsRef.current = undefined;
+        if (!isDraggingTokenRef.current) {
+          tempTokenPositionsRef.current = undefined;
+        }
       }, 1000);
 
       // If a modifier-click on an already-selected token happened and no drag occurred,
@@ -11446,7 +11495,7 @@ export const SimpleTabletop = () => {
         tempTokenPositionsRef.current = {
           [draggedTokenId]: { x: newX, y: newY }
         };
-        requestAnimationFrame(() => redrawCanvas());
+        scheduleRedraw();
       } else if (isDraggingRegion && draggedRegionId) {
         const region = regions.find(r => r.id === draggedRegionId);
         if (!region) return;
@@ -11494,7 +11543,7 @@ export const SimpleTabletop = () => {
           tempTokenPositionsRef.current = positions;
         }
 
-        requestAnimationFrame(() => redrawCanvas());
+        scheduleRedraw();
       }
     },
     onDragEnd: (x, y, rect) => {
@@ -12222,7 +12271,7 @@ export const SimpleTabletop = () => {
                       if (lastMousePosRef.current) {
                         fogBrushCursorRef.current = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
                       }
-                      requestAnimationFrame(() => redrawCanvas());
+                      scheduleRedraw();
                     }
                     return next;
                   });
