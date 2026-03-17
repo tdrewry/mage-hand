@@ -917,7 +917,7 @@ export const SimpleTabletop = () => {
   const groupFrozenAABBRef = useRef<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null);
 
   // Temporary token positions during region drag to avoid store updates
-  const [tempTokenPositions, setTempTokenPositions] = useState<{ [tokenId: string]: { x: number; y: number } }>();
+  const tempTokenPositionsRef = useRef<{ [tokenId: string]: { x: number; y: number } }>();
 
   // Rotation state
   const [isRotatingRegion, setIsRotatingRegion] = useState(false);
@@ -1468,7 +1468,7 @@ export const SimpleTabletop = () => {
           setDragStartPos({ x: 0, y: 0 });
           dragPathRef.current = [];
           setGroupedTokens([]);
-          setTempTokenPositions(undefined);
+          tempTokenPositionsRef.current = undefined;
           // Clear real-time vision preview
           dragPreviewVisibilityRef.current = null;
           setDragPreviewPosition(null);
@@ -1480,7 +1480,7 @@ export const SimpleTabletop = () => {
           setDragStartPos({ x: 0, y: 0 });
           dragPathRef.current = [];
           setGroupedTokens([]);
-          setTempTokenPositions(undefined);
+          tempTokenPositionsRef.current = undefined;
           dragPreviewVisibilityRef.current = null;
           setDragPreviewPosition(null);
         }
@@ -2511,27 +2511,30 @@ export const SimpleTabletop = () => {
             }
           });
 
-          if (!combinedVisibility) return;
-
-          // Store current visibility for interaction checks (clone before merging)
+          // If there is no token visibility, we must still clear the current visibility ref
+          // so that tokens correctly test as NOT illuminated (if no lights are present either).
           if (currentVisibilityRef.current && currentVisibilityRef.current.remove) {
             currentVisibilityRef.current.remove();
+            currentVisibilityRef.current = null;
           }
-          currentVisibilityRef.current = combinedVisibility.clone({ insert: false }) as paper.Path;
 
-          // Merge into explored areas (per-map)
-          const activeExplored = getActiveExploredArea();
-          setActiveExploredArea(addVisibleToExplored(activeExplored, combinedVisibility));
+          if (combinedVisibility) {
+            currentVisibilityRef.current = combinedVisibility.clone({ insert: false }) as paper.Path;
 
-          // Clean up combined visibility
-          if (combinedVisibility.remove) combinedVisibility.remove();
+            // Merge into explored areas (per-map)
+            const activeExplored = getActiveExploredArea();
+            setActiveExploredArea(addVisibleToExplored(activeExplored, combinedVisibility));
 
-          // Serialize for persistence
-          const currentMapId = selectedMapId || 'default-map';
-          const serialized = serializeFogGeometry(getActiveExploredArea());
-          if (serialized) {
-            fogSerializeSourceRef.current = true;
-            setSerializedExploredAreasForMap(currentMapId, serialized);
+            // Clean up combined visibility
+            if (combinedVisibility.remove) combinedVisibility.remove();
+
+            // Serialize for persistence
+            const currentMapId = selectedMapId || 'default-map';
+            const serialized = serializeFogGeometry(getActiveExploredArea());
+            if (serialized) {
+              fogSerializeSourceRef.current = true;
+              setSerializedExploredAreasForMap(currentMapId, serialized);
+            }
           }
 
           // Compute masks
@@ -2559,7 +2562,11 @@ export const SimpleTabletop = () => {
             }
           });
 
-          if (!visibilityForMask) return;
+          // Even if we have no token visibility, we should still compute masks (it will just be all fog/explored area)
+          // Create an empty path if needed so computeFogMasks doesn't crash
+          if (!visibilityForMask) {
+             visibilityForMask = new paper.Path();
+          }
 
           const masks = computeFogMasks(getActiveExploredArea(), visibilityForMask, worldBounds);
 
@@ -3242,7 +3249,7 @@ export const SimpleTabletop = () => {
     const viewHeight = canvas.height / transform.zoom;
     const viewX = -transform.x / transform.zoom;
     const viewY = -transform.y / transform.zoom;
-    const offScreenTokens: any[] = [];
+    let offScreenTokens: any[] = []; // Changed to let to be safe, though const works if we just push to it
 
     // Save context
     ctx.save();
@@ -3303,7 +3310,7 @@ export const SimpleTabletop = () => {
 
     tokens.forEach((token) => {
       // Use temporary position if available (during region drag)
-      const tempPos = tempTokenPositions?.[token.id];
+      const tempPos = tempTokenPositionsRef.current?.[token.id];
       const checkToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
 
       // Use the larger dimension for circular token radius
@@ -3794,7 +3801,7 @@ export const SimpleTabletop = () => {
     const drawTokensToContext = (targetCtx: CanvasRenderingContext2D) => {
       visibleTokens.forEach((token) => {
         // Use temporary position if available (during local drag)
-        let tempPos = tempTokenPositions?.[token.id];
+        let tempPos = tempTokenPositionsRef.current?.[token.id];
         
         // Alternatively, use remote drag position if available (during remote drag)
         if (!tempPos && remoteDrags[token.id]?.pos) {
@@ -3813,6 +3820,8 @@ export const SimpleTabletop = () => {
 
           // Use stable visibility snapshot during drag to prevent flashing
           // The stable snapshot is captured at drag start and doesn't change during movement
+          // For remote drags, we don't have a stable snapshot, so we check if there are ANY active remote drags
+          const hasRemoteDrags = Object.keys(remoteDrags).length > 0;
           const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
             ? stableVisibilityRef.current
             : currentVisibilityRef.current;
@@ -3821,7 +3830,7 @@ export const SimpleTabletop = () => {
           const isCurrentlyIlluminated = isPointInVisibleArea(
             tokenPoint,
             visibilityToCheck
-          );
+          ) || !!remoteDrags[token.id]; // Tokens being actively dragged remotely are always visible to prevent flickering
 
           // Check token ownership - friendly tokens always visible to their owner
           const tokenPlayer = players.find((p) => p.id === currentPlayerId);
@@ -9540,7 +9549,7 @@ export const SimpleTabletop = () => {
           }
         });
       }
-      setTempTokenPositions(newTempPositions);
+      tempTokenPositionsRef.current = newTempPositions;
       requestAnimationFrame(() => redrawCanvas());
 
       // Real-time vision preview during drag (if enabled)
@@ -9896,7 +9905,7 @@ export const SimpleTabletop = () => {
           if (snap?.position) newTempPositions[m.id] = { x: snap.position.x + absDeltaX, y: snap.position.y + absDeltaY };
         });
         if (Object.keys(newTempPositions).length > 0) {
-          setTempTokenPositions(prev => ({ ...prev, ...newTempPositions }));
+          tempTokenPositionsRef.current = { ...tempTokenPositionsRef.current, ...newTempPositions };
         }
       }
 
@@ -9984,7 +9993,7 @@ export const SimpleTabletop = () => {
           // Annotation MapObjects are now EntityGroup members — no special propagation needed.
         }
 
-        setTempTokenPositions(newTempPositions);
+        tempTokenPositionsRef.current = newTempPositions;
 
         if (draggedRegion.regionType === "path" && draggedRegion.pathPoints) {
           // Update path points for preview
@@ -10195,8 +10204,7 @@ export const SimpleTabletop = () => {
             }
           }
         }
-
-        setTempTokenPositions(newTempPositions);
+        tempTokenPositionsRef.current = newTempPositions;
       }
 
       // Use requestAnimationFrame for smooth rendering
@@ -10682,7 +10690,7 @@ export const SimpleTabletop = () => {
       // Handle token snapping on drag end
       if (isDraggingToken && draggedTokenId && !tokensMovedByRegion.includes(draggedTokenId)) {
         const storeToken = tokens.find((t) => t.id === draggedTokenId);
-        const tempPos = tempTokenPositions?.[draggedTokenId];
+        const tempPos = tempTokenPositionsRef.current?.[draggedTokenId];
         const token = storeToken && tempPos ? { ...storeToken, x: tempPos.x, y: tempPos.y } : storeToken;
         if (token) {
           // === COLLISION CHECK FIRST ===
@@ -10838,7 +10846,7 @@ export const SimpleTabletop = () => {
       // This prevents the token from visually flashing back to its start position.
       // Eagerly clear if another drag starts before this fires.
       setTimeout(() => {
-        setTempTokenPositions((prev) => prev ? undefined : prev);
+        tempTokenPositionsRef.current = undefined;
       }, 1000);
 
       // If a modifier-click on an already-selected token happened and no drag occurred,
@@ -11054,15 +11062,15 @@ export const SimpleTabletop = () => {
       }
 
       // Apply final token positions to store (only once at the end)
-      if (tempTokenPositions) {
-        Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
+      if (tempTokenPositionsRef.current) {
+        Object.entries(tempTokenPositionsRef.current).forEach(([tokenId, position]) => {
           updateTokenPosition(tokenId, position.x, position.y);
         });
       }
 
       // Clear grouped tokens and temp positions
       setGroupedTokens([]);
-      setTempTokenPositions(undefined);
+      tempTokenPositionsRef.current = undefined;
     }
 
     // Handle rotation completion
@@ -11504,9 +11512,9 @@ export const SimpleTabletop = () => {
         dragPathRef.current = [...dragPathRef.current, { x: newX, y: newY }];
 
         // Update token position temporarily
-        setTempTokenPositions({
+        tempTokenPositionsRef.current = {
           [draggedTokenId]: { x: newX, y: newY }
-        });
+        };
         requestAnimationFrame(() => redrawCanvas());
       } else if (isDraggingRegion && draggedRegionId) {
         const region = regions.find(r => r.id === draggedRegionId);
@@ -11552,7 +11560,7 @@ export const SimpleTabletop = () => {
           groupedTokens.forEach(({ tokenId, startX, startY }) => {
             positions[tokenId] = { x: startX + dx, y: startY + dy };
           });
-          setTempTokenPositions(positions);
+          tempTokenPositionsRef.current = positions;
         }
 
         requestAnimationFrame(() => redrawCanvas());
@@ -11566,7 +11574,7 @@ export const SimpleTabletop = () => {
       // Token drag end - reuse existing logic from handleMouseUp
       if (isDraggingToken && draggedTokenId) {
         const storeToken = tokens.find(t => t.id === draggedTokenId);
-        const tempPos = tempTokenPositions?.[draggedTokenId];
+        const tempPos = tempTokenPositionsRef.current?.[draggedTokenId];
         const token = storeToken && tempPos ? { ...storeToken, x: tempPos.x, y: tempPos.y } : storeToken;
         if (token) {
           // Check collision using correct store state
@@ -11686,7 +11694,7 @@ export const SimpleTabletop = () => {
         // Defensively keep the temp position for 1000ms while the CoMap syncs over the network.
         // Eagerly clear if another drag starts before this fires.
         setTimeout(() => {
-          setTempTokenPositions((prev) => prev ? undefined : prev);
+          tempTokenPositionsRef.current = undefined;
         }, 1000);
 
         if (stableVisibilityRef.current) {
@@ -11734,8 +11742,8 @@ export const SimpleTabletop = () => {
           }
         }
 
-        if (tempTokenPositions) {
-          Object.entries(tempTokenPositions).forEach(([tokenId, position]) => {
+        if (tempTokenPositionsRef.current) {
+          Object.entries(tempTokenPositionsRef.current).forEach(([tokenId, position]) => {
             updateTokenPosition(tokenId, position.x, position.y);
           });
         }
@@ -11759,7 +11767,7 @@ export const SimpleTabletop = () => {
         setRegionDragOffset({ x: 0, y: 0 });
         setDragPreview(null);
         setGroupedTokens([]);
-        setTempTokenPositions(undefined);
+        tempTokenPositionsRef.current = undefined;
 
         if (stableVisibilityRef.current) {
           stableVisibilityRef.current.remove();
