@@ -89,22 +89,6 @@ export function useAutoReconnect() {
         return;
       }
 
-      // ── OpBridge / WebSocket reconnect ──────────────────────────────
-      if (!state.serverUrl) return;
-
-      console.log('🔄 [AutoReconnect] Reconnecting to session', code);
-
-      netManager.connect({
-        serverUrl: state.serverUrl,
-        sessionCode: code,
-        username,
-        roles: state.roles.length > 0 ? state.roles : undefined,
-      }).then(() => {
-        console.log('✅ [AutoReconnect] Reconnected successfully');
-      }).catch((err) => {
-        console.warn('⚠️ [AutoReconnect] Failed to reconnect:', err);
-        useMultiplayerStore.getState().reset();
-      });
     }
 
     // Subscribe to store changes so we can react once rehydration completes

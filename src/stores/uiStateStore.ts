@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface UiState {
   // Focus Mode collapses all sidebars to maximize the canvas
@@ -24,24 +25,31 @@ interface UiState {
   toggleProfiler: () => void;
 }
 
-export const useUiStateStore = create<UiState>((set) => ({
-  isFocusMode: false,
-  setFocusMode: (focus) => set({ isFocusMode: focus }),
-  toggleFocusMode: () => set((state) => ({ isFocusMode: !state.isFocusMode })),
+export const useUiStateStore = create<UiState>()(
+  persist(
+    (set) => ({
+      isFocusMode: false,
+      setFocusMode: (focus) => set({ isFocusMode: focus }),
+      toggleFocusMode: () => set((state) => ({ isFocusMode: !state.isFocusMode })),
 
-  isLeftSidebarOpen: true,
-  setLeftSidebarOpen: (open) => set({ isLeftSidebarOpen: open }),
-  toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
+      isLeftSidebarOpen: true,
+      setLeftSidebarOpen: (open) => set({ isLeftSidebarOpen: open }),
+      toggleLeftSidebar: () => set((state) => ({ isLeftSidebarOpen: !state.isLeftSidebarOpen })),
 
-  isRightSidebarOpen: true,
-  setRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
-  toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+      isRightSidebarOpen: true,
+      setRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
+      toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
 
-  isTopNavbarOpen: true,
-  setTopNavbarOpen: (open) => set({ isTopNavbarOpen: open }),
-  toggleTopNavbar: () => set((state) => ({ isTopNavbarOpen: !state.isTopNavbarOpen })),
+      isTopNavbarOpen: true,
+      setTopNavbarOpen: (open) => set({ isTopNavbarOpen: open }),
+      toggleTopNavbar: () => set((state) => ({ isTopNavbarOpen: !state.isTopNavbarOpen })),
 
-  isProfilerVisible: false,
-  setProfilerVisible: (visible) => set({ isProfilerVisible: visible }),
-  toggleProfiler: () => set((state) => ({ isProfilerVisible: !state.isProfilerVisible })),
-}));
+      isProfilerVisible: false,
+      setProfilerVisible: (visible) => set({ isProfilerVisible: visible }),
+      toggleProfiler: () => set((state) => ({ isProfilerVisible: !state.isProfilerVisible })),
+    }),
+    {
+      name: 'vtt-ui-state',
+    }
+  )
+);

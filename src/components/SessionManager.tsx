@@ -12,19 +12,11 @@ import {
   Send,
   Zap,
   Database,
-  Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -39,33 +31,27 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useMultiplayerStore, type TransportType } from '@/stores/multiplayerStore';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { netManager } from '@/lib/net';
-import { getOrCreateClientId } from '../../networking/client/NetworkSession';
+import { getOrCreateClientId } from '@/lib/net/NetworkConstants';
 import { sendPing, sendChat } from '@/lib/net/demo';
-import { createJazzSession, joinJazzSession } from '@/lib/jazz/session';
 import { toast } from 'sonner';
 import {
   resolveSessionCode,
   generateSessionCode,
-  encodeJazzCode,
   isJazzCode,
+  encodeJazzCode,
 } from '@/lib/sessionCodeResolver';
 
-export { type TransportType } from '@/stores/multiplayerStore';
-
-interface SessionManagerProps {
+export const SessionManager: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultTab?: 'create' | 'join';
-}
-
-export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChange, defaultTab }) => {
+}> = ({ open, onOpenChange, defaultTab }) => {
   const {
     isConnected,
     connectionStatus,
-    serverUrl,
     currentSession,
     currentUsername,
     connectedUsers,
@@ -74,14 +60,15 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
     lastError,
     activeTransport,
     customJazzUrl,
-    setServerUrl,
+    customRegistryId,
     setCurrentUsername,
-    setActiveTransport,
     setCustomJazzUrl,
+    setCustomRegistryId,
   } = useMultiplayerStore();
 
-  const [localServerUrl, setLocalServerUrl] = useState(serverUrl);
   const [localJazzUrl, setLocalJazzUrl] = useState(customJazzUrl || '');
+  const [localRegistryId, setLocalRegistryId] = useState(customRegistryId || '');
+  const [isProvisioning, setIsProvisioning] = useState(false);
   const sessionPlayers = useSessionStore((s) => s.players);
   const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
   const landingUsername = React.useMemo(() => {
@@ -100,52 +87,35 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       }
     }
   }, [open, landingUsername, currentUsername]);
-  const [sessionCode, setSessionCode] = useState('');
-  const [password, setPassword] = useState('');
-  const [inviteToken, setInviteToken] = useState('');
+
+  const initialSessionCode = useSessionStore.getState().isFromUrl ? useSessionStore.getState().sessionId : '';
+  const [sessionCode, setSessionCode] = useState(initialSessionCode);
+  
+  // Sync local state if sessionId changes externally (e.g. from URL init)
+  React.useEffect(() => {
+      const state = useMultiplayerStore.getState();
+      if (state.isConnected && state.currentSession) {
+        // If already connected to a session, use its code
+        setSessionCode(state.currentSession.sessionCode || '');
+      } else {
+        // Otherwise, use the initial code from URL or clear it
+        const s = useSessionStore.getState();
+        const current = s.isFromUrl ? s.sessionId : '';
+        if (current && current !== sessionCode) {
+          setSessionCode(current);
+        } else if (!current && sessionCode) {
+          // Clear sessionCode if no longer from URL and not connected
+          setSessionCode('');
+        }
+      }
+  }, [initialSessionCode, isConnected, currentSession]); // Depend on connection status and current session
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [chatText, setChatText] = useState('');
-  const [transport, setTransport] = useState<TransportType>('jazz');
-
-  const handleConnect = async (code: string) => {
-    if (!username.trim()) {
-      toast.error('Please enter a username');
-      return;
-    }
-    if (!code.trim()) {
-      toast.error('Please enter a session code');
-      return;
-    }
-
-    setServerUrl(localServerUrl);
-    setIsConnecting(true);
-    try {
-      // Get local player's role IDs from sessionStore
-      const sessionState = useSessionStore.getState();
-      const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
-      const localRoles = currentPlayer?.roleIds;
-
-      await netManager.connect({
-        serverUrl: localServerUrl,
-        sessionCode: code.trim().toUpperCase(),
-        username: username.trim(),
-        inviteToken: inviteToken || undefined,
-        password: password || undefined,
-        roles: localRoles,
-      });
-      setCurrentUsername(username.trim());
-      setActiveTransport('opbridge');
-      toast.success(`Connected to session ${code.toUpperCase()}`);
-    } catch (error) {
-      console.error('Failed to connect:', error);
-      toast.error('Failed to connect. Is the server running?');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
+  const [vanityCode, setVanityCode] = useState('');
 
   const handleCreateSession = async () => {
     if (!username.trim()) {
@@ -153,76 +123,76 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       return;
     }
 
-    if (transport === 'jazz') {
-      setIsConnecting(true);
-      try {
-        if (localJazzUrl.trim()) {
-          setCustomJazzUrl(localJazzUrl.trim());
-        } else {
-          setCustomJazzUrl(null);
-        }
-
-        setCurrentUsername(username.trim());
-        useMultiplayerStore.getState().setActiveTransport('jazz');
-        
-        // Wait briefly for the UI to update / unmount the connecting state globally
-        setTimeout(async () => {
-             try {
-                const { createJazzSession } = await import('@/lib/jazz/session');
-                const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
-                const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
-                const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
-                
-                const sessionState = useSessionStore.getState();
-                const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
-                const playerRoles = currentPlayer?.roleIds || ['dm'];
-                
-                const info = createJazzSession(username.trim());
-                const shortCode = encodeJazzCode(info.sessionCoId);
-                
-                // Hydration stores
-                useMultiplayerStore.getState().setRoles(playerRoles);
-                useMultiplayerStore.getState().setCurrentSession({
-                  sessionCode: shortCode,
-                  sessionId: info.sessionCoId,
-                  createdAt: Date.now(),
-                  hasPassword: false,
-                });
-                
-                const clientId = getOrCreateClientId();
-                const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
-                const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles);
-                
-                await netManager.connectWithTransport({
-                  transport,
-                  ephemeralTransport,
-                  sessionCode: shortCode,
-                  username: username.trim(),
-                  roles: playerRoles,
-                });
-                
-                toast.success(`Jazz session created — code: ${shortCode}`);
-             } catch (err: any) {
-                console.error('Failed to init Jazz session setup:', err);
-                toast.error(`Session setup failed: ${err.message}`);
-                useMultiplayerStore.getState().setActiveTransport(null);
-             } finally {
-                setIsConnecting(false);
-             }
-        }, 100);
-      } catch (error) {
-        console.error('Failed to setup transport state:', error);
-        toast.error('Failed to init Jazz session state');
-        useMultiplayerStore.getState().setActiveTransport(null);
-        setIsConnecting(false);
+    setIsConnecting(true);
+    try {
+      if (localJazzUrl.trim()) {
+        setCustomJazzUrl(localJazzUrl.trim());
+      } else {
+        setCustomJazzUrl(null);
       }
-      return;
-    }
 
-    // Default: OpBridge / WebSocket
-    const code = generateSessionCode();
-    setSessionCode(code);
-    handleConnect(code);
+      setCurrentUsername(username.trim());
+      useMultiplayerStore.getState().setActiveTransport('jazz');
+      
+      // Dynamic imports for heavy session logic
+      const { createJazzSession } = await import('@/lib/jazz/session');
+      const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+      const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
+      const { registerCode } = await import('@/lib/jazz/registry');
+      
+      const sessionState = useSessionStore.getState();
+      const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+      const playerRoles = currentPlayer?.roleIds || ['dm'];
+      
+      const info = createJazzSession(username.trim());
+      
+      // Use vanity code if provided, otherwise use the existing sessionCode (from URL/State) or generate a new one
+      const finalCode = vanityCode.trim() || sessionCode.trim() || generateSessionCode();
+      
+      // Register code in global registry
+      try {
+        const { registerCode } = await import('@/lib/jazz/registry');
+        await registerCode(finalCode, info.sessionCoId);
+      } catch (regErr) {
+        console.warn("[SessionManager] Registration failed:", regErr);
+        toast.warning("Session created, but short-code registration failed. Please share the direct J- code instead.");
+      }
+      
+      // Hydration stores
+      useMultiplayerStore.getState().setRoles(playerRoles);
+      useMultiplayerStore.getState().setCurrentSession({
+        sessionCode: finalCode,
+        sessionId: info.sessionCoId,
+        createdAt: Date.now(),
+        hasPassword: false,
+      });
+      
+      const clientId = getOrCreateClientId();
+      const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+      const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles, finalCode);
+      
+      await netManager.connectWithTransport({
+        transport,
+        ephemeralTransport,
+        sessionCode: finalCode,
+        username: username.trim(),
+        roles: playerRoles,
+      });
+      
+      // Update URL to the readable shortCode
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('session', finalCode);
+      window.history.replaceState({}, '', newUrl.toString());
+
+      toast.success(`Jazz session created — code: ${finalCode}`);
+      onOpenChange(false);
+    } catch (err: any) {
+      console.error('Failed to init Jazz session setup:', err);
+      toast.error(`Session setup failed: ${err.message}`);
+      useMultiplayerStore.getState().setActiveTransport(null);
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   /** Unified join — auto-detects transport from the code format. */
@@ -236,11 +206,30 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
       return;
     }
 
+    const intentCode = sessionCode.trim();
+    
     setIsConnecting(true);
+    const searchToast = toast.loading('Searching for session...');
+    
     try {
-      const resolved = resolveSessionCode(sessionCode);
+      let resolved;
+      let attempt = 0;
+      const maxAttempts = 3;
+      
+      while (attempt < maxAttempts) {
+        resolved = await resolveSessionCode(intentCode);
+        if (resolved.transport === 'jazz') break;
+        
+        attempt++;
+        if (attempt < maxAttempts) {
+          console.log(`[SessionManager] Registry entry not found for ${intentCode}, retrying ${attempt}/${maxAttempts}...`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+      
+      toast.dismiss(searchToast);
 
-      if (resolved.transport === 'jazz') {
+      if (resolved && resolved.transport === 'jazz') {
         if (localJazzUrl.trim()) {
           setCustomJazzUrl(localJazzUrl.trim());
         } else {
@@ -249,54 +238,50 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
         setCurrentUsername(username.trim());
         useMultiplayerStore.getState().setActiveTransport('jazz');
 
-        // Wait briefly before resolving the connection payload
-        setTimeout(async () => {
-             try {
-                const { joinJazzSession } = await import('@/lib/jazz/session');
-                const { encodeJazzCode } = await import('@/lib/sessionCodeResolver');
-                const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
-                const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
-                
-                const sessionState = useSessionStore.getState();
-                const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
-                const playerRoles = currentPlayer?.roleIds || ['player'];
-                
-                const info = await joinJazzSession(resolved.connectionId);
-                const shortCode = encodeJazzCode(info.sessionCoId);
-                
-                // Hydration stores
-                useMultiplayerStore.getState().setRoles(playerRoles);
-                useMultiplayerStore.getState().setCurrentSession({
-                  sessionCode: shortCode,
-                  sessionId: info.sessionCoId,
-                  createdAt: Date.now(),
-                  hasPassword: false,
-                });
-                
-                const clientId = getOrCreateClientId();
-                const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
-                const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles);
-                
-                await netManager.connectWithTransport({
-                  transport,
-                  ephemeralTransport,
-                  sessionCode: shortCode,
-                  username: username.trim(),
-                  roles: playerRoles,
-                });
-                
-                toast.success(`Joined Jazz session ${shortCode}`);
-             } catch (err: any) {
-                console.error('Failed to prep Jazz join:', err);
-                toast.error(`Session join failed: ${err.message}`);
-                useMultiplayerStore.getState().setActiveTransport(null);
-             } finally {
-                setIsConnecting(false);
-             }
-        }, 100);
+        // Dynamic imports for heavy session logic
+        const { joinJazzSession } = await import('@/lib/jazz/session');
+        const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+        const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
+        
+        const sessionState = useSessionStore.getState();
+        const currentPlayer = sessionState.players.find(p => p.id === sessionState.currentPlayerId);
+        const playerRoles = currentPlayer?.roleIds || ['player'];
+        
+        const info = await joinJazzSession(resolved.connectionId);
+        const shortCode = resolved.displayCode;
+        
+        // Hydration stores
+        useMultiplayerStore.getState().setRoles(playerRoles);
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: shortCode,
+          sessionId: info.sessionCoId,
+          createdAt: Date.now(),
+          hasPassword: false,
+        });
+        
+        const clientId = getOrCreateClientId();
+        const transport = new JazzTransport(info.root, clientId, username.trim(), playerRoles);
+        const ephemeralTransport = new WebRTCTransport(info.root, clientId, playerRoles, shortCode);
+        
+        await netManager.connectWithTransport({
+          transport,
+          ephemeralTransport,
+          sessionCode: shortCode,
+          username: username.trim(),
+          roles: playerRoles,
+        });
+        
+        // Update URL and SessionStore to the readable shortCode
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('session', shortCode);
+        window.history.replaceState({}, '', newUrl.toString());
+        
+        useSessionStore.setState({ sessionId: shortCode });
+
+        toast.success(`Joined Jazz session ${shortCode}`);
+        onOpenChange(false);
       } else {
-        // OpBridge join
-        await handleConnect(resolved.connectionId);
+        toast.error('Could not find session. Please check the code and try again.');
       }
     } catch (error) {
       console.error('Failed to prep Jazz join:', error);
@@ -307,29 +292,22 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
   };
 
   const handleLeaveSession = () => {
-    // If Jazz was active, tear down the bridge synchronously BEFORE closing WS
-    // so Jazz cleanup happens while the connection is still live
-    if (activeTransport === 'jazz') {
+    const currentActiveTransport = useMultiplayerStore.getState().activeTransport;
+    if (currentActiveTransport === 'jazz') {
       try {
-        // Use synchronous import — leaveJazzSession is already loaded at this point
-        const { leaveJazzSession } = require('@/lib/jazz/session');
-        leaveJazzSession();
-      } catch {
-        // Fallback: async import (shouldn't normally reach here)
         import('@/lib/jazz/session').then(({ leaveJazzSession }) => {
           leaveJazzSession();
         }).catch(() => {});
-      }
+      } catch (e) {}
     }
 
-    // Tear down WebSocket — sends close frame so server broadcasts presence:leave
+    // Tear down connection
     netManager.disconnect();
 
     // Fully reset multiplayer state to local-only defaults
     useMultiplayerStore.getState().reset();
 
     setSessionCode('');
-    setPassword('');
     toast.info('Left session');
   };
 
@@ -442,6 +420,31 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 </div>
               </div>
 
+              {currentSession?.sessionId && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest pl-1">Direct Share Link (Fallback)</Label>
+                    <Badge variant="outline" className="text-[9px] h-4 px-1 opacity-70">Always Works</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-background/30 rounded-lg border border-white/5">
+                    <code className="text-[10px] text-primary/70 font-mono truncate flex-1">
+                      {encodeJazzCode(currentSession.sessionId)}
+                    </code>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(encodeJazzCode(currentSession!.sessionId));
+                        toast.success('Direct link copied!');
+                      }}
+                      className="h-6 w-6 shrink-0"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <Separator />
 
               <div className="space-y-2">
@@ -452,11 +455,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Transport</span>
                   <Badge variant="secondary" className="text-xs">
-                    {activeTransport === 'jazz' ? (
-                      <><Database className="h-3 w-3 mr-1" /> Jazz (CRDT)</>
-                    ) : (
-                      <><Radio className="h-3 w-3 mr-1" /> OpBridge (WS)</>
-                    )}
+                    <Database className="h-3 w-3 mr-1" /> Jazz (CRDT)
                   </Badge>
                 </div>
                 {roles.length > 0 && (
@@ -465,16 +464,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                     <div className="flex gap-1">
                       {roles.map(r => (
                         <Badge key={r} variant="secondary" className="text-xs">{r}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {permissions.length > 0 && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground text-xs">Permissions</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {permissions.map(p => (
-                        <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
                       ))}
                     </div>
                   </div>
@@ -489,7 +478,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
             </div>
 
-            {/* Connected Users List */}
             {connectedUsers.length > 0 && (
               <div className="space-y-3 pt-2">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Connected Users</Label>
@@ -509,7 +497,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
               </div>
             )}
 
-            {/* Debug Section */}
             <Collapsible open={showDebug} onOpenChange={setShowDebug} className="pt-2">
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5">
@@ -547,14 +534,13 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
             </div>
           </div>
         ) : (
-          // Session Creation/Join View
-          <Tabs defaultValue={defaultTab || "create"} className="w-full pt-2">
+          <Tabs defaultValue={defaultTab || (sessionCode ? "join" : "create")} className="w-full pt-2">
             <TabsList className="grid w-full grid-cols-2 bg-background/50 border border-white/5 p-1 rounded-lg">
               <TabsTrigger value="create" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Create Session</TabsTrigger>
               <TabsTrigger value="join" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md">Join Session</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="create" className="space-y-4 mt-4">
+            <TabsContent value="create" className="space-y-6 mt-4">
               <div className="space-y-2">
                 <Label htmlFor="create-username" className="pl-1 text-muted-foreground">Username</Label>
                 <Input
@@ -562,7 +548,6 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
                   disabled={isConnecting}
                   className="bg-background/50 border-white/10 focus-visible:ring-primary h-10"
                 />
@@ -570,53 +555,30 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
 
               <div className="space-y-2 pt-2">
                 <Label className="pl-1 text-muted-foreground">Transport</Label>
-                <Select
-                  value={transport}
-                  onValueChange={(v) => setTransport(v as TransportType)}
+                <div className="p-3 rounded-lg bg-background/30 border border-white/5 flex items-center gap-3">
+                  <Database className="h-4 w-4 text-primary" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Jazz (CRDT)</p>
+                    <p className="text-xs text-muted-foreground">Peer-to-peer sync via Jazz (no server needed)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vanity-code" className="pl-1 text-muted-foreground">Vanity Code (Optional)</Label>
+                <Input
+                  id="vanity-code"
+                  placeholder="e.g. My-Cool-Game"
+                  value={vanityCode}
+                  onChange={(e) => setVanityCode(e.target.value)}
                   disabled={isConnecting}
-                >
-                  <SelectTrigger className="bg-background/50 border-white/10 h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="opbridge">
-                      <span className="flex items-center gap-2">
-                        <Radio className="h-3.5 w-3.5 text-primary" />
-                        OpBridge (WebSocket)
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="jazz">
-                      <span className="flex items-center gap-2">
-                        <Database className="h-3.5 w-3.5 text-primary" />
-                        Jazz (CRDT)
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="bg-background/50 border-white/10 focus-visible:ring-primary h-10"
+                />
                 <p className="text-xs text-muted-foreground">
-                  {transport === 'opbridge'
-                    ? 'Real-time sync via WebSocket server (requires running server)'
-                    : 'Peer-to-peer CRDT sync via Jazz (no server needed for durable state)'}
+                  Create a human-readable link for your session.
                 </p>
               </div>
 
-              {transport === 'opbridge' && (
-              <div className="space-y-2">
-                <Label htmlFor="create-password">Password (Optional)</Label>
-                <Input
-                  id="create-password"
-                  type="password"
-                  placeholder="Protect your session"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
-                  disabled={isConnecting}
-                  className="bg-input border-border text-foreground"
-                />
-              </div>
-              )}
-
-              {/* Advanced Settings — handles both OpBridge and Jazz dynamically */}
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced} className="pt-2">
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5">
@@ -625,52 +587,64 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
-                  {transport === 'opbridge' ? (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="create-server-url" className="text-xs text-muted-foreground">Server URL</Label>
-                        <Input
-                          id="create-server-url"
-                          placeholder="ws://localhost:3001"
-                          value={localServerUrl}
-                          onChange={(e) => setLocalServerUrl(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="create-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
-                        <Input
-                          id="create-invite-token"
-                          placeholder="Enter invite token"
-                          value={inviteToken}
-                          onChange={(e) => setInviteToken(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 text-sm h-9"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground/70">
-                        Change server URL to connect to a remote server
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="create-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
-                        <Input
-                          id="create-jazz-url"
-                          placeholder="wss://your-project.mesh.jazz.workers.dev"
-                          value={localJazzUrl}
-                          onChange={(e) => setLocalJazzUrl(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground/70">
-                        Leave blank to use the default or environment variable synchronization mesh.
-                      </p>
-                    </>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
+                    <Input
+                      id="create-jazz-url"
+                      placeholder="wss://your-project.mesh.jazz.workers.dev"
+                      value={localJazzUrl}
+                      onChange={(e) => {
+                        setLocalJazzUrl(e.target.value);
+                        setCustomJazzUrl(e.target.value || null);
+                      }}
+                      disabled={isConnecting}
+                      className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                    />
+                  </div>
+
+                  <Separator className="my-2 opacity-30" />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="registry-id" className="text-xs text-muted-foreground">Registry CoValue ID</Label>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-[10px] text-primary"
+                        onClick={async () => {
+                          setIsProvisioning(true);
+                          const { provisionRegistry } = await import('@/lib/jazz/registry');
+                          try {
+                            const newId = provisionRegistry();
+                            setLocalRegistryId(newId);
+                            setCustomRegistryId(newId);
+                            toast.success("New registry provisioned!");
+                          } catch (e: any) {
+                            toast.error(`Provisioning failed: ${e.message}`);
+                          } finally {
+                            setIsProvisioning(false);
+                          }
+                        }}
+                        disabled={isProvisioning}
+                      >
+                        {isProvisioning ? 'Provisioning...' : 'Provision New'}
+                      </Button>
+                    </div>
+                    <Input
+                      id="registry-id"
+                      placeholder="co_zRegistry..."
+                      value={localRegistryId}
+                      onChange={(e) => {
+                        setLocalRegistryId(e.target.value);
+                        setCustomRegistryId(e.target.value || null);
+                      }}
+                      disabled={isConnecting || isProvisioning}
+                      className="bg-background/50 border-white/10 font-mono text-[10px] h-8"
+                    />
+                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed italic">
+                      Share this ID with peers to enable 6-character short codes on your mesh.
+                    </p>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -716,39 +690,21 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   value={sessionCode}
                   onChange={(e) => {
                     const val = e.target.value;
-                    // Don't force uppercase for Jazz codes (they're case-sensitive)
-                    setSessionCode(isJazzCode(val) ? val : val.toUpperCase());
+                    setSessionCode(val);
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
                   maxLength={64}
+                  onFocus={(e) => e.target.select()}
                   disabled={isConnecting}
                   className={`bg-background/50 border-white/10 focus-visible:ring-primary font-mono text-center h-14 ${
                     sessionCode.length > 12 ? 'text-sm tracking-normal' : 'text-xl tracking-widest uppercase'
                   }`}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Paste the code shared by your host — the connection type is detected automatically.
+                  Paste the code shared by your host.
                 </p>
               </div>
 
-              {/* Only show password for non-Jazz codes */}
-              {!isJazzCode(sessionCode) && (
-                <div className="space-y-2">
-                  <Label htmlFor="join-password">Password (If Required)</Label>
-                  <Input
-                    id="join-password"
-                    type="password"
-                    placeholder="Enter session password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleJoinSession()}
-                    disabled={isConnecting}
-                    className="bg-input border-border text-foreground"
-                  />
-                </div>
-              )}
-
-              {/* Advanced Settings — both Jazz and OpBridge */}
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="w-full">
@@ -757,49 +713,20 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 mt-3 p-4 bg-background/30 rounded-xl border border-white/5">
-                  {!isJazzCode(sessionCode) && sessionCode !== '' ? (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="join-server-url" className="text-xs text-muted-foreground">Server URL</Label>
-                        <Input
-                          id="join-server-url"
-                          placeholder="ws://localhost:3001"
-                          value={localServerUrl}
-                          onChange={(e) => setLocalServerUrl(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="join-invite-token" className="text-xs text-muted-foreground">Invite Token (Optional)</Label>
-                        <Input
-                          id="join-invite-token"
-                          placeholder="Enter invite token"
-                          value={inviteToken}
-                          onChange={(e) => setInviteToken(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 text-sm h-9"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="join-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
-                        <Input
-                          id="join-jazz-url"
-                          placeholder="wss://your-project.mesh.jazz.workers.dev"
-                          value={localJazzUrl}
-                          onChange={(e) => setLocalJazzUrl(e.target.value)}
-                          disabled={isConnecting}
-                          className="bg-background/50 border-white/10 font-mono text-sm h-9"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground/70">
-                        Leave blank to use the default or environment variable synchronization mesh.
-                      </p>
-                    </>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="join-jazz-url" className="text-xs text-muted-foreground">Custom Jazz Mesh URL</Label>
+                    <Input
+                      id="join-jazz-url"
+                      placeholder="wss://your-project.mesh.jazz.workers.dev"
+                      value={localJazzUrl}
+                      onChange={(e) => setLocalJazzUrl(e.target.value)}
+                      disabled={isConnecting}
+                      className="bg-background/50 border-white/10 font-mono text-sm h-9"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground/70">
+                    Leave blank to use the default synchronization mesh.
+                  </p>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -820,6 +747,23 @@ export const SessionManager: React.FC<SessionManagerProps> = ({ open, onOpenChan
                     Join Session
                   </>
                 )}
+                </Button>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSessionCode('DEV_LOCAL');
+                    setUsername(username || `Tester_${Math.floor(Math.random() * 1000)}`);
+                    // Yield briefly to let state update before joining
+                    setTimeout(() => handleJoinSession(), 50);
+                  }}
+                  disabled={isConnecting}
+                  className="w-full h-10 text-sm border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all font-mono"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Quick Join Sandbox (DEV_LOCAL)
                 </Button>
               </div>
             </TabsContent>

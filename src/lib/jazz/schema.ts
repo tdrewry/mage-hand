@@ -289,6 +289,8 @@ export const JazzConnectedUsersMap = co.record(z.string(), z.string()); // Recor
 
 export const JazzSignalingRoom = co.record(z.string(), z.string()); // Record<PeerId, JSON.stringify(SignalingData)>
 
+export const JazzSessionRegistry = co.record(z.string(), z.string()); // Record<ShortCode, CoValueId>
+
 // ── Session Root ───────────────────────────────────────────────────────────
 
 export const JazzSessionRoot = co.map({

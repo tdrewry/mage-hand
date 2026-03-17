@@ -655,7 +655,10 @@ export const useCardStore = create<CardStore>((set, get) => ({
           }
           return acc;
         }, []);
-        set({ cards: uniqueCards });
+        
+        // Restore nextZIndex based on loaded cards to preserve card stack order
+        const maxZ = Math.max(...uniqueCards.map((c: CardState) => c.zIndex || Z_INDEX.CARDS.BASE), Z_INDEX.CARDS.BASE);
+        set({ cards: uniqueCards, nextZIndex: maxZ + 1 });
       } catch (e) {
         console.error('Failed to load card layout:', e);
       }

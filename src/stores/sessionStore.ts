@@ -7,6 +7,8 @@
 import { create, StateCreator } from 'zustand';
 import { persist, PersistOptions } from 'zustand/middleware';
 import { syncPatch } from '@/lib/sync';
+import { generateSessionCode, resolveSessionCode, isJazzCode } from '@/lib/sessionCodeResolver';
+import { useMultiplayerStore } from './multiplayerStore';
 import type { IlluminationSource } from '@/types/illumination';
 
 export type LabelPosition = 'above' | 'center' | 'below';
@@ -115,6 +117,7 @@ export interface ViewportTransform {
 
 export interface SessionState {
   sessionId: string;
+  isFromUrl: boolean;
   tokens: Token[];
   players: Player[];
   currentPlayerId: string;
@@ -162,7 +165,7 @@ export interface SessionState {
   setLabelVisibility: (visibility: LabelVisibility) => void;
   addPlayer: (player: Player) => void;
   setCurrentPlayer: (playerId: string, role: 'dm' | 'player') => void;
-  initializeSession: (sessionId?: string) => void;
+  initializeSession: (router?: any) => Promise<void>;
   setViewportTransform: (mapId: string, transform: ViewportTransform) => void;
   getViewportTransform: (mapId: string) => ViewportTransform;
 }
@@ -170,6 +173,7 @@ export interface SessionState {
 // Define the store creator separately for better type inference
 const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   sessionId: '',
+  isFromUrl: false,
   tokens: [],
   players: [],
   currentPlayerId: '',
@@ -507,29 +511,52 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     });
   },
   
-  initializeSession: (sessionId) => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlSessionId = urlParams.get('session');
-    const finalSessionId = sessionId || urlSessionId || generateSessionId();
+  initializeSession: async (router?: any) => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionParam = params.get('session');
+    
+    let targetSessionId = '';
+
+    if (sessionParam) {
+      try {
+        const resolved = await resolveSessionCode(sessionParam);
+        targetSessionId = resolved.connectionId;
+
+        // If the resolved code is a Jazz code, update the URL to the full session ID
+        if (isJazzCode(sessionParam) && router) {
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('session', targetSessionId);
+          router.replace(newUrl.toString(), undefined, { shallow: true });
+        }
+      } catch (err) {
+        console.warn("[session-store] Failed to resolve session ID from URL:", err);
+        targetSessionId = sessionParam; // Fallback to raw param
+      }
+    }
+
+    if (!targetSessionId) {
+      targetSessionId = generateSessionCode();
+    }
     
     // Generate or get current player ID
     let currentPlayerId = localStorage.getItem('vtt-player-id');
     if (!currentPlayerId) {
-      currentPlayerId = generateSessionId();
+      currentPlayerId = generateSessionCode(); // Using the imported generateSessionCode
       localStorage.setItem('vtt-player-id', currentPlayerId);
     }
     
     set({ 
-      sessionId: finalSessionId,
+      sessionId: targetSessionId,
+      isFromUrl: !!sessionParam,
       currentPlayerId,
     });
     
     // Don't auto-assign role here - let RoleSelectionModal handle it
     
-    // Update URL if needed
-    if (!urlSessionId || urlSessionId !== finalSessionId) {
+    // Update URL if needed (avoid over-writing short codes with CoIDs)
+    if (!sessionParam && targetSessionId) {
       const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set('session', finalSessionId);
+      newUrl.searchParams.set('session', targetSessionId);
       window.history.replaceState({}, '', newUrl.toString());
     }
   },

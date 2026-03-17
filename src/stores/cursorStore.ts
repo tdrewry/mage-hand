@@ -2,6 +2,7 @@
 // Reactive store for remote user cursors, fed by ephemeral TTLCache.
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface RemoteCursor {
   userId: string;
@@ -50,44 +51,52 @@ function getColorForUser(userId: string): string {
   return color;
 }
 
-export const useCursorStore = create<CursorState>()((set) => ({
-  cursors: {},
-  cursorSharingEnabled: true,
+export const useCursorStore = create<CursorState>()(
+  persist(
+    (set) => ({
+      cursors: {},
+      cursorSharingEnabled: true,
 
-  setCursor: (userId, cursor) =>
-    set((state) => {
-      // Skip update if position hasn't meaningfully changed (within 0.5 world units)
-      // Prevents unnecessary React renders and canvas redraws on remote clients
-      const existing = state.cursors[userId];
-      if (existing) {
-        const dx = Math.abs(existing.x - cursor.x);
-        const dy = Math.abs(existing.y - cursor.y);
-        if (dx < 0.5 && dy < 0.5 && existing.tool === cursor.tool) return state;
-      }
-      return {
-        cursors: {
-          ...state.cursors,
-          [userId]: {
-            ...cursor,
-            color: cursor.color || getColorForUser(userId),
-            lastSeen: Date.now(),
-          },
-        },
-      };
-    }),
+      setCursor: (userId, cursor) =>
+        set((state) => {
+          // Skip update if position hasn't meaningfully changed (within 0.5 world units)
+          // Prevents unnecessary React renders and canvas redraws on remote clients
+          const existing = state.cursors[userId];
+          if (existing) {
+            const dx = Math.abs(existing.x - cursor.x);
+            const dy = Math.abs(existing.y - cursor.y);
+            if (dx < 0.5 && dy < 0.5 && existing.tool === cursor.tool) return state;
+          }
+          return {
+            cursors: {
+              ...state.cursors,
+              [userId]: {
+                ...cursor,
+                color: cursor.color || getColorForUser(userId),
+                lastSeen: Date.now(),
+              },
+            },
+          };
+        }),
 
-  removeCursor: (userId) =>
-    set((state) => {
-      const { [userId]: _, ...rest } = state.cursors;
-      return { cursors: rest };
-    }),
+      removeCursor: (userId) =>
+        set((state) => {
+          const { [userId]: _, ...rest } = state.cursors;
+          return { cursors: rest };
+        }),
 
-  setCursorSharingEnabled: (enabled) =>
-    set((state) => {
-      // When disabling, also clear all remote cursors so nothing lingers
-      if (!enabled) {
-        return { cursorSharingEnabled: false, cursors: {} };
-      }
-      return { cursorSharingEnabled: true };
+      setCursorSharingEnabled: (enabled) =>
+        set((state) => {
+          // When disabling, also clear all remote cursors so nothing lingers
+          if (!enabled) {
+            return { cursorSharingEnabled: false, cursors: {} };
+          }
+          return { cursorSharingEnabled: true };
+        }),
     }),
-}));
+    {
+      name: 'vtt-cursor-state',
+      partialize: (state) => ({ cursorSharingEnabled: state.cursorSharingEnabled }),
+    }
+  )
+);

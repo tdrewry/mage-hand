@@ -17,6 +17,7 @@ export interface PeerDiagnostics {
   isHost: boolean;
   iceCandidatesSent: number;
   iceCandidatesReceived: number;
+  iceState?: RTCIceConnectionState | 'new' | 'unknown';
   error?: string;
 }
 
@@ -38,6 +39,7 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set) 
         isHost: false,
         iceCandidatesSent: 0,
         iceCandidatesReceived: 0,
+        iceState: 'unknown',
       };
       return {
         peers: {

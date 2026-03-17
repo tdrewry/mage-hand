@@ -15,17 +15,15 @@
 
 import type { TransportType } from '@/stores/multiplayerStore';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export interface ResolvedSession {
   transport: TransportType;
-  /** For OpBridge: the 6-char session code.  For Jazz: the full CoValue ID. */
+  /** For OpBridge: the 6-char session code. For Jazz: the full CoValue ID. */
   connectionId: string;
   /** The raw code the user typed (for display). */
   displayCode: string;
 }
+
+import { resolveCode as resolveFromRegistry } from './jazz/registry';
 
 // Removed B64 conversion since it bloats entropy instead of compressing it
 
@@ -83,17 +81,24 @@ export function isOpBridgeCode(code: string): boolean {
   return /^[A-Z0-9]{4,8}$/.test(code);
 }
 
+/** Returns true if the code looks like a vanity code (e.g. DEV-1). */
+export function isVanityCode(code: string): boolean {
+  return /^[a-zA-Z0-9-]{3,32}$/.test(code) && !isJazzCode(code);
+}
+
 // ---------------------------------------------------------------------------
 // Resolver
 // ---------------------------------------------------------------------------
 
 /**
  * Resolve a user-entered session code into a transport + connection ID.
- * Throws if the code format is unrecognised.
+ * Supports legacy Jazz codes (J-), OpBridge codes (registry only!), and Vanity/ShortCodes via Registry.
+ * Returns a Promise since Registry lookup is async.
  */
-export function resolveSessionCode(rawCode: string): ResolvedSession {
+export async function resolveSessionCode(rawCode: string): Promise<ResolvedSession> {
   const code = rawCode.trim();
 
+  // 1. Direct Jazz Code (Legacy/Deep Link)
   if (isJazzCode(code)) {
     const coValueId = decodeJazzCode(code);
     if (!coValueId) {
@@ -106,17 +111,28 @@ export function resolveSessionCode(rawCode: string): ResolvedSession {
     };
   }
 
-  // Default: OpBridge
-  const upper = code.toUpperCase();
-  if (!isOpBridgeCode(upper)) {
-    throw new Error('Invalid session code format');
+  // 1.5 Local Dev Sandbox Escape Hatch
+  if (code.toUpperCase() === 'DEV_LOCAL') {
+    return {
+      transport: 'jazz',
+      connectionId: 'co_zLocalDevSession0000000000000000',
+      displayCode: 'DEV_LOCAL',
+    };
   }
 
-  return {
-    transport: 'opbridge',
-    connectionId: upper,
-    displayCode: upper,
-  };
+  // 2. Registry Lookup (Vanity / ShortCodes)
+  // We prioritize Jazz-backed registry lookups for unqualified codes
+  const resolvedCoId = await resolveFromRegistry(code);
+  if (resolvedCoId) {
+    return {
+      transport: 'jazz',
+      connectionId: resolvedCoId,
+      displayCode: code,
+    };
+  }
+
+  // 3. Failure
+  throw new Error(`Session code "${code}" could not be resolved in the Jazz registry.`);
 }
 
 // ---------------------------------------------------------------------------

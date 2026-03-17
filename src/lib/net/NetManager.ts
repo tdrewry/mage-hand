@@ -61,12 +61,9 @@ export class NetManager {
 
   // Reconnection state
   private _lastConnectParams?: {
-    serverUrl: string;
-    sessionCode: string;
-    username: string;
-    inviteToken?: string;
-    password?: string;
     roles?: string[];
+    transport?: ITransport;
+    ephemeralTransport?: ITransport;
   };
   private _reconnectTimer?: number;
   private _reconnectAttempt = 0;
@@ -81,49 +78,6 @@ export class NetManager {
     this.wireEvents();
   }
 
-  /** Connect to a session via WebSocket. */
-  async connect(params: {
-    serverUrl: string;
-    sessionCode: string;
-    username: string;
-    inviteToken?: string;
-    password?: string;
-    roles?: string[];
-  }): Promise<NetworkSessionInfo> {
-    const store = useMultiplayerStore.getState();
-    store.setConnectionStatus("connecting");
-    store.setLastError(null);
-
-    this._sessionCode = params.sessionCode;
-    this._lastConnectParams = params;
-    this._intentionalDisconnect = false;
-    this._reconnectAttempt = 0;
-    this.clearReconnectTimer();
-
-    const lastSeenSeq = readLastSeenSeq(params.sessionCode);
-
-    const connectParams: ConnectParams = {
-      serverUrl: params.serverUrl,
-      sessionCode: params.sessionCode,
-      username: params.username,
-      inviteToken: params.inviteToken,
-      password: params.password,
-      roles: params.roles,
-      lastSeenSeq: lastSeenSeq > 0 ? lastSeenSeq : undefined,
-    };
-
-    try {
-      const info = await this.session.connect(connectParams);
-      this._reconnectAttempt = 0;
-      return info;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const s = useMultiplayerStore.getState();
-      s.setConnectionStatus("error");
-      s.setLastError(msg);
-      throw err;
-    }
-  }
 
   /**
    * Connect using a custom injected transport (e.g. JazzTransport).
@@ -488,15 +442,14 @@ export class NetManager {
       this.cleanups = [];
       this.wireEvents();
 
-      if (this._ephemeralOnly && (params as any).transport) {
+      if (params.transport) {
         await this.connectWithTransport(params as any);
-      } else {
-        await this.connect(params);
       }
       
       console.log("✅ [NetManager] Reconnected successfully");
-    } catch (err) {
-      console.warn("⚠️ [NetManager] Reconnect attempt failed:", err);
+    } catch (err: any) {
+      console.warn('⚠️ [AutoReconnect] Failed to reconnect:', err);
+      useMultiplayerStore.getState().reset();
       if (!this._intentionalDisconnect && this._autoReconnect) {
         this.scheduleReconnect();
       }

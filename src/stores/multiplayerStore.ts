@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectedUser } from '@/types/multiplayerEvents';
 
-export type TransportType = 'opbridge' | 'jazz';
+export type TransportType = 'jazz';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
 
@@ -17,7 +17,6 @@ export interface MultiplayerState {
   // Connection state
   isConnected: boolean;
   connectionStatus: ConnectionStatus;
-  serverUrl: string;
   
   // Session state
   currentSession: SessionInfo | null;
@@ -31,6 +30,7 @@ export interface MultiplayerState {
   lastError: string | null;
   activeTransport: TransportType | null;
   customJazzUrl: string | null;
+  customRegistryId: string | null;
   
   // WebRTC Ephemeral State
   webRtcConnections: Array<{ peerId: string; status: RTCPeerConnectionState | 'new' }>;
@@ -47,7 +47,6 @@ export interface MultiplayerState {
   _rehydrated: boolean;
   
   // Actions
-  setServerUrl: (url: string) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
   setCurrentSession: (session: SessionInfo | null) => void;
   setCurrentUserId: (userId: string | null) => void;
@@ -62,6 +61,7 @@ export interface MultiplayerState {
   setLastError: (error: string | null) => void;
   setActiveTransport: (transport: TransportType | null) => void;
   setCustomJazzUrl: (url: string | null) => void;
+  setCustomRegistryId: (id: string | null) => void;
   setWebRtcConnection: (peerId: string, status: RTCPeerConnectionState | 'new') => void;
   removeWebRtcConnection: (peerId: string) => void;
   setSyncing: (syncing: boolean) => void;
@@ -72,7 +72,6 @@ export interface MultiplayerState {
   reset: () => void;
 }
 
-const DEFAULT_SERVER_URL = 'ws://localhost:3001';
 
 export const useMultiplayerStore = create<MultiplayerState>()(
   persist(
@@ -80,7 +79,6 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       // Initial state
       isConnected: false,
       connectionStatus: 'disconnected',
-      serverUrl: DEFAULT_SERVER_URL,
       currentSession: null,
       connectedUsers: [],
       currentUserId: null,
@@ -90,6 +88,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       lastError: null,
       activeTransport: null,
       customJazzUrl: null,
+      customRegistryId: null,
       webRtcConnections: [],
       isSyncing: false,
       lastSyncTimestamp: 0,
@@ -98,7 +97,6 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       _rehydrated: false,
       
       // Actions
-      setServerUrl: (url) => set({ serverUrl: url }),
       
       setConnectionStatus: (status) => set({ 
         connectionStatus: status,
@@ -195,6 +193,7 @@ export const useMultiplayerStore = create<MultiplayerState>()(
       setLastError: (error) => set({ lastError: error }),
       setActiveTransport: (transport) => set({ activeTransport: transport }),
       setCustomJazzUrl: (url) => set({ customJazzUrl: url }),
+      setCustomRegistryId: (id) => set({ customRegistryId: id }),
       
       setWebRtcConnection: (peerId, status) => set((state) => {
          const existing = state.webRtcConnections.find(c => c.peerId === peerId);
@@ -237,12 +236,12 @@ export const useMultiplayerStore = create<MultiplayerState>()(
     {
       name: 'vtt-multiplayer-storage',
       partialize: (state) => ({
-        serverUrl: state.serverUrl,
         currentUsername: state.currentUsername,
         currentSession: state.currentSession,
         currentUserId: state.currentUserId,
         roles: state.roles,
         customJazzUrl: state.customJazzUrl,
+        customRegistryId: state.customRegistryId,
       }),
       onRehydrateStorage: () => {
         return (state) => {

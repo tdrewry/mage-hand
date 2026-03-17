@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { syncProfiler } from '@/lib/jazz/profiler';
 import { Button } from './ui/button';
-import { Download, Copy, Check, Play, Server, Zap } from 'lucide-react';
+import { Download, Copy, Check, Play, Server, Zap, RefreshCw, Link, Share2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
 import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
 import { toast } from 'sonner';
+import { encodeJazzCode } from '@/lib/sessionCodeResolver';
 
 export const SyncProfilerPanel: React.FC = () => {
   const [stats, setStats] = useState({ outKb: '0.00', inKb: '0.00', outOps: 0, inOps: 0, activeDOs: 0, streamKb: '0.00' });
   const [active, setActive] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedRoot, setCopiedRoot] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   
   const isProfilerVisible = useUiStateStore(s => s.isProfilerVisible);
   const currentSession = useMultiplayerStore(s => s.currentSession);
@@ -23,13 +27,45 @@ export const SyncProfilerPanel: React.FC = () => {
   const peers = useNetworkDiagnosticsStore((s) => s.peers);
   const peerList = Object.values(peers);
   
-  const handleCopySession = () => {
-    const sessionId = currentSession?.sessionId || currentSession?.sessionCode;
+  const handleCopySessionCode = () => {
+    const sessionCode = currentSession?.sessionCode;
+    if (sessionCode) {
+      navigator.clipboard.writeText(sessionCode);
+      setCopiedCode(true);
+      toast.success('Join Code copied');
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  const handleCopySessionRoot = () => {
+    const sessionId = currentSession?.sessionId;
     if (sessionId) {
       navigator.clipboard.writeText(sessionId);
-      setCopied(true);
+      setCopiedRoot(true);
       toast.success('Session root ID copied');
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopiedRoot(false), 2000);
+    }
+  };
+
+  const handleCopyLink = () => {
+    const sessionId = currentSession?.sessionId;
+    if (sessionId) {
+      const shareUrl = encodeJazzCode(sessionId);
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      toast.success('J-Code link copied');
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
+  const handleCopyUrl = () => {
+    const sessionCode = currentSession?.sessionCode;
+    if (sessionCode) {
+      const shareUrl = `${window.location.origin}/?session=${sessionCode}`;
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedUrl(true);
+      toast.success('Direct URL copied');
+      setTimeout(() => setCopiedUrl(false), 2000);
     }
   };
 
@@ -63,30 +99,66 @@ export const SyncProfilerPanel: React.FC = () => {
 
   if (!isProfilerVisible) return null;
 
-  const sessionId = currentSession?.sessionId || currentSession?.sessionCode;
+  const sessionCode = currentSession?.sessionCode;
+  const sessionRootId = currentSession?.sessionId;
 
   return (
     <div 
-      className="fixed right-[100px] z-[9999] bg-slate-900/95 text-xs text-white p-3 rounded-md border border-slate-700 shadow-2xl flex items-stretch space-x-6 backdrop-blur-md transition-all duration-300 ease-in-out"
+      className="fixed right-[100px] z-[9999] bg-slate-900/95 text-xs text-white p-3 rounded-md border border-slate-700 shadow-2xl flex flex-col backdrop-blur-md transition-all duration-300 ease-in-out min-w-[550px]"
       style={{ bottom: isBottomNavbarVisible ? '120px' : '56px' }}
     >
-      {/* SECTION 1: Jazz Network State */}
-      <div className="flex flex-col min-w-[240px]">
-        <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800">
-          <div className="font-semibold text-slate-300 flex items-center shrink-0">
-            <Server className="h-3 w-3 mr-1.5 text-blue-400" /> Jazz Sync Profiler
-          </div>
-          {sessionId && (
+      {/* Header Section */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-700">
+        <div className="font-bold text-slate-200 text-sm tracking-wide">Network Profiler</div>
+        {sessionCode && (
+          <div className="flex items-center space-x-2">
             <div 
-              className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 cursor-pointer px-1.5 py-0.5 rounded text-[9px] text-slate-300 transition-colors ml-2 shrink-0"
-              onClick={handleCopySession}
-              title="Click to copy Session Root"
+              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+              onClick={handleCopyUrl}
+              title="Click to copy Direct URL"
             >
-              <span className="truncate max-w-[70px]">{sessionId}</span>
-              {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+              <span className="font-mono text-slate-400">Direct URL</span>
+              {copiedUrl ? <Check className="h-3 w-3 text-emerald-400" /> : <Link className="h-3 w-3" />}
             </div>
-          )}
-        </div>
+            <div 
+              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+              onClick={handleCopyLink}
+              title="Click to copy Fallback J-Code Link"
+            >
+              <span className="font-mono text-slate-400">J-Code</span>
+              {copiedLink ? <Check className="h-3 w-3 text-emerald-400" /> : <Share2 className="h-3 w-3" />}
+            </div>
+            <div 
+              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+              onClick={handleCopySessionCode}
+              title="Click to copy Join Code"
+            >
+              <span className="font-mono text-slate-400">Join Code:</span>
+              <span className="font-mono text-emerald-400">{sessionCode}</span>
+              {copiedCode ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-stretch space-x-6">
+        {/* SECTION 1: Jazz Network State */}
+        <div className="flex flex-col min-w-[240px] flex-1">
+          <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800">
+            <div className="font-semibold text-slate-300 flex items-center shrink-0">
+              <Server className="h-3 w-3 mr-1.5 text-blue-400" /> Durable Objects (Jazz)
+            </div>
+            {sessionRootId && (
+              <div 
+                className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 cursor-pointer px-1.5 py-0.5 rounded text-[9px] text-slate-300 transition-colors ml-2 shrink-0"
+                onClick={handleCopySessionRoot}
+                title="Click to copy Session Root ID"
+              >
+                <span className="truncate max-w-[70px]">{sessionRootId}</span>
+                {copiedRoot ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+              </div>
+            )}
+          </div>
         
         <TooltipProvider>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3 flex-1">
@@ -154,6 +226,24 @@ export const SyncProfilerPanel: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
+            className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-amber-900/20 text-amber-400 border-amber-900/50 hover:bg-amber-900/40"
+            onClick={() => (window as any).HARD_RESET?.(false)}
+            title="Clean Burn: Clear session, disconnect, and start fresh (HARD RESET)"
+          >
+            <RefreshCw className="h-3 w-3" /> New Test
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-emerald-900/20 text-emerald-400 border-emerald-900/50 hover:bg-emerald-900/40"
+            onClick={() => (window as any).HARD_RESET?.(true)}
+            title="Sandbox Burn: Clear session, disconnect, and start DEV_LOCAL session"
+          >
+            <RefreshCw className="h-3 w-3" /> Sandbox
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white px-2"
             onClick={() => syncProfiler.downloadCSV()}
             title="Download Profiler Log (CSV)"
@@ -213,7 +303,7 @@ export const SyncProfilerPanel: React.FC = () => {
                       </span>
                    </div>
                    <div className="flex justify-between items-center text-[9px] text-slate-400 mt-0.5">
-                      <div>ICE: <span className="text-slate-300 font-mono">{peer.iceCandidatesSent}</span> keys</div>
+                      <div>ICE: <span className="text-slate-300 font-mono">{peer.iceState || 'unknown'}</span></div>
                       {isError && peer.error && <div className="text-red-400 truncate max-w-[80px]" title={peer.error}>{peer.error}</div>}
                    </div>
                  </div>
@@ -221,6 +311,7 @@ export const SyncProfilerPanel: React.FC = () => {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

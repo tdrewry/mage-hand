@@ -27,6 +27,7 @@ export class WebRTCTransport implements ITransport {
   private sessionRoot: JazzSessionRoot;
   private userId: string;
   private isHost: boolean;
+  private sessionCode: string;
   
   // Host mapping for connections
   private peerConnections = new Map<string, RTCPeerConnection>();
@@ -38,10 +39,11 @@ export class WebRTCTransport implements ITransport {
 
   private unsubs: Array<() => void> = [];
 
-  constructor(sessionRoot: JazzSessionRoot, localUserId: string, roles: string[]) {
+  constructor(sessionRoot: JazzSessionRoot, localUserId: string, roles: string[], sessionCode: string = '') {
     this.sessionRoot = sessionRoot;
     this.userId = localUserId;
     this.isHost = roles.includes("dm") || roles.includes("host");
+    this.sessionCode = sessionCode;
   }
 
   connect(url: string): void {
@@ -125,6 +127,18 @@ export class WebRTCTransport implements ITransport {
   private wireSignaling() {
     const signalingRoom = this.sessionRoot.signalingRoom as any;
     if (!signalingRoom || !signalingRoom.$jazz) return;
+    
+    // 1. Idempotent Signaling: Clear any existing presence in the signaling room for ourselves.
+    // This prevents "Zombie" connection states from a previous page reload where we didn't unmount cleanly.
+    try {
+        if (typeof signalingRoom.$jazz.delete === 'function') {
+            signalingRoom.$jazz.delete(this.userId);
+        } else {
+            signalingRoom.$jazz.set(this.userId, undefined);
+        }
+    } catch(e) {
+        console.warn("[WebRTCTransport] Failed to clear stale signaling record:", e);
+    }
     
     // As Host: watch connectedUsers to initiate offers
     if (this.isHost) {
@@ -217,15 +231,36 @@ export class WebRTCTransport implements ITransport {
           data.candidatesHost[Date.now().toString() + Math.random().toString()] = e.candidate!.toJSON();
         });
         
-        useNetworkDiagnosticsStore.getState().updatePeer(clientId, {
-          stage: 'ice_gathering',
-        });
+        const peer = useNetworkDiagnosticsStore.getState().peers[clientId];
+        if (peer?.stage !== 'connected' && peer?.stage !== 'datachannel_open') {
+            useNetworkDiagnosticsStore.getState().updatePeer(clientId, { stage: 'ice_gathering' });
+        }
         
         // Non-reactive read-modify-write for the counter
         const store = useNetworkDiagnosticsStore.getState();
         const existing = store.peers[clientId]?.iceCandidatesSent || 0;
         store.updatePeer(clientId, { iceCandidatesSent: existing + 1 });
       }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+        useNetworkDiagnosticsStore.getState().updatePeer(clientId, { iceState: pc.iceConnectionState });
+        
+        // ICE Restart Fallback: If we get stuck in "checking" for more than 5 seconds, restart ICE.
+        if (pc.iceConnectionState === 'checking') {
+            const timeoutId = setTimeout(() => {
+                if (pc.iceConnectionState === 'checking') {
+                    console.warn(`[WebRTCTransport] Host connection to ${clientId} stuck in checking. Restarting ICE!`);
+                    pc.restartIce();
+                }
+            }, 5000);
+            (pc as any)._checkingTimeout = timeoutId;
+        } else {
+            if ((pc as any)._checkingTimeout) {
+                clearTimeout((pc as any)._checkingTimeout);
+                delete (pc as any)._checkingTimeout;
+            }
+        }
     };
 
     pc.onconnectionstatechange = () => {
@@ -297,21 +332,45 @@ export class WebRTCTransport implements ITransport {
      if (sigData.answer && pc.signalingState === "have-local-offer") {
          useNetworkDiagnosticsStore.getState().updatePeer(clientId, { stage: 'signal_answer' });
          await pc.setRemoteDescription(sigData.answer);
-     }
-     
-     // Process incoming ICE candidates independently of the Answer state
-     if (sigData.candidatesClient && Object.keys(sigData.candidatesClient).length > 0) {
-         useNetworkDiagnosticsStore.getState().updatePeer(clientId, { stage: 'ice_gathering' });
-         for (const cand of Object.values(sigData.candidatesClient)) {
+         
+         const pending = (pc as any)._pendingIceCandidates || [];
+         for (const cand of pending) {
              try {
                  const existingKeys = (pc as any)._knownClientIceCandidates || new Set();
                  const candStr = JSON.stringify(cand);
                  if (!existingKeys.has(candStr)) {
+                     await pc.addIceCandidate(cand);
                      existingKeys.add(candStr);
                      (pc as any)._knownClientIceCandidates = existingKeys;
-                     await pc.addIceCandidate(cand);
                  }
              } catch(e) {}
+         }
+         (pc as any)._pendingIceCandidates = [];
+     }
+     // Process incoming ICE candidates independently of the Answer state
+     if (sigData.candidatesClient && Object.keys(sigData.candidatesClient).length > 0) {
+         const peer = useNetworkDiagnosticsStore.getState().peers[clientId];
+         if (peer?.stage !== 'connected' && peer?.stage !== 'datachannel_open') {
+             useNetworkDiagnosticsStore.getState().updatePeer(clientId, { stage: 'ice_gathering' });
+         }
+         for (const cand of Object.values(sigData.candidatesClient)) {
+             if (!pc.remoteDescription) {
+                 const pending = (pc as any)._pendingIceCandidates || [];
+                 pending.push(cand);
+                 (pc as any)._pendingIceCandidates = pending;
+                 continue; // Waiting for Answer first
+             }
+             try {
+                 const existingKeys = (pc as any)._knownClientIceCandidates || new Set();
+                 const candStr = JSON.stringify(cand);
+                 if (!existingKeys.has(candStr)) {
+                     await pc.addIceCandidate(cand);
+                     existingKeys.add(candStr);
+                     (pc as any)._knownClientIceCandidates = existingKeys;
+                 }
+             } catch(e) {
+                 console.warn("Failed to add client ICE candidate", e);
+             }
          }
      }
   }
@@ -352,13 +411,36 @@ export class WebRTCTransport implements ITransport {
                      data.candidatesClient[Date.now().toString() + Math.random().toString()] = e.candidate!.toJSON();
                  });
                  
-                 useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, {
-                     stage: 'ice_gathering'
-                 });
+                 const peer = useNetworkDiagnosticsStore.getState().peers[sigData.hostId];
+                 if (peer?.stage !== 'connected' && peer?.stage !== 'datachannel_open') {
+                     useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, { stage: 'ice_gathering' });
+                 }
              }
          };
 
-         this.hostConnection.ondatachannel = (e) => {
+          this.hostConnection.oniceconnectionstatechange = () => {
+              if (this.hostConnection) {
+                  useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, { iceState: this.hostConnection.iceConnectionState });
+                  
+                  // ICE Restart Fallback
+                  if (this.hostConnection.iceConnectionState === 'checking') {
+                      const timeoutId = setTimeout(() => {
+                          if (this.hostConnection?.iceConnectionState === 'checking') {
+                              console.warn(`[WebRTCTransport] Client connection to host ${sigData.hostId} stuck in checking. Restarting ICE!`);
+                              this.hostConnection.restartIce();
+                          }
+                      }, 5000);
+                      (this.hostConnection as any)._checkingTimeout = timeoutId;
+                  } else {
+                      if ((this.hostConnection as any)._checkingTimeout) {
+                          clearTimeout((this.hostConnection as any)._checkingTimeout);
+                          delete (this.hostConnection as any)._checkingTimeout;
+                      }
+                  }
+              }
+          };
+
+          this.hostConnection.ondatachannel = (e) => {
              this.hostDataChannel = e.channel;
              
              // The channel might already be open by the time this fires
@@ -420,21 +502,65 @@ export class WebRTCTransport implements ITransport {
             data.answer = { type: answer.type, sdp: answer.sdp };
          });
          
+         
          useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, { isHost: true, stage: 'signal_answer' });
-     } else {
-         // Add host ICE candidates if any
+         
+         const pending = (this.hostConnection as any)._pendingIceCandidates || [];
+         for (const cand of pending) {
+             try {
+                 const existingKeys = (this.hostConnection as any)._knownHostIceCandidates || new Set();
+                 const candStr = JSON.stringify(cand);
+                 if (!existingKeys.has(candStr)) {
+                     await this.hostConnection.addIceCandidate(cand);
+                     existingKeys.add(candStr);
+                     (this.hostConnection as any)._knownHostIceCandidates = existingKeys;
+                 }
+             } catch(e) {}
+         }
+         (this.hostConnection as any)._pendingIceCandidates = [];
+         
+         // Process any host candidates that arrived with the offer
          if (sigData.candidatesHost && Object.keys(sigData.candidatesHost).length > 0) {
-             useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, { stage: 'ice_gathering' });
              for (const cand of Object.values(sigData.candidatesHost)) {
+                 if (!this.hostConnection.remoteDescription) continue;
                  try {
                      const existingKeys = (this.hostConnection as any)._knownHostIceCandidates || new Set();
                      const candStr = JSON.stringify(cand);
                      if (!existingKeys.has(candStr)) {
+                         await this.hostConnection.addIceCandidate(cand);
                          existingKeys.add(candStr);
                          (this.hostConnection as any)._knownHostIceCandidates = existingKeys;
-                         await this.hostConnection.addIceCandidate(cand);
                      }
-                 } catch(e) {}
+                 } catch(e) {
+                     console.warn("Failed to add host ICE candidate on init", e);
+                 }
+             }
+         }
+     } else {
+         // Add host ICE candidates if any
+         if (sigData.candidatesHost && Object.keys(sigData.candidatesHost).length > 0) {
+             const peer = useNetworkDiagnosticsStore.getState().peers[sigData.hostId];
+             if (peer?.stage !== 'connected' && peer?.stage !== 'datachannel_open') {
+                 useNetworkDiagnosticsStore.getState().updatePeer(sigData.hostId, { stage: 'ice_gathering' });
+             }
+             for (const cand of Object.values(sigData.candidatesHost)) {
+                 if (!this.hostConnection.remoteDescription) {
+                     const pending = (this.hostConnection as any)._pendingIceCandidates || [];
+                     pending.push(cand);
+                     (this.hostConnection as any)._pendingIceCandidates = pending;
+                     continue;
+                 }
+                 try {
+                     const existingKeys = (this.hostConnection as any)._knownHostIceCandidates || new Set();
+                     const candStr = JSON.stringify(cand);
+                     if (!existingKeys.has(candStr)) {
+                         await this.hostConnection.addIceCandidate(cand);
+                         existingKeys.add(candStr);
+                         (this.hostConnection as any)._knownHostIceCandidates = existingKeys;
+                     }
+                 } catch(e) {
+                     console.warn("Failed to add host ICE candidate", e);
+                 }
              }
          }
      }
