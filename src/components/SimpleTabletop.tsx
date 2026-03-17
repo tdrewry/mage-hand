@@ -429,10 +429,13 @@ export const SimpleTabletop = () => {
     setSessionSelectedTokens(selectedTokenIds);
   }, [selectedTokenIds, setSessionSelectedTokens]);
   const [isDraggingToken, setIsDraggingToken] = useState(false);
+  const isDraggingTokenRef = useRef(false);
   const [fogRefreshTick, setFogRefreshTick] = useState(0);
   const [draggedTokenId, setDraggedTokenId] = useState<string | null>(null);
+  const draggedTokenIdRef = useRef<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
   const dragPathRef = useRef<{ x: number; y: number }[]>([]);
 
   const remoteHovers = useTokenEphemeralStore((s) => s.hovers);
@@ -1463,9 +1466,12 @@ export const SimpleTabletop = () => {
           markTokenDragEnd(draggedTokenId);
           unmarkDraggedForSync(draggedTokenId);
           setIsDraggingToken(false);
+          isDraggingTokenRef.current = false;
           setDraggedTokenId(null);
+          draggedTokenIdRef.current = null;
           setDragOffset({ x: 0, y: 0 });
           setDragStartPos({ x: 0, y: 0 });
+          dragStartPosRef.current = { x: 0, y: 0 };
           dragPathRef.current = [];
           setGroupedTokens([]);
           tempTokenPositionsRef.current = undefined;
@@ -1475,9 +1481,12 @@ export const SimpleTabletop = () => {
         } else if (isDraggingToken) {
           // Token drag without draggedTokenId - just reset state
           setIsDraggingToken(false);
+          isDraggingTokenRef.current = false;
           setDraggedTokenId(null);
+          draggedTokenIdRef.current = null;
           setDragOffset({ x: 0, y: 0 });
           setDragStartPos({ x: 0, y: 0 });
+          dragStartPosRef.current = { x: 0, y: 0 };
           dragPathRef.current = [];
           setGroupedTokens([]);
           tempTokenPositionsRef.current = undefined;
@@ -3822,7 +3831,7 @@ export const SimpleTabletop = () => {
           // The stable snapshot is captured at drag start and doesn't change during movement
           // For remote drags, we don't have a stable snapshot, so we check if there are ANY active remote drags
           const hasRemoteDrags = Object.keys(remoteDrags).length > 0;
-          const visibilityToCheck = (isDraggingToken || isDraggingRegion) && stableVisibilityRef.current
+          const visibilityToCheck = (isDraggingTokenRef.current || isDraggingRegion) && stableVisibilityRef.current
             ? stableVisibilityRef.current
             : currentVisibilityRef.current;
 
@@ -4495,7 +4504,7 @@ export const SimpleTabletop = () => {
       }
 
       // Draw drag path BEFORE tokens so footprints appear below token art
-      if (isDraggingToken && draggedTokenId) {
+      if (isDraggingTokenRef.current && draggedTokenIdRef.current) {
         drawDragPathOnly(ctx);
       }
       // Draw remote drag paths before tokens too
@@ -4630,7 +4639,7 @@ export const SimpleTabletop = () => {
             }
 
             // Draw drag path BEFORE tokens so footprints appear below token art
-            if (isDraggingToken && draggedTokenId) {
+            if (isDraggingTokenRef.current && draggedTokenIdRef.current) {
               try { drawDragPathOnly(overlayCtx); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawDragPathOnly error:', e); }
             }
             try { drawRemoteDragDecorations(overlayCtx, 'path'); } catch (e) { logErrorOnce('[RENDER FAILED] overlay drawRemoteDragDecorations (path) error:', e); }
@@ -4817,13 +4826,13 @@ export const SimpleTabletop = () => {
 
   // Function to draw drag ghost and path
   const drawDragGhostAndPath = (ctx: CanvasRenderingContext2D) => {
-    if (!draggedTokenId) return;
+    if (!draggedTokenIdRef.current) return;
 
-    const draggedToken = tokens.find((t) => t.id === draggedTokenId);
+    const draggedToken = tokens.find((t) => t.id === draggedTokenIdRef.current);
     if (!draggedToken) return;
 
     // Draw ghost token at original position (on top of everything)
-    drawGhostToken(ctx, dragStartPos.x, dragStartPos.y, draggedToken);
+    drawGhostToken(ctx, dragStartPosRef.current.x, dragStartPosRef.current.y, draggedToken);
 
     // Note: Drag path is now drawn separately via drawDragPathOnly() BEFORE tokens
   };
@@ -5368,9 +5377,9 @@ export const SimpleTabletop = () => {
   };
 
   const drawDragPathOnly = (ctx: CanvasRenderingContext2D) => {
-    if (!draggedTokenId) return;
+    if (!draggedTokenIdRef.current) return;
 
-    const draggedToken = tokens.find((t) => t.id === draggedTokenId);
+    const draggedToken = tokens.find((t) => t.id === draggedTokenIdRef.current);
     if (!draggedToken) return;
 
     // Draw drag path
@@ -5507,9 +5516,19 @@ export const SimpleTabletop = () => {
 
     ctx.save();
 
+    const startPos = dragStartPosRef.current;
+
+    // Use active drag position if available, otherwise fall back to store position
+    const currentX = (isDraggingTokenRef.current && draggedTokenIdRef.current === token.id)
+      ? (tempTokenPositionsRef.current?.[token.id]?.x ?? token.x)
+      : token.x;
+    const currentY = (isDraggingTokenRef.current && draggedTokenIdRef.current === token.id)
+      ? (tempTokenPositionsRef.current?.[token.id]?.y ?? token.y)
+      : token.y;
+
     // Calculate distance in grid units
-    const dx = token.x - dragStartPos.x;
-    const dy = token.y - dragStartPos.y;
+    const dx = currentX - startPos.x;
+    const dy = currentY - startPos.y;
     const distancePixels = Math.sqrt(dx * dx + dy * dy);
     const distanceGridUnits = (distancePixels / gridSize).toFixed(2);
 
@@ -5519,15 +5538,15 @@ export const SimpleTabletop = () => {
     ctx.globalAlpha = 0.3;
     ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
     ctx.beginPath();
-    ctx.moveTo(dragStartPos.x, dragStartPos.y);
-    ctx.lineTo(token.x, token.y);
+    ctx.moveTo(startPos.x, startPos.y);
+    ctx.lineTo(currentX, currentY);
     ctx.stroke();
     ctx.setLineDash([]);
 
     // Draw distance text at midpoint of line
     if (distancePixels > 10) {
-      const midX = (dragStartPos.x + token.x) / 2;
-      const midY = (dragStartPos.y + token.y) / 2;
+      const midX = (startPos.x + currentX) / 2;
+      const midY = (startPos.y + currentY) / 2;
 
       ctx.fillStyle = "#ffffff";
       ctx.globalAlpha = 0.9;
@@ -8962,8 +8981,10 @@ export const SimpleTabletop = () => {
         }
 
         setIsDraggingToken(true);
+        isDraggingTokenRef.current = true;
         ephemeralBus.emit("presence.activity", { activity: "moving token" });
         setDraggedTokenId(clickedToken.id);
+        draggedTokenIdRef.current = clickedToken.id;
         markTokenDragStart(clickedToken.id);
         markDraggedForSync(clickedToken.id);
         setDragOffset({
@@ -8973,6 +8994,7 @@ export const SimpleTabletop = () => {
 
         // Store original position for ghost and path
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
+        dragStartPosRef.current = { x: clickedToken.x, y: clickedToken.y };
         dragPathRef.current = [{ x: clickedToken.x, y: clickedToken.y }];
 
         // Capture stable visibility snapshot at drag start to prevent flashing
@@ -10836,9 +10858,12 @@ export const SimpleTabletop = () => {
 
       if (draggedTokenId) { markTokenDragEnd(draggedTokenId); unmarkDraggedForSync(draggedTokenId); }
       setIsDraggingToken(false);
+      isDraggingTokenRef.current = false;
       setDraggedTokenId(null);
+      draggedTokenIdRef.current = null;
       setDragOffset({ x: 0, y: 0 });
       setDragStartPos({ x: 0, y: 0 });
+      dragStartPosRef.current = { x: 0, y: 0 };
       dragPathRef.current = [];
       setInitialTokenState(null);
 
@@ -11434,7 +11459,9 @@ export const SimpleTabletop = () => {
         }
 
         setIsDraggingToken(true);
+        isDraggingTokenRef.current = true;
         setDraggedTokenId(clickedToken.id);
+        draggedTokenIdRef.current = clickedToken.id;
         markTokenDragStart(clickedToken.id);
         markDraggedForSync(clickedToken.id);
         setDragOffset({
@@ -11442,6 +11469,7 @@ export const SimpleTabletop = () => {
           y: worldPos.y - clickedToken.y,
         });
         setDragStartPos({ x: clickedToken.x, y: clickedToken.y });
+        dragStartPosRef.current = { x: clickedToken.x, y: clickedToken.y };
         dragPathRef.current = [{ x: clickedToken.x, y: clickedToken.y }];
 
         // ── Emit drag begin (touch path) ──
@@ -11685,9 +11713,12 @@ export const SimpleTabletop = () => {
 
         if (draggedTokenId) { markTokenDragEnd(draggedTokenId); unmarkDraggedForSync(draggedTokenId); }
         setIsDraggingToken(false);
+        isDraggingTokenRef.current = false;
         setDraggedTokenId(null);
+        draggedTokenIdRef.current = null;
         setDragOffset({ x: 0, y: 0 });
         setDragStartPos({ x: 0, y: 0 });
+        dragStartPosRef.current = { x: 0, y: 0 };
         dragPathRef.current = [];
         setInitialTokenState(null);
         

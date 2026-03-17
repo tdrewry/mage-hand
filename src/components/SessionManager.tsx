@@ -226,8 +226,6 @@ export const SessionManager: React.FC<{
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
-      
-      toast.dismiss(searchToast);
 
       if (resolved && resolved.transport === 'jazz') {
         if (localJazzUrl.trim()) {
@@ -287,6 +285,7 @@ export const SessionManager: React.FC<{
       console.error('Failed to prep Jazz join:', error);
       toast.error('Failed to prepare Jazz join');
     } finally {
+      toast.dismiss(searchToast);
       setIsConnecting(false);
     }
   };
