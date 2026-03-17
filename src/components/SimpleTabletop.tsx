@@ -1391,144 +1391,31 @@ export const SimpleTabletop = () => {
     }
   }, [tokens]);
 
+  // Track the latest handleMouseUp closure to call it from tests or global events
+  const latestHandleMouseUp = useRef<(e: React.MouseEvent<HTMLCanvasElement>) => void>(() => {});
+
   useEffect(() => {
     if (isDraggingToken || isDraggingRegion || isPanning || isDraggingMapObject || isDraggingVertex || isRotatingMapObject) {
-      const handleGlobalMouseUp = () => {
-        // Reset all drag states
-        if (isDraggingToken && draggedTokenId) {
-          // Check for collision before finalizing the move
-          const { enforceMovementBlocking, enforceRegionBounds, renderingMode } = useDungeonStore.getState();
-          const shouldEnforceCollisions = renderingMode === 'play';
-
-          console.log('[Collision Debug] Token drag ended', { enforceMovementBlocking, enforceRegionBounds, renderingMode });
-
-          if (shouldEnforceCollisions && (enforceMovementBlocking || enforceRegionBounds)) {
-            const draggedToken = tokens.find(t => t.id === draggedTokenId);
-            if (draggedToken) {
-              // Use center point only (radius = 0) - allows tokens to pass through corridors
-              // as long as their center can fit, regardless of token visual size
-              const tokenRadius = 0;
-
-              const blockingObjects = enforceMovementBlocking ? getBlockingObjects(mapObjects) : [];
-              const checkRegions = enforceRegionBounds ? regions : [];
-
-              console.log('[Collision Debug] Checking path', dragStartPos, '->', { x: draggedToken.x, y: draggedToken.y });
-              console.log('[Collision Debug] Blocking objects:', blockingObjects.length);
-
-              const collisionResult = checkMovementCollision(
-                dragStartPos,
-                { x: draggedToken.x, y: draggedToken.y },
-                tokenRadius,
-                blockingObjects,
-                checkRegions,
-                { enforceMovementBlocking, enforceRegionBounds }
-              );
-
-              console.log('[Collision Debug] Result:', collisionResult);
-
-              if (collisionResult.blocked) {
-                // Show toast with details
-                let blockReason = '';
-                let blockDetails = '';
-                if (collisionResult.collidedWith && collisionResult.collidedWith !== 'region_bounds') {
-                  const blockingObj = mapObjects.find(obj => obj.id === collisionResult.collidedWith);
-                  const objName = blockingObj?.label || blockingObj?.category || 'obstacle';
-                  blockReason = blockingObj?.category === 'door'
-                    ? `Blocked by closed door`
-                    : `Blocked by ${objName}`;
-                  blockDetails = `Object: ${blockingObj?.category}${blockingObj?.label ? ` "${blockingObj.label}"` : ''} (ID: ${collisionResult.collidedWith?.slice(0, 8)}...)`;
-                } else {
-                  blockReason = 'Left region boundary';
-                  blockDetails = `Token tried to exit all regions (obstacle=${enforceMovementBlocking}, bounds=${enforceRegionBounds})`;
-                }
-
-                toast.error(blockReason, {
-                  duration: 3000,
-                  description: blockDetails
-                });
-                triggerSound('movement.collision');
-
-                // Snap back to original position
-                updateTokenPosition(draggedTokenId, dragStartPos.x, dragStartPos.y);
-              } else {
-                toast.success('Movement valid', { duration: 800 });
-
-                // Check for portal teleportation after valid movement
-                checkPortalTeleport(draggedTokenId);
-              }
-            }
-          } else {
-            // No collision enforcement — still check portal teleport
-            checkPortalTeleport(draggedTokenId);
-          }
-
-          emitDragEnd({ tokenId: draggedTokenId, finalPos: { x: tokens.find(t => t.id === draggedTokenId)?.x ?? 0, y: tokens.find(t => t.id === draggedTokenId)?.y ?? 0 } });
-          markTokenDragEnd(draggedTokenId);
-          unmarkDraggedForSync(draggedTokenId);
-          setIsDraggingToken(false);
-          isDraggingTokenRef.current = false;
-          setDraggedTokenId(null);
-          draggedTokenIdRef.current = null;
-          setDragOffset({ x: 0, y: 0 });
-          setDragStartPos({ x: 0, y: 0 });
-          dragStartPosRef.current = { x: 0, y: 0 };
-          dragPathRef.current = [];
-          setGroupedTokens([]);
-          tempTokenPositionsRef.current = undefined;
-          // Clear real-time vision preview
-          dragPreviewVisibilityRef.current = null;
-          setDragPreviewPosition(null);
-        } else if (isDraggingToken) {
-          // Token drag without draggedTokenId - just reset state
-          setIsDraggingToken(false);
-          isDraggingTokenRef.current = false;
-          setDraggedTokenId(null);
-          draggedTokenIdRef.current = null;
-          setDragOffset({ x: 0, y: 0 });
-          setDragStartPos({ x: 0, y: 0 });
-          dragStartPosRef.current = { x: 0, y: 0 };
-          dragPathRef.current = [];
-          setGroupedTokens([]);
-          tempTokenPositionsRef.current = undefined;
-          dragPreviewVisibilityRef.current = null;
-          setDragPreviewPosition(null);
+      const handleGlobalMouseUpFacade = (e: MouseEvent) => {
+        // If the target is the canvas, React's built-in onMouseUp handles it properly
+        // and fires synthetic events. We only catch drops outside the canvas.
+        if (e.target instanceof HTMLCanvasElement && e.target.id === 'tabletop-canvas') {
+          return;
         }
-        if (isDraggingRegion) {
-          if (draggedRegionId) ephemeralBus.emit("region.drag.end", { regionId: draggedRegionId });
-          setIsDraggingRegion(false);
-          setDraggedRegionId(null);
-          setDragPreview(null);
-        }
-        if (isDraggingMapObject) {
-          if (draggedMapObjectId) ephemeralBus.emit("mapObject.drag.end", { objectId: draggedMapObjectId });
-          setIsDraggingMapObject(false);
-          setDraggedMapObjectId(null);
-          setMapObjectDragOffset({ x: 0, y: 0 });
-        }
-        if (isRotatingMapObject) {
-          setIsRotatingMapObject(false);
-          setRotatingMapObjectId(null);
-        }
-        if (isDraggingVertex) {
-          setIsDraggingVertex(false);
-          setDraggedVertexInfo(null);
-        }
-        if (isPanning) {
-          setIsPanning(false);
-        }
-        if (isRotatingRegion) {
-          setIsRotatingRegion(false);
-          setTempRegionRotation({});
-          groupFrozenAABBRef.current = null;
-        }
+
+        // Adapt native MouseEvent to look like React.MouseEvent for the handler
+        const fakeReactEvent = e as unknown as React.MouseEvent<HTMLCanvasElement>;
+        latestHandleMouseUp.current(fakeReactEvent);
       };
 
-      window.addEventListener("mouseup", handleGlobalMouseUp);
+      window.addEventListener("mouseup", handleGlobalMouseUpFacade);
       return () => {
-        window.removeEventListener("mouseup", handleGlobalMouseUp);
+        window.removeEventListener("mouseup", handleGlobalMouseUpFacade);
       };
     }
   }, [isDraggingToken, isDraggingRegion, isPanning, isRotatingRegion, isDraggingMapObject, isDraggingVertex, isRotatingMapObject]);
+
+
 
   // MapObject context menu is handled by Radix ContextMenu component
   // No need for manual click-outside handling - Radix handles it
@@ -8964,6 +8851,13 @@ export const SimpleTabletop = () => {
       const clickedRegion = getRegionAtPosition(worldPos.x, worldPos.y);
 
       if (clickedToken) {
+        // Prevent picking up a token currently being dragged by another user
+        const remoteDrags = useRemoteDragStore.getState().drags;
+        if (remoteDrags[clickedToken.id]) {
+          toast.error("This token is currently being moved by another player", { duration: 1500 });
+          return;
+        }
+
         // Check if movement is restricted
         if (restrictMovement) {
           if (isInCombat) {
@@ -10468,6 +10362,8 @@ export const SimpleTabletop = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    latestHandleMouseUp.current = handleMouseUp;
+
     // Use map-filtered entities for hit-testing
     const tokens = filteredTokens;
     const mapObjects = filteredMapObjects;
@@ -11444,6 +11340,13 @@ export const SimpleTabletop = () => {
       // Check for token
       const clickedToken = getTokenAtPosition(worldPos.x, worldPos.y);
       if (clickedToken) {
+        // Prevent picking up a token currently being dragged by another user
+        const remoteDrags = useRemoteDragStore.getState().drags;
+        if (remoteDrags[clickedToken.id]) {
+          toast.error("This token is currently being moved by another player", { duration: 1500 });
+          return false;
+        }
+        
         // Check movement restrictions
         if (restrictMovement) {
           if (isInCombat) {
