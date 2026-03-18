@@ -45,6 +45,8 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { netManager } from '@/lib/net';
+import { getOrCreateClientId } from '../../networking/client/NetworkSession';
 import { SessionManager } from '@/components/SessionManager';
 import {
   exportProjectToFile,
@@ -71,6 +73,7 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
   const [showAbout, setShowAbout] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAutoReconnecting, setIsAutoReconnecting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Progressive UX: 0 = Identity Setup, 1 = Action Hub
@@ -169,8 +172,82 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
 
   // Multiplayer state
   const { isConnected, connectionStatus, currentSession, connectedUsers, syncReady } = useMultiplayerStore();
+  const multiplayerRoles = useMultiplayerStore(s => s.roles);
+  const multiplayerUsername = useMultiplayerStore(s => s.currentUsername);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
   const [sessionManagerTab, setSessionManagerTab] = useState<'create' | 'join'>('create');
+
+  // Auto-reconnect for client (non-DM) sessions on landing page mount.
+  // This fires as a belt-and-suspenders approach alongside useAutoReconnect,
+  // which can sometimes miss the rehydration window.
+  const hasTriedClientReconnect = useRef(false);
+  useEffect(() => {
+    const store = useMultiplayerStore.getState();
+    const sessionId = store.currentSession?.sessionId;
+    const sessionCode = store.currentSession?.sessionCode;
+    const storedRoles = store.roles;
+    const storedUsername = store.currentUsername;
+
+    // Only fire for client (non-DM) sessions that aren't already connected
+    const isClient = storedRoles.length > 0 && !storedRoles.includes('dm');
+    if (
+      hasTriedClientReconnect.current ||
+      !sessionId || !sessionId.startsWith('co_') ||
+      !storedUsername ||
+      !isClient ||
+      store.isConnected ||
+      store.connectionStatus === 'connecting' ||
+      store.connectionStatus === 'reconnecting'
+    ) return;
+
+    hasTriedClientReconnect.current = true;
+    setIsAutoReconnecting(true);
+    console.log('[LandingScreen] Client session detected — auto-reconnecting...');
+
+    const doRejoin = async () => {
+      try {
+        // Mark connecting before setCurrentSession to block any secondary triggers
+        useMultiplayerStore.getState().setConnectionStatus('connecting');
+        useMultiplayerStore.getState().setActiveTransport('jazz');
+
+        const { joinJazzSession } = await import('@/lib/jazz/session');
+        const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+        const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
+
+        const info = await joinJazzSession(sessionId);
+        const clientId = getOrCreateClientId();
+
+        useMultiplayerStore.getState().setRoles(storedRoles);
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: sessionCode || sessionId,
+          sessionId: info.sessionCoId,
+          createdAt: store.currentSession?.createdAt ?? Date.now(),
+          hasPassword: store.currentSession?.hasPassword ?? false,
+        });
+
+        const transport = new JazzTransport(info.root, clientId, storedUsername, storedRoles);
+        const ephemeralTransport = new WebRTCTransport(info.root, clientId, storedRoles);
+
+        await netManager.connectWithTransport({
+          transport,
+          ephemeralTransport,
+          sessionCode: sessionCode || sessionId,
+          username: storedUsername,
+          roles: storedRoles.length > 0 ? storedRoles : undefined,
+        });
+
+        console.log('[LandingScreen] Client auto-reconnect complete');
+      } catch (err) {
+        console.warn('[LandingScreen] Client auto-reconnect failed:', err);
+        useMultiplayerStore.getState().reset();
+      } finally {
+        setIsAutoReconnecting(false);
+      }
+    };
+
+    doRejoin();
+  }, []);
+
 
   const handleCopySessionCode = () => {
     if (currentSession?.sessionCode) {

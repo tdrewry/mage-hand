@@ -21,6 +21,7 @@ export const SyncProfilerPanel: React.FC = () => {
   const isProfilerVisible = useUiStateStore(s => s.isProfilerVisible);
   const currentSession = useMultiplayerStore(s => s.currentSession);
   const activeTransport = useMultiplayerStore((s) => s.activeTransport);
+  const sessionRoles = useMultiplayerStore((s) => s.roles);
   const isBottomNavbarVisible = useBottomNavbarVisible();
   
   // WebRTC Diagnostics
@@ -111,7 +112,14 @@ export const SyncProfilerPanel: React.FC = () => {
     >
       {/* Header Section */}
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-700">
-        <div className="font-bold text-slate-200 text-sm tracking-wide">Network Profiler</div>
+        <div className="font-bold text-slate-200 text-sm tracking-wide">
+          Network Profiler{' '}
+          {sessionRoles.length > 0 && (
+            <span className={`text-xs font-normal ml-1 px-1.5 py-0.5 rounded ${sessionRoles.includes('dm') ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+              {sessionRoles.includes('dm') ? 'Host' : 'Client'}
+            </span>
+          )}
+        </div>
         {sessionCode && (
           <div className="flex items-center space-x-2">
             <div 

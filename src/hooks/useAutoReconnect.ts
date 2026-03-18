@@ -1,20 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { netManager } from '@/lib/net';
-import { isJazzCode, decodeJazzCode, resolveSessionCode } from '@/lib/sessionCodeResolver';
-import { joinJazzSession } from '@/lib/jazz';
-import { JazzTransport } from '@/lib/net/transports/JazzTransport';
-import { WebRTCTransport } from '@/lib/net/transports/WebRTCTransport';
 import { getOrCreateClientId } from '../../networking/client/NetworkSession';
 
 /**
  * Hook to automatically reconnect to a multiplayer session on page load
  * if the user was previously connected to a session.
- * Waits for persist rehydration before attempting reconnection.
  *
- * Supports both WebSocket (OpBridge) and Jazz (CRDT) transports.
- * For Jazz sessions, reconnects both the CRDT bridge AND the
- * ephemeral WebSocket in tandem mode.
+ * Strategy: LEAVE then REJOIN — identical to the manual J-code rejoin flow.
+ * This avoids zombie WebRTC connections, double-transport races, and
+ * signaling ghost issues by starting completely fresh each time.
+ *
+ * Waits for persist rehydration before attempting reconnection.
  */
 export function useAutoReconnect() {
   const hasAttemptedReconnect = useRef(false);
@@ -27,83 +24,64 @@ export function useAutoReconnect() {
       // Already connected or in progress
       if (state.isConnected || state.connectionStatus === 'connecting' || state.connectionStatus === 'reconnecting') return;
 
-      // Need session details to reconnect
-      const code = state.currentSession?.sessionCode;
+      // Need a valid Jazz session ID to reconnect
+      const sessionId = state.currentSession?.sessionId;
+      const sessionCode = state.currentSession?.sessionCode;
       const username = state.currentUsername;
-      if (!code || !username) return;
+      const roles = state.roles;
+
+      if (!sessionId || !sessionId.startsWith('co_') || !username) return;
 
       hasAttemptedReconnect.current = true;
 
-      // ── Jazz reconnect (tandem: CRDT + ephemeral WS) ─────────────
-      const executeReconnect = async (targetCode: string) => {
-        let isJazz = isJazzCode(targetCode);
-        let coValueId = '';
+      console.log('🔄 [AutoReconnect] Starting leave-rejoin for session', sessionId);
 
-        // Prefer the persisted sessionId (raw co_z CoValue ID) — always available after
-        // a successful connect and avoids a registry round-trip on every page reload.
-        const persistedSessionId = state.currentSession?.sessionId;
-        if (persistedSessionId && persistedSessionId.startsWith('co_')) {
-          isJazz = true;
-          coValueId = persistedSessionId;
-        } else if (isJazz) {
-          coValueId = decodeJazzCode(targetCode) || '';
-        } else if (!isJazz && targetCode.length <= 10) {
-          // Last resort: registry lookup for codes that lack a stored sessionId
-          try {
-            const resolved = await resolveSessionCode(targetCode);
-            if (resolved.transport === 'jazz') {
-              isJazz = true;
-              coValueId = resolved.connectionId;
-            }
-          } catch (e) {
-            console.warn('⚠️ [AutoReconnect] Failed to resolve short code:', e);
-          }
-        }
+      const executeReconnect = async () => {
+        // ── Step 1: Clean slate ────────────────────────────────────────
+        // Disconnect any stale transport cleanly (intentional so no auto-schedule fires)
+        netManager.disconnect();
 
-        if (!isJazz || !coValueId) {
-          console.warn('⚠️ [AutoReconnect] No valid Jazz session ID found, clearing session');
-          useMultiplayerStore.getState().reset();
-          return;
-        }
-
-        // JazzActiveProvider is always mounted — no phase 1 needed.
-        // Ensure activeTransport is set so provider/hooks know we're in Jazz mode.
+        // Mark as connecting BEFORE setCurrentSession so useAutoReconnect won't
+        // re-trigger if this hook somehow fires again (same guard as handleJoinSession)
+        useMultiplayerStore.getState().setConnectionStatus('connecting');
         useMultiplayerStore.getState().setActiveTransport('jazz');
 
-        console.log('🔄 [AutoReconnect] Reconnecting Jazz session', coValueId);
-        useMultiplayerStore.getState().setConnectionStatus('reconnecting');
+        // ── Step 2: Rejoin — same path as manual handleJoinSession ─────
+        const { joinJazzSession } = await import('@/lib/jazz/session');
+        const { JazzTransport } = await import('@/lib/net/transports/JazzTransport');
+        const { WebRTCTransport } = await import('@/lib/net/transports/WebRTCTransport');
 
-        // 1. Reconnect Jazz CRDT bridge directly
-        joinJazzSession(coValueId)
-        .then((info) => {
-          const store = useMultiplayerStore.getState();
-          store.setConnectionStatus('connected');
-          console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
+        const info = await joinJazzSession(sessionId);
+        const clientId = getOrCreateClientId();
 
-          // 2. Inject ephemeral transport
-          const clientId = getOrCreateClientId();
-          const transport = new JazzTransport(info.root, clientId, username, store.roles);
-          const ephemeralTransport = new WebRTCTransport(info.root, clientId, store.roles);
-
-          netManager.connectWithTransport({
-            transport,
-            ephemeralTransport,
-            sessionCode: code,
-            username,
-            roles: store.roles.length > 0 ? store.roles : undefined,
-          }).then(() => {
-            console.log('✅ [AutoReconnect] Jazz Ephemeral Transport injected');
-          }).catch((err) => {
-            console.warn('⚠️ [AutoReconnect] Transport injection failed:', err);
-          });
-        })
-        .catch((err) => {
-          console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
-          useMultiplayerStore.getState().reset();
+        // Restore session info (connectWithTransport won't overwrite in ephemeralOnly mode)
+        useMultiplayerStore.getState().setRoles(roles);
+        useMultiplayerStore.getState().setCurrentSession({
+          sessionCode: sessionCode || sessionId,
+          sessionId: info.sessionCoId,
+          createdAt: state.currentSession?.createdAt ?? Date.now(),
+          hasPassword: state.currentSession?.hasPassword ?? false,
         });
+
+        const transport = new JazzTransport(info.root, clientId, username, roles);
+        const ephemeralTransport = new WebRTCTransport(info.root, clientId, roles);
+
+        // ── Step 3: Connect (identical to handleJoinSession path) ──────
+        await netManager.connectWithTransport({
+          transport,
+          ephemeralTransport,
+          sessionCode: sessionCode || sessionId,
+          username,
+          roles: roles.length > 0 ? roles : undefined,
+        });
+
+        console.log('✅ [AutoReconnect] Rejoin complete');
       };
 
-      executeReconnect(code);
+      executeReconnect().catch((err) => {
+        console.warn('⚠️ [AutoReconnect] Rejoin failed:', err);
+        useMultiplayerStore.getState().reset();
+      });
     }
 
     // Subscribe to store changes so we can react once rehydration completes

@@ -99,6 +99,10 @@ export class WebRTCTransport implements ITransport {
     this.unsubs.forEach(u => u());
     this.unsubs = [];
 
+    // Clear all diagnostics for this transport's session — prevents zombie entries
+    // from appearing in the profiler when joining a new session.
+    useNetworkDiagnosticsStore.getState().clearAll();
+
     // Clean up all RTCPeerConnections
     const store = useMultiplayerStore.getState();
     for (const [peerId, pc] of this.peerConnections.entries()) {
@@ -160,10 +164,23 @@ export class WebRTCTransport implements ITransport {
 
                if (isConnected) {
                  activeClientIds.add(clientId);
-                 // Ensure we have a peer connection for this active client
                  if (!this.peerConnections.has(clientId)) {
+                   // No existing connection — initiate a fresh offer
+                   useNetworkDiagnosticsStore.getState().updatePeer(clientId, { isHost: false, stage: 'signal_offer' });
+                   this.initiateOffer(clientId);
+                 } else {
+                   // Check if existing peer connection is a zombie (dead but ICE hasn't cleaned up yet)
+                   const existingPc = this.peerConnections.get(clientId);
+                   if (existingPc && ['disconnected', 'failed', 'closed'].includes(existingPc.connectionState)) {
+                     console.log(`[WebRTCTransport] Zombie peer ${clientId} (${existingPc.connectionState}). Re-initiating.`);
+                     existingPc.close();
+                     this.peerConnections.delete(clientId);
+                     this.dataChannels.delete(clientId);
+                     useMultiplayerStore.getState().removeWebRtcConnection(clientId);
                      useNetworkDiagnosticsStore.getState().updatePeer(clientId, { isHost: false, stage: 'signal_offer' });
                      this.initiateOffer(clientId);
+                   }
+                   // else: connected/connecting — healthy, no action needed
                  }
                }
              }
