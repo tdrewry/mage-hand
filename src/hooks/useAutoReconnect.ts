@@ -59,53 +59,48 @@ export function useAutoReconnect() {
             console.warn('⚠️ [AutoReconnect] Failed to resolve short code:', e);
           }
         }
-        
-        if (isJazz) {
-          if (state.activeTransport !== 'jazz') {
-            // Phase 1: Trigger the global provider tree to swap to <JazzActiveProvider>
-            console.log('🔄 [AutoReconnect] Phase 1: Requesting Jazz Provider mount');
-            useMultiplayerStore.getState().setActiveTransport('jazz');
-            return;
-          }
 
-          if (!coValueId) {
-            console.warn('⚠️ [AutoReconnect] Invalid Jazz code, clearing session');
-            useMultiplayerStore.getState().reset();
-            return;
-          }
-
-          console.log('🔄 [AutoReconnect] Phase 2: Reconnecting Jazz session', targetCode);
-          useMultiplayerStore.getState().setConnectionStatus('reconnecting');
-
-          // 1. Reconnect Jazz CRDT bridge directly
-          joinJazzSession(coValueId)
-          .then((info) => {
-            const store = useMultiplayerStore.getState();
-            store.setConnectionStatus('connected');
-            console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
-            
-            // 2. Inject ephemeral transport
-            const clientId = getOrCreateClientId();
-            const transport = new JazzTransport(info.root, clientId, username, store.roles);
-            const ephemeralTransport = new WebRTCTransport(info.root, clientId, store.roles);
-            
-            netManager.connectWithTransport({
-              transport,
-              ephemeralTransport,
-              sessionCode: code,
-              username,
-              roles: store.roles.length > 0 ? store.roles : undefined,
-            }).then(() => {
-              console.log('✅ [AutoReconnect] Jazz Ephemeral Transport injected');
-            }).catch((err) => {
-              console.warn('⚠️ [AutoReconnect] Transport injection failed:', err);
-            });
-          })
-          .catch((err) => {
-            console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
-            useMultiplayerStore.getState().reset();
-          });
+        if (!isJazz || !coValueId) {
+          console.warn('⚠️ [AutoReconnect] No valid Jazz session ID found, clearing session');
+          useMultiplayerStore.getState().reset();
+          return;
         }
+
+        // JazzActiveProvider is always mounted — no phase 1 needed.
+        // Ensure activeTransport is set so provider/hooks know we're in Jazz mode.
+        useMultiplayerStore.getState().setActiveTransport('jazz');
+
+        console.log('🔄 [AutoReconnect] Reconnecting Jazz session', coValueId);
+        useMultiplayerStore.getState().setConnectionStatus('reconnecting');
+
+        // 1. Reconnect Jazz CRDT bridge directly
+        joinJazzSession(coValueId)
+        .then((info) => {
+          const store = useMultiplayerStore.getState();
+          store.setConnectionStatus('connected');
+          console.log('✅ [AutoReconnect] Jazz session reconnected:', info.sessionCoId);
+
+          // 2. Inject ephemeral transport
+          const clientId = getOrCreateClientId();
+          const transport = new JazzTransport(info.root, clientId, username, store.roles);
+          const ephemeralTransport = new WebRTCTransport(info.root, clientId, store.roles);
+
+          netManager.connectWithTransport({
+            transport,
+            ephemeralTransport,
+            sessionCode: code,
+            username,
+            roles: store.roles.length > 0 ? store.roles : undefined,
+          }).then(() => {
+            console.log('✅ [AutoReconnect] Jazz Ephemeral Transport injected');
+          }).catch((err) => {
+            console.warn('⚠️ [AutoReconnect] Transport injection failed:', err);
+          });
+        })
+        .catch((err) => {
+          console.warn('⚠️ [AutoReconnect] Jazz reconnect failed:', err);
+          useMultiplayerStore.getState().reset();
+        });
       };
 
       executeReconnect(code);

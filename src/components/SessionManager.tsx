@@ -158,7 +158,9 @@ export const SessionManager: React.FC<{
         toast.warning("Session created, but short-code registration failed. Please share the direct J- code instead.");
       }
       
-      // Hydration stores
+      // Mark as connecting BEFORE setCurrentSession to prevent useAutoReconnect
+      // from treating this as a reconnect opportunity (it guards on connectionStatus === 'connecting')
+      useMultiplayerStore.getState().setConnectionStatus('connecting');
       useMultiplayerStore.getState().setRoles(playerRoles);
       useMultiplayerStore.getState().setCurrentSession({
         sessionCode: finalCode,
@@ -248,7 +250,9 @@ export const SessionManager: React.FC<{
         const info = await joinJazzSession(resolved.connectionId);
         const shortCode = resolved.displayCode;
         
-        // Hydration stores
+        // Mark as connecting BEFORE setCurrentSession to prevent useAutoReconnect
+        // from treating this as a reconnect opportunity (it guards on connectionStatus === 'connecting')
+        useMultiplayerStore.getState().setConnectionStatus('connecting');
         useMultiplayerStore.getState().setRoles(playerRoles);
         useMultiplayerStore.getState().setCurrentSession({
           sessionCode: shortCode,

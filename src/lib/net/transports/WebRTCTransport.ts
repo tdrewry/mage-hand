@@ -526,6 +526,8 @@ export class WebRTCTransport implements ITransport {
          };
 
          this.hostConnection.onconnectionstatechange = () => {
+              // Guard: this.hostConnection may be nulled by cleanup before async events fire
+              if (!this.hostConnection) return;
              const store = useMultiplayerStore.getState();
              store.setWebRtcConnection(sigData.hostId, this.hostConnection!.connectionState);
              
