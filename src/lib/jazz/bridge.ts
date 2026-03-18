@@ -1274,14 +1274,26 @@ export function pullTokensFromJazz(sessionRoot: any): void {
 
   console.log(`[jazz-bridge] Pulling ${len} tokens from Jazz (local had ${localTokenCount})`);
 
+  const tokensNeedingTextureResolve: { id: string; hash: string }[] = [];
+
   runFromJazz(() => {
     const store = useSessionStore.getState();
     store.tokens.forEach((t) => store.removeToken(t.id));
     for (let i = 0; i < len; i++) {
       const jt = jazzTokens[i];
-      if (jt) store.addToken(jazzToZustandToken(jt));
+      if (jt) {
+        const token = jazzToZustandToken(jt);
+        store.addToken(token);
+        if (token.imageHash) {
+          tokensNeedingTextureResolve.push({ id: token.id, hash: token.imageHash });
+        }
+      }
     }
   });
+
+  if (tokensNeedingTextureResolve.length > 0) {
+    _resolveTokenTextures(tokensNeedingTextureResolve);
+  }
 }
 
 /** Pull all regions from Jazz into Zustand */
@@ -1343,14 +1355,27 @@ export function pullMapObjectsFromJazz(sessionRoot: any): void {
 
   console.log(`[jazz-bridge] Pulling ${len} map objects from Jazz (local had ${localCount})`);
 
+  const mapObjectsNeedingTextureResolve: { id: string; hash: string }[] = [];
+
   runFromJazz(() => {
     const store = useMapObjectStore.getState();
     store.clearMapObjects();
     for (let i = 0; i < len; i++) {
       const jmo = jazzMapObjects[i];
-      if (jmo) store.addMapObject(jazzToZustandMapObject(jmo));
+      if (jmo) {
+        const obj = jazzToZustandMapObject(jmo);
+        store.addMapObject(obj);
+        if (obj.imageHash) {
+          mapObjectsNeedingTextureResolve.push({ id: obj.id, hash: obj.imageHash });
+        }
+      }
     }
   });
+
+  // Resolve textures from local IDB (same pattern as pullTokensFromJazz / pullRegionsFromJazz)
+  if (mapObjectsNeedingTextureResolve.length > 0) {
+    _resolveMapObjectTextures(mapObjectsNeedingTextureResolve);
+  }
 }
 
 /** Pull all DO blobs from Jazz into Zustand */
@@ -2138,6 +2163,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   };
                   if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
                     tokensNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                  } else if (!existing.imageUrl && existing.imageHash) {
+                    tokensNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
                   }
                   updatedTokens[localIdx] = merged;
                   tokensChanged = true;
@@ -2146,6 +2173,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   import('./profiler').then(({ syncProfiler }) => {
                     syncProfiler.measureInbound(incoming, 'token');
                   });
+                } else {
+                  if (!existing.imageUrl && existing.imageHash) {
+                    tokensNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
+                  }
                 }
               } else {
                 const newToken = jazzToZustandToken(jt);
@@ -2271,6 +2302,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   // If textureHash changed, flag for async texture resolution
                   if (incoming.textureHash && incoming.textureHash !== existing.textureHash) {
                     regionsNeedingTextureResolve.push({ id: existing.id, hash: incoming.textureHash });
+                  } else if (!existing.backgroundImage && existing.textureHash) {
+                    regionsNeedingTextureResolve.push({ id: existing.id, hash: existing.textureHash });
+                  }
+                } else {
+                  // No structural change, but still check if texture needs resolving after refresh
+                  if (!existing.backgroundImage && existing.textureHash) {
+                    regionsNeedingTextureResolve.push({ id: existing.id, hash: existing.textureHash });
                   }
                 }
               } else {
@@ -2386,6 +2424,12 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   // If imageHash changed, flag for async texture resolution
                   if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
                     mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                  } else if (!existing.imageUrl && existing.imageHash) {
+                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
+                  }
+                } else {
+                  if (!existing.imageUrl && existing.imageHash) {
+                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
                   }
                 }
               } else {

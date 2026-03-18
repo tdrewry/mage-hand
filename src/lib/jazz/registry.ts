@@ -34,7 +34,7 @@ export async function registerCode(shortCode: string, coValueId: string, registr
       console.log(`[registry] Registered ${shortCode} -> ${coValueId} in ${registryId || 'default'}`);
     }
   } catch (err) {
-    console.error("[registry] Failed to register code:", err);
+    console.warn("[registry] Short-code registration failed (registry unavailable — use J-Code for local/self-hosted sharing):", err);
   }
 }
 

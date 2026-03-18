@@ -518,19 +518,32 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     let targetSessionId = '';
 
     if (sessionParam) {
-      try {
-        const resolved = await resolveSessionCode(sessionParam);
-        targetSessionId = resolved.connectionId;
+      // Only attempt Jazz registry/code resolution for codes that actually require
+      // a network round-trip. Plain local session codes (e.g. "RNYXUW") are used
+      // directly as the session ID — no registry lookup needed.
+      const needsNetworkResolution =
+        isJazzCode(sessionParam) ||           // J-... prefix
+        sessionParam.startsWith('co_z') ||    // raw CoValue ID
+        sessionParam.startsWith('co_');       // legacy co_ prefix
 
-        // If the resolved code is a Jazz code, update the URL to the full session ID
-        if (isJazzCode(sessionParam) && router) {
-          const newUrl = new URL(window.location.href);
-          newUrl.searchParams.set('session', targetSessionId);
-          router.replace(newUrl.toString(), undefined, { shallow: true });
+      if (needsNetworkResolution) {
+        try {
+          const resolved = await resolveSessionCode(sessionParam);
+          targetSessionId = resolved.connectionId;
+
+          // If the resolved code is a Jazz code, update the URL to the full session ID
+          if (isJazzCode(sessionParam) && router) {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('session', targetSessionId);
+            router.replace(newUrl.toString(), undefined, { shallow: true });
+          }
+        } catch (err) {
+          console.warn("[session-store] Failed to resolve session ID from URL:", err);
+          targetSessionId = sessionParam; // Fallback to raw param
         }
-      } catch (err) {
-        console.warn("[session-store] Failed to resolve session ID from URL:", err);
-        targetSessionId = sessionParam; // Fallback to raw param
+      } else {
+        // Local / OpBridge code — use directly, no network needed
+        targetSessionId = sessionParam;
       }
     }
 

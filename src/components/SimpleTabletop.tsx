@@ -74,7 +74,7 @@ import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache, computeVisibilityFromSegments, visibilityPolygonToPath2D } from "../lib/visibilityEngine";
 import { throttle } from "../lib/throttle";
 import { computeTokenVisibilityPaper } from "../lib/fogOfWar";
-import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea, getFogScope } from "../lib/fogGeometry";
+import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToPath2D, isPointInRevealedArea, isPointInVisibleArea, getFogScope, visibilityPolygonToPaperPath } from "../lib/fogGeometry";
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
@@ -211,6 +211,34 @@ const CursorStatusIndicator: React.FC = () => {
   );
 };
 
+
+// ── Block 3B: stable module-level focus-dim helpers (extracted from redrawCanvas) ──
+// These were previously defined as closures inside the render function, creating new
+// function objects on every frame. They now accept their dependencies as parameters.
+/** Apply dim/blur for entities on non-focused maps. Returns true if effects were applied. */
+function applyFocusDim(
+  ctx: CanvasRenderingContext2D,
+  entityMapId: string | undefined,
+  focusActive: boolean,
+  currentSelectedMapId: string | null | undefined,
+  unfocusedOpacity: number,
+  unfocusedBlur: number,
+): boolean {
+  if (!focusActive || !currentSelectedMapId) return false;
+  if (entityMapId === undefined || entityMapId === currentSelectedMapId) return false;
+  ctx.save();
+  ctx.globalAlpha *= unfocusedOpacity;
+  if (unfocusedBlur > 0) {
+    ctx.filter = `blur(${unfocusedBlur}px)`;
+  }
+  return true;
+}
+
+/** Restore context after focus dim. Only call if applyFocusDim returned true. */
+function restoreFocusDim(ctx: CanvasRenderingContext2D): void {
+  ctx.restore();
+}
+
 export const SimpleTabletop = () => {
   // Check if selection action bar is visible for layout padding
   const isBottomNavbarVisible = useBottomNavbarVisible();
@@ -230,6 +258,8 @@ export const SimpleTabletop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null); // For UI elements above fog post-processing
+  // Block 3A: fog offscreen canvas stored as a component-scoped ref instead of window global
+  const fogOffscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isRegionBackgroundModalOpen, setIsRegionBackgroundModalOpen] = useState(false);
 
   // Helper function to capture full region transform state for undo/redo
@@ -677,7 +707,7 @@ export const SimpleTabletop = () => {
   // ── Listen for remote drag updates to trigger canvas repaint ──
   useEffect(() => {
     const unsub = ephemeralBus.on("remote.drag.update", () => {
-      requestAnimationFrame(() => redrawCanvas());
+      scheduleRedraw();
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -760,6 +790,59 @@ export const SimpleTabletop = () => {
     };
   }, []);
 
+  // ── Block 2C: cleanupDismissedEffects — run periodically outside the render loop ──
+  // Calling a Zustand setState from within redrawCanvas (an rAF callback) is a
+  // re-entrancy hazard. Moving it here keeps the render loop side-effect-free.
+  useEffect(() => {
+    const id = setInterval(() => {
+      useEffectStore.getState().cleanupDismissedEffects();
+    }, 1500);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Block 2C: tickAuras — run at ~5Hz via interval instead of throttle-ref inside rAF ──
+  useEffect(() => {
+    const id = setInterval(() => {
+      const effectState = useEffectStore.getState();
+      const activeMapId = selectedMapId || 'default-map';
+      const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
+      const auraEffects = mapEffects.filter(e => e.isAura);
+      if (auraEffects.length === 0) return;
+      const tokens = useSessionStore.getState().tokens;
+      const gridSize = useRegionStore.getState().regions[0]?.gridSize || 40;
+      const auraEvents = tickAuras(
+        auraEffects,
+        tokens,
+        combinedSegmentsRef.current,
+        gridSize,
+        effectState.updateAuraState,
+      );
+      // Broadcast aura state changes to connected players
+      for (const ev of auraEvents) {
+        const effect = auraEffects.find(e => e.id === ev.effectId);
+        if (effect) {
+          const anchor = tokens.find(t => t.id === effect.anchorTokenId);
+          if (anchor) {
+            emitAuraState(
+              ev.effectId,
+              { x: anchor.x, y: anchor.y },
+              effect.tokensInsideArea ?? [],
+              (effect.impactedTargets ?? []).map(t => ({
+                targetId: t.targetId,
+                targetType: t.targetType,
+                distanceFromOrigin: t.distanceFromOrigin,
+                overlapPercent: t.overlapPercent,
+              })),
+            );
+          }
+        }
+      }
+      scheduleRedraw();
+    }, 200); // 5Hz — same cadence as before
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMapId]);
+
   // Pending teleport confirmation (DM approval)
   const [pendingTeleport, setPendingTeleport] = useState<{
     tokenId: string;
@@ -776,6 +859,7 @@ export const SimpleTabletop = () => {
 
   // Real-time vision preview during drag
   const dragPreviewVisibilityRef = useRef<Path2D | null>(null);
+  const dragPreviewVisibilityPaperRef = useRef<paper.Path | null>(null);
   const [dragPreviewPosition, setDragPreviewPosition] = useState<{ x: number; y: number; range: number } | null>(null);
 
   // Pre-computed fog masks (updated outside render loop)
@@ -833,8 +917,8 @@ export const SimpleTabletop = () => {
   // Track previous dragging state to detect drag-end transitions
   const wasDraggingTokenRef = useRef(false);
 
-  // Counter to force re-render when images load
-  const [imageLoadCounter, setImageLoadCounter] = useState(0);
+  // Ref counter to trigger canvas redraw when images load (avoids React re-renders)
+  const imageLoadCounterRef = useRef(0);
 
   // Derive selectedRegionIds from the regionStore so that selections made
   // from the Map Tree (or anywhere else that calls selectRegion) are
@@ -3086,8 +3170,9 @@ export const SimpleTabletop = () => {
       imageCache.current.set(url, img);
 
       img.onload = () => {
-        // Increment counter to trigger re-render when image loads
-        setImageLoadCounter(c => c + 1);
+        // Increment ref counter and schedule a canvas repaint (no React re-render)
+        imageLoadCounterRef.current += 1;
+        scheduleRedraw();
       };
 
       img.src = url;
@@ -3144,23 +3229,8 @@ export const SimpleTabletop = () => {
     const focusState = useMapFocusStore.getState();
     const focusActive = isFocusEffectActive(focusState);
     const currentSelectedMapId = useMapStore.getState().selectedMapId;
-
-    /** Apply dim/blur for entities on non-focused maps. Returns true if effects were applied. */
-    const applyFocusDim = (ctx: CanvasRenderingContext2D, entityMapId: string | undefined): boolean => {
-      if (!focusActive || !currentSelectedMapId) return false;
-      if (entityMapId === undefined || entityMapId === currentSelectedMapId) return false;
-      ctx.save();
-      ctx.globalAlpha *= focusState.unfocusedOpacity;
-      if (focusState.unfocusedBlur > 0) {
-        ctx.filter = `blur(${focusState.unfocusedBlur}px)`;
-      }
-      return true;
-    };
-
-    /** Restore context after focus dim. Only call if applyFocusDim returned true. */
-    const restoreFocusDim = (ctx: CanvasRenderingContext2D) => {
-      ctx.restore();
-    };
+    // applyFocusDim / restoreFocusDim are now module-level functions (Block 3B).
+    // Call them as: applyFocusDim(ctx, entityMapId, focusActive, currentSelectedMapId, focusState.unfocusedOpacity, focusState.unfocusedBlur)
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -3295,7 +3365,7 @@ export const SimpleTabletop = () => {
           return;
         }
 
-        const dimmed = applyFocusDim(ctx, region.mapId);
+        const dimmed = applyFocusDim(ctx, region.mapId, focusActive, currentSelectedMapId, focusState.unfocusedOpacity, focusState.unfocusedBlur);
         drawRegion(ctx, region, true); // skipStroke = true for both modes
         if (dimmed) restoreFocusDim(ctx);
       });
@@ -3318,7 +3388,6 @@ export const SimpleTabletop = () => {
       wallThickness,
       textureScale,
       isPlayMode,
-      lights.length,
     );
 
     // Check if we can use cached decorations
@@ -3755,7 +3824,8 @@ export const SimpleTabletop = () => {
           const isCurrentlyIlluminated = isPointInVisibleArea(
             tokenPoint,
             visibilityToCheck
-          ) || !!remoteDrags[token.id]; // Tokens being actively dragged remotely are always visible to prevent flickering
+          ) || (isDraggingTokenRef.current && realtimeVisionDuringDrag && dragPreviewVisibilityPaperRef.current && isPointInVisibleArea(tokenPoint, dragPreviewVisibilityPaperRef.current))
+            || !!remoteDrags[token.id]; // Tokens being actively dragged remotely are always visible to prevent flickering
 
           // Check token ownership - friendly tokens always visible to their owner
           const tokenPlayer = players.find((p) => p.id === currentPlayerId);
@@ -3783,7 +3853,7 @@ export const SimpleTabletop = () => {
         if (shouldSkipToken) return;
 
         // Apply focus dim for tokens on non-focused maps
-        const tokenDimmed = applyFocusDim(targetCtx, renderToken.mapId);
+        const tokenDimmed = applyFocusDim(targetCtx, renderToken.mapId, focusActive, currentSelectedMapId, focusState.unfocusedOpacity, focusState.unfocusedBlur);
         drawTokenToContext(targetCtx, renderToken, tokenInFog);
         if (tokenDimmed) restoreFocusDim(targetCtx);
       });
@@ -4197,13 +4267,17 @@ export const SimpleTabletop = () => {
         // Without this, destination-out would make holes through the ENTIRE canvas (including regions).
 
         // Create or reuse offscreen fog canvas
-        let fogOffscreenCanvas = (window as any).__fogOffscreenCanvas as HTMLCanvasElement | undefined;
-        if (!fogOffscreenCanvas || fogOffscreenCanvas.width !== canvas.width || fogOffscreenCanvas.height !== canvas.height) {
-          fogOffscreenCanvas = document.createElement('canvas');
-          fogOffscreenCanvas.width = Math.max(1, canvas.width);
-          fogOffscreenCanvas.height = Math.max(1, canvas.height);
-          (window as any).__fogOffscreenCanvas = fogOffscreenCanvas;
+        if (
+          !fogOffscreenCanvasRef.current ||
+          fogOffscreenCanvasRef.current.width !== canvas.width ||
+          fogOffscreenCanvasRef.current.height !== canvas.height
+        ) {
+          const newFogCanvas = document.createElement('canvas');
+          newFogCanvas.width = Math.max(1, canvas.width);
+          newFogCanvas.height = Math.max(1, canvas.height);
+          fogOffscreenCanvasRef.current = newFogCanvas;
         }
+        const fogOffscreenCanvas = fogOffscreenCanvasRef.current;
 
         const fogCtx = fogOffscreenCanvas.getContext('2d');
         if (fogCtx) {
@@ -4366,44 +4440,10 @@ export const SimpleTabletop = () => {
             belowTokenEffects,
           );
         }
-        // Clean up fully-faded dismissed effects
-        if (mapEffects.length > 0) {
-          effectState.cleanupDismissedEffects();
-        }
-        // Tick aura hit-testing (throttled to ~5Hz)
-        const auraEffects = mapEffects.filter(e => e.isAura);
-        const now = performance.now();
-        if (auraEffects.length > 0 && now - lastAuraTickRef.current >= AURA_TICK_INTERVAL) {
-          lastAuraTickRef.current = now;
-          const auraEvents = tickAuras(
-            auraEffects,
-            filteredTokens,
-            combinedSegmentsRef.current,
-            effectGridSize,
-            effectState.updateAuraState,
-          );
-          // Broadcast aura state changes to connected players
-          for (const ev of auraEvents) {
-            const effect = auraEffects.find(e => e.id === ev.effectId);
-            if (effect) {
-              const anchor = filteredTokens.find(t => t.id === effect.anchorTokenId);
-              if (anchor) {
-                emitAuraState(
-                  ev.effectId,
-                  { x: anchor.x, y: anchor.y },
-                  effect.tokensInsideArea ?? [],
-                  (effect.impactedTargets ?? []).map(t => ({
-                    targetId: t.targetId,
-                    targetType: t.targetType,
-                    distanceFromOrigin: t.distanceFromOrigin,
-                    overlapPercent: t.overlapPercent,
-                  })),
-                );
-              }
-            }
-          }
-        }
+        // cleanupDismissedEffects is now run from a standalone setInterval (see Block 2C effect)
+        // tickAuras is now driven from a standalone setInterval (see Block 2C effect)
         // Render below-token aura effects (visibility-clipped circles)
+        const auraEffects = mapEffects.filter(e => e.isAura);
         const belowAuras = auraEffects.filter(e => !e.template?.renderAboveTokens);
         if (belowAuras.length > 0) {
           const tokenPosMap = new Map<string, { x: number; y: number }>();
@@ -5945,13 +5985,14 @@ export const SimpleTabletop = () => {
   };
 
   // Generate cache key for wall decorations
+  // NOTE: lights.length intentionally excluded — wall geometry depends only on region
+  // shapes, not light count. Light changes should NOT bust the expensive wall rebuild.
   const generateWallDecorationCacheKey = (
     regions: CanvasRegion[],
     wallEdgeStyle: WallEdgeStyle,
     wallThickness: number,
     textureScale: number,
     isPlayMode: boolean,
-    numLights: number,
   ): string => {
     const regionData = regions
       .map((r) => {
@@ -5961,7 +6002,7 @@ export const SimpleTabletop = () => {
         return `${r.id}-${(r.x ?? 0).toFixed(0)},${(r.y ?? 0).toFixed(0)},${(r.width ?? 0).toFixed(0)},${(r.height ?? 0).toFixed(0)},${r.rotation || 0}`;
       })
       .join("|");
-    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? "play" : "edit"}-${numLights}`;
+    return `${regionData}-${wallEdgeStyle}-${wallThickness}-${textureScale}-${isPlayMode ? "play" : "edit"}`;
   };
 
   // Function to draw regions
@@ -6214,8 +6255,9 @@ export const SimpleTabletop = () => {
         staticImg.onload = () => {
           // Invalidate any cached patterns for this image since it just loaded
           texturePatternCache.invalidateImage(region.backgroundImage!);
-          // Trigger re-render when image loads
-          setImageLoadCounter(c => c + 1);
+          // Trigger canvas redraw when image loads (no React re-render)
+          imageLoadCounterRef.current += 1;
+          scheduleRedraw();
         };
 
         staticImg.onerror = () => {
@@ -7528,7 +7570,7 @@ export const SimpleTabletop = () => {
     return () => {
       if (transformRedrawRafRef.current !== null) cancelAnimationFrame(transformRedrawRafRef.current);
     };
-  }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, imageLoadCounter, canvasDimensions.width, canvasDimensions.height]);
+  }, [transform, filteredTokens, filteredRegions, currentPath, isInCombat, currentTurnIndex, canvasDimensions.width, canvasDimensions.height]);
 
   // --- Auto-pause animations while panning or fog brush is active ---
   const setAnimationsPaused = useUiModeStore((state) => state.setAnimationsPaused);
@@ -9563,6 +9605,12 @@ export const SimpleTabletop = () => {
 
                 if (visibility.polygon && visibility.polygon.length > 2) {
                   dragPreviewVisibilityRef.current = visibilityPolygonToPath2D(visibility.polygon);
+                  try {
+                    if (dragPreviewVisibilityPaperRef.current) dragPreviewVisibilityPaperRef.current.remove();
+                    dragPreviewVisibilityPaperRef.current = visibilityPolygonToPaperPath(visibility.polygon);
+                  } catch (e) {
+                    console.error('[DRAG VISION] Error converting wall visibility to paper.Path:', e);
+                  }
                   console.log('[DRAG VISION] Path2D created from wall visibility');
                 } else {
                   throw new Error('Invalid polygon');
@@ -9573,6 +9621,17 @@ export const SimpleTabletop = () => {
                 const circlePath = new Path2D();
                 circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
                 dragPreviewVisibilityRef.current = circlePath;
+                try {
+                  const scope = getFogScope();
+                  scope.activate();
+                  if (dragPreviewVisibilityPaperRef.current) dragPreviewVisibilityPaperRef.current.remove();
+                  dragPreviewVisibilityPaperRef.current = new scope.Path.Circle({
+                    center: [tokenCenterX, tokenCenterY],
+                    radius: tokenVisionRange
+                  });
+                } catch (pe) {
+                  console.error('[DRAG VISION] Error creating fallback paper circle:', pe);
+                }
                 console.log('[DRAG VISION] Using circular fallback after error');
               }
             } else {
@@ -9580,6 +9639,17 @@ export const SimpleTabletop = () => {
               const circlePath = new Path2D();
               circlePath.arc(tokenCenterX, tokenCenterY, tokenVisionRange, 0, Math.PI * 2);
               dragPreviewVisibilityRef.current = circlePath;
+              try {
+                const scope = getFogScope();
+                scope.activate();
+                if (dragPreviewVisibilityPaperRef.current) dragPreviewVisibilityPaperRef.current.remove();
+                dragPreviewVisibilityPaperRef.current = new scope.Path.Circle({
+                  center: [tokenCenterX, tokenCenterY],
+                  radius: tokenVisionRange
+                });
+              } catch (pe) {
+                console.error('[DRAG VISION] Error creating fallback paper circle:', pe);
+              }
               console.log('[DRAG VISION] Using circular (no walls), center:', tokenCenterX, tokenCenterY, 'range:', tokenVisionRange);
             }
           }

@@ -36,6 +36,7 @@ export class WebRTCTransport implements ITransport {
   // Client's single connection to Host
   private hostConnection?: RTCPeerConnection;
   private hostDataChannel?: RTCDataChannel;
+  private lastHostOfferSdp?: string;
 
   private unsubs: Array<() => void> = [];
 
@@ -147,18 +148,37 @@ export class WebRTCTransport implements ITransport {
         this.unsubs.push(
           connectedUsers.$jazz.subscribe([], (users: any) => {
              if (!users) return;
+             const activeClientIds = new Set<string>();
              for (const clientId of Object.keys(users)) {
                if (clientId === this.userId || clientId === "in" || clientId === "$jazz") continue;
                
-               // Ensure we have a peer connection for this active client
-               if (!this.peerConnections.has(clientId)) {
-                 try {
-                   const val = JSON.parse(users[clientId] || "{}");
-                   if (val.status === "connected") {
+               let isConnected = false;
+               try {
+                 const val = JSON.parse(users[clientId] || "{}");
+                 isConnected = val.status === "connected";
+               } catch (e) {}
+
+               if (isConnected) {
+                 activeClientIds.add(clientId);
+                 // Ensure we have a peer connection for this active client
+                 if (!this.peerConnections.has(clientId)) {
                      useNetworkDiagnosticsStore.getState().updatePeer(clientId, { isHost: false, stage: 'signal_offer' });
                      this.initiateOffer(clientId);
-                   }
-                 } catch (e) {}
+                 }
+               }
+             }
+
+             // Teardown connections for clients that are no longer connected
+             for (const clientId of this.peerConnections.keys()) {
+               if (!activeClientIds.has(clientId)) {
+                 console.log(`[WebRTCTransport] Client ${clientId} disconnected from Jazz. Tearing down peer connection.`);
+                 const pc = this.peerConnections.get(clientId);
+                 if (pc) {
+                     pc.close();
+                     this.peerConnections.delete(clientId);
+                     this.dataChannels.delete(clientId);
+                     useMultiplayerStore.getState().removeWebRtcConnection(clientId);
+                 }
                }
              }
           })
@@ -172,6 +192,37 @@ export class WebRTCTransport implements ITransport {
           for (const clientId of Object.keys(room)) {
             if (clientId === this.userId || clientId === "in" || clientId === "$jazz") continue;
             const dataStr = room[clientId];
+            
+            // If the client explicitly cleared their signaling row (e.g. on page refresh),
+            // we should proactively tear down the stale peer connection.
+            // If the client explicitly cleared their signaling row (e.g. on page refresh or
+            // after the ghost-cleanup timer fires once they connected), check whether our
+            // existing peer connection is still alive before re-initiating.
+            if (!dataStr && this.peerConnections.has(clientId)) {
+              const existingPc = this.peerConnections.get(clientId);
+              const existingState = existingPc?.connectionState;
+              
+              // If the connection is already live (connected) or actively doing the DTLS
+              // handshake (connecting), the client just fired its ghost-cleanup timer.
+              // Do NOT tear it down — let the handshake complete.
+              if (existingState === 'connected' || existingState === 'connecting') {
+                console.log(`[WebRTCTransport] Client ${clientId} cleared signaling row but connection is ${existingState} — ignoring ghost cleanup.`);
+                continue;
+              }
+              
+              // Connection is genuinely dead — tear it down and re-offer.
+              console.log(`[WebRTCTransport] Client ${clientId} cleared signaling room. Connection state: ${existingState}. Tearing down and re-initiating.`);
+              const pc = this.peerConnections.get(clientId);
+              if (pc) pc.close();
+              this.peerConnections.delete(clientId);
+              this.dataChannels.delete(clientId);
+              useMultiplayerStore.getState().removeWebRtcConnection(clientId);
+              
+              // Immediately re-initiate offer since they are likely still in connectedUsers
+              this.initiateOffer(clientId);
+              continue;
+            }
+
             if (dataStr && typeof dataStr === "string") {
               try {
                 const sigData = JSON.parse(dataStr) as SignalingData;
@@ -322,6 +373,8 @@ export class WebRTCTransport implements ITransport {
     updateSignalRoom((data) => {
       data.offer = { type: offer.type, sdp: offer.sdp };
       data.hostId = this.userId; // ensure set
+      delete data.answer; // Ensure we don't accidentally reuse a stale answer from a previous session
+      data.candidatesClient = {}; // wipe out stale client candidates too
     });
   }
 
@@ -388,7 +441,21 @@ export class WebRTCTransport implements ITransport {
   private async handleSignalAsClient(sigData: SignalingData) {
      if (!sigData.offer || sigData.hostId === this.userId) return; // don't answer yourself
 
+     // If we already have a connection but the Host sent a NEW offer,
+     // it means the Host probably refreshed their page and recreated the transport.
+     // We need to tear down our stale connection and accept the new offer.
+     if (this.hostConnection) {
+         if (this.lastHostOfferSdp && this.lastHostOfferSdp !== sigData.offer.sdp) {
+             console.log("[WebRTCTransport] Detected new Host offer! Host likely refreshed. Tearing down stale connection.");
+             this.hostConnection.close();
+             this.hostConnection = undefined;
+             this.hostDataChannel = undefined;
+             this.lastHostOfferSdp = undefined;
+         }
+     }
+
      if (!this.hostConnection) {
+         this.lastHostOfferSdp = sigData.offer.sdp;
          this.hostConnection = new RTCPeerConnection(STUN_SERVERS);
          
          const updateSignalRoom = (mutator: (current: SignalingData) => void) => {

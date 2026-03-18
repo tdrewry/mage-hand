@@ -133,6 +133,16 @@ export function TokenEditModal({
     setImageScaleValue(result.scale);
     setImageOffsetXValue(result.offsetX);
     setImageOffsetYValue(result.offsetY);
+
+    if (!isMultiSelection && currentToken) {
+      applyUpdatesToStore([currentToken.id], {
+        imageUrl: result.imageUrl,
+        imageHash: hash,
+        imageScale: result.scale,
+        imageOffsetX: result.offsetX,
+        imageOffsetY: result.offsetY,
+      });
+    }
   };
 
   const handleImageImportMultipleConfirm = async (images: { url: string; hash?: string }[]) => {
@@ -798,6 +808,84 @@ export function TokenEditModal({
                     >
                       <X className="h-3 w-3" />
                     </Button>
+                  </div>
+                )}
+
+                {currentToken?.appearanceVariants && currentToken.appearanceVariants.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    {currentToken.appearanceVariants.map((variant) => (
+                      <div key={variant.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full overflow-hidden relative bg-black/20 shrink-0 shadow-inner">
+                            {variant.imageUrl ? (
+                              <img
+                                src={variant.imageUrl}
+                                alt={variant.name}
+                                className="w-full h-full object-cover"
+                                style={{
+                                  transform: `translate(${((variant.imageOffsetX || 0) * 100).toFixed(1)}%, ${((variant.imageOffsetY || 0) * 100).toFixed(1)}%) scale(${variant.imageScale || 1})`
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-xs uppercase">
+                                {variant.name.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {variant.name}
+                              {currentToken.activeVariantId === variant.id && (
+                                <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-semibold">ACTIVE</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{variant.gridWidth}×{variant.gridHeight}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {currentToken.activeVariantId !== variant.id && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                applyUpdatesToStore([currentToken.id], {
+                                  activeVariantId: variant.id,
+                                  gridWidth: variant.gridWidth,
+                                  gridHeight: variant.gridHeight,
+                                  imageHash: variant.imageHash,
+                                  imageUrl: variant.imageUrl,
+                                  imageScale: variant.imageScale,
+                                  imageOffsetX: variant.imageOffsetX,
+                                  imageOffsetY: variant.imageOffsetY,
+                                });
+                                // Update local state so form reflects it
+                                setGridWidthValue(variant.gridWidth);
+                                setGridHeightValue(variant.gridHeight);
+                                setImageUrlValue(variant.imageUrl || '');
+                                setImageHashValue(variant.imageHash);
+                                setImageScaleValue(variant.imageScale || 1);
+                                setImageOffsetXValue(variant.imageOffsetX || 0);
+                                setImageOffsetYValue(variant.imageOffsetY || 0);
+                              }}
+                            >
+                              Apply
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              useSessionStore.getState().removeAppearanceVariant(currentToken.id, variant.id);
+                              onUpdateCanvas?.();
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

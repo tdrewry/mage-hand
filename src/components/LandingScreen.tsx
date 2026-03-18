@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { APP_VERSION } from '@/lib/version';
+import { encodeJazzCode } from '@/lib/sessionCodeResolver';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -377,8 +378,8 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                     <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center">
                       <Network className="w-5 h-5 text-green-400" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-green-400 flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-green-400 flex items-center gap-2 flex-wrap">
                         Connected to Session 
                         <div className="flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded">
                           <span className="font-mono text-[10px] sm:text-xs leading-tight break-all max-w-[150px] sm:max-w-xs text-wrap" title={currentSession.sessionCode}>
@@ -387,13 +388,31 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                           <button
                             onClick={handleCopySessionCode}
                             className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400"
-                            title="Copy Code"
+                            title="Copy short code (requires registry)"
                           >
                             {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </h4>
-                      <p className="text-sm text-green-400/80">
+                      {/* J-code row — no registry needed, works locally */}
+                      {currentSession.sessionId && (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[10px] text-green-400/60 shrink-0">J-Code:</span>
+                          <code className="text-[10px] font-mono text-green-300/70 truncate flex-1" title={encodeJazzCode(currentSession.sessionId)}>
+                            {encodeJazzCode(currentSession.sessionId)}
+                          </code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(encodeJazzCode(currentSession.sessionId));
+                            }}
+                            className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400/60 hover:text-green-400"
+                            title="Copy J-Code (works without registry)"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <p className="text-sm text-green-400/80 mt-1">
                         {connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} online
                       </p>
                     </div>

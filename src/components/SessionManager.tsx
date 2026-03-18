@@ -389,9 +389,10 @@ export const SessionManager: React.FC<{
           // Active Session View
           <div className="space-y-4 pt-4">
             <div className="p-5 bg-background/40 rounded-xl border border-white/5 shadow-inner space-y-4">
+              {/* Short code — works via registry when online */}
               <div className="flex items-center justify-between gap-2">
                 <div className="space-y-1 min-w-0 flex-1">
-                  <Label className="text-xs text-muted-foreground">Session Code</Label>
+                  <Label className="text-xs text-muted-foreground">Session Code <span className="opacity-50">(requires registry)</span></Label>
                   <div className="flex items-center gap-2">
                     <code 
                       className={`font-bold tracking-wider text-primary break-all ${
@@ -419,26 +420,43 @@ export const SessionManager: React.FC<{
                 </div>
               </div>
 
+              {/* J-code — works everywhere, no registry needed */}
               {currentSession?.sessionId && (
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest pl-1">Direct Share Link (Fallback)</Label>
-                    <Badge variant="outline" className="text-[9px] h-4 px-1 opacity-70">Always Works</Badge>
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest pl-1">J-Code <span className="normal-case opacity-70">— local / self-hosted / always works</span></Label>
+                    <Badge variant="outline" className="text-[9px] h-4 px-1 text-emerald-400 border-emerald-500/30">No Registry</Badge>
                   </div>
                   <div className="flex items-center gap-2 p-2 bg-background/30 rounded-lg border border-white/5">
-                    <code className="text-[10px] text-primary/70 font-mono truncate flex-1">
+                    <code className="text-[10px] text-primary/70 font-mono truncate flex-1" title={encodeJazzCode(currentSession.sessionId)}>
                       {encodeJazzCode(currentSession.sessionId)}
                     </code>
+                    {/* Copy J-code */}
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => {
                         navigator.clipboard.writeText(encodeJazzCode(currentSession!.sessionId));
-                        toast.success('Direct link copied!');
+                        toast.success('J-Code copied!');
                       }}
                       className="h-6 w-6 shrink-0"
+                      title="Copy J-Code (paste into Join Session)"
                     >
                       <Copy className="h-3 w-3" />
+                    </Button>
+                    {/* Copy direct URL with J-code */}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        const jCode = encodeJazzCode(currentSession!.sessionId);
+                        navigator.clipboard.writeText(`${window.location.origin}/?session=${jCode}`);
+                        toast.success('Direct URL copied!');
+                      }}
+                      className="h-6 w-6 shrink-0"
+                      title="Copy shareable URL (J-Code based, works without registry)"
+                    >
+                      <LogIn className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>

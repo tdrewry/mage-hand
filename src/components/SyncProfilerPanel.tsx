@@ -59,12 +59,14 @@ export const SyncProfilerPanel: React.FC = () => {
   };
 
   const handleCopyUrl = () => {
-    const sessionCode = currentSession?.sessionCode;
-    if (sessionCode) {
-      const shareUrl = `${window.location.origin}/?session=${sessionCode}`;
+    const sessionId = currentSession?.sessionId;
+    if (sessionId) {
+      // Use J-code in the URL so it works without the registry (local/self-hosted)
+      const jCode = encodeJazzCode(sessionId);
+      const shareUrl = `${window.location.origin}/?session=${jCode}`;
       navigator.clipboard.writeText(shareUrl);
       setCopiedUrl(true);
-      toast.success('Direct URL copied');
+      toast.success('Direct URL copied (J-Code based)');
       setTimeout(() => setCopiedUrl(false), 2000);
     }
   };
@@ -115,15 +117,15 @@ export const SyncProfilerPanel: React.FC = () => {
             <div 
               className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
               onClick={handleCopyUrl}
-              title="Click to copy Direct URL"
+              title="Click to copy direct join URL (J-Code, works without registry)"
             >
-              <span className="font-mono text-slate-400">Direct URL</span>
+              <span className="font-mono text-slate-400">Share URL</span>
               {copiedUrl ? <Check className="h-3 w-3 text-emerald-400" /> : <Link className="h-3 w-3" />}
             </div>
             <div 
               className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
               onClick={handleCopyLink}
-              title="Click to copy Fallback J-Code Link"
+              title="Click to copy J-Code (paste into Join Session)"
             >
               <span className="font-mono text-slate-400">J-Code</span>
               {copiedLink ? <Check className="h-3 w-3 text-emerald-400" /> : <Share2 className="h-3 w-3" />}
@@ -131,9 +133,9 @@ export const SyncProfilerPanel: React.FC = () => {
             <div 
               className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
               onClick={handleCopySessionCode}
-              title="Click to copy Join Code"
+              title="Click to copy short code (requires registry to join)"
             >
-              <span className="font-mono text-slate-400">Join Code:</span>
+              <span className="font-mono text-slate-400">Code:</span>
               <span className="font-mono text-emerald-400">{sessionCode}</span>
               {copiedCode ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
             </div>
