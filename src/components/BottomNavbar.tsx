@@ -280,25 +280,55 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
 
   // --- Deletion & Clearing ---
   const handleDeleteConfirm = () => {
-    // Collect all tokens, regions, objects, and lights to delete
-    // Currently implementation mainly maps to tokens due to store API limits out of box,
-    // but we can at least remove tokens.
+    let deletedCount = 0;
+
+    // Tokens
     selectedTokens.forEach(token => {
       removeToken(token.id);
+      deletedCount++;
     });
-    // Delete remaining selected map objects
+
+    // Regions
+    if (selectedRegionIds.length > 0) {
+      const { removeRegion } = useRegionStore.getState();
+      selectedRegionIds.forEach(id => {
+        removeRegion(id);
+        deletedCount++;
+      });
+    }
+
+    // Map Objects (respect locked state)
     if (selectedMapObjectIds.length > 0) {
       const { mapObjects } = useMapObjectStore.getState();
-      const unlockedMapObjects = mapObjects.filter(o => selectedMapObjectIds.includes(o.id) && !o.locked);
+      const unlockedMapObjects = mapObjects
+        .filter(o => selectedMapObjectIds.includes(o.id) && !o.locked)
+        .map(o => o.id);
       if (unlockedMapObjects.length > 0) {
-        useMapObjectStore.getState().removeMultipleMapObjects(unlockedMapObjects.map(o => o.id));
+        useMapObjectStore.getState().removeMultipleMapObjects(unlockedMapObjects);
+        deletedCount += unlockedMapObjects.length;
       }
     }
 
+    // Lights
+    if (selectedLightIds.length > 0) {
+      const { removeLight } = useLightStore.getState();
+      selectedLightIds.forEach(id => {
+        removeLight(id);
+        deletedCount++;
+      });
+    }
+
+    // Groups (dissolve group container; members were already handled above)
+    activeGroups.forEach(group => {
+      removeGroup(group.id);
+      deletedCount++;
+    });
+
     setShowDeleteModal(false);
     onClearSelection();
+    clearGroupSelection();
     onUpdateCanvas?.();
-    toast.success(`Deleted ${totalCount} selected item(s)`);
+    toast.success(`Deleted ${deletedCount} selected item(s)`);
   };
 
   const handleClear = () => {

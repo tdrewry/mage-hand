@@ -2,6 +2,23 @@
 
 This document establishes the canonical terminology, interface shapes, and schema definitions used throughout the Mage-Hand codebase. Consistency in these terms is vital for maintainability and clear communication.
 
+## Canvas Entity (Umbrella Term)
+
+A **Canvas Entity** is any object that can be placed, selected, moved, grouped, and rendered on the map canvas. Canvas Entities support shared operations: bulk selection, bulk delete, grouping, and drag-move.
+
+| Canonical Name | TypeScript Type | Store | Selectable? | Bulk Delete? |
+|---|---|---|---|---|
+| **Token** | `Token` | `sessionStore` | ✅ | ✅ |
+| **Region** | `CanvasRegion` | `regionStore` | ✅ | ✅ |
+| **Map Object** | `MapObject` | `mapObjectStore` | ✅ | ✅ (respects lock) |
+| **Light** | `LightSource` | `lightStore` | ✅ | ✅ |
+| **Group** | `EntityGroup` | `groupStore` | ✅ | ✅ (dissolves container) |
+| **Effect** | `PlacedEffect` | `effectStore` | ✅ | — (dismissed, not deleted) |
+
+> **Usage:** When writing code or documentation that applies across multiple entity types, use "canvas entity" / "canvas entities" rather than an ad-hoc list like "tokens, regions, and objects."
+
+---
+
 ## Core Entities
 
 ### Token (`Token`)
@@ -23,6 +40,17 @@ Drawn vector shapes on the canvas used for terrain, hazards, annotations, or log
 *   **Key Fields:** `pathPoints`, `bezierControlPoints`, `gridSnapping`.
 *   **Location:** `src/stores/regionStore.ts`
 *   **Sync Target:** `JazzRegion`
+
+### Light (`LightSource`)
+A point or ambient light emitter placed on the map. Affects fog-of-war visibility calculations and shadow casting.
+*   **Key Fields:** `position`, `radius`, `color`, `intensity`, `castsShadows`.
+*   **Location:** `src/stores/lightStore.ts`
+*   **Sync Target:** `JazzIlluminationSource`
+
+### Group (`EntityGroup`)
+A named container that binds two or more Canvas Entities together. Selecting any member selects the whole group. Groups can be locked to prevent accidental edits. Dissolving a group removes the container but leaves all member entities intact.
+*   **Key Fields:** `name`, `members` (array of `{ id, type }`), `locked`.
+*   **Location:** `src/stores/groupStore.ts`
 
 ### Effect (`PlacedEffect`)
 A spell, capability, or hazard dropped onto the map, created from an `EffectTemplate`. Handles area-of-effect calculations and hit-testing against Tokens and MapObjects.

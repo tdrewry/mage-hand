@@ -2397,6 +2397,11 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             console.log(`[jazz-bridge] Skipping inbound mapObjects during startup grace`);
             return;
           }
+          // Guard: if outbound throttle is active, skip inbound sync entirely.
+          // This prevents the race where the creator deletes objects locally but
+          // the Jazz CoValue still has them — causing them to be re-added before
+          // the throttled push writes the deletion to Jazz.
+          if (_fineGrainedTimers.has('mapObjects')) return;
 
           const mapObjectsNeedingTextureResolve: { id: string; hash: string }[] = [];
 
@@ -2433,11 +2438,16 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                   }
                 }
               } else {
-                const newObj = jazzToZustandMapObject(jmo);
-                store.addMapObject(newObj);
-                // New map object with imageHash needs texture resolution
-                if (newObj.imageHash) {
-                  mapObjectsNeedingTextureResolve.push({ id: newObj.id, hash: newObj.imageHash });
+                // Non-creator: add new object from Jazz.
+                // Creator: trust local state — if the object isn't here, the creator
+                // deleted it intentionally. Don't re-add from stale Jazz state.
+                if (!_isCreator) {
+                  const newObj = jazzToZustandMapObject(jmo);
+                  store.addMapObject(newObj);
+                  // New map object with imageHash needs texture resolution
+                  if (newObj.imageHash) {
+                    mapObjectsNeedingTextureResolve.push({ id: newObj.id, hash: newObj.imageHash });
+                  }
                 }
               }
             }
