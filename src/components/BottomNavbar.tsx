@@ -74,6 +74,14 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   const [showTokenEditModal, setShowTokenEditModal] = useState(false);
   const [colorValue, setColorValue] = useState('#FF6B6B');
   const [showIlluminationModal, setShowIlluminationModal] = useState(false);
+  // Bulk action state — regions
+  const [regionFillColor, setRegionFillColor] = useState('#4A90E2');
+  // Bulk action state — map objects
+  const [mapObjectOpacity, setMapObjectOpacity] = useState(1);
+  // Bulk action state — lights
+  const [lightRadius, setLightRadius] = useState(200);
+  const [lightColor, setLightColor] = useState('#FFD700');
+  const [lightIntensity, setLightIntensity] = useState(0.8);
 
   const selectedTokens = tokens.filter(t => selectedTokenIds.includes(t.id));
   const currentPlayer = players.find(p => p.id === currentPlayerId);
@@ -95,6 +103,11 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   const entityCount = selectedTokenIds.length + selectedRegionIds.length + selectedMapObjectIds.length + selectedLightIds.length;
   const groupCount = activeGroups.length;
   const totalCount = entityCount + groupCount;
+
+  // Homogeneous selection helpers
+  const onlyRegions   = selectedRegionIds.length > 0 && selectedTokenIds.length === 0 && selectedMapObjectIds.length === 0 && selectedLightIds.length === 0;
+  const onlyMapObjects = selectedMapObjectIds.length > 0 && selectedTokenIds.length === 0 && selectedRegionIds.length === 0 && selectedLightIds.length === 0;
+  const onlyLights    = selectedLightIds.length > 0 && selectedTokenIds.length === 0 && selectedRegionIds.length === 0 && selectedMapObjectIds.length === 0;
 
   const showBar = entityCount > 0 || groupCount > 0;
   if (!showBar) return null;
@@ -336,6 +349,36 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
     clearGroupSelection();
   };
 
+  // --- Region Bulk Actions ---
+  const handleBulkRegionColor = () => {
+    useRegionStore.getState().updateMultipleRegions(selectedRegionIds, { color: regionFillColor });
+    onUpdateCanvas?.();
+    toast.success(`Fill color updated for ${selectedRegionIds.length} region(s)`);
+  };
+
+  // --- Map Object Bulk Actions ---
+  const handleBulkMapObjectOpacity = (opacity: number) => {
+    useMapObjectStore.getState().updateMultipleMapObjects(
+      selectedMapObjectIds,
+      { opacity }
+    );
+    onUpdateCanvas?.();
+  };
+
+  const handleBulkMapObjectLock = (locked: boolean) => {
+    useMapObjectStore.getState().updateMultipleMapObjects(
+      selectedMapObjectIds,
+      { locked }
+    );
+    toast.success(`${locked ? 'Locked' : 'Unlocked'} ${selectedMapObjectIds.length} object(s)`);
+  };
+
+  // --- Light Bulk Actions ---
+  const handleBulkLightUpdate = (updates: Partial<{ radius: number; color: string; intensity: number }>) => {
+    useLightStore.getState().updateMultipleLights(selectedLightIds, updates);
+    onUpdateCanvas?.();
+  };
+
   return (
     <>
       <div 
@@ -568,6 +611,160 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
 
           {/* Embedded Type-Specific Toolbars (Regions, Objects) */}
           {children}
+
+          {/* Region Bulk Actions (only when all selected are regions) */}
+          {onlyRegions && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Palette className="h-4 w-4 mr-2" />
+                    Fill Color
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 bg-background/95 backdrop-blur border-white/10 p-4" side="top">
+                  <div className="space-y-3">
+                    <Label>Fill Color</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={regionFillColor}
+                        onChange={(e) => setRegionFillColor(e.target.value)}
+                        className="w-10 h-10 rounded cursor-pointer border border-white/10 bg-transparent"
+                      />
+                      <Input
+                        value={regionFillColor}
+                        onChange={(e) => setRegionFillColor(e.target.value)}
+                        className="bg-black/20 border-white/10 h-8 font-mono text-xs"
+                        maxLength={7}
+                      />
+                    </div>
+                    <Button size="sm" className="w-full" onClick={handleBulkRegionColor}>
+                      Apply to {selectedRegionIds.length} Region(s)
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="h-4 w-px bg-white/10 mx-2" />
+            </>
+          )}
+
+          {/* Map Object Bulk Actions (only when all selected are map objects) */}
+          {onlyMapObjects && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Opacity
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 bg-background/95 backdrop-blur border-white/10 p-4" side="top">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Opacity</Label>
+                      <span className="text-xs text-muted-foreground">{Math.round(mapObjectOpacity * 100)}%</span>
+                    </div>
+                    <Slider
+                      value={[mapObjectOpacity]}
+                      min={0} max={1} step={0.05}
+                      onValueChange={([val]) => {
+                        setMapObjectOpacity(val);
+                        handleBulkMapObjectOpacity(val);
+                      }}
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Lock className="h-4 w-4 mr-2" />
+                    Lock
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-background/95 backdrop-blur border-white/10" side="top">
+                  <DropdownMenuItem onClick={() => handleBulkMapObjectLock(true)}>
+                    <Lock className="h-4 w-4 mr-2" /> Lock All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkMapObjectLock(false)}>
+                    <Unlock className="h-4 w-4 mr-2" /> Unlock All
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="h-4 w-px bg-white/10 mx-2" />
+            </>
+          )}
+
+          {/* Light Bulk Actions (only when all selected are lights) */}
+          {onlyLights && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Lightbulb className="h-4 w-4 mr-2" />
+                    Light
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 bg-background/95 backdrop-blur border-white/10 p-4" side="top">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Radius</Label>
+                        <span className="text-xs text-muted-foreground">{lightRadius}px</span>
+                      </div>
+                      <Slider
+                        value={[lightRadius]}
+                        min={20} max={800} step={10}
+                        onValueChange={([val]) => {
+                          setLightRadius(val);
+                          handleBulkLightUpdate({ radius: val });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Intensity</Label>
+                        <span className="text-xs text-muted-foreground">{Math.round(lightIntensity * 100)}%</span>
+                      </div>
+                      <Slider
+                        value={[lightIntensity]}
+                        min={0} max={1} step={0.05}
+                        onValueChange={([val]) => {
+                          setLightIntensity(val);
+                          handleBulkLightUpdate({ intensity: val });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Color</Label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={lightColor}
+                          onChange={(e) => {
+                            setLightColor(e.target.value);
+                            handleBulkLightUpdate({ color: e.target.value });
+                          }}
+                          className="w-10 h-10 rounded cursor-pointer border border-white/10 bg-transparent"
+                        />
+                        <Input
+                          value={lightColor}
+                          onChange={(e) => {
+                            setLightColor(e.target.value);
+                            handleBulkLightUpdate({ color: e.target.value });
+                          }}
+                          className="bg-black/20 border-white/10 h-8 font-mono text-xs"
+                          maxLength={7}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="h-4 w-px bg-white/10 mx-2" />
+            </>
+          )}
 
           {/* Delete Action */}
           <Button 

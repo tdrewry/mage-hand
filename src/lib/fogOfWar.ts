@@ -37,7 +37,9 @@ export async function computeTokenVisibilityPaper(
   visionRangePixels: number = 300
 ): Promise<any> {
   if (tokens.length === 0) {
-    return new paper.Path() as any;
+    const scope = getFogScope();
+    scope.activate();
+    return new scope.Path() as any;
   }
 
   // Note: We no longer filter tokens by wallGeometry.wallPath.
@@ -88,7 +90,12 @@ export async function computeTokenVisibilityPaper(
     }
   }
   
-  return combinedVisibility || new paper.Path();
+  if (!combinedVisibility) {
+    const scope = getFogScope();
+    scope.activate();
+    combinedVisibility = new scope.Path();
+  }
+  return combinedVisibility;
 }
 
 /**

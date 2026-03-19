@@ -21,6 +21,7 @@ interface LightState {
   
   addLight: (light: Omit<LightSource, 'id'> & { id?: string }) => string;
   updateLight: (id: string, updates: Partial<LightSource>) => void;
+  updateMultipleLights: (ids: string[], updates: Partial<LightSource>) => void;
   removeLight: (id: string) => void;
   toggleLight: (id: string) => void;
   setLights: (lights: LightSource[]) => void;
@@ -55,7 +56,16 @@ const lightStoreCreator: StateCreator<LightState> = (set, get) => ({
       ),
     }));
   },
-  
+
+  updateMultipleLights: (ids, updates) => {
+    const idSet = new Set(ids);
+    set((state) => ({
+      lights: state.lights.map((light) =>
+        idSet.has(light.id) ? { ...light, ...updates } : light
+      ),
+    }));
+  },
+
   removeLight: (id) => {
     set((state) => ({
       lights: state.lights.filter((light) => light.id !== id),

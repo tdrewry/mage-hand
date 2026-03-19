@@ -134,7 +134,8 @@ import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied, emitForceRedraw } from "@/lib/net/ephemeral/mapHandlers";
+import { FEATURE_CANVAS_FORCE_REDRAW } from "@/lib/featureFlags";
 import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
@@ -1295,6 +1296,7 @@ export const SimpleTabletop = () => {
             useMapStore.getState().updateMap(targetPortal.mapId!, { active: true });
             useMapStore.getState().setSelectedMap(targetPortal.mapId!);
             emitMapSelectMap(targetPortal.mapId!);
+            if (FEATURE_CANVAS_FORCE_REDRAW) emitForceRedraw('map_switch');
             toast.success(`Map "${targetMap.name}" activated`, { duration: 2000 });
             requestAnimationFrame(() => {
               if (canvasRef.current) {
@@ -1312,6 +1314,7 @@ export const SimpleTabletop = () => {
         } else if ((sourcePortal.portalAutoActivateTarget || useMapStore.getState().autoFocusFollowsToken) && targetPortal.mapId) {
           useMapStore.getState().setSelectedMap(targetPortal.mapId);
           emitMapSelectMap(targetPortal.mapId);
+          if (FEATURE_CANVAS_FORCE_REDRAW) emitForceRedraw('map_switch');
           requestAnimationFrame(() => {
             if (canvasRef.current) {
               const canvas = canvasRef.current;
@@ -2126,11 +2129,32 @@ export const SimpleTabletop = () => {
     });
   }, [mapObjects]);
 
-  // Cleanup fog state when switching from edit/dm → play mode
+  // Redraw and fog/post-processing visibility when renderingMode changes.
+  // IMPORTANT: renderingMode is synced network state, so this effect runs on
+  // ALL clients when the DM changes mode. Post-processing visibility must only
+  // be toggled by the DM's own client — player clients always keep their
+  // post-processing layer whatever usePostProcessing initialized it to.
   useEffect(() => {
     const wasEdit = prevRenderingModeRef.current !== 'play';
     const isNowPlay = renderingMode === 'play';
+    const isNowEdit = renderingMode !== 'play';
     prevRenderingModeRef.current = renderingMode;
+
+    // --- DM only: toggle post-processing visibility based on mode ---
+    // Players never touch their own post-processing layer here — doing so
+    // caused their PixiJS fog canvas to flicker during remote token drags
+    // because renderingMode is shared network state.
+    if (isDM) {
+      if (isNowEdit && isPostProcessingReadyRef.current) {
+        setPostProcessingVisible(false);
+        redrawCanvas();
+        return; // No cache flush needed on edit-mode entry
+      }
+
+      if (wasEdit && isNowPlay && isPostProcessingReadyRef.current) {
+        setPostProcessingVisible(true);
+      }
+    }
 
     if (!wasEdit || !isNowPlay) return;
 
@@ -2163,16 +2187,7 @@ export const SimpleTabletop = () => {
     // 5. Null out the fog mask so fog computation cannot use the stale masks
     fogMasksRef.current = null;
 
-    // 6. Reset PixiJS post-processing layer for a clean frame
-    if (isPostProcessingReadyRef.current) {
-      setPostProcessingVisible(false);
-      requestAnimationFrame(() => {
-        setPostProcessingVisible(true);
-        redrawCanvas();
-      });
-    } else {
-      redrawCanvas();
-    }
+    redrawCanvas();
   }, [renderingMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // DM escape hatch: listen for manual fog-refresh requests from the UI
@@ -2238,6 +2253,17 @@ export const SimpleTabletop = () => {
 
     window.addEventListener('fog:force-refresh', handleForceFogRefresh);
     return () => window.removeEventListener('fog:force-refresh', handleForceFogRefresh);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Remote canvas redraw request — DM broadcasts canvas.forceRedraw → all clients repaint
+  // Gated by FEATURE_CANVAS_FORCE_REDRAW flag — set to false to diagnose remote drag flickering
+  useEffect(() => {
+    if (!FEATURE_CANVAS_FORCE_REDRAW) return;
+    const handleRemoteRedraw = () => {
+      requestAnimationFrame(() => redrawCanvas());
+    };
+    window.addEventListener('canvas:forceRedraw', handleRemoteRedraw);
+    return () => window.removeEventListener('canvas:forceRedraw', handleRemoteRedraw);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute fog of war masks when tokens move or fog settings change

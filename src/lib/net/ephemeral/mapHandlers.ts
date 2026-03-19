@@ -28,6 +28,7 @@ import type {
   PortalTeleportRequestPayload,
   PortalTeleportApprovedPayload,
   PortalTeleportDeniedPayload,
+  CanvasForceRedrawPayload,
 } from "./types";
 
 let registered = false;
@@ -179,6 +180,12 @@ export function registerMapHandlers(): void {
     store.getState().setPortalActivation(data.objectId);
   });
 
+  // Global canvas redraw request (DM → all clients)
+  ephemeralBus.on("canvas.forceRedraw", (_data: CanvasForceRedrawPayload, _userId) => {
+    // Fire a DOM event so SimpleTabletop's useEffect can call redrawCanvas()
+    window.dispatchEvent(new CustomEvent('canvas:forceRedraw', { detail: _data }));
+  });
+
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -239,6 +246,13 @@ export function emitGroupDragPreview(groupId: string, delta: { x: number; y: num
 /** Broadcast a map focus command to all connected players (DM only). */
 export function emitMapFocus(pos: { x: number; y: number }, zoom?: number): void {
   ephemeralBus.emit("map.focus", { pos, zoom });
+}
+
+/** Broadcast a canvas force-redraw to all connected clients (DM only). */
+export function emitForceRedraw(reason?: string): void {
+  ephemeralBus.emit("canvas.forceRedraw", { reason });
+  // Also fire locally so the DM's own canvas redraws immediately
+  window.dispatchEvent(new CustomEvent('canvas:forceRedraw', { detail: { reason } }));
 }
 
 /** Broadcast DM map selection to all connected players. */

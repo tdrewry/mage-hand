@@ -38,7 +38,7 @@ export const MapFocusSettings: React.FC = () => {
         </div>
         <Slider
           min={0}
-          max={80}
+          max={100}
           step={5}
           value={[dimPercent]}
           onValueChange={([v]) => setUnfocusedOpacity(1 - v / 100)}

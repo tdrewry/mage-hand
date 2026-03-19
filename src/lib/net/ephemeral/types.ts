@@ -77,7 +77,9 @@ export type EphemeralOpKind =
   | "portal.teleport.denied"
   // Ambient
   | "ambient.loop.play"
-  | "ambient.loop.stop";
+  | "ambient.loop.stop"
+  // Canvas
+  | "canvas.forceRedraw";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
@@ -437,6 +439,13 @@ export interface AmbientLoopStopPayload {
   // intentionally empty
 }
 
+// -- Canvas --
+
+export interface CanvasForceRedrawPayload {
+  /** Free-text reason for logging purposes, e.g. 'map_switch', 'bulk_delete' */
+  reason?: string;
+}
+
 // -- Token Position Sync --
 
 export interface TokenPositionSyncPayload {
@@ -511,6 +520,7 @@ export interface EphemeralPayloadMap {
   "portal.teleport.denied": PortalTeleportDeniedPayload;
   "ambient.loop.play": AmbientLoopPlayPayload;
   "ambient.loop.stop": AmbientLoopStopPayload;
+  "canvas.forceRedraw": CanvasForceRedrawPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -617,4 +627,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Ambient
   "ambient.loop.play":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
   "ambient.loop.stop":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "none", dmOnly: true },
+
+  // Canvas
+  "canvas.forceRedraw":     { throttleMs: 500, ttlMs: 0,    keyStrategy: "session", dmOnly: true },
 };

@@ -40,6 +40,7 @@ interface RegionStore {
   
   addRegion: (region: Omit<CanvasRegion, 'id'> & { id?: string }) => void;
   updateRegion: (id: string, updates: Partial<CanvasRegion>) => void;
+  updateMultipleRegions: (ids: string[], updates: Partial<CanvasRegion>) => void;
   removeRegion: (id: string) => void;
   clearRegions: () => void;
   setRegions: (regions: CanvasRegion[]) => void;
@@ -65,6 +66,15 @@ const regionStoreCreator: StateCreator<RegionStore> = (set, get) => ({
     set((state) => ({
       regions: state.regions.map((region) =>
         region.id === id ? { ...region, ...updates } : region
+      ),
+    }));
+  },
+
+  updateMultipleRegions: (ids, updates) => {
+    const idSet = new Set(ids);
+    set((state) => ({
+      regions: state.regions.map((region) =>
+        idSet.has(region.id) ? { ...region, ...updates } : region
       ),
     }));
   },
