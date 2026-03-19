@@ -25,7 +25,11 @@ export interface EntityRef {
 export interface AppearanceVariant {
   id: string;              // Unique identifier
   name: string;            // User-friendly name (e.g., "Bear Form", "Mounted")
+  imageUrl?: string;       // In-memory image data (excluded from sync, loaded from IndexedDB via imageHash)
   imageHash?: string;      // Hash reference to stored texture (imageUrl loaded from IndexedDB)
+  imageScale?: number;     // Scale factor for the token image
+  imageOffsetX?: number;   // X offset for the token image (panning)
+  imageOffsetY?: number;   // Y offset for the token image (panning)
   gridWidth: number;       // Footprint width in grid units
   gridHeight: number;      // Footprint height in grid units
   isDefault?: boolean;     // Mark one variant as the default/original

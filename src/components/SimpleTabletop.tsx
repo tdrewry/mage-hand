@@ -9032,6 +9032,12 @@ export const SimpleTabletop = () => {
 
         // ── Emit drag begin to network ──
         emitDragBegin({ tokenId: clickedToken.id, startPos: { x: clickedToken.x, y: clickedToken.y }, mode: "freehand" });
+        // For group drags: also announce each sibling token so remote clients see the whole group move
+        tokens.forEach(t => {
+          if (allSelected.includes(t.id) && t.id !== clickedToken.id) {
+            emitDragBegin({ tokenId: t.id, startPos: { x: t.x, y: t.y }, mode: "freehand" });
+          }
+        });
       } else if (clickedMapObject && clickedMapObject.selected && renderingMode === "edit" && !clickedMapObject.locked) {
         // Wall point edit mode: add/remove vertices
         if (wallPointEditMode && clickedMapObject.shape === 'wall' && clickedMapObject.wallPoints) {
@@ -9558,7 +9564,10 @@ export const SimpleTabletop = () => {
           if (tid === draggedTokenId) return;
           const tStart = startPositions[tid];
           if (tStart) {
-            newTempPositions[tid] = { x: tStart.x + dx, y: tStart.y + dy };
+            const sibPos = { x: tStart.x + dx, y: tStart.y + dy };
+            newTempPositions[tid] = sibPos;
+            // ── Emit drag update for each sibling so remote clients see the group move ──
+            emitDragUpdate({ tokenId: tid, pos: sibPos });
           }
         });
       }

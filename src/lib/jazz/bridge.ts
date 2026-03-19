@@ -117,9 +117,13 @@ async function _resolveTokenTextures(entries: { id: string; hash: string }[]): P
     if (dataUrl) {
       const store = useSessionStore.getState();
       const token = store.tokens.find(t => t.id === id);
-      if (token && (!token.imageUrl || token.imageUrl.length === 0)) {
+      // Staleness check: the token's hash may have changed while the IDB lookup was in flight
+      // (e.g. bulk assignment). Only apply if the token still expects this exact hash.
+      if (token && token.imageHash === hash) {
         console.log(`[jazz-bridge] 🎨 Resolved texture for token ${id} from local IDB (hash: ${hash})`);
         store.updateTokenImage(id, dataUrl, hash);
+      } else if (token) {
+        console.log(`[jazz-bridge] 🎨 Skipping stale resolve for token ${id} (current: ${token.imageHash}, resolved: ${hash})`);
       }
     } else {
       console.log(`[jazz-bridge] 🎨 Token ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
@@ -140,9 +144,12 @@ async function _resolveRegionTextures(entries: { id: string; hash: string }[]): 
     if (dataUrl) {
       const store = useRegionStore.getState();
       const region = store.regions.find(r => r.id === id);
-      if (region) {
+      // Staleness check: region's textureHash may have changed while IDB lookup was in flight
+      if (region && region.textureHash === hash) {
         console.log(`[jazz-bridge] 🎨 Resolved texture for region ${id} from local IDB (hash: ${hash})`);
         store.updateRegion(id, { backgroundImage: dataUrl });
+      } else if (region) {
+        console.log(`[jazz-bridge] 🎨 Skipping stale resolve for region ${id} (current: ${region.textureHash}, resolved: ${hash})`);
       }
     } else {
       console.log(`[jazz-bridge] 🎨 Region ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
@@ -163,9 +170,12 @@ async function _resolveMapObjectTextures(entries: { id: string; hash: string }[]
     if (dataUrl) {
       const store = useMapObjectStore.getState();
       const obj = store.mapObjects.find(o => o.id === id);
-      if (obj && (!obj.imageUrl || obj.imageUrl.length === 0)) {
+      // Staleness check: mapObject's imageHash may have changed while IDB lookup was in flight
+      if (obj && (obj as any).imageHash === hash) {
         console.log(`[jazz-bridge] 🎨 Resolved texture for mapObject ${id} from local IDB (hash: ${hash})`);
         store.updateMapObject(id, { imageUrl: dataUrl });
+      } else if (obj) {
+        console.log(`[jazz-bridge] 🎨 Skipping stale resolve for mapObject ${id} (current: ${(obj as any).imageHash}, resolved: ${hash})`);
       }
     } else {
       console.log(`[jazz-bridge] 🎨 MapObject ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);

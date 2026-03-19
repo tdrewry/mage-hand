@@ -518,7 +518,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
               </Button>
             </div>
           ) : (
-            <div className="h-64 overflow-y-auto border rounded-lg bg-black/20 p-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="h-64 overflow-y-auto border rounded-lg bg-black/20 p-2 grid grid-cols-4 auto-rows-[80px] gap-2">
               {loadingStored ? (
                 <div className="col-span-full flex h-full items-center justify-center text-muted-foreground text-sm">
                   Loading textures...
@@ -536,7 +536,7 @@ export const ImageImportModal: React.FC<ImageImportModalProps> = ({
                   return (
                     <div 
                       key={tex.hash}
-                      className={`relative aspect-square rounded-md overflow-hidden border-2 cursor-pointer transition-all ${
+                      className={`relative rounded-md overflow-hidden border-2 cursor-pointer transition-all ${
                         isSelected ? 'border-primary' : 'border-transparent hover:border-white/20'
                       }`}
                       onClick={() => {

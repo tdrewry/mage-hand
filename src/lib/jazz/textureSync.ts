@@ -298,10 +298,10 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
  * that reference this hash but don't have the image data loaded yet.
  */
 function _applyTextureToEntities(hash: string, dataUrl: string): void {
-  // Tokens
+  // Tokens — always apply when hash matches (handles both initial sync and texture changes)
   const sessionStore = useSessionStore.getState();
   const tokensNeedingTexture = sessionStore.tokens.filter(
-    t => t.imageHash === hash && (!t.imageUrl || t.imageUrl.length === 0)
+    t => t.imageHash === hash
   );
   if (tokensNeedingTexture.length > 0) {
     for (const t of tokensNeedingTexture) {
@@ -322,10 +322,10 @@ function _applyTextureToEntities(hash: string, dataUrl: string): void {
     console.log(`[jazz-texture] Applied texture ${hash} to ${regionsNeedingTexture.length} region(s)`);
   }
 
-  // Map Objects
+  // Map Objects — always apply when hash matches (handles both initial sync and texture changes)
   const mapObjStore = useMapObjectStore.getState();
   const objectsNeedingTexture = mapObjStore.mapObjects.filter(
-    (o: any) => o.imageHash === hash && (!o.imageUrl || o.imageUrl.length === 0)
+    (o: any) => o.imageHash === hash
   );
   if (objectsNeedingTexture.length > 0) {
     for (const o of objectsNeedingTexture) {

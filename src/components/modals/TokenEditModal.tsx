@@ -128,21 +128,12 @@ export function TokenEditModal({
       }
     }
 
+    // Stage locally — do NOT push to store until Apply is clicked
     setImageUrlValue(result.imageUrl);
     setImageHashValue(hash);
     setImageScaleValue(result.scale);
     setImageOffsetXValue(result.offsetX);
     setImageOffsetYValue(result.offsetY);
-
-    if (!isMultiSelection && currentToken) {
-      applyUpdatesToStore([currentToken.id], {
-        imageUrl: result.imageUrl,
-        imageHash: hash,
-        imageScale: result.scale,
-        imageOffsetX: result.offsetX,
-        imageOffsetY: result.offsetY,
-      });
-    }
   };
 
   const handleImageImportMultipleConfirm = async (images: { url: string; hash?: string }[]) => {
@@ -186,6 +177,17 @@ export function TokenEditModal({
     
     toast.success(`Assigned ${images.length} images across ${ids.length} tokens`);
     onUpdateCanvas?.();
+
+    // Explicitly push any new FileStreams to Jazz — same race-condition fix as applyChanges.
+    // The Jazz CoMap update propagates synchronously; without this, clients receive new imageHash
+    // values before the binary FileStream arrives, causing a flicker from old to new image.
+    Promise.all([
+      import('@/lib/jazz/textureSync'),
+      import('@/lib/jazz/bridge'),
+    ]).then(async ([{ pushTexturesToJazz }, { getSessionRoot }]) => {
+      const sessionRoot = getSessionRoot();
+      if (sessionRoot) await pushTexturesToJazz(sessionRoot);
+    }).catch(() => {});
   };
 
   const openImageImport = () => {
@@ -269,11 +271,9 @@ export function TokenEditModal({
   };
 
   const handleClearImage = () => {
+    // Stage the clear locally — committed on Apply
     setImageUrlValue('');
     setImageHashValue(undefined);
-    if (!isMultiSelection && currentToken) {
-      applyUpdatesToStore([currentToken.id], { imageUrl: '', imageHash: undefined });
-    }
   };
 
   // Helper that batches zustand updates
@@ -320,7 +320,16 @@ export function TokenEditModal({
               pathOpacity: pathOpacityValue,
               pathGaitWidth: pathGaitWidthValue,
               gridWidth: gridWidthValue,
-              gridHeight: gridHeightValue
+              gridHeight: gridHeightValue,
+              // Appearance — only update image fields for single-token edits
+              // (multi-token image assignment is handled by handleImageImportMultipleConfirm)
+              ...((!isMultiSelection) && {
+                imageUrl: imageUrlValue,
+                imageHash: imageHashValue,
+                imageScale: imageScaleValue,
+                imageOffsetX: imageOffsetXValue,
+                imageOffsetY: imageOffsetYValue,
+              }),
             };
           }
           return t;
@@ -331,6 +340,23 @@ export function TokenEditModal({
     toast.success(`Updated ${targetTokens.length} token(s)`);
     onOpenChange(false);
     onUpdateCanvas?.();
+
+    // If the image hash changed on a single token, explicitly push the new FileStream to Jazz.
+    // The Jazz CoMap token update (synchronous inside the Zustand watcher) can reach clients
+    // before the async pushTexturesToJazz inside the watcher finishes — causing the client to
+    // log "not in local IDB yet, waiting for FileStream". Belt-and-suspenders: kick off the
+    // push immediately here so it races ahead of (or alongside) the CoMap update.
+    if (!isMultiSelection && currentToken && imageHashValue && imageHashValue !== currentToken.imageHash) {
+      Promise.all([
+        import('@/lib/jazz/textureSync'),
+        import('@/lib/jazz/bridge'),
+      ]).then(async ([{ pushTexturesToJazz }, { getSessionRoot }]) => {
+        const sessionRoot = getSessionRoot();
+        if (sessionRoot) {
+          await pushTexturesToJazz(sessionRoot);
+        }
+      }).catch(() => {}); // Jazz not active — Zustand watcher will handle it
+    }
   };
 
   const handleSaveVariant = () => {
@@ -363,34 +389,8 @@ export function TokenEditModal({
      toast.success(`Saved variant "${newVariant.name}"`);
   };
 
-  // Debounced auto-save for single-token mode
-  useEffect(() => {
-     if (isMultiSelection || !open || !currentToken) return;
-     const timeout = setTimeout(() => {
-       applyUpdatesToStore([currentToken.id], {
-         name: nameValue,
-         label: labelValue,
-         labelPosition: labelPositionValue,
-         labelColor: labelColorValue,
-         labelBackgroundColor: labelBackgroundValue,
-         color: tokenColorValue,
-         pathStyle: pathStyleValue,
-         footprintType: footprintTypeValue,
-         pathColor: useTokenColorForPath ? undefined : pathColorValue,
-         pathWeight: pathWeightValue,
-         pathOpacity: pathOpacityValue,
-         pathGaitWidth: pathGaitWidthValue,
-         gridWidth: gridWidthValue,
-         gridHeight: gridHeightValue,
-       });
-     }, 300);
-     return () => clearTimeout(timeout);
-  }, [
-    nameValue, labelValue, labelPositionValue, labelColorValue, labelBackgroundValue,
-    tokenColorValue, pathStyleValue, footprintTypeValue, pathColorValue, useTokenColorForPath,
-    pathWeightValue, pathOpacityValue, pathGaitWidthValue, gridWidthValue, gridHeightValue,
-    isMultiSelection, open, currentToken?.id
-  ]);
+  // NOTE: no auto-save debounce — all changes are staged locally and committed only when Apply is clicked.
+  // This prevents premature sync to connected clients while the DM is still editing.
 
   const getCurrentSizePreset = () => {
     return SIZE_PRESETS.find(p => p.gridWidth === gridWidthValue && p.gridHeight === gridHeightValue);
