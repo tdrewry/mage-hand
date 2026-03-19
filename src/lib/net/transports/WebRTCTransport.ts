@@ -185,16 +185,41 @@ export class WebRTCTransport implements ITransport {
                }
              }
 
-             // Teardown connections for clients that are no longer connected
+             // Teardown connections for clients that have explicitly disconnected.
+             // IMPORTANT: Only tear down when status === 'disconnected'. Do NOT tear down
+             // just because a clientId is absent from the current Jazz CoMap snapshot —
+             // Jazz CoMap reads can transiently omit keys during concurrent writes
+             // (e.g. large FileStream uploads), which would falsely close live connections.
              for (const clientId of this.peerConnections.keys()) {
                if (!activeClientIds.has(clientId)) {
-                 console.log(`[WebRTCTransport] Client ${clientId} disconnected from Jazz. Tearing down peer connection.`);
-                 const pc = this.peerConnections.get(clientId);
-                 if (pc) {
+                 // Verify the user is explicitly marked disconnected in Jazz, not just transiently absent
+                 let explicitlyDisconnected = false;
+                 try {
+                   const val = users[clientId];
+                   if (val === undefined || val === null) {
+                     // Key is absent — could be a transient Jazz read gap. Check if connection is dead.
+                     const pc = this.peerConnections.get(clientId);
+                     if (pc && ['failed', 'closed'].includes(pc.connectionState)) {
+                       explicitlyDisconnected = true;
+                     }
+                     // If connection is connected/connecting, don't tear it down on an absent key
+                   } else {
+                     const payload = JSON.parse(val);
+                     explicitlyDisconnected = payload.status === 'disconnected';
+                   }
+                 } catch (e) {
+                   explicitlyDisconnected = false;
+                 }
+
+                 if (explicitlyDisconnected) {
+                   console.log(`[WebRTCTransport] Client ${clientId} explicitly disconnected from Jazz. Tearing down peer connection.`);
+                   const pc = this.peerConnections.get(clientId);
+                   if (pc) {
                      pc.close();
                      this.peerConnections.delete(clientId);
                      this.dataChannels.delete(clientId);
                      useMultiplayerStore.getState().removeWebRtcConnection(clientId);
+                   }
                  }
                }
              }

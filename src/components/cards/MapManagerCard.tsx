@@ -122,6 +122,7 @@ export const MapManagerCardContent = () => {
     // Create a CanvasRegion in regionStore with the image as background texture
     const newMaps = useMapStore.getState().maps;
     const newMap = newMaps.length > mapCountBefore ? newMaps[newMaps.length - 1] : null;
+    let newRegionId: string | null = null;
     if (newMap) {
       useRegionStore.getState().addRegion({
         x: 0,
@@ -143,9 +144,40 @@ export const MapManagerCardContent = () => {
         regionType: 'rectangle',
         mapId: newMap.id,
       });
+
+      // Capture the new region ID (addRegion pushes to the end of the list)
+      const regions = useRegionStore.getState().regions;
+      newRegionId = regions.length > 0 ? regions[regions.length - 1].id : null;
     }
 
     toast.success(`Map "${result.mapName}" created from image`);
+
+    // ── Async: hash the image, save to IDB, stamp hashes on map + region ──
+    // This MUST happen after addMap/addRegion because hashing is async.
+    // Stamping imageHash/textureHash is what triggers pushTexturesToJazz in bridge.ts
+    // and allows clients to receive the texture binary via Jazz FileStreams.
+    if (newMap) {
+      const mapId = newMap.id;
+      const capturedRegionId = newRegionId;
+      import('@/lib/textureStorage').then(async ({ hashImageData, saveTextureByHash }) => {
+        try {
+          const hash = await hashImageData(result.imageUrl);
+          await saveTextureByHash(hash, result.imageUrl);
+
+          // Stamp imageHash on the GameMap — triggers unsubMapsTexture → pushTexturesToJazz
+          useMapStore.getState().updateMap(mapId, { imageHash: hash } as any);
+
+          // Stamp textureHash on the CanvasRegion — triggers region Zustand subscriber → pushTexturesToJazz
+          if (capturedRegionId) {
+            useRegionStore.getState().updateRegion(capturedRegionId, { textureHash: hash } as any);
+          }
+
+          console.log(`[MapManagerCard] 🎨 Map image hashed and stamped: ${hash} (map: ${mapId})`);
+        } catch (err) {
+          console.error('[MapManagerCard] Failed to hash/stamp map image:', err);
+        }
+      });
+    }
   };
 
   // ── Remove map ──

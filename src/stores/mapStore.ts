@@ -462,6 +462,13 @@ const withSyncPatch = syncPatch<MapStore>({
 const persistOptions: PersistOptions<MapStore, Partial<MapStore>> = {
   name: 'map-store',
   version: 3, // v3: visible → active migration
+  // Strip imageUrl before persisting — map images are large base64 dataURLs that
+  // easily exceed the 5MB localStorage quota. They are recoverable from IndexedDB
+  // via imageHash, so they must never be written to localStorage.
+  partialize: (state) => ({
+    ...state,
+    maps: state.maps.map(m => ({ ...m, imageUrl: '' })),
+  }),
   migrate: (persistedState: any, version: number) => {
     if (version < 3 && persistedState?.maps) {
       persistedState.maps = persistedState.maps.map((map: any) => ({

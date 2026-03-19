@@ -7,8 +7,7 @@ import { CanvasRegion } from '@/stores/regionStore';
 import { ImageImportModal, ImageImportResult, ShapeConfig } from './ImageImportModal';
 import { toast } from 'sonner';
 import { Image, Trash2 } from 'lucide-react';
-import { saveRegionTexture, removeRegionTexture } from '@/lib/textureStorage';
-import { uploadTexture } from '@/lib/textureSync';
+import { saveRegionTexture, removeRegionTexture, hashImageData, saveTextureByHash } from '@/lib/textureStorage';
 
 interface RegionBackgroundModalProps {
   open: boolean;
@@ -29,10 +28,16 @@ export const RegionBackgroundModal = ({
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const [showImageImport, setShowImageImport] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+
+  // Track the original URL when modal opens so we know if anything changed
+  const [originalUrl, setOriginalUrl] = useState('');
 
   useEffect(() => {
     if (region && open) {
-      setBackgroundUrl(region.backgroundImage || '');
+      const url = region.backgroundImage || '';
+      setBackgroundUrl(url);
+      setOriginalUrl(url);
       setBackgroundScale(region.backgroundScale || 1);
       setBackgroundRepeat(region.backgroundRepeat || 'repeat');
       setOffsetX(region.backgroundOffsetX || 0);
@@ -47,7 +52,6 @@ export const RegionBackgroundModal = ({
     }
 
     if (region.regionType === 'path' && region.pathPoints && region.pathPoints.length > 0) {
-      // Normalize path points to 0-1 range for the shape overlay
       const minX = Math.min(...region.pathPoints.map(p => p.x));
       const maxX = Math.max(...region.pathPoints.map(p => p.x));
       const minY = Math.min(...region.pathPoints.map(p => p.y));
@@ -83,62 +87,102 @@ export const RegionBackgroundModal = ({
     setShowImageImport(false);
   };
 
-  const applyBackground = async () => {
-    if (!region) return;
-
-    // Save to IndexedDB for persistence and get the hash
-    let textureHash: string | undefined;
-    try {
-      textureHash = await saveRegionTexture(region.id, backgroundUrl);
-      
-      // Upload to server for multiplayer sync with compression based on region size
-      if (textureHash) {
-        await uploadTexture(textureHash, backgroundUrl, region.width, region.height);
-      }
-    } catch (error) {
-      console.error('Failed to persist texture to IndexedDB:', error);
-    }
-
-    onUpdateRegion(region.id, {
-      backgroundImage: backgroundUrl,
-      textureHash, // Include hash for sync
-      backgroundScale,
-      backgroundRepeat,
-      backgroundOffsetX: offsetX,
-      backgroundOffsetY: offsetY
-    });
-
-    toast.success('Region background updated');
-    onOpenChange(false);
-  };
-
-  const clearBackground = async () => {
-    if (!region) return;
-
-    // Remove from IndexedDB
-    try {
-      await removeRegionTexture(region.id);
-    } catch (error) {
-      console.error('Failed to remove texture from IndexedDB:', error);
-    }
-
-    onUpdateRegion(region.id, {
-      backgroundImage: undefined,
-      textureHash: undefined, // Clear hash for sync
-      backgroundScale: 1,
-      backgroundRepeat: 'repeat',
-      backgroundOffsetX: 0,
-      backgroundOffsetY: 0
-    });
-
+  // Stage a remove — does NOT apply immediately. User must click Apply Changes.
+  const stageRemove = () => {
     setBackgroundUrl('');
     setBackgroundScale(1);
     setBackgroundRepeat('repeat');
     setOffsetX(0);
     setOffsetY(0);
-
-    toast.success('Region background cleared');
   };
+
+  const applyBackground = async () => {
+    if (!region) return;
+    setIsApplying(true);
+
+    try {
+      if (backgroundUrl) {
+        // ── New/changed image: hash, save to IDB, stamp on region, push to Jazz ──
+        let textureHash: string | undefined;
+        try {
+          // saveRegionTexture handles hash computation + IDB in one step
+          textureHash = await saveRegionTexture(region.id, backgroundUrl);
+          // Also save by raw hash so pushTexturesToJazz (which keys by hash) can find it
+          if (textureHash) {
+            await saveTextureByHash(textureHash, backgroundUrl);
+          }
+        } catch (error) {
+          // Fallback: compute hash manually if saveRegionTexture fails
+          console.error('[RegionBackground] saveRegionTexture failed, falling back:', error);
+          try {
+            textureHash = await hashImageData(backgroundUrl);
+            await saveTextureByHash(textureHash, backgroundUrl);
+          } catch (e2) {
+            console.error('[RegionBackground] Fallback hash also failed:', e2);
+          }
+        }
+
+        onUpdateRegion(region.id, {
+          backgroundImage: backgroundUrl,
+          textureHash,
+          backgroundScale,
+          backgroundRepeat,
+          backgroundOffsetX: offsetX,
+          backgroundOffsetY: offsetY,
+        });
+
+        // Explicitly trigger Jazz FileStream push — belt+suspenders alongside the Zustand watcher
+        // in bridge.ts which keys on textureHash changes.
+        if (textureHash) {
+          Promise.all([
+            import('@/lib/jazz/textureSync'),
+            import('@/lib/jazz/bridge'),
+          ]).then(async ([{ pushTexturesToJazz }, { getSessionRoot }]) => {
+            try {
+              const sessionRoot = getSessionRoot();
+              if (sessionRoot) {
+                await pushTexturesToJazz(sessionRoot);
+              }
+            } catch (e) {
+              // Jazz not active — sync will happen next time bridge pushes
+            }
+          });
+        }
+
+        toast.success('Region background updated');
+      } else {
+        // ── Staged remove: clear IDB reference and wipe region fields ──
+        try {
+          await removeRegionTexture(region.id);
+        } catch (error) {
+          console.error('[RegionBackground] Failed to remove texture from IDB:', error);
+        }
+
+        onUpdateRegion(region.id, {
+          backgroundImage: undefined,
+          textureHash: undefined,
+          backgroundScale: 1,
+          backgroundRepeat: 'repeat',
+          backgroundOffsetX: 0,
+          backgroundOffsetY: 0,
+        });
+
+        toast.success('Region background removed');
+      }
+
+      onOpenChange(false);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // Apply is enabled when something has actually changed from what the region had on open
+  const hasChanges = backgroundUrl !== originalUrl || 
+    backgroundScale !== (region?.backgroundScale || 1) ||
+    backgroundRepeat !== (region?.backgroundRepeat || 'repeat') ||
+    offsetX !== (region?.backgroundOffsetX || 0) ||
+    offsetY !== (region?.backgroundOffsetY || 0);
+  const canApply = hasChanges && !isApplying;
 
   if (!region) return null;
 
@@ -173,7 +217,7 @@ export const RegionBackgroundModal = ({
                     <Button 
                       variant="destructive" 
                       size="sm"
-                      onClick={clearBackground}
+                      onClick={stageRemove}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Remove
@@ -184,16 +228,24 @@ export const RegionBackgroundModal = ({
                   </div>
                 </div>
               ) : (
-                <Button 
-                  variant="outline" 
-                  className="w-full h-24 border-dashed"
-                  onClick={() => setShowImageImport(true)}
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <Image className="h-8 w-8 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Click to select image</span>
-                  </div>
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-24 border-dashed"
+                    onClick={() => setShowImageImport(true)}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Image className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Click to select image</span>
+                    </div>
+                  </Button>
+                  {/* Inform user when a remove has been staged */}
+                  {originalUrl && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Background staged for removal — click <strong>Apply Changes</strong> to confirm.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -218,11 +270,11 @@ export const RegionBackgroundModal = ({
 
             {/* Action Buttons */}
             <div className="flex justify-between gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
                 Cancel
               </Button>
-              <Button onClick={applyBackground} disabled={!backgroundUrl}>
-                Apply Background
+              <Button onClick={applyBackground} disabled={!canApply}>
+                {isApplying ? 'Applying…' : 'Apply Changes'}
               </Button>
             </div>
           </div>

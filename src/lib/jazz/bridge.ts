@@ -140,7 +140,7 @@ async function _resolveRegionTextures(entries: { id: string; hash: string }[]): 
     if (dataUrl) {
       const store = useRegionStore.getState();
       const region = store.regions.find(r => r.id === id);
-      if (region && (!region.backgroundImage || region.backgroundImage.length === 0)) {
+      if (region) {
         console.log(`[jazz-bridge] 🎨 Resolved texture for region ${id} from local IDB (hash: ${hash})`);
         store.updateRegion(id, { backgroundImage: dataUrl });
       }
@@ -169,6 +169,33 @@ async function _resolveMapObjectTextures(entries: { id: string; hash: string }[]
       }
     } else {
       console.log(`[jazz-bridge] 🎨 MapObject ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
+    }
+  }
+}
+
+/**
+ * Async texture resolution for maps: when a map arrives (via blob sync) with an imageHash but no imageUrl,
+ * try to load the texture from local IndexedDB. If found, update the map's imageUrl.
+ *
+ * This is the counterpart to _resolveRegionTextures for the GameMap.imageUrl field.
+ * The maps blob extractor always strips imageUrl (sets it to '') before syncing, so
+ * clients that receive the blob always need this step to re-populate the image data.
+ */
+async function _resolveMapTextures(entries: { id: string; hash: string }[]): Promise<void> {
+  const { loadTextureByHash } = await import("@/lib/textureStorage");
+
+  for (const { id, hash } of entries) {
+    const dataUrl = await loadTextureByHash(hash);
+
+    if (dataUrl) {
+      const store = useMapStore.getState();
+      const map = store.maps.find(m => m.id === id);
+      if (map && (!map.imageUrl || map.imageUrl.length === 0)) {
+        console.log(`[jazz-bridge] 🎨 Resolved texture for map ${id} from local IDB (hash: ${hash})`);
+        store.updateMap(id, { imageUrl: dataUrl });
+      }
+    } else {
+      console.log(`[jazz-bridge] 🎨 Map ${id} needs hash ${hash} — not in local IDB yet, waiting for FileStream`);
     }
   }
 }
@@ -860,6 +887,19 @@ function pullBlobFromJazz(kind: string, stateJson: string): void {
       reg.hydrator(state);
     });
     console.log(`[jazz-bridge] ← Jazz blob: ${kind}`);
+
+    // ── Map texture resolution: re-populate imageUrl from local IDB after map blob hydration ──
+    // The maps blob extractor strips imageUrl (too large), so clients that pull the blob
+    // always have imageUrl = '' even if the image is in their local IndexedDB.
+    if (kind === 'maps' && !_isCreator) {
+      const mapsNeedingResolve = useMapStore.getState().maps
+        .filter(m => (m as any).imageHash && (!(m as any).imageUrl || (m as any).imageUrl.length === 0))
+        .map(m => ({ id: m.id, hash: (m as any).imageHash as string }));
+      if (mapsNeedingResolve.length > 0) {
+        console.log(`[jazz-bridge] 🎨 Map blob received: resolving ${mapsNeedingResolve.length} map texture(s)`);
+        _resolveMapTextures(mapsNeedingResolve);
+      }
+    }
   } catch (err) {
     console.error(`[jazz-bridge] Blob pull error for ${kind}:`, err);
   }
@@ -2294,16 +2334,23 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Only update if something actually changed (deep-compare parsed JSON fields)
                 const incoming = jazzToZustandRegion(jr);
                 if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'backgroundImage'])) {
-                  // Preserve local backgroundImage (loaded from IndexedDB, not synced)
-                  store.updateRegion(jr.regionId, {
-                    ...incoming,
-                    backgroundImage: existing.backgroundImage,
-                  });
-                  // If textureHash changed, flag for async texture resolution
-                  if (incoming.textureHash && incoming.textureHash !== existing.textureHash) {
-                    regionsNeedingTextureResolve.push({ id: existing.id, hash: incoming.textureHash });
-                  } else if (!existing.backgroundImage && existing.textureHash) {
-                    regionsNeedingTextureResolve.push({ id: existing.id, hash: existing.textureHash });
+                  if (incoming.textureHash) {
+                    // Preserve local backgroundImage (loaded from IndexedDB, not synced via Jazz).
+                    // The backgroundImage will be populated by _resolveRegionTextures below.
+                    store.updateRegion(jr.regionId, {
+                      ...incoming,
+                      backgroundImage: existing.backgroundImage,
+                    });
+                    // If textureHash changed, flag for async texture resolution
+                    if (incoming.textureHash !== existing.textureHash) {
+                      regionsNeedingTextureResolve.push({ id: existing.id, hash: incoming.textureHash });
+                    }
+                  } else {
+                    // textureHash was cleared by host — also wipe backgroundImage so client canvas clears
+                    store.updateRegion(jr.regionId, {
+                      ...incoming,
+                      backgroundImage: undefined,
+                    });
                   }
                 } else {
                   // No structural change, but still check if texture needs resolving after refresh
@@ -2379,6 +2426,39 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     }
   });
   activeSubscriptions.push(unsubMapObjectsZustand);
+
+  // ── Map texture watch: Zustand → Jazz (imageHash changes trigger texture push) ──
+  // Maps are synced as blobs (imageUrl stripped), but the binary is pushed separately
+  // via pushTexturesToJazz. Without this watcher, adding a new map image never gets
+  // pushed to Jazz FileStreams — clients see the region/map structure but no texture.
+  let prevMaps = useMapStore.getState().maps;
+  const unsubMapsTexture = useMapStore.subscribe((state) => {
+    const maps = state.maps;
+    if (maps === prevMaps) return;
+    if (_fromJazz) { prevMaps = maps; return; }
+
+    let needsTexturePush = false;
+    for (const m of maps) {
+      const prev = prevMaps.find(pm => pm.id === m.id);
+      const newHash = (m as any).imageHash;
+      const prevHash = prev ? (prev as any).imageHash : undefined;
+      if (newHash && newHash !== prevHash) {
+        needsTexturePush = true;
+        console.log(`[jazz-bridge] 🎨 Map ${m.id} imageHash changed: ${prevHash ?? 'none'} → ${newHash}`);
+      }
+    }
+    prevMaps = maps;
+
+    if (needsTexturePush && _sessionRoot) {
+      console.log(`[jazz-bridge] 🎨 Triggering texture push for new map imageHash(es)...`);
+      import("./textureSync").then(({ pushTexturesToJazz }) => {
+        pushTexturesToJazz(_sessionRoot).catch(err => {
+          console.warn("[jazz-bridge] Mid-session map texture push failed:", err);
+        });
+      });
+    }
+  });
+  activeSubscriptions.push(unsubMapsTexture);
 
   // ── MapObject sync: Jazz → Zustand ──
   const jazzMapObjectsRef = sessionRoot.mapObjects;
@@ -2839,7 +2919,57 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     console.warn("[jazz-bridge] Could not start texture subscription:", err);
   }
 
+  // ── STEP-004 Fix 1: Startup texture resolution pass for late-joining clients ──
+  // pullTexturesFromJazz() runs before the host has pushed FileStream binaries,
+  // so the Jazz texture list is often empty on first join. This deferred pass
+  // re-resolves any entity that has a hash but no loaded image data after the
+  // initial sync wave has had time to settle.
+  if (!isCreator) {
+    setTimeout(() => {
+      // Regions
+      const regionsNeedingResolve = useRegionStore.getState().regions
+        .filter(r => r.textureHash && (!r.backgroundImage || r.backgroundImage.length === 0))
+        .map(r => ({ id: r.id, hash: r.textureHash! }));
+      if (regionsNeedingResolve.length > 0) {
+        console.log(`[jazz-bridge] 🎨 Startup: resolving ${regionsNeedingResolve.length} region texture(s)`);
+        _resolveRegionTextures(regionsNeedingResolve);
+      }
+
+      // Tokens
+      const tokensNeedingResolve = useSessionStore.getState().tokens
+        .filter(t => t.imageHash && (!t.imageUrl || t.imageUrl.length === 0))
+        .map(t => ({ id: t.id, hash: t.imageHash! }));
+      if (tokensNeedingResolve.length > 0) {
+        console.log(`[jazz-bridge] 🎨 Startup: resolving ${tokensNeedingResolve.length} token texture(s)`);
+        _resolveTokenTextures(tokensNeedingResolve);
+      }
+
+      // Map Objects
+      const objectsNeedingResolve = useMapObjectStore.getState().mapObjects
+        .filter((o: any) => o.imageHash && (!o.imageUrl || o.imageUrl.length === 0))
+        .map((o: any) => ({ id: o.id, hash: o.imageHash! }));
+      if (objectsNeedingResolve.length > 0) {
+        console.log(`[jazz-bridge] 🎨 Startup: resolving ${objectsNeedingResolve.length} mapObject texture(s)`);
+        _resolveMapObjectTextures(objectsNeedingResolve);
+      }
+
+      // Maps (imageUrl is stripped by the blob extractor, needs re-loading from IDB)
+      const mapsNeedingResolve = useMapStore.getState().maps
+        .filter((m: any) => m.imageHash && (!m.imageUrl || m.imageUrl.length === 0))
+        .map((m: any) => ({ id: m.id, hash: m.imageHash as string }));
+      if (mapsNeedingResolve.length > 0) {
+        console.log(`[jazz-bridge] 🎨 Startup: resolving ${mapsNeedingResolve.length} map texture(s)`);
+        _resolveMapTextures(mapsNeedingResolve);
+      }
+    }, 500);
+  }
+
   console.log(`[jazz-bridge] Bridge started: tokens + regions + mapObjects + effects + illumination (fine-grained) + ${BLOB_SYNC_KINDS.length} DO blob kinds + texture FileStreams`);
+}
+
+/** Return the active session root (used by UI code to trigger pushTexturesToJazz directly) */
+export function getSessionRoot(): any {
+  return _sessionRoot;
 }
 
 /**

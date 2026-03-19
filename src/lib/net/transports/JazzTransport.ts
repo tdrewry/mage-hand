@@ -181,12 +181,17 @@ export class JazzTransport implements ITransport {
   private wireSubscriptions(): void {
     // When remote peers change the Jazz CoValues, we funnel them back into NetManager
     
+    // Track users we've already seen to detect new joiners (for texture push)
+    const knownUserIds = new Set<string>();
+
     // Connected Users / Presence
     if ((this.sessionRoot as any).connectedUsers?.$jazz?.subscribe) {
       this.unsubs.push(
         ((this.sessionRoot as any).connectedUsers as any).$jazz.subscribe([], (users: any) => {
           if (!users) return;
           const activeUsers: any[] = [];
+          let newUserJoined = false;
+
           for (const uId of Object.keys(users)) {
             if (uId === "in" || uId === "$jazz") continue;
             try {
@@ -200,11 +205,28 @@ export class JazzTransport implements ITransport {
                     roles: payload.roles || [],
                     lastPing: payload.timestamp
                   });
+                  // Detect net-new peers (not self, not previously seen)
+                  if (!knownUserIds.has(uId) && uId !== this.userId) {
+                    newUserJoined = true;
+                  }
+                  knownUserIds.add(uId);
                 }
               }
             } catch (e) {
               console.warn("[JazzTransport] Failed to parse connectedUser value", e);
             }
+          }
+
+          // STEP-004 Fix 3: When a new peer joins and we are DM/host, push texture binaries.
+          // pushTexturesToJazz() skips already-uploaded hashes (_uploadedHashes guard),
+          // so repeat calls for subsequent joiners are essentially free.
+          if (newUserJoined && this.roles.some(r => r === "dm" || r === "host")) {
+            console.log("[JazzTransport] 🎨 New peer detected — pushing textures to Jazz");
+            import("../../jazz/textureSync").then(({ pushTexturesToJazz }) => {
+              pushTexturesToJazz(this.sessionRoot as any).catch((err: any) => {
+                console.warn("[JazzTransport] Failed to push textures on new peer join:", err);
+              });
+            });
           }
           
           console.log("[JazzTransport] Broadcasting active users to NetManager:", activeUsers);

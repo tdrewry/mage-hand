@@ -310,10 +310,10 @@ function _applyTextureToEntities(hash: string, dataUrl: string): void {
     console.log(`[jazz-texture] Applied texture ${hash} to ${tokensNeedingTexture.length} token(s)`);
   }
 
-  // Regions
+  // Regions — always apply when hash matches, even if backgroundImage already set (handles texture changes)
   const regionStore = useRegionStore.getState();
   const regionsNeedingTexture = regionStore.regions.filter(
-    r => r.textureHash === hash && (!r.backgroundImage || r.backgroundImage.length === 0)
+    r => r.textureHash === hash
   );
   if (regionsNeedingTexture.length > 0) {
     for (const r of regionsNeedingTexture) {
@@ -332,6 +332,18 @@ function _applyTextureToEntities(hash: string, dataUrl: string): void {
       mapObjStore.updateMapObject(o.id, { imageUrl: dataUrl } as any);
     }
     console.log(`[jazz-texture] Applied texture ${hash} to ${objectsNeedingTexture.length} mapObject(s)`);
+  }
+
+  // Maps (GameMap.imageUrl — stripped by extractor, re-populated from FileStream)
+  const mapStore = useMapStore.getState();
+  const mapsNeedingTexture = mapStore.maps.filter(
+    (m: any) => m.imageHash === hash && (!m.imageUrl || m.imageUrl.length === 0)
+  );
+  if (mapsNeedingTexture.length > 0) {
+    for (const m of mapsNeedingTexture) {
+      mapStore.updateMap(m.id, { imageUrl: dataUrl });
+    }
+    console.log(`[jazz-texture] Applied texture ${hash} to ${mapsNeedingTexture.length} map(s)`);
   }
 }
 
