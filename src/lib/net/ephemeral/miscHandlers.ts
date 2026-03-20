@@ -113,6 +113,11 @@ export function registerMiscHandlers(): void {
     store.getState().setGroupDrag(userId, { userId, groupId: data.groupId, delta: data.delta });
   });
 
+  ephemeralBus.on("group.drag.end", (_data: { groupId: string }, userId) => {
+    // Clear the ghost bounding box so it doesn't linger on clients after drag ends
+    store.getState().removeGroupDrag(userId);
+  });
+
   // ── Roles ──
   ephemeralBus.on("role.handRaise", (_data: RoleHandRaisePayload, userId) => {
     store.getState().setHandRaise(userId);

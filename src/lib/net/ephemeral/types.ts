@@ -44,6 +44,7 @@ export type EphemeralOpKind =
   // Groups
   | "group.select.preview"
   | "group.drag.preview"
+  | "group.drag.end"
   // Roles & Presence
   | "role.handRaise"
   | "role.assign"
@@ -586,6 +587,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   // Groups
   "group.select.preview":   { throttleMs: 100, ttlMs: 500,  keyStrategy: "userId" },
   "group.drag.preview":     { throttleMs: 50,  ttlMs: 400,  keyStrategy: "entityId" },
+  "group.drag.end":         { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
 
   // Roles & Presence
   "role.handRaise":         { throttleMs: 0,   ttlMs: 30000, keyStrategy: "userId" },

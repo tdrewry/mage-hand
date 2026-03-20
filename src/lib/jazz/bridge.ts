@@ -15,6 +15,7 @@
  * transport that feeds into the same Zustand stores.
  */
 
+import { JAZZ_SYNC_THROTTLE_MS } from "@/lib/featureFlags";
 import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { useRegionStore, type CanvasRegion } from "@/stores/regionStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
@@ -1688,7 +1689,6 @@ function throttledPushBlob(kind: string): void {
 // FINE-GRAINED SYNC HELPERS (regions & mapObjects outbound)
 // ══════════════════════════════════════════════════════════════════════════
 
-const FINE_GRAINED_THROTTLE_MS = 1000;
 const _fineGrainedTimers = new Map<string, number>();
 /** Pending functions — always updated to the LATEST closure so trailing state wins */
 const _fineGrainedPending = new Map<string, () => void>();
@@ -1697,12 +1697,30 @@ function throttledPushFineGrained(kind: string, fn: () => void): void {
   // Always store the latest function (trailing-edge: last-write wins)
   _fineGrainedPending.set(kind, fn);
   if (_fineGrainedTimers.has(kind)) return;
+  // Use per-kind throttle from config, fall back to 50ms for unknown kinds
+  const throttleMs = JAZZ_SYNC_THROTTLE_MS[kind] ?? 50;
   _fineGrainedTimers.set(kind, window.setTimeout(() => {
     _fineGrainedTimers.delete(kind);
     const pendingFn = _fineGrainedPending.get(kind);
     _fineGrainedPending.delete(kind);
     if (pendingFn) pendingFn();
-  }, FINE_GRAINED_THROTTLE_MS));
+  }, throttleMs));
+}
+
+/**
+ * Immediately fires any pending throttled sync for `kind`, bypassing the timer.
+ * Use this on time-critical commit paths (e.g. drag mouseup) to guarantee
+ * all Zustand writes land in Jazz in the same task rather than after the throttle window.
+ */
+export function flushPendingSync(kind: string): void {
+  const timer = _fineGrainedTimers.get(kind);
+  if (timer !== undefined) {
+    window.clearTimeout(timer);
+    _fineGrainedTimers.delete(kind);
+  }
+  const pendingFn = _fineGrainedPending.get(kind);
+  _fineGrainedPending.delete(kind);
+  if (pendingFn) pendingFn();
 }
 
 /** Sync regions from Zustand → Jazz (diff-based) */
@@ -1726,25 +1744,40 @@ function syncRegionsToJazz(regions: CanvasRegion[], prevRegions: CanvasRegion[])
     }
   }
 
-  // Updated
+  // Updated — field-level diff: only write fields that actually changed.
+  // A position-only drag commit writes ~4-6 ops (x, y, w, h, pathPointsJson,
+  // bezierControlPointsJson) rather than the full ~20 fields, drastically
+  // reducing Jazz CRDT propagation events so clients receive all regions together.
   for (const r of regions) {
-    if (prevIds.has(r.id)) {
-      const prev = prevRegions.find(pr => pr.id === r.id);
-      if (!prev || JSON.stringify(regionToJazzInit(r)) === JSON.stringify(regionToJazzInit(prev))) continue;
-      const len = jazzRegions.length ?? 0;
-      for (let i = 0; i < len; i++) {
-        const jr = jazzRegions[i];
-        if (jr && jr.regionId === r.id) {
-          try {
-            const init = regionToJazzInit(r);
-            for (const [key, val] of Object.entries(init)) {
-              if (key !== 'regionId') jr.$jazz.set(key, val ?? undefined);
-            }
-          } catch (err) {
-            console.error(`[jazz-bridge] Failed to update region ${r.id}:`, err);
+    if (!prevIds.has(r.id)) continue;
+    const prev = prevRegions.find(pr => pr.id === r.id);
+    if (!prev) continue;
+
+    const current = regionToJazzInit(r);
+    const previous = regionToJazzInit(prev);
+
+    // Collect only keys where the value actually changed
+    const changedKeys = Object.keys(current).filter(key => {
+      if (key === 'regionId') return false;
+      const curVal = current[key] ?? null;
+      const prevVal = previous[key] ?? null;
+      return curVal !== prevVal;
+    });
+
+    if (changedKeys.length === 0) continue;
+
+    const len = jazzRegions.length ?? 0;
+    for (let i = 0; i < len; i++) {
+      const jr = jazzRegions[i];
+      if (jr && jr.regionId === r.id) {
+        try {
+          for (const key of changedKeys) {
+            jr.$jazz.set(key, current[key] ?? undefined);
           }
-          break;
+        } catch (err) {
+          console.error(`[jazz-bridge] Failed to update region ${r.id}:`, err);
         }
+        break;
       }
     }
   }
@@ -2273,6 +2306,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
   // ── Region sync: Zustand → Jazz ──
   let prevRegions = useRegionStore.getState().regions;
+  // Debounce texture push: when a group of regions all get textureHash stamped in rapid
+  // succession (e.g. bulk group texture assignment), we wait for all stamps to land before
+  // uploading the FileStream — otherwise the client receives the hash before the binary is ready.
+  let _regionTexturePushTimer: ReturnType<typeof setTimeout> | null = null;
   const unsubRegionsZustand = useRegionStore.subscribe((state) => {
     const regions = state.regions;
     if (regions === prevRegions) return;
@@ -2296,14 +2333,18 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
       prevRegions = currentRegions;
     });
 
-    // Trigger texture push if textureHash changed
+    // Trigger texture push if textureHash changed — debounced to batch group assignments
     if (needsTexturePush && _sessionRoot) {
-      console.log(`[jazz-bridge] 🎨 Triggering texture push for new region textureHash(es)...`);
-      import("./textureSync").then(({ pushTexturesToJazz }) => {
-        pushTexturesToJazz(_sessionRoot).catch(err => {
-          console.warn("[jazz-bridge] Mid-session region texture push failed:", err);
+      if (_regionTexturePushTimer) clearTimeout(_regionTexturePushTimer);
+      _regionTexturePushTimer = setTimeout(() => {
+        _regionTexturePushTimer = null;
+        console.log(`[jazz-bridge] 🎨 Triggering debounced texture push for region textureHash change(s)...`);
+        import("./textureSync").then(({ pushTexturesToJazz }) => {
+          pushTexturesToJazz(_sessionRoot!).catch(err => {
+            console.warn("[jazz-bridge] Mid-session region texture push failed:", err);
+          });
         });
-      });
+      }, 300); // 300ms — enough for all group region stamps to land
     }
   });
   activeSubscriptions.push(unsubRegionsZustand);
