@@ -48,6 +48,12 @@ export interface GameMap {
   structureId?: string;
   /** Floor number within a structure for ordering */
   floorNumber?: number;
+  /**
+   * Extra padding (in pixels) added beyond the bounding box of all region polygon vertices.
+   * Used to give light sources, token radii, etc. room to breathe beyond the rendered region.
+   * Defaults to 200 (4 grid cells at 50px/cell) when not set.
+   */
+  boundsMargin?: number;
 }
 
 // Helper type for creating new maps
@@ -141,9 +147,48 @@ interface MapStore {
   navigateFloor: (direction: 'up' | 'down') => string | null;
 }
 
+/**
+ * Compute the effective bounding box for a map from its region polygon vertices
+ * plus the configured margin. This is the authoritative map extent used for
+ * background fill, viewport culling, and hit-testing.
+ */
+export function getComputedBounds(map: GameMap): { x: number; y: number; width: number; height: number } {
+  const margin = map.boundsMargin ?? 200;
+
+  // Collect all polygon vertices from all regions
+  const allPoints: { x: number; y: number }[] = [];
+  for (const region of map.regions) {
+    if (region.points && region.points.length > 0) {
+      allPoints.push(...region.points);
+    }
+  }
+
+  // Fall back to stored bounds when no region points exist (e.g. blank map before edit)
+  if (allPoints.length === 0) {
+    return {
+      x: map.bounds.x - margin,
+      y: map.bounds.y - margin,
+      width: map.bounds.width + margin * 2,
+      height: map.bounds.height + margin * 2,
+    };
+  }
+
+  const minX = Math.min(...allPoints.map(p => p.x));
+  const minY = Math.min(...allPoints.map(p => p.y));
+  const maxX = Math.max(...allPoints.map(p => p.x));
+  const maxY = Math.max(...allPoints.map(p => p.y));
+
+  return {
+    x: minX - margin,
+    y: minY - margin,
+    width: (maxX - minX) + margin * 2,
+    height: (maxY - minY) + margin * 2,
+  };
+}
+
 const createDefaultMap = (id?: string): GameMap => ({
   id: id || `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  name: '',
+  name: 'Default',
   bounds: { x: 0, y: 0, width: 2000, height: 2000 },
   backgroundColor: '#2a2a2a',
   active: true,
@@ -310,11 +355,12 @@ const mapStoreCreator: StateCreator<MapStore> = (set, get) => ({
 
     for (const map of activeMaps) {
       // Check if point is within map bounds
+      const cb = getComputedBounds(map);
       if (
-        x >= map.bounds.x &&
-        x <= map.bounds.x + map.bounds.width &&
-        y >= map.bounds.y &&
-        y <= map.bounds.y + map.bounds.height
+        x >= cb.x &&
+        x <= cb.x + cb.width &&
+        y >= cb.y &&
+        y <= cb.y + cb.height
       ) {
         // Find the smallest visible region at this point (most specific)
         const matchingRegions = map.regions

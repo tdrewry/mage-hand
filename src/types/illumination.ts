@@ -21,6 +21,8 @@ export type IlluminationClipShape = 'circle' | 'cone';
 export interface IlluminationSource {
   id: string;
   name: string;
+  /** Optional display label shown in the layer tree (falls back to name if unset) */
+  label?: string;
   enabled: boolean;
   
   // Position (world coordinates, in pixels)

@@ -56,6 +56,7 @@ const illuminationStoreCreator: StateCreator<IlluminationState> = (set, get) => 
     const newLight: IlluminationSource = {
       id,
       name: lightData.name ?? defaults.name,
+      label: lightData.label,
       enabled: lightData.enabled ?? defaults.enabled,
       position: lightData.position,
       range: lightData.range ?? defaults.range,

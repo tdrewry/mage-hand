@@ -20,7 +20,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useGroupStore } from '@/stores/groupStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { useLightStore } from '@/stores/lightStore';
+import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { canAssignTokenRoles } from '@/lib/rolePermissions';
@@ -78,10 +78,8 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   const [regionFillColor, setRegionFillColor] = useState('#4A90E2');
   // Bulk action state — map objects
   const [mapObjectOpacity, setMapObjectOpacity] = useState(1);
-  // Bulk action state — lights
-  const [lightRadius, setLightRadius] = useState(200);
+  const [lightRange, setLightRange] = useState(12);
   const [lightColor, setLightColor] = useState('#FFD700');
-  const [lightIntensity, setLightIntensity] = useState(0.8);
 
   const selectedTokens = tokens.filter(t => selectedTokenIds.includes(t.id));
   const currentPlayer = players.find(p => p.id === currentPlayerId);
@@ -128,7 +126,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
     const currentTokens = useSessionStore.getState().tokens;
     const currentRegions = useRegionStore.getState().regions;
     const currentMapObjects = useMapObjectStore.getState().mapObjects;
-    const currentLights = useLightStore.getState().lights;
+    const currentLights = useIlluminationStore.getState().lights;
 
     selectedTokenIds.forEach((id) => {
       members.push({ id, type: 'token' });
@@ -186,7 +184,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
       const currentTokens = useSessionStore.getState().tokens;
       const currentRegions = useRegionStore.getState().regions;
       const currentMapObjects = useMapObjectStore.getState().mapObjects;
-      const currentLights = useLightStore.getState().lights;
+      const currentLights = useIlluminationStore.getState().lights;
       const prefab = await exportGroupToPrefab(singleGroup, currentTokens, currentRegions, currentMapObjects, currentLights);
       downloadPrefab(prefab);
       toast.success(`Exported "${singleGroup.name}" as prefab`);
@@ -322,11 +320,11 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
       }
     }
 
-    // Lights
+    // Lights — redirect to illuminationStore
     if (selectedLightIds.length > 0) {
-      const { removeLight } = useLightStore.getState();
+      const illumStore = useIlluminationStore.getState();
       selectedLightIds.forEach(id => {
-        removeLight(id);
+        illumStore.removeLight(id);
         deletedCount++;
       });
     }
@@ -373,9 +371,10 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
     toast.success(`${locked ? 'Locked' : 'Unlocked'} ${selectedMapObjectIds.length} object(s)`);
   };
 
-  // --- Light Bulk Actions ---
-  const handleBulkLightUpdate = (updates: Partial<{ radius: number; color: string; intensity: number }>) => {
-    useLightStore.getState().updateMultipleLights(selectedLightIds, updates);
+  // --- Light Bulk Actions (illuminationStore) ---
+  const handleBulkLightUpdate = (updates: Partial<{ range: number; color: string }>) => {
+    const illumStore = useIlluminationStore.getState();
+    selectedLightIds.forEach(id => illumStore.updateLight(id, updates));
     onUpdateCanvas?.();
   };
 
@@ -710,29 +709,15 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Radius</Label>
-                        <span className="text-xs text-muted-foreground">{lightRadius}px</span>
+                        <Label>Range (grid)</Label>
+                        <span className="text-xs text-muted-foreground">{lightRange} sq</span>
                       </div>
                       <Slider
-                        value={[lightRadius]}
-                        min={20} max={800} step={10}
+                        value={[lightRange]}
+                        min={1} max={40} step={1}
                         onValueChange={([val]) => {
-                          setLightRadius(val);
-                          handleBulkLightUpdate({ radius: val });
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Intensity</Label>
-                        <span className="text-xs text-muted-foreground">{Math.round(lightIntensity * 100)}%</span>
-                      </div>
-                      <Slider
-                        value={[lightIntensity]}
-                        min={0} max={1} step={0.05}
-                        onValueChange={([val]) => {
-                          setLightIntensity(val);
-                          handleBulkLightUpdate({ intensity: val });
+                          setLightRange(val);
+                          handleBulkLightUpdate({ range: val });
                         }}
                       />
                     </div>

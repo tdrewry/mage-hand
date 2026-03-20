@@ -6,7 +6,7 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { useFogStore } from '@/stores/fogStore';
-import { useLightStore } from '@/stores/lightStore';
+// lightStore removed — freestanding lights now in illuminationStore
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -89,7 +89,7 @@ export class AutoSaveManager {
     useRoleStore.subscribe(markChanges);
     useVisionProfileStore.subscribe(markChanges);
     useFogStore.subscribe(markChanges);
-    useLightStore.subscribe(markChanges);
+    // useLightStore removed — illuminationStore subscription covers freestanding lights
     useCardStore.subscribe(markChanges);
     useDungeonStore.subscribe(markChanges);
     useMapObjectStore.subscribe(markChanges);
@@ -124,7 +124,7 @@ export class AutoSaveManager {
       const roleState = useRoleStore.getState();
       const visionProfileState = useVisionProfileStore.getState();
       const fogState = useFogStore.getState();
-      const lightState = useLightStore.getState();
+
       const cardState = useCardStore.getState();
       const dungeonState = useDungeonStore.getState();
       const mapObjectState = useMapObjectStore.getState();
@@ -191,7 +191,7 @@ export class AutoSaveManager {
           realtimeVisionThrottleMs: fogState.realtimeVisionThrottleMs,
           fogSettingsPerMap: fogState.fogSettingsPerMap,
         },
-        lights: lightState.lights,
+        // lights field removed — use illumination block below
         cardStates: cardState.cards,
         dungeonData: {
           doors: dungeonState.doors,

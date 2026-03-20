@@ -1,5 +1,5 @@
 import { GridRenderer, Viewport } from './gridSystem';
-import { GameMap, GridRegion } from '../stores/mapStore';
+import { GameMap, GridRegion, getComputedBounds } from '../stores/mapStore';
 import { 
   createHexLayout, 
   hexesInRectangle, 
@@ -67,10 +67,11 @@ function renderSingleMap(
 }
 
 function isMapVisibleInViewport(map: GameMap, viewport: Viewport): boolean {
-  const mapLeft = map.bounds.x;
-  const mapRight = map.bounds.x + map.bounds.width;
-  const mapTop = map.bounds.y;
-  const mapBottom = map.bounds.y + map.bounds.height;
+  const cb = getComputedBounds(map);
+  const mapLeft = cb.x;
+  const mapRight = cb.x + cb.width;
+  const mapTop = cb.y;
+  const mapBottom = cb.y + cb.height;
   
   const viewLeft = viewport.x;
   const viewRight = viewport.x + (viewport.width / viewport.zoom);
@@ -93,11 +94,12 @@ function renderMapBackground(
 ): void {
   const { ctx } = renderer;
   
-  // Convert map bounds to screen coordinates
-  const screenLeft = (map.bounds.x - viewport.x) * viewport.zoom;
-  const screenTop = (map.bounds.y - viewport.y) * viewport.zoom;
-  const screenWidth = map.bounds.width * viewport.zoom;
-  const screenHeight = map.bounds.height * viewport.zoom;
+  // Convert computed bounds to screen coordinates
+  const cb = getComputedBounds(map);
+  const screenLeft = (cb.x - viewport.x) * viewport.zoom;
+  const screenTop = (cb.y - viewport.y) * viewport.zoom;
+  const screenWidth = cb.width * viewport.zoom;
+  const screenHeight = cb.height * viewport.zoom;
   
   // Only draw if visible on screen
   if (screenLeft < renderer.canvas.width && 

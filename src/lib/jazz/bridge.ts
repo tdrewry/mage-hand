@@ -47,7 +47,7 @@ import { useInitiativeStore } from "@/stores/initiativeStore";
 import { useRoleStore } from "@/stores/roleStore";
 import { useVisionProfileStore } from "@/stores/visionProfileStore";
 import { useFogStore } from "@/stores/fogStore";
-import { useLightStore } from "@/stores/lightStore";
+// lightStore removed — all freestanding lights now use illuminationStore
 import { useIlluminationStore } from "@/stores/illuminationStore";
 import { useDungeonStore } from "@/stores/dungeonStore";
 import { useCreatureStore } from "@/stores/creatureStore";
@@ -1662,7 +1662,7 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   roles: () => useRoleStore,
   visionProfiles: () => useVisionProfileStore,
   fog: () => useFogStore,
-  lights: () => useLightStore,
+  // 'lights' blob kind removed — legacy migration handled in durableObjectRegistry
   dungeon: () => useDungeonStore,
   creatures: () => useCreatureStore,
   hatching: () => useHatchingStore,

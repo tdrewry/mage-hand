@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMapStore, type GameMap } from '@/stores/mapStore';
+import { useMapStore, type GameMap, getComputedBounds } from '@/stores/mapStore';
 import { MapFocusSettings } from '@/components/MapFocusSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ColorPicker } from '@/components/ui/color-picker';
 import {
   Plus,
   Trash2,
@@ -217,13 +218,14 @@ export const MapManagerCardContent = () => {
     setCompoundName('');
   };
 
-  // Helper: grid dimensions for a map
+  // Helper: grid dimensions for a map (from computed bounds)
   const getGridInfo = (map: GameMap) => {
     const firstRegion = map.regions[0];
     if (!firstRegion || firstRegion.gridType === 'none') return null;
-    const cols = Math.round(map.bounds.width / firstRegion.gridSize);
-    const rows = Math.round(map.bounds.height / firstRegion.gridSize);
-    return { cols, rows, gridSize: firstRegion.gridSize };
+    const cb = getComputedBounds(map);
+    const cols = Math.round(cb.width / firstRegion.gridSize);
+    const rows = Math.round(cb.height / firstRegion.gridSize);
+    return { cols, rows, gridSize: firstRegion.gridSize, cb };
   };
 
   return (
@@ -374,14 +376,14 @@ export const MapManagerCardContent = () => {
                 </Button>
               </div>
 
-              {/* Badges row */}
+              {/* Badges row — shows computed (live) dimensions */}
               <div className="flex gap-1 flex-wrap pl-7">
                 {map.active && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Active</Badge>}
                 {map.compoundMapId && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Compound</Badge>}
                 {map.imageUrl && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Image</Badge>}
                 {gridInfo && (
                   <span className="text-[10px] text-muted-foreground">
-                    {map.bounds.width}×{map.bounds.height}px · {gridInfo.cols}×{gridInfo.rows} cells
+                    {Math.round(gridInfo.cb.width)}×{Math.round(gridInfo.cb.height)}px · {gridInfo.cols}×{gridInfo.rows} cells
                   </span>
                 )}
               </div>
@@ -389,43 +391,39 @@ export const MapManagerCardContent = () => {
               {/* Expanded details */}
               <Collapsible open={expandedMaps.has(map.id)}>
                 <CollapsibleContent className="space-y-2 pl-7 pt-1">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <Label className="text-[10px]">Width (px)</Label>
-                      <Input
-                        type="number"
-                        value={map.bounds.width}
-                        onChange={(e) => updateMap(map.id, { bounds: { ...map.bounds, width: parseInt(e.target.value) || 0 } })}
-                        className="h-6 text-xs"
-                      />
+
+                  {/* Bounds Margin slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <Label className="text-[10px]">Bounds Margin (px)</Label>
+                      <span className="text-[10px] text-muted-foreground">{map.boundsMargin ?? 200}</span>
                     </div>
-                    <div>
-                      <Label className="text-[10px]">Height (px)</Label>
-                      <Input
-                        type="number"
-                        value={map.bounds.height}
-                        onChange={(e) => updateMap(map.id, { bounds: { ...map.bounds, height: parseInt(e.target.value) || 0 } })}
-                        className="h-6 text-xs"
-                      />
-                    </div>
+                    <Slider
+                      value={[map.boundsMargin ?? 200]}
+                      onValueChange={([v]) => updateMap(map.id, { boundsMargin: v })}
+                      min={0}
+                      max={500}
+                      step={25}
+                    />
+                    <p className="text-[9px] text-muted-foreground leading-tight">
+                      Extra space beyond region edges — allows light radii and tokens to function off-map
+                    </p>
                   </div>
-                  <div>
-                    <Label className="text-[10px]">Background Color</Label>
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        type="color"
-                        value={map.backgroundColor}
-                        onChange={(e) => updateMap(map.id, { backgroundColor: e.target.value })}
-                        className="h-6 w-10 p-0 border-0"
-                      />
-                      <span className="text-[10px] text-muted-foreground">{map.backgroundColor}</span>
-                    </div>
+
+                  {/* Background color + regions/z-index inline */}
+                  <div className="flex items-end gap-3">
+                    <ColorPicker
+                      label="Background Color"
+                      value={map.backgroundColor}
+                      onChange={(c) => updateMap(map.id, { backgroundColor: c })}
+                      showAlpha
+                      className="flex-1"
+                    />
+                    <span className="text-[10px] text-muted-foreground pb-1 whitespace-nowrap">
+                      {map.regions.length} region{map.regions.length !== 1 ? 's' : ''} · z {map.zIndex}
+                    </span>
                   </div>
-                  {/* Regions summary */}
-                  <div className="text-[10px] text-muted-foreground">
-                    {map.regions.length} region{map.regions.length !== 1 ? 's' : ''} ·{' '}
-                    z-index: {map.zIndex}
-                  </div>
+
                 </CollapsibleContent>
               </Collapsible>
             </div>

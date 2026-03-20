@@ -21,7 +21,8 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { useFogStore } from '@/stores/fogStore';
-import { useLightStore } from '@/stores/lightStore';
+// lightStore removed — all freestanding lights now use illuminationStore
+import { migrateLegacyLight } from '@/stores/illuminationStore';
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -34,6 +35,7 @@ import { useEffectStore } from '@/stores/effectStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
+import { useCanvasItemStore } from '@/stores/canvasItemStore';
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
   kind: 'tokens',
@@ -268,23 +270,29 @@ DurableObjectRegistry.register({
   },
 });
 
-// ── Legacy Lights ──────────────────────────────────────────────────────────
+// ── Legacy Lights (migration only) ───────────────────────────────────────
+// The 'lights' blob kind is kept for backward-compat with old autosaves.
+// Old LightSource entries are migrated into illuminationStore on hydration.
 DurableObjectRegistry.register({
   kind: 'lights',
-  version: 1,
-  label: 'Legacy Lights',
+  version: 2,
+  label: 'Legacy Lights (migrated)',
   authoritative: true,
-  extractor: () => ({
-    lights: useLightStore.getState().lights,
-    globalAmbientLight: useLightStore.getState().globalAmbientLight,
-  }),
+  extractor: () =>
+    // Nothing to export — illuminationStore's own 'illumination' kind handles export
+    ({ lights: [], globalAmbientLight: undefined }),
   hydrator: (state: any) => {
-    const store = useLightStore.getState();
-    store.clearAllLights();
-    (state?.lights || []).forEach((l: any) => store.addLight(l));
-    if (state?.globalAmbientLight !== undefined) store.setGlobalAmbientLight(state.globalAmbientLight);
+    if (!state?.lights?.length) return;
+    // Migrate old LightSource[] → IlluminationSource[] via the migration helper
+    const store = useIlluminationStore.getState();
+    (state.lights as any[]).forEach((l: any) => {
+      const migrated = migrateLegacyLight(l);
+      store.addLight(migrated);
+    });
+    if (state.globalAmbientLight !== undefined)
+      store.setGlobalAmbientLight(state.globalAmbientLight);
   },
-  summarizer: () => `${useLightStore.getState().lights.length} lights`,
+  summarizer: () => '(migrated to illumination)',
 });
 
 // ── Illumination (Unified) ────────────────────────────────────────────────
@@ -304,6 +312,27 @@ DurableObjectRegistry.register({
     if (state?.globalAmbientLight !== undefined) store.setGlobalAmbientLight(state.globalAmbientLight);
   },
   summarizer: () => `${useIlluminationStore.getState().lights.length} sources`,
+});
+
+// ── Canvas Items (STEP-007) ───────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'canvas-items',
+  version: 1,
+  label: 'Canvas Items',
+  authoritative: true,
+  extractor: () => ({
+    items: useCanvasItemStore.getState().items.map(item => ({
+      ...item,
+      imageUrl: undefined,  // strip local-only URL
+      selected: undefined,
+    })),
+  }),
+  hydrator: (state: any) => {
+    const store = useCanvasItemStore.getState();
+    store.clearAllItems();
+    if (Array.isArray(state?.items)) store.setItems(state.items);
+  },
+  summarizer: () => `${useCanvasItemStore.getState().items.length} items`,
 });
 
 // ── Cards (UI Layout) ─────────────────────────────────────────────────────

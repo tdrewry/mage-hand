@@ -17,7 +17,7 @@ import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useVisionProfileStore } from '@/stores/visionProfileStore';
 import { useFogStore } from '@/stores/fogStore';
-import { useLightStore } from '@/stores/lightStore';
+// lightStore removed — all freestanding lights now in illuminationStore
 import { useCardStore } from '@/stores/cardStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -50,7 +50,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
   const roleStore = useRoleStore.getState();
   const visionProfileStore = useVisionProfileStore.getState();
   const fogStore = useFogStore.getState();
-  const lightStore = useLightStore.getState();
+
   const cardStore = useCardStore.getState();
   const dungeonStore = useDungeonStore.getState();
   const mapObjectStore = useMapObjectStore.getState();
@@ -99,7 +99,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       realtimeVisionThrottleMs: fogStore.realtimeVisionThrottleMs,
       fogSettingsPerMap: fogStore.fogSettingsPerMap,
     },
-    lights: lightStore.lights,
+    // lights: removed — freestanding lights now live exclusively in illuminationStore (data.illumination)
     cardStates: cardStore.cards,
     dungeonData: {
       doors: dungeonStore.doors,
@@ -165,7 +165,6 @@ export function clearAllStores(): void {
   const regionStore = useRegionStore.getState();
   const groupStore = useGroupStore.getState();
   const initiativeStore = useInitiativeStore.getState();
-  const lightStore = useLightStore.getState();
   const fogStore = useFogStore.getState();
   const effectStore = useEffectStore.getState();
 
@@ -175,7 +174,7 @@ export function clearAllStores(): void {
   regionStore.regions.forEach(r => regionStore.removeRegion(r.id));
   groupStore.clearAllGroups();
   initiativeStore.endCombat();
-  lightStore.clearAllLights();
+  useIlluminationStore.getState().clearAllLights();
   fogStore.resetFog();
 
   const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
@@ -213,7 +212,7 @@ export function applyProjectData(data: ProjectData): void {
   // 2. Map Sub-Entities: Regions, Objects, Lighting
   if (data.regions) data.regions.forEach(r => useRegionStore.getState().addRegion(r));
   if (data.mapObjects) useMapObjectStore.getState().setMapObjects(data.mapObjects);
-  if (data.lights) useLightStore.getState().setLights(data.lights);
+  // data.lights (legacy) intentionally ignored — use data.illumination instead
   
   // 3. Organizational Entities: Base Groups, Roles, Token Groups
   if (data.groups) data.groups.forEach(g => useGroupStore.getState().restoreGroup(g));

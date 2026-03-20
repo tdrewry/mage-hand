@@ -26,7 +26,7 @@ import {
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { useLightStore } from '@/stores/lightStore';
+import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useGroupStore } from '@/stores/groupStore';
 import { useMapStore } from '@/stores/mapStore';
 import { EntityGroup, EntityGeometry } from '@/lib/groupTransforms';
@@ -651,11 +651,15 @@ export const MapTreeCardContent: React.FC = () => {
   const normalizeRenderOrders = useMapObjectStore(s => s.normalizeRenderOrders);
   const toggleDoor = useMapObjectStore(s => s.toggleDoor);
 
-  const lights      = useLightStore(s => s.lights);
-  const addLight = useLightStore(s => s.addLight);
-  const removeLight = useLightStore(s => s.removeLight);
-  const updateLight = useLightStore(s => s.updateLight);
-  const toggleLight = useLightStore(s => s.toggleLight);
+  const lights      = useIlluminationStore(s => s.lights);
+  const addLight = useIlluminationStore(s => s.addLight);
+  const removeLight = useIlluminationStore(s => s.removeLight);
+  const updateLight = useIlluminationStore(s => s.updateLight);
+  // toggleLight: illuminationStore doesn't have a dedicated toggle; we patch enabled field
+  const toggleLight = useCallback((id: string) => {
+    const l = useIlluminationStore.getState().lights.find(x => x.id === id);
+    if (l) useIlluminationStore.getState().updateLight(id, { enabled: !l.enabled });
+  }, []);
 
   const { groups, removeGroup, setGroupLocked, updateGroup, removeMemberFromGroup, addGroup, addMembersToGroup } = useGroupStore();
 

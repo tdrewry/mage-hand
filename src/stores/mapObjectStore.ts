@@ -33,6 +33,8 @@ interface MapObjectStore {
   
   // Factory method for creating from preset
   createFromPreset: (category: MapObjectCategory, position: { x: number; y: number }) => string;
+  /** Create from preset centered in the current viewport (no need to pass position). */
+  createFromPresetAtCenter: (category: MapObjectCategory) => string;
   
   // Conversion from terrain features (legacy column/debris)
   convertTerrainFeatureToMapObjects: (
@@ -59,6 +61,8 @@ interface MapObjectStore {
   toggleDoor: (id: string) => void;
   setDoorState: (id: string, isOpen: boolean) => void;
   closeAllDoors: () => void;
+  /** Close only doors on a specific map. */
+  closeAllDoorsOnMap: (mapId: string) => void;
   
   // Get vision-blocking objects (for fog calculation)
   getVisionBlockingObjects: () => MapObject[];
@@ -209,6 +213,24 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
     }));
     
     return id;
+  },
+
+  createFromPresetAtCenter: (category) => {
+    // Read active viewport transform from mapStore to derive canvas center
+    let cx = 300;
+    let cy = 300;
+    try {
+      const { useMapStore } = require('@/stores/mapStore');
+      const ms = useMapStore.getState();
+      const activeMapId = ms.activeMapId || ms.selectedMapId;
+      const vp = (ms as any).viewportTransforms?.[activeMapId] ?? { x: 0, y: 0, zoom: 1 };
+      // Canvas center = (-translate / zoom), shifted to approximate screen center
+      cx = (-vp.x + 400) / vp.zoom;
+      cy = (-vp.y + 300) / vp.zoom;
+    } catch {
+      // mapStore not available (test environment), use defaults
+    }
+    return get().createFromPreset(category, { x: cx, y: cy });
   },
 
   convertTerrainFeatureToMapObjects: (terrainType, tiles, terrainFeatureId) => {
@@ -544,6 +566,17 @@ const mapObjectStoreCreator: StateCreator<MapObjectStore> = (set, get) => ({
             isOpen: false,
             blocksVision: true,
           };
+        }
+        return obj;
+      }),
+    }));
+  },
+
+  closeAllDoorsOnMap: (mapId) => {
+    set((state) => ({
+      mapObjects: state.mapObjects.map((obj) => {
+        if (obj.category === 'door' && obj.mapId === mapId) {
+          return { ...obj, isOpen: false, blocksVision: true };
         }
         return obj;
       }),

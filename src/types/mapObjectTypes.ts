@@ -52,12 +52,20 @@ export interface MapObject {
   // Wall-specific properties (polyline shape)
   wallPoints?: { x: number; y: number }[]; // Points defining the wall polyline
   
-  // Light-specific properties (embedded light data)
+  // Light-specific properties (legacy — shallow fields)
+  // DEPRECATED: use illuminationSource for new objects. These are kept for backward compatibility only.
   lightColor?: string; // Hex color for the light
   lightRadius?: number; // Maximum visibility distance in pixels (dim zone outer edge)
   lightBrightRadius?: number; // Bright zone radius in pixels (defaults to lightRadius * 0.5)
   lightIntensity?: number; // 0-1, affects brightness
   lightEnabled?: boolean; // Whether the light is currently active
+
+  /**
+   * Full IlluminationSource settings for light-category map objects.
+   * Takes precedence over the deprecated legacy lightColor/lightRadius fields.
+   * Stored as a partial since `id` and `position` are derived from the map object itself.
+   */
+  illuminationSource?: import('@/types/illumination').IlluminationSource;
   
   // Lock state
   locked?: boolean; // Prevents all transformations when true
@@ -124,6 +132,46 @@ export const MAP_OBJECT_CATEGORY_LABELS: Record<MapObjectCategory, string> = {
   'deployment-zone': 'Deployment Zone',
   custom: 'Custom',
 };
+
+/**
+ * Logical grouping of categories for the Create palette UI.
+ * `imported-obstacle` is excluded — it's generated only by the Watabou importer.
+ */
+export interface MapObjectCategoryGroup {
+  label: string;
+  /** Lucide icon name hint for the group header */
+  icon: string;
+  categories: MapObjectCategory[];
+}
+
+export const MAP_OBJECT_CATEGORY_GROUPS: MapObjectCategoryGroup[] = [
+  {
+    label: 'Terrain',
+    icon: 'Mountain',
+    categories: ['column', 'statue', 'debris', 'obstacle', 'water'],
+  },
+  {
+    label: 'Furniture',
+    icon: 'Armchair',
+    categories: ['furniture', 'decoration', 'custom'],
+  },
+  {
+    label: 'Architecture',
+    icon: 'DoorOpen',
+    // Note: 'door' can be manually placed; walls are free-draw only (no preset position)
+    categories: ['door', 'stairs', 'wall'],
+  },
+  {
+    label: 'Interactive',
+    icon: 'Waypoints',
+    categories: ['portal', 'deployment-zone', 'annotation', 'trap'],
+  },
+  {
+    label: 'Lighting',
+    icon: 'Lamp',
+    categories: ['light'],
+  },
+];
 
 export const MAP_OBJECT_PRESETS: Record<MapObjectCategory, Partial<MapObject>> = {
   column: {

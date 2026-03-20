@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { useFogStore } from '@/stores/fogStore';
 import { useMapStore } from '@/stores/mapStore';
 import type { IlluminationSource, IlluminationAnimationType } from '@/types/illumination';
@@ -238,27 +239,12 @@ export const TokenIlluminationModal: React.FC<TokenIlluminationModalProps> = ({
                 onCheckedChange={setColorEnabled}
               />
             </div>
-            <div className={`flex gap-2 items-center ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <Input
-                type="color"
+            <div className={!colorEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <ColorPicker
                 value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-14 h-10 p-1 cursor-pointer"
-                disabled={!colorEnabled}
+                onChange={(c) => { setColor(c); }}
+                showAlpha={false}
               />
-              <span className="text-sm text-muted-foreground">{color}</span>
-            </div>
-            {/* Color presets */}
-            <div className={`flex gap-2 flex-wrap ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              {['#FFFFFF', '#FFD700', '#FFA500', '#87CEEB', '#90EE90', '#FF6B6B'].map((c) => (
-                <button
-                  key={c}
-                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
-                  style={{ backgroundColor: c }}
-                  onClick={() => colorEnabled && setColor(c)}
-                  disabled={!colorEnabled}
-                />
-              ))}
             </div>
             {/* Color Intensity Slider */}
             <div className={`space-y-2 ${!colorEnabled ? 'opacity-50 pointer-events-none' : ''}`}>

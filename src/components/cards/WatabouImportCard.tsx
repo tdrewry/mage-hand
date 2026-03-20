@@ -11,7 +11,7 @@ import { parsePrefabFile, importPrefabToMap } from '@/lib/groupSerializer';
 import { useRegionStore } from '@/stores/regionStore';
 import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
-import { useLightStore } from '@/stores/lightStore';
+import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useGroupStore } from '@/stores/groupStore';
 import { saveRegionTexture } from '@/lib/textureStorage';
@@ -40,9 +40,9 @@ export const WatabouImportCardContent = () => {
   const addMapObject = useMapObjectStore((state) => state.addMapObject);
   const clearMapObjects = useMapObjectStore((state) => state.clearMapObjects);
 
-  const addLight = useLightStore((state) => state.addLight);
-  const clearAllLights = useLightStore((state) => state.clearAllLights);
-  const setGlobalAmbientLight = useLightStore((state) => state.setGlobalAmbientLight);
+  const addLight = useIlluminationStore((state) => state.addLight);
+  const clearAllLights = useIlluminationStore((state) => state.clearAllLights);
+  const setGlobalAmbientLight = useIlluminationStore((state) => state.setGlobalAmbientLight);
 
   /** Derive a default group name from the file name (strip extension). */
   const deriveGroupName = (file: File) =>

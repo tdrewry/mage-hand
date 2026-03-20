@@ -2,7 +2,7 @@
  * Light System - Manages light calculations and rendering
  */
 
-import type { LightSource } from '@/stores/lightStore';
+import type { IlluminationSource } from '@/types/illumination';
 import type { CanvasRegion } from '@/stores/regionStore';
 import { computeVisibilityFromSegments, visibilityPolygonToPath2D, clearVisibilityCache } from './visibilityEngine';
 import type { Point, VisibilityResult, LineSegment } from './visibilityEngine';
@@ -11,7 +11,7 @@ export interface IlluminationMap {
   litAreas: Path2D[]; // Areas lit by each light source
   combinedLitArea: Path2D; // Union of all lit areas
   shadowAreas: Path2D; // Areas in shadow (inverse of lit areas)
-  lightSources: LightSource[]; // Active light sources
+  lightSources: IlluminationSource[]; // Active light sources
 }
 
 /**
@@ -19,7 +19,7 @@ export interface IlluminationMap {
  * Uses wall geometry segments as obstacles
  */
 export function computeIllumination(
-  lights: LightSource[],
+  lights: IlluminationSource[],
   wallSegments: LineSegment[],
   wallGeometry?: any
 ): IlluminationMap {
@@ -49,7 +49,9 @@ export function computeIllumination(
   
   // Compute visibility polygon for each light using wall segments as obstacles
   for (const light of activeLights) {
-    const visibility = computeVisibilityFromSegments(light.position, wallSegments, light.radius);
+    // Convert range (grid units) to pixels. GridSize defaults to 50px if not provided.
+    const lightRadiusPx = (light.range ?? 12) * 50;
+    const visibility = computeVisibilityFromSegments(light.position, wallSegments, lightRadiusPx);
     const path = visibilityPolygonToPath2D(visibility.polygon);
     litAreas.push(path);
   }
@@ -79,7 +81,7 @@ export function computeIllumination(
  */
 export function renderLightSources(
   ctx: CanvasRenderingContext2D,
-  lights: LightSource[],
+  lights: IlluminationSource[],
   transform: { x: number; y: number; zoom: number }
 ) {
   ctx.save();
@@ -93,7 +95,8 @@ export function renderLightSources(
     ctx.strokeStyle = light.color + '40'; // 25% opacity
     ctx.lineWidth = 2 / transform.zoom;
     ctx.beginPath();
-    ctx.arc(x, y, light.radius, 0, Math.PI * 2);
+    const radiusPx = (light.range ?? 12) * 50;
+    ctx.arc(x, y, radiusPx, 0, Math.PI * 2);
     ctx.stroke();
     
     // Draw light source center

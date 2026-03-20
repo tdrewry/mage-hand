@@ -10,6 +10,7 @@ import { syncPatch } from '@/lib/sync';
 import { generateSessionCode, resolveSessionCode, isJazzCode } from '@/lib/sessionCodeResolver';
 import { useMultiplayerStore } from './multiplayerStore';
 import type { IlluminationSource } from '@/types/illumination';
+import type { EntitySheet } from '@/types/entitySheet';
 
 export type LabelPosition = 'above' | 'center' | 'below';
 
@@ -99,6 +100,9 @@ export interface Token {
   
   // @deprecated Use roleId instead
   ownerId?: string;
+
+  // Generic entity data sheet (STEP-009)
+  entitySheet?: EntitySheet;
 }
 
 export interface Player {
@@ -155,6 +159,7 @@ export interface SessionState {
   updateTokenDetails: (tokenId: string, notes?: string, quickReferenceUrl?: string, statBlockJson?: string) => void;
   updateTokenStatBlockJson: (tokenId: string, json: string) => void;
   updateTokenEntityRef: (tokenId: string, entityRef: EntityRef | undefined) => void;
+  updateTokenEntitySheet: (tokenId: string, sheet: EntitySheet | undefined) => void;
   addAppearanceVariant: (tokenId: string, variant: AppearanceVariant) => void;
   removeAppearanceVariant: (tokenId: string, variantId: string) => void;
   updateAppearanceVariant: (tokenId: string, variantId: string, updates: Partial<AppearanceVariant>) => void;
@@ -397,6 +402,14 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
     set((state) => ({
       tokens: state.tokens.map((token) =>
         token.id === tokenId ? { ...token, entityRef } : token
+      ),
+    }));
+  },
+
+  updateTokenEntitySheet: (tokenId, sheet) => {
+    set((state) => ({
+      tokens: state.tokens.map((token) =>
+        token.id === tokenId ? { ...token, entitySheet: sheet } : token
       ),
     }));
   },

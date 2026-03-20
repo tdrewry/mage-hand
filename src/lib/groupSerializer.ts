@@ -9,7 +9,7 @@
 import { Token } from '../stores/sessionStore';
 import { CanvasRegion } from '../stores/regionStore';
 import { MapObject } from '../types/mapObjectTypes';
-import { LightSource } from '../stores/lightStore';
+import { IlluminationSource } from '../types/illumination';
 import { EntityGroup, GroupMember, EntityGeometry, createEntityGroup } from './groupTransforms';
 import { getAllTextures, getAllRegionMappings, importTextures } from './textureStorage';
 import { getAllTokenMappings, importTokenTextures } from './textureStorage';
@@ -29,7 +29,7 @@ export interface PrefabData {
   tokens: Token[];
   regions: CanvasRegion[];
   mapObjects: MapObject[];
-  lights: LightSource[];
+  lights: IlluminationSource[];
   embeddedTextures?: EmbeddedPrefabTextures;
 }
 
@@ -46,7 +46,7 @@ export async function exportGroupToPrefab(
   tokens: Token[],
   regions: CanvasRegion[],
   mapObjects: MapObject[],
-  lights: LightSource[],
+  lights: IlluminationSource[],
 ): Promise<PrefabData> {
   const memberTokenIds = new Set(group.members.filter(m => m.type === 'token').map(m => m.id));
   const memberRegionIds = new Set(group.members.filter(m => m.type === 'region').map(m => m.id));
@@ -173,7 +173,7 @@ export interface ImportResult {
   tokens: Token[];
   regions: CanvasRegion[];
   mapObjects: MapObject[];
-  lights: LightSource[];
+  lights: IlluminationSource[];
   group: EntityGroup;
   idMap: IdMap;
 }
@@ -223,7 +223,7 @@ export async function importPrefabToMap(
     };
   });
 
-  const newLights: LightSource[] = prefab.lights.map(l => {
+  const newLights: IlluminationSource[] = prefab.lights.map(l => {
     const newId = freshId('light');
     idMap.set(l.id, newId);
     return {

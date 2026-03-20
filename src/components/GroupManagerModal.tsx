@@ -34,7 +34,7 @@ import { useGroupStore } from '../stores/groupStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useRegionStore } from '../stores/regionStore';
 import { useMapObjectStore } from '../stores/mapObjectStore';
-import { useLightStore } from '../stores/lightStore';
+import { useIlluminationStore } from '../stores/illuminationStore';
 import { EntityGroup, GroupMember, EntityType, EntityGeometry } from '../lib/groupTransforms';
 
 const ENTITY_TYPE_ICON: Record<EntityType, React.ReactNode> = {
@@ -79,7 +79,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
   const { tokens } = useSessionStore();
   const { regions } = useRegionStore();
   const { mapObjects } = useMapObjectStore();
-  const { lights } = useLightStore();
+  const { lights } = useIlluminationStore();
 
   // Entities not yet in any group
   const availableEntities = useMemo(() => {
@@ -124,7 +124,9 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({
     }
     if (m.type === 'light') {
       const l = lights.find(x => x.id === m.id);
-      return l ? { id: l.id, x: l.position.x - l.radius, y: l.position.y - l.radius, width: l.radius * 2, height: l.radius * 2 } : { id: m.id, x: 0, y: 0, width: 50, height: 50 };
+      // range is in grid squares; use 50px per square for the bounding box
+      const sz = l ? (l.range ?? 5) * 50 : 50;
+      return l ? { id: l.id, x: l.position.x - sz / 2, y: l.position.y - sz / 2, width: sz, height: sz } : { id: m.id, x: 0, y: 0, width: 50, height: 50 };
     }
     return { id: m.id, x: 0, y: 0, width: 50, height: 50 };
   };

@@ -2604,7 +2604,9 @@ export const SimpleTabletop = () => {
             wallOcclusionPath?: Path2D;
             isLightSource?: boolean;
             tokenIllumination?: typeof tokens[0]['illuminationSources'];
-            mapObjectLightData?: { lightColor?: string; lightRadius?: number; lightBrightRadius?: number; lightIntensity?: number };
+            /** Full illumination settings derived from a light-category MapObject (supersedes legacy shallow fields). */
+            mapObjectIllumination?: import('@/types/illumination').IlluminationSource;
+
           }> = [];
 
           tokenVisibilityCacheRef.current.forEach((cached, tokenId) => {
@@ -2662,7 +2664,10 @@ export const SimpleTabletop = () => {
 
           // Add enabled light MapObjects to fog revelation
           for (const lightObj of lightMapObjectSources) {
-            const radius = lightObj.lightRadius || 100;
+            // Derive full IlluminationSource — prefers illuminationSource field; falls back to legacy shallow fields
+            const { mapObjectToIlluminationSource: moToIllum } = await import('@/lib/lightMapObjectUtils');
+            const moIllumSource = moToIllum(lightObj);
+            const radius = moIllumSource.range * 50; // range is in grid units (50px each)
             const lightId = `map-light-${lightObj.id || Math.random()}`;
             const lightVision = await computeTokenVisibilityPaper(
               [{ x: lightObj.position.x, y: lightObj.position.y, id: lightId, gridWidth: 1, gridHeight: 1 }],
@@ -2678,11 +2683,9 @@ export const SimpleTabletop = () => {
                 visionRange: radius,
                 visibilityPath: lightPath2D,
                 isLightSource: true,
-                mapObjectLightData: {
-                  lightColor: lightObj.lightColor,
-                  lightRadius: lightObj.lightRadius,
-                  lightBrightRadius: lightObj.lightBrightRadius,
-                  lightIntensity: lightObj.lightIntensity,
+                mapObjectIllumination: {
+                  ...moIllumSource,
+                  position: lightObj.position,
                 },
               });
               if (lightVision.remove) lightVision.remove();
@@ -4379,11 +4382,20 @@ export const SimpleTabletop = () => {
           illuminationSourcesCacheRef.current = tokenVisibilityDataRef.current.map((t, idx) => {
             const tokenSettings = t.tokenIllumination?.[0];
             const rangePixels = t.visionRange;
-            const moLight = t.mapObjectLightData;
-            const dimRadius = moLight?.lightRadius ?? rangePixels;
-            const brightRadius = moLight?.lightBrightRadius ?? dimRadius * 0.5;
-            const moColor = moLight?.lightColor ?? '#FFD700';
-            const moIntensity = moLight?.lightIntensity ?? 1.0;
+            // Full illumination source from map object (new path)
+            const moIllum = (t as any).mapObjectIllumination as import('@/types/illumination').IlluminationSource | undefined;
+
+            if (moIllum) {
+              // Use every field from the stored IlluminationSource
+              return {
+                ...moIllum,
+                id: `vis-${idx}`,
+                position: t.position,
+                // Convert grid-unit range back to pixels for the shader
+                range: moIllum.range * 50,
+                visibilityPolygon: t.wallOcclusionPath,
+              };
+            }
 
             return {
               id: `vis-${idx}`,
@@ -4391,24 +4403,12 @@ export const SimpleTabletop = () => {
               enabled: true,
               position: t.position,
               range: rangePixels,
-              brightZone: moLight
-                ? (brightRadius / dimRadius)
-                : (tokenSettings?.brightZone ?? effectSettings.lightFalloff),
-              brightIntensity: moLight
-                ? moIntensity
-                : (tokenSettings?.brightIntensity ?? 1.0),
-              dimIntensity: moLight
-                ? moIntensity * 0.4
-                : (tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0)),
-              color: moLight
-                ? moColor
-                : (tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF')),
-              colorEnabled: moLight
-                ? true
-                : (tokenSettings?.colorEnabled ?? false),
-              colorIntensity: moLight
-                ? 0.5
-                : (tokenSettings?.colorIntensity ?? 0.5),
+              brightZone: tokenSettings?.brightZone ?? effectSettings.lightFalloff,
+              brightIntensity: tokenSettings?.brightIntensity ?? 1.0,
+              dimIntensity: tokenSettings?.dimIntensity ?? (t.isLightSource ? 0.4 : 0.0),
+              color: tokenSettings?.color ?? (t.isLightSource ? '#FFD700' : '#FFFFFF'),
+              colorEnabled: tokenSettings?.colorEnabled ?? false,
+              colorIntensity: tokenSettings?.colorIntensity ?? 0.5,
               softEdge: tokenSettings?.softEdge ?? true,
               softEdgeRadius: tokenSettings?.softEdgeRadius ?? 8,
               animation: tokenSettings?.animation ?? 'none',

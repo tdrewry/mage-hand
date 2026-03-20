@@ -14,6 +14,7 @@ import {
 import { Switch } from '../ui/switch';
 import { useRegionStore, CanvasRegion } from '@/stores/regionStore';
 import { CardSaveButton } from './CardSaveButton';
+import { ColorPicker } from '@/components/ui/color-picker';
 
 interface RegionControlsCardContentProps {
   regionId: string | null;
@@ -164,25 +165,11 @@ export const RegionControlsCardContent: React.FC<RegionControlsCardContentProps>
       {/* Background Color */}
       <div className="space-y-2">
         <Label className="text-xs font-medium">Appearance</Label>
-        <div className="space-y-1">
-          <Label htmlFor="backgroundColor" className="text-xs">Background Color</Label>
-          <div className="flex gap-2">
-            <Input
-              id="backgroundColor"
-              type="color"
-              value={region.backgroundColor || '#000000'}
-              onChange={(e) => updateRegion(region.id, { backgroundColor: e.target.value })}
-              className="h-8 w-16 p-1"
-            />
-            <Input
-              type="text"
-              value={region.backgroundColor || 'transparent'}
-              onChange={(e) => updateRegion(region.id, { backgroundColor: e.target.value })}
-              placeholder="transparent"
-              className="h-8 text-xs flex-1"
-            />
-          </div>
-        </div>
+        <ColorPicker
+          value={region.backgroundColor || 'rgba(0,0,0,1)'}
+          onChange={(c) => updateRegion(region.id, { backgroundColor: c })}
+          showAlpha
+        />
       </div>
 
       {/* Path Smoothing (only for path regions with bezier curves) */}

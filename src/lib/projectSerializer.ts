@@ -14,7 +14,7 @@ import { GameMap } from '../stores/mapStore';
 import { CanvasRegion } from '../stores/regionStore';
 import { TokenGroup } from './groupTransforms'; // TokenGroup is now an alias for EntityGroup
 import { InitiativeEntry } from '../stores/initiativeStore';
-import { LightSource } from '../stores/lightStore';
+// LightSource removed — lights are now IlluminationSource in illuminationStore
 import { FogSettings } from '../stores/fogStore';
 import { Role } from '../stores/roleStore';
 import { VisionProfile } from '../stores/visionProfileStore';
@@ -83,7 +83,8 @@ export interface ProjectData {
   roles?: Role[];
   visionProfiles?: VisionProfile[];
   fogData?: FogSettings;
-  lights?: LightSource[];
+  /** @deprecated Legacy — use illumination instead. Kept for old .mhsession backward compat. */
+  lights?: IlluminationSource[];
   cardStates?: CardState[];
   dungeonData?: any; // Optional dungeon data
   mapObjects?: MapObject[]; // Interactive map features (doors, columns, etc.)

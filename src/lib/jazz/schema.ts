@@ -44,6 +44,8 @@ export const JazzToken = co.map({
   quickReferenceUrl: z.optional(z.string()),
   /** Complex nested fields (illuminationSources, entityRef, appearanceVariants) as JSON */
   extras: z.optional(z.string()),
+  /** EntitySheet serialized as JSON string (STEP-009) */
+  entitySheetJson: z.optional(z.string()),
 });
 export type JazzToken = co.loaded<typeof JazzToken>;
 
@@ -252,6 +254,36 @@ export type JazzIlluminationSource = co.loaded<typeof JazzIlluminationSource>;
 export const JazzIlluminationSourceList = co.list(JazzIlluminationSource);
 export type JazzIlluminationSourceList = co.loaded<typeof JazzIlluminationSourceList>;
 
+// ── Canvas Item (STEP-007) ─────────────────────────────────────────────────
+// Canvas items are physical world objects: torches, chests, weapons, etc.
+// Supersedes the old freestanding LightSource (STEP-002).
+
+export const JazzItem = co.map({
+  itemId: z.string(),
+  name: z.string(),
+  mapId: z.string(),
+  positionX: z.number(),
+  positionY: z.number(),
+  scale: z.number(),
+  isHidden: z.boolean(),
+  isPickedUp: z.boolean(),
+  isContainer: z.boolean(),
+  renderOrder: z.optional(z.number()),
+  rotation: z.optional(z.number()),
+  imageHash: z.optional(z.string()),
+  description: z.optional(z.string()),
+  material: z.optional(z.string()),
+  durability: z.optional(z.number()),
+  carriedByTokenId: z.optional(z.string()),
+  illuminationSourceId: z.optional(z.string()),
+  /** IlluminationPreset, resistances, actions, features, inventory serialized as JSON */
+  extrasJson: z.optional(z.string()),
+});
+export type JazzItem = co.loaded<typeof JazzItem>;
+
+export const JazzItemList = co.list(JazzItem);
+export type JazzItemList = co.loaded<typeof JazzItemList>;
+
 // ── Texture Entry (FileStream reference) ──────────────────────────────────
 
 export const JazzTextureEntry = co.map({
@@ -303,6 +335,7 @@ export const JazzSessionRoot = co.map({
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
   illuminationSources: co.optional(JazzIlluminationSourceList),
+  items: co.optional(JazzItemList),
   // Ephemeral Data
   cursors: co.optional(JazzCursorFeed),
   pings: co.optional(JazzPingFeed),
@@ -362,6 +395,7 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
   const illuminationSources = JazzIlluminationSourceList.create([], group);
+  const items = JazzItemList.create([], group);
 
   const cursors = JazzCursorFeed.create([], group);
   const pings = JazzPingFeed.create([], group);
@@ -381,6 +415,7 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
       blobs: blobs as any, 
       textures: textures as any, 
       illuminationSources: illuminationSources as any,
+      items: items as any,
       cursors: cursors as any, 
       pings: pings as any, 
       chat: chat as any,
