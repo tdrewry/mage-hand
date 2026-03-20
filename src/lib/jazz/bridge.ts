@@ -1686,8 +1686,85 @@ function throttledPushBlob(kind: string): void {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// CANVAS EDIT SUBSCRIPTION LIFECYCLE
+// Observer clients pause Jazz→Zustand subscriptions during host transforms
+// to prevent N×K sequential callback fires (one per Jazz CoValue.set op).
+// On resume, one hydration pass applies the final CRDT state atomically.
+// ══════════════════════════════════════════════════════════════════════════
+
+let _regionSubPaused = false;
+let _mapObjectSubPaused = false;
+/** Latest Jazz snapshot received while paused — applied on resume */
+let _pendingInboundRegionSnapshot: any = null;
+let _pendingInboundMapObjectSnapshot: any = null;
+/** Auto-resume timer: fires if canvas.edit.end is never received (dropped WebRTC) */
+let _editResumeTimer: ReturnType<typeof setTimeout> | null = null;
+const EDIT_RESUME_FALLBACK_MS = 5000;
+
+/**
+ * Pause Jazz→Zustand subscriptions for canvas entities during a host transform.
+ * Called by mapHandlers when canvas.edit.begin is received from an editor via WebRTC.
+ */
+export function pauseCanvasSubscriptions(entityType: 'region' | 'mapObject' | 'all'): void {
+  if (entityType === 'region' || entityType === 'all') _regionSubPaused = true;
+  if (entityType === 'mapObject' || entityType === 'all') _mapObjectSubPaused = true;
+
+  // Cancel any existing auto-resume and reset the timeout
+  if (_editResumeTimer !== null) clearTimeout(_editResumeTimer);
+  _editResumeTimer = setTimeout(() => {
+    _editResumeTimer = null;
+    // WebRTC failure: canvas.edit.end never arrived — auto-resume and mark partial
+    console.warn('[jazz-bridge] canvas.edit.end not received within timeout — auto-resuming');
+    resumeCanvasSubscriptions();
+    import('@/stores/useCanvasEditStatusStore').then(({ useCanvasEditStatusStore }) => {
+      useCanvasEditStatusStore.getState().setPartial();
+    });
+  }, EDIT_RESUME_FALLBACK_MS);
+}
+
+/**
+ * Resume Jazz→Zustand subscriptions and immediately apply the buffered final state.
+ * Called by mapHandlers when canvas.edit.end is received from the editor.
+ * This replicates the "landing page reconnect" behavior that delivers all region
+ * updates atomically in one hydration pass instead of N×K sequential callbacks.
+ */
+export function resumeCanvasSubscriptions(): void {
+  if (_editResumeTimer !== null) { clearTimeout(_editResumeTimer); _editResumeTimer = null; }
+
+  // Apply buffered snapshots before clearing flags (so the apply functions can read them)
+  if (_regionSubPaused && _pendingInboundRegionSnapshot !== null) {
+    _regionSubPaused = false;
+    // _applyInboundRegions is set by setupBridgeSubscriptions — call via ref
+    if (_applyInboundRegionsFn) _applyInboundRegionsFn(_pendingInboundRegionSnapshot);
+    _pendingInboundRegionSnapshot = null;
+  } else {
+    _regionSubPaused = false;
+    _pendingInboundRegionSnapshot = null;
+  }
+
+  if (_mapObjectSubPaused && _pendingInboundMapObjectSnapshot !== null) {
+    _mapObjectSubPaused = false;
+    if (_applyInboundMapObjectsFn) _applyInboundMapObjectsFn(_pendingInboundMapObjectSnapshot);
+    _pendingInboundMapObjectSnapshot = null;
+  } else {
+    _mapObjectSubPaused = false;
+    _pendingInboundMapObjectSnapshot = null;
+  }
+
+  // Signal hydration complete
+  import('@/stores/useCanvasEditStatusStore').then(({ useCanvasEditStatusStore }) => {
+    useCanvasEditStatusStore.getState().setIdle();
+  });
+}
+
+/** Set by setupBridgeSubscriptions so resumeCanvasSubscriptions can call the apply fn */
+let _applyInboundRegionsFn: ((snapshot: any) => void) | null = null;
+let _applyInboundMapObjectsFn: ((snapshot: any) => void) | null = null;
+
+// ══════════════════════════════════════════════════════════════════════════
 // FINE-GRAINED SYNC HELPERS (regions & mapObjects outbound)
 // ══════════════════════════════════════════════════════════════════════════
+
 
 const _fineGrainedTimers = new Map<string, number>();
 /** Pending functions — always updated to the LATEST closure so trailing state wins */
@@ -2353,15 +2430,19 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   const jazzRegionsRef = sessionRoot.regions;
   if (jazzRegionsRef?.$jazz?.subscribe) {
     try {
-      const unsubRegionsJazz = jazzRegionsRef.$jazz.subscribe(
-        { resolve: { $each: true } },
-        (regions: any) => {
+      // Debounce state: buffer incoming Jazz region updates within a short window
+      // so that N individual Jazz CoValue.set() ops (from a drag commit) are applied
+      // in ONE runFromJazz pass rather than N separate Zustand mutations + canvas redraws.
+      let _inboundRegionTimer: ReturnType<typeof setTimeout> | null = null;
+      let _pendingInboundRegions: any = null;
+      const INBOUND_REGION_DEBOUNCE_MS = JAZZ_SYNC_THROTTLE_MS['regions'] ?? 16;
+
+      const applyInboundRegions = (regions: any) => {
           if (!regions) return;
           const len = regions.length ?? 0;
           const localCount = useRegionStore.getState().regions.length;
 
           if (len === 0 && localCount > 0 && _isCreator) return;
-          // Startup grace: suppress inbound for creator during initial propagation
           if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) {
             console.log(`[jazz-bridge] Skipping inbound regions during startup grace`);
             return;
@@ -2382,29 +2463,23 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
 
               const existing = currentMap.get(jr.regionId);
               if (existing) {
-                // Only update if something actually changed (deep-compare parsed JSON fields)
                 const incoming = jazzToZustandRegion(jr);
                 if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'backgroundImage'])) {
                   if (incoming.textureHash) {
-                    // Preserve local backgroundImage (loaded from IndexedDB, not synced via Jazz).
-                    // The backgroundImage will be populated by _resolveRegionTextures below.
                     store.updateRegion(jr.regionId, {
                       ...incoming,
                       backgroundImage: existing.backgroundImage,
                     });
-                    // If textureHash changed, flag for async texture resolution
                     if (incoming.textureHash !== existing.textureHash) {
                       regionsNeedingTextureResolve.push({ id: existing.id, hash: incoming.textureHash });
                     }
                   } else {
-                    // textureHash was cleared by host — also wipe backgroundImage so client canvas clears
                     store.updateRegion(jr.regionId, {
                       ...incoming,
                       backgroundImage: undefined,
                     });
                   }
                 } else {
-                  // No structural change, but still check if texture needs resolving after refresh
                   if (!existing.backgroundImage && existing.textureHash) {
                     regionsNeedingTextureResolve.push({ id: existing.id, hash: existing.textureHash });
                   }
@@ -2412,7 +2487,6 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
               } else {
                 const newRegion = jazzToZustandRegion(jr);
                 store.addRegion(newRegion);
-                // New region with textureHash needs texture resolution
                 if (newRegion.textureHash) {
                   regionsNeedingTextureResolve.push({ id: newRegion.id, hash: newRegion.textureHash });
                 }
@@ -2426,13 +2500,36 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             }
           });
 
-          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
           if (regionsNeedingTextureResolve.length > 0) {
             _resolveRegionTextures(regionsNeedingTextureResolve);
           }
 
-          // Update prev to prevent echo
           prevRegions = useRegionStore.getState().regions;
+      };
+
+      // Register for resumeCanvasSubscriptions to call on canvas.edit.end
+      _applyInboundRegionsFn = applyInboundRegions;
+
+      const unsubRegionsJazz = jazzRegionsRef.$jazz.subscribe(
+        { resolve: { $each: true } },
+        (regions: any) => {
+          // If subscription is paused (host is transforming canvas entities),
+          // buffer the latest snapshot and return. On resume, applyInboundRegions
+          // will fire once with the final committed state — same as landing page reconnect.
+          if (_regionSubPaused) {
+            _pendingInboundRegionSnapshot = regions;
+            return;
+          }
+          // Debounce: store latest snapshot, apply after the window closes.
+          // This collapses N per-field Jazz ops into one Zustand + canvas update.
+          _pendingInboundRegions = regions;
+          if (_inboundRegionTimer !== null) return; // timer already running
+          _inboundRegionTimer = setTimeout(() => {
+            _inboundRegionTimer = null;
+            const snapshot = _pendingInboundRegions;
+            _pendingInboundRegions = null;
+            applyInboundRegions(snapshot);
+          }, INBOUND_REGION_DEBOUNCE_MS);
         },
       );
       activeSubscriptions.push(unsubRegionsJazz);
@@ -2440,6 +2537,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
       console.warn("[jazz-bridge] Could not subscribe to Jazz regions:", err);
     }
   }
+
+
 
   // ── MapObject sync: Zustand → Jazz ──
   let prevMapObjects = useMapObjectStore.getState().mapObjects;

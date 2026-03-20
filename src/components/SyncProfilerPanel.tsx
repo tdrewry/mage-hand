@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { syncProfiler } from '@/lib/jazz/profiler';
 import { Button } from './ui/button';
-import { Download, Copy, Check, Play, Server, Zap, RefreshCw, Link, Share2 } from 'lucide-react';
+import { Download, Copy, Check, Play, Server, Zap, RefreshCw, Link, Share2, AlertTriangle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
@@ -9,6 +9,7 @@ import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
 import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
 import { toast } from 'sonner';
 import { encodeJazzCode } from '@/lib/sessionCodeResolver';
+import { useCanvasEditStatusStore } from '@/stores/useCanvasEditStatusStore';
 
 export const SyncProfilerPanel: React.FC = () => {
   const [stats, setStats] = useState({ outKb: '0.00', inKb: '0.00', outOps: 0, inOps: 0, activeDOs: 0, streamKb: '0.00' });
@@ -100,7 +101,10 @@ export const SyncProfilerPanel: React.FC = () => {
     };
   }, [active]);
 
+  const canvasEditStatus = useCanvasEditStatusStore((s) => s.status);
+
   if (!isProfilerVisible) return null;
+
 
   const sessionCode = currentSession?.sessionCode;
   const sessionRootId = currentSession?.sessionId;
@@ -269,8 +273,13 @@ export const SyncProfilerPanel: React.FC = () => {
       {/* SECTION 2: WebRTC Ephemeral State */}
       <div className="flex flex-col min-w-[260px]">
         <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-800">
-          <div className="font-semibold text-slate-300 flex items-center">
-            <Zap className="h-3 w-3 mr-1.5 text-amber-400" /> Ephemeral WebRTC
+          <div className="font-semibold text-slate-300 flex items-center gap-1.5">
+            <Zap className="h-3 w-3 text-amber-400" /> Ephemeral WebRTC
+            {canvasEditStatus === 'partial' && (
+              <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-rose-900/50 border border-rose-700/50 text-rose-300 font-semibold">
+                <AlertTriangle className="h-2.5 w-2.5" /> Partial
+              </span>
+            )}
           </div>
           <Button 
             variant="outline" 

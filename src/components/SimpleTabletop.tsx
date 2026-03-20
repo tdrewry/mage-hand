@@ -129,12 +129,13 @@ import { useGroupStore } from "../stores/groupStore";
 import { useActionStore } from "../stores/actionStore";
 import { CursorOverlay } from "./CursorOverlay";
 import { ActionPendingOverlay } from "./ActionPendingOverlay";
+import { CanvasEditStatusBar } from "./CanvasEditStatusBar";
 import { useCursorStore } from "@/stores/cursorStore";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
-import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied, emitForceRedraw } from "@/lib/net/ephemeral/mapHandlers";
+import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied, emitForceRedraw, emitCanvasEditBegin, emitCanvasEditEnd } from "@/lib/net/ephemeral/mapHandlers";
 import { FEATURE_CANVAS_FORCE_REDRAW, FEATURE_CANVAS_DRAG_LIVE_PREVIEW, CANVAS_DRAG_BROADCAST_FPS } from "@/lib/featureFlags";
 import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
@@ -8807,6 +8808,9 @@ export const SimpleTabletop = () => {
                 setDraggedRegionId(primaryRegion.id);
                 setInitialRegionState(captureRegionTransformState(primaryRegion));
                 setTransformingRegionId(primaryRegion.id);
+                // Notify observer clients to pause Jazz subscriptions during transform
+                const _ownerId = useSessionStore.getState().currentPlayerId ?? 'dm';
+                emitCanvasEditBegin(_ownerId, 'all');
                 const pivot = computeGroupCentroid(grpCheck);
                 groupRotationPivotRef.current = pivot;
                 const groupStartAngle = calculateAngle(pivot.x, pivot.y, worldPos.x, worldPos.y);
@@ -8874,6 +8878,9 @@ export const SimpleTabletop = () => {
               setIsResizingRegion(true);
               setResizeHandle(handle);
               setDraggedRegionId(selectedRegion.id);
+              // Notify observer clients to pause Jazz subscriptions during resize
+              const _resizeOwnerId = useSessionStore.getState().currentPlayerId ?? 'dm';
+              emitCanvasEditBegin(_resizeOwnerId, 'region');
               return;
             }
 
@@ -11387,7 +11394,9 @@ export const SimpleTabletop = () => {
       // the 5-6s sequential region-population effect on client side.
       flushPendingSync('regions');
       flushPendingSync('mapObjects');
-
+      // Signal observer clients to resume Jazz subscriptions and hydrate from final CRDT state
+      const _editOwnerId = useSessionStore.getState().currentPlayerId ?? 'dm';
+      emitCanvasEditEnd(_editOwnerId);
 
     if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
       // Clear temp region position refs
@@ -11635,6 +11644,9 @@ export const SimpleTabletop = () => {
           setIsDraggingRegion(true);
           setDraggedRegionId(clickedRegion.id);
           ephemeralBus.emit("region.drag.begin", { regionId: clickedRegion.id, startPos: { x: clickedRegion.x, y: clickedRegion.y } });
+          // Notify observer clients to pause Jazz subscriptions during drag
+          const _dragOwnerId = useSessionStore.getState().currentPlayerId ?? 'dm';
+          emitCanvasEditBegin(_dragOwnerId, 'all');
 
           if (currentVisibilityRef.current) {
             stableVisibilityRef.current = currentVisibilityRef.current.clone({ insert: false }) as paper.Path;
@@ -12411,6 +12423,8 @@ export const SimpleTabletop = () => {
         <CursorOverlay transform={transform} />
         {/* Player-facing action pending / resolved overlay */}
         <ActionPendingOverlay />
+        {/* Canvas edit status bar: shows Pending/Loading/Partial to observer clients during host transforms */}
+        <CanvasEditStatusBar />
         {/* DOM marquee — rendered above fog (z-index above FOG_POST_PROCESSING).
             Position/size is driven directly via ref to avoid React re-renders and flicker. */}
         <div

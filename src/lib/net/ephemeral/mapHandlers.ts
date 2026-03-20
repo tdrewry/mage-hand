@@ -29,6 +29,8 @@ import type {
   PortalTeleportApprovedPayload,
   PortalTeleportDeniedPayload,
   CanvasForceRedrawPayload,
+  CanvasEditBeginPayload,
+  CanvasEditEndPayload,
 } from "./types";
 
 let registered = false;
@@ -186,6 +188,25 @@ export function registerMapHandlers(): void {
     window.dispatchEvent(new CustomEvent('canvas:forceRedraw', { detail: _data }));
   });
 
+  // Canvas edit lifecycle: pause/resume Jazz→Zustand subscriptions on observer clients
+  ephemeralBus.on("canvas.edit.begin", (data: CanvasEditBeginPayload, _userId) => {
+    import('@/lib/jazz/bridge').then(({ pauseCanvasSubscriptions }) => {
+      pauseCanvasSubscriptions(data.entityType);
+    });
+    import('@/stores/useCanvasEditStatusStore').then(({ useCanvasEditStatusStore }) => {
+      useCanvasEditStatusStore.getState().setPending(data.ownerId);
+    });
+  });
+
+  ephemeralBus.on("canvas.edit.end", (data: CanvasEditEndPayload, _userId) => {
+    import('@/stores/useCanvasEditStatusStore').then(({ useCanvasEditStatusStore }) => {
+      useCanvasEditStatusStore.getState().setLoading();
+    });
+    import('@/lib/jazz/bridge').then(({ resumeCanvasSubscriptions }) => {
+      resumeCanvasSubscriptions(); // sets idle after hydration
+    });
+  });
+
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {
     if (entry) return;
@@ -253,6 +274,24 @@ export function emitForceRedraw(reason?: string): void {
   ephemeralBus.emit("canvas.forceRedraw", { reason });
   // Also fire locally so the DM's own canvas redraws immediately
   window.dispatchEvent(new CustomEvent('canvas:forceRedraw', { detail: { reason } }));
+}
+
+/**
+ * Broadcast canvas edit begin to observer clients — they will pause Jazz→Zustand
+ * subscriptions until canvas.edit.end arrives, preventing sequential callback fires.
+ * Call this from the editor (DM) at the START of any canvas entity transform.
+ */
+export function emitCanvasEditBegin(ownerId: string, entityType: 'region' | 'mapObject' | 'all' = 'region'): void {
+  ephemeralBus.emit("canvas.edit.begin", { ownerId, entityType });
+}
+
+/**
+ * Broadcast canvas edit end to observer clients — they resume subscriptions and
+ * apply the final Jazz CRDT state in one atomic hydration pass.
+ * Call this from the editor (DM) AFTER flushPendingSync completes.
+ */
+export function emitCanvasEditEnd(ownerId: string): void {
+  ephemeralBus.emit("canvas.edit.end", { ownerId });
 }
 
 /** Broadcast DM map selection to all connected players. */

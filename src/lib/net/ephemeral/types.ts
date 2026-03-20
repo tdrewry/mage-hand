@@ -80,7 +80,9 @@ export type EphemeralOpKind =
   | "ambient.loop.play"
   | "ambient.loop.stop"
   // Canvas
-  | "canvas.forceRedraw";
+  | "canvas.forceRedraw"
+  | "canvas.edit.begin"
+  | "canvas.edit.end";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
@@ -447,6 +449,23 @@ export interface CanvasForceRedrawPayload {
   reason?: string;
 }
 
+/** Sent by an editor (DM) when a canvas entity transform begins (drag, rotate, resize, property change).
+ *  Observer clients should pause their Jazz→Zustand region/mapObject subscriptions
+ *  until canvas.edit.end is received, to avoid N×K sequential subscription callbacks. */
+export interface CanvasEditBeginPayload {
+  /** ID of the player performing the edit */
+  ownerId: string;
+  /** Which entity type subscriptions to pause */
+  entityType: 'region' | 'mapObject' | 'all';
+}
+
+/** Sent by an editor when the transform is committed (mouseup / property write complete).
+ *  Observer clients should resume subscriptions and apply the final Jazz CRDT state. */
+export interface CanvasEditEndPayload {
+  ownerId: string;
+}
+
+
 // -- Token Position Sync --
 
 export interface TokenPositionSyncPayload {
@@ -522,6 +541,8 @@ export interface EphemeralPayloadMap {
   "ambient.loop.play": AmbientLoopPlayPayload;
   "ambient.loop.stop": AmbientLoopStopPayload;
   "canvas.forceRedraw": CanvasForceRedrawPayload;
+  "canvas.edit.begin": CanvasEditBeginPayload;
+  "canvas.edit.end": CanvasEditEndPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -632,4 +653,6 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
 
   // Canvas
   "canvas.forceRedraw":     { throttleMs: 500, ttlMs: 0,    keyStrategy: "session", dmOnly: true },
+  "canvas.edit.begin":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "session", dmOnly: true },
+  "canvas.edit.end":        { throttleMs: 0,   ttlMs: 0,    keyStrategy: "session", dmOnly: true },
 };
