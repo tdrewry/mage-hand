@@ -7,6 +7,112 @@ import { WatabouStyle, DEFAULT_STYLE } from './watabouStyles';
 import { computeInsetPath } from '@/utils/pathUtils';
 
 // ---------------------------------------------------------------------------
+// Wall AABB helper + transform handle renderer (exported for SimpleTabletop)
+// ---------------------------------------------------------------------------
+
+export interface WallAABB {
+  minX: number; minY: number;
+  maxX: number; maxY: number;
+  cx: number; cy: number;
+  width: number; height: number;
+}
+
+/**
+ * Compute the axis-aligned bounding box and centroid of a wall polyline.
+ * Returns null when fewer than 2 points exist.
+ * A minimum thickness of 4px is applied on flat axes so handles remain reachable.
+ */
+export function getWallAABB(points: { x: number; y: number }[]): WallAABB | null {
+  if (!points || points.length < 2) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  if (maxX - minX < 4) { minX -= 2; maxX += 2; }
+  if (maxY - minY < 4) { minY -= 2; maxY += 2; }
+  return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * Draw the rotate handle (circle above centroid) or scale handles (8 AABB corners/midpoints)
+ * for a selected wall. Called from SimpleTabletop's redrawCanvas after normal wall rendering.
+ */
+export function drawWallTransformHandles(
+  ctx: CanvasRenderingContext2D,
+  wallPoints: { x: number; y: number }[],
+  tool: 'rotate' | 'scale',
+  zoom: number
+): void {
+  const aabb = getWallAABB(wallPoints);
+  if (!aabb) return;
+  const { minX, minY, maxX, maxY, cx, cy } = aabb;
+
+  ctx.save();
+
+  // Dashed AABB — shown in both rotate and scale modes
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.setLineDash([5 / zoom, 3 / zoom]);
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.rect(minX, minY, maxX - minX, maxY - minY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (tool === 'rotate') {
+    const handleY = minY - 30 / zoom;
+    // Stem
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 1 / zoom;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(cx, minY);
+    ctx.lineTo(cx, handleY);
+    ctx.stroke();
+    // Handle circle
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 2 / zoom;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(cx, handleY, 6 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Rotation arc indicator
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.beginPath();
+    ctx.arc(cx, handleY, 3.5 / zoom, -Math.PI * 0.75, Math.PI * 0.5);
+    ctx.stroke();
+  } else {
+    // Scale: 8 square handles at corners + edge midpoints
+    const hs = 5 / zoom;
+    const handlePositions = [
+      { x: minX, y: minY }, { x: cx,   y: minY }, { x: maxX, y: minY },
+      { x: maxX, y: cy   },
+      { x: maxX, y: maxY }, { x: cx,   y: maxY }, { x: minX, y: maxY },
+      { x: minX, y: cy   },
+    ];
+    for (const h of handlePositions) {
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.rect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+
+// ---------------------------------------------------------------------------
 // Texture image cache for map objects
 // ---------------------------------------------------------------------------
 
@@ -385,41 +491,80 @@ function renderWallShape(
   isDMView: boolean = false,
   selected: boolean = false
 ) {
-  const { wallPoints, position, strokeColor, category, locked } = mapObject;
+  const { wallPoints, position, strokeColor, strokeWidth: rawStrokeWidth, category, locked,
+          wallShadowColor, wallShadowBlur, wallShadowOffsetX, wallShadowOffsetY, wallShadowOpacity,
+          wallVisibleInPlay } = mapObject;
   if (!wallPoints || wallPoints.length < 2) return;
-  
-  // Only render in editor/DM view - walls are invisible in play mode
-  if (!isDMView) return;
-  
+
+  // Play-mode visibility: walls are hidden by default; render only when wallVisibleInPlay is set.
+  const isPlayMode = !isDMView;
+  if (isPlayMode && !wallVisibleInPlay) return;
+
   // Undo parent translate since wallPoints are in absolute coords
   ctx.save();
   ctx.translate(-position.x, -position.y);
-  
-  // Draw wall segments with dashed decoration
+
   const isObstacle = category === 'imported-obstacle';
+  const effectiveStrokeWidth = (rawStrokeWidth > 0 ? rawStrokeWidth : 2) / zoom;
+
+  // ── Shadow pass (drawn behind the main stroke) ──────────────────────────────
+  if (wallShadowColor && wallShadowColor !== 'none' && wallShadowColor !== 'rgba(0,0,0,0)') {
+    ctx.save();
+    ctx.globalAlpha = (wallShadowOpacity ?? 1) * (mapObject.opacity ?? 1);
+    ctx.strokeStyle = wallShadowColor;
+    ctx.lineWidth = effectiveStrokeWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = wallShadowColor;
+    ctx.shadowBlur = (wallShadowBlur ?? 0) / zoom;
+    ctx.shadowOffsetX = (wallShadowOffsetX ?? 0) / zoom;
+    ctx.shadowOffsetY = (wallShadowOffsetY ?? 0) / zoom;
+    ctx.beginPath();
+    ctx.moveTo(wallPoints[0].x, wallPoints[0].y);
+    for (let i = 1; i < wallPoints.length; i++) ctx.lineTo(wallPoints[i].x, wallPoints[i].y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Main stroke ─────────────────────────────────────────────────────────────
   ctx.strokeStyle = isObstacle ? '#f97316' : (strokeColor || '#ef4444');
-  ctx.lineWidth = (isObstacle ? 1.5 : 2) / zoom;
+  ctx.lineWidth = isObstacle ? 1.5 / zoom : effectiveStrokeWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.setLineDash(isObstacle ? [6 / zoom, 4 / zoom] : []);
-  ctx.globalAlpha = 0.7;
-  
+  ctx.globalAlpha = isPlayMode ? (mapObject.opacity ?? 0.9) : 0.7;
+
   ctx.beginPath();
   ctx.moveTo(wallPoints[0].x, wallPoints[0].y);
-  for (let i = 1; i < wallPoints.length; i++) {
-    ctx.lineTo(wallPoints[i].x, wallPoints[i].y);
-  }
+  for (let i = 1; i < wallPoints.length; i++) ctx.lineTo(wallPoints[i].x, wallPoints[i].y);
   ctx.stroke();
-  
-  // Draw vertex handles
+
+  // ── Vertex handles (DM/edit view only — hidden from players) ───────────────────
+  if (isPlayMode) {
+    ctx.restore();
+    return;
+  }
+
   ctx.setLineDash([]);
   const isEditable = !locked && selected;
-  
+
+  // Colorblind-safe terminal node colors (Okabe & Ito palette):
+  //   Start → teal-green  #009E73  (safe for deuteranopia & protanopia)
+  //   Stop  → vermillion  #D55E00  (distinguishable from green even in grayscale)
+  const COLOR_START = '#009E73';
+  const COLOR_STOP  = '#D55E00';
+
   for (let i = 0; i < wallPoints.length; i++) {
     const point = wallPoints[i];
+    const isStart = i === 0;
+    const isEnd   = i === wallPoints.length - 1;
+    const terminalColor = isStart ? COLOR_START : (isEnd ? COLOR_STOP : null);
+
     if (isEditable) {
-      // Draggable handles - larger, filled with white, blue border
-      const handleRadius = 5 / zoom;
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#3b82f6';
+      // Terminal nodes: color-coded, slightly larger
+      const handleRadius = terminalColor ? 7 / zoom : 5 / zoom;
+      ctx.fillStyle = terminalColor ?? '#ffffff';
+      ctx.strokeStyle = terminalColor ? '#ffffff' : '#3b82f6';
       ctx.lineWidth = 2 / zoom;
       ctx.globalAlpha = 1;
       ctx.beginPath();
@@ -427,16 +572,16 @@ function renderWallShape(
       ctx.fill();
       ctx.stroke();
     } else {
-      // Small dots at vertices (non-editable)
-      ctx.fillStyle = isObstacle ? '#f97316' : (strokeColor || '#ef4444');
+      // Small dots at vertices (non-editable) — terminals still color-coded
+      ctx.fillStyle = terminalColor ?? (isObstacle ? '#f97316' : (strokeColor || '#ef4444'));
       ctx.globalAlpha = 0.7;
-      const dotRadius = 3 / zoom;
+      const dotRadius = terminalColor ? 4 / zoom : 3 / zoom;
       ctx.beginPath();
       ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-  
+
   ctx.restore();
 }
 

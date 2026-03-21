@@ -132,6 +132,14 @@ export const JazzMapObject = co.map({
   customPathJson: z.optional(z.string()),
   wallPointsJson: z.optional(z.string()),
   doorDirectionJson: z.optional(z.string()),
+  /**
+   * JSON blob for wall visual styling (strokeColor, strokeWidth, wallShadow*, wallVisibleInPlay).
+   * Using a single blob avoids repeated schema migrations when new styling fields are added.
+   * Only written when styling changes (infrequent), not during drag.
+   */
+  wallStyleJson: z.optional(z.string()),
+  /** Full IlluminationSource config for light-category map objects, serialized as JSON. */
+  illuminationSourceJson: z.optional(z.string()),
 });
 export type JazzMapObject = co.loaded<typeof JazzMapObject>;
 

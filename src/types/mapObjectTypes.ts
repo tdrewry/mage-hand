@@ -51,6 +51,17 @@ export interface MapObject {
   
   // Wall-specific properties (polyline shape)
   wallPoints?: { x: number; y: number }[]; // Points defining the wall polyline
+
+  // Wall stroke shadow — decorative shadow drawn behind the wall line
+  wallShadowColor?: string;   // CSS color (default: no shadow)
+  wallShadowBlur?: number;    // Shadow blur radius in px (default: 0)
+  wallShadowOffsetX?: number; // Shadow x offset in px (default: 0)
+  wallShadowOffsetY?: number; // Shadow y offset in px (default: 0)
+  wallShadowOpacity?: number; // Shadow opacity 0–1 (default: 1)
+
+  // When true, this wall's decorative stroke (color/width/shadow) is rendered in play mode.
+  // Default: false (walls are invisible to players). Edit-mode wire-frame always hidden from players.
+  wallVisibleInPlay?: boolean;
   
   // Light-specific properties (legacy — shallow fields)
   // DEPRECATED: use illuminationSource for new objects. These are kept for backward compatibility only.

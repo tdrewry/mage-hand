@@ -585,6 +585,17 @@ function mapObjectToJazzInit(obj: MapObject): Record<string, any> {
     customPathJson: obj.customPath ? JSON.stringify(obj.customPath) : undefined,
     wallPointsJson: obj.wallPoints ? JSON.stringify(obj.wallPoints) : undefined,
     doorDirectionJson: obj.doorDirection ? JSON.stringify(obj.doorDirection) : undefined,
+    // Wall visual styling — packed as a single blob to avoid schema migrations
+    wallStyleJson: (obj.shape === 'wall' || obj.shape === 'door') ? JSON.stringify({
+      strokeColor: obj.strokeColor,
+      strokeWidth: obj.strokeWidth,
+      wallShadowColor: obj.wallShadowColor,
+      wallShadowBlur: obj.wallShadowBlur,
+      wallShadowOffsetX: obj.wallShadowOffsetX,
+      wallShadowOffsetY: obj.wallShadowOffsetY,
+      wallShadowOpacity: obj.wallShadowOpacity,
+      wallVisibleInPlay: obj.wallVisibleInPlay,
+    }) : undefined,
   };
 }
 
@@ -593,9 +604,11 @@ function jazzToZustandMapObject(jmo: any): MapObject {
   let customPath: { x: number; y: number }[] | undefined;
   let wallPoints: { x: number; y: number }[] | undefined;
   let doorDirection: { x: number; y: number } | undefined;
+  let wallStyle: Record<string, any> = {};
   try { if (jmo.customPathJson) customPath = JSON.parse(jmo.customPathJson); } catch { /* */ }
   try { if (jmo.wallPointsJson) wallPoints = JSON.parse(jmo.wallPointsJson); } catch { /* */ }
   try { if (jmo.doorDirectionJson) doorDirection = JSON.parse(jmo.doorDirectionJson); } catch { /* */ }
+  try { if (jmo.wallStyleJson) wallStyle = JSON.parse(jmo.wallStyleJson); } catch { /* */ }
 
   return {
     id: jmo.objectId,
@@ -639,6 +652,18 @@ function jazzToZustandMapObject(jmo: any): MapObject {
     customPath,
     wallPoints,
     doorDirection,
+    // Wall visual styling — override schema-level strokeColor/Width with wallStyleJson values
+    // (wallStyleJson takes precedence since it's what the Stroke popover writes)
+    ...(Object.keys(wallStyle).length > 0 ? {
+      strokeColor: wallStyle.strokeColor ?? jmo.strokeColor,
+      strokeWidth: wallStyle.strokeWidth ?? jmo.strokeWidth,
+      wallShadowColor: wallStyle.wallShadowColor,
+      wallShadowBlur: wallStyle.wallShadowBlur,
+      wallShadowOffsetX: wallStyle.wallShadowOffsetX,
+      wallShadowOffsetY: wallStyle.wallShadowOffsetY,
+      wallShadowOpacity: wallStyle.wallShadowOpacity,
+      wallVisibleInPlay: wallStyle.wallVisibleInPlay,
+    } : {}),
     selected: false,
   };
 }

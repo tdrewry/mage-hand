@@ -31,7 +31,7 @@ import { emitLocalOp } from "@/lib/net";
 import { markTokenDragStart, markTokenDragEnd, flushPendingSync } from "@/lib/jazz/bridge";
 import { emitDragBegin, emitDragUpdate, emitDragEnd } from "@/lib/net/dragOps";
 import { markDraggedForSync, unmarkDraggedForSync } from "@/lib/net/tokenPositionSync";
-import { useMapStore } from "../stores/mapStore";
+import { useMapStore, getComputedBounds } from "../stores/mapStore";
 import { useRegionStore, type CanvasRegion } from "../stores/regionStore";
 import { useDungeonStore } from "../stores/dungeonStore";
 import { useInitiativeStore } from "../stores/initiativeStore";
@@ -43,7 +43,7 @@ import {
   renderDungeonMapRegions,
   renderDungeonMapDoors,
 } from "../lib/dungeonRenderer";
-import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, findWallVertexAtPoint, findNearestWallSegmentPoint, triggerDoorAnimation } from "../lib/mapObjectRenderer";
+import { renderMapObjects, renderMapObjectShadows, findMapObjectAtPoint, findWallVertexAtPoint, findNearestWallSegmentPoint, triggerDoorAnimation, drawWallTransformHandles, getWallAABB } from "../lib/mapObjectRenderer";
 import { MapObjectControlBar } from "./MapObjectControlBar";
 import { generateNegativeSpaceRegion, mapObjectsToSegments } from "../lib/wallGeometry";
 import {
@@ -1054,8 +1054,16 @@ export const SimpleTabletop = () => {
   const [draggedMapObjectId, setDraggedMapObjectId] = useState<string | null>(null);
   const [mapObjectDragOffset, setMapObjectDragOffset] = useState({ x: 0, y: 0 });
 
-  // MapObject active tool: 'drag' | 'rotate' | 'points'
-  const [mapObjectTool, setMapObjectTool] = useState<'drag' | 'rotate' | 'points'>('drag');
+  // MapObject active tool: 'drag' | 'rotate' | 'scale' | 'points'
+  const [mapObjectTool, setMapObjectToolState] = useState<'drag' | 'rotate' | 'scale' | 'points'>('drag');
+  // Ref mirror — readable inside redrawCanvas without stale-closure issues
+  const mapObjectToolRef = useRef<'drag' | 'rotate' | 'scale' | 'points'>('drag');
+  const setMapObjectTool = (tool: 'drag' | 'rotate' | 'scale' | 'points') => {
+    mapObjectToolRef.current = tool;
+    setMapObjectToolState(tool);
+  };
+  // Keep ref in sync if state is reset externally (e.g., selection change resets to 'drag')
+  useEffect(() => { mapObjectToolRef.current = mapObjectTool; }, [mapObjectTool]);
 
   // MapObject rotation drag state
   const [isRotatingMapObject, setIsRotatingMapObject] = useState(false);
@@ -1072,6 +1080,20 @@ export const SimpleTabletop = () => {
     width: number;
     height: number;
     rotation: number;
+  } | null>(null);
+
+  // Wall transform snapshots (separate from mapObjectResizeSnapshot which only handles width/height/position)
+  const wallScaleSnapshotRef = useRef<{
+    id: string;
+    wallPoints: { x: number; y: number }[];
+    aabb: import('@/lib/mapObjectRenderer').WallAABB;
+    strokeWidth: number;
+  } | null>(null);
+  const wallRotateSnapshotRef = useRef<{
+    id: string;
+    wallPoints: { x: number; y: number }[];
+    cx: number; cy: number;
+    startAngle: number;
   } | null>(null);
 
   // Wall vertex dragging state
@@ -3455,18 +3477,18 @@ export const SimpleTabletop = () => {
       const mapObjectSegments = mapObjectsToSegments(mapObjects);
       combinedSegmentsRef.current = [...wallGeometry.wallSegments, ...mapObjectSegments, ...importedWallSegments];
     } else {
-      // Generate new decorations and cache them.
-      // Build extra bounds points so the outer wall bounding box encompasses ALL content.
-      // Without this, anything outside region bounds causes the visibility engine to treat
-      // the region boundary corner as an invisible occluder (producing hard light cutoffs
-      // and 45-degree diagonal clipping near bounding-box corners).
+      // Build extra bounds points so the outer wall bounding box encompasses ALL light radii.
+      // IMPORTANT — we deliberately EXCLUDE raw token positions.
+      // Token positions are volatile (move every drag frame) and should NOT drive the wall
+      // geometry bounding box.  Instead we expand by each token's illumination/vision radius
+      // so the bounding box is large enough for light discs without being token-position-dependent.
       //
       // We include:
       //  • Map object positions (walls, obstacles, doors)
-      //  • Map object LIGHT RADII — the bounding box must reach the outer edge of each
-      //    light's illumination circle, not just its center
-      //  • Token positions — tokens near a bounding-box corner get 45° shadow artifacts
-      //  • LightStore light positions + radii
+      //  • Map object LIGHT RADII — use illuminationSource.range when available; fall back to lightRadius
+      //  • Token ILLUMINATION RADII — the 4 radius-edge points from each emitting token so lightdiscs don't clip
+      //  • Token VISION RANGES — same treatment for vision-based tokens to prevent 45° artifacts
+      //  • LightStore/IlluminationStore light positions + radii
       const extraBoundsPoints: { x: number; y: number }[] = [];
 
       for (const mo of mapObjects) {
@@ -3476,23 +3498,54 @@ export const SimpleTabletop = () => {
         } else {
           // Non-wall: include center
           extraBoundsPoints.push(mo.position);
-          // If it's a light object, also include its four radius-edge points so the
-          // outer bounding box extends to the full illumination circle
-          if (mo.category === 'light' && mo.lightRadius) {
-            const r = mo.lightRadius;
-            extraBoundsPoints.push(
-              { x: mo.position.x - r, y: mo.position.y },
-              { x: mo.position.x + r, y: mo.position.y },
-              { x: mo.position.x, y: mo.position.y - r },
-              { x: mo.position.x, y: mo.position.y + r },
-            );
+          // If it's a light object, include its illumination circle edge points
+          // Prefer the new illuminationSource field; fall back to legacy lightRadius
+          if (mo.category === 'light') {
+            const moRange = mo.illuminationSource ? mo.illuminationSource.range * 50 : (mo.lightRadius ?? 0);
+            if (moRange > 0) {
+              const r = moRange;
+              extraBoundsPoints.push(
+                { x: mo.position.x - r, y: mo.position.y },
+                { x: mo.position.x + r, y: mo.position.y },
+                { x: mo.position.x, y: mo.position.y - r },
+                { x: mo.position.x, y: mo.position.y + r },
+              );
+            }
           }
         }
       }
 
-      // Include token positions so tokens near the boundary don't get 45° clipping
+      // Tokens: expand by illumination radius or vision range — NOT by raw position.
+      // This prevents bounds from shifting on every token drag while still ensuring
+      // the bounding box is large enough to contain each token's full light disc.
       for (const token of tokens) {
-        extraBoundsPoints.push({ x: token.x, y: token.y });
+        const illuRange = token.illuminationSources?.[0]?.range;
+        if (illuRange) {
+          // Convert grid units → pixels (50px per grid unit default)
+          const tokenRegion = regions.find(
+            (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height
+          );
+          const gs = tokenRegion?.gridSize ?? 50;
+          const r = illuRange * gs;
+          extraBoundsPoints.push(
+            { x: token.x - r, y: token.y },
+            { x: token.x + r, y: token.y },
+            { x: token.x, y: token.y - r },
+            { x: token.x, y: token.y + r },
+          );
+        } else if (token.visionRange) {
+          const tokenRegion = regions.find(
+            (r) => token.x >= r.x && token.x <= r.x + r.width && token.y >= r.y && token.y <= r.y + r.height
+          );
+          const gs = tokenRegion?.gridSize ?? 50;
+          const r = token.visionRange * gs;
+          extraBoundsPoints.push(
+            { x: token.x - r, y: token.y },
+            { x: token.x + r, y: token.y },
+            { x: token.x, y: token.y - r },
+            { x: token.x, y: token.y + r },
+          );
+        }
       }
 
       // Include LightStore lights (position + radius)
@@ -3592,15 +3645,22 @@ export const SimpleTabletop = () => {
     //   ctx.globalAlpha = 1.0;
     // }
 
-    // Draw the base wall with red outline in edit mode only
-    if (wallGeometry && !isPlayMode) {
-      ctx.save();
-      ctx.globalAlpha = 0.2;
-      ctx.strokeStyle = "#ff6b6b";
-      ctx.lineWidth = 2 / transform.zoom;
-      const bounds = wallGeometry.bounds;
-      ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-      ctx.restore();
+    // Draw bounds margin indicator in edit mode only.
+    // Uses getComputedBounds so the rectangle matches what the user controls in Map Manager
+    // (region polygon vertex bounding box + boundsMargin), NOT the raw wall geometry box.
+    if (!isPlayMode) {
+      const activeMaps = maps.filter(m => m.active);
+      for (const activeMap of activeMaps) {
+        if (activeMap.regions.length === 0) continue;
+        const cb = getComputedBounds(activeMap);
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2 / transform.zoom;
+        ctx.setLineDash([8 / transform.zoom, 4 / transform.zoom]);
+        ctx.strokeRect(cb.x, cb.y, cb.width, cb.height);
+        ctx.restore();
+      }
     }
 
     // Draw cached wall with texture and decorations
@@ -3737,6 +3797,16 @@ export const SimpleTabletop = () => {
       }
     }
 
+
+
+    // Draw wall transform handles (rotate/scale) when a wall is selected in edit mode
+    if (renderingMode === 'edit' && selectedMapObjectIds.length === 1 &&
+        (mapObjectToolRef.current === 'rotate' || mapObjectToolRef.current === 'scale')) {
+      const selWall = mapObjects.find(o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape === 'wall');
+      if (selWall && selWall.wallPoints) {
+        drawWallTransformHandles(ctx, selWall.wallPoints, mapObjectToolRef.current as 'rotate' | 'scale', transform.zoom);
+      }
+    }
 
     // Draw the single shared group rotation handle for any selected grouped entities (edit mode only).
     // Each group only gets one handle even if multiple members are selected.
@@ -8301,8 +8371,34 @@ export const SimpleTabletop = () => {
           setIsMarqueeSelecting(true);
         }
       } else {
-        // Clicked on empty space
-        if (e.shiftKey && renderingMode === 'edit') {
+        // Clicked on empty space — but first check if any selected wall's transform handle was clicked
+        // (handles float outside the wall body so findMapObjectAtPoint misses them)
+        const wallHandleWasHit = (() => {
+          if (renderingMode !== 'edit' || selectedMapObjectIds.length !== 1) return false;
+          const tool = mapObjectToolRef.current;
+          if (tool !== 'rotate' && tool !== 'scale') return false;
+          const selWall = mapObjects.find(o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape === 'wall');
+          if (!selWall?.wallPoints) return false;
+          const wallAabb = getWallAABB(selWall.wallPoints);
+          if (!wallAabb) return false;
+          const { minX, minY, maxX, maxY, cx, cy } = wallAabb;
+          if (tool === 'rotate') {
+            const handleY = minY - 30 / transform.zoom;
+            return Math.hypot(worldPos.x - cx, worldPos.y - handleY) <= 10 / transform.zoom;
+          }
+          // scale: 8 square handles
+          const hs = 5 / transform.zoom + 10 / transform.zoom;
+          const handles = [
+            { x: minX, y: minY }, { x: cx, y: minY }, { x: maxX, y: minY },
+            { x: maxX, y: cy  }, { x: maxX, y: maxY }, { x: cx, y: maxY },
+            { x: minX, y: maxY}, { x: minX, y: cy  },
+          ];
+          return handles.some(h => Math.abs(worldPos.x - h.x) <= hs && Math.abs(worldPos.y - h.y) <= hs);
+        })();
+
+        if (wallHandleWasHit) {
+          // Click consumed by wall transform handle hit-test above — do not deselect
+        } else if (e.shiftKey && renderingMode === 'edit') {
           // Shift+click in edit mode: add token at clicked position
           addTokenToCanvas("", worldPos.x, worldPos.y);
         } else if (renderingMode === 'edit') {
@@ -8969,6 +9065,7 @@ export const SimpleTabletop = () => {
       // If no map object was found at the click point, check if the click landed on the
       // rotation or scale handles of the currently-selected map object.  Those handles
       // are rendered outside the object's bounding box so findMapObjectAtPoint misses them.
+      // Wall rotate/scale tool — hit-test the transform handles for selected walls
       if (!clickedMapObject && renderingMode === 'edit' && selectedMapObjectIds.length === 1) {
         const selMObj = mapObjects.find(
           o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape !== 'wall' &&
@@ -8979,6 +9076,32 @@ export const SimpleTabletop = () => {
           const overScale = !overRot && getMapObjectScaleHandle(selMObj, worldPos.x, worldPos.y) !== null;
           if (overRot || overScale) {
             clickedMapObject = selMObj;
+          }
+        }
+        // Wall transform handle hit-testing
+        const selWall = mapObjects.find(
+          o => o.id === selectedMapObjectIds[0] && !o.locked && o.shape === 'wall'
+        );
+        if (selWall && selWall.wallPoints && (mapObjectTool === 'rotate' || mapObjectTool === 'scale')) {
+          const wallAabb = getWallAABB(selWall.wallPoints);
+          if (wallAabb) {
+            const HIT = 10 / transform.zoom;
+            const hs = 5 / transform.zoom;
+            const { minX, minY, maxX, maxY, cx, cy } = wallAabb;
+            let hitWall = false;
+            if (mapObjectTool === 'rotate') {
+              const handleY = minY - 30 / transform.zoom;
+              const dx = worldPos.x - cx; const dy = worldPos.y - handleY;
+              hitWall = Math.hypot(dx, dy) <= 8 / transform.zoom;
+            } else {
+              const handles = [
+                { x: minX, y: minY }, { x: cx, y: minY }, { x: maxX, y: minY },
+                { x: maxX, y: cy }, { x: maxX, y: maxY }, { x: cx, y: maxY },
+                { x: minX, y: maxY }, { x: minX, y: cy },
+              ];
+              hitWall = handles.some(h => Math.abs(worldPos.x - h.x) <= hs + HIT && Math.abs(worldPos.y - h.y) <= hs + HIT);
+            }
+            if (hitWall) clickedMapObject = selWall;
           }
         }
       }
@@ -9117,7 +9240,10 @@ export const SimpleTabletop = () => {
           return; // Don't start dragging in point edit mode
         }
         // Check for wall vertex drag first (before general MapObject drag)
-        const vertexHit = findWallVertexAtPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom);
+        // Skip vertex drag when in rotate or scale mode — those handle their own interaction
+        const vertexHit = (mapObjectTool !== 'rotate' && mapObjectTool !== 'scale')
+          ? findWallVertexAtPoint(worldPos.x, worldPos.y, mapObjects, transform.zoom)
+          : null;
         if (vertexHit && renderingMode === "edit") {
           setIsDraggingVertex(true);
           setDraggedVertexInfo(vertexHit);
@@ -9125,7 +9251,56 @@ export const SimpleTabletop = () => {
           // ── PRIORITY: rotation handle → scale handles → drag ──────────────
           const isWallObj = clickedMapObject.shape === 'wall';
 
-          if (!isWallObj && isOverMapObjectRotationHandle(clickedMapObject, worldPos.x, worldPos.y)) {
+          if (isWallObj && mapObjectTool === 'rotate') {
+            // Wall rotate — compute centroid from AABB, record snapshot + start angle
+            const aabb2 = getWallAABB(clickedMapObject.wallPoints!);
+            if (aabb2) {
+              const startAngle = Math.atan2(worldPos.y - aabb2.cy, worldPos.x - aabb2.cx) * 180 / Math.PI;
+              wallRotateSnapshotRef.current = {
+                id: clickedMapObject.id,
+                wallPoints: clickedMapObject.wallPoints!.map(p => ({ ...p })),
+                cx: aabb2.cx,
+                cy: aabb2.cy,
+                startAngle,
+              };
+              setIsRotatingMapObject(true);
+              setRotatingMapObjectId(clickedMapObject.id);
+              const mobjRotSnap2: typeof groupSiblingSnapshotsRef.current = {};
+              mobjRotSnap2[clickedMapObject.id] = {
+                type: 'mapObject',
+                wallPoints: clickedMapObject.wallPoints!.map(p => ({ ...p })),
+              };
+              groupSiblingSnapshotsRef.current = mobjRotSnap2;
+              groupRotationPivotRef.current = { x: aabb2.cx, y: aabb2.cy };
+              setMapObjectRotationStartAngle(startAngle);
+              setMapObjectRotationStartValue(0);
+            }
+          } else if (isWallObj && mapObjectTool === 'scale') {
+            // Wall scale — snapshot the wallPoints and AABB
+            const aabb3 = getWallAABB(clickedMapObject.wallPoints!);
+            if (aabb3) {
+              const hs = 5 / transform.zoom;
+              const HIT = 10 / transform.zoom;
+              const { minX, minY, maxX, maxY, cx, cy } = aabb3;
+              const handles = [
+                { name: 'nw', x: minX, y: minY }, { name: 'n', x: cx, y: minY }, { name: 'ne', x: maxX, y: minY },
+                { name: 'e',  x: maxX, y: cy  },
+                { name: 'se', x: maxX, y: maxY }, { name: 's', x: cx, y: maxY }, { name: 'sw', x: minX, y: maxY },
+                { name: 'w',  x: minX, y: cy  },
+              ];
+              const hit = handles.find(h => Math.abs(worldPos.x - h.x) <= hs + HIT && Math.abs(worldPos.y - h.y) <= hs + HIT);
+              if (hit) {
+                wallScaleSnapshotRef.current = {
+                  id: clickedMapObject.id,
+                  wallPoints: clickedMapObject.wallPoints!.map(p => ({ ...p })),
+                  aabb: aabb3,
+                  strokeWidth: clickedMapObject.strokeWidth ?? 2,
+                };
+                setIsResizingMapObject(true);
+                setMapObjectResizeHandle(hit.name);
+              }
+            }
+          } else if (!isWallObj && isOverMapObjectRotationHandle(clickedMapObject, worldPos.x, worldPos.y)) {
             // Start rotation (handle always visible in edit mode)
             setIsRotatingMapObject(true);
             setRotatingMapObjectId(clickedMapObject.id);
@@ -9779,9 +9954,54 @@ export const SimpleTabletop = () => {
         });
       }
       redrawCanvas();
-    } else if (isResizingMapObject && mapObjectResizeHandle && mapObjectResizeSnapshot) {
+    } else if (isResizingMapObject && mapObjectResizeHandle) {
       // ── Map object scale/resize drag ────────────────────────────────────────
       const worldPos = screenToWorld(mouseX, mouseY);
+
+      // ── Wall scale: remap vertices from normalised AABB space ──────────────
+      if (wallScaleSnapshotRef.current && wallScaleSnapshotRef.current.id) {
+        const { id, wallPoints: snapPts, aabb } = wallScaleSnapshotRef.current;
+        const { minX, minY, maxX, maxY } = aabb;
+        let newMinX = minX, newMaxX = maxX, newMinY = minY, newMaxY = maxY;
+        switch (mapObjectResizeHandle) {
+          case 'nw': newMinX = worldPos.x; newMinY = worldPos.y; break;
+          case 'n':  newMinY = worldPos.y; break;
+          case 'ne': newMaxX = worldPos.x; newMinY = worldPos.y; break;
+          case 'e':  newMaxX = worldPos.x; break;
+          case 'se': newMaxX = worldPos.x; newMaxY = worldPos.y; break;
+          case 's':  newMaxY = worldPos.y; break;
+          case 'sw': newMinX = worldPos.x; newMaxY = worldPos.y; break;
+          case 'w':  newMinX = worldPos.x; break;
+        }
+        const origW = maxX - minX || 1;
+        const origH = maxY - minY || 1;
+        const newW  = Math.max(4, newMaxX - newMinX);
+        const newH  = Math.max(4, newMaxY - newMinY);
+        const newPts = snapPts.map(p => ({
+          x: newMinX + ((p.x - minX) / origW) * newW,
+          y: newMinY + ((p.y - minY) / origH) * newH,
+        }));
+        const xs = newPts.map(p => p.x); const ys = newPts.map(p => p.y);
+        // Scale strokeWidth proportionally using geometric mean of X/Y scale factors
+        // so line weight stays visually consistent as the wall is resized.
+        const scaleX = newW / origW;
+        const scaleY = newH / origH;
+        const scaleFactor = Math.sqrt(scaleX * scaleY);
+        const obj = mapObjects.find(o => o.id === id);
+        const origStrokeWidth = wallScaleSnapshotRef.current!.strokeWidth ?? obj?.strokeWidth ?? 2;
+        const newStrokeWidth = Math.max(0.5, Math.min(48, origStrokeWidth * scaleFactor));
+        updateMapObject(id, {
+          wallPoints: newPts,
+          position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+          width:  Math.max(Math.max(...xs) - Math.min(...xs), 1),
+          height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
+          strokeWidth: newStrokeWidth,
+        });
+        redrawCanvas();
+        return;
+      }
+
+      if (!mapObjectResizeSnapshot) { redrawCanvas(); return; }
       const snap = mapObjectResizeSnapshot;
       const rotation = snap.rotation;
       const rad = -(rotation * Math.PI) / 180; // un-rotate mouse into local space
@@ -11168,6 +11388,7 @@ export const SimpleTabletop = () => {
       if (isResizingMapObject) {
         setIsResizingMapObject(false);
         setMapObjectResizeHandle(null);
+        wallScaleSnapshotRef.current = null;
         setMapObjectResizeSnapshot(null);
         notifyObstaclesChanged();
         redrawCanvas();
