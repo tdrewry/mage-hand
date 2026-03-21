@@ -3,7 +3,7 @@ import type { ITransport, TransportEvents, TransportState } from "../../../../ne
 import type { JazzSessionRoot, JazzSignalingRoom } from "../../jazz/schema";
 import type { ClientToServerMessage, ServerToClientMessage } from "../../../../networking/contract/v1";
 import { useMultiplayerStore } from "../../../stores/multiplayerStore";
-import { useNetworkDiagnosticsStore } from "@/stores/networkDiagnosticsStore";
+import { useNetworkDiagnosticsStore, registerPeerConnection, unregisterPeerConnection } from "@/stores/networkDiagnosticsStore";
 
 const STUN_SERVERS = {
   iceServers: [
@@ -108,6 +108,7 @@ export class WebRTCTransport implements ITransport {
     for (const [peerId, pc] of this.peerConnections.entries()) {
         pc.close();
         store.removeWebRtcConnection(peerId);
+        unregisterPeerConnection(peerId);
     }
     this.peerConnections.clear();
     this.dataChannels.clear();
@@ -116,6 +117,7 @@ export class WebRTCTransport implements ITransport {
         this.hostConnection.close();
         const hostId = (this.sessionRoot.signalingRoom as any)?.hostId || "host";
         store.removeWebRtcConnection(hostId);
+        unregisterPeerConnection(hostId);
         this.hostConnection = undefined;
         this.hostDataChannel = undefined;
     }
@@ -175,6 +177,7 @@ export class WebRTCTransport implements ITransport {
                      console.log(`[WebRTCTransport] Zombie peer ${clientId} (${existingPc.connectionState}). Re-initiating.`);
                      existingPc.close();
                      this.peerConnections.delete(clientId);
+                     unregisterPeerConnection(clientId);
                      this.dataChannels.delete(clientId);
                      useMultiplayerStore.getState().removeWebRtcConnection(clientId);
                      useNetworkDiagnosticsStore.getState().updatePeer(clientId, { isHost: false, stage: 'signal_offer' });
@@ -217,6 +220,7 @@ export class WebRTCTransport implements ITransport {
                    if (pc) {
                      pc.close();
                      this.peerConnections.delete(clientId);
+                     unregisterPeerConnection(clientId);
                      this.dataChannels.delete(clientId);
                      useMultiplayerStore.getState().removeWebRtcConnection(clientId);
                    }
@@ -257,6 +261,7 @@ export class WebRTCTransport implements ITransport {
               const pc = this.peerConnections.get(clientId);
               if (pc) pc.close();
               this.peerConnections.delete(clientId);
+              unregisterPeerConnection(clientId);
               this.dataChannels.delete(clientId);
               useMultiplayerStore.getState().removeWebRtcConnection(clientId);
               
@@ -299,6 +304,7 @@ export class WebRTCTransport implements ITransport {
 
     const pc = new RTCPeerConnection(STUN_SERVERS);
     this.peerConnections.set(clientId, pc);
+    registerPeerConnection(clientId, pc);
 
     const updateSignalRoom = (mutator: (current: SignalingData) => void) => {
       try {
@@ -388,6 +394,7 @@ export class WebRTCTransport implements ITransport {
 
        if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
           this.peerConnections.delete(clientId);
+          unregisterPeerConnection(clientId);
           this.dataChannels.delete(clientId);
        }
     };
@@ -490,6 +497,7 @@ export class WebRTCTransport implements ITransport {
          if (this.lastHostOfferSdp && this.lastHostOfferSdp !== sigData.offer.sdp) {
              console.log("[WebRTCTransport] Detected new Host offer! Host likely refreshed. Tearing down stale connection.");
              this.hostConnection.close();
+             unregisterPeerConnection(sigData.hostId);
              this.hostConnection = undefined;
              this.hostDataChannel = undefined;
              this.lastHostOfferSdp = undefined;
@@ -499,6 +507,7 @@ export class WebRTCTransport implements ITransport {
      if (!this.hostConnection) {
          this.lastHostOfferSdp = sigData.offer.sdp;
          this.hostConnection = new RTCPeerConnection(STUN_SERVERS);
+         registerPeerConnection(sigData.hostId, this.hostConnection);
          
          const updateSignalRoom = (mutator: (current: SignalingData) => void) => {
             try {
@@ -600,6 +609,7 @@ export class WebRTCTransport implements ITransport {
              }
              
              if (this.hostConnection?.connectionState === "disconnected" || this.hostConnection?.connectionState === "failed") {
+                 unregisterPeerConnection(sigData.hostId);
                  this.hostConnection = undefined;
                  this.hostDataChannel = undefined;
              }

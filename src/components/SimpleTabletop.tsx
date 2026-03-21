@@ -710,8 +710,11 @@ export const SimpleTabletop = () => {
 
   // ── Listen for remote drag updates to trigger canvas repaint ──
   useEffect(() => {
-    const unsub = ephemeralBus.on("remote.drag.update", () => {
-      scheduleRedraw();
+    const unsub = useRemoteDragStore.subscribe((state, prevState) => {
+      // Only schedule redraw if the drags object actually changed
+      if (state.drags !== prevState.drags) {
+        scheduleRedraw();
+      }
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps

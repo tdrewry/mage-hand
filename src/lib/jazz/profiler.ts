@@ -5,11 +5,54 @@
  * bandwidth usage for cost-analysis and optimization.
  */
 
+import { metricsDb } from '@/lib/db/metricsDb';
+import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
+
+export type ProfilerSeverity = 'warning' | 'critical';
+
+export interface ProfilerAlert {
+  severity: ProfilerSeverity;
+  message: string;
+}
+
+export type AlertCallback = (payload: ProfilerAlert) => void;
+
 class SyncProfiler {
   private outKb = 0;
   private inKb = 0;
   private outOps = 0;
   private inOps = 0;
+
+  public sessionId: string = typeof crypto !== 'undefined' && crypto.randomUUID 
+    ? crypto.randomUUID() 
+    : Date.now().toString(36);
+  public role: 'host' | 'client' = 'client';
+
+  public setRole(role: 'host' | 'client') {
+    this.role = role;
+  }
+  
+  // Budget Tracking
+  public sessionBudgetMax = 100000;
+  public totalOutOps = 0;
+
+  public get sessionBudgetConsumedPct(): number {
+    return (this.totalOutOps / this.sessionBudgetMax) * 100;
+  }
+
+  // Event Emitter for Alerts
+  private alertListeners: AlertCallback[] = [];
+
+  public onAlert(callback: AlertCallback) {
+    this.alertListeners.push(callback);
+    return () => {
+      this.alertListeners = this.alertListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  private fireAlert(alert: ProfilerAlert) {
+    this.alertListeners.forEach(cb => cb(alert));
+  }
   
   // Jazz Billing Metrics
   public activeDOs = 0;      // Roughly correlates to unique CoValues modified/watched
@@ -23,6 +66,9 @@ class SyncProfiler {
   
   // Store historical data for export
   public history: { timestamp: string, outKb: string, inKb: string, outOps: number, inOps: number, activeDOs: number, streamOutKb: string, streamInKb: string }[] = [];
+  
+  // Keep rolling array of last 6 windows (60 seconds) for UI polling
+  public rollingWindows: { timestamp: string, outKb: string, inKb: string, outOps: number, inOps: number, activeDOs: number, streamOutKb: string, streamInKb: string }[] = [];
 
   start() {
     if (this.intervalId) return;
@@ -52,6 +98,7 @@ class SyncProfiler {
       const size = this.approximateSize(patch);
       this.outKb += size / 1024;
       this.outOps++;
+      this.totalOutOps++;
       
       // Track DO allocations (roughly counting unique entities)
       if (patch && patch.id && !this._trackedDOs.has(patch.id)) {
@@ -142,9 +189,22 @@ class SyncProfiler {
     const streamOutKb = (this.streamOutBytes / 1024).toFixed(2);
     const streamInKb = (this.streamInBytes / 1024).toFixed(2);
     
-    // Store in history
-    this.history.push({
-      timestamp: new Date().toISOString(),
+    // Evaluate thresholds for alerts (10-second window completes)
+    if (this.outOps > 150) {
+      this.fireAlert({ severity: 'critical', message: `Network Spike Detected: ${this.outOps} ops` });
+    } else if (this.outOps > 80 || this.outKb > 10) {
+      this.fireAlert({ severity: 'warning', message: `High Network Activity: ${this.outOps} ops, ${outKbs} KB` });
+    }
+
+    const tsString = new Date().toISOString();
+
+    // Trigger WebRTC flush immediately so the arrays align on the same heartbeat
+    useNetworkDiagnosticsStore.getState().flushWebRTCStats(tsString).catch(e => {
+      console.warn('[SyncProfiler] Failed to flush WebRTC stats', e);
+    });
+
+    const windowData = {
+      timestamp: tsString,
       outKb: outKbs,
       inKb: inKbs,
       outOps: this.outOps,
@@ -152,8 +212,33 @@ class SyncProfiler {
       activeDOs: this.activeDOs,
       streamOutKb,
       streamInKb
-    });
+    };
+
+    // Store in history
+    this.history.push(windowData);
+
+    // Maintain 60-second rolling window (last 6 samples)
+    this.rollingWindows.push(windowData);
+    if (this.rollingWindows.length > 6) {
+      this.rollingWindows.shift();
+    }
     
+    // Save to IndexedDB quietly
+    metricsDb.profiler_logs.add({
+      sessionId: this.sessionId,
+      role: this.role,
+      timestamp: Date.now(),
+      outKb: parseFloat(outKbs),
+      inKb: parseFloat(inKbs),
+      outOps: this.outOps,
+      inOps: this.inOps,
+      activeDOs: this.activeDOs,
+      streamOutKb: parseFloat(streamOutKb),
+      streamInKb: parseFloat(streamInKb),
+    }).catch(e => {
+      console.warn('[SyncProfiler] Failed to save telemetry to local DB:', e);
+    });
+
     console.log(
       `%c[SyncProfiler] 10s Window: %cOut %c${outKbs} KB%c (${this.outOps} ops) | %cIn %c${inKbs} KB%c (${this.inOps} ops) | %cDOs %c${this.activeDOs}%c | %cSTR Out %c${streamOutKb} KB%c | %cSTR In %c${streamInKb} KB`,
       'color: #888',

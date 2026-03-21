@@ -79,13 +79,11 @@ export function registerTokenHandlers(): void {
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     // Write exclusively to the remote drag state; do NOT mutate durable sessionStore here
     useRemoteDragStore.getState().updateDrag(data.tokenId, data.pos, data.path || []);
-    ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });
 
   ephemeralBus.on("token.drag.end", (data: { tokenId: string }, userId) => {
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     useRemoteDragStore.getState().endDrag(data.tokenId);
-    ephemeralBus.emit("remote.drag.update", { tokenId: data.tokenId });
   });
 
   // ── Staleness auto-clear ──

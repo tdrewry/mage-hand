@@ -13,7 +13,6 @@ export type EphemeralOpKind =
   | "token.drag.begin"
   | "token.drag.update"
   | "token.drag.end"
-  | "remote.drag.update"
   | "token.position.sync"
   | "token.meta.sync"
   // Map & Camera
@@ -509,7 +508,6 @@ export interface EphemeralPayloadMap {
   "token.drag.begin": { tokenId: string; startPos: Vec2; mode?: "freehand" | "directLine" };
   "token.drag.update": { tokenId: string; pos: Vec2; path?: Vec2[] };
   "token.drag.end": { tokenId: string };
-  "remote.drag.update": { tokenId: string };
   "token.position.sync": TokenPositionSyncPayload;
   "token.meta.sync": TokenMetaSyncPayload;
   "map.dm.viewport": DmViewportPayload;
@@ -593,7 +591,6 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "token.drag.begin":       { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.update":      { throttleMs: 50,  ttlMs: 0,    keyStrategy: "entityId" },
   "token.drag.end":         { throttleMs: 0,   ttlMs: 400,  keyStrategy: "entityId" },
-  "remote.drag.update":     { throttleMs: 0,   ttlMs: 0,    keyStrategy: "entityId" },
   "token.position.sync":    { throttleMs: 100, ttlMs: 500,  keyStrategy: "session" },
   "token.meta.sync":        { throttleMs: 200, ttlMs: 2000, keyStrategy: "entityId" },
 
