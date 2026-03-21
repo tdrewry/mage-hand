@@ -2361,7 +2361,6 @@ export const SimpleTabletop = () => {
       // Compute visibility asynchronously
       const computeFog = async () => {
         try {
-          const paper = await import("paper");
           if (!fogScopeRef.current) return;
           fogScopeRef.current.activate();
 
