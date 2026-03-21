@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { LandingScreen } from '@/components/LandingScreen';
+import { WaitingRoomOverlay } from '@/components/WaitingRoomOverlay';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useLaunchStore } from '@/stores/launchStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
@@ -30,6 +31,7 @@ const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
   if (!launched) {
     return (
       <div ref={ref}>
+        <WaitingRoomOverlay />
         <LandingScreen onLaunch={() => setLaunched(true)} hasSession={hasSession} />
       </div>
     );
@@ -37,6 +39,7 @@ const Index = React.forwardRef<HTMLDivElement>((_, ref) => {
 
   return (
     <div ref={ref}>
+      <WaitingRoomOverlay />
       <Suspense fallback={<LoadingScreen />}>
         <SimpleTabletop />
       </Suspense>

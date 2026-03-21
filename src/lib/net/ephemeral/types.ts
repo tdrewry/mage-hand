@@ -82,7 +82,10 @@ export type EphemeralOpKind =
   // Canvas
   | "canvas.forceRedraw"
   | "canvas.edit.begin"
-  | "canvas.edit.end";
+  | "canvas.edit.end"
+  | "canvas.broadcast.pause"
+  | "canvas.broadcast.resume"
+  | "canvas.broadcast.heartbeat";
 
 // ── Payload Interfaces ──────────────────────────────────────────
 
@@ -465,6 +468,23 @@ export interface CanvasEditEndPayload {
   ownerId: string;
 }
 
+/** DM → all: enter paused-broadcast state. All canvas-mutable ephemeral ops suppressed. */
+export interface CanvasBroadcastPausePayload {
+  dmId: string;
+  dmName?: string;
+}
+
+/** DM → all: leave paused-broadcast state; clients re-subscribe to Jazz durable layer. */
+export interface CanvasBroadcastResumePayload {
+  dmId: string;
+}
+
+/** DM → all: liveness ping while paused. Clients use this to drive auto-resume watchdog. */
+export interface CanvasBroadcastHeartbeatPayload {
+  dmId: string;
+  ts: number;
+}
+
 
 // -- Token Position Sync --
 
@@ -543,6 +563,9 @@ export interface EphemeralPayloadMap {
   "canvas.forceRedraw": CanvasForceRedrawPayload;
   "canvas.edit.begin": CanvasEditBeginPayload;
   "canvas.edit.end": CanvasEditEndPayload;
+  "canvas.broadcast.pause": CanvasBroadcastPausePayload;
+  "canvas.broadcast.resume": CanvasBroadcastResumePayload;
+  "canvas.broadcast.heartbeat": CanvasBroadcastHeartbeatPayload;
 }
 
 // ── Ephemeral Config (throttle + TTL per op kind) ───────────────
@@ -655,4 +678,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "canvas.forceRedraw":     { throttleMs: 500, ttlMs: 0,    keyStrategy: "session", dmOnly: true },
   "canvas.edit.begin":      { throttleMs: 0,   ttlMs: 0,    keyStrategy: "session", dmOnly: true },
   "canvas.edit.end":        { throttleMs: 0,   ttlMs: 0,    keyStrategy: "session", dmOnly: true },
+  "canvas.broadcast.pause":     { throttleMs: 0, ttlMs: 0,    keyStrategy: "session", dmOnly: true },
+  "canvas.broadcast.resume":    { throttleMs: 0, ttlMs: 0,    keyStrategy: "session", dmOnly: true },
+  "canvas.broadcast.heartbeat": { throttleMs: 0, ttlMs: 8000, keyStrategy: "session", dmOnly: true },
 };

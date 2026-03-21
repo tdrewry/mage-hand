@@ -42,7 +42,11 @@ export {
   startBridge,
   stopBridge,
   getBridgedSessionRoot,
+  areCanvasSubsPaused,
+  pauseCanvasSubscriptions,
+  resumeCanvasSubscriptions,
 } from "./bridge";
+
 
 // Session management
 export {

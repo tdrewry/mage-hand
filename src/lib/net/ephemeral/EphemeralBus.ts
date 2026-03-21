@@ -28,6 +28,23 @@ export interface EphemeralEvent {
 
 const EPHEMERAL_OP_KINDS = new Set<string>(Object.keys(EPHEMERAL_OP_CONFIG));
 
+/**
+ * Canvas-mutating op kinds that are suppressed while broadcasts are paused.
+ * Chat, actions, presence, initiative, and portal events pass through freely.
+ */
+const CANVAS_MUTABLE_OPS = new Set<EphemeralOpKind>([
+  "region.drag.begin", "region.drag.update", "region.drag.end", "region.handle.preview",
+  "mapObject.drag.begin", "mapObject.drag.update", "mapObject.drag.end",
+  "mapObject.handle.preview", "mapObject.door.preview",
+  "token.drag.begin", "token.drag.update", "token.drag.end",
+  "token.position.sync", "token.meta.sync",
+  "group.drag.preview", "group.drag.end", "group.select.preview",
+  "fog.cursor.preview", "fog.reveal.preview",
+  "map.dm.viewport",
+  "cursor.update",   // hide DM cursor movement from clients during pause
+  "canvas.edit.begin", "canvas.edit.end", "canvas.forceRedraw",
+]);
+
 /** Check if an EngineOp kind is ephemeral. */
 export function isEphemeralOp(kind: string): kind is EphemeralOpKind {
   return EPHEMERAL_OP_KINDS.has(kind);
@@ -73,6 +90,9 @@ export class EphemeralBus {
   /** Callbacks fired whenever the cache changes (for driving reactive stores). */
   private _cacheChangeListeners: Array<(key: string, entry: TTLEntry<EphemeralEvent> | null) => void> = [];
 
+  /** When true, all canvas-mutable ops are dropped in emit() — Pause Broadcasts mode. */
+  private _broadcastPaused = false;
+
   constructor() {
     this.cache = new TTLCache<EphemeralEvent>({
       onChange: (key, entry) => {
@@ -86,6 +106,15 @@ export class EphemeralBus {
   /** Wire the outbound send function (called by NetManager/index after construction). */
   setSendFn(fn: (op: EngineOp) => void): void {
     this._sendFn = fn;
+  }
+
+  /**
+   * Toggle the broadcast-pause gate on the outbound emit path.
+   * When paused, all canvas-mutable ops are silently dropped (never sent to network).
+   * Pause/resume control ops themselves are NOT gated so clients receive the signal.
+   */
+  setBroadcastPaused(paused: boolean): void {
+    this._broadcastPaused = paused;
   }
 
   /** Add a callback for cache changes (for reactive overlay stores). Returns unsubscribe fn. */
@@ -121,6 +150,10 @@ export class EphemeralBus {
     // store side-effects (e.g. actionStore.broadcastActionQueue) fire during
     // blob pull, but the player shouldn't re-broadcast DM state they just received.
     if (isFromJazz()) return;
+
+    // Broadcast-pause gate: drop all canvas-mutable ops when DM has paused.
+    // Pause/resume/heartbeat control ops always pass through.
+    if (this._broadcastPaused && CANVAS_MUTABLE_OPS.has(kind)) return;
 
     // DM-only gate (client-side check)
     if (config.dmOnly) {

@@ -31,6 +31,9 @@ import type {
   CanvasForceRedrawPayload,
   CanvasEditBeginPayload,
   CanvasEditEndPayload,
+  CanvasBroadcastPausePayload,
+  CanvasBroadcastResumePayload,
+  CanvasBroadcastHeartbeatPayload,
 } from "./types";
 
 let registered = false;
@@ -206,6 +209,96 @@ export function registerMapHandlers(): void {
       resumeCanvasSubscriptions(); // sets idle after hydration
     });
   });
+
+  // ── Pause Broadcasts lifecycle ──────────────────────────────────────────
+
+  /** Client-side watchdog — auto-resumes if the DM drops without sending resume. */
+  let _broadcastPauseWatchdog: ReturnType<typeof setTimeout> | null = null;
+  const BROADCAST_PAUSE_WATCHDOG_MS = 17_000; // 3 missed heartbeats × 5s + 2s grace
+
+  function _resetBroadcastWatchdog(dmId: string): void {
+    if (_broadcastPauseWatchdog !== null) clearTimeout(_broadcastPauseWatchdog);
+    _broadcastPauseWatchdog = setTimeout(() => {
+      _broadcastPauseWatchdog = null;
+      console.warn(`[mapHandlers] Pause Broadcasts watchdog fired — no heartbeat from ${dmId} for ${BROADCAST_PAUSE_WATCHDOG_MS}ms, auto-resuming`);
+      // Clear the waiting-room overlay and EphemeralBus gate
+      import('@/stores/useBroadcastPauseStore').then(({ useBroadcastPauseStore }) => {
+        useBroadcastPauseStore.getState().setUnpaused();
+      });
+      import('@/lib/net').then(({ ephemeralBus }) => {
+        ephemeralBus.setBroadcastPaused(false);
+      });
+      // Remount SimpleTabletop for non-DM clients
+      import('@/stores/multiplayerStore').then(({ useMultiplayerStore }) => {
+        const isDM = useMultiplayerStore.getState().roles.includes('dm');
+        if (!isDM) {
+          import('@/stores/launchStore').then(({ useLaunchStore }) => {
+            useLaunchStore.getState().setLaunched(true);
+          });
+        }
+      });
+    }, BROADCAST_PAUSE_WATCHDOG_MS);
+  }
+
+  ephemeralBus.on("canvas.broadcast.pause", (data: CanvasBroadcastPausePayload, _userId) => {
+    console.log(`[mapHandlers] Pause Broadcasts (Waiting Room) activated by DM ${data.dmId}`);
+    // Update store so WaitingRoomOverlay becomes visible
+    import('@/stores/useBroadcastPauseStore').then(({ useBroadcastPauseStore }) => {
+      useBroadcastPauseStore.getState().setPaused(data.dmId);
+    });
+    // Gate own emit path (DM echo: ensures own canvas ops are also blocked)
+    import('@/lib/net').then(({ ephemeralBus: eb }) => {
+      eb.setBroadcastPaused(true);
+    });
+    // Non-DM clients: unmount SimpleTabletop by navigating back to Landing Page.
+    // The Waiting Room overlay (fixed, z-index 1000) covers the Landing Page.
+    // Jazz continues syncing freely in the background.
+    import('@/stores/multiplayerStore').then(({ useMultiplayerStore }) => {
+      const isDM = useMultiplayerStore.getState().roles.includes('dm');
+      if (!isDM) {
+        import('@/stores/launchStore').then(({ useLaunchStore }) => {
+          useLaunchStore.getState().setLaunched(false);
+        });
+      }
+    });
+    // Start watchdog — auto-resume if DM goes dark
+    _resetBroadcastWatchdog(data.dmId);
+  });
+
+  ephemeralBus.on("canvas.broadcast.resume", (_data: CanvasBroadcastResumePayload, _userId) => {
+    console.log(`[mapHandlers] Pause Broadcasts (Waiting Room) deactivated`);
+    // Clear watchdog
+    if (_broadcastPauseWatchdog !== null) { clearTimeout(_broadcastPauseWatchdog); _broadcastPauseWatchdog = null; }
+    // DM-side: flush all deferred Jazz writes BEFORE clearing pause state.
+    // This commits the entire editing session to Jazz CRDTs in one synchronous pass.
+    import('@/lib/jazz/bridge').then(({ flushAllPendingSync }) => {
+      flushAllPendingSync();
+    });
+    // Resume emit gate and clear pause store (hides WaitingRoomOverlay)
+    import('@/lib/net').then(({ ephemeralBus: eb }) => {
+      eb.setBroadcastPaused(false);
+    });
+    import('@/stores/useBroadcastPauseStore').then(({ useBroadcastPauseStore }) => {
+      useBroadcastPauseStore.getState().setUnpaused();
+    });
+    // Non-DM clients: remount SimpleTabletop by setting launched=true.
+    // Fresh mount reads the latest Jazz state — no explicit redraw needed.
+    import('@/stores/multiplayerStore').then(({ useMultiplayerStore }) => {
+      const isDM = useMultiplayerStore.getState().roles.includes('dm');
+      if (!isDM) {
+        import('@/stores/launchStore').then(({ useLaunchStore }) => {
+          useLaunchStore.getState().setLaunched(true);
+        });
+      }
+    });
+  });
+
+  ephemeralBus.on("canvas.broadcast.heartbeat", (data: CanvasBroadcastHeartbeatPayload, _userId) => {
+    // Reset the watchdog on every heartbeat from the pausing DM
+    _resetBroadcastWatchdog(data.dmId);
+  });
+
+
 
   // TTL expiry cleanup
   ephemeralBus.onCacheChange((key, entry) => {

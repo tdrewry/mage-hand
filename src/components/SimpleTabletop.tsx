@@ -69,7 +69,7 @@ import {
 import { isPointInPolygon, getPolygonBounds, isPointNearPolygonEdge, findNearestVertex } from "../utils/pathUtils";
 import { simplifyPath } from "../utils/pathSimplification";
 import { generateBezierControlPoints, getBezierBounds } from "../utils/bezierUtils";
-import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged } from "../lib/lightSystem";
+import { computeIllumination, renderShadows, renderLightSources, notifyObstaclesChanged, lightToIlluminationSource } from "../lib/lightSystem";
 import { useLightStore } from "../stores/lightStore";
 import { clearVisibilityCache, computeVisibilityFromSegments, visibilityPolygonToPath2D } from "../lib/visibilityEngine";
 import { throttle } from "../lib/throttle";
@@ -78,6 +78,7 @@ import { addVisibleToExplored, computeFogMasks, cleanupFogGeometry, paperPathToP
 import { serializeFogGeometry, deserializeFogGeometry } from "../lib/fogSerializer";
 import { renderFogLayers } from "../lib/fogRenderer";
 import { useVisionProfileStore } from "../stores/visionProfileStore";
+import { useBroadcastPauseStore } from "../stores/useBroadcastPauseStore";
 import { useRoleStore } from "../stores/roleStore";
 import { useUiModeStore, type DmFogVisibility } from "../stores/uiModeStore";
 import { getTokensForVisionCalculation } from "../lib/visionPermissions";
@@ -136,6 +137,7 @@ import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
 import { registerTokenHandlers } from "@/lib/net/ephemeral/tokenHandlers";
 import { registerMapHandlers, emitRegionHandlePreview, emitMapObjectHandlePreview, emitGroupSelectPreview, emitGroupDragPreview, emitMapFocus, emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied, emitForceRedraw, emitCanvasEditBegin, emitCanvasEditEnd } from "@/lib/net/ephemeral/mapHandlers";
+import { WaitingRoomOverlay } from "./WaitingRoomOverlay";
 import { FEATURE_CANVAS_FORCE_REDRAW, FEATURE_CANVAS_DRAG_LIVE_PREVIEW, CANVAS_DRAG_BROADCAST_FPS } from "@/lib/featureFlags";
 import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
@@ -945,8 +947,17 @@ export const SimpleTabletop = () => {
   /** Ephemeral positions for ALL regions being dragged (primary + siblings). Cleared on mouseup. Mirrors tempTokenPositionsRef. */
   const tempRegionPositionsRef = useRef<Record<string, {
     x: number; y: number;
+    width?: number; height?: number; rotation?: number;
     pathPoints?: Array<{x: number; y: number}>;
     bezierControlPoints?: Array<{cp1: {x: number; y: number}; cp2: {x: number; y: number}}>;
+  }>>({});
+  /** Temp positions for map object group siblings during drag — mirrors tempRegionPositionsRef.
+   *  Written every frame in mousemove, read by renderer, committed to store on mouseup. */
+  const tempMapObjectPositionsRef = useRef<Record<string, {
+    position: { x: number; y: number };
+    rotation?: number;
+    wallPoints?: Array<{x: number; y: number}>;
+    width?: number; height?: number;
   }>>({});
   /** Start snapshots for ALL selected regions captured at drag begin (enables multi-select drag without EntityGroup) */
   const multiRegionDragStartsRef = useRef<Record<string, {
@@ -3672,7 +3683,7 @@ export const SimpleTabletop = () => {
     // NEW: Render shadows using visibility polygon system
     // Use combined segments (walls + vision-blocking map objects)
     if (isPlayMode && lights.length > 0 && wallGeometry) {
-      const illumination = computeIllumination(lights, combinedSegmentsRef.current, wallGeometry);
+      const illumination = computeIllumination(lights.map(lightToIlluminationSource), combinedSegmentsRef.current, wallGeometry);
       renderShadows(ctx, regions, illumination, shadowIntensity, globalAmbientLight);
     }
 
@@ -3727,7 +3738,13 @@ export const SimpleTabletop = () => {
       }
       renderMapObjects(ctx, focusedObjs, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
     } else {
-      renderMapObjects(ctx, mapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
+      // Merge in-flight group drag temp positions over the live array — no Zustand writes per frame.
+      const tempMOPos = tempMapObjectPositionsRef.current;
+      const hasTempMO = Object.keys(tempMOPos).length > 0;
+      const effectiveMapObjects = hasTempMO
+        ? mapObjects.map(o => { const t = tempMOPos[o.id]; if (!t) return o; return { ...o, position: t.position, ...(t.wallPoints ? { wallPoints: t.wallPoints, width: t.width ?? o.width, height: t.height ?? o.height } : {}) }; })
+        : mapObjects;
+      renderMapObjects(ctx, effectiveMapObjects, transform.zoom, selectedMapObjectIds, watabouStyle, isDM && renderingMode !== 'play', portalActivations);
     }
 
     // Draw scale handles + rotation handle on selected, unlocked, non-wall map objects (edit mode)
@@ -4268,7 +4285,7 @@ export const SimpleTabletop = () => {
     // Draw light sources in edit mode using new system (only from active maps)
     if (renderingMode === "edit" && lights.length > 0) {
       const activeLights = lights.filter(l => isEntityVisible(l.mapId));
-      if (activeLights.length > 0) renderLightSources(ctx, activeLights, transform);
+      if (activeLights.length > 0) renderLightSources(ctx, activeLights.map(lightToIlluminationSource), transform);
     }
 
     // Draw current path being drawn
@@ -6149,8 +6166,16 @@ export const SimpleTabletop = () => {
         height: preview.height ?? region.height,
         pathPoints: preview.pathPoints ?? region.pathPoints,
         bezierControlPoints: preview.bezierControlPoints ?? region.bezierControlPoints,
+        // Rotation: prefer temp ref value (set per-frame during rotation), then apply
+        // tempRegionRotation delta on top of stale store value as fallback.
+        rotation: tempPos?.rotation !== undefined
+          ? tempPos.rotation
+          : (region.rotation ?? 0) + (tempRegionRotation[region.id] || 0),
       }
-      : region;
+      : {
+        ...region,
+        rotation: (region.rotation ?? 0) + (tempRegionRotation[region.id] || 0),
+      };
 
     if (effectiveRegion.regionType === "path" && effectiveRegion.pathPoints && effectiveRegion.pathPoints.length > 2) {
       // Handle path region rendering
@@ -6281,8 +6306,8 @@ export const SimpleTabletop = () => {
   ) => {
     ctx.save();
 
-    // Apply rotation if present
-    const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
+    // Rotation is already baked into region.rotation by drawRegion (via effectiveRegion)
+    const effectiveRotation = region.rotation || 0;
     if (effectiveRotation !== 0) {
       const centerX = region.x + region.width / 2;
       const centerY = region.y + region.height / 2;
@@ -6314,7 +6339,7 @@ export const SimpleTabletop = () => {
 
     // Apply rotation again for border drawing
     if (region.rotation && region.rotation !== 0) {
-      const effectiveRotation = (region.rotation || 0) + (tempRegionRotation[region.id] || 0);
+      const effectiveRotation = region.rotation || 0;
       const centerX = region.x + region.width / 2;
       const centerY = region.y + region.height / 2;
       const angle = (effectiveRotation * Math.PI) / 180;
@@ -10275,6 +10300,7 @@ export const SimpleTabletop = () => {
         //         (B) multi-selected regions via multiRegionDragStartsRef.
         // This matches the token group drag approach — no Zustand writes during drag.
         const newTempRegions: typeof tempRegionPositionsRef.current = {};
+        const newTempMapObjects: typeof tempMapObjectPositionsRef.current = {};
         const movedIds = new Set<string>();
 
         // (A) EntityGroup members
@@ -10297,29 +10323,23 @@ export const SimpleTabletop = () => {
                 newTempRegions[member.id] = { x: snap.x + deltaX, y: snap.y + deltaY };
               }
             }
-            // mapObjects and lights: only write to store when live-preview is on AND FPS budget allows.
-            // When flag is off, they commit silently via Jazz CRDT on mouseup (no mid-drag transaction flood).
-            if (FEATURE_CANVAS_DRAG_LIVE_PREVIEW && _canBroadcast) {
-              if (member.type === 'mapObject' && snap.type === 'mapObject') {
+            // mapObjects: write to tempMapObjectPositionsRef instead of calling updateMapObject per frame.
+            // Mirrors tempRegionPositionsRef — no store writes during drag, renderer reads the ref.
+            if (member.type === 'mapObject' && snap.type === 'mapObject') {
               if (snap.wallPoints) {
                 const newWallPoints = snap.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
                 const xs = newWallPoints.map(p => p.x); const ys = newWallPoints.map(p => p.y);
                 const minX = Math.min(...xs); const maxX = Math.max(...xs);
                 const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                updateMapObject(member.id, {
-                  wallPoints: newWallPoints,
-                  position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
-                  width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1),
-                });
+                newTempMapObjects[member.id] = { position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }, wallPoints: newWallPoints, width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1) };
               } else if (snap.position) {
-                updateMapObject(member.id, { position: { x: snap.position.x + deltaX, y: snap.position.y + deltaY } });
+                newTempMapObjects[member.id] = { position: { x: snap.position.x + deltaX, y: snap.position.y + deltaY } };
               }
-            } else if (FEATURE_CANVAS_DRAG_LIVE_PREVIEW && _canBroadcast && member.type === 'light' && snap.lightPos) {
+            } else if (member.type === 'light' && snap.lightPos) {
               useLightStore.getState().updateLight(member.id, { position: { x: snap.lightPos.x + deltaX, y: snap.lightPos.y + deltaY } });
             }
-          } // end FEATURE_CANVAS_DRAG_LIVE_PREVIEW block
-          }
-        }
+          } // end for (member of group.members)
+        } // end if (group && delta)
 
         // (B) Multi-selected regions not covered by EntityGroup
         for (const [rid, start] of Object.entries(multiRegionDragStartsRef.current)) {
@@ -10337,6 +10357,7 @@ export const SimpleTabletop = () => {
         }
 
         tempRegionPositionsRef.current = newTempRegions;
+        tempMapObjectPositionsRef.current = newTempMapObjects;
 
         // When FEATURE_CANVAS_DRAG_LIVE_PREVIEW is on, broadcast all sibling region positions
         // at the same throttled rate as the primary to give remote clients a live group view.
@@ -10423,6 +10444,11 @@ export const SimpleTabletop = () => {
         const rad = (rotationDelta * Math.PI) / 180;
         const cos = Math.cos(rad); const sin = Math.sin(rad);
 
+        // Temp accumulators — written per-frame, committed atomically at mouseup.
+        // Declared here (before the primary region block) to avoid TDZ errors.
+        const newTempMapObjects: typeof tempMapObjectPositionsRef.current = {};
+        const newTempRegions: typeof tempRegionPositionsRef.current = {};
+
         if (draggedRegion.regionType === 'path' && (primarySnap?.pathPoints ?? draggedRegion.pathPoints)) {
           const basePathPoints = primarySnap?.pathPoints ?? draggedRegion.pathPoints!;
           const newPathPoints = basePathPoints.map(p => {
@@ -10432,13 +10458,13 @@ export const SimpleTabletop = () => {
           const pxs = newPathPoints.map(p => p.x); const pys = newPathPoints.map(p => p.y);
           const minPX = Math.min(...pxs); const maxPX = Math.max(...pxs);
           const minPY = Math.min(...pys); const maxPY = Math.max(...pys);
-          updateRegion(draggedRegionId, {
-            pathPoints: newPathPoints,
+          // Write to temp ref — no Zustand/Jazz writes during rotation frames
+          newTempRegions[draggedRegionId] = {
             x: minPX, y: minPY,
             width: Math.max(maxPX - minPX, 1),
             height: Math.max(maxPY - minPY, 1),
-            rotation: 0,
-          });
+            pathPoints: newPathPoints,
+          };
         } else {
           // Rect region: orbit its bounding-box center around the pivot then add local spin
           const snapW = (primarySnap?.width ?? (initialRegionState?.width ?? draggedRegion.width)) as number;
@@ -10449,17 +10475,19 @@ export const SimpleTabletop = () => {
           const cx2 = snapX + snapW / 2; const cy2 = snapY + snapH / 2;
           const dx = cx2 - pivotX; const dy = cy2 - pivotY;
           const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-          updateRegion(draggedRegionId, {
+          // Write to temp ref — no Zustand/Jazz writes during rotation frames
+          newTempRegions[draggedRegionId] = {
             x: newCx - snapW / 2, y: newCy - snapH / 2,
             rotation: baseRot + rotationDelta,
-          });
+          };
         }
 
-        // Update tempRegionRotation so drawRegion doesn't add an extra delta on top.
-        // Since we've already committed to the store, temp delta should be 0.
+        // Drive rotation preview via React state (no Zustand/Jazz writes per-frame).
+        // Renderer shows: region.rotation (stale store) + tempRegionRotation (delta) = correct visual.
+        // The store commit happens at mouseup from newTempRegions[draggedRegionId].
         setTempRegionRotation(prev => ({
           ...prev,
-          [draggedRegionId]: 0,
+          [draggedRegionId]: rotationDelta,
         }));
 
         setDragPreview({
@@ -10499,20 +10527,20 @@ export const SimpleTabletop = () => {
                 const ys = newWallPoints.map(p => p.y);
                 const minX = Math.min(...xs); const maxX = Math.max(...xs);
                 const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                updateMapObject(member.id, {
-                  wallPoints: newWallPoints,
+                // Write to temp ref — no Zustand/Jazz writes during rotation frames
+                newTempMapObjects[member.id] = {
                   position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+                  wallPoints: newWallPoints,
                   width: Math.max(maxX - minX, 1),
                   height: Math.max(maxY - minY, 1),
-                  // rotation omitted for walls — orientation is in wallPoints vertices
-                });
+                };
               } else if (snap.position) {
-                // Non-wall: orbit + local spin
+                // Non-wall: orbit + local spin — write to temp ref
                 const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
-                updateMapObject(member.id, {
+                newTempMapObjects[member.id] = {
                   position: { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos },
                   rotation: (snap.rotation || 0) + rotationDelta,
-                });
+                };
               }
             } else if (member.type === 'token' && snap.position) {
               const dx = snap.position.x - pivotX; const dy = snap.position.y - pivotY;
@@ -10520,7 +10548,6 @@ export const SimpleTabletop = () => {
             } else if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined && snap.y !== undefined) {
               if (snap.pathPoints && snap.pathPoints.length > 0) {
                 // Path region: rotate every path point around the shared group pivot.
-                // pathPoints ARE the geometry — x/y/width/height are just the bounding box.
                 const newPathPoints = snap.pathPoints.map(p => {
                   const dx = p.x - pivotX; const dy = p.y - pivotY;
                   return { x: pivotX + dx * cos - dy * sin, y: pivotY + dx * sin + dy * cos };
@@ -10528,13 +10555,13 @@ export const SimpleTabletop = () => {
                 const pxs = newPathPoints.map(p => p.x); const pys = newPathPoints.map(p => p.y);
                 const minPX = Math.min(...pxs); const maxPX = Math.max(...pxs);
                 const minPY = Math.min(...pys); const maxPY = Math.max(...pys);
-                updateRegion(member.id, {
-                  pathPoints: newPathPoints,
+                // Write to temp ref — no Zustand/Jazz writes during rotation frames
+                newTempRegions[member.id] = {
                   x: minPX, y: minPY,
                   width: Math.max(maxPX - minPX, 1),
                   height: Math.max(maxPY - minPY, 1),
-                  rotation: 0,
-                });
+                  pathPoints: newPathPoints,
+                };
               } else {
                 // Rect region: orbit bounding-box center around shared pivot
                 const snapW = snap.width ?? 0;
@@ -10542,7 +10569,12 @@ export const SimpleTabletop = () => {
                 const cx2 = snap.x + snapW / 2; const cy2 = snap.y + snapH / 2;
                 const dx = cx2 - pivotX; const dy = cy2 - pivotY;
                 const newCx = pivotX + dx * cos - dy * sin; const newCy = pivotY + dx * sin + dy * cos;
-                updateRegion(member.id, { x: newCx - snapW / 2, y: newCy - snapH / 2, rotation: (snap.regRotation || 0) + rotationDelta });
+                // Write to temp ref — no Zustand/Jazz writes during rotation frames
+                newTempRegions[member.id] = {
+                  x: newCx - snapW / 2,
+                  y: newCy - snapH / 2,
+                  rotation: (snap.regRotation || 0) + rotationDelta,
+                };
               }
 
             } else if (member.type === 'light' && snap.lightPos) {
@@ -10552,6 +10584,12 @@ export const SimpleTabletop = () => {
           }
         }
         tempTokenPositionsRef.current = newTempPositions;
+        // Flush rotation temp state to refs so canvas preview reads them and
+        // mouseup commit block writes final positions to Zustand/Jazz atomically.
+        if (Object.keys(newTempMapObjects).length > 0)
+          tempMapObjectPositionsRef.current = { ...tempMapObjectPositionsRef.current, ...newTempMapObjects };
+        if (Object.keys(newTempRegions).length > 0)
+          tempRegionPositionsRef.current = { ...tempRegionPositionsRef.current, ...newTempRegions };
       }
 
       // Use requestAnimationFrame for smooth rendering
@@ -11409,7 +11447,17 @@ export const SimpleTabletop = () => {
             rotation: r.rotation,
           });
         } else {
-          updateRegion(rid, { x: pos.x, y: pos.y, width: r.width, height: r.height, rotation: r.rotation });
+          updateRegion(rid, { x: pos.x, y: pos.y, width: pos.width ?? r.width, height: pos.height ?? r.height, rotation: pos.rotation ?? r.rotation });
+        }
+      }
+
+      // Commit temp map-object positions (group siblings set per-frame in tempMapObjectPositionsRef)
+      // This covers annotations, custom shapes, etc. that are group members of a dragged region.
+      for (const [oid, pos] of Object.entries(tempMapObjectPositionsRef.current)) {
+        if (pos.wallPoints) {
+          updateMapObject(oid, { wallPoints: pos.wallPoints, position: pos.position, width: pos.width, height: pos.height });
+        } else {
+          updateMapObject(oid, { position: pos.position, ...(pos.rotation !== undefined && { rotation: pos.rotation }) });
         }
       }
       // Also handle legacy single-region dragPreview (rotation/resize ops that don't use tempRegionPositionsRef)
@@ -11620,8 +11668,10 @@ export const SimpleTabletop = () => {
       emitCanvasEditEnd(_editOwnerId);
 
     if (isDraggingRegion || isRotatingRegion || isResizingRegion) {
-      // Clear temp region position refs
+      // Clear temp region and map-object drag position refs
       tempRegionPositionsRef.current = {};
+      tempMapObjectPositionsRef.current = {};
+
       multiRegionDragStartsRef.current = {};
       multiMapObjectStartsRef.current = {};
       if (isDraggingRegion && draggedRegionId) {
@@ -11932,17 +11982,31 @@ export const SimpleTabletop = () => {
         const movedIds = new Set<string>();
 
         const group = useGroupStore.getState().getGroupForEntity(draggedRegionId);
+        const newTempMapObjects: typeof tempMapObjectPositionsRef.current = {};
         if (group) {
           for (const member of group.members) {
             const snap = groupSiblingSnapshotsRef.current[member.id];
-            if (!snap || member.type !== 'region' || snap.type !== 'region' || snap.x === undefined) continue;
+            if (!snap) continue;
             movedIds.add(member.id);
-            if (snap.pathPoints) {
-              const pp = snap.pathPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
-              const bcp = snap.bezierControlPoints?.map(c => ({ cp1: { x: c.cp1.x + deltaX, y: c.cp1.y + deltaY }, cp2: { x: c.cp2.x + deltaX, y: c.cp2.y + deltaY } }));
-              newTempRegions[member.id] = { x: snap.x + deltaX, y: snap.y + deltaY, pathPoints: pp, bezierControlPoints: bcp };
-            } else {
-              newTempRegions[member.id] = { x: snap.x + deltaX, y: snap.y + deltaY };
+            if (member.type === 'region' && snap.type === 'region' && snap.x !== undefined) {
+              if (snap.pathPoints) {
+                const pp = snap.pathPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                const bcp = snap.bezierControlPoints?.map(c => ({ cp1: { x: c.cp1.x + deltaX, y: c.cp1.y + deltaY }, cp2: { x: c.cp2.x + deltaX, y: c.cp2.y + deltaY } }));
+                newTempRegions[member.id] = { x: snap.x + deltaX, y: snap.y + deltaY, pathPoints: pp, bezierControlPoints: bcp };
+              } else {
+                newTempRegions[member.id] = { x: snap.x + deltaX, y: snap.y + deltaY };
+              }
+            } else if (member.type === 'mapObject' && snap.type === 'mapObject') {
+              // Accumulate mapObject/annotation group members into temp ref (no per-frame store writes)
+              if (snap.wallPoints) {
+                const newWallPoints = snap.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+                const xs = newWallPoints.map(p => p.x); const ys = newWallPoints.map(p => p.y);
+                const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                const minY = Math.min(...ys); const maxY = Math.max(...ys);
+                newTempMapObjects[member.id] = { position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }, wallPoints: newWallPoints, width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1) };
+              } else if (snap.position) {
+                newTempMapObjects[member.id] = { position: { x: snap.position.x + deltaX, y: snap.position.y + deltaY } };
+              }
             }
           }
         }
@@ -11957,27 +12021,32 @@ export const SimpleTabletop = () => {
           }
         }
         tempRegionPositionsRef.current = newTempRegions;
+        tempMapObjectPositionsRef.current = newTempMapObjects;
 
         // Broadcast all dragged region positions for remote live view
         for (const [rid, pos] of Object.entries(newTempRegions)) {
           ephemeralBus.emit("region.drag.update", { regionId: rid, pos: { x: pos.x, y: pos.y } });
         }
 
-        // Move selected mapObjects (annotations, doors) together with multi-select drag
+        // (C) Multi-selected mapObjects (annotations, doors) not in EntityGroup.
+        // Write to tempMapObjectPositionsRef — no Zustand/Jazz writes per frame.
+        // The mouseup commit block at line ~11427 will flush the final state.
         for (const [oid, start] of Object.entries(multiMapObjectStartsRef.current)) {
           if (movedIds.has(oid)) continue;
           if (start.wallPoints) {
             const newWallPoints = start.wallPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
             const xs = newWallPoints.map(p => p.x); const ys = newWallPoints.map(p => p.y);
-            updateMapObject(oid, {
-              wallPoints: newWallPoints,
+            newTempMapObjects[oid] = {
               position: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
-              width: Math.max(Math.max(...xs) - Math.min(...xs), 1), height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
-            });
+              wallPoints: newWallPoints,
+              width: Math.max(Math.max(...xs) - Math.min(...xs), 1),
+              height: Math.max(Math.max(...ys) - Math.min(...ys), 1),
+            };
           } else {
-            updateMapObject(oid, { position: { x: start.x + deltaX, y: start.y + deltaY } });
+            newTempMapObjects[oid] = { position: { x: start.x + deltaX, y: start.y + deltaY } };
           }
         }
+        tempMapObjectPositionsRef.current = { ...tempMapObjectPositionsRef.current, ...newTempMapObjects };
 
         // Move grouped tokens
         if (groupedTokens.length > 0) {

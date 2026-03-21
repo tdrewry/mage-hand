@@ -7,12 +7,61 @@ import type { CanvasRegion } from '@/stores/regionStore';
 import { computeVisibilityFromSegments, visibilityPolygonToPath2D, clearVisibilityCache } from './visibilityEngine';
 import type { Point, VisibilityResult, LineSegment } from './visibilityEngine';
 
+/**
+ * Minimal shape of the legacy LightSource from lightStore.
+ * We avoid a direct import to prevent a circular-dependency; the shape is duck-typed.
+ */
+interface LegacyLightSource {
+  id: string;
+  position: { x: number; y: number };
+  radius: number;
+  intensity: number;
+  color: string;
+  enabled: boolean;
+  label?: string;
+  mapId?: string;
+}
+
+/**
+ * Converts a legacy LightSource (radius + intensity fields) to the unified
+ * IlluminationSource expected by computeIllumination / renderLightSources.
+ *
+ * Mapping rationale:
+ *  - radius (px @ gridSize=50)  →  range (grid units = radius / 50)
+ *  - intensity (0-1)            →  brightIntensity + dimIntensity
+ *  - All IlluminationSource-only fields receive safe defaults.
+ */
+export function lightToIlluminationSource(l: LegacyLightSource): IlluminationSource {
+  const DEFAULT_GRID_SIZE = 50;
+  return {
+    id: l.id,
+    name: l.label ?? 'Light',
+    label: l.label,
+    enabled: l.enabled,
+    position: l.position,
+    range: l.radius / DEFAULT_GRID_SIZE,
+    brightZone: 0.5,
+    brightIntensity: l.intensity,
+    dimIntensity: l.intensity * 0.6,
+    color: l.color ?? '#FFD700',
+    colorEnabled: false,
+    colorIntensity: 0.15,
+    softEdge: true,
+    softEdgeRadius: 8,
+    animation: 'none',
+    animationSpeed: 1.0,
+    animationIntensity: 0.3,
+    mapId: l.mapId,
+  };
+}
+
 export interface IlluminationMap {
   litAreas: Path2D[]; // Areas lit by each light source
   combinedLitArea: Path2D; // Union of all lit areas
   shadowAreas: Path2D; // Areas in shadow (inverse of lit areas)
   lightSources: IlluminationSource[]; // Active light sources
 }
+
 
 /**
  * Compute illumination map from active light sources
@@ -113,7 +162,8 @@ export function renderLightSources(
       ctx.font = `${14 / transform.zoom}px sans-serif`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText(light.label, x, y - (light.radius + 20 / transform.zoom));
+      ctx.fillText(light.label, x, y - (light.range * 50 + 20 / transform.zoom));
+
     }
   }
   

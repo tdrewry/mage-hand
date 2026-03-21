@@ -58,6 +58,7 @@ import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
 import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { useBroadcastPauseStore } from "@/stores/useBroadcastPauseStore";
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
@@ -1703,6 +1704,8 @@ const _throttleTimers = new Map<string, number>();
 const BLOB_THROTTLE_MS = 1000; // 1Hz max per kind
 
 function throttledPushBlob(kind: string): void {
+  // Defer Jazz writes while DM broadcast is paused — no CRDT frames during editing.
+  if (useBroadcastPauseStore.getState().isPaused) return;
   if (_throttleTimers.has(kind)) return;
   _throttleTimers.set(kind, window.setTimeout(() => {
     _throttleTimers.delete(kind);
@@ -1719,6 +1722,10 @@ function throttledPushBlob(kind: string): void {
 
 let _regionSubPaused = false;
 let _mapObjectSubPaused = false;
+/** Broad pause flag used by the Pause Broadcasts feature (in addition to fine-grained flags above). */
+let _canvasSubsPaused = false;
+/** Returns true when canvas subscriptions are paused by Pause Broadcasts. */
+export function areCanvasSubsPaused(): boolean { return _canvasSubsPaused; }
 /** Latest Jazz snapshot received while paused — applied on resume */
 let _pendingInboundRegionSnapshot: any = null;
 let _pendingInboundMapObjectSnapshot: any = null;
@@ -1733,6 +1740,7 @@ const EDIT_RESUME_FALLBACK_MS = 5000;
 export function pauseCanvasSubscriptions(entityType: 'region' | 'mapObject' | 'all'): void {
   if (entityType === 'region' || entityType === 'all') _regionSubPaused = true;
   if (entityType === 'mapObject' || entityType === 'all') _mapObjectSubPaused = true;
+  _canvasSubsPaused = true; // Pause Broadcasts broad gate
 
   // Cancel any existing auto-resume and reset the timeout
   if (_editResumeTimer !== null) clearTimeout(_editResumeTimer);
@@ -1755,6 +1763,7 @@ export function pauseCanvasSubscriptions(entityType: 'region' | 'mapObject' | 'a
  */
 export function resumeCanvasSubscriptions(): void {
   if (_editResumeTimer !== null) { clearTimeout(_editResumeTimer); _editResumeTimer = null; }
+  _canvasSubsPaused = false; // Pause Broadcasts broad gate
 
   // Apply buffered snapshots before clearing flags (so the apply functions can read them)
   if (_regionSubPaused && _pendingInboundRegionSnapshot !== null) {
@@ -1799,6 +1808,9 @@ function throttledPushFineGrained(kind: string, fn: () => void): void {
   // Always store the latest function (trailing-edge: last-write wins)
   _fineGrainedPending.set(kind, fn);
   if (_fineGrainedTimers.has(kind)) return;
+  // Defer Jazz writes while DM broadcast is paused — pending fn stays stored,
+  // no timer started. flushAllPendingSync() fires everything on resume.
+  if (useBroadcastPauseStore.getState().isPaused) return;
   // Use per-kind throttle from config, fall back to 50ms for unknown kinds
   const throttleMs = JAZZ_SYNC_THROTTLE_MS[kind] ?? 50;
   _fineGrainedTimers.set(kind, window.setTimeout(() => {
@@ -1823,6 +1835,27 @@ export function flushPendingSync(kind: string): void {
   const pendingFn = _fineGrainedPending.get(kind);
   _fineGrainedPending.delete(kind);
   if (pendingFn) pendingFn();
+}
+
+/**
+ * Flush ALL pending deferred Jazz writes immediately.
+ * Called on broadcast resume so the DM's entire editing session is committed
+ * to Jazz in one synchronous pass before clients remount.
+ */
+export function flushAllPendingSync(): void {
+  // Fine-grained kinds (per-entity CoValue sync)
+  for (const kind of ['regions', 'mapObjects', 'tokens', 'effects', 'illumination']) {
+    flushPendingSync(kind);
+  }
+  // Blob kinds: cancel pending timers and push immediately (bypass throttle)
+  for (const kind of BLOB_SYNC_KINDS) {
+    const timer = _throttleTimers.get(kind);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      _throttleTimers.delete(kind);
+    }
+    pushBlobToJazz(kind);
+  }
 }
 
 /** Sync regions from Zustand → Jazz (diff-based) */
@@ -2639,6 +2672,68 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   const jazzMapObjectsRef = sessionRoot.mapObjects;
   if (jazzMapObjectsRef?.$jazz?.subscribe) {
     try {
+      // Extract apply logic so resumeCanvasSubscriptions() can call it with the buffered snapshot
+      function applyInboundMapObjects(mapObjects: any): void {
+        if (!mapObjects) return;
+        const len = mapObjects.length ?? 0;
+        const mapObjectsNeedingTextureResolve: { id: string; hash: string }[] = [];
+
+        runFromJazz(() => {
+          const store = useMapObjectStore.getState();
+          const localObjects = store.mapObjects;
+          const currentMap = new Map(localObjects.map((o: any) => [o.id, o]));
+          const jazzIds = new Set<string>();
+
+          for (let i = 0; i < len; i++) {
+            const jmo = mapObjects[i];
+            if (!jmo) continue;
+            jazzIds.add(jmo.objectId);
+
+            const existing = currentMap.get(jmo.objectId);
+            if (existing) {
+              const incoming = jazzToZustandMapObject(jmo);
+              if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'imageUrl'])) {
+                store.updateMapObject(jmo.objectId, {
+                  ...incoming,
+                  imageUrl: existing.imageUrl,
+                });
+                if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
+                  mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
+                } else if (!existing.imageUrl && existing.imageHash) {
+                  mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
+                }
+              } else {
+                if (!existing.imageUrl && existing.imageHash) {
+                  mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
+                }
+              }
+            } else {
+              if (!_isCreator) {
+                const newObj = jazzToZustandMapObject(jmo);
+                store.addMapObject(newObj);
+                if (newObj.imageHash) {
+                  mapObjectsNeedingTextureResolve.push({ id: newObj.id, hash: newObj.imageHash });
+                }
+              }
+            }
+          }
+
+          if (!_isCreator) {
+            for (const obj of store.mapObjects) {
+              if (!jazzIds.has(obj.id)) store.removeMapObject(obj.id);
+            }
+          }
+        });
+
+        if (mapObjectsNeedingTextureResolve.length > 0) {
+          _resolveMapObjectTextures(mapObjectsNeedingTextureResolve);
+        }
+        prevMapObjects = useMapObjectStore.getState().mapObjects;
+      }
+
+      // Register for resumeCanvasSubscriptions() to call on canvas.edit.end / broadcast resume
+      _applyInboundMapObjectsFn = applyInboundMapObjects;
+
       const unsubMapObjectsJazz = jazzMapObjectsRef.$jazz.subscribe(
         { resolve: { $each: true } },
         (mapObjects: any) => {
@@ -2646,80 +2741,22 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const len = mapObjects.length ?? 0;
           const localCount = useMapObjectStore.getState().mapObjects.length;
 
+          // If subscription is paused (Pause Broadcasts or host canvas.edit.begin),
+          // buffer the latest snapshot and return. On resume, _applyInboundMapObjectsFn
+          // fires once with the final committed state.
+          if (_mapObjectSubPaused) {
+            _pendingInboundMapObjectSnapshot = mapObjects;
+            return;
+          }
+
           if (len === 0 && localCount > 0 && _isCreator) return;
-          // Startup grace: suppress inbound for creator during initial propagation
           if (_isCreator && Date.now() - _bridgeStartedAt < STARTUP_GRACE_MS) {
             console.log(`[jazz-bridge] Skipping inbound mapObjects during startup grace`);
             return;
           }
-          // Guard: if outbound throttle is active, skip inbound sync entirely.
-          // This prevents the race where the creator deletes objects locally but
-          // the Jazz CoValue still has them — causing them to be re-added before
-          // the throttled push writes the deletion to Jazz.
           if (_fineGrainedTimers.has('mapObjects')) return;
 
-          const mapObjectsNeedingTextureResolve: { id: string; hash: string }[] = [];
-
-          runFromJazz(() => {
-            const store = useMapObjectStore.getState();
-            const localObjects = store.mapObjects;
-            const currentMap = new Map(localObjects.map(o => [o.id, o]));
-            const jazzIds = new Set<string>();
-
-            for (let i = 0; i < len; i++) {
-              const jmo = mapObjects[i];
-              if (!jmo) continue;
-              jazzIds.add(jmo.objectId);
-
-              const existing = currentMap.get(jmo.objectId);
-              if (existing) {
-                // Only update if something actually changed (deep-compare parsed JSON fields)
-                const incoming = jazzToZustandMapObject(jmo);
-                if (_hasEntityChanges(existing, incoming, ['id', 'selected', 'imageUrl'])) {
-                  // Preserve local imageUrl (loaded from IndexedDB, not synced)
-                  store.updateMapObject(jmo.objectId, {
-                    ...incoming,
-                    imageUrl: existing.imageUrl,
-                  });
-                  // If imageHash changed, flag for async texture resolution
-                  if (incoming.imageHash && incoming.imageHash !== existing.imageHash) {
-                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: incoming.imageHash });
-                  } else if (!existing.imageUrl && existing.imageHash) {
-                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
-                  }
-                } else {
-                  if (!existing.imageUrl && existing.imageHash) {
-                    mapObjectsNeedingTextureResolve.push({ id: existing.id, hash: existing.imageHash });
-                  }
-                }
-              } else {
-                // Non-creator: add new object from Jazz.
-                // Creator: trust local state — if the object isn't here, the creator
-                // deleted it intentionally. Don't re-add from stale Jazz state.
-                if (!_isCreator) {
-                  const newObj = jazzToZustandMapObject(jmo);
-                  store.addMapObject(newObj);
-                  // New map object with imageHash needs texture resolution
-                  if (newObj.imageHash) {
-                    mapObjectsNeedingTextureResolve.push({ id: newObj.id, hash: newObj.imageHash });
-                  }
-                }
-              }
-            }
-
-            if (!_isCreator) {
-              for (const obj of store.mapObjects) {
-                if (!jazzIds.has(obj.id)) store.removeMapObject(obj.id);
-              }
-            }
-          });
-
-          // Async texture resolution — runs OUTSIDE runFromJazz to allow store updates
-          if (mapObjectsNeedingTextureResolve.length > 0) {
-            _resolveMapObjectTextures(mapObjectsNeedingTextureResolve);
-          }
-
-          prevMapObjects = useMapObjectStore.getState().mapObjects;
+          applyInboundMapObjects(mapObjects);
         },
       );
       activeSubscriptions.push(unsubMapObjectsJazz);

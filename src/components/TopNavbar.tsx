@@ -6,6 +6,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useLaunchStore } from '@/stores/launchStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useBroadcastPauseStore } from '@/stores/useBroadcastPauseStore';
 import { useRegionStore } from '@/stores/regionStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useMapEphemeralStore } from '@/stores/mapEphemeralStore';
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { 
   Focus, Maximize, ChevronLeft, ChevronRight, Settings, FolderOpen, Monitor, 
   Network, HardDrive, Volume2, Home, Save, Download, Play, Castle, UserCircle, Plus, Shield,
-  Gamepad2, Footprints, ScanEye, Lock, Activity
+  Gamepad2, Footprints, ScanEye, Lock, Activity, Radio
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -61,7 +62,11 @@ export const TopNavbar: React.FC = () => {
   const { restrictMovement: movementLocked, setRestrictMovement: setMovementLocked } = useInitiativeStore();
   const enforceFollowDM = useMapEphemeralStore((s) => s.enforceFollowDM);
   const setEnforceFollowDM = useMapEphemeralStore((s) => s.setEnforceFollowDM);
-  
+
+  // Pause Broadcasts store
+  const { isPaused: broadcastPaused, activatePause, deactivatePause } = useBroadcastPauseStore();
+
+
   const registerCard = useCardStore((state) => state.registerCard);
   const cards = useCardStore((state) => state.cards);
   const setVisibility = useCardStore((state) => state.setVisibility);
@@ -233,7 +238,7 @@ export const TopNavbar: React.FC = () => {
         </div>
 
         {/* Center: Future map selector or core global toggles */}
-        <div className="flex flex-1 items-center justify-center pointer-events-none">
+        <div className="flex flex-1 items-center justify-center gap-2 pointer-events-none">
           {movementLocked && (
             <Badge 
               variant="destructive" 
@@ -245,6 +250,29 @@ export const TopNavbar: React.FC = () => {
               <span>Movement Locked — click to unlock</span>
             </Badge>
           )}
+          {/* DM: Broadcasts paused indicator (clickable to resume) */}
+          {broadcastPaused && isDM && (
+            <Badge
+              className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
+              onClick={() => {
+                deactivatePause();
+                toast.success('Broadcasts resumed — clients syncing final state');
+              }}
+              title="Broadcasts are paused — click to resume and sync clients"
+            >
+              <Radio className="h-3 w-3" />
+              <span>Broadcasts Paused — click to resume</span>
+            </Badge>
+          )}
+          {/* Client: map being updated banner (non-clickable) */}
+          {broadcastPaused && !isDM && (
+            <Badge
+              className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-none bg-amber-500/10 text-amber-400/80 border border-amber-500/30"
+            >
+              <Radio className="h-3 w-3" />
+              <span>Map is being updated by the DM…</span>
+            </Badge>
+          )}
         </div>
 
         {/* Right side: Global settings and views */}
@@ -253,6 +281,37 @@ export const TopNavbar: React.FC = () => {
           {/* DM Mode Status Indicators */}
           {isDM && (
             <>
+              {/* Pause Broadcasts toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-6 w-6 rounded-full shrink-0 transition-colors",
+                      broadcastPaused
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30 animate-pulse"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+                    )}
+                    onClick={() => {
+                      if (broadcastPaused) {
+                        deactivatePause();
+                        toast.success('Broadcasts resumed — clients syncing final state');
+                      } else {
+                        activatePause(currentPlayer?.id ?? 'dm');
+                        toast.info('Broadcasts paused — clients are frozen');
+                      }
+                    }}
+                  >
+                    <Radio className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">
+                  {broadcastPaused ? 'Broadcasts Paused (Click to resume — clients will sync)' : 'Pause Broadcasts (freeze client canvas updates)'}
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Lock to DM Viewport */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -480,6 +539,25 @@ export const TopNavbar: React.FC = () => {
                     </DropdownMenuItem>
                   </TooltipTrigger>
                   <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Force players' camera to follow your view</TooltipContent>
+                </Tooltip>
+              )}
+              {isDM && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuItem onClick={() => {
+                      if (broadcastPaused) {
+                        deactivatePause();
+                        toast.success('Broadcasts resumed — clients syncing final state');
+                      } else {
+                        activatePause(currentPlayer?.id ?? 'dm');
+                        toast.info('Broadcasts paused — clients are frozen');
+                      }
+                    }}>
+                      <Radio className="mr-2 h-4 w-4" />
+                      <span>{broadcastPaused ? 'Resume Broadcasts' : 'Pause Broadcasts'}</span>
+                    </DropdownMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14} className="bg-background/90 backdrop-blur border-white/10 z-[100]">Freeze canvas updates on all connected clients</TooltipContent>
                 </Tooltip>
               )}
             </DropdownMenuContent>
