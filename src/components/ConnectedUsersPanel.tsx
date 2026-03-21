@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Circle, Settings, Shield, UserCog, Map, Activity, Hand } from 'lucide-react';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useMultiplayerStore, useActiveRoster } from '@/stores/multiplayerStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { usePresenceStore } from '@/stores/presenceStore';
@@ -35,6 +35,7 @@ interface ConnectedUsersPanelProps {
 
 export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigger }) => {
   const { connectedUsers, currentUserId } = useMultiplayerStore();
+  const activeRoster = useActiveRoster();
   const { roles, getRoleById } = useRoleStore();
   const presence = usePresenceStore((s) => s.presence);
   const handRaises = useMiscEphemeralStore((s) => s.handRaises);
@@ -93,7 +94,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
         {trigger || (
           <Button variant="outline" size="sm" className="gap-2">
             <Users className="h-4 w-4" />
-            Connected Players ({connectedUsers.length})
+            Connected Players ({activeRoster.length})
           </Button>
         )}
       </DialogTrigger>
@@ -255,7 +256,7 @@ export const ConnectedUsersPanel: React.FC<ConnectedUsersPanelProps> = ({ trigge
 
         {/* Footer info */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <span>{connectedUsers.length} player{connectedUsers.length !== 1 ? 's' : ''} connected</span>
+          <span>{activeRoster.length} player{activeRoster.length !== 1 ? 's' : ''} connected</span>
           {canAssignPlayerRoles && (
             <div className="flex items-center gap-1">
               <Settings className="h-3 w-3" />

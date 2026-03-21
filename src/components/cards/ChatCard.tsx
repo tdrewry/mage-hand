@@ -14,7 +14,7 @@ import { Send, Swords, Target, MessageSquare, Eye, Users, X, Dice5 } from 'lucid
 import { useChatStore, type ChatMessage, type ChatActionEntry, type ChatDiceEntry } from '@/stores/chatStore';
 import { useDiceStore } from '@/stores/diceStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useMultiplayerStore, useActiveRoster } from '@/stores/multiplayerStore';
 import { emitChatTyping } from '@/lib/net/ephemeral/miscHandlers';
 import type { AttackResolution } from '@/types/actionTypes';
 
@@ -215,9 +215,8 @@ function WhisperPicker({
   whisperTargets: string[];
   setWhisperTargets: (targets: string[]) => void;
 }) {
-  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
-  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
-  const otherUsers = connectedUsers.filter((u) => u.userId !== currentUserId);
+  const activeRoster = useActiveRoster();
+  const otherUsers = activeRoster.filter((u) => !u.isLocal);
 
   const isWhisperMode = whisperTargets.length > 0;
 
@@ -261,14 +260,14 @@ function WhisperPicker({
           <Separator />
           {otherUsers.map((user) => (
             <label
-              key={user.userId}
+              key={user.id}
               className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer"
             >
               <Checkbox
-                checked={whisperTargets.includes(user.userId)}
-                onCheckedChange={() => toggleUser(user.userId)}
+                checked={whisperTargets.includes(user.id)}
+                onCheckedChange={() => toggleUser(user.id)}
               />
-              <span className="text-xs text-foreground">{user.username}</span>
+              <span className="text-xs text-foreground">{user.displayName}</span>
             </label>
           ))}
           {otherUsers.length > 1 && (
@@ -279,13 +278,13 @@ function WhisperPicker({
                 size="sm"
                 className="w-full h-6 text-[10px]"
                 onClick={() => {
-                  const allIds = otherUsers.map((u) => u.userId);
+                  const allIds = otherUsers.map((u) => u.id);
                   const allSelected = allIds.every((id) => whisperTargets.includes(id));
                   setWhisperTargets(allSelected ? [] : allIds);
                 }}
               >
                 <Users className="h-3 w-3 mr-1" />
-                {otherUsers.every((u) => whisperTargets.includes(u.userId)) ? 'Deselect All' : 'Select All'}
+                {otherUsers.every((u) => whisperTargets.includes(u.id)) ? 'Deselect All' : 'Select All'}
               </Button>
             </>
           )}
@@ -300,6 +299,7 @@ export const ChatCardContent: React.FC = () => {
   const addMessage = useChatStore((s) => s.addMessage);
   const currentUserId = useMultiplayerStore((s) => s.currentUserId);
   const currentUsername = useMultiplayerStore((s) => s.currentUsername);
+  const activeRoster = useActiveRoster();
   const [draft, setDraft] = useState('');
   const [whisperTargets, setWhisperTargets] = useState<string[]>([]);
   const [acIndex, setAcIndex] = useState(0);
@@ -330,8 +330,6 @@ export const ChatCardContent: React.FC = () => {
 
   const isWhisperMode = whisperTargets.length > 0;
 
-  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
-
   // Slash command definitions
   const SLASH_COMMANDS = useMemo(() => [
     { command: '/roll', alias: '/r', description: 'Roll dice', usage: '/roll 2d20+5', icon: '🎲' },
@@ -354,14 +352,17 @@ export const ChatCardContent: React.FC = () => {
     const match = draft.match(/^\/(?:w|whisper)\s+(\S*)$/i);
     if (!match) return [];
     const partial = match[1].toLowerCase();
+    
+    const otherUsers = activeRoster.filter(u => !u.isLocal);
+    
     if (!partial) {
       // Show all other users when just "/w "
-      return connectedUsers.filter((u) => u.userId !== currentUserId);
+      return otherUsers;
     }
-    return connectedUsers.filter(
-      (u) => u.userId !== currentUserId && u.username.toLowerCase().startsWith(partial)
+    return otherUsers.filter(
+      (u) => u.displayName.toLowerCase().startsWith(partial)
     );
-  }, [draft, connectedUsers, currentUserId]);
+  }, [draft, activeRoster]);
 
   // Combined suggestions: slash commands take priority over whisper names
   const hasAnySuggestions = slashSuggestions.length > 0 || acSuggestions.length > 0;
@@ -417,8 +418,9 @@ export const ChatCardContent: React.FC = () => {
       const messageText = slashMatch[2].trim();
       if (!messageText) return;
 
-      const matched = connectedUsers.filter(
-        (u) => u.userId !== currentUserId && u.username.toLowerCase().startsWith(targetName)
+      const otherUsers = activeRoster.filter(u => !u.isLocal);
+      const matched = otherUsers.filter(
+        (u) => u.displayName.toLowerCase().startsWith(targetName)
       );
       if (matched.length === 0) {
         addMessage(
@@ -431,7 +433,7 @@ export const ChatCardContent: React.FC = () => {
           currentUserId || 'local',
           currentUsername || 'You',
           messageText,
-          matched.map((u) => u.userId)
+          matched.map((u) => u.id)
         );
       }
       setDraft('');
@@ -445,7 +447,7 @@ export const ChatCardContent: React.FC = () => {
       isWhisperMode ? whisperTargets : undefined
     );
     setDraft('');
-  }, [draft, addMessage, diceRoll, currentUserId, currentUsername, isWhisperMode, whisperTargets, connectedUsers]);
+  }, [draft, addMessage, diceRoll, currentUserId, currentUsername, isWhisperMode, whisperTargets, activeRoster]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -486,7 +488,7 @@ export const ChatCardContent: React.FC = () => {
         }
         if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
           e.preventDefault();
-          applyAutocomplete(acSuggestions[acIndex].username);
+          applyAutocomplete(acSuggestions[acIndex].displayName);
           return;
         }
         if (e.key === 'Escape') {
@@ -584,15 +586,15 @@ export const ChatCardContent: React.FC = () => {
             <p className="text-[9px] text-muted-foreground px-2 py-0.5">Whisper to…</p>
             {acSuggestions.map((user, i) => (
               <button
-                key={user.userId}
+                key={user.id}
                 className={`w-full text-left rounded px-2 py-1 text-xs flex items-center gap-1.5 ${
                   i === acIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-muted'
                 }`}
-                onMouseDown={(e) => { e.preventDefault(); applyAutocomplete(user.username); }}
+                onMouseDown={(e) => { e.preventDefault(); applyAutocomplete(user.displayName); }}
                 onMouseEnter={() => setAcIndex(i)}
               >
                 <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
-                {user.username}
+                {user.displayName}
               </button>
             ))}
           </div>

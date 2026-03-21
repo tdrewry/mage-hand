@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectedUser } from '@/types/multiplayerEvents';
@@ -11,6 +12,13 @@ export interface SessionInfo {
   sessionId: string;
   createdAt: number;
   hasPassword: boolean;
+}
+
+export interface RosterPeer {
+  id: string;
+  displayName: string;
+  role: 'host' | 'client';
+  isLocal: boolean;
 }
 
 export interface MultiplayerState {
@@ -261,3 +269,75 @@ export const useMultiplayerStore = create<MultiplayerState>()(
     }
   )
 );
+
+export const useActiveRoster = (): RosterPeer[] => {
+  const currentUserId = useMultiplayerStore((s) => s.currentUserId);
+  const currentUsername = useMultiplayerStore((s) => s.currentUsername);
+  const roles = useMultiplayerStore((s) => s.roles);
+  const webRtcConnections = useMultiplayerStore((s) => s.webRtcConnections);
+  const connectedUsers = useMultiplayerStore((s) => s.connectedUsers);
+
+  return useMemo(() => {
+    const roster: RosterPeer[] = [];
+    const isHost = roles.includes('dm');
+
+    // 1. Always include local user
+    roster.push({
+      id: currentUserId || 'local',
+      displayName: currentUsername || 'You',
+      role: isHost ? 'host' : 'client',
+      isLocal: true,
+    });
+
+    // 2. Add everyone in connectedUsers (excluding local user)
+    connectedUsers.forEach((u) => {
+      if (u.userId !== currentUserId) {
+        roster.push({
+          id: u.userId,
+          displayName: u.username,
+          role: u.roleIds.includes('dm') ? 'host' : 'client',
+          isLocal: false,
+        });
+      }
+    });
+
+    // 3. Identify active WebRTC peers (fallback if not in connectedUsers yet)
+    webRtcConnections.forEach((conn) => {
+      // Treat anything not cleanly disconnected as active enough to be in the roster
+      if (
+        conn.status !== 'disconnected' &&
+        conn.status !== 'failed' &&
+        conn.status !== 'closed'
+      ) {
+        // If not already in roster from connectedUsers
+        if (!roster.some((r) => r.id === conn.peerId)) {
+          if (isHost) {
+            // We are the host, connected peers are clients
+            roster.push({
+              id: conn.peerId,
+              displayName: `Guest-${conn.peerId.slice(0, 4)}`,
+              role: 'client',
+              isLocal: false,
+            });
+          } else {
+            // We are a client, connected peers are hosts
+            roster.push({
+              id: conn.peerId,
+              displayName: `Host-${conn.peerId.slice(0, 4)}`,
+              role: 'host',
+              isLocal: false,
+            });
+          }
+        }
+      }
+    });
+
+    // Deduplicate roster just in case
+    const seen = new Set<string>();
+    return roster.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+  }, [currentUserId, currentUsername, roles, webRtcConnections, connectedUsers]);
+};

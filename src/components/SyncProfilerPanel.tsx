@@ -5,7 +5,7 @@ import { Download, Copy, Check, Play, Server, Zap, RefreshCw, Link, Share2, Aler
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { useUiStateStore } from '@/stores/uiStateStore';
-import { useMultiplayerStore } from '@/stores/multiplayerStore';
+import { useMultiplayerStore, useActiveRoster } from '@/stores/multiplayerStore';
 import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
 import { useBottomNavbarVisible } from '@/hooks/useBottomNavbarVisible';
 import { toast } from 'sonner';
@@ -32,8 +32,9 @@ export const SyncProfilerPanel: React.FC = () => {
   const peers = useNetworkDiagnosticsStore((s) => s.peers);
   const webrtcHistory = useNetworkDiagnosticsStore((s) => s.history);
   const peerList = Object.values(peers);
+  const activeRoster = useActiveRoster();
 
-  const activePeers = peerList.filter(p => p.stage === 'connected' || p.stage === 'datachannel_open').length;
+  const activePeers = activeRoster.length;
   const currentBandwidth = webrtcHistory.length > 0 
     ? (Number(webrtcHistory[webrtcHistory.length - 1].inKb || 0) + Number(webrtcHistory[webrtcHistory.length - 1].outKb || 0)).toFixed(2)
     : '0.00';
