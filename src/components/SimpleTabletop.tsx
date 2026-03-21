@@ -132,6 +132,7 @@ import { CursorOverlay } from "./CursorOverlay";
 import { ActionPendingOverlay } from "./ActionPendingOverlay";
 import { CanvasEditStatusBar } from "./CanvasEditStatusBar";
 import { useCursorStore } from "@/stores/cursorStore";
+import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { ephemeralBus } from "@/lib/net";
 import { registerCursorHandlers } from "@/lib/net/ephemeral/cursorHandlers";
 import { registerPresenceHandlers } from "@/lib/net/ephemeral/presenceHandlers";
@@ -2589,12 +2590,15 @@ export const SimpleTabletop = () => {
             // Clean up combined visibility
             if (combinedVisibility.remove) combinedVisibility.remove();
 
-            // Serialize for persistence
-            const currentMapId = selectedMapId || 'default-map';
-            const serialized = serializeFogGeometry(getActiveExploredArea());
-            if (serialized) {
-              fogSerializeSourceRef.current = true;
-              setSerializedExploredAreasForMap(currentMapId, serialized);
+            // Serialize for persistence (Host only to prevent State Authority Leaks)
+            const isHost = roles.includes('dm') || roles.includes('host');
+            if (isHost) {
+              const currentMapId = selectedMapId || 'default-map';
+              const serialized = serializeFogGeometry(getActiveExploredArea());
+              if (serialized) {
+                fogSerializeSourceRef.current = true;
+                setSerializedExploredAreasForMap(currentMapId, serialized);
+              }
             }
           }
 
@@ -9693,7 +9697,11 @@ export const SimpleTabletop = () => {
     // ── EPHEMERAL CURSOR: broadcast world-space position (only when sharing enabled) ──
     if (useCursorStore.getState().cursorSharingEnabled) {
       const worldCursorPos = screenToWorld(mouseX, mouseY);
-      ephemeralBus.emit("cursor.update", { pos: { x: worldCursorPos.x, y: worldCursorPos.y } });
+      const currentUsername = useMultiplayerStore.getState().currentUsername || "Guest";
+      ephemeralBus.emit("cursor.update", { 
+        pos: { x: worldCursorPos.x, y: worldCursorPos.y }, 
+        name: currentUsername 
+      });
     }
 
     // ── ACTION TARGETING: track mouse position for reticle ──

@@ -2,6 +2,9 @@
 import type { ClientId } from "../../../networking/contract/v1";
 
 function randomId(prefix = ""): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}${crypto.randomUUID()}`;
+  }
   const rnd = Math.random().toString(16).slice(2);
   const time = Date.now().toString(16);
   return `${prefix}${time}-${rnd}`;

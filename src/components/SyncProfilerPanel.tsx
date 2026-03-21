@@ -24,6 +24,7 @@ export const SyncProfilerPanel: React.FC = () => {
   
   const isProfilerVisible = useUiStateStore(s => s.isProfilerVisible);
   const currentSession = useMultiplayerStore(s => s.currentSession);
+  const currentUsername = useMultiplayerStore(s => s.currentUsername);
   const activeTransport = useMultiplayerStore((s) => s.activeTransport);
   const sessionRoles = useMultiplayerStore((s) => s.roles);
   const isBottomNavbarVisible = useBottomNavbarVisible();
@@ -87,10 +88,12 @@ export const SyncProfilerPanel: React.FC = () => {
   useEffect(() => {
     if (!active) {
       syncProfiler.stop();
+      useNetworkDiagnosticsStore.getState().setIsRecording(false);
       return;
     }
     
     syncProfiler.start();
+    useNetworkDiagnosticsStore.getState().setIsRecording(true);
 
     const unsubscribeAlerts = syncProfiler.onAlert((payload) => {
       if (payload.severity === 'critical') {
@@ -281,31 +284,17 @@ export const SyncProfilerPanel: React.FC = () => {
             className="h-6 text-[10px] flex-1 px-2"
             onClick={() => setActive(!active)}
           >
-            {active ? 'Stop Profiler' : 'Start Profiler'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-amber-900/20 text-amber-400 border-amber-900/50 hover:bg-amber-900/40"
-            onClick={() => (window as any).HARD_RESET?.(false)}
-            title="Clean Burn: Clear session, disconnect, and start fresh (HARD RESET)"
-          >
-            <RefreshCw className="h-3 w-3" /> New Test
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-emerald-900/20 text-emerald-400 border-emerald-900/50 hover:bg-emerald-900/40"
-            onClick={() => (window as any).HARD_RESET?.(true)}
-            title="Sandbox Burn: Clear session, disconnect, and start DEV_LOCAL session"
-          >
-            <RefreshCw className="h-3 w-3" /> Sandbox
+            {active ? 'Pause Profiler' : 'Resume Profiler'}
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white px-2"
-            onClick={() => syncProfiler.downloadCSV()}
+            onClick={() => {
+              const role = sessionRoles.includes('dm') ? 'host' : 'client';
+              const safeName = (currentUsername || 'unknown').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+              syncProfiler.downloadCSV(`${role}-${safeName}-sync_profiler_log_${Date.now()}.csv`);
+            }}
             title="Download Profiler Log (CSV)"
           >
             <Download className="h-3 w-3" /> Save CSV

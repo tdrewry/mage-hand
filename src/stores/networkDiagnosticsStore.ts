@@ -46,11 +46,15 @@ interface NetworkDiagnosticsState {
   removePeer: (clientId: string) => void;
   clearAll: () => void;
   flushWebRTCStats: (timestamp: number | string) => Promise<void>;
+  isRecording: boolean;
+  setIsRecording: (recording: boolean) => void;
 }
 
 export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set) => ({
   peers: {},
   history: [],
+  isRecording: true,
+  setIsRecording: (recording) => set({ isRecording: recording }),
   updatePeer: (clientId, update) =>
     set((state) => {
       const existing = state.peers[clientId] || {
@@ -130,6 +134,8 @@ export const useNetworkDiagnosticsStore = create<NetworkDiagnosticsState>((set) 
     const inKb = (globalDeltaReceived / 1024).toFixed(2);
 
     set((state) => {
+      if (!state.isRecording) return state;
+      
       const newHistory = [...state.history, { timestamp, outKb, inKb }];
       if (newHistory.length > 6) {
         newHistory.shift();

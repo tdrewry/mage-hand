@@ -263,6 +263,7 @@ export interface CursorUpdatePayload {
   pos: Vec2;
   color?: string;
   tool?: string;
+  name?: string;
 }
 
 export interface CursorVisibilityPayload {

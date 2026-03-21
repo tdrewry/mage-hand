@@ -13,15 +13,28 @@ export function registerCursorHandlers(): void {
   if (registered) return;
   registered = true;
 
+  // Track last cursor update timestamp per user to throttle heavy re-renders
+  const lastCursorUpdate = new Map<string, number>();
+
   ephemeralBus.on("cursor.update", (data: CursorUpdatePayload, userId) => {
     // Skip store update if cursor sharing is disabled — reduces unnecessary state churn
     if (!useCursorStore.getState().cursorSharingEnabled) return;
+
+    // Fast path throttle: limit updates to ~30fps (33ms) to prevent UI thread lockup on Host
+    const now = performance.now();
+    const lastUpdate = lastCursorUpdate.get(userId) || 0;
+    if (now - lastUpdate < 33) {
+      return;
+    }
+    lastCursorUpdate.set(userId, now);
+
     useCursorStore.getState().setCursor(userId, {
       userId,
       x: data.pos.x,
       y: data.pos.y,
       color: data.color ?? "",
       tool: data.tool,
+      name: data.name,
     });
   });
 

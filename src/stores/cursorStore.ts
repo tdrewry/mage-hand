@@ -11,6 +11,7 @@ export interface RemoteCursor {
   y: number;
   color: string;
   tool?: string;
+  name?: string;
   /** Timestamp of last update (for staleness checks) */
   lastSeen: number;
 }

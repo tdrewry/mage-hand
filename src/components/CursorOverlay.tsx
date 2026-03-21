@@ -33,7 +33,7 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = React.memo(({ transfo
 
         // Find username for label
         const user = connectedUsers.find((u) => u.userId === cursor.userId);
-        const label = user?.username ?? cursor.userId.slice(0, 6);
+        const label = user?.username ?? cursor.name ?? `Guest-${cursor.userId.slice(0, 4)}`;
 
         return (
           <div

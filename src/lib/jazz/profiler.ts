@@ -70,7 +70,10 @@ class SyncProfiler {
   // Keep rolling array of last 6 windows (60 seconds) for UI polling
   public rollingWindows: { timestamp: string, outKb: string, inKb: string, outOps: number, inOps: number, activeDOs: number, streamOutKb: string, streamInKb: string }[] = [];
 
+  public isRecording: boolean = true;
+
   start() {
+    this.isRecording = true;
     if (this.intervalId) return;
     this.reset();
     
@@ -83,11 +86,7 @@ class SyncProfiler {
   }
 
   stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-      console.log('[SyncProfiler] Stopped');
-    }
+    this.isRecording = false;
   }
 
   /**
@@ -215,7 +214,9 @@ class SyncProfiler {
     };
 
     // Store in history
-    this.history.push(windowData);
+    if (this.isRecording) {
+      this.history.push(windowData);
+    }
 
     // Maintain 60-second rolling window (last 6 samples)
     this.rollingWindows.push(windowData);
@@ -224,20 +225,22 @@ class SyncProfiler {
     }
     
     // Save to IndexedDB quietly
-    metricsDb.profiler_logs.add({
-      sessionId: this.sessionId,
-      role: this.role,
-      timestamp: Date.now(),
-      outKb: parseFloat(outKbs),
-      inKb: parseFloat(inKbs),
-      outOps: this.outOps,
-      inOps: this.inOps,
-      activeDOs: this.activeDOs,
-      streamOutKb: parseFloat(streamOutKb),
-      streamInKb: parseFloat(streamInKb),
-    }).catch(e => {
-      console.warn('[SyncProfiler] Failed to save telemetry to local DB:', e);
-    });
+    if (this.isRecording) {
+      metricsDb.profiler_logs.add({
+        sessionId: this.sessionId,
+        role: this.role,
+        timestamp: Date.now(),
+        outKb: parseFloat(outKbs),
+        inKb: parseFloat(inKbs),
+        outOps: this.outOps,
+        inOps: this.inOps,
+        activeDOs: this.activeDOs,
+        streamOutKb: parseFloat(streamOutKb),
+        streamInKb: parseFloat(streamInKb),
+      }).catch(e => {
+        console.warn('[SyncProfiler] Failed to save telemetry to local DB:', e);
+      });
+    }
 
     console.log(
       `%c[SyncProfiler] 10s Window: %cOut %c${outKbs} KB%c (${this.outOps} ops) | %cIn %c${inKbs} KB%c (${this.inOps} ops) | %cDOs %c${this.activeDOs}%c | %cSTR Out %c${streamOutKb} KB%c | %cSTR In %c${streamInKb} KB`,
@@ -262,7 +265,7 @@ class SyncProfiler {
   /**
    * Downloads the recorded history as a CSV file and clears the log.
    */
-  downloadCSV() {
+  downloadCSV(filename?: string) {
     if (this.history.length === 0) {
       console.warn("No profiler data to download.");
       return;
@@ -288,7 +291,7 @@ class SyncProfiler {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `sync_profiler_log_${new Date().getTime()}.csv`);
+    link.setAttribute("download", filename || `sync_profiler_log_${new Date().getTime()}.csv`);
     document.body.appendChild(link); // Required for FF
     link.click();
     document.body.removeChild(link);
