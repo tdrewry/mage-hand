@@ -51,7 +51,7 @@ interface SoundState {
 }
 
 const DEFAULT_STATE = {
-  enabled: true,
+  enabled: false,
   masterVolume: 0.5,
   categoryVolumes: {} as Record<string, number>,
   disabledEvents: {} as Record<string, boolean>,
