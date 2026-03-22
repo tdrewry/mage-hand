@@ -388,7 +388,8 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
               className={cn(
                 "absolute rounded-lg border-2 bg-card shadow-md cursor-pointer transition-shadow",
                 isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                isStart && "border-primary",
+                isStart && !isFunctionNode && "border-primary",
+                isStart && isFunctionNode && "border-primary bg-purple-500/5",
                 !isStart && !isFunctionNode && "border-border",
                 isFunctionNode && !isStart && "border-purple-500/50 bg-purple-500/5",
                 isHover && "ring-2 ring-green-500",
@@ -401,7 +402,12 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
             >
               <div className="p-2 h-full flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className={cn("text-muted-foreground", isStart && "text-primary", isFunctionNode && !isStart && "text-purple-500")}>{getNodeIcon(node)}</span>
+                  <span className={cn(
+                     "flex items-center gap-1", 
+                     isStart && !isFunctionNode && "text-primary", 
+                     isFunctionNode && "text-purple-500",
+                     !isStart && !isFunctionNode && "text-muted-foreground"
+                  )}>{getNodeIcon(node)}</span>
                   <span className="text-xs font-bold truncate flex-1">{node.nodeData.name || node.id}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">

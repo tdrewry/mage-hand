@@ -30,6 +30,8 @@ import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 // ---------------------------------------------------------------------------
 // createCurrentProjectData — snapshot every store into a serialisable object
 // ---------------------------------------------------------------------------
@@ -60,6 +62,8 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
   const effectStore = useEffectStore.getState();
   const uiModeStore = useUiModeStore.getState();
   const campaignStore = useCampaignStore.getState();
+  const ruleStore = useRuleStore.getState();
+  const globalConfigStore = useGlobalConfigStore.getState();
 
   return {
     metadata: createProjectMetadata(
@@ -152,6 +156,10 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
     mapStructures: mapStore.structures,
     selectedMapId: mapStore.selectedMapId,
     autoFocusFollowsToken: mapStore.autoFocusFollowsToken,
+    rulesEngine: {
+      vocabularyCategories: globalConfigStore.categories,
+      pipelines: ruleStore.pipelines,
+    },
   };
 }
 
@@ -180,6 +188,7 @@ export function clearAllStores(): void {
   const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
   effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
   useTokenGroupStore.getState().clearAllGroups();
+  useRuleStore.setState({ pipelines: [] });
 }
 
 // ---------------------------------------------------------------------------
@@ -358,5 +367,15 @@ export function applyProjectData(data: ProjectData): void {
     if (data.mapFocus.unfocusedOpacity !== undefined) mf.setUnfocusedOpacity(data.mapFocus.unfocusedOpacity);
     if (data.mapFocus.unfocusedBlur !== undefined) mf.setUnfocusedBlur(data.mapFocus.unfocusedBlur);
     if (data.mapFocus.selectionLockEnabled !== undefined) mf.setSelectionLockEnabled(data.mapFocus.selectionLockEnabled);
+  }
+
+  // 9. Rules Engine
+  if (data.rulesEngine) {
+    if (data.rulesEngine.vocabularyCategories) {
+      useGlobalConfigStore.setState({ categories: data.rulesEngine.vocabularyCategories });
+    }
+    if (data.rulesEngine.pipelines) {
+      useRuleStore.setState({ pipelines: data.rulesEngine.pipelines });
+    }
   }
 }

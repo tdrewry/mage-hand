@@ -129,6 +129,11 @@ export interface ProjectData {
     unfocusedBlur: number;
     selectionLockEnabled: boolean;
   };
+  // Rules and Automation
+  rulesEngine?: {
+    vocabularyCategories: Record<string, any>;
+    pipelines: any[];
+  };
   // Map hierarchy structures and selection
   mapStructures?: any[];
   selectedMapId?: string | null;

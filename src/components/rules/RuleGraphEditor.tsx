@@ -3,7 +3,7 @@ import { Suspense, lazy } from 'react';
 import { GenericFlowCanvas } from '@/lib/campaign-editor/components/GenericFlowCanvas';
 import { RuleNode } from '@/lib/rules-engine/types';
 import { FlowNodePosition } from '@/lib/campaign-editor/types/base';
-import { AlertCircle, Plus, Trash2, ArrowLeft, Save, Flag, Calculator, Play, X } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, ArrowLeft, Save, Flag, Calculator, Play, X, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRuleStore } from '@/stores/ruleStore';
@@ -18,6 +18,241 @@ import { PipelineTester } from './PipelineTester';
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 const mockAdapter = { labels: { node: 'Rule' } } as any;
+
+const FunctionNodeInspector = ({ 
+  node, 
+  setNodes,
+  setJsonValue
+}: { 
+  node: RuleNode; 
+  setNodes: React.Dispatch<React.SetStateAction<RuleNode[]>>;
+  setJsonValue: (val: string) => void;
+}) => {
+  const logicMap = node.nodeData.jsonLogic || {};
+  const ops = ['floor', 'ceil', 'round', 'abs', 'roll', 'custom'];
+  const knownOps = ['floor', 'ceil', 'round', 'abs', 'roll'];
+  const mathOps = ['floor', 'ceil', 'round', 'abs'];
+  
+  const logicKeys = Object.keys(logicMap);
+  let currentOp = 'custom';
+  let initialCustomName = 'my_custom_name';
+  
+  const foundKnownOp = logicKeys.find(k => knownOps.includes(k));
+  if (foundKnownOp) {
+      currentOp = foundKnownOp;
+  } else if (logicKeys.length > 0) {
+      currentOp = 'custom';
+      initialCustomName = logicKeys[0];
+  } else if (logicKeys.length === 0) {
+      currentOp = 'floor';
+  }
+
+  let currentTarget = '';
+  if (mathOps.includes(currentOp)) {
+    const args = logicMap[currentOp];
+    if (Array.isArray(args) && args[0] && args[0].var) {
+      currentTarget = args[0].var;
+    }
+  }
+
+  const getInitialJsonState = () => {
+    if (currentOp === 'roll') {
+      return JSON.stringify(logicMap['roll'] || [], null, 2);
+    } else if (currentOp === 'custom') {
+      return JSON.stringify(logicMap[initialCustomName] || [], null, 2);
+    }
+    return '';
+  };
+  
+  const [localJsonValue, setLocalJsonValue] = useState(getInitialJsonState());
+  const [localJsonError, setLocalJsonError] = useState<string | null>(null);
+  const [customName, setCustomName] = useState(initialCustomName);
+
+  useEffect(() => {
+    const localKeys = Object.keys(logicMap);
+    const localKnown = localKeys.find(k => knownOps.includes(k));
+    if (!localKnown && localKeys.length > 0) {
+       setCustomName(localKeys[0]);
+    } else if (localKeys.length === 0) {
+       setCustomName('my_custom_name');
+    }
+    
+    setLocalJsonValue(getInitialJsonState());
+    setLocalJsonError(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id, currentOp, JSON.stringify(logicMap)]);
+
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFunctionChange = (newOp: string, newTarget: string, newCustomName: string = customName) => {
+    let payload: any = {};
+    if (mathOps.includes(newOp)) {
+      payload = { [newOp]: [{ "var": newTarget }] };
+    } else if (newOp === 'roll') {
+      let args = [];
+      try { args = JSON.parse(localJsonValue || '[]'); } catch(e) {}
+      payload = { "roll": args };
+    } else if (newOp === 'custom') {
+      let args = [];
+      try { args = JSON.parse(localJsonValue || '[]'); } catch(e) {}
+      payload = { [newCustomName]: args };
+    }
+    
+    setNodes(curr => curr.map(n => 
+      n.id === node.id 
+        ? { ...n, nodeData: { ...n.nodeData, jsonLogic: payload } } 
+        : n
+    ));
+    setJsonValue(JSON.stringify(payload, null, 2));
+  };
+  
+  const handleCustomNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const newName = e.target.value;
+     setCustomName(newName);
+     if (currentOp === 'custom') {
+        let args = [];
+        try { args = JSON.parse(localJsonValue || '[]'); } catch(e) {}
+        const payload = { [newName]: args };
+        setNodes(curr => curr.map(n => 
+          n.id === node.id 
+            ? { ...n, nodeData: { ...n.nodeData, jsonLogic: payload } } 
+            : n
+        ));
+        setJsonValue(JSON.stringify(payload, null, 2));
+     }
+  };
+
+  const handleLocalJsonChange = (val: string | undefined) => {
+    const newVal = val ?? '';
+    setLocalJsonValue(newVal);
+    
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    
+    debounceTimer.current = setTimeout(() => {
+      try {
+        if (!newVal.trim()) {
+           setLocalJsonError(null);
+           return; 
+        }
+        const parsed = JSON.parse(newVal);
+        setLocalJsonError(null);
+        
+        let payload: any = parsed;
+        if (currentOp === 'roll') {
+          payload = { "roll": parsed };
+        } else if (currentOp === 'custom') {
+          payload = { [customName]: parsed };
+        }
+        
+        setNodes(curr => curr.map(n => 
+          n.id === node.id 
+            ? { ...n, nodeData: { ...n.nodeData, jsonLogic: payload } } 
+            : n
+        ));
+      } catch (e: any) {
+        setLocalJsonError(e.message);
+      }
+    }, 500);
+  };
+
+  const renderPreview = () => {
+     if (mathOps.includes(currentOp)) {
+        return JSON.stringify({ [currentOp]: [{ "var": currentTarget }] }, null, 2);
+     }
+     try {
+        const parsed = JSON.parse(localJsonValue || '[]');
+        if (currentOp === 'roll') {
+           return JSON.stringify({ "roll": parsed }, null, 2);
+        } else if (currentOp === 'custom') {
+           return JSON.stringify({ [customName]: parsed }, null, 2);
+        }
+        return JSON.stringify(parsed, null, 2);
+     } catch (e) {
+        return "Invalid JSON";
+     }
+  };
+
+  return (
+    <div className="p-4 flex flex-col gap-4 flex-1 min-h-0">
+      <div className="flex flex-col gap-1.5 shrink-0">
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Operation</label>
+        <select 
+          value={currentOp}
+          onChange={(e) => handleFunctionChange(e.target.value, currentTarget)}
+          className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          {ops.map(op => <option key={op} value={op}>{op.toUpperCase()}</option>)}
+        </select>
+      </div>
+      
+      {mathOps.includes(currentOp) ? (
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Target Variable</label>
+          <input 
+            type="text" 
+            value={currentTarget}
+            onChange={(e) => handleFunctionChange(currentOp, e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="e.g. damage.amount"
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 flex-1 min-h-[200px]">
+          {currentOp === 'custom' && (
+            <div className="flex flex-col gap-1.5 shrink-0">
+               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Custom Name</label>
+               <input 
+                 type="text" 
+                 value={customName}
+                 onChange={handleCustomNameChange}
+                 className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                 placeholder="e.g. my_custom_name"
+               />
+            </div>
+          )}
+        
+          <div className="flex flex-col gap-1.5 flex-1 min-h-[150px]">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {currentOp === 'roll' ? 'ROLL ARGUMENTS (JSON)' : 'ARGUMENTS (JSON)'}
+            </label>
+            {localJsonError && (
+              <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span className="font-mono break-all">{localJsonError}</span>
+              </div>
+            )}
+            <div className="flex-1 min-h-[100px] border border-input rounded-md overflow-hidden">
+              <Suspense fallback={<div className="p-4 text-xs text-muted-foreground text-center">Loading Monaco Editor...</div>}>
+                <MonacoEditor
+                   height="100%"
+                   language="json"
+                   path={currentOp === 'roll' ? "inmemory://rule-schema-roll.json" : "inmemory://rule-schema-custom.json"}
+                   value={localJsonValue}
+                   onChange={handleLocalJsonChange}
+                   theme="vs-dark"
+                   options={{
+                     minimap: { enabled: false },
+                     fontSize: 12,
+                     wordWrap: 'on',
+                     formatOnPaste: false,
+                     formatOnType: false,
+                     scrollBeyondLastLine: false,
+                     padding: { top: 8 }
+                   }}
+                />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="text-xs text-muted-foreground p-3 rounded-md border border-border bg-black/20 font-mono break-all shrink-0">
+        <span className="text-purple-400">Payload Preview:</span><br/>
+        {renderPreview()}
+      </div>
+    </div>
+  );
+};
 
 interface RuleGraphEditorProps {
   onBack: () => void;
@@ -39,6 +274,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
   const [hasLoaded, setHasLoaded] = useState(false);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(pipelineId || null);
   const [entryNodeId, setEntryNodeId] = useState<string | null>(null);
+  const [isInspectorExpanded, setIsInspectorExpanded] = useState(false);
 
   const [mockStateJson, setMockStateJson] = useState('{\n  \n}');
   const [outputState, setOutputState] = useState<any>(null);
@@ -207,6 +443,30 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
     toast.success("Pipeline saved!");
   };
 
+  const handleExportClick = () => {
+    const exportData = {
+      mageHandExportVersion: 1,
+      type: "logic-pipeline",
+      pipeline: {
+        name: pipelineTitle || 'Untitled Pipeline',
+        description: '', // Graph doesn't currently keep a local description state at top level component
+        nodes,
+        positions,
+        entryNodeId: entryNodeId || undefined,
+        mockStateJson
+      }
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(pipelineTitle || 'pipeline').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Pipeline exported successfully");
+  };
+
   const addConnection = (src: string, tgt: string, type: 'success' | 'failure') => {
     setNodes(curr => curr.map(n => {
       if (n.id === src) {
@@ -369,6 +629,16 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
           </div>
 
           <Button 
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={handleExportClick}
+            title="Export Pipeline to JSON"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" /> Export
+          </Button>
+
+          <Button 
             variant="default"
             size="sm"
             className="h-7 px-2 text-xs font-semibold"
@@ -411,8 +681,19 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
 
         {/* Right Sidebar */}
         {selectedNode && (
-          <div className="w-[350px] border-l border-border flex flex-col shrink-0 bg-card overflow-y-auto">
-             <div className="p-4 border-b border-border shrink-0 flex flex-col gap-4">
+          <div className={`transition-all duration-300 flex flex-col shrink-0 bg-card border-l border-border relative ${isInspectorExpanded ? "w-[700px]" : "w-[350px]"}`}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute top-4 -left-3 h-6 w-6 rounded-full border border-border bg-background shadow-sm z-10 p-0 hover:bg-muted"
+              onClick={() => setIsInspectorExpanded(!isInspectorExpanded)}
+              title={isInspectorExpanded ? "Collapse Inspector" : "Expand Inspector"}
+            >
+              {isInspectorExpanded ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+            </Button>
+            
+            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+              <div className="p-4 border-b border-border shrink-0 flex flex-col gap-4">
                <div className="flex items-center justify-between">
                  <h3 className="font-semibold text-sm">Rule Inspector</h3>
                  <Button 
@@ -475,79 +756,32 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
               </div>
             )}
 
-             <div className="flex-1 min-h-0 mt-2 border-t border-border flex flex-col">
-               {selectedNode.nodeType === 'function_node' ? (
-                 (() => {
-                   const logicMap = selectedNode.nodeData.jsonLogic || {};
-                   const ops = ['floor', 'ceil', 'round', 'abs', 'roll'];
-                   const currentOp = Object.keys(logicMap).find(k => ops.includes(k)) || 'floor';
-                   let currentTarget = '';
-                   const args = logicMap[currentOp];
-                   if (Array.isArray(args) && args[0] && args[0].var) {
-                     currentTarget = args[0].var;
-                   }
-
-                   const handleFunctionChange = (op: string, target: string) => {
-                     const payload = { [op]: [{ "var": target }] };
-                     setNodes(curr => curr.map(n => 
-                       n.id === selectedNode.id 
-                         ? { ...n, nodeData: { ...n.nodeData, jsonLogic: payload } } 
-                         : n
-                     ));
-                     setJsonValue(JSON.stringify(payload, null, 2));
-                   };
-
-                   return (
-                     <div className="p-4 flex flex-col gap-4">
-                       <div className="flex flex-col gap-1.5">
-                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Operation</label>
-                         <select 
-                           value={currentOp}
-                           onChange={(e) => handleFunctionChange(e.target.value, currentTarget)}
-                           className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                         >
-                           {ops.map(op => <option key={op} value={op}>{op.toUpperCase()}</option>)}
-                         </select>
-                       </div>
-                       <div className="flex flex-col gap-1.5">
-                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Target Variable</label>
-                         <input 
-                           type="text" 
-                           value={currentTarget}
-                           onChange={(e) => handleFunctionChange(currentOp, e.target.value)}
-                           className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                           placeholder="e.g. damage.amount"
-                         />
-                       </div>
-                       <div className="text-xs text-muted-foreground mt-4 p-3 rounded-md border border-border bg-black/20 font-mono break-all">
-                         <span className="text-purple-400">Payload Preview:</span><br/>
-                         {JSON.stringify({ [currentOp]: [{ "var": currentTarget }] }, null, 2)}
-                       </div>
-                     </div>
-                   );
-                 })()
-               ) : (
-                 <Suspense fallback={<div className="p-4 text-xs text-muted-foreground text-center">Loading Monaco Editor...</div>}>
-                   <MonacoEditor
-                      height="100%"
-                      language="json"
-                      path="inmemory://rule-schema.json"
-                      value={jsonValue}
-                      onChange={handleJsonChange}
-                      theme="vs-dark"
-                      options={{
-                        minimap: { enabled: false },
-                        fontSize: 12,
-                        wordWrap: 'on',
-                        formatOnPaste: false,
-                        formatOnType: false,
-                        scrollBeyondLastLine: false,
-                        padding: { top: 16 }
-                      }}
-                   />
-                 </Suspense>
-               )}
-              </div>
+              <div className="flex-1 min-h-0 mt-2 border-t border-border flex flex-col">
+                {selectedNode.nodeType === 'function_node' ? (
+                  <FunctionNodeInspector node={selectedNode} setNodes={setNodes} setJsonValue={setJsonValue} />
+                ) : (
+                  <Suspense fallback={<div className="p-4 text-xs text-muted-foreground text-center">Loading Monaco Editor...</div>}>
+                    <MonacoEditor
+                       height="100%"
+                       language="json"
+                       path="inmemory://rule-schema.json"
+                       value={jsonValue}
+                       onChange={handleJsonChange}
+                       theme="vs-dark"
+                       options={{
+                         minimap: { enabled: false },
+                         fontSize: 12,
+                         wordWrap: 'on',
+                         formatOnPaste: false,
+                         formatOnType: false,
+                         scrollBeyondLastLine: false,
+                         padding: { top: 16 }
+                       }}
+                    />
+                  </Suspense>
+                )}
+               </div>
+            </div>
           </div>
         )}
       </div>

@@ -13,6 +13,8 @@ import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { serializeProject, deserializeProject, ProjectData } from './projectSerializer';
 
 const AUTO_SAVE_KEY = 'magehand-autosave';
@@ -96,6 +98,8 @@ export class AutoSaveManager {
     useIlluminationStore.subscribe(markChanges);
     useCreatureStore.subscribe(markChanges);
     useHatchingStore.subscribe(markChanges);
+    useRuleStore.subscribe(markChanges);
+    useGlobalConfigStore.subscribe(markChanges);
   }
 
   private debouncedSave(): void {
@@ -131,6 +135,8 @@ export class AutoSaveManager {
       const illuminationState = useIlluminationStore.getState();
       const creatureState = useCreatureStore.getState();
       const hatchingState = useHatchingStore.getState();
+      const ruleState = useRuleStore.getState();
+      const globalConfigState = useGlobalConfigStore.getState();
 
       // Strip large data URIs from tokens to avoid blowing up localStorage
       const strippedTokens = sessionState.tokens.map(t => {
@@ -217,6 +223,10 @@ export class AutoSaveManager {
         hatching: {
           enabled: hatchingState.enabled,
           hatchingOptions: hatchingState.hatchingOptions,
+        },
+        rulesEngine: {
+          vocabularyCategories: globalConfigState.categories,
+          pipelines: ruleState.pipelines,
         },
         viewportTransforms: sessionState.viewportTransforms,
       };
