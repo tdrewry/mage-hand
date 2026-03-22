@@ -220,11 +220,19 @@ export function BaseCard({
               onClick={handleMinimize}
               onMouseDown={handleMouseDown}
             >
-              <h3 className="text-sm font-semibold text-card-foreground select-none truncate">{title}</h3>
-              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePopOut} title="Pop Out to Map">
-                  <ArrowUpRight className="h-3 w-3" />
+              <div className="flex items-center gap-1 min-w-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" 
+                  onClick={handlePopOut} 
+                  title="detach"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" />
                 </Button>
+                <h3 className="text-sm font-semibold text-card-foreground select-none truncate">{title}</h3>
+              </div>
+              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleMinimize}>
                   {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                 </Button>

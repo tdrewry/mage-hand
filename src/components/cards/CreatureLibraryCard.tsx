@@ -61,6 +61,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { ImportCharacterModal } from '@/components/modals/ImportCharacterModal';
 
 interface CreatureLibraryCardContentProps {
@@ -798,7 +809,7 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
                   <CharacterListItem
                     key={char.id}
                     character={char}
-                    onView={() => handleOpenCharacterSheet(char)}
+                    onEdit={() => handleOpenCharacterSheet(char)}
                     onCreateToken={() => handleCreateCharacterToken(char)}
                     isCreating={creatingToken === char.id}
                     onRemove={() => {
@@ -923,7 +934,7 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
                   <MonsterListItem
                     key={monster.id}
                     monster={monster}
-                    onView={() => handleOpenMonsterStatBlock(monster)}
+                    onEdit={() => handleOpenMonsterStatBlock(monster)}
                     onCreateToken={() => handleCreateMonsterToken(monster)}
                     isCreating={creatingToken === monster.id}
                     onRemove={() => {
@@ -1088,17 +1099,17 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
 // Character List Item Component
 interface CharacterListItemProps {
   character: DndBeyondCharacter;
-  onView: () => void;
+  onEdit: () => void;
   onCreateToken: () => void;
   isCreating: boolean;
   onRemove: () => void;
 }
 
-function CharacterListItem({ character, onView, onCreateToken, isCreating, onRemove }: CharacterListItemProps) {
+function CharacterListItem({ character, onEdit, onCreateToken, isCreating, onRemove }: CharacterListItemProps) {
   const classString = character.classes.map((c) => `${c.name} ${c.level}`).join(' / ');
   
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
       {/* Portrait */}
       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0">
         {character.portraitUrl ? (
@@ -1113,7 +1124,7 @@ function CharacterListItem({ character, onView, onCreateToken, isCreating, onRem
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[120px]">
         <p className="text-sm font-medium truncate">{character.name}</p>
         <p className="text-xs text-muted-foreground truncate">
           Level {character.level} {character.race} {classString}
@@ -1131,7 +1142,7 @@ function CharacterListItem({ character, onView, onCreateToken, isCreating, onRem
       </div>
 
       {/* Actions */}
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-auto shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button 
@@ -1150,17 +1161,41 @@ function CharacterListItem({ character, onView, onCreateToken, isCreating, onRem
           </TooltipTrigger>
           <TooltipContent>Create Token</TooltipContent>
         </Tooltip>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onView}>
-          <Eye className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Edit Character">
+          <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={onRemove}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Character</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the character "{character.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -1169,7 +1204,7 @@ function CharacterListItem({ character, onView, onCreateToken, isCreating, onRem
 // Monster List Item Component
 interface MonsterListItemProps {
   monster: Monster5eTools;
-  onView: () => void;
+  onEdit: () => void;
   onCreateToken: () => void;
   isCreating: boolean;
   onRemove: () => void;
@@ -1177,13 +1212,13 @@ interface MonsterListItemProps {
   formatCR: (cr: string | number) => string;
 }
 
-function MonsterListItem({ monster, onView, onCreateToken, isCreating, onRemove, getMonsterTypeString, formatCR }: MonsterListItemProps) {
+function MonsterListItem({ monster, onEdit, onCreateToken, isCreating, onRemove, getMonsterTypeString, formatCR }: MonsterListItemProps) {
   const monsterType = getMonsterTypeString(monster);
   const sizeName = MONSTER_SIZE_NAMES[monster.size] || monster.size;
   const gridSize = MONSTER_SIZE_GRID[monster.size] || 1;
   
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
       {/* Token Art */}
       <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center overflow-hidden flex-shrink-0">
         {monster.tokenUrl ? (
@@ -1198,25 +1233,25 @@ function MonsterListItem({ monster, onView, onCreateToken, isCreating, onRemove,
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[120px]">
         <p className="text-sm font-medium truncate">{monster.name}</p>
         <p className="text-xs text-muted-foreground truncate">
           {sizeName} {monsterType}
         </p>
       </div>
 
-      {/* CR Badge */}
-      <Badge variant="secondary" className="text-[10px] px-1.5 flex-shrink-0">
-        CR {formatCR(monster.cr)}
-      </Badge>
-
-      {/* Source */}
-      <span className="text-[10px] text-muted-foreground flex-shrink-0">
-        {monster.source}
-      </span>
+      {/* Badges */}
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary" className="text-[10px] px-1.5 flex-shrink-0">
+          CR {formatCR(monster.cr)}
+        </Badge>
+        <span className="text-[10px] text-muted-foreground flex-shrink-0">
+          {monster.source}
+        </span>
+      </div>
 
       {/* Actions */}
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-auto shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button 
@@ -1235,17 +1270,41 @@ function MonsterListItem({ monster, onView, onCreateToken, isCreating, onRemove,
           </TooltipTrigger>
           <TooltipContent>Create Token ({gridSize}×{gridSize})</TooltipContent>
         </Tooltip>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onView}>
-          <Eye className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Edit Monster">
+          <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={onRemove}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Monster</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the monster "{monster.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -1267,32 +1326,58 @@ function ItemListEntry({ item, isEditing, onEdit, onUpdate, onRemove }: ItemList
   return (
     <div className="rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
       {/* Summary row */}
-      <div className="flex items-center gap-3 p-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-2">
         <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
           <Gem className="h-5 w-5 text-primary" />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[120px]">
           <p className="text-sm font-medium truncate">{item.name}</p>
           <p className="text-xs text-muted-foreground truncate">
             {categoryLabel}
             {item.value ? ` · ${item.value}` : ''}
           </p>
         </div>
-        {rarityLabel && (
-          <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
-            {rarityLabel}
-          </Badge>
-        )}
-        {item.source && (
-          <span className="text-[10px] text-muted-foreground shrink-0">{item.source}</span>
-        )}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2">
+          {rarityLabel && (
+            <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
+              {rarityLabel}
+            </Badge>
+          )}
+          {item.source && (
+            <span className="text-[10px] text-muted-foreground shrink-0">{item.source}</span>
+          )}
+        </div>
+        <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-auto shrink-0">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onRemove}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Item</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete the item "{item.name}"? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
