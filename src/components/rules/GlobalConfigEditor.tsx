@@ -3,6 +3,17 @@ import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { Button } from '@/components/ui/button';
 import { Trash2, Plus, Settings2, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function GlobalConfigEditor() {
   const store = useGlobalConfigStore();
@@ -43,9 +54,7 @@ export function GlobalConfigEditor() {
 
   const handleRemoveItem = (index: number) => {
     if (!currentCategoryId) return;
-    if (window.confirm(`Are you sure you want to remove this item?`)) {
-      store.removeItem(currentCategoryId, index);
-    }
+    store.removeItem(currentCategoryId, index);
   };
 
   const startEditing = (index: number, val: string) => {
@@ -169,23 +178,42 @@ export function GlobalConfigEditor() {
                   >
                     <Pencil className="w-3 h-3" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 ${['damageTypes', 'conditions', 'abilities'].includes(cat.id) ? 'hidden' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Are you sure you want to delete the category "${cat.label}" and all its items?`)) {
-                        store.removeCategory(cat.id);
-                        if (activeCategory === cat.id) {
-                           setActiveCategory(categoriesList.find(c => c.id !== cat.id)?.id || '');
-                        }
-                      }
-                    }}
-                    title="Delete Category"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Delete Category"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete the category "{cat.label}" and all its items?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            store.removeCategory(cat.id);
+                            if (activeCategory === cat.id) {
+                               setActiveCategory(categoriesList.find(c => c.id !== cat.id)?.id || '');
+                            }
+                          }}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
             </div>
@@ -249,15 +277,35 @@ export function GlobalConfigEditor() {
                         </span>
                       )}
                       
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0 ml-2"
-                        onClick={() => handleRemoveItem(idx)}
-                        title="Remove Item"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0 ml-2"
+                            title="Remove Item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Item</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to remove "{item.value}"?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleRemoveItem(idx)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Remove
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
 
                     {/* Aliases Section */}

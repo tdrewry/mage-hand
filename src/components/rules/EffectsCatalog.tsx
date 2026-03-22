@@ -19,6 +19,17 @@ import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const CATEGORY_META: Record<EffectCategory, { label: string; icon: React.ElementType }> = {
   spell: { label: 'Spells', icon: Wand2 },
@@ -1370,14 +1381,39 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         <Pencil className="w-3 h-3 text-muted-foreground" />
       </Button>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-5 w-5 opacity-0 group-hover:opacity-100"
-        onClick={(e) => { e.stopPropagation(); onDelete(template.id); }}
-      >
-        <Trash2 className="w-3 h-3 text-destructive" />
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 opacity-0 group-hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+            title="Delete Effect"
+          >
+            <Trash2 className="w-3 h-3 text-destructive" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Effect Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the effect template "{template.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(template.id);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1689,14 +1725,39 @@ export function EffectsCatalog() {
                         <RotateCcw className="w-3 h-3 text-primary" />
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                      onClick={() => removeEffect(e.id)}
-                    >
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                          onClick={(evt) => evt.stopPropagation()}
+                          title="Remove Placed Effect"
+                        >
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={(evt) => evt.stopPropagation()}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Active Effect</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to remove this active effect from the table?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              removeEffect(e.id);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Remove
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 ))}
               </div>

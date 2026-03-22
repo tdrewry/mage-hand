@@ -9,12 +9,20 @@ export interface RuleNode extends BaseFlowNode<RuleNodeData> {
   nodeType: 'rule' | 'function_node';
 }
 
+export interface TargetResult {
+  challengeResult?: { rolls: number[]; modifier: number; total: number; isSuccess: boolean };
+  damage: Record<string, { amount: number }>;
+  effectsApplied: Record<string, { duration: number; unit: string; trigger?: string; pipelineId?: string }>;
+  suggestedResolution: string;
+}
+
 export interface ResolutionPayload {
   source: { name: string; type: string };
-  attacker: { id: string; name: string };
-  defender: { id: string; name: string };
-  attackRoll?: { formula: string; total: number; versusAC: number };
-  damage: Array<{ type: string; amount: number; formula: string }>;
-  suggestedResolution: string;
-  outcomes: Record<string, any>;
+  targets: Array<{ id: string; name: string }>;
+  challenge?: { type: string; versus: string; target: number };
+  rawResults: { 
+    damage: Record<string, { amount: number; formula: string; rolls: number[] }>; 
+    effects: Record<string, { duration: number; unit: string; trigger?: string; pipelineId?: string }>;
+  };
+  targetResults: Record<string, TargetResult>;
 }

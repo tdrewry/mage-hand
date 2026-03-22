@@ -10,7 +10,7 @@ import type { ResolutionPayload } from '@/lib/rules-engine/types';
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 function isResolutionPayload(obj: any): obj is ResolutionPayload {
-  return obj && !obj.error && obj.attacker && obj.defender && obj.source && obj.damage && Array.isArray(obj.damage);
+  return obj && !obj.error && obj.source && obj.targets && Array.isArray(obj.targets) && obj.rawResults && obj.targetResults;
 }
 
 export function PipelineTester({ 

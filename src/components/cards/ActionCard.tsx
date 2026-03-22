@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices, Lock } from 'lucide-react';
+import { Swords, Target, Check, X, AlertTriangle, Skull, Shield, ChevronRight, Percent, Dices, Lock, Zap, CheckCircle2, XCircle, ShieldAlert } from 'lucide-react';
 import { useActionStore, broadcastResolutionClaim } from '@/stores/actionStore';
 import { useActionPendingStore } from '@/stores/actionPendingStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
@@ -771,184 +771,139 @@ export function ActionCard({
   payload: ResolutionPayload;
   onCommit?: (result: any) => void;
 }) {
-  const [damageOverride, setDamageOverride] = useState<string>('');
-  const [resolution, setResolution] = useState<AttackResolution | undefined>(
-    (payload.suggestedResolution as AttackResolution) || 'miss'
-  );
-  const [adjustedDamage, setAdjustedDamage] = useState<number>(
-    payload.damage ? payload.damage.reduce((acc, d) => acc + d.amount, 0) : 0
-  );
-
-  const handleDamageOverride = (val?: number) => {
-    if (val !== undefined) {
-      setAdjustedDamage(val);
-      return;
-    }
-    const parsed = parseInt(damageOverride);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setAdjustedDamage(parsed);
-      setDamageOverride('');
-    }
-  };
-
-  const isHit = payload.attackRoll ? payload.attackRoll.total >= payload.attackRoll.versusAC : false;
-  // Fallbacks just for visual formatting
-  const isNat20 = payload.attackRoll ? payload.attackRoll.formula.includes('20') : false; 
-  const isNat1 = payload.attackRoll ? payload.attackRoll.formula.includes('1') : false;
-
+  const { source, targets, challenge, rawResults, targetResults } = payload;
+  
   return (
-    <div className="flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden">
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {/* Action Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Swords className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="font-semibold text-sm">{payload.attacker.name}</h3>
-                <p className="text-xs text-muted-foreground">{payload.source.name}</p>
-              </div>
-            </div>
-            {payload.damage && payload.damage.length > 1 ? (
-              <div className="flex gap-1">
-                {payload.damage.map((d, i) => (
-                  <Badge key={i} variant="outline" className="text-xs">{d.type}</Badge>
-                ))}
-              </div>
-            ) : payload.damage && payload.damage.length === 1 ? (
-              <Badge variant="outline" className="text-xs">{payload.damage[0].type}</Badge>
-            ) : null}
+    <div className="flex flex-col flex-1 h-full bg-slate-950 text-slate-200 overflow-hidden font-sans border-none shadow-none rounded-md">
+      {/* Header */}
+      <div className="bg-slate-900 border-b border-slate-800 p-4 shrink-0">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold uppercase tracking-wider text-rose-400">{source?.type || 'Unknown'}</span>
+            <span className="text-xl font-bold text-white">{source?.name || 'Unknown Action'}</span>
           </div>
-
-          <Separator />
-
-          <div className="border border-border rounded-lg p-3 space-y-3 bg-card">
-            {/* Target header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-muted-foreground" />
-                <span className="font-semibold text-sm">{payload.defender.name}</span>
-              </div>
+          {challenge && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 rounded-full border border-slate-700">
+              <Shield className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-medium">DC {challenge.target} {challenge.versus}</span>
             </div>
-
-            {/* Attack roll vs defense */}
-            {payload.attackRoll && (
-              <div className="flex items-center justify-between bg-muted/30 rounded p-2">
-                <div className="text-center flex-1">
-                  <p className="text-xs text-muted-foreground">Attack Roll</p>
-                  <p className="text-lg font-bold font-mono">
-                    <span className={isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : ''}>
-                      {payload.attackRoll.total}
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {payload.attackRoll.formula}
-                  </p>
-                </div>
-                <div className="text-center px-2">
-                  <span className={`text-sm font-bold ${isHit ? 'text-green-400' : 'text-red-400'}`}>
-                    {isHit ? '≥' : '<'}
-                  </span>
-                </div>
-                <div className="text-center flex-1">
-                  <p className="text-xs text-muted-foreground">AC</p>
-                  <p className="text-lg font-bold font-mono">{payload.attackRoll.versusAC}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Damage display */}
-            {payload.damage && payload.damage.length > 0 && (
-              <div className="bg-muted/30 rounded p-2 space-y-1">
-                {payload.damage.length > 1 ? (
-                  <>
-                    <p className="text-xs text-muted-foreground">Damage</p>
-                    {payload.damage.map((row, i) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-mono text-sm">
-                            {row.amount} <span className="text-xs text-muted-foreground">{row.type}</span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">{row.formula}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="border-t border-border/50 pt-1 mt-1 flex items-center justify-between">
-                      <p className="font-mono text-sm font-bold">
-                        {adjustedDamage} <span className="text-xs text-muted-foreground">total</span>
-                      </p>
-                      <DamageControls 
-                        damageOverride={damageOverride}
-                        setDamageOverride={setDamageOverride}
-                        handleDamageOverride={handleDamageOverride}
-                        total={payload.damage.reduce((acc, d) => acc + d.amount, 0)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Damage</p>
-                      <p className="font-mono text-sm">
-                        {adjustedDamage} <span className="text-xs text-muted-foreground">{payload.damage[0].type}</span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{payload.damage[0].formula}</p>
-                    </div>
-                    <DamageControls 
-                      damageOverride={damageOverride}
-                      setDamageOverride={setDamageOverride}
-                      handleDamageOverride={handleDamageOverride}
-                      total={payload.damage[0].amount}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Resolution buttons */}
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">
-                Resolution {payload.suggestedResolution && `(suggested: ${RESOLUTION_CONFIG[payload.suggestedResolution as AttackResolution]?.label || payload.suggestedResolution})`}
-              </p>
-              <div className="grid grid-cols-5 gap-1">
-                {RESOLUTION_BUTTON_KEYS.map(key => {
-                  const cfg = RESOLUTION_CONFIG[key];
-                  const Icon = cfg.icon;
-                  const isActive = resolution === key;
-                  return (
-                    <Tooltip key={key}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setResolution(key)}
-                          className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
-                            isActive
-                              ? cfg.color + ' border-2'
-                              : 'border-border/50 hover:bg-muted/50'
-                          }`}
-                        >
-                          <Icon className="w-3 h-3" />
-                          <span className="leading-tight text-center">{cfg.label.split(' ').map((w: string) => w[0]).join('')}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        {cfg.label}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          
-          <Separator />
-          
-          <div className="flex gap-2 pt-2">
-            <Button size="sm" className="flex-1 w-full" onClick={() => onCommit?.({ resolution, adjustedDamage })}>
-              Commit Results
-            </Button>
-          </div>
+          )}
         </div>
-      </ScrollArea>
+        <div className="text-sm text-slate-400">
+          Targeting: {targets?.map(t => t.name).join(', ') || 'None'}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Global Results */}
+        {(rawResults?.damage || rawResults?.effects) && (
+          <div className="space-y-3">
+            <h4 className="text-sm flex items-center gap-2 font-medium text-slate-500 uppercase tracking-wider">
+              <Zap className="w-4 h-4" /> Base Output
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(rawResults.damage || {}).map(([type, dmg]) => (
+                <div key={type} className="bg-slate-900 border border-slate-800 rounded p-3 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black text-rose-500">{dmg.amount}</span>
+                  <span className="text-xs text-slate-400 font-mono capitalize">{type} • {dmg.formula}</span>
+                </div>
+              ))}
+            </div>
+            {Object.entries(rawResults.effects || {}).length > 0 && (
+               <div className="flex flex-wrap gap-2">
+                 {Object.entries(rawResults.effects).map(([effectName, effect]) => (
+                   <span key={effectName} className="px-2.5 py-1 bg-indigo-950 text-indigo-300 border border-indigo-900 rounded-full text-xs font-medium">
+                     {effectName} ({effect.duration} {effect.unit})
+                   </span>
+                 ))}
+               </div>
+            )}
+          </div>
+        )}
+
+        {/* Target Rows */}
+        {targetResults && Object.keys(targetResults).length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm flex items-center gap-2 font-medium text-slate-500 uppercase tracking-wider">
+              <Skull className="w-4 h-4" /> Resolutions
+            </h4>
+            <div className="space-y-3">
+              {targets?.map(target => {
+                const res = targetResults[target.id];
+                if (!res) return null;
+                
+                const totalDamage = Object.values(res.damage || {}).reduce((acc, curr) => acc + curr.amount, 0);
+
+                return (
+                  <div key={target.id} className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-bold text-white">{target.name}</span>
+                      <div className="flex gap-2">
+                         <Button variant="outline" size="sm" className="h-7 text-xs border-emerald-900 hover:bg-emerald-950 text-emerald-400 hover:text-emerald-300">
+                           <CheckCircle2 className="w-3 h-3 mr-1" /> Hit
+                         </Button>
+                         <Button variant="outline" size="sm" className="h-7 text-xs border-rose-900 hover:bg-rose-950 text-rose-400 hover:text-rose-300">
+                           <XCircle className="w-3 h-3 mr-1" /> Miss
+                         </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-sm">
+                      {res.challengeResult && (
+                        <div className="flex flex-col">
+                          <span className="text-slate-500 text-[10px] uppercase">Save</span>
+                          <span className={`font-mono font-medium ${res.challengeResult.isSuccess ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {res.challengeResult.total}
+                          </span>
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-col">
+                        <span className="text-slate-500 text-[10px] uppercase">Damage</span>
+                        <span className="font-mono font-medium text-amber-500">
+                          {totalDamage > 0 ? `-${totalDamage}` : '0'}
+                        </span>
+                      </div>
+
+                      <div className="flex-1">
+                        {Object.keys(res.effectsApplied || {}).length > 0 && (
+                          <div className="flex flex-col items-end">
+                             <span className="text-slate-500 text-[10px] uppercase mb-1">Status</span>
+                             <div className="flex gap-1">
+                               {Object.keys(res.effectsApplied || {}).map(e => (
+                                  <span key={e} className="px-1.5 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-900 rounded text-[10px]">
+                                    {e}
+                                  </span>
+                               ))}
+                             </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {res.suggestedResolution && (
+                      <div className="mt-3 text-xs text-slate-400 italic border-t border-slate-800 pt-2">
+                        {res.suggestedResolution}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Actions */}
+      <div className="bg-slate-900 border-t border-slate-800 p-4 shrink-0 mt-auto">
+        <Button 
+          className="w-full h-10 font-bold tracking-wide" 
+          onClick={onCommit}
+        >
+          <ShieldAlert className="w-4 h-4 mr-2" />
+          COMMIT RESULTS
+        </Button>
+      </div>
     </div>
   );
 }

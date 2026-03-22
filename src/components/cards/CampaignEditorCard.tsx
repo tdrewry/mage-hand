@@ -15,6 +15,17 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen, Gem, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
@@ -296,14 +307,38 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                           >
                             {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); removeCampaign(c.id); }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Scenario</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete the scenario "{c.name}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeCampaign(c.id);
+                                  }}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
 
