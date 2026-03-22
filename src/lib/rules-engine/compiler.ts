@@ -1,11 +1,63 @@
 import { RuleNode } from './types';
 import jsonLogic from 'json-logic-js';
+import { resolveVocabulary } from '@/stores/globalConfigStore';
 
 // Register extended mathematical operations used by Function Nodes
 jsonLogic.add_operation("floor", Math.floor);
 jsonLogic.add_operation("ceil", Math.ceil);
 jsonLogic.add_operation("round", Math.round);
 jsonLogic.add_operation("abs", Math.abs);
+
+export interface RollResult {
+  formula: string;
+  rolls: number[];
+  modifier: number;
+  total: number;
+}
+
+// Operator 1: roll
+jsonLogic.add_operation("roll", (formula: any) => {
+  const strExpr = String(formula).trim();
+  const match = strExpr.toLowerCase().match(/^(\d+)d(\d+)(?:\s*([+-])\s*(\d+))?$/);
+  if (!match) return { formula: strExpr, rolls: [], modifier: 0, total: 0 };
+  
+  const count = parseInt(match[1], 10);
+  const sides = parseInt(match[2], 10);
+  const sign = match[3] === '-' ? -1 : (match[3] === '+' ? 1 : 0);
+  const mod = match[4] ? parseInt(match[4], 10) * sign : 0;
+  
+  const rolls: number[] = [];
+  let total = mod;
+  for (let i = 0; i < count; i++) {
+    const r = Math.floor(Math.random() * sides) + 1;
+    rolls.push(r);
+    total += r;
+  }
+  
+  return {
+    formula: strExpr,
+    rolls,
+    modifier: mod,
+    total
+  };
+});
+
+// Operator 2: has_trait
+jsonLogic.add_operation("has_trait", (array: any, trait: string) => {
+  if (!Array.isArray(array)) return false;
+  return array.includes(trait);
+});
+
+// Operator 3: vocab_match
+jsonLogic.add_operation("vocab_match", (category: string, varToCheck: string, expectedVal: string) => {
+  if (!category || typeof varToCheck !== 'string' || typeof expectedVal !== 'string') return false;
+  
+  const resolvedVar = resolveVocabulary(category, varToCheck);
+  const resolvedExpected = resolveVocabulary(category, expectedVal);
+  
+  if (!resolvedVar || !resolvedExpected) return false;
+  return resolvedVar === resolvedExpected;
+});
 
 /**
  * Safely sets a deeply nested property on an object (like lodash/set).

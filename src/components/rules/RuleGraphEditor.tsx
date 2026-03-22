@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useRuleStore } from '@/stores/ruleStore';
 import { compilePipeline, executePipeline, extractVariables, buildSkeletonFromVariables } from '@/lib/rules-engine/compiler';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { useMonaco } from '@monaco-editor/react';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 
 function PipelineTester({ 
   nodes, 
@@ -96,7 +98,7 @@ function PipelineTester({
                 value={mockStateJson}
                 onChange={(val) => setMockStateJson(val || '')}
                 theme="vs-dark"
-                options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: 'on', padding: { top: 16 } }}
+                options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: 'on', formatOnPaste: false, formatOnType: false, padding: { top: 16 } }}
               />
             </Suspense>
           </div>
@@ -136,6 +138,8 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
   const pipelines = useRuleStore(s => s.pipelines);
   const addPipeline = useRuleStore(s => s.addPipeline);
   const updatePipeline = useRuleStore(s => s.updatePipeline);
+  const categories = useGlobalConfigStore(s => s.categories);
+  const monaco = useMonaco();
 
   const [nodes, setNodes] = useState<RuleNode[]>([]);
   const [positions, setPositions] = useState<Record<string, FlowNodePosition>>({});
@@ -148,6 +152,40 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
   const [mockStateJson, setMockStateJson] = useState('{\n  \n}');
   const [outputState, setOutputState] = useState<any>(null);
   const [isTestMode, setIsTestMode] = useState(false);
+
+  useEffect(() => {
+    if (!monaco) return;
+
+    const damageTypes = categories['damageTypes']?.items || [];
+    const conditions = categories['conditions']?.items || [];
+    const abilities = categories['abilities']?.items || [];
+
+    const allEnumsSet = new Set<string>();
+    [...damageTypes, ...conditions, ...abilities].forEach(item => {
+      if (item.value) allEnumsSet.add(item.value);
+      if (item.aliases) item.aliases.forEach(a => allEnumsSet.add(a));
+    });
+    const allEnums = Array.from(allEnumsSet);
+
+    const monacoLangs = monaco.languages as any;
+    if (monacoLangs.json) {
+      monacoLangs.json.jsonDefaults.setDiagnosticsOptions({
+        validate: true,
+        schemas: [{
+          uri: "inmemory://rule-schema.json",
+          fileMatch: ["inmemory://rule-schema.json"],
+          schema: {
+            type: ["object", "array", "string", "number", "boolean", "null"],
+            anyOf: [
+              { type: "string", enum: allEnums },
+              { type: "object", additionalProperties: { $ref: "#" } },
+              { type: "array", items: { $ref: "#" } }
+            ]
+          }
+        }]
+      });
+    }
+  }, [monaco, categories]);
 
   useEffect(() => {
     if (pipelineId && !hasLoaded) {
@@ -173,11 +211,16 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
   const jsonUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
-    if (selectedNode) {
-      setJsonValue(JSON.stringify(selectedNode.nodeData.jsonLogic || {}, null, 2));
+    const node = nodes.find(n => n.id === selectedNodeId);
+    if (node) {
+      setJsonValue(JSON.stringify(node.nodeData.jsonLogic || {}, null, 2));
+      setJsonError(null);
+    } else {
+      setJsonValue('');
       setJsonError(null);
     }
-  }, [selectedNodeId, selectedNode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNodeId]);
 
   const handleJsonChange = (val: string | undefined) => {
     const newVal = val ?? '';
@@ -545,7 +588,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
                {selectedNode.nodeType === 'function_node' ? (
                  (() => {
                    const logicMap = selectedNode.nodeData.jsonLogic || {};
-                   const ops = ['floor', 'ceil', 'round', 'abs'];
+                   const ops = ['floor', 'ceil', 'round', 'abs', 'roll'];
                    const currentOp = Object.keys(logicMap).find(k => ops.includes(k)) || 'floor';
                    let currentTarget = '';
                    const args = logicMap[currentOp];
@@ -597,6 +640,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
                    <MonacoEditor
                       height="100%"
                       language="json"
+                      path="inmemory://rule-schema.json"
                       value={jsonValue}
                       onChange={handleJsonChange}
                       theme="vs-dark"
@@ -604,7 +648,8 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
                         minimap: { enabled: false },
                         fontSize: 12,
                         wordWrap: 'on',
-                        formatOnPaste: true,
+                        formatOnPaste: false,
+                        formatOnType: false,
                         scrollBeyondLastLine: false,
                         padding: { top: 16 }
                       }}

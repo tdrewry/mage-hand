@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EffectsCatalog } from './EffectsCatalog';
 import { RuleGraphEditor } from './RuleGraphEditor';
+import { GlobalConfigEditor } from './GlobalConfigEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2 } from 'lucide-react';
+import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2 } from 'lucide-react';
 import { useRuleStore } from '@/stores/ruleStore';
 
 export function RulesLibrary() {
   const pipelines = useRuleStore(s => s.pipelines);
   const deletePipeline = useRuleStore(s => s.deletePipeline);
   
-  const [activeTab, setActiveTab] = useState<'effects' | 'logic'>('effects');
+  const [activeTab, setActiveTab] = useState<'effects' | 'logic' | 'vocabulary'>('effects');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
@@ -34,7 +35,11 @@ export function RulesLibrary() {
   return (
     <div className="flex flex-col h-full w-full">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0 p-4">
-        <TabsList className="grid w-full max-w-sm grid-cols-2 mb-4 h-auto py-1">
+        <TabsList className="grid w-full max-w-[24rem] grid-cols-3 mb-4 h-auto py-1">
+          <TabsTrigger value="vocabulary" className="p-1 px-2 gap-2">
+            <Settings2 className="w-4 h-4" />
+            <span>Vocabulary</span>
+          </TabsTrigger>
           <TabsTrigger value="effects" className="p-1 px-2 gap-2">
             <Sparkles className="w-4 h-4" />
             <span>Effects</span>
@@ -47,6 +52,10 @@ export function RulesLibrary() {
         
         <TabsContent value="effects" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
           <EffectsCatalog />
+        </TabsContent>
+
+        <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
+          <GlobalConfigEditor />
         </TabsContent>
 
         <TabsContent value="logic" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
