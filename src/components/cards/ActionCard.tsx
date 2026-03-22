@@ -13,7 +13,7 @@ import { useActionPendingStore } from '@/stores/actionPendingStore';
 import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
-
+import type { ResolutionPayload } from '@/lib/rules-engine/types';
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
   miss: { label: 'Miss', color: 'bg-muted text-muted-foreground border-border', icon: X },
@@ -760,6 +760,226 @@ function TargetResolveCard({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+export function ActionCard({
+  payload,
+  onCommit
+}: {
+  payload: ResolutionPayload;
+  onCommit?: (result: any) => void;
+}) {
+  const [damageOverride, setDamageOverride] = useState<string>('');
+  const [resolution, setResolution] = useState<AttackResolution | undefined>(
+    (payload.suggestedResolution as AttackResolution) || 'miss'
+  );
+  const [adjustedDamage, setAdjustedDamage] = useState<number>(
+    payload.damage ? payload.damage.reduce((acc, d) => acc + d.amount, 0) : 0
+  );
+
+  const handleDamageOverride = (val?: number) => {
+    if (val !== undefined) {
+      setAdjustedDamage(val);
+      return;
+    }
+    const parsed = parseInt(damageOverride);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setAdjustedDamage(parsed);
+      setDamageOverride('');
+    }
+  };
+
+  const isHit = payload.attackRoll ? payload.attackRoll.total >= payload.attackRoll.versusAC : false;
+  // Fallbacks just for visual formatting
+  const isNat20 = payload.attackRoll ? payload.attackRoll.formula.includes('20') : false; 
+  const isNat1 = payload.attackRoll ? payload.attackRoll.formula.includes('1') : false;
+
+  return (
+    <div className="flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden">
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-4">
+          {/* Action Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Swords className="w-5 h-5 text-primary" />
+              <div>
+                <h3 className="font-semibold text-sm">{payload.attacker.name}</h3>
+                <p className="text-xs text-muted-foreground">{payload.source.name}</p>
+              </div>
+            </div>
+            {payload.damage && payload.damage.length > 1 ? (
+              <div className="flex gap-1">
+                {payload.damage.map((d, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{d.type}</Badge>
+                ))}
+              </div>
+            ) : payload.damage && payload.damage.length === 1 ? (
+              <Badge variant="outline" className="text-xs">{payload.damage[0].type}</Badge>
+            ) : null}
+          </div>
+
+          <Separator />
+
+          <div className="border border-border rounded-lg p-3 space-y-3 bg-card">
+            {/* Target header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-muted-foreground" />
+                <span className="font-semibold text-sm">{payload.defender.name}</span>
+              </div>
+            </div>
+
+            {/* Attack roll vs defense */}
+            {payload.attackRoll && (
+              <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+                <div className="text-center flex-1">
+                  <p className="text-xs text-muted-foreground">Attack Roll</p>
+                  <p className="text-lg font-bold font-mono">
+                    <span className={isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : ''}>
+                      {payload.attackRoll.total}
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {payload.attackRoll.formula}
+                  </p>
+                </div>
+                <div className="text-center px-2">
+                  <span className={`text-sm font-bold ${isHit ? 'text-green-400' : 'text-red-400'}`}>
+                    {isHit ? '≥' : '<'}
+                  </span>
+                </div>
+                <div className="text-center flex-1">
+                  <p className="text-xs text-muted-foreground">AC</p>
+                  <p className="text-lg font-bold font-mono">{payload.attackRoll.versusAC}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Damage display */}
+            {payload.damage && payload.damage.length > 0 && (
+              <div className="bg-muted/30 rounded p-2 space-y-1">
+                {payload.damage.length > 1 ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">Damage</p>
+                    {payload.damage.map((row, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-mono text-sm">
+                            {row.amount} <span className="text-xs text-muted-foreground">{row.type}</span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{row.formula}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-t border-border/50 pt-1 mt-1 flex items-center justify-between">
+                      <p className="font-mono text-sm font-bold">
+                        {adjustedDamage} <span className="text-xs text-muted-foreground">total</span>
+                      </p>
+                      <DamageControls 
+                        damageOverride={damageOverride}
+                        setDamageOverride={setDamageOverride}
+                        handleDamageOverride={handleDamageOverride}
+                        total={payload.damage.reduce((acc, d) => acc + d.amount, 0)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Damage</p>
+                      <p className="font-mono text-sm">
+                        {adjustedDamage} <span className="text-xs text-muted-foreground">{payload.damage[0].type}</span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">{payload.damage[0].formula}</p>
+                    </div>
+                    <DamageControls 
+                      damageOverride={damageOverride}
+                      setDamageOverride={setDamageOverride}
+                      handleDamageOverride={handleDamageOverride}
+                      total={payload.damage[0].amount}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Resolution buttons */}
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Resolution {payload.suggestedResolution && `(suggested: ${RESOLUTION_CONFIG[payload.suggestedResolution as AttackResolution]?.label || payload.suggestedResolution})`}
+              </p>
+              <div className="grid grid-cols-5 gap-1">
+                {RESOLUTION_BUTTON_KEYS.map(key => {
+                  const cfg = RESOLUTION_CONFIG[key];
+                  const Icon = cfg.icon;
+                  const isActive = resolution === key;
+                  return (
+                    <Tooltip key={key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setResolution(key)}
+                          className={`flex flex-col items-center gap-0.5 p-1.5 rounded border text-[10px] transition-colors ${
+                            isActive
+                              ? cfg.color + ' border-2'
+                              : 'border-border/50 hover:bg-muted/50'
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          <span className="leading-tight text-center">{cfg.label.split(' ').map((w: string) => w[0]).join('')}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        {cfg.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          <div className="flex gap-2 pt-2">
+            <Button size="sm" className="flex-1 w-full" onClick={() => onCommit?.({ resolution, adjustedDamage })}>
+              Commit Results
+            </Button>
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+function DamageControls({ damageOverride, setDamageOverride, handleDamageOverride, total }: any) {
+  return (
+    <div className="flex items-center gap-1">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
+            onClick={() => handleDamageOverride(Math.floor(total / 2))}
+          >
+            ½
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">Save for Half</TooltipContent>
+      </Tooltip>
+      <Input
+        type="number"
+        className="w-16 h-7 text-xs"
+        placeholder="Adj."
+        value={damageOverride}
+        onChange={(e) => setDamageOverride(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleDamageOverride()}
+      />
+      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDamageOverride()}>
+        <Check className="w-3 h-3" />
+      </Button>
     </div>
   );
 }
