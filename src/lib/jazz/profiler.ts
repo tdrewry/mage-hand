@@ -7,6 +7,8 @@
 
 import { metricsDb } from '@/lib/db/metricsDb';
 import { useNetworkDiagnosticsStore } from '@/stores/networkDiagnosticsStore';
+import { useTelemetryStore } from '@/stores/telemetryStore';
+import jsonLogic from 'json-logic-js';
 
 export type ProfilerSeverity = 'warning' | 'critical';
 
@@ -213,6 +215,15 @@ class SyncProfiler {
       streamInKb
     };
 
+    const metricsForEval = {
+      ...windowData,
+      outKb: parseFloat(outKbs),
+      inKb: parseFloat(inKbs),
+      streamOutKb: parseFloat(streamOutKb),
+      streamInKb: parseFloat(streamInKb)
+    };
+    this.evaluateAlertRules(metricsForEval, false);
+
     // Store in history
     if (this.isRecording) {
       this.history.push(windowData);
@@ -298,6 +309,36 @@ class SyncProfiler {
     
     // Optional: Clear history after download
     // this.history = [];
+  }
+
+  public evaluateAlertRules(metrics: any, isTest: boolean = false) {
+    try {
+      const { rules, webhooks } = useTelemetryStore.getState();
+      
+      if (rules.length > 0 && webhooks.length > 0) {
+        for (const rule of rules) {
+          const isTriggered = jsonLogic.apply(rule.logic, metrics);
+          if (isTriggered) {
+            const testPrefix = isTest ? '[TEST] ' : '';
+            const payload = {
+              content: `⚠️ **Mage-Hand Alert:** ${testPrefix}${rule.name}\nMetrics: ${metrics.outOps} Ops, ${metrics.outKb} KB`
+            };
+
+            for (const url of webhooks) {
+              fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              }).catch(e => {
+                console.warn(`[SyncProfiler] Failed to send webhook alert to ${url}:`, e);
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SyncProfiler] Error evaluating telemetry rules:', e);
+    }
   }
 }
 
