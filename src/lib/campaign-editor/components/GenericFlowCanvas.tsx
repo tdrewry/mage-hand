@@ -7,8 +7,9 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { BaseFlowNode, BaseNodeData, FlowNodePosition } from '../types/base';
 import { CampaignEditorAdapter } from '../types/adapter';
 import { cn } from '@/lib/utils';
-import { Flag, ZoomIn, ZoomOut, Maximize, LayoutGrid, Swords, ScrollText, MessageSquare, Tent, Circle } from 'lucide-react';
+import { Flag, ZoomIn, ZoomOut, Maximize, LayoutGrid, Swords, ScrollText, MessageSquare, Tent, Circle, Calculator, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getBezierPath, getDragBezierPath } from '../utils/geometry';
 
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 80;
@@ -234,19 +235,25 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
   };
 
   const getConnectionPath = (from: FlowNodePosition, to: FlowNodePosition): string => {
-    const startX = from.x + NODE_WIDTH;
-    const startY = from.y + NODE_HEIGHT / 2;
-    const endX = to.x;
-    const endY = to.y + NODE_HEIGHT / 2;
-    const midX = (startX + endX) / 2;
-    return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+    return getBezierPath(
+      { x: from.x, y: from.y, width: NODE_WIDTH, height: NODE_HEIGHT },
+      { x: to.x, y: to.y, width: NODE_WIDTH, height: NODE_HEIGHT }
+    );
   };
 
   const getDragConnectionPath = (): string => {
     if (!dragConnection) return '';
     const { startX, startY, currentX, currentY } = dragConnection;
-    const midX = (startX + currentX) / 2;
-    return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${currentY}, ${currentX} ${currentY}`;
+    // We already calculated the drag connection source node when dragging started.
+    // So we can still use the geometry fn by tracking the source BoundingBox or just using its position.
+    // Note: dragConnection has startX, startY based on the hardcoded dot previously.
+    // We will update handleConnectionDragStart to only store sourceId, or we look it up here.
+    const sourcePos = positions[dragConnection.sourceId];
+    if (!sourcePos) return '';
+    return getDragBezierPath(
+      { x: sourcePos.x, y: sourcePos.y, width: NODE_WIDTH, height: NODE_HEIGHT },
+      { x: currentX, y: currentY }
+    );
   };
 
   const connections: Array<{ id: string; sourceId: string; targetId: string; type: 'success' | 'failure' }> = [];
@@ -266,6 +273,8 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
     narrative: <ScrollText className="w-3.5 h-3.5" />,
     dialog: <MessageSquare className="w-3.5 h-3.5" />,
     rest: <Tent className="w-3.5 h-3.5" />,
+    rule: <Shield className="w-3.5 h-3.5" />,
+    function_node: <Calculator className="w-3.5 h-3.5" />,
   };
 
   const getNodeIcon = (node: TNode) => {
@@ -371,6 +380,7 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
           const isSelected = selectedNodeId === node.id;
           const isStart = node.id === startNodeId;
           const isHover = hoverNodeId === node.id && dragConnection !== null;
+          const isFunctionNode = node.nodeType === 'function_node';
 
           return (
             <div
@@ -379,7 +389,8 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
                 "absolute rounded-lg border-2 bg-card shadow-md cursor-pointer transition-shadow",
                 isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                 isStart && "border-primary",
-                !isStart && "border-border",
+                !isStart && !isFunctionNode && "border-border",
+                isFunctionNode && !isStart && "border-purple-500/50 bg-purple-500/5",
                 isHover && "ring-2 ring-green-500",
                 draggingNode === node.id && "shadow-lg"
               )}
@@ -390,7 +401,7 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
             >
               <div className="p-2 h-full flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className={cn("text-muted-foreground", isStart && "text-primary")}>{getNodeIcon(node)}</span>
+                  <span className={cn("text-muted-foreground", isStart && "text-primary", isFunctionNode && !isStart && "text-purple-500")}>{getNodeIcon(node)}</span>
                   <span className="text-xs font-bold truncate flex-1">{node.nodeData.name || node.id}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2">

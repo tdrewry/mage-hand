@@ -20,7 +20,7 @@ import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard
 import { DiceCardContent } from '@/components/cards/DiceCard';
 import { ActionCardContent } from '@/components/cards/ActionCard';
 import { NetworkDemoCardContent } from '@/components/cards/NetworkDemoCard';
-import { EffectsCardContent } from '@/components/cards/EffectsCard';
+import { EffectsCatalog } from '@/components/rules/EffectsCatalog';
 import { ChatCardContent } from '@/components/cards/ChatCard';
 import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';
@@ -32,6 +32,7 @@ import { CompendiumCardContent } from '@/components/cards/CompendiumCard';
 import { EnvironmentCardContent } from '@/components/cards/EnvironmentCard';
 import { PlayCardContent } from '@/components/cards/PlayCard';
 import { CampaignCardContent } from '@/components/cards/CampaignCard';
+import { RulesCardContent } from '@/components/cards/RulesCard';
 import React, { Suspense, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useCardStore } from '@/stores/cardStore';
@@ -189,6 +190,7 @@ function getCardTitle(type: CardType): string {
     [CardType.ENVIRONMENT]: 'Environment',
     [CardType.PLAY]: 'Play',
     [CardType.CAMPAIGN]: 'Campaign',
+    [CardType.RULES]: 'Rules',
   };
   return titles[type] || type;
 }
@@ -287,7 +289,7 @@ function renderCardContent(
     case CardType.NETWORK_DEMO:
       return <NetworkDemoCardContent />;
     case CardType.EFFECTS:
-      return <EffectsCardContent />;
+      return <EffectsCatalog />;
     case CardType.CHAT:
       return <ChatCardContent />;
     case CardType.ART_APPROVAL:
@@ -315,6 +317,8 @@ function renderCardContent(
       return <PlayCardContent cardId={cardId} />;
     case CardType.CAMPAIGN:
       return <CampaignCardContent cardId={cardId} />;
+    case CardType.RULES:
+      return <RulesCardContent cardId={cardId} />;
     default:
       return <div className="text-muted-foreground text-sm">Unknown card type</div>;
   }

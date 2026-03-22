@@ -1649,8 +1649,14 @@ export const SimpleTabletop = () => {
     const PAN_SPEED = 50; // Pixels to pan per keypress
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input field
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      // Ignore if typing in an input/textarea or Monaco Editor
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement || 
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable ||
+        target.closest('.monaco-editor') !== null
+      ) {
         return;
       }
 

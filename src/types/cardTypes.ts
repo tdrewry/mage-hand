@@ -40,6 +40,7 @@ export enum CardType {
   ENVIRONMENT = 'environment',
   PLAY = 'play',
   CAMPAIGN = 'campaign',
+  RULES = 'rules',
 }
 
 /** Card types that require DM role — players cannot open or see these */

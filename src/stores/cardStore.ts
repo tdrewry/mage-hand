@@ -487,6 +487,17 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     autoCenter: true,
     dockPosition: 'right',
   },
+  [CardType.RULES]: {
+    title: 'Rules',
+    defaultPosition: { x: 0, y: 80 },
+    defaultSize: { width: 360, height: 600 },
+    minSize: { width: 320, height: 400 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: true,
+    defaultMinimized: true,
+    dockPosition: 'left',
+  },
 };
 
 export const useCardStore = create<CardStore>((set, get) => ({

@@ -1384,7 +1384,7 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
 
 // --- Main Card Content ---
 
-export function EffectsCardContent() {
+export function EffectsCatalog() {
   const allTemplates = useEffectStore((s) => s.allTemplates);
   const placedEffects = useEffectStore((s) => s.placedEffects);
   const hiddenBuiltInIds = useEffectStore((s) => s.hiddenBuiltInIds);

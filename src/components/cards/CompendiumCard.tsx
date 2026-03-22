@@ -4,12 +4,11 @@ import { CreatureLibraryCardContent } from './CreatureLibraryCard';
 import { TokenPanelCardContent } from './TokenPanelCard';
 import { LibraryEditorCardContent } from './LibraryEditorCard';
 import { RosterCardContent } from './RosterCard';
-import { EffectsCardContent } from './EffectsCard';
 import { TokenGroupManagerCardContent } from './TokenGroupManagerCard';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCardStore } from '@/stores/cardStore';
 import { cn } from '@/lib/utils';
-import { Users, Ghost, Backpack, Sparkles, CircleUser, LayoutPanelLeft } from 'lucide-react';
+import { Users, Ghost, Backpack, CircleUser, LayoutPanelLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CompendiumCardContentProps {
@@ -21,13 +20,13 @@ export function CompendiumCardContent({ cardId, onAddToken }: CompendiumCardCont
   const card = useCardStore((state) => state.getCard(cardId));
   const isDocked = card?.dockPosition !== 'floating';
 
-  const [activeMasterTab, setActiveMasterTab] = useState<'characters' | 'monsters' | 'items' | 'effects' | 'tokens'>('monsters');
+  const [activeMasterTab, setActiveMasterTab] = useState<'characters' | 'monsters' | 'items' | 'tokens'>('monsters');
   const [selectedEntity, setSelectedEntity] = useState<{ id: string; type: 'character' | 'monster' } | null>(null);
 
   return (
     <div className="flex flex-col h-full w-full">
       <Tabs value={activeMasterTab} onValueChange={(v) => setActiveMasterTab(v as any)} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-5 mb-2 h-auto py-1">
+        <TabsList className="grid w-full grid-cols-4 mb-2 h-auto py-1">
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -68,18 +67,6 @@ export function CompendiumCardContent({ cardId, onAddToken }: CompendiumCardCont
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex w-full">
-                  <TabsTrigger value="effects" className="w-full p-1 px-2 gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    {!isDocked && <span className="truncate">Effects</span>}
-                  </TabsTrigger>
-                </div>
-              </TooltipTrigger>
-              {isDocked && <TooltipContent side="top" sideOffset={8}>Effects</TooltipContent>}
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex w-full">
                   <TabsTrigger value="tokens" className="w-full p-1 px-2 gap-2">
                     <CircleUser className="w-4 h-4" />
                     {!isDocked && <span className="truncate">Tokens</span>}
@@ -109,10 +96,6 @@ export function CompendiumCardContent({ cardId, onAddToken }: CompendiumCardCont
             cardId={cardId} 
             forcedTab="items"
           />
-        </TabsContent>
-
-        <TabsContent value="effects" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
-          <EffectsCardContent />
         </TabsContent>
 
         <TabsContent value="tokens" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col gap-4 overflow-y-auto m-0 p-0">

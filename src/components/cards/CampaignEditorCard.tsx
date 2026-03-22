@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen, Gem } from 'lucide-react';
+import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen, Gem, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -875,13 +875,25 @@ export function CampaignEditorCardContent({ cardId }: { cardId?: string }) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 text-destructive"
+            className="h-7 w-7 p-0 text-destructive mr-1"
             onClick={handleRemoveNode}
             title="Delete selected node"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
+
+        <div className="w-px h-4 bg-border mx-1" />
+
+        <Button 
+          variant="default"
+          size="sm"
+          className="h-7 px-2 text-xs font-semibold"
+          onClick={() => toast.success("Scenario autosaved")}
+          title="Save Scenario"
+        >
+          <Save className="w-3.5 h-3.5 mr-1" /> Save
+        </Button>
       </div>
 
       {/* Content area: flow canvas + optional property panel */}

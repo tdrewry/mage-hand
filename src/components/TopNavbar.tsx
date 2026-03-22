@@ -204,6 +204,9 @@ export const TopNavbar: React.FC = () => {
                 <DropdownMenuItem onClick={() => handleDockTool(CardType.PLAY, 'Play', 'left')}>
                   Play
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDockTool(CardType.RULES, 'Rules', 'left')}>
+                  Rules
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="ghost" size="icon" onClick={toggleLeftSidebar} className="h-8 w-8 hover:bg-white/5 shrink-0">
@@ -612,6 +615,9 @@ export const TopNavbar: React.FC = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleDockTool(CardType.PLAY, 'Play', 'right')}>
                   Play
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDockTool(CardType.RULES, 'Rules', 'right')}>
+                  Rules
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
