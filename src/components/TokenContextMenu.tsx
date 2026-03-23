@@ -328,6 +328,33 @@ export const TokenContextMenu = ({
     useActionStore.getState().startAttack(currentToken.id, attack);
   };
 
+  const handleDeclareAction = (category: string) => {
+    if (!currentToken) return;
+    
+    const cardStore = useCardStore.getState();
+    const declareCard = cardStore.cards.find(c => 
+      c.type === CardType.ACTION_DECLARE_CARD && 
+      c.metadata?.tokenId === currentToken.id
+    );
+    
+    if (declareCard) {
+      // Update metadata category if it already exists
+      cardStore.updateCardMetadata(declareCard.id, { category });
+      cardStore.setVisibility(declareCard.id, true);
+      cardStore.bringToFront(declareCard.id);
+    } else {
+      const newId = cardStore.registerCard({
+        type: CardType.ACTION_DECLARE_CARD,
+        title: 'Declare Action',
+        defaultPosition: { x: 380, y: 100 },
+        defaultSize: { width: 400, height: 600 },
+        metadata: { tokenId: currentToken.id, category },
+      });
+      cardStore.setVisibility(newId, true);
+      cardStore.bringToFront(newId);
+    }
+  };
+
   // Handle unlinking a creature from the token
   const handleUnlinkCreature = () => {
     if (!currentToken) return;
@@ -708,98 +735,28 @@ export const TokenContextMenu = ({
               <ContextMenuSeparator />
             </>
           )}
-          {/* Actions submenu — attacks, spells, skills, traits */}
+          {/* Action Categories */}
           {!isMultiSelection && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <Swords className="mr-2 h-4 w-4" />
-                <span>Actions</span>
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-64 bg-popover z-[1000] max-h-[400px] overflow-y-auto">
-                {(() => {
-                  const allActions = getAvailableActions();
-                  const grouped: Partial<Record<TokenActionCategory, TokenActionItem[]>> = {};
-                  for (const item of allActions) {
-                    if (!grouped[item.category]) grouped[item.category] = [];
-                    grouped[item.category]!.push(item);
-                  }
-
-                  const categoryConfig: { key: TokenActionCategory; label: string; icon: React.ReactNode }[] = [
-                    { key: 'attack', label: 'Attacks', icon: <Swords className="w-3 h-3" /> },
-                    { key: 'spell', label: 'Spells', icon: <Sparkles className="w-3 h-3" /> },
-                    { key: 'bonus', label: 'Bonus Actions', icon: <Zap className="w-3 h-3" /> },
-                    { key: 'reaction', label: 'Reactions', icon: <RotateCw className="w-3 h-3" /> },
-                    { key: 'legendary', label: 'Legendary', icon: <Star className="w-3 h-3" /> },
-                    { key: 'skill', label: 'Skills', icon: <Dices className="w-3 h-3" /> },
-                    { key: 'trait', label: 'Traits & Features', icon: <BookOpen className="w-3 h-3" /> },
-                  ];
-
-                  return categoryConfig.map(({ key, label, icon }) => {
-                    const items = grouped[key];
-                    if (!items || items.length === 0) return null;
-                    return (
-                      <ContextMenuSub key={key}>
-                        <ContextMenuSubTrigger className="text-xs">
-                          <span className="mr-2">{icon}</span>
-                          <span>{label}</span>
-                          <span className="ml-auto text-[10px] text-muted-foreground">{items.length}</span>
-                        </ContextMenuSubTrigger>
-                        <ContextMenuSubContent className="w-60 bg-popover z-[1001] max-h-[300px] overflow-y-auto">
-                          {items.map(item => (
-                            <ContextMenuItem
-                              key={item.id}
-                            onClick={() => {
-                                if (item.asAttack) {
-                                  handleStartAttack(item.asAttack);
-                                } else {
-                                  // Try explicit effectTemplateId first, then name match
-                                  const effectStore = useEffectStore.getState();
-                                  const matchedTemplate = item.effectTemplateId
-                                    ? effectStore.getTemplate(item.effectTemplateId)
-                                    : effectStore.allTemplates.find(
-                                        t => t.name.toLowerCase() === item.name.toLowerCase()
-                                      );
-                                  if (matchedTemplate && currentToken) {
-                                    // Use the spell's level (from the action item), fall back to template baseLevel
-                                    const castLevel = item.spellLevel ?? matchedTemplate.baseLevel;
-                                    const gridUnit = 50;
-                                    effectStore.startPlacement(
-                                      matchedTemplate.id,
-                                      currentToken.id,
-                                      undefined,
-                                      { x: currentToken.x, y: currentToken.y, gridWidth: (currentToken.gridWidth || 1) * gridUnit, gridHeight: (currentToken.gridHeight || 1) * gridUnit },
-                                      castLevel,
-                                    );
-                                    toast.info(`Placing ${matchedTemplate.name}${castLevel ? ` at level ${castLevel}` : ''}`);
-                                  } else if (item.category === 'skill' && item.modifier !== undefined && currentToken) {
-                                    useActionStore.getState().startSkillCheck(currentToken.id, item.name, item.modifier);
-                                  } else {
-                                    toast.info(`${item.name}: ${item.description || 'No description'}`);
-                                  }
-                                }
-                              }}
-                            >
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <span className="text-xs truncate">{item.name}</span>
-                                <span className="text-[10px] text-muted-foreground truncate">
-                                  {item.category === 'attack' && item.asAttack
-                                    ? `+${item.attackBonus} | ${item.damageFormula} ${item.damageType}`
-                                    : item.category === 'skill'
-                                    ? `${item.modifier != null && item.modifier >= 0 ? '+' : ''}${item.modifier ?? 0}${item.proficient ? ' (prof)' : ''}`
-                                    : item.category === 'spell'
-                                    ? item.description || ''
-                                    : item.description ? item.description.substring(0, 50) : ''}
-                                </span>
-                              </div>
-                            </ContextMenuItem>
-                          ))}
-                        </ContextMenuSubContent>
-                      </ContextMenuSub>
-                    );
-                  });
-                })()}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
+            <>
+              <ContextMenuSeparator />
+              <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Declare Action</div>
+              <ContextMenuItem onClick={() => handleDeclareAction('attack')}>
+                <Swords className="mr-2 h-4 w-4 text-red-400" />
+                <span>Attacks</span>
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleDeclareAction('spell')}>
+                <Sparkles className="mr-2 h-4 w-4 text-blue-400" />
+                <span>Spells</span>
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleDeclareAction('skill')}>
+                <Dices className="mr-2 h-4 w-4 text-green-400" />
+                <span>Skills</span>
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleDeclareAction('trait')}>
+                <BookOpen className="mr-2 h-4 w-4 text-amber-400" />
+                <span>Traits & Features</span>
+              </ContextMenuItem>
+            </>
           )}
           <ContextMenuItem onClick={handleInitiativeClick}>
             <Plus className="mr-2 h-4 w-4" />

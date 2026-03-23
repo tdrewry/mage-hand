@@ -28,6 +28,7 @@ import { HandoutCatalogCardContent } from '@/components/cards/HandoutCatalogCard
 import { HandoutViewerCardContent } from '@/components/cards/HandoutViewerCard';
 import { CampaignEditorCardContent } from '@/components/cards/CampaignEditorCard';
 import { TokenGroupManagerCardContent } from '@/components/cards/TokenGroupManagerCard';
+import { ActionDeclareCardContent } from '@/components/cards/ActionDeclareCard';
 import { CompendiumCardContent } from '@/components/cards/CompendiumCard';
 import { EnvironmentCardContent } from '@/components/cards/EnvironmentCard';
 import { PlayCardContent } from '@/components/cards/PlayCard';
@@ -176,6 +177,7 @@ function getCardTitle(type: CardType): string {
     [CardType.MAP_TREE]: 'Map Tree',
     [CardType.DICE_BOX]: 'Dice Box',
     [CardType.ACTION_CARD]: 'Action',
+    [CardType.ACTION_DECLARE_CARD]: 'Declare Action',
     [CardType.NETWORK_DEMO]: 'Network Demo',
     [CardType.EFFECTS]: 'Effects',
     [CardType.CHAT]: 'Chat',
@@ -286,6 +288,8 @@ function renderCardContent(
       return <div className="text-muted-foreground text-sm">Content for {type} coming soon...</div>;
     case CardType.ACTION_CARD:
       return <ActionCardContent />;
+    case CardType.ACTION_DECLARE_CARD:
+      return <ActionDeclareCardContent cardId={cardId} />;
     case CardType.NETWORK_DEMO:
       return <NetworkDemoCardContent />;
     case CardType.EFFECTS:

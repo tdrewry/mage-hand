@@ -25,6 +25,7 @@ export enum CardType {
   MAP_TREE = 'map_tree',
   DICE_BOX = 'dice_box',
   ACTION_CARD = 'action_card',
+  ACTION_DECLARE_CARD = 'action_declare_card',
   NETWORK_DEMO = 'network_demo',
   EFFECTS = 'effects',
   CHAT = 'chat',

@@ -60,6 +60,13 @@ interface CardStore {
   updateCardSize: (id: string, size: CardSize) => void;
   
   /**
+   * Updates only the metadata properties of a given card, preserving others.
+   * @param id The ID of the card.
+   * @param metadata The new metadata payload.
+   */
+  updateCardMetadata: (id: string, metadata: Record<string, unknown>) => void;
+  
+  /**
    * Docks or floats a card.
    * @param id The ID of the card.
    * @param position The dock position.
@@ -350,6 +357,15 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: false,
   },
+  [CardType.ACTION_DECLARE_CARD]: {
+    title: 'Declare Action',
+    defaultPosition: { x: 380, y: 100 },
+    defaultSize: { width: 400, height: 600 },
+    minSize: { width: 350, height: 450 },
+    isResizable: true,
+    isClosable: true,
+    defaultVisible: false,
+  },
   [CardType.NETWORK_DEMO]: {
     title: 'Network Demo',
     defaultPosition: { x: 345, y: 80 },
@@ -582,6 +598,14 @@ export const useCardStore = create<CardStore>((set, get) => ({
     set((state) => ({
       cards: state.cards.map((card) =>
         card.id === id ? { ...card, size } : card
+      ),
+    }));
+  },
+
+  updateCardMetadata: (id: string, metadata: Record<string, unknown>) => {
+    set((state) => ({
+      cards: state.cards.map((card) =>
+        card.id === id ? { ...card, metadata: { ...card.metadata, ...metadata } } : card
       ),
     }));
   },

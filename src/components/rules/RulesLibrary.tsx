@@ -5,7 +5,7 @@ import { RuleGraphEditor } from './RuleGraphEditor';
 import { GlobalConfigEditor } from './GlobalConfigEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download } from 'lucide-react';
+import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy } from 'lucide-react';
 import { useRuleStore } from '@/stores/ruleStore';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -91,6 +91,27 @@ export function RulesLibrary() {
     };
     downloadPipelineBlob(exportData, `${(p.name || 'pipeline').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`);
     toast.success("Pipeline exported");
+  };
+
+  const handleCopyPipeline = (p: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Create new ID and deep copy contents
+    const newId = `logic-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const clonedNodes = JSON.parse(JSON.stringify(p.nodes));
+    const clonedPositions = JSON.parse(JSON.stringify(p.positions));
+    
+    const copiedPipeline = {
+      ...p,
+      id: newId,
+      name: `Copy of ${p.name || 'Untitled Pipeline'}`,
+      nodes: clonedNodes,
+      positions: clonedPositions,
+      updatedAt: new Date().toISOString()
+    };
+    
+    addPipeline(copiedPipeline);
+    toast.success("Pipeline duplicated successfully!");
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,6 +280,15 @@ export function RulesLibrary() {
                           title="Export"
                         >
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          onClick={(e) => handleCopyPipeline(p, e)} 
+                          title="Duplicate"
+                        >
+                          <Copy className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 

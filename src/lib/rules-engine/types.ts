@@ -16,6 +16,14 @@ export interface TargetResult {
   suggestedResolution: string;
 }
 
+export interface IntentPayload {
+  actorId: string;
+  actionId: string;
+  actionType: 'attack' | 'spell' | 'skill' | 'trait';
+  targets: string[];
+  modifiers: Record<string, any>;
+}
+
 export interface ResolutionPayload {
   source: { name: string; type: string };
   targets: Array<{ id: string; name: string }>;
