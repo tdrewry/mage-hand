@@ -17,6 +17,8 @@ import { useChatStore } from '@/stores/chatStore';
 import { useEffectStore } from '@/stores/effectStore';
 import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
+import { createEmptyEntitySheet } from '@/types/entitySheet';
+import type { ResolutionPayload } from '@/lib/rules-engine/types';
 
 /** Broadcast the current action queue state to other DM sessions */
 function broadcastActionQueue() {
@@ -170,6 +172,9 @@ interface ActionActions {
 
   /** Hydrate the full action queue from an external source (ephemeral sync) */
   hydrateQueue: (currentAction: ActionQueueEntry | null, pendingActions: ActionQueueEntry[], actionHistory: ActionHistoryEntry[]) => void;
+
+  /** Apply resolved pipeline outputs to token attributes */
+  applyPipelineResolution: (payload: ResolutionPayload) => void;
 }
 
 type ActionStore = ActionState & ActionActions;
@@ -786,6 +791,35 @@ export const useActionStore = create<ActionStore>()(
       targetingMousePos: null,
       resolutionFlashes: [],
     });
+  },
+
+  applyPipelineResolution: (payload) => {
+    const sessionStore = useSessionStore.getState();
+    const tokens = sessionStore.tokens;
+    
+    for (const [targetId, result] of Object.entries(payload.targetResults)) {
+      const token = tokens.find(t => t.id === targetId);
+      if (!token) continue;
+      
+      const dmgTotal = Object.values(result.damage).reduce((sum, d) => sum + d.amount, 0);
+      if (dmgTotal > 0) {
+        const sheet = token.entitySheet ? JSON.parse(JSON.stringify(token.entitySheet)) : createEmptyEntitySheet(token.name);
+        if (!sheet.defenses) sheet.defenses = {};
+        if (!sheet.defenses.hitPoints) sheet.defenses.hitPoints = { max: 0, current: 0, temporary: 0 };
+        
+        sheet.defenses.hitPoints.current -= dmgTotal;
+        sessionStore.updateTokenEntitySheet(targetId, sheet);
+      }
+      
+      const newStatuses = Object.keys(result.effectsApplied);
+      if (newStatuses.length > 0) {
+        const uniqueStatuses = Array.from(new Set([...(token.statuses || []), ...newStatuses]));
+        sessionStore.updateTokenStatuses(targetId, uniqueStatuses);
+      }
+    }
+
+    get().cancelAction();
+    get().clearFlashes();
   },
 }),
     {
