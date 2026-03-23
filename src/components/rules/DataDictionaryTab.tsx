@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import type { SchemaNode } from '@/lib/rules-engine/schemas';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 function CopyPathButton({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
@@ -12,13 +13,19 @@ function CopyPathButton({ path }: { path: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button 
-      onClick={(e) => { e.stopPropagation(); handleCopy(); }}
-      className="p-1 hover:bg-slate-700/50 rounded text-slate-500 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
-      title="Copy variable path"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button 
+          onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+          className="p-1 hover:bg-slate-700/50 rounded text-slate-500 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        Copy variable path
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -41,9 +48,14 @@ function SchemaNodeTree({ name, node, path }: { name: string, node: SchemaNode, 
             {node.type}{node.items ? `[${node.items.type}]` : ''}
           </span>
           {node.description && (
-            <span className="text-slate-400 text-[11px] mt-0.5 truncate hidden sm:inline-block max-w-[300px] xl:max-w-none" title={node.description}>
-              // {node.description}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-slate-400 text-[11px] mt-0.5 truncate hidden sm:inline-block max-w-[300px] xl:max-w-none">
+                  // {node.description}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{node.description}</TooltipContent>
+            </Tooltip>
           )}
           {node.enumValues && (
             <span className="text-amber-200/70 text-[10px] mt-0.5 flex gap-1 items-center flex-wrap">

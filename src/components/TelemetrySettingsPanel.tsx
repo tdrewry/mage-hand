@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { syncProfiler } from '@/lib/jazz/profiler';
 import { Trash2, Edit2, ChevronRight } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export function TelemetrySettingsPanel() {
   const { webhooks, rules, addWebhook, removeWebhook, saveRule, removeRule } = useTelemetryStore();
@@ -85,9 +86,14 @@ export function TelemetrySettingsPanel() {
           <ul className="space-y-2 border rounded-md divide-y overflow-hidden max-h-40 overflow-y-auto">
             {webhooks.map((url, i) => (
               <li key={i} className="flex items-center justify-between text-xs bg-muted/40 p-2 group">
-                <span className="truncate flex-1 pr-2 text-muted-foreground group-hover:text-foreground transition-colors" title={url}>
-                  {url}
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="truncate flex-1 pr-2 text-muted-foreground group-hover:text-foreground transition-colors">
+                      {url}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{url}</TooltipContent>
+                </Tooltip>
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive shrink-0" onClick={() => removeWebhook(url)}>
                   <Trash2 className="h-3 w-3" />
                 </Button>

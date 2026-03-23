@@ -43,6 +43,7 @@ import {
   isJazzCode,
   encodeJazzCode,
 } from '@/lib/sessionCodeResolver';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export const SessionManager: React.FC<{
   open: boolean;
@@ -398,16 +399,20 @@ export const SessionManager: React.FC<{
                 <div className="space-y-1 min-w-0 flex-1">
                   <Label className="text-xs text-muted-foreground">Session Code <span className="opacity-50">(requires registry)</span></Label>
                   <div className="flex items-center gap-2">
-                    <code 
-                      className={`font-bold tracking-wider text-primary break-all ${
-                        (currentSession.sessionCode?.length ?? 0) > 12 
-                          ? 'text-[11px] leading-tight max-w-[200px] text-wrap' 
-                          : 'text-2xl'
-                      }`}
-                      title={currentSession.sessionCode}
-                    >
-                      {currentSession.sessionCode}
-                    </code>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code 
+                          className={`font-bold tracking-wider text-primary break-all ${
+                            (currentSession.sessionCode?.length ?? 0) > 12 
+                              ? 'text-[11px] leading-tight max-w-[200px] text-wrap' 
+                              : 'text-2xl'
+                          }`}
+                        >
+                          {currentSession.sessionCode}
+                        </code>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{currentSession.sessionCode}</TooltipContent>
+                    </Tooltip>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -432,36 +437,49 @@ export const SessionManager: React.FC<{
                     <Badge variant="outline" className="text-[9px] h-4 px-1 text-emerald-400 border-emerald-500/30">No Registry</Badge>
                   </div>
                   <div className="flex items-center gap-2 p-2 bg-background/30 rounded-lg border border-white/5">
-                    <code className="text-[10px] text-primary/70 font-mono truncate flex-1" title={encodeJazzCode(currentSession.sessionId)}>
-                      {encodeJazzCode(currentSession.sessionId)}
-                    </code>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code className="text-[10px] text-primary/70 font-mono truncate flex-1">
+                          {encodeJazzCode(currentSession.sessionId)}
+                        </code>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{encodeJazzCode(currentSession.sessionId)}</TooltipContent>
+                    </Tooltip>
                     {/* Copy J-code */}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        navigator.clipboard.writeText(encodeJazzCode(currentSession!.sessionId));
-                        toast.success('J-Code copied!');
-                      }}
-                      className="h-6 w-6 shrink-0"
-                      title="Copy J-Code (paste into Join Session)"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            navigator.clipboard.writeText(encodeJazzCode(currentSession!.sessionId));
+                            toast.success('J-Code copied!');
+                          }}
+                          className="h-6 w-6 shrink-0"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Copy J-Code (paste into Join Session)</TooltipContent>
+                    </Tooltip>
                     {/* Copy direct URL with J-code */}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        const jCode = encodeJazzCode(currentSession!.sessionId);
-                        navigator.clipboard.writeText(`${window.location.origin}/?session=${jCode}`);
-                        toast.success('Direct URL copied!');
-                      }}
-                      className="h-6 w-6 shrink-0"
-                      title="Copy shareable URL (J-Code based, works without registry)"
-                    >
-                      <LogIn className="h-3 w-3" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            const jCode = encodeJazzCode(currentSession!.sessionId);
+                            navigator.clipboard.writeText(`${window.location.origin}/?session=${jCode}`);
+                            toast.success('Direct URL copied!');
+                          }}
+                          className="h-6 w-6 shrink-0"
+                        >
+                          <LogIn className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Copy shareable URL (J-Code based, works without registry)</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               )}

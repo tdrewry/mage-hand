@@ -27,6 +27,7 @@ import {
   Package,
   Pencil,
 } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
 import { useItemStore } from '@/stores/itemStore';
@@ -56,11 +57,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1161,9 +1158,14 @@ function CharacterListItem({ character, onEdit, onCreateToken, isCreating, onRem
           </TooltipTrigger>
           <TooltipContent>Create Token</TooltipContent>
         </Tooltip>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Edit Character">
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Edit Character</TooltipContent>
+        </Tooltip>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button 
@@ -1270,9 +1272,14 @@ function MonsterListItem({ monster, onEdit, onCreateToken, isCreating, onRemove,
           </TooltipTrigger>
           <TooltipContent>Create Token ({gridSize}×{gridSize})</TooltipContent>
         </Tooltip>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Edit Monster">
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Edit Monster</TooltipContent>
+        </Tooltip>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button 

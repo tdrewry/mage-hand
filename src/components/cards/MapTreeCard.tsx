@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import {
   ContextMenu,
@@ -281,17 +282,21 @@ function SelectionBubble({
   onClick: (e: React.MouseEvent) => void;
 }) {
   return (
-    <button
-      className={`shrink-0 flex items-center justify-center w-4 h-4 rounded-full border transition-all
-        ${selected
-          ? 'bg-primary border-primary text-primary-foreground opacity-100'
-          : 'border-muted-foreground/40 opacity-0 group-hover:opacity-60'
-        }`}
-      onClick={onClick}
-      title="Add to selection"
-    >
-      {selected && <Check className="h-2.5 w-2.5" />}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className={`shrink-0 flex items-center justify-center w-4 h-4 rounded-full border transition-all
+            ${selected
+              ? 'bg-primary border-primary text-primary-foreground opacity-100'
+              : 'border-muted-foreground/40 opacity-0 group-hover:opacity-60'
+            }`}
+          onClick={onClick}
+        >
+          {selected && <Check className="h-2.5 w-2.5" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Add to selection</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -392,37 +397,49 @@ function EntityRow({
 
         {/* Eject from group (only when inside a group) */}
         {groupId && onEjectFromGroup && !isRenaming && (
-          <button
-            className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
-            title="Remove from group (eject to ungrouped)"
-            onClick={e => { e.stopPropagation(); onEjectFromGroup(groupId, entity.id); }}
-          >
-            <ArrowRightFromLine className="h-3 w-3" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                onClick={e => { e.stopPropagation(); onEjectFromGroup(groupId, entity.id); }}
+              >
+                <ArrowRightFromLine className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Remove from group (eject to ungrouped)</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Create new group (only ungrouped entities) */}
         {!groupId && onAddToNewGroup && !isRenaming && (
-          <button
-            className="shrink-0 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-80 transition-opacity"
-            title="Create a new group with this entity"
-            onClick={e => { e.stopPropagation(); onAddToNewGroup(entity); }}
-          >
-            <Plus className="h-3 w-3" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="shrink-0 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-80 transition-opacity"
+                onClick={e => { e.stopPropagation(); onAddToNewGroup(entity); }}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create a new group with this entity</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Lock toggle */}
         {canLock && !isRenaming ? (
-          <button
-            className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            title={entity.locked ? 'Unlock entity' : 'Lock entity'}
-            onClick={e => { e.stopPropagation(); onToggleLock?.(entity); }}
-          >
-            {entity.locked
-              ? <Lock className="h-3 w-3 text-primary" />
-              : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={e => { e.stopPropagation(); onToggleLock?.(entity); }}
+              >
+                {entity.locked
+                  ? <Lock className="h-3 w-3 text-primary" />
+                  : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{entity.locked ? 'Unlock entity' : 'Lock entity'}</TooltipContent>
+          </Tooltip>
         ) : !isRenaming ? (
           <span className="h-3 w-3 ml-0.5 shrink-0" />
         ) : null}
@@ -542,35 +559,47 @@ function GroupNode({
 
         {/* Rename */}
         {!renaming && (
-          <button
-            className="shrink-0 p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
-            title="Rename group"
-            onClick={e => { e.stopPropagation(); setRenaming(true); }}
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="shrink-0 p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                onClick={e => { e.stopPropagation(); setRenaming(true); }}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Rename group</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Lock */}
-        <button
-          className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
-          title={group.locked ? 'Unlock group' : 'Lock group'}
-          onClick={e => { e.stopPropagation(); onToggleLock(group); }}
-        >
-          {group.locked
-            ? <Lock    className="h-3 w-3 text-primary" />
-            : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={e => { e.stopPropagation(); onToggleLock(group); }}
+            >
+              {group.locked
+                ? <Lock    className="h-3 w-3 text-primary" />
+                : <LockOpen className="h-3 w-3 opacity-40 group-hover:opacity-80" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{group.locked ? 'Unlock group' : 'Lock group'}</TooltipContent>
+        </Tooltip>
 
         {/* Delete / dissolve */}
-        <Button
-          variant="ghost" size="icon"
-          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={e => { e.stopPropagation(); onDelete(group.id); }}
-          title="Dissolve group (keeps members)"
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={e => { e.stopPropagation(); onDelete(group.id); }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Dissolve group (keeps members)</TooltipContent>
+        </Tooltip>
       </div>
 
       <CollapsibleContent>
@@ -1519,20 +1548,28 @@ export const MapTreeCardContent: React.FC = () => {
           })}
 
           <div className="ml-auto flex items-center gap-1">
-            <button
-              onClick={handleSelectAll}
-              className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-              title="Select all entities"
-            >
-              All
-            </button>
-            <button
-              onClick={handleSelectNone}
-              className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-              title="Deselect all entities"
-            >
-              None
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleSelectAll}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                >
+                  All
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Select all entities</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleSelectNone}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                >
+                  None
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Deselect all entities</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -1616,7 +1653,12 @@ export const MapTreeCardContent: React.FC = () => {
 
                       {/* Texture indicator */}
                       {regions.some(r => r.mapId === map.id && (r.backgroundImage || r.textureHash)) && (
-                        <span title="Has textured regions"><Image className="h-3 w-3 shrink-0 text-muted-foreground" /></span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span><Image className="h-3 w-3 shrink-0 text-muted-foreground" /></span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Has textured regions</TooltipContent>
+                        </Tooltip>
                       )}
 
                       {/* Collapse/expand groups within this map */}
@@ -1627,15 +1669,19 @@ export const MapTreeCardContent: React.FC = () => {
                         const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
                         const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
                         return (
-                          <button
-                            className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
-                            title={anyExpanded ? 'Collapse all groups' : 'Expand all groups'}
-                            onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
-                          >
-                            {anyExpanded
-                              ? <ChevronsUp className="h-3.5 w-3.5" />
-                              : <ChevronsDown className="h-3.5 w-3.5" />}
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-80 transition-opacity"
+                                onClick={e => { e.stopPropagation(); toggleAllGroupsInMap(map.id); }}
+                              >
+                                {anyExpanded
+                                  ? <ChevronsUp className="h-3.5 w-3.5" />
+                                  : <ChevronsDown className="h-3.5 w-3.5" />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{anyExpanded ? 'Collapse all groups' : 'Expand all groups'}</TooltipContent>
+                          </Tooltip>
                         );
                       })()}
                     </div>
@@ -1648,108 +1694,137 @@ export const MapTreeCardContent: React.FC = () => {
                           const sIdx = sMaps.findIndex(m => m.id === map.id);
                           return (
                             <>
-                              <button
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                disabled={sIdx <= 0}
-                                onClick={() => {
-                                  const prev = sMaps[sIdx - 1];
-                                  const curFloor = map.floorNumber ?? sIdx;
-                                  const prevFloor = prev.floorNumber ?? (sIdx - 1);
-                                  updateMap(map.id, { floorNumber: prevFloor });
-                                  updateMap(prev.id, { floorNumber: curFloor });
-                                  toast.success('Floor order updated');
-                                }}
-                                title="Move floor up"
-                              >
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                disabled={sIdx >= sMaps.length - 1}
-                                onClick={() => {
-                                  const next = sMaps[sIdx + 1];
-                                  const curFloor = map.floorNumber ?? sIdx;
-                                  const nextFloor = next.floorNumber ?? (sIdx + 1);
-                                  updateMap(map.id, { floorNumber: nextFloor });
-                                  updateMap(next.id, { floorNumber: curFloor });
-                                  toast.success('Floor order updated');
-                                }}
-                                title="Move floor down"
-                              >
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              </button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    disabled={sIdx <= 0}
+                                    onClick={() => {
+                                      const prev = sMaps[sIdx - 1];
+                                      const curFloor = map.floorNumber ?? sIdx;
+                                      const prevFloor = prev.floorNumber ?? (sIdx - 1);
+                                      updateMap(map.id, { floorNumber: prevFloor });
+                                      updateMap(prev.id, { floorNumber: curFloor });
+                                      toast.success('Floor order updated');
+                                    }}
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Move floor up</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    disabled={sIdx >= sMaps.length - 1}
+                                    onClick={() => {
+                                      const next = sMaps[sIdx + 1];
+                                      const curFloor = map.floorNumber ?? sIdx;
+                                      const nextFloor = next.floorNumber ?? (sIdx + 1);
+                                      updateMap(map.id, { floorNumber: nextFloor });
+                                      updateMap(next.id, { floorNumber: curFloor });
+                                      toast.success('Floor order updated');
+                                    }}
+                                  >
+                                    <ArrowDown className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">Move floor down</TooltipContent>
+                              </Tooltip>
                             </>
                           );
                         })() : (
                           <>
-                            <button
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                              disabled={index === 0}
-                              onClick={() => reorderMaps(index, index - 1)}
-                              title="Move map up"
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                              disabled={index >= maps.length - 1}
-                              onClick={() => reorderMaps(index, index + 1)}
-                              title="Move map down"
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  disabled={index === 0}
+                                  onClick={() => reorderMaps(index, index - 1)}
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Move map up</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  disabled={index >= maps.length - 1}
+                                  onClick={() => reorderMaps(index, index + 1)}
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Move map down</TooltipContent>
+                            </Tooltip>
                           </>
                         )}
                       </div>
 
                       <div className="w-px h-3.5 bg-border mx-1" />
 
-                      <button
-                        className={`shrink-0 p-0.5 rounded transition-colors ${
-                          isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        title="Set as focused map"
-                        onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
-                      >
-                        <MousePointer2 className="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`shrink-0 p-0.5 rounded transition-colors ${
+                              isFocused ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            onClick={e => { e.stopPropagation(); setSelectedMap(map.id); }}
+                          >
+                            <MousePointer2 className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Set as focused map</TooltipContent>
+                      </Tooltip>
 
                       {/* Fog toggle button */}
                       {(() => {
                         const mapFog = useFogStore.getState().getMapFogSettings(map.id);
                         const isFogOn = mapFog.enabled;
                         return (
-                          <button
-                            className={`shrink-0 p-0.5 rounded transition-colors ${
-                              isFogOn ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title={isFogOn ? 'Fog enabled — click to open fog controls' : 'Fog disabled — click to open fog controls'}
-                            onClick={e => {
-                              e.stopPropagation();
-                              const cardStore = useCardStore.getState();
-                              cardStore.registerCard({
-                                type: CardType.FOG,
-                                title: `Fog - ${map.name}`,
-                                defaultPosition: { x: 345, y: 80 },
-                                defaultSize: { width: 350, height: 400 },
-                                defaultVisible: true,
-                                metadata: { targetMapId: map.id, targetLabel: map.name },
-                              });
-                            }}
-                          >
-                            {isFogOn ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className={`shrink-0 p-0.5 rounded transition-colors ${
+                                  isFogOn ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const cardStore = useCardStore.getState();
+                                  cardStore.registerCard({
+                                    type: CardType.FOG,
+                                    title: `Fog - ${map.name}`,
+                                    defaultPosition: { x: 345, y: 80 },
+                                    defaultSize: { width: 350, height: 400 },
+                                    defaultVisible: true,
+                                    metadata: { targetMapId: map.id, targetLabel: map.name },
+                                  });
+                                }}
+                              >
+                                {isFogOn ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{isFogOn ? 'Fog enabled — click to open fog controls' : 'Fog disabled — click to open fog controls'}</TooltipContent>
+                          </Tooltip>
                         );
                       })()}
 
                       {/* Active toggle */}
-                      <div onClick={e => e.stopPropagation()} title={map.active ? 'Active — rendered' : 'Inactive — hidden'} className="ml-1 transition-opacity">
-                        <Switch
-                          checked={map.active}
-                          onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
-                          className="scale-[0.7]"
-                        />
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div onClick={e => e.stopPropagation()} className="ml-1 transition-opacity">
+                            <Switch
+                              checked={map.active}
+                              onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
+                              className="scale-[0.7]"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{map.active ? 'Active — rendered' : 'Inactive — hidden'}</TooltipContent>
+                    </Tooltip>
                     </div>
                   </div>
 
@@ -1942,50 +2017,66 @@ export const MapTreeCardContent: React.FC = () => {
                         {structure.name}
                       </span>
                       {/* Structure fog button */}
-                      <button
-                        className="text-[10px] text-muted-foreground hover:text-foreground"
-                        title="Open fog controls for entire structure"
-                        onClick={() => {
-                          const cardStore = useCardStore.getState();
-                          cardStore.registerCard({
-                            type: CardType.FOG,
-                            title: `Fog - ${structure.name}`,
-                            defaultPosition: { x: 345, y: 80 },
-                            defaultSize: { width: 350, height: 400 },
-                            defaultVisible: true,
-                            metadata: { isStructureMode: true, structureId: structure.id, targetLabel: structure.name },
-                          });
-                        }}
-                      >
-                        <Cloud className="h-3 w-3" />
-                      </button>
-                      <button
-                        className="text-[10px] text-muted-foreground hover:text-destructive"
-                        title="Delete structure"
-                        onClick={() => { removeStructure(structure.id); toast.success(`Removed structure "${structure.name}"`); }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        className="text-[10px] text-muted-foreground hover:text-foreground"
-                        title="Rename structure"
-                        onClick={() => {
-                          const name = prompt('Rename structure:', structure.name);
-                          if (name) renameStructure(structure.id, name);
-                        }}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button
-                        className={`text-[10px] ${structure.exclusiveFocus ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
-                        title={structure.exclusiveFocus ? 'Exclusive focus ON — only the focused floor is active' : 'Exclusive focus OFF — multiple floors can be active'}
-                        onClick={() => {
-                          setStructureExclusiveFocus(structure.id, !structure.exclusiveFocus);
-                          toast.success(structure.exclusiveFocus ? 'Exclusive focus disabled' : 'Exclusive focus enabled');
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              const cardStore = useCardStore.getState();
+                              cardStore.registerCard({
+                                type: CardType.FOG,
+                                title: `Fog - ${structure.name}`,
+                                defaultPosition: { x: 345, y: 80 },
+                                defaultSize: { width: 350, height: 400 },
+                                defaultVisible: true,
+                                metadata: { isStructureMode: true, structureId: structure.id, targetLabel: structure.name },
+                              });
+                            }}
+                          >
+                            <Cloud className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Open fog controls for entire structure</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-destructive"
+                            onClick={() => { removeStructure(structure.id); toast.success(`Removed structure "${structure.name}"`); }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Delete structure</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              const name = prompt('Rename structure:', structure.name);
+                              if (name) renameStructure(structure.id, name);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Rename structure</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`text-[10px] ${structure.exclusiveFocus ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
+                            onClick={() => {
+                              setStructureExclusiveFocus(structure.id, !structure.exclusiveFocus);
+                              toast.success(structure.exclusiveFocus ? 'Exclusive focus disabled' : 'Exclusive focus enabled');
+                            }}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{structure.exclusiveFocus ? 'Exclusive focus ON — only the focused floor is active' : 'Exclusive focus OFF — multiple floors can be active'}</TooltipContent>
+                      </Tooltip>
                     </div>
                     {structMaps.map((map) => {
                       const globalIdx = maps.findIndex(m => m.id === map.id);

@@ -21,6 +21,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   Play,
@@ -459,34 +460,52 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
                       <h4 className="font-semibold text-green-400 flex items-center gap-2 flex-wrap">
                         Connected to Session 
                         <div className="flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded">
-                          <span className="font-mono text-[10px] sm:text-xs leading-tight break-all max-w-[150px] sm:max-w-xs text-wrap" title={currentSession.sessionCode}>
-                            {currentSession.sessionCode}
-                          </span>
-                          <button
-                            onClick={handleCopySessionCode}
-                            className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400"
-                            title="Copy short code (requires registry)"
-                          >
-                            {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="font-mono text-[10px] sm:text-xs leading-tight break-all max-w-[150px] sm:max-w-xs text-wrap">
+                                {currentSession.sessionCode}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{currentSession.sessionCode}</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={handleCopySessionCode}
+                                className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400"
+                              >
+                                {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Copy short code (requires registry)</TooltipContent>
+                          </Tooltip>
                         </div>
                       </h4>
                       {/* J-code row — no registry needed, works locally */}
                       {currentSession.sessionId && (
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className="text-[10px] text-green-400/60 shrink-0">J-Code:</span>
-                          <code className="text-[10px] font-mono text-green-300/70 truncate flex-1" title={encodeJazzCode(currentSession.sessionId)}>
-                            {encodeJazzCode(currentSession.sessionId)}
-                          </code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(encodeJazzCode(currentSession.sessionId));
-                            }}
-                            className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400/60 hover:text-green-400"
-                            title="Copy J-Code (works without registry)"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <code className="text-[10px] font-mono text-green-300/70 truncate flex-1">
+                                {encodeJazzCode(currentSession.sessionId)}
+                              </code>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{encodeJazzCode(currentSession.sessionId)}</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(encodeJazzCode(currentSession.sessionId));
+                                }}
+                                className="p-1 hover:bg-green-500/20 rounded-md transition-colors shrink-0 text-green-400/60 hover:text-green-400"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Copy J-Code (works without registry)</TooltipContent>
+                          </Tooltip>
                         </div>
                       )}
                       <p className="text-sm text-green-400/80 mt-1">

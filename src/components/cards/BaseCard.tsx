@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Minus, X, Maximize2, Minimize2, PanelLeft, PanelRight, ArrowUpRight } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useCardStore } from '@/stores/cardStore';
 import { CardPosition, CardSize } from '@/types/cardTypes';
 import { useUiStateStore } from '@/stores/uiStateStore';
@@ -221,15 +222,19 @@ export function BaseCard({
               onMouseDown={handleMouseDown}
             >
               <div className="flex items-center gap-1 min-w-0">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" 
-                  onClick={handlePopOut} 
-                  title="detach"
-                >
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground" 
+                      onClick={handlePopOut} 
+                    >
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">detach</TooltipContent>
+                </Tooltip>
                 <h3 className="text-sm font-semibold text-card-foreground select-none truncate">{title}</h3>
               </div>
               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -293,12 +298,22 @@ export function BaseCard({
           >
             <h3 className="text-sm font-semibold text-card-foreground select-none">{title}</h3>
             <div className="flex items-center gap-1 shrink-0">
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockLeft} title="Dock Left">
-                <PanelLeft className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockRight} title="Dock Right">
-                <PanelRight className="h-3 w-3" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockLeft}>
+                    <PanelLeft className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Dock Left</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDockRight}>
+                    <PanelRight className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Dock Right</TooltipContent>
+              </Tooltip>
               <Button
                 variant="ghost"
                 size="icon"

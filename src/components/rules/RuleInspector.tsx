@@ -3,6 +3,7 @@ import { RuleNode } from '@/lib/rules-engine/types';
 import { AlertCircle, Flag, ChevronLeft, ChevronRight, Calculator, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getV3SchemaPaths } from '@/lib/rules-engine/schema-paths';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
@@ -603,15 +604,19 @@ export function RuleInspector({
 
   return (
     <div className={`transition-all duration-300 flex flex-col shrink-0 bg-card border-l border-border relative ${isInspectorExpanded ? "w-[700px]" : "w-[350px]"}`}>
-      <Button
-        variant="outline"
-        size="icon"
-        className="absolute top-4 -left-3 h-6 w-6 rounded-full border border-border bg-background shadow-sm z-10 p-0 hover:bg-muted"
-        onClick={() => setIsInspectorExpanded(!isInspectorExpanded)}
-        title={isInspectorExpanded ? "Collapse Inspector" : "Expand Inspector"}
-      >
-        {isInspectorExpanded ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute top-4 -left-3 h-6 w-6 rounded-full border border-border bg-background shadow-sm z-10 p-0 hover:bg-muted"
+            onClick={() => setIsInspectorExpanded(!isInspectorExpanded)}
+          >
+            {isInspectorExpanded ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{isInspectorExpanded ? "Collapse Inspector" : "Expand Inspector"}</TooltipContent>
+      </Tooltip>
       
       <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
         <div className="p-4 border-b border-border shrink-0 flex flex-col gap-4">

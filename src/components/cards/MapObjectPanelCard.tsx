@@ -5,6 +5,7 @@ import {
   Copy, Image, ChevronUp, ChevronDown, Mountain, Armchair,
   Lamp, Search, X, Filter, Layers, Plus, AlertTriangle,
 } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -101,18 +102,21 @@ function CreateTab({ onCreate }: { onCreate: (id: string) => void }) {
               {group.categories.map(cat => {
                 const isWall = cat === 'wall';
                 return (
-                  <Button
-                    key={cat}
-                    variant="outline"
-                    size="sm"
-                    className="text-[10px] h-7 px-1.5 justify-start gap-1.5 font-normal"
-                    title={isWall ? wallNote : `Add ${MAP_OBJECT_CATEGORY_LABELS[cat]}`}
-                    disabled={isWall}
-                    onClick={() => !isWall && handleCreate(cat)}
-                  >
-                    <Plus className="w-2.5 h-2.5 flex-shrink-0" />
-                    <span className="truncate">{MAP_OBJECT_CATEGORY_LABELS[cat]}</span>
-                  </Button>
+                  <Tooltip key={cat}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] h-7 px-1.5 justify-start gap-1.5 font-normal"
+                        disabled={isWall}
+                        onClick={() => !isWall && handleCreate(cat)}
+                      >
+                        <Plus className="w-2.5 h-2.5 flex-shrink-0" />
+                        <span className="truncate">{MAP_OBJECT_CATEGORY_LABELS[cat]}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{isWall ? wallNote : `Add ${MAP_OBJECT_CATEGORY_LABELS[cat]}`}</TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>
@@ -294,15 +298,19 @@ function ObjectsTab({ onSelect }: { onSelect: (id: string) => void }) {
                   )}
                   {/* Quick door toggle */}
                   {obj.category === 'door' && (
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleDoor(obj.id); }}
-                      className="ml-1 p-0.5 rounded hover:bg-muted"
-                      title={obj.isOpen ? 'Close door' : 'Open door'}
-                    >
-                      {obj.isOpen
-                        ? <DoorClosed className="w-3 h-3 text-muted-foreground" />
-                        : <DoorOpen className="w-3 h-3 text-muted-foreground" />}
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleDoor(obj.id); }}
+                          className="ml-1 p-0.5 rounded hover:bg-muted"
+                        >
+                          {obj.isOpen
+                            ? <DoorClosed className="w-3 h-3 text-muted-foreground" />
+                            : <DoorOpen className="w-3 h-3 text-muted-foreground" />}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{obj.isOpen ? 'Close door' : 'Open door'}</TooltipContent>
+                    </Tooltip>
                   )}
                 </button>
               );
@@ -765,16 +773,24 @@ function SelectedTab() {
                   className="h-7 text-xs flex-1"
                   min={0} max={9999}
                 />
-                <Button variant="outline" size="sm" className="h-7 px-2"
-                  title="Move to front"
-                  onClick={() => reorderMapObject(single.id, 1000)}>
-                  <ChevronUp className="w-3 h-3" />
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 px-2"
-                  title="Move to back"
-                  onClick={() => reorderMapObject(single.id, 0)}>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2"
+                      onClick={() => reorderMapObject(single.id, 1000)}>
+                      <ChevronUp className="w-3 h-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Move to front</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2"
+                      onClick={() => reorderMapObject(single.id, 0)}>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Move to back</TooltipContent>
+                </Tooltip>
               </div>
               <p className="text-[10px] text-muted-foreground">Lower = drawn first/behind</p>
             </div>

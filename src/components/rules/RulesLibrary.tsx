@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EffectsCatalog } from './EffectsCatalog';
 import { RuleGraphEditor } from './RuleGraphEditor';
-import { GlobalConfigEditor } from './GlobalConfigEditor';
+import { LexiconEditor } from './LexiconEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy, Map, Plug, Database } from 'lucide-react';
@@ -306,43 +306,59 @@ export function RulesLibrary() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0" 
-                          onClick={(e) => handleExportSingle(p, e)} 
-                          title="Export"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0" 
-                          onClick={(e) => handleCopyPipeline(p, e)} 
-                          title="Duplicate"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0" 
-                          onClick={() => setEditingPipelineId(p.id)} 
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
-                              title="Delete"
+                              className="h-8 w-8 p-0" 
+                              onClick={(e) => handleExportSingle(p, e)} 
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Download className="h-4 w-4" />
                             </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Export</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0" 
+                              onClick={(e) => handleCopyPipeline(p, e)} 
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Duplicate</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0" 
+                              onClick={() => setEditingPipelineId(p.id)} 
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete</TooltipContent>
+                              </Tooltip>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -380,7 +396,7 @@ export function RulesLibrary() {
         </TabsContent>
 
         <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
-          <GlobalConfigEditor />
+          <LexiconEditor />
         </TabsContent>
       </Tabs>
 

@@ -134,15 +134,19 @@ export function ActionCardContent() {
       </div>
       <div className="flex-1 min-h-0 relative">
         <div className="absolute top-2 right-2 z-50">
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-6 px-2 text-[10px] opacity-20 hover:opacity-100 transition-opacity"
-            title="Emergency Clear Actions"
-            onClick={() => useActionStore.getState().cancelAllActions()}
-          >
-            Bail Out
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-[10px] opacity-20 hover:opacity-100 transition-opacity"
+                onClick={() => useActionStore.getState().cancelAllActions()}
+              >
+                Bail Out
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Emergency Clear Actions</TooltipContent>
+          </Tooltip>
         </div>
         <SingleActionView action={currentAction} />
       </div>
@@ -627,13 +631,17 @@ function TargetResolveCard({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{(distance * 5).toFixed(0)} ft.</span>
-          <button
-            onClick={onDismiss}
-            className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-            title="Dismiss target"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onDismiss}
+                className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Dismiss target</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

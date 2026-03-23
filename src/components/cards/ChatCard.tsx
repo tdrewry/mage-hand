@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Send, Swords, Target, MessageSquare, Eye, Users, X, Dice5 } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useChatStore, type ChatMessage, type ChatActionEntry, type ChatDiceEntry } from '@/stores/chatStore';
 import { useDiceStore } from '@/stores/diceStore';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
@@ -233,14 +234,18 @@ function WhisperPicker({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant={isWhisperMode ? 'default' : 'ghost'}
-          size="sm"
-          className={`h-8 px-2 shrink-0 ${isWhisperMode ? 'bg-purple-700 hover:bg-purple-600 text-purple-100' : ''}`}
-          title="Whisper to specific players"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant={isWhisperMode ? 'default' : 'ghost'}
+              size="sm"
+              className={`h-8 px-2 shrink-0 ${isWhisperMode ? 'bg-purple-700 hover:bg-purple-600 text-purple-100' : ''}`}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Whisper to specific players</TooltipContent>
+        </Tooltip>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2" align="start" side="top">
         <div className="space-y-2">

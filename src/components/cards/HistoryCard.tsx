@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Clock, Undo2, Redo2, Trash2 } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -49,15 +50,19 @@ export const HistoryCard: React.FC = () => {
           <Clock className="w-5 h-5 text-muted-foreground" />
           <h3 className="font-semibold text-foreground">History</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClearHistory}
-          disabled={!canUndo && !canRedo}
-          title="Clear all history"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearHistory}
+              disabled={!canUndo && !canRedo}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Clear all history</TooltipContent>
+        </Tooltip>
       </div>
 
         <Separator />

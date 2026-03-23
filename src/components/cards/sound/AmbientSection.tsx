@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   Play, Square, Radio, Upload, Trash2, Volume2, Plus,
 } from 'lucide-react';
@@ -160,36 +161,48 @@ export const AmbientSection: React.FC = () => {
             </div>
 
             {/* Preview (local only) */}
-            <Button
-              variant="ghost" size="icon"
-              className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={() => handlePlay(loop.id)}
-              title="Preview locally"
-            >
-              <Play className="h-3 w-3" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => handlePlay(loop.id)}
+                >
+                  <Play className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Preview locally</TooltipContent>
+            </Tooltip>
 
             {/* Broadcast (DM only) */}
             {isDM && (
-              <Button
-                variant="ghost" size="icon"
-                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-primary"
-                onClick={() => handleBroadcast(loop.id)}
-                title="Broadcast to all players"
-              >
-                <Radio className="h-3 w-3" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost" size="icon"
+                    className="h-5 w-5 shrink-0 text-muted-foreground hover:text-primary"
+                    onClick={() => handleBroadcast(loop.id)}
+                  >
+                    <Radio className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Broadcast to all players</TooltipContent>
+              </Tooltip>
             )}
 
             {/* Remove */}
-            <Button
-              variant="ghost" size="icon"
-              className="h-5 w-5 shrink-0 text-destructive/70 hover:text-destructive"
-              onClick={() => handleRemoveCustom(loop.id)}
-              title="Remove loop"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-5 w-5 shrink-0 text-destructive/70 hover:text-destructive"
+                  onClick={() => handleRemoveCustom(loop.id)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Remove loop</TooltipContent>
+            </Tooltip>
           </div>
         ))}
       </div>

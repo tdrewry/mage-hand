@@ -243,29 +243,37 @@ export const TopNavbar: React.FC = () => {
         {/* Center: Future map selector or core global toggles */}
         <div className="flex flex-1 items-center justify-center gap-2 pointer-events-none">
           {movementLocked && (
-            <Badge 
-              variant="destructive" 
-              className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto"
-              onClick={() => setMovementLocked(false)}
-              title="Click to unlock movement"
-            >
-              <Lock className="h-3 w-3" />
-              <span>Movement Locked — click to unlock</span>
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge 
+                  variant="destructive" 
+                  className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto"
+                  onClick={() => setMovementLocked(false)}
+                >
+                  <Lock className="h-3 w-3" />
+                  <span>Movement Locked — click to unlock</span>
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Click to unlock movement</TooltipContent>
+            </Tooltip>
           )}
           {/* DM: Broadcasts paused indicator (clickable to resume) */}
           {broadcastPaused && isDM && (
-            <Badge
-              className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
-              onClick={() => {
-                deactivatePause();
-                toast.success('Broadcasts resumed — clients syncing final state');
-              }}
-              title="Broadcasts are paused — click to resume and sync clients"
-            >
-              <Radio className="h-3 w-3" />
-              <span>Broadcasts Paused — click to resume</span>
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  className="flex items-center gap-2 px-4 py-1 text-xs font-medium shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 cursor-pointer hover:opacity-80 transition-opacity pointer-events-auto bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
+                  onClick={() => {
+                    deactivatePause();
+                    toast.success('Broadcasts resumed — clients syncing final state');
+                  }}
+                >
+                  <Radio className="h-3 w-3" />
+                  <span>Broadcasts Paused — click to resume</span>
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Broadcasts are paused — click to resume and sync clients</TooltipContent>
+            </Tooltip>
           )}
           {/* Client: map being updated banner (non-clickable) */}
           {broadcastPaused && !isDM && (

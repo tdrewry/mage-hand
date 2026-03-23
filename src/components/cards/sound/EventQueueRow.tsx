@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Play, Upload, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useSoundStore } from '@/stores/soundStore';
 import { triggerSound, type SoundEvent } from '@/lib/soundEngine';
@@ -121,24 +122,32 @@ export const EventQueueRow: React.FC<EventQueueRowProps> = ({ event, disabled, o
         )}
 
         {/* Preview */}
-        <Button
-          variant="ghost" size="icon"
-          className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-          onClick={() => triggerSound(event)}
-          title="Preview sound (random from queue)"
-        >
-          <Play className="h-3 w-3" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost" size="icon"
+              className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => triggerSound(event)}
+            >
+              <Play className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Preview sound (random from queue)</TooltipContent>
+        </Tooltip>
 
         {/* Add to queue */}
-        <Button
-          variant="ghost" size="icon"
-          className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-          onClick={() => fileRef.current?.click()}
-          title="Add audio to queue"
-        >
-          <Upload className="h-3 w-3" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost" size="icon"
+              className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Add audio to queue</TooltipContent>
+        </Tooltip>
 
         {totalCustom > 0 && (
           <Button

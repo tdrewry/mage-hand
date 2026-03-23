@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { syncProfiler } from '@/lib/jazz/profiler';
 import { Button } from './ui/button';
 import { Download, Copy, Check, Play, Server, Zap, RefreshCw, Link, Share2, AlertTriangle } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip as RadixTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { useMultiplayerStore, useActiveRoster } from '@/stores/multiplayerStore';
@@ -283,31 +283,43 @@ export const SyncProfilerPanel: React.FC = () => {
           
           {sessionCode && (
             <div className="flex items-center space-x-2">
-              <div 
-                className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
-                onClick={handleCopyUrl}
-                title="Click to copy direct join URL (J-Code, works without registry)"
-              >
-                <span className="font-mono text-slate-400">Share URL</span>
-                {copiedUrl ? <Check className="h-3 w-3 text-emerald-400" /> : <Link className="h-3 w-3" />}
-              </div>
-              <div 
-                className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
-                onClick={handleCopyLink}
-                title="Click to copy J-Code (paste into Join Session)"
-              >
-                <span className="font-mono text-slate-400">J-Code</span>
-                {copiedLink ? <Check className="h-3 w-3 text-emerald-400" /> : <Share2 className="h-3 w-3" />}
-              </div>
-              <div 
-                className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
-                onClick={handleCopySessionCode}
-                title="Click to copy short code (requires registry to join)"
-              >
-                <span className="font-mono text-slate-400">Code:</span>
-                <span className="font-mono text-emerald-400">{sessionCode}</span>
-                {copiedCode ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-              </div>
+              <RadixTooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+                    onClick={handleCopyUrl}
+                  >
+                    <span className="font-mono text-slate-400">Share URL</span>
+                    {copiedUrl ? <Check className="h-3 w-3 text-emerald-400" /> : <Link className="h-3 w-3" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to copy direct join URL (J-Code, works without registry)</TooltipContent>
+              </RadixTooltip>
+              <RadixTooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+                    onClick={handleCopyLink}
+                  >
+                    <span className="font-mono text-slate-400">J-Code</span>
+                    {copiedLink ? <Check className="h-3 w-3 text-emerald-400" /> : <Share2 className="h-3 w-3" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to copy J-Code (paste into Join Session)</TooltipContent>
+              </RadixTooltip>
+              <RadixTooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 cursor-pointer px-2 py-1 rounded text-[10px] text-slate-300 transition-colors shrink-0 border border-slate-700/50"
+                    onClick={handleCopySessionCode}
+                  >
+                    <span className="font-mono text-slate-400">Code:</span>
+                    <span className="font-mono text-emerald-400">{sessionCode}</span>
+                    {copiedCode ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to copy short code (requires registry to join)</TooltipContent>
+              </RadixTooltip>
             </div>
           )}
         </div>
@@ -326,14 +338,18 @@ export const SyncProfilerPanel: React.FC = () => {
                 <Server className="h-3 w-3 mr-1.5 text-blue-400" /> Durable Objects (Jazz)
               </div>
               {sessionRootId && (
-                <div 
-                  className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 cursor-pointer px-1.5 py-0.5 rounded text-[9px] text-slate-300 transition-colors ml-2 shrink-0"
-                  onClick={handleCopySessionRoot}
-                  title="Click to copy Session Root ID"
-                >
-                  <span className="truncate max-w-[70px]">{sessionRootId}</span>
-                  {copiedRoot ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                </div>
+                <RadixTooltip>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 cursor-pointer px-1.5 py-0.5 rounded text-[9px] text-slate-300 transition-colors ml-2 shrink-0"
+                      onClick={handleCopySessionRoot}
+                    >
+                      <span className="truncate max-w-[70px]">{sessionRootId}</span>
+                      {copiedRoot ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Click to copy Session Root ID</TooltipContent>
+                </RadixTooltip>
               )}
             </div>
           
@@ -481,17 +497,29 @@ export const SyncProfilerPanel: React.FC = () => {
                      return (
                        <div key={peer.clientId} className="bg-slate-800/60 rounded border border-slate-700/50 p-1.5 px-2 relative overflow-hidden flex flex-col justify-center">
                          <div className="flex justify-between items-center">
-                            <span className="font-mono text-[10px] truncate max-w-[100px] text-slate-300" title={peer.clientId}>
-                              {peer.isHost ? "Host: " : "Client: "}
-                              <span className="opacity-70">{peer.clientId.substring(0, 8)}...</span>
-                            </span>
+                            <RadixTooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-mono text-[10px] truncate max-w-[100px] text-slate-300">
+                                  {peer.isHost ? "Host: " : "Client: "}
+                                  <span className="opacity-70">{peer.clientId.substring(0, 8)}...</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">{peer.clientId}</TooltipContent>
+                            </RadixTooltip>
                             <span className={`font-semibold capitalize text-[9px] ${colorClass}`}>
                               {peer.stage.replace('_', ' ')}
                             </span>
                          </div>
                          <div className="flex justify-between items-center text-[9px] text-slate-400 mt-0.5">
                             <div>ICE: <span className="text-slate-300 font-mono">{peer.iceState || 'unknown'}</span></div>
-                            {isError && peer.error && <div className="text-red-400 truncate max-w-[80px]" title={peer.error}>{peer.error}</div>}
+                            {isError && peer.error && (
+                              <RadixTooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="text-red-400 truncate max-w-[80px]">{peer.error}</div>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">{peer.error}</TooltipContent>
+                              </RadixTooltip>
+                            )}
                          </div>
                        </div>
                      );
@@ -525,19 +553,23 @@ export const SyncProfilerPanel: React.FC = () => {
                 >
                   {active ? 'Pause Profiler' : 'Resume Profiler'}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white px-2"
-                  onClick={() => {
-                    const role = sessionRoles.includes('dm') ? 'host' : 'client';
-                    const safeName = (currentUsername || 'unknown').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    syncProfiler.downloadCSV(`${role}-${safeName}-sync_profiler_log_${Date.now()}.csv`);
-                  }}
-                  title="Download Profiler Log (CSV)"
-                >
-                  <Download className="h-3 w-3 mr-1" /> Save CSV
-                </Button>
+                <RadixTooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] flex-1 flex items-center justify-center gap-1 bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white px-2"
+                      onClick={() => {
+                        const role = sessionRoles.includes('dm') ? 'host' : 'client';
+                        const safeName = (currentUsername || 'unknown').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                        syncProfiler.downloadCSV(`${role}-${safeName}-sync_profiler_log_${Date.now()}.csv`);
+                      }}
+                    >
+                      <Download className="h-3 w-3 mr-1" /> Save CSV
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Download Profiler Log (CSV)</TooltipContent>
+                </RadixTooltip>
               </div>
             )}
           </div>

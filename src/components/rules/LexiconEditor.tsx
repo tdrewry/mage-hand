@@ -4,6 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Plus, Settings2, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function GlobalConfigEditor() {
+export function LexiconEditor() {
   const store = useGlobalConfigStore();
   
   const categoriesList = Object.values(store.categories);
@@ -93,7 +98,7 @@ export function GlobalConfigEditor() {
     }
     
     if (val !== store.categories[id]?.label && categoriesList.some(c => c.label.toLowerCase() === val.toLowerCase())) {
-      toast.error(`Category "${val}" already exists.`);
+      toast.error(`Lexicon "${val}" already exists.`);
       setEditingCatId(null);
       return;
     }
@@ -109,23 +114,23 @@ export function GlobalConfigEditor() {
     
     const id = label.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!id || store.categories[id]) {
-      toast.error('Invalid or duplicate category name.');
+      toast.error('Invalid or duplicate lexicon name.');
       return;
     }
     
     store.addCategory(id, label);
     setNewCatLabel('');
     setActiveCategory(id);
-    toast.success(`Category "${label}" added!`);
+    toast.success(`Lexicon "${label}" added!`);
   };
 
   return (
     <div className="flex h-full w-full bg-background rounded-md border border-border overflow-hidden">
-      {/* Left Column: Categories */}
+      {/* Left Column: Lexicons */}
       <div className="w-64 border-r border-border bg-card/50 flex flex-col shrink-0">
         <div className="p-4 border-b border-border">
           <h2 className="font-semibold text-sm flex items-center gap-2">
-            <Settings2 className="w-4 h-4" /> Global Settings
+            <Settings2 className="w-4 h-4" /> Lexicons
           </h2>
           <p className="text-xs text-muted-foreground mt-1">Manage system vocabulary</p>
         </div>
@@ -166,35 +171,45 @@ export function GlobalConfigEditor() {
               
               {editingCatId !== cat.id && (
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startEditingCat(cat.id, cat.label);
-                    }}
-                    title="Edit Category Name"
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Delete Category"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingCat(cat.id, cat.label);
+                        }}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Pencil className="w-3 h-3" />
                       </Button>
-                    </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit Lexicon Name</TooltipContent>
+                  </Tooltip>
+                  
+                  <AlertDialog>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete Lexicon</TooltipContent>
+                    </Tooltip>
+                    
                     <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Lexicon</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete the category "{cat.label}" and all its items?
+                          Are you sure you want to delete the lexicon "{cat.label}" and all its items?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -219,9 +234,9 @@ export function GlobalConfigEditor() {
             </div>
           ))}
 
-          {/* Add Category Form */}
+          {/* Add Lexicon Form */}
           <form onSubmit={handleAddCategory} className="pt-4 mt-4 border-t border-border flex flex-col gap-2 px-1">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">New Category</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">New Lexicon</span>
             <div className="flex items-center gap-1.5">
               <input
                 value={newCatLabel}
@@ -229,9 +244,14 @@ export function GlobalConfigEditor() {
                 placeholder="e.g. Weapon Types"
                 className="flex-1 min-w-0 h-8 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
               />
-              <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={!newCatLabel.trim()} title="Add Category">
-                <Plus className="w-4 h-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={!newCatLabel.trim()}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add Lexicon</TooltipContent>
+              </Tooltip>
             </div>
           </form>
         </div>
@@ -278,16 +298,21 @@ export function GlobalConfigEditor() {
                       )}
                       
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0 ml-2"
-                            title="Remove Item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0 ml-2"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove Item</TooltipContent>
+                        </Tooltip>
+                        
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remove Item</AlertDialogTitle>
@@ -354,7 +379,7 @@ export function GlobalConfigEditor() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            No categories available. Add one to get started.
+            No lexicons available. Add one to get started.
           </div>
         )}
       </div>

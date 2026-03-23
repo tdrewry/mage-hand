@@ -15,6 +15,7 @@ import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1259,15 +1260,19 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
                           </div>
                           
                           <div className="flex items-center gap-2 ml-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleShowHistory(project.id)}
-                              className="text-xs"
-                              title="View version history"
-                            >
-                              <Clock className="w-3 h-3" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowHistory(project.id)}
+                                  className="text-xs"
+                                >
+                                  <Clock className="w-3 h-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">View version history</TooltipContent>
+                            </Tooltip>
                             <Button
                               variant="outline"
                               size="sm"

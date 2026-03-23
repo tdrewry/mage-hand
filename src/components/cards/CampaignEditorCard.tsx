@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Play, Square, ArrowLeft, AlertTriangle, Swords, ScrollText, MessageSquare, Tent, Pencil, Check, Download, Upload, BookOpen, Gem, Save } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -210,9 +211,14 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
         <Button size="sm" onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-1" /> New
         </Button>
-        <Button size="sm" variant="outline" onClick={handleImport} title="Import scenario (.mhscenario)">
-          <Upload className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" variant="outline" onClick={handleImport}>
+              <Upload className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Import scenario (.mhscenario)</TooltipContent>
+        </Tooltip>
       </div>
       <Separator />
       {campaigns.length === 0 ? (
@@ -244,15 +250,19 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                           autoFocus
                           onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(e as any)}
                         />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0 shrink-0"
-                          onClick={handleSaveEdit}
-                          title="Save"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 shrink-0"
+                              onClick={handleSaveEdit}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Save</TooltipContent>
+                        </Tooltip>
                       </div>
                       <Textarea
                         value={editDesc}
@@ -280,33 +290,45 @@ function ScenarioListView({ onSelect }: { onSelect: (id: string) => void }) {
                         
                         {/* Row 2: Buttons */}
                         <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={(e) => handleExport(e, c)}
-                            title="Export scenario"
-                          >
-                            <Download className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            onClick={(e) => handleStartEdit(e, c)}
-                            title="Rename / edit brief"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant={isActive ? 'default' : 'ghost'}
-                            size="sm"
-                            className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
-                            onClick={(e) => handleToggleActive(e, c.id)}
-                            title={isActive ? 'Stop scenario' : 'Run scenario'}
-                          >
-                            {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => handleExport(e, c)}
+                              >
+                                <Download className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Export scenario</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => handleStartEdit(e, c)}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Rename / edit brief</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant={isActive ? 'default' : 'ghost'}
+                                size="sm"
+                                className={`h-7 w-7 p-0 ${isActive ? '' : 'text-muted-foreground hover:text-foreground'}`}
+                                onClick={(e) => handleToggleActive(e, c.id)}
+                              >
+                                {isActive ? <Square className="h-3 w-3" /> : <Play className="h-3.5 w-3.5" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{isActive ? 'Stop scenario' : 'Run scenario'}</TooltipContent>
+                          </Tooltip>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -894,41 +916,52 @@ export function CampaignEditorCardContent({ cardId }: { cardId?: string }) {
 
         {/* Add node buttons */}
         {MAGEHAND_NODE_TYPE_CONFIGS.map((cfg) => (
-          <Button
-            key={cfg.id}
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => handleAddNode(cfg.id)}
-            title={`Add ${cfg.label}`}
-          >
-            {NODE_TYPE_ICONS[cfg.id]}
-          </Button>
+          <Tooltip key={cfg.id}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => handleAddNode(cfg.id)}
+              >
+                {NODE_TYPE_ICONS[cfg.id]}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Add {cfg.label}</TooltipContent>
+          </Tooltip>
         ))}
 
         {selectedNodeId && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-destructive mr-1"
-            onClick={handleRemoveNode}
-            title="Delete selected node"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-destructive mr-1"
+                onClick={handleRemoveNode}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Delete selected node</TooltipContent>
+          </Tooltip>
         )}
 
         <div className="w-px h-4 bg-border mx-1" />
 
-        <Button 
-          variant="default"
-          size="sm"
-          className="h-7 px-2 text-xs font-semibold"
-          onClick={() => toast.success("Scenario autosaved")}
-          title="Save Scenario"
-        >
-          <Save className="w-3.5 h-3.5 mr-1" /> Save
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="default"
+              size="sm"
+              className="h-7 px-2 text-xs font-semibold"
+              onClick={() => toast.success("Scenario autosaved")}
+            >
+              <Save className="w-3.5 h-3.5 mr-1" /> Save
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Save Scenario</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Content area: flow canvas + optional property panel */}

@@ -206,7 +206,12 @@ function HistoryRow({ roll }: { roll: DiceRollResult }) {
         <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`} />
         <span className="text-muted-foreground w-10 shrink-0">{ts}</span>
         {contextLabel && (
-          <span className="text-muted-foreground truncate max-w-[6rem]" title={contextLabel}>{contextLabel}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-muted-foreground truncate max-w-[6rem]">{contextLabel}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top">{contextLabel}</TooltipContent>
+          </Tooltip>
         )}
         <span className="font-mono text-muted-foreground truncate flex-1 mx-1">{roll.formula}</span>
         <span className="font-bold tabular-nums">{roll.total}</span>

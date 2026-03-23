@@ -29,6 +29,7 @@ import {
   LogOut,
   Copy,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from "sonner";
 
 export const NetworkDemoCardContent: React.FC = () => {
@@ -112,7 +113,12 @@ export const NetworkDemoCardContent: React.FC = () => {
           <div className="space-y-1">
             {webRtcConnections.map((conn) => (
               <div key={conn.peerId} className="flex items-center justify-between text-xs bg-background/50 border border-white/5 rounded px-2 py-1">
-                <span className="truncate max-w-[120px]" title={conn.peerId}>{conn.peerId}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="truncate max-w-[120px]">{conn.peerId}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{conn.peerId}</TooltipContent>
+                </Tooltip>
                 <Badge variant="outline" className={`text-[10px] h-4 ${conn.status === 'connected' ? 'bg-success/20 text-success border-success/30' : ''}`}>
                   {conn.status}
                 </Badge>
@@ -140,15 +146,19 @@ export const NetworkDemoCardContent: React.FC = () => {
               <span className="text-[10px] text-muted-foreground truncate flex-1">
                 {jazzSession.sessionCoId}
               </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0"
-                onClick={handleCopySessionId}
-                title="Copy session ID"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={handleCopySessionId}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Copy session ID</TooltipContent>
+              </Tooltip>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Session: {jazzSession.name}</span>

@@ -260,16 +260,20 @@ export function CampaignSceneRunner() {
         {/* ── Row 1: Standard tools ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Campaign name + progress */}
-          <button
-            type="button"
-            className="flex items-center gap-1.5 min-w-0 shrink hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
-            onClick={handleOpenEditor}
-            title="Open scenario editor"
-          >
-            <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px] underline decoration-dotted underline-offset-2">
-              {campaign.name}
-            </span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 min-w-0 shrink hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+                onClick={handleOpenEditor}
+              >
+                <span className="text-xs font-medium text-muted-foreground truncate max-w-[100px] underline decoration-dotted underline-offset-2">
+                  {campaign.name}
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Open scenario editor</TooltipContent>
+          </Tooltip>
           <Badge variant="outline" className="text-[10px] shrink-0">
             {completedCount}/{totalCount}
           </Badge>
@@ -279,17 +283,21 @@ export function CampaignSceneRunner() {
           {/* Current scene info */}
           {currentNode && !isComplete ? (
             <>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 min-w-0 hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
-                onClick={() => setShowSummary((v) => !v)}
-                title="Click to view node details"
-              >
-                <span className="text-muted-foreground shrink-0">{NODE_ICONS[nodeType]}</span>
-                <span className="text-sm font-medium truncate max-w-[140px] underline decoration-dotted underline-offset-2">
-                  {currentNode.nodeData.name}
-                </span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 min-w-0 hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 transition-colors cursor-pointer"
+                    onClick={() => setShowSummary((v) => !v)}
+                  >
+                    <span className="text-muted-foreground shrink-0">{NODE_ICONS[nodeType]}</span>
+                    <span className="text-sm font-medium truncate max-w-[140px] underline decoration-dotted underline-offset-2">
+                      {currentNode.nodeData.name}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to view node details</TooltipContent>
+              </Tooltip>
 
               <div className="flex items-center gap-1 shrink-0">
                 {/* Run */}

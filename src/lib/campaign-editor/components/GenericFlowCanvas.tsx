@@ -9,6 +9,7 @@ import { CampaignEditorAdapter } from '../types/adapter';
 import { cn } from '@/lib/utils';
 import { Flag, ZoomIn, ZoomOut, Maximize, LayoutGrid, Swords, ScrollText, MessageSquare, Tent, Circle, Calculator, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { getBezierPath, getDragBezierPath } from '../utils/geometry';
 
 const NODE_WIDTH = 180;
@@ -311,7 +312,12 @@ export function GenericFlowCanvas<TNodeData extends BaseNodeData = BaseNodeData,
         <Button variant="secondary" size="sm" className="h-7 px-2 text-xs">{Math.round(scale * 100)}%</Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={zoomIn}><ZoomIn className="w-3 h-3" /></Button>
         <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={fitToView}><Maximize className="w-3 h-3" /></Button>
-        <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={autoLayout} title="Auto Layout"><LayoutGrid className="w-3 h-3" /></Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={autoLayout}><LayoutGrid className="w-3 h-3" /></Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Auto Layout</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Grid background */}

@@ -7,6 +7,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { ChevronUp, ChevronDown, Swords, Dices, AlignVerticalJustifyStart, AlignHorizontalJustifyStart, Minimize2 } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
 import { ephemeralBus } from '@/lib/net';
@@ -216,15 +217,30 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
          
          {/* Format Toggle */}
          <ToggleGroup type="single" value={layoutFormat} onValueChange={(v) => v && setLayoutFormat(v as any)} size="sm" className="bg-black/20 rounded-lg p-0.5">
-           <ToggleGroupItem value="vertical" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background" title="Vertical Format">
-             <AlignVerticalJustifyStart className="h-3 w-3" />
-           </ToggleGroupItem>
-           <ToggleGroupItem value="horizontal" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background" title="Horizontal Format">
-             <AlignHorizontalJustifyStart className="h-3 w-3" />
-           </ToggleGroupItem>
-           <ToggleGroupItem value="mini" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background" title="Mini Format">
-             <Minimize2 className="h-3 w-3" />
-           </ToggleGroupItem>
+           <Tooltip>
+             <TooltipTrigger asChild>
+               <ToggleGroupItem value="vertical" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background">
+                 <AlignVerticalJustifyStart className="h-3 w-3" />
+               </ToggleGroupItem>
+             </TooltipTrigger>
+             <TooltipContent side="top">Vertical Format</TooltipContent>
+           </Tooltip>
+           <Tooltip>
+             <TooltipTrigger asChild>
+               <ToggleGroupItem value="horizontal" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background">
+                 <AlignHorizontalJustifyStart className="h-3 w-3" />
+               </ToggleGroupItem>
+             </TooltipTrigger>
+             <TooltipContent side="top">Horizontal Format</TooltipContent>
+           </Tooltip>
+           <Tooltip>
+             <TooltipTrigger asChild>
+               <ToggleGroupItem value="mini" className="h-6 w-6 p-0 rounded-md data-[state=on]:bg-[#38bdf8] data-[state=on]:text-background">
+                 <Minimize2 className="h-3 w-3" />
+               </ToggleGroupItem>
+             </TooltipTrigger>
+             <TooltipContent side="top">Mini Format</TooltipContent>
+           </Tooltip>
          </ToggleGroup>
       </div>
 

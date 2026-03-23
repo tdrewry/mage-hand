@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useRuleStore } from '@/stores/ruleStore';
 import { compilePipeline, executePipeline, extractVariables, buildSkeletonFromVariables } from '@/lib/rules-engine/compiler';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useMonaco } from '@monaco-editor/react';
 import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { PipelineTester } from './PipelineTester';
@@ -262,9 +263,14 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
     <div className="flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden">
       {/* Header toolbar */}
       <div className="flex items-center gap-2 p-2 border-b border-border shrink-0 bg-background/50">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleBackClick} title="Save & Go Back">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleBackClick}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Save & Go Back</TooltipContent>
+        </Tooltip>
         <div className="flex-1 px-2 min-w-0">
           <input 
             value={pipelineTitle}
@@ -275,97 +281,129 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
         </div>
         
         <div className="flex items-center gap-1 shrink-0">
-          <Button 
-            onClick={addNode} 
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            title="Add Rule Node"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add Rule
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={addNode} 
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Rule
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Add Rule Node</TooltipContent>
+          </Tooltip>
 
-          <Button 
-            onClick={addFunctionNode} 
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
-            title="Add Function Node"
-          >
-            <Calculator className="w-3.5 h-3.5 mr-1" /> Add Function
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={addFunctionNode} 
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+              >
+                <Calculator className="w-3.5 h-3.5 mr-1" /> Add Function
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Add Function Node</TooltipContent>
+          </Tooltip>
 
           {selectedNodeId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-destructive"
-              onClick={handleDeleteNode}
-              title="Delete selected rule"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-destructive"
+                  onClick={handleDeleteNode}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Delete selected rule</TooltipContent>
+            </Tooltip>
           )}
 
           <div className="w-px h-4 bg-border mx-1" />
           
           <div className="flex bg-muted/80 rounded border border-border/50 p-0.5 shadow-inner">
-            <button
-              title="Edit Pipeline"
-              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${!isTestMode && !isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-              onClick={() => { setIsTestMode(false); setIsDictionaryMode(false); }}
-            >
-              Edit
-            </button>
-            <button
-              title="Data Dictionary"
-              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-              onClick={() => { setIsTestMode(false); setIsDictionaryMode(true); }}
-            >
-              Dictionary
-            </button>
-            <button
-              title="Test Pipeline"
-              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${isTestMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-              onClick={() => {
-                if (!isTestMode) {
-                  if (mockStateJson.trim() === '{}' || mockStateJson.trim() === '{\n  \n}') {
-                    const compiled = compilePipeline(nodes, entryNodeId || undefined);
-                    const allVars = new Set<string>();
-                    compiled.forEach(n => {
-                      extractVariables(n.nodeData.jsonLogic || {}).forEach(v => allVars.add(v));
-                    });
-                    const skeleton = buildSkeletonFromVariables(Array.from(allVars));
-                    setMockStateJson(JSON.stringify(skeleton, null, 2));
-                  }
-                  setIsDictionaryMode(false);
-                  setIsTestMode(true);
-                }
-              }}
-            >
-              Test
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${!isTestMode && !isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                  onClick={() => { setIsTestMode(false); setIsDictionaryMode(false); }}
+                >
+                  Edit
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Edit Pipeline</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                  onClick={() => { setIsTestMode(false); setIsDictionaryMode(true); }}
+                >
+                  Dictionary
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Data Dictionary</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${isTestMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                  onClick={() => {
+                    if (!isTestMode) {
+                      if (mockStateJson.trim() === '{}' || mockStateJson.trim() === '{\n  \n}') {
+                        const compiled = compilePipeline(nodes, entryNodeId || undefined);
+                        const allVars = new Set<string>();
+                        compiled.forEach(n => {
+                          extractVariables(n.nodeData.jsonLogic || {}).forEach(v => allVars.add(v));
+                        });
+                        const skeleton = buildSkeletonFromVariables(Array.from(allVars));
+                        setMockStateJson(JSON.stringify(skeleton, null, 2));
+                      }
+                      setIsDictionaryMode(false);
+                      setIsTestMode(true);
+                    }
+                  }}
+                >
+                  Test
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Test Pipeline</TooltipContent>
+            </Tooltip>
           </div>
 
-          <Button 
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={handleExportClick}
-            title="Export Pipeline to JSON"
-          >
-            <Download className="w-3.5 h-3.5 mr-1" /> Export
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={handleExportClick}
+              >
+                <Download className="w-3.5 h-3.5 mr-1" /> Export
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Export Pipeline to JSON</TooltipContent>
+          </Tooltip>
 
-          <Button 
-            variant="default"
-            size="sm"
-            className="h-7 px-2 text-xs font-semibold"
-            onClick={handleSaveClick}
-            title="Save Pipeline"
-          >
-            <Save className="w-3.5 h-3.5 mr-1" /> Save
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="default"
+                size="sm"
+                className="h-7 px-2 text-xs font-semibold"
+                onClick={handleSaveClick}
+              >
+                <Save className="w-3.5 h-3.5 mr-1" /> Save
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Save Pipeline</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

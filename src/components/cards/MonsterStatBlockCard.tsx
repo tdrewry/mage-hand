@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useDiceStore } from '@/stores/diceStore';
 import type { RollMetadata } from '@/lib/diceEngine';
@@ -273,14 +274,18 @@ function AbilityScore({ label, score, source }: { label: string; score: number; 
   return (
     <div className="flex flex-col">
       <span className="text-xs font-bold text-[hsl(var(--primary))]">{label}</span>
-      <button
-        type="button"
-        className="text-sm hover:text-[hsl(var(--primary))] cursor-pointer transition-colors"
-        onClick={() => rollInDiceBox(formula, reason, source ? { source, reason } : undefined)}
-        title={`Roll ${formula}`}
-      >
-        {score} ({formatModifier(mod)})
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="text-sm hover:text-[hsl(var(--primary))] cursor-pointer transition-colors"
+            onClick={() => rollInDiceBox(formula, reason, source ? { source, reason } : undefined)}
+          >
+            {score} ({formatModifier(mod)})
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Roll {formula}</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -419,14 +424,18 @@ function rollInDiceBox(formula: string, label?: string, meta?: RollMetadata) {
 function DiceFormula({ formula, display, label, source, reason }: { formula: string; display: string; label?: string; source?: string; reason?: string }) {
   const meta: RollMetadata | undefined = source ? { source, reason: reason || label } : undefined;
   return (
-    <button
-      type="button"
-      className="inline font-mono text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.7)] underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
-      onClick={(e) => { e.stopPropagation(); rollInDiceBox(formula, label, meta); }}
-      title={`Roll ${formula}`}
-    >
-      {display}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline font-mono text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.7)] underline decoration-dotted underline-offset-2 cursor-pointer transition-colors"
+          onClick={(e) => { e.stopPropagation(); rollInDiceBox(formula, label, meta); }}
+        >
+          {display}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Roll {formula}</TooltipContent>
+    </Tooltip>
   );
 }
 

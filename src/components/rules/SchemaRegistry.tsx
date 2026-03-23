@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { Database, Network, Lock, Save, Plus, Trash2, X } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -126,15 +127,19 @@ export function SchemaRegistry() {
             </h2>
             <p className="text-[10px] text-muted-foreground mt-0.5">{schemaList.length} total active blueprints</p>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-8 w-8 p-0 hover:bg-indigo-500/20 hover:text-indigo-400 text-muted-foreground"
-            onClick={() => { setIsCreatingNew(true); setActiveSchemaId(null); setNewId(''); setNewLabel(''); }}
-            title="Create Custom Schema"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 hover:bg-indigo-500/20 hover:text-indigo-400 text-muted-foreground"
+                onClick={() => { setIsCreatingNew(true); setActiveSchemaId(null); setNewId(''); setNewLabel(''); }}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create Custom Schema</TooltipContent>
+          </Tooltip>
         </div>
         
         <ScrollArea className="flex-1">
@@ -231,9 +236,14 @@ export function SchemaRegistry() {
 
           <div className="flex items-center gap-2">
             {!isCreatingNew && isReadOnly && (
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-rose-500/10 text-rose-400 rounded-sm border border-rose-500/20 mr-2 flex items-center gap-1.5 cursor-not-allowed" title="System schemas cannot be altered directly to prevent crashing engine pipelines">
-                <Lock className="w-3 h-3" /> System Managed (Read-Only)
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-rose-500/10 text-rose-400 rounded-sm border border-rose-500/20 mr-2 flex items-center gap-1.5 cursor-not-allowed">
+                    <Lock className="w-3 h-3" /> System Managed (Read-Only)
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>System schemas cannot be altered directly to prevent crashing engine pipelines</TooltipContent>
+              </Tooltip>
             )}
 
             {!isCreatingNew && !isReadOnly && activeSchema && (

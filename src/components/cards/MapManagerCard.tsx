@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   Plus,
   Trash2,
@@ -345,24 +346,33 @@ export const MapManagerCardContent = () => {
                 />
 
                 {/* Active/Inactive toggle */}
-                <div className="flex items-center gap-1" title={map.active ? 'Active — rendered on canvas' : 'Inactive — hidden'}>
-                  <Switch
-                    checked={map.active}
-                    onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
-                    className="scale-75"
-                  />
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      <Switch
+                        checked={map.active}
+                        onCheckedChange={(checked) => updateMap(map.id, { active: checked })}
+                        className="scale-75"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{map.active ? 'Active — rendered on canvas' : 'Inactive — hidden'}</TooltipContent>
+                </Tooltip>
 
                 {/* Select as focus */}
-                <Button
-                  variant={isSelected ? 'default' : 'ghost'}
-                  size="sm"
-                  className="p-1 h-auto"
-                  onClick={() => setSelectedMap(map.id)}
-                  title="Set as focused map"
-                >
-                  <MousePointer2 className="h-3.5 w-3.5" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isSelected ? 'default' : 'ghost'}
+                      size="sm"
+                      className="p-1 h-auto"
+                      onClick={() => setSelectedMap(map.id)}
+                    >
+                      <MousePointer2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Set as focused map</TooltipContent>
+                </Tooltip>
 
                 {/* Delete */}
                 <Button

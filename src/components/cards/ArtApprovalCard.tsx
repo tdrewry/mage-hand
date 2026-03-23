@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Check, X, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useArtSubmissionStore, type ArtSubmission } from '@/stores/artSubmissionStore';
 import {
   emitArtAccepted,
@@ -82,35 +83,47 @@ function SubmissionItem({ submission }: { submission: ArtSubmission }) {
         {/* Actions */}
         {submission.status === 'pending' ? (
           <div className="flex gap-1 shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/20"
-              onClick={handleAccept}
-              title="Accept"
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/20"
-              onClick={handleReject}
-              title="Reject"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/20"
+                  onClick={handleAccept}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Accept</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/20"
+                  onClick={handleReject}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Reject</TooltipContent>
+            </Tooltip>
           </div>
         ) : (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground"
-            onClick={() => removeSubmission(submission.id)}
-            title="Dismiss"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground"
+                onClick={() => removeSubmission(submission.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Dismiss</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </div>

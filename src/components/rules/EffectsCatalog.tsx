@@ -666,11 +666,16 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
           {template.persistence === 'persistent' && (
             <>
               <span>·</span>
-              <span title={template.recurring === false ? 'One-shot' : 'Recurring'}>
-                {template.recurring === false
-                  ? <Ban className="w-3 h-3 inline" />
-                  : <Repeat className="w-3 h-3 inline" />}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    {template.recurring === false
+                      ? <Ban className="w-3 h-3 inline" />
+                      : <Repeat className="w-3 h-3 inline" />}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{template.recurring === false ? 'One-shot' : 'Recurring'}</TooltipContent>
+              </Tooltip>
             </>
           )}
         </div>
@@ -708,17 +713,21 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
       </Button>
 
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5 opacity-0 group-hover:opacity-100"
-            onClick={(e) => e.stopPropagation()}
-            title="Delete Effect"
-          >
-            <Trash2 className="w-3 h-3 text-destructive" />
-          </Button>
-        </AlertDialogTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Trash2 className="w-3 h-3 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Delete Effect</TooltipContent>
+        </Tooltip>
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Effect Template</AlertDialogTitle>
@@ -914,17 +923,23 @@ export function EffectsCatalog() {
                     />
                     <span className="flex-1 truncate">{e.template.name}</span>
                     {e.template.persistence === 'persistent' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        title={e.template.recurring === false ? 'One-shot (click to make recurring)' : 'Recurring each round (click to make one-shot)'}
-                        onClick={() => toggleRecurring(e.id)}
-                      >
-                        {e.template.recurring === false
-                          ? <Ban className="w-3 h-3 text-muted-foreground" />
-                          : <Repeat className="w-3 h-3 text-primary" />}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={() => toggleRecurring(e.id)}
+                          >
+                            {e.template.recurring === false
+                              ? <Ban className="w-3 h-3 text-muted-foreground" />
+                              : <Repeat className="w-3 h-3 text-primary" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {e.template.recurring === false ? 'One-shot (click to make recurring)' : 'Recurring each round (click to make one-shot)'}
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {e.roundsRemaining !== undefined && e.roundsRemaining > 0 && (
                       <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
@@ -940,28 +955,36 @@ export function EffectsCatalog() {
                       {e.impactedTargets.length} hit
                     </span>
                     {e.template.persistence === 'persistent' && e.triggeredTokenIds.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                        title="Reset triggers — tokens can trigger this effect again"
-                        onClick={() => resetTriggeredTokens(e.id)}
-                      >
-                        <RotateCcw className="w-3 h-3 text-primary" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                            onClick={() => resetTriggeredTokens(e.id)}
+                          >
+                            <RotateCcw className="w-3 h-3 text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Reset triggers — tokens can trigger this effect again</TooltipContent>
+                      </Tooltip>
                     )}
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                          onClick={(evt) => evt.stopPropagation()}
-                          title="Remove Placed Effect"
-                        >
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                              onClick={(evt) => evt.stopPropagation()}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Remove Placed Effect</TooltipContent>
+                      </Tooltip>
                       <AlertDialogContent onClick={(evt) => evt.stopPropagation()}>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Remove Active Effect</AlertDialogTitle>

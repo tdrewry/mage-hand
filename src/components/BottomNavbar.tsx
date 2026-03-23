@@ -33,6 +33,7 @@ import { TokenEditModal } from './modals/TokenEditModal';
 import { getSelectablePresets, presetToIlluminationSource, type PresetKey } from '@/lib/illuminationPresets';
 import { cn } from '@/lib/utils';
 import { useUiStateStore } from '@/stores/uiStateStore';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface BottomNavbarProps {
   onClearSelection: () => void;
@@ -402,21 +403,41 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
           {/* Grouping UI */}
           {singleGroup && (
             <>
-              <span className="text-xs font-semibold text-primary px-2 truncate max-w-[120px]" title={singleGroup.name}>
-                {singleGroup.name}
-              </span>
-              <Button variant="ghost" size="sm" onClick={handleToggleLock} title={singleGroup.locked ? 'Unlock group' : 'Lock group'}>
-                {singleGroup.locked ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
-                {singleGroup.locked ? 'Unlock' : 'Lock'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleUngroup} title="Dissolve group (keep members)">
-                <Ungroup className="h-4 w-4 mr-2" />
-                Ungroup
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleExportPrefab} title="Export group as prefab">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs font-semibold text-primary px-2 truncate max-w-[120px]">
+                    {singleGroup.name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{singleGroup.name}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={handleToggleLock}>
+                    {singleGroup.locked ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
+                    {singleGroup.locked ? 'Unlock' : 'Lock'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{singleGroup.locked ? 'Unlock group' : 'Lock group'}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={handleUngroup}>
+                    <Ungroup className="h-4 w-4 mr-2" />
+                    Ungroup
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Dissolve group (keep members)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={handleExportPrefab}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Export group as prefab</TooltipContent>
+              </Tooltip>
               <div className="h-4 w-px bg-white/10 mx-2" />
             </>
           )}
