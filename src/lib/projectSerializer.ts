@@ -133,6 +133,7 @@ export interface ProjectData {
   rulesEngine?: {
     vocabularyCategories: Record<string, any>;
     pipelines: any[];
+    schemas?: Record<string, any>;
   };
   // Map hierarchy structures and selection
   mapStructures?: any[];

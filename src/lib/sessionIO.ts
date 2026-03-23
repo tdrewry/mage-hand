@@ -159,6 +159,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
     rulesEngine: {
       vocabularyCategories: globalConfigStore.categories,
       pipelines: ruleStore.pipelines,
+      schemas: globalConfigStore.schemas,
     },
   };
 }
@@ -373,6 +374,9 @@ export function applyProjectData(data: ProjectData): void {
   if (data.rulesEngine) {
     if (data.rulesEngine.vocabularyCategories) {
       useGlobalConfigStore.setState({ categories: data.rulesEngine.vocabularyCategories });
+    }
+    if (data.rulesEngine.schemas) {
+      useGlobalConfigStore.setState({ schemas: data.rulesEngine.schemas });
     }
     if (data.rulesEngine.pipelines) {
       useRuleStore.setState({ pipelines: data.rulesEngine.pipelines });

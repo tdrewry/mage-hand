@@ -227,6 +227,7 @@ export class AutoSaveManager {
         rulesEngine: {
           vocabularyCategories: globalConfigState.categories,
           pipelines: ruleState.pipelines,
+          schemas: globalConfigState.schemas,
         },
         viewportTransforms: sessionState.viewportTransforms,
       };
