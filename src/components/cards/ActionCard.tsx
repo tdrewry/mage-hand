@@ -132,7 +132,18 @@ export function ActionCardContent() {
           })}
         </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute top-2 right-2 z-50">
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-6 px-2 text-[10px] opacity-20 hover:opacity-100 transition-opacity"
+            title="Emergency Clear Actions"
+            onClick={() => useActionStore.getState().cancelAllActions()}
+          >
+            Bail Out
+          </Button>
+        </div>
         <SingleActionView action={currentAction} />
       </div>
     </div>
@@ -434,21 +445,26 @@ function ResolvePhase() {
             </div>
           </div>
           {(() => {
-            const firstTarget = currentAction.targets[0];
-            const dmg = firstTarget ? currentAction.damageResults[firstTarget.targetKey] : null;
-            if (dmg?.breakdown && dmg.breakdown.length > 1) {
-              return (
-                <div className="flex gap-1">
-                  {dmg.breakdown.map((b, i) => (
-                    <Badge key={i} variant="outline" className="text-xs">{b.damageType}</Badge>
-                  ))}
-                </div>
-              );
+            const types = new Set<string>();
+            currentAction.targets.forEach(t => {
+              const dmg = currentAction.damageResults[t.targetKey];
+              if (dmg?.breakdown && dmg.breakdown.length > 0) {
+                dmg.breakdown.forEach(b => types.add(b.damageType));
+              } else if (dmg?.damageType) {
+                types.add(dmg.damageType);
+              }
+            });
+            if (types.size === 0) {
+              types.add(currentAction.attack.damageType);
             }
             return (
-              <Badge variant="outline" className="text-xs">
-                {currentAction.attack.damageType}
-              </Badge>
+              <div className="flex gap-1 flex-wrap">
+                {Array.from(types).map((type, i) => (
+                  <Badge key={i} variant="outline" className="text-[10px] capitalize">
+                    {type}
+                  </Badge>
+                ))}
+              </div>
             );
           })()}
         </div>
@@ -481,7 +497,7 @@ function ResolvePhase() {
                 roll={roll}
                 damage={damage}
                 resolution={resolution}
-                damageType={currentAction.attack!.damageType}
+                damageType={damage?.damageType || currentAction.attack!.damageType}
                 dropLabel={dropLabel}
                 disabled={claimedByOther}
                 onSetResolution={(r) => claimAndResolve(target.targetKey, r)}
@@ -573,9 +589,11 @@ function TargetResolveCard({
   isEffect,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
-  const isHit = roll.totalRoll >= defenseValue;
-  const isNat20 = roll.naturalRoll === 20;
-  const isNat1 = roll.naturalRoll === 1;
+  const safeRoll = roll || { totalRoll: 0, naturalRoll: 0, attackBonus: 0, formula: 'rules-engine' };
+  const safeDamage = damage || { total: 0, adjustedTotal: 0, formula: '0', diceResults: [], damageType: 'untyped' };
+  const isHit = safeRoll.totalRoll >= defenseValue;
+  const isNat20 = safeRoll.naturalRoll === 20;
+  const isNat1 = safeRoll.naturalRoll === 1;
 
   // Auto-suggest resolution
   const suggested: AttackResolution = isNat1
@@ -625,11 +643,11 @@ function TargetResolveCard({
           <p className="text-xs text-muted-foreground">Attack Roll</p>
           <p className="text-lg font-bold font-mono">
             <span className={isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : ''}>
-              {roll.totalRoll}
+              {safeRoll.totalRoll}
             </span>
           </p>
           <p className="text-[10px] text-muted-foreground">
-            d20({roll.naturalRoll}) + {roll.attackBonus}
+            {safeRoll.formula === 'rules-engine' ? 'rules-engine' : `d20(${safeRoll.naturalRoll}) + ${safeRoll.attackBonus}`}
           </p>
         </div>
         <div className="text-center px-2">
@@ -646,10 +664,10 @@ function TargetResolveCard({
       {/* Damage display */}
       <div className="bg-muted/30 rounded p-2 space-y-1">
         {/* Show breakdown rows if multi-type damage */}
-        {damage.breakdown && damage.breakdown.length > 1 ? (
+        {safeDamage.breakdown && safeDamage.breakdown.length > 1 ? (
           <>
             <p className="text-xs text-muted-foreground">Damage</p>
-            {damage.breakdown.map((row, i) => (
+            {safeDamage.breakdown.map((row, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div>
                   <p className="font-mono text-sm">
@@ -657,14 +675,14 @@ function TargetResolveCard({
                     <span className="text-xs text-muted-foreground">{row.damageType}</span>
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {row.formula} → [{row.diceResults.join(', ')}] = {row.total}
+                    {row.formula} {row.diceResults?.length > 0 ? `→ [${row.diceResults.join(', ')}] ` : ''}= {row.total}
                   </p>
                 </div>
               </div>
             ))}
             <div className="border-t border-border/50 pt-1 mt-1 flex items-center justify-between">
               <p className="font-mono text-sm font-bold">
-                {damage.adjustedTotal}{' '}
+                {safeDamage.adjustedTotal}{' '}
                 <span className="text-xs text-muted-foreground">total</span>
               </p>
               <div className="flex items-center gap-1">
@@ -674,7 +692,7 @@ function TargetResolveCard({
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
-                      onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
+                      onClick={() => onOverrideDamage(Math.floor(safeDamage.total / 2))}
                     >
                       ½
                     </Button>
@@ -701,11 +719,11 @@ function TargetResolveCard({
             <div>
               <p className="text-xs text-muted-foreground">Damage</p>
               <p className="font-mono text-sm">
-                {damage.adjustedTotal}{' '}
+                {safeDamage.adjustedTotal}{' '}
                 <span className="text-xs text-muted-foreground">{damageType}</span>
               </p>
               <p className="text-[10px] text-muted-foreground">
-                {damage.formula} → [{damage.diceResults.join(', ')}] = {damage.total}
+                {safeDamage.formula} {safeDamage.diceResults?.length > 0 ? `→ [${safeDamage.diceResults.join(', ')}] ` : ''}= {safeDamage.total}
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -715,7 +733,7 @@ function TargetResolveCard({
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 text-xs font-bold text-blue-400 hover:bg-blue-900/30"
-                    onClick={() => onOverrideDamage(Math.floor(damage.total / 2))}
+                    onClick={() => onOverrideDamage(Math.floor(safeDamage.total / 2))}
                   >
                     ½
                   </Button>
@@ -843,7 +861,7 @@ export function ActionCard({
                 const res = targetResults[target.id];
                 if (!res) return null;
                 
-                const totalDamage = Object.values(res.damage || {}).reduce((acc, curr) => acc + curr.amount, 0);
+                const totalDamage = Object.values(res.damage || {}).reduce((acc, curr) => acc + (typeof curr.amount === 'object' ? curr.amount.total : curr.amount), 0);
 
                 return (
                   <div key={target.id} className="bg-slate-900 border border-slate-800 rounded-lg p-3">

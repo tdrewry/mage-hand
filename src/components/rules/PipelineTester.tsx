@@ -6,6 +6,10 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { compilePipeline, executePipeline, extractVariables } from '@/lib/rules-engine/compiler';
 import { ActionCard } from '@/components/cards/ActionCard';
 import type { ResolutionPayload } from '@/lib/rules-engine/types';
+import { validateContract, ValidationIssue, CONTRACT_OPTIONS } from '@/lib/rules-engine/validator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
@@ -22,11 +26,30 @@ export function PipelineTester({
   setOutputState, 
   setIsTestMode 
 }: any) {
+  const [targetContract, setTargetContract] = useState<string>('action');
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[] | null>(null);
+
   return (
     <div className="absolute inset-0 z-50 bg-background flex flex-col pt-4">
       <div className="flex-1 min-h-0 grid grid-cols-3 gap-6 px-6 pb-6 overflow-hidden">
         {/* Column 1: Execution Order */}
         <div className="flex flex-col min-h-0 bg-card border border-border rounded-lg p-4 shadow-sm">
+          <div className="mb-4 shrink-0">
+            <h3 className="font-semibold text-sm mb-2 text-muted-foreground">Target Contract</h3>
+            <Select value={targetContract} onValueChange={setTargetContract}>
+              <SelectTrigger className="w-full text-xs h-8">
+                <SelectValue placeholder="Select contract..." />
+              </SelectTrigger>
+              <SelectContent>
+                {CONTRACT_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           <h3 className="font-semibold text-sm mb-3 shrink-0">Execution Order</h3>
           <div className="flex-1 min-h-0 overflow-y-auto pr-2">
             <Accordion type="multiple" className="w-full text-xs border border-border rounded bg-background/50 overflow-hidden">
@@ -76,9 +99,11 @@ export function PipelineTester({
                   const compiled = compilePipeline(nodes, entryNodeId || undefined);
                   const result = executePipeline(compiled, parsed);
                   setOutputState(result);
+                  setValidationIssues(validateContract(targetContract as any, result));
                   toast.success("Pipeline executed successfully!");
                 } catch (e: any) {
                   setOutputState({ error: e.message });
+                  setValidationIssues(null);
                   toast.error("Execution failed: " + e.message);
                 }
               }}
@@ -106,25 +131,54 @@ export function PipelineTester({
         </div>
 
         {/* Column 3: Output State */}
-        <div className="flex flex-col min-h-0 bg-card border border-border rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold text-sm mb-3 shrink-0">Output Result</h3>
-          <div className={`flex-1 min-h-0 flex flex-col border border-border rounded-md overflow-y-auto ${isResolutionPayload(outputState) ? 'bg-background' : 'bg-black/40 p-4'}`}>
-             {outputState ? (
-              isResolutionPayload(outputState) ? (
-                <ActionCard 
-                  payload={outputState} 
-                  onCommit={() => toast.success("Committed test resolution!")}
-                />
+        <div className="flex flex-col min-h-0 gap-4">
+          <div className="flex flex-col flex-1 min-h-0 bg-card border border-border rounded-lg p-4 shadow-sm">
+            <h3 className="font-semibold text-sm mb-3 shrink-0">Output Result</h3>
+            <div className={`flex-1 min-h-0 flex flex-col border border-border rounded-md overflow-y-auto ${isResolutionPayload(outputState) ? 'bg-background' : 'bg-black/40 p-4'}`}>
+               {outputState ? (
+                isResolutionPayload(outputState) ? (
+                  <ActionCard 
+                    payload={outputState} 
+                    onCommit={() => toast.success("Committed test resolution!")}
+                  />
+                ) : (
+                  <pre className={`text-sm font-mono whitespace-pre-wrap ${outputState?.error ? 'text-destructive' : 'text-green-400'}`}>
+                    {JSON.stringify(outputState, null, 2)}
+                  </pre>
+                )
               ) : (
-                <pre className={`text-sm font-mono whitespace-pre-wrap ${outputState?.error ? 'text-destructive' : 'text-green-400'}`}>
-                  {JSON.stringify(outputState, null, 2)}
-                </pre>
-              )
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-sm italic p-4">
-                Run the pipeline to inspect outputs here.
-              </div>
-            )}
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm italic p-4">
+                  Run the pipeline to inspect outputs here.
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex flex-col shrink-0 bg-card border border-border rounded-lg p-4 shadow-sm h-1/3 min-h-[150px]">
+            <h3 className="font-semibold text-sm mb-3 shrink-0">Contract Validation</h3>
+            <div className={`flex-1 min-h-0 overflow-y-auto border border-border rounded-md bg-background ${!validationIssues || validationIssues.length === 0 ? 'p-0' : 'p-3'}`}>
+              {validationIssues === null ? (
+                <div className="text-muted-foreground text-xs italic text-center h-full flex items-center justify-center p-4">
+                  Run pipeline to validate contract.
+                </div>
+              ) : validationIssues.length === 0 ? (
+                <div className="text-emerald-500 font-medium text-sm flex items-center justify-center gap-2 h-full bg-emerald-500/10">
+                  <CheckCircle className="w-5 h-5" /> Meets contract requirements.
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {validationIssues.map((issue, idx) => (
+                    <li key={idx} className="text-xs flex items-start gap-2 text-destructive bg-destructive/10 p-2 rounded">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-mono font-bold block mb-1">{issue.path}</span>
+                        <p className="opacity-90">{issue.message}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -21,9 +21,13 @@ export function ActionResolveCard({ payload, onClose }: ActionResolveCardProps) 
     setLocalPayload(prev => {
       const next = { ...prev, targetResults: { ...prev.targetResults } };
       const targetData = { ...next.targetResults[targetId] };
+      const oldAmount = targetData.damage[damageKey]?.amount;
       targetData.damage = {
         ...targetData.damage,
-        [damageKey]: { ...targetData.damage[damageKey], amount: newAmount }
+        [damageKey]: { 
+          ...targetData.damage[damageKey], 
+          amount: typeof oldAmount === 'object' ? { ...oldAmount, total: newAmount } : newAmount 
+        }
       };
       next.targetResults[targetId] = targetData;
       return next;
@@ -67,7 +71,9 @@ export function ActionResolveCard({ payload, onClose }: ActionResolveCardProps) 
               <div key={key} className="flex items-center justify-between p-2 rounded bg-slate-800/50 border border-slate-700/50">
                 <span className="text-sm capitalize">{key}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-mono">{data.formula} [{data.rolls?.join(',') || '0'}]</span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {data.formula} {data.rolls && data.rolls.length > 0 ? `[${data.rolls.join(',')}]` : ''}
+                  </span>
                   <Badge variant="outline" className="text-rose-400 border-rose-900/50 bg-rose-950/30">
                     {data.amount}
                   </Badge>
@@ -115,7 +121,7 @@ export function ActionResolveCard({ payload, onClose }: ActionResolveCardProps) 
                       <div className="flex items-center gap-2">
                         <Input 
                           type="number" 
-                          value={d.amount} 
+                          value={typeof d.amount === 'object' ? (d.amount?.total ?? 0) : d.amount} 
                           onChange={(e) => handleOverrideDamage(targetId, key, parseInt(e.target.value) || 0)}
                           className="w-16 h-7 text-xs bg-slate-950 border-slate-700" 
                         />

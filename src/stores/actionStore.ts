@@ -19,6 +19,8 @@ import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 import { createEmptyEntitySheet } from '@/types/entitySheet';
 import type { ResolutionPayload, IntentPayload } from '@/lib/rules-engine/types';
+import { useCreatureStore } from '@/stores/creatureStore';
+import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 
 /** Broadcast the current action queue state to other DM sessions */
 function broadcastActionQueue() {
@@ -460,7 +462,23 @@ export const useActionStore = create<ActionStore>()(
 
   submitIntentResolution: (intent, resolutionPayload) => {
     const sessionTokens = useSessionStore.getState().tokens;
-    const sourceToken = sessionTokens.find(t => t.id === intent.actorId);
+    const sourceToken: any = sessionTokens.find(t => t.id === intent.actorId);
+
+    let allActions: TokenActionItem[] = [];
+    if (sourceToken?.statBlockJson) {
+      try {
+        allActions = collectAllActions(JSON.parse(sourceToken.statBlockJson));
+      } catch {}
+    } else if (sourceToken?.entityRef?.entityId) {
+      const creatureStore = useCreatureStore.getState();
+      const monster = creatureStore.getMonsterById(sourceToken.entityRef.entityId);
+      if (monster) {
+        allActions = collectAllActions(monster);
+      } else {
+        const character = creatureStore.getCharacterById(sourceToken.entityRef.entityId);
+        if (character) allActions = collectAllActions(character);
+      }
+    }
 
     const entry: ActionQueueEntry = {
       id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -468,13 +486,16 @@ export const useActionStore = create<ActionStore>()(
       category: intent.actionType === 'spell' ? 'spell' : 'attack',
       sourceTokenId: intent.actorId,
       sourceTokenName: sourceToken?.name || sourceToken?.label || 'Unknown',
-      attack: {
-        id: intent.actionId,
-        name: resolutionPayload.source.type,
-        attackBonus: 0,
-        damageFormula: '0',
-        damageType: 'untyped',
-      },
+      attack: (() => {
+        const declaredAction = allActions.find(a => a.id === intent.actionId);
+        return {
+          id: intent.actionId,
+          name: declaredAction?.name || resolutionPayload.source.type,
+          attackBonus: declaredAction?.attackBonus || 0,
+          damageFormula: declaredAction?.damageFormula || '0',
+          damageType: declaredAction?.damageType || 'untyped',
+        };
+      })(),
       targets: resolutionPayload.targets.map(t => ({
         targetKey: `${t.id}-${Date.now()}`,
         tokenId: t.id,
@@ -497,10 +518,18 @@ export const useActionStore = create<ActionStore>()(
       if (result) {
         if (result.challengeResult) {
           entry.rollResults[t.targetKey] = {
-            naturalRoll: result.challengeResult.rolls[0] || 0,
-            totalRoll: result.challengeResult.total,
-            attackBonus: result.challengeResult.modifier,
+            naturalRoll: result.challengeResult.rolls?.[0] || result.challengeResult.total || 0,
+            totalRoll: result.challengeResult.total || 0,
+            attackBonus: result.challengeResult.modifier || 0,
             formula: '1d20',
+          };
+          entry.resolutions[t.targetKey] = (result.suggestedResolution as any) || 'miss';
+        } else {
+          entry.rollResults[t.targetKey] = {
+            naturalRoll: 0,
+            totalRoll: 0,
+            attackBonus: 0,
+            formula: 'rules-engine',
           };
           entry.resolutions[t.targetKey] = (result.suggestedResolution as any) || 'miss';
         }
@@ -509,22 +538,30 @@ export const useActionStore = create<ActionStore>()(
         const breakDown: any[] = [];
         let primaryType = 'untyped';
 
-        for (const [dmgType, dmgData] of Object.entries(result.damage)) {
-          totalDmg += dmgData.amount;
+        for (const [dmgType, dmgData] of Object.entries(result.damage || {})) {
+          const isComplex = typeof dmgData.amount === 'object' && dmgData.amount !== null;
+          const amt = isComplex ? (dmgData.amount as any).total : (dmgData.amount as number);
+          const form = isComplex ? (dmgData.amount as any).formula || 'rules-engine' : 'rules-engine';
+          const diceResults = isComplex ? (dmgData.amount as any).rolls || [] : [];
+          
+          totalDmg += amt;
           breakDown.push({
-            formula: 'rules-engine',
-            total: dmgData.amount,
-            diceResults: [],
+            formula: form,
+            total: amt,
+            diceResults,
             damageType: dmgType,
-            adjustedTotal: dmgData.amount
+            adjustedTotal: amt
           });
           if (primaryType === 'untyped') primaryType = dmgType;
         }
 
+        const combinedFormula = breakDown.map(b => b.formula).join(' + ') || 'rules-engine';
+        const allRolls = breakDown.flatMap(b => b.diceResults);
+
         entry.damageResults[t.targetKey] = {
-          formula: 'rules-engine',
+          formula: breakDown.length === 1 ? breakDown[0].formula : combinedFormula,
           total: totalDmg,
-          diceResults: [],
+          diceResults: breakDown.length === 1 ? breakDown[0].diceResults : allRolls,
           damageType: primaryType,
           adjustedTotal: totalDmg,
           breakdown: breakDown.length > 1 ? breakDown : undefined,
@@ -914,7 +951,10 @@ export const useActionStore = create<ActionStore>()(
       const token = tokens.find(t => t.id === targetId);
       if (!token) continue;
       
-      const dmgTotal = Object.values(result.damage).reduce((sum, d) => sum + d.amount, 0);
+      const dmgTotal = Object.values(result.damage || {}).reduce((sum, d) => {
+        const amt = typeof d.amount === 'object' ? (d.amount as any).total : d.amount;
+        return sum + (amt || 0);
+      }, 0);
       if (dmgTotal > 0) {
         const sheet = token.entitySheet ? JSON.parse(JSON.stringify(token.entitySheet)) : createEmptyEntitySheet(token.name);
         if (!sheet.defenses) sheet.defenses = {};

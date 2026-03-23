@@ -9,7 +9,7 @@ export interface CreatureAction {
   effectTemplateId?: string;
   
   // Routing Rules
-  targetingMode?: 'manual' | 'template';
+  targetingMode?: 'manual' | 'template' | 'self';
   templateId?: string;
   pipelineId?: string;
   executionPolicy?: 'shared' | 'per-target';
@@ -21,7 +21,7 @@ export interface CreatureSpell {
   effectTemplateId?: string;
   
   // Routing Rules
-  targetingMode?: 'manual' | 'template';
+  targetingMode?: 'manual' | 'template' | 'self';
   templateId?: string;
   pipelineId?: string;
   executionPolicy?: 'shared' | 'per-target';

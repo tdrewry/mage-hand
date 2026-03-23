@@ -32,6 +32,8 @@ export interface TokenActionItem {
   asAttack?: AttackDefinition;
   /** Explicitly assigned effect template ID */
   effectTemplateId?: string;
+  /** Custom pipeline ID linked from rules engine */
+  pipelineId?: string;
 }
 
 // ─── Collect all actions from any data source ─────────────────────────────────
@@ -214,6 +216,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
       damageType: atk.damageType,
       range: action.range,
       description: action.description,
+      pipelineId: (action as any).pipelineId,
       asAttack: atk,
     });
   }

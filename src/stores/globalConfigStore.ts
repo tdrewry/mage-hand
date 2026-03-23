@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { CONTEXT_REGISTRY_SEED, type SchemaNode } from '@/lib/rules-engine/schemas';
 
 export interface ConfigItem {
   value: string;
@@ -12,8 +13,15 @@ export interface CategorySpec {
   items: ConfigItem[];
 }
 
+export interface SchemaSpec {
+  id: string;
+  label: string;
+  rootSchema: SchemaNode;
+}
+
 export interface GlobalConfigState {
   categories: Record<string, CategorySpec>;
+  schemas: Record<string, SchemaSpec>;
   
   addCategory: (id: string, label: string) => void;
   removeCategory: (id: string) => void;
@@ -25,6 +33,9 @@ export interface GlobalConfigState {
   
   addAlias: (categoryId: string, itemIndex: number, alias: string) => void;
   removeAlias: (categoryId: string, itemIndex: number, aliasIndex: number) => void;
+
+  addSchema: (id: string, label: string, rootSchema: SchemaNode) => void;
+  removeSchema: (id: string) => void;
 }
 
 const defaultCategories: Record<string, CategorySpec> = {
@@ -56,6 +67,7 @@ export const useGlobalConfigStore = create<GlobalConfigState>()(
   persist(
     (set) => ({
       categories: defaultCategories,
+      schemas: CONTEXT_REGISTRY_SEED,
       
       addCategory: (id, label) => set((state) => {
         if (state.categories[id]) return state;
@@ -150,10 +162,23 @@ export const useGlobalConfigStore = create<GlobalConfigState>()(
         return {
           categories: { ...state.categories, [categoryId]: { ...cat, items: newItems } }
         };
+      }),
+
+      addSchema: (id, label, rootSchema) => set((state) => {
+        if (state.schemas[id]) return state;
+        return {
+          schemas: { ...state.schemas, [id]: { id, label, rootSchema } }
+        };
+      }),
+
+      removeSchema: (id) => set((state) => {
+        const newSchemas = { ...state.schemas };
+        delete newSchemas[id];
+        return { schemas: newSchemas };
       })
     }),
     {
-      name: 'vtt-global-config-v3', // version bump to force fresh structures matching {value, aliases[]}
+      name: 'vtt-global-config-v4', // version bump to include schemas state
     }
   )
 );

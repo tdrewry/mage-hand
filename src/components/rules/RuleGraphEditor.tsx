@@ -14,6 +14,7 @@ import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { PipelineTester } from './PipelineTester';
 import { getV3SchemaPaths } from '@/lib/rules-engine/schema-paths';
 import { RuleInspector } from './RuleInspector';
+import { DataDictionaryTab } from './DataDictionaryTab';
 
 
 
@@ -48,6 +49,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
   const [mockStateJson, setMockStateJson] = useState('{\n  \n}');
   const [outputState, setOutputState] = useState<any>(null);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [isDictionaryMode, setIsDictionaryMode] = useState(false);
 
   useEffect(() => {
     if (!monaco) return;
@@ -310,10 +312,17 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
           <div className="flex bg-muted/80 rounded border border-border/50 p-0.5 shadow-inner">
             <button
               title="Edit Pipeline"
-              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${!isTestMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-              onClick={() => setIsTestMode(false)}
+              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${!isTestMode && !isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              onClick={() => { setIsTestMode(false); setIsDictionaryMode(false); }}
             >
               Edit
+            </button>
+            <button
+              title="Data Dictionary"
+              className={`flex items-center px-4 py-[3px] text-[11px] font-medium tracking-wide rounded transition-all duration-200 ${isDictionaryMode ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              onClick={() => { setIsTestMode(false); setIsDictionaryMode(true); }}
+            >
+              Dictionary
             </button>
             <button
               title="Test Pipeline"
@@ -329,6 +338,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
                     const skeleton = buildSkeletonFromVariables(Array.from(allVars));
                     setMockStateJson(JSON.stringify(skeleton, null, 2));
                   }
+                  setIsDictionaryMode(false);
                   setIsTestMode(true);
                 }
               }}
@@ -360,7 +370,7 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
       </div>
 
       <div className="flex flex-1 min-h-0 relative">
-        {isTestMode && (
+        {isTestMode && !isDictionaryMode && (
           <PipelineTester 
             nodes={nodes}
             entryNodeId={entryNodeId}
@@ -371,8 +381,14 @@ export function RuleGraphEditor({ onBack, title = "Untitled Pipeline", pipelineI
             setIsTestMode={setIsTestMode}
           />
         )}
+
+        {isDictionaryMode && (
+          <div className="flex-1 min-w-0 w-full">
+            <DataDictionaryTab />
+          </div>
+        )}
         
-        <div className={`flex flex-1 min-h-0 relative ${isTestMode ? 'hidden' : ''}`}>
+        <div className={`flex flex-1 min-h-0 relative ${isTestMode || isDictionaryMode ? 'hidden' : ''}`}>
           {/* Canvas Area */}
           <div className="flex-1 relative">
           <GenericFlowCanvas

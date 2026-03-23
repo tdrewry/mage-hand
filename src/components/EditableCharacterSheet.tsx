@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Shield, Star, Dices, Link2 } from 'lucide-react';
 import { useEffectStore } from '@/stores/effectStore';
+import { ActionEditor } from './ActionEditor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -241,88 +242,21 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
       >
         <div className="space-y-2">
           {character.actions.map((action, i) => (
-            <div key={i} className="border border-border rounded p-2 space-y-1.5 bg-muted/20">
-              <div className="flex items-center gap-1">
-                <Input
-                  value={action.name}
-                  onChange={e => {
-                    const actions = [...character.actions];
-                    actions[i] = { ...action, name: e.target.value };
-                    update({ actions });
-                  }}
-                  className="h-6 text-xs font-semibold flex-1"
-                  placeholder="Attack name"
-                />
-                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => {
-                  update({ actions: character.actions.filter((_, j) => j !== i) });
-                }}>
-                  <Trash2 className="w-3 h-3 text-destructive" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                <Field label="To Hit" compact>
-                  <NumericInput
-                    value={action.attackBonus ?? 0}
-                    onChange={v => {
-                      const actions = [...character.actions];
-                      actions[i] = { ...action, attackBonus: v };
-                      update({ actions });
-                    }}
-                    className="h-6 text-[10px]"
-                  />
-                </Field>
-                <Field label="Damage" compact>
-                  <Input
-                    value={action.damage ?? ''}
-                    onChange={e => {
-                      const actions = [...character.actions];
-                      actions[i] = { ...action, damage: e.target.value };
-                      update({ actions });
-                    }}
-                    className="h-6 text-[10px] font-mono"
-                    placeholder="1d8+3"
-                  />
-                </Field>
-                <Field label="Type" compact>
-                  <Input
-                    value={action.damageType ?? ''}
-                    onChange={e => {
-                      const actions = [...character.actions];
-                      actions[i] = { ...action, damageType: e.target.value };
-                      update({ actions });
-                    }}
-                    className="h-6 text-[10px]"
-                    placeholder="slashing"
-                  />
-                </Field>
-                <Field label="Range" compact>
-                  <Input
-                    value={action.range ?? ''}
-                    onChange={e => {
-                      const actions = [...character.actions];
-                      actions[i] = { ...action, range: e.target.value };
-                      update({ actions });
-                    }}
-                    className="h-6 text-[10px]"
-                    placeholder="5 ft."
-                  />
-                </Field>
-              </div>
-              <Field label="Description" compact>
-                <Input
-                  value={action.description}
-                  onChange={e => {
-                    const actions = [...character.actions];
-                    actions[i] = { ...action, description: e.target.value };
-                    update({ actions });
-                  }}
-                  className="h-6 text-[10px]"
-                />
-              </Field>
-            </div>
+            <ActionEditor
+              key={i}
+              action={action}
+              onChange={(updated) => {
+                const actions = [...character.actions];
+                actions[i] = updated;
+                update({ actions });
+              }}
+              onDelete={() => {
+                update({ actions: character.actions.filter((_, j) => j !== i) });
+              }}
+            />
           ))}
           <Button variant="outline" size="sm" className="w-full h-6 text-[10px]" onClick={() => {
-            update({ actions: [...character.actions, { name: '', attackBonus: 0, damage: '', damageType: '', range: '', description: '' }] });
+            update({ actions: [...character.actions, { name: '', attackBonus: 0, damage: '', damageType: '', range: '', description: '', targetingMode: 'manual', executionPolicy: 'per-target' }] });
           }}>
             <Plus className="w-3 h-3 mr-1" /> Add Action
           </Button>

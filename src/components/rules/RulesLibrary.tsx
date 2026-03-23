@@ -5,10 +5,18 @@ import { RuleGraphEditor } from './RuleGraphEditor';
 import { GlobalConfigEditor } from './GlobalConfigEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy } from 'lucide-react';
+import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy, Map, Plug, Database } from 'lucide-react';
+import { AdapterEditor } from './AdapterEditor';
+import { SchemaRegistry } from './SchemaRegistry';
 import { useRuleStore } from '@/stores/ruleStore';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +43,7 @@ export function RulesLibrary() {
   const updatePipeline = useRuleStore(s => s.updatePipeline);
   const deletePipeline = useRuleStore(s => s.deletePipeline);
   
-  const [activeTab, setActiveTab] = useState<'effects' | 'logic' | 'vocabulary'>('effects');
+  const [activeTab, setActiveTab] = useState<'templates' | 'pipelines' | 'adapters' | 'schema' | 'vocabulary'>('templates');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -193,30 +201,56 @@ export function RulesLibrary() {
         onChange={handleImport} 
       />
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0 p-4">
-        <TabsList className="grid w-full max-w-[24rem] grid-cols-3 mb-4 h-auto py-1">
-          <TabsTrigger value="vocabulary" className="p-1 px-2 gap-2">
-            <Settings2 className="w-4 h-4" />
-            <span>Vocabulary</span>
-          </TabsTrigger>
-          <TabsTrigger value="effects" className="p-1 px-2 gap-2">
-            <Sparkles className="w-4 h-4" />
-            <span>Effects</span>
-          </TabsTrigger>
-          <TabsTrigger value="logic" className="p-1 px-2 gap-2">
-            <GitMerge className="w-4 h-4" />
-            <span>Logic Pipelines</span>
-          </TabsTrigger>
-        </TabsList>
+        <TooltipProvider delayDuration={300}>
+          <TabsList className="grid w-full max-w-[24rem] grid-cols-5 mb-4 h-auto py-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="templates" className="p-2 flex items-center justify-center">
+                  <Map className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Map Templates</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="pipelines" className="p-2 flex items-center justify-center">
+                  <GitMerge className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Rules Pipeline</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="adapters" className="p-2 flex items-center justify-center">
+                  <Plug className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Adapters</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="schema" className="p-2 flex items-center justify-center">
+                  <Database className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Schema Registry</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="vocabulary" className="p-2 flex items-center justify-center">
+                  <Settings2 className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Vocabulary</TooltipContent>
+            </Tooltip>
+          </TabsList>
+        </TooltipProvider>
         
-        <TabsContent value="effects" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
+        <TabsContent value="templates" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
           <EffectsCatalog />
         </TabsContent>
 
-        <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
-          <GlobalConfigEditor />
-        </TabsContent>
-
-        <TabsContent value="logic" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
+        <TabsContent value="pipelines" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
           <ScrollArea className="flex-1 h-full pr-4">
             {pipelines.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-border rounded-lg bg-background/50">
@@ -335,6 +369,18 @@ export function RulesLibrary() {
               </div>
             )}
           </ScrollArea>
+        </TabsContent>
+        
+        <TabsContent value="adapters" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
+          <AdapterEditor />
+        </TabsContent>
+
+        <TabsContent value="schema" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
+          <SchemaRegistry />
+        </TabsContent>
+
+        <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
+          <GlobalConfigEditor />
         </TabsContent>
       </Tabs>
 

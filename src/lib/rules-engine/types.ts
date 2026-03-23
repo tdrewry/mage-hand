@@ -11,7 +11,7 @@ export interface RuleNode extends BaseFlowNode<RuleNodeData> {
 
 export interface TargetResult {
   challengeResult?: { rolls: number[]; modifier: number; total: number; isSuccess: boolean };
-  damage: Record<string, { amount: number }>;
+  damage: Record<string, { amount: number | { formula?: string; rolls?: number[]; total: number; modifier?: number } }>;
   effectsApplied: Record<string, { duration: number; unit: string; trigger?: string; pipelineId?: string }>;
   suggestedResolution: string;
 }
