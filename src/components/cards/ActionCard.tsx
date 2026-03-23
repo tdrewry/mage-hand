@@ -14,6 +14,8 @@ import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 import type { ResolutionPayload } from '@/lib/rules-engine/types';
+import { ActionDeclareCardContent } from './ActionDeclareCard';
+
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
   miss: { label: 'Miss', color: 'bg-muted text-muted-foreground border-border', icon: X },
@@ -54,12 +56,21 @@ function actionTabLabel(action: ActionQueueEntry, index: number, allActions: Act
 }
 
 export function ActionCardContent() {
-  const { currentAction, pendingActions, swapToAction } = useActionStore();
+  const { currentAction, pendingActions, swapToAction, draftingIntent, cancelDrafting } = useActionStore();
   // Maintain stable tab ordering — new actions append, removed actions get pruned
   const stableOrderRef = useRef<string[]>([]);
 
   if (!currentAction) {
     stableOrderRef.current = [];
+    if (draftingIntent) {
+      return (
+        <ActionDeclareCardContent 
+          actorId={draftingIntent.actorId}
+          category={draftingIntent.category}
+          onCancel={cancelDrafting}
+        />
+      );
+    }
     return <EmptyState />;
   }
 

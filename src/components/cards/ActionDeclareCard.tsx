@@ -7,14 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Swords, Sparkles, Dices, BookOpen, Target, Send } from 'lucide-react';
-import { useCardStore } from '@/stores/cardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useActionStore } from '@/stores/actionStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 import type { IntentPayload } from '@/lib/rules-engine/types';
+import { evaluateIntent } from '@/lib/rules-engine/evaluator';
 
 interface ActionDeclareCardProps {
-  cardId: string;
+  actorId: string;
+  category: string;
+  onCancel?: () => void;
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -31,14 +34,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   trait: 'Traits & Features',
 };
 
-export function ActionDeclareCardContent({ cardId }: ActionDeclareCardProps) {
-  const card = useCardStore((s) => s.cards.find(c => c.id === cardId));
-  const tokenId = card?.metadata?.tokenId as string;
-  const category = (card?.metadata?.category as string) || 'attack';
-
+export function ActionDeclareCardContent({ actorId, category, onCancel }: ActionDeclareCardProps) {
   const tokens = useSessionStore((s) => s.tokens);
   const selectedTokenIds = useSessionStore((s) => s.selectedTokenIds);
-  const token = tokens.find((t) => t.id === tokenId);
+  const token = tokens.find((t) => t.id === actorId);
   
   // Local state for the action config
   const [selectedActionId, setSelectedActionId] = useState<string>('');
@@ -98,7 +97,7 @@ export function ActionDeclareCardContent({ cardId }: ActionDeclareCardProps) {
     }
   }, [actions, selectedActionId]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!token || !currentAction) return;
     
     const payload: IntentPayload = {
@@ -113,11 +112,14 @@ export function ActionDeclareCardContent({ cardId }: ActionDeclareCardProps) {
       }
     };
     
-    console.log('--- Intent Payload Submitted to DM ---');
-    console.log(JSON.stringify(payload, null, 2));
-    console.log('--------------------------------------');
+    // Evaluate the intent to produce a resolution payload
+    const resolutionPayload = await evaluateIntent(payload);
     
-    useCardStore.getState().unregisterCard(cardId);
+    // Submit evaluated intent directly to resolve phase
+    useActionStore.getState().submitIntentResolution(payload, resolutionPayload);
+    
+    // Clear drafting intent so ui switches
+    useActionStore.getState().cancelDrafting();
   };
 
   if (!token) {
@@ -241,9 +243,18 @@ export function ActionDeclareCardContent({ cardId }: ActionDeclareCardProps) {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
+      <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0 flex gap-3">
+        {onCancel && (
+          <Button 
+            variant="outline"
+            className="flex-1 bg-slate-800 border-slate-700 hover:bg-slate-700" 
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+        )}
         <Button 
-          className="w-full font-bold gap-2 text-primary-foreground" 
+          className="flex-1 font-bold gap-2 text-primary-foreground" 
           size="lg"
           onClick={handleSubmit}
           disabled={!currentAction}

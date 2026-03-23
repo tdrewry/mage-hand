@@ -4,6 +4,7 @@
  * Defines the data structures for token-to-token and token-to-environment
  * interactions (attacks, abilities, spells, etc.)
  */
+import type { ResolutionPayload } from '@/lib/rules-engine/types';
 
 export type ActionCategory = 'attack' | 'ability' | 'skill' | 'spell' | 'trap' | 'environment' | 'effect';
 
@@ -104,6 +105,9 @@ export interface ActionQueueEntry {
   
   /** Timestamp for history */
   timestamp: number;
+
+  /** The DRA payload from the rules engine */
+  resolutionPayload?: ResolutionPayload;
 
   /** Effect template info (when category === 'effect') */
   effectInfo?: {

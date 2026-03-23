@@ -331,28 +331,7 @@ export const TokenContextMenu = ({
   const handleDeclareAction = (category: string) => {
     if (!currentToken) return;
     
-    const cardStore = useCardStore.getState();
-    const declareCard = cardStore.cards.find(c => 
-      c.type === CardType.ACTION_DECLARE_CARD && 
-      c.metadata?.tokenId === currentToken.id
-    );
-    
-    if (declareCard) {
-      // Update metadata category if it already exists
-      cardStore.updateCardMetadata(declareCard.id, { category });
-      cardStore.setVisibility(declareCard.id, true);
-      cardStore.bringToFront(declareCard.id);
-    } else {
-      const newId = cardStore.registerCard({
-        type: CardType.ACTION_DECLARE_CARD,
-        title: 'Declare Action',
-        defaultPosition: { x: 380, y: 100 },
-        defaultSize: { width: 400, height: 600 },
-        metadata: { tokenId: currentToken.id, category },
-      });
-      cardStore.setVisibility(newId, true);
-      cardStore.bringToFront(newId);
-    }
+    useActionStore.getState().startDrafting(currentToken.id, category);
   };
 
   // Handle unlinking a creature from the token

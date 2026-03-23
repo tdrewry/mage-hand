@@ -18,7 +18,7 @@ import { useEffectStore } from '@/stores/effectStore';
 import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 import { createEmptyEntitySheet } from '@/types/entitySheet';
-import type { ResolutionPayload } from '@/lib/rules-engine/types';
+import type { ResolutionPayload, IntentPayload } from '@/lib/rules-engine/types';
 
 /** Broadcast the current action queue state to other DM sessions */
 function broadcastActionQueue() {
@@ -110,6 +110,9 @@ interface ActionState {
 
   /** Active resolution flash effects on canvas */
   resolutionFlashes: ResolutionFlash[];
+
+  /** The current intent being drafted by the player, before it's submitted to the pipeline. */
+  draftingIntent: { actorId: string; category: string } | null;
 }
 
 interface ActionActions {
@@ -119,6 +122,12 @@ interface ActionActions {
   /** Start a skill check action (rolls d20+modifier, goes straight to resolve) */
   startSkillCheck: (sourceTokenId: string, skillName: string, modifier: number) => void;
   
+  /** Start drafting an intent in the unified DRA panel */
+  startDrafting: (actorId: string, category: string) => void;
+
+  /** Cancel drafting an intent */
+  cancelDrafting: () => void;
+
   /** Start an effect-based action with pre-populated targets (skips targeting phase) */
   startEffectAction: (params: {
     sourceTokenId?: string;
@@ -175,6 +184,9 @@ interface ActionActions {
 
   /** Apply resolved pipeline outputs to token attributes */
   applyPipelineResolution: (payload: ResolutionPayload) => void;
+
+  /** Submit an intent directly to the resolve phase with its evaluated payload */
+  submitIntentResolution: (intent: IntentPayload, resolutionPayload: ResolutionPayload) => void;
 }
 
 type ActionStore = ActionState & ActionActions;
@@ -188,6 +200,19 @@ export const useActionStore = create<ActionStore>()(
   targetingMousePos: null,
   actionHistory: [],
   resolutionFlashes: [],
+  draftingIntent: null,
+
+  startDrafting: (actorId, category) => {
+    // Optionally open the PlayCard dock action tab by dispatching an event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('openActionsTab'));
+    }
+    set({ draftingIntent: { actorId, category } });
+  },
+
+  cancelDrafting: () => {
+    set({ draftingIntent: null });
+  },
 
   startAttack: (sourceTokenId, attack) => {
     const token = useSessionStore.getState().tokens.find(t => t.id === sourceTokenId);
@@ -433,6 +458,90 @@ export const useActionStore = create<ActionStore>()(
     }
   },
 
+  submitIntentResolution: (intent, resolutionPayload) => {
+    const sessionTokens = useSessionStore.getState().tokens;
+    const sourceToken = sessionTokens.find(t => t.id === intent.actorId);
+
+    const entry: ActionQueueEntry = {
+      id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      phase: 'resolve', // Skip targeting phase
+      category: intent.actionType === 'spell' ? 'spell' : 'attack',
+      sourceTokenId: intent.actorId,
+      sourceTokenName: sourceToken?.name || sourceToken?.label || 'Unknown',
+      attack: {
+        id: intent.actionId,
+        name: resolutionPayload.source.type,
+        attackBonus: 0,
+        damageFormula: '0',
+        damageType: 'untyped',
+      },
+      targets: resolutionPayload.targets.map(t => ({
+        targetKey: `${t.id}-${Date.now()}`,
+        tokenId: t.id,
+        tokenName: t.name,
+        distance: 0,
+        defenseValue: resolutionPayload.challenge?.target || 0,
+        defenseType: 'flat',
+        defenseLabel: resolutionPayload.challenge?.versus || 'AC',
+      })),
+      rollResults: {},
+      damageResults: {},
+      resolutions: {},
+      timestamp: Date.now(),
+      resolutionPayload,
+    };
+
+    // Populate rollResults, damageResults, resolutions based on the TargetResults
+    for (const t of entry.targets) {
+      const result = resolutionPayload.targetResults[t.tokenId];
+      if (result) {
+        if (result.challengeResult) {
+          entry.rollResults[t.targetKey] = {
+            naturalRoll: result.challengeResult.rolls[0] || 0,
+            totalRoll: result.challengeResult.total,
+            attackBonus: result.challengeResult.modifier,
+            formula: '1d20',
+          };
+          entry.resolutions[t.targetKey] = (result.suggestedResolution as any) || 'miss';
+        }
+        
+        let totalDmg = 0;
+        const breakDown: any[] = [];
+        let primaryType = 'untyped';
+
+        for (const [dmgType, dmgData] of Object.entries(result.damage)) {
+          totalDmg += dmgData.amount;
+          breakDown.push({
+            formula: 'rules-engine',
+            total: dmgData.amount,
+            diceResults: [],
+            damageType: dmgType,
+            adjustedTotal: dmgData.amount
+          });
+          if (primaryType === 'untyped') primaryType = dmgType;
+        }
+
+        entry.damageResults[t.targetKey] = {
+          formula: 'rules-engine',
+          total: totalDmg,
+          diceResults: [],
+          damageType: primaryType,
+          adjustedTotal: totalDmg,
+          breakdown: breakDown.length > 1 ? breakDown : undefined,
+        };
+      }
+    }
+
+    const { currentAction } = get();
+    if (currentAction) {
+      set({ pendingActions: [...get().pendingActions, entry] });
+    } else {
+      set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
+      broadcastActionPending(entry);
+      broadcastActionInProgress('resolve', intent.actorId);
+    }
+  },
+
   addTarget: (target) => {
     const { currentAction } = get();
     if (!currentAction || currentAction.phase !== 'targeting') return;
@@ -654,6 +763,7 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: remainingActions,
       isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
+      draftingIntent: null,
       actionHistory: [historyEntry, ...actionHistory].slice(0, 100),
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
@@ -721,6 +831,7 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: remainingActions,
       isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
+      draftingIntent: null,
     });
   },
 
@@ -752,6 +863,7 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: [],
       isTargeting: false,
       targetingMousePos: null,
+      draftingIntent: null,
     });
   },
 
@@ -790,6 +902,7 @@ export const useActionStore = create<ActionStore>()(
       isTargeting: currentAction?.phase === 'targeting',
       targetingMousePos: null,
       resolutionFlashes: [],
+      draftingIntent: null,
     });
   },
 
