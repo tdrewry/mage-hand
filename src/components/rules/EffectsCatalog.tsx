@@ -3,8 +3,7 @@ import { CardSaveEvent } from '@/components/cards/CardSaveButton';
 import { useEffectStore } from '@/stores/effectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, DamageDiceEntry, ScalingRule, LevelOverride, EffectModifier, EffectModifierOperation, EffectCondition, EffectGrantedAction, EffectAttackRoll, AuraConfig } from '@/types/effectTypes';
-import { computeScaledTemplate, EFFECT_MODIFIER_TARGETS, DND_5E_CONDITIONS } from '@/types/effectTypes';
+import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, AuraConfig } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
 import { Button } from '@/components/ui/button';
@@ -90,21 +89,7 @@ interface TemplateFormData {
   animationSpeed: number;
   rotateDirection: EffectRotateDirection;
   category: EffectCategory;
-  damageDice: DamageDiceEntry[];
-  level: string;
   multiDropCount: number;
-  // Scaling
-  baseLevel: string;
-  scaling: ScalingRule[];
-  levelOverrides: LevelOverride[];
-  // Attack roll
-  attackRoll: EffectAttackRoll;
-  // Modifiers
-  modifiers: EffectModifier[];
-  // Conditions
-  conditions: EffectCondition[];
-  // Granted actions
-  grantedActions: EffectGrantedAction[];
   // Aura
   isAura: boolean;
   auraAffectSelf: boolean;
@@ -141,16 +126,7 @@ const INITIAL_FORM: TemplateFormData = {
   animationSpeed: 1,
   rotateDirection: 'cw',
   category: 'custom',
-  damageDice: [],
-  level: '',
   multiDropCount: 1,
-  baseLevel: '',
-  scaling: [],
-  levelOverrides: [],
-  attackRoll: { enabled: false, abilitySource: 'spellcasting' },
-  modifiers: [],
-  conditions: [],
-  grantedActions: [],
   isAura: false,
   auraAffectSelf: false,
   auraWallBlocked: true,
@@ -187,503 +163,21 @@ function templateToForm(t: EffectTemplate): TemplateFormData {
     animationSpeed: t.animationSpeed,
     rotateDirection: t.rotateDirection ?? 'cw',
     category: t.category,
-    damageDice: t.damageDice ?? [],
-    level: t.level !== undefined ? String(t.level) : '',
     multiDropCount: t.multiDrop?.count ?? 1,
-    baseLevel: t.baseLevel !== undefined ? String(t.baseLevel) : '',
-    scaling: t.scaling ?? [],
-    levelOverrides: t.levelOverrides ?? [],
-    attackRoll: t.attackRoll ?? { enabled: false, abilitySource: 'spellcasting' },
-    modifiers: t.modifiers ?? [],
-    conditions: t.conditions ?? [],
-    grantedActions: t.grantedActions ?? [],
     isAura: !!t.aura,
     auraAffectSelf: t.aura?.affectSelf ?? false,
     auraWallBlocked: t.aura?.wallBlocked !== false,
   };
 }
 
-// --- Damage Dice Rows Component ---
+// --- Shared Form Fields Component (tabbed) ---
 
-function DamageDiceRows({
-  rows,
-  onChange,
-}: {
-  rows: DamageDiceEntry[];
-  onChange: (rows: DamageDiceEntry[]) => void;
-}) {
-  const addRow = () => onChange([...rows, { formula: '', damageType: '' }]);
-  const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
-  const updateRow = (i: number, field: keyof DamageDiceEntry, value: string) =>
-    onChange(rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
-
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] text-muted-foreground font-medium">Damage Dice</label>
-      {rows.map((row, i) => (
-        <div key={i} className="flex flex-wrap gap-1 items-center">
-          <Input
-            value={row.formula}
-            onChange={(e) => updateRow(i, 'formula', e.target.value)}
-            placeholder="e.g. 4d6"
-            className="h-6 text-xs font-mono flex-1"
-          />
-          <Input
-            value={row.damageType}
-            onChange={(e) => updateRow(i, 'damageType', e.target.value)}
-            placeholder="fire, radiant..."
-            className="h-6 text-xs flex-1"
-          />
-          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeRow(i)}>
-            <X className="w-3 h-3 text-destructive" />
-          </Button>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addRow}>
-        <Plus className="w-3 h-3 mr-1" /> Add Damage Row
-      </Button>
-    </div>
-  );
-}
-
-// --- Scaling Rules Editor ---
-
-const SCALABLE_PROPERTIES: { value: ScalingRule['property']; label: string }[] = [
-  { value: 'damageDice', label: 'Damage Dice' },
-  { value: 'radius', label: 'Radius' },
-  { value: 'width', label: 'Width' },
-  { value: 'length', label: 'Length' },
-  { value: 'multiDropCount', label: 'Quantity' },
-];
-
-function ScalingRulesEditor({
-  rules,
-  onChange,
-  damageDiceCount,
-}: {
-  rules: ScalingRule[];
-  onChange: (rules: ScalingRule[]) => void;
-  damageDiceCount: number;
-}) {
-  const addRule = () => onChange([...rules, { property: 'damageDice', perLevel: 1 }]);
-  const removeRule = (i: number) => onChange(rules.filter((_, idx) => idx !== i));
-  const updateRule = (i: number, updates: Partial<ScalingRule>) =>
-    onChange(rules.map((r, idx) => idx === i ? { ...r, ...updates } : r));
-
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] text-muted-foreground font-medium">Scaling Rules (per upcast level)</label>
-      {rules.map((rule, i) => (
-        <div key={i} className="flex flex-wrap gap-1 items-center">
-          <Select value={rule.property} onValueChange={(v) => updateRule(i, { property: v as ScalingRule['property'] })}>
-            <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {SCALABLE_PROPERTIES.map(p => (
-                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="w-12">
-            <NumericInput
-              value={rule.perLevel}
-              onChange={(v) => updateRule(i, { perLevel: v })}
-              className="h-6 text-[10px]"
-              min={1}
-              max={20}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground">/</span>
-          <div className="w-10">
-            <NumericInput
-              value={rule.perLevels ?? 1}
-              onChange={(v) => updateRule(i, { perLevels: v <= 1 ? undefined : v })}
-              className="h-6 text-[10px]"
-              min={1}
-              max={9}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground">lvl</span>
-          {rule.property === 'damageDice' && damageDiceCount > 1 && (
-            <div className="w-10">
-              <NumericInput
-                value={rule.diceIndex ?? 0}
-                onChange={(v) => updateRule(i, { diceIndex: v })}
-                className="h-6 text-[10px]"
-                min={0}
-                max={damageDiceCount - 1}
-              />
-            </div>
-          )}
-          <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeRule(i)}>
-            <X className="w-3 h-3 text-destructive" />
-          </Button>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addRule}>
-        <Plus className="w-3 h-3 mr-1" /> Add Scaling Rule
-      </Button>
-    </div>
-  );
-}
-
-// --- Level Overrides Editor ---
-
-function LevelOverridesEditor({
-  overrides,
-  onChange,
-  baseLevel,
-}: {
-  overrides: LevelOverride[];
-  onChange: (overrides: LevelOverride[]) => void;
-  baseLevel: number;
-}) {
-  const addOverride = () => {
-    // Find the next unused level
-    const usedLevels = new Set(overrides.map(o => o.level));
-    let nextLevel = baseLevel + 1;
-    while (usedLevels.has(nextLevel) && nextLevel <= 9) nextLevel++;
-    if (nextLevel > 9) return;
-    onChange([...overrides, { level: nextLevel }]);
-  };
-  const removeOverride = (i: number) => onChange(overrides.filter((_, idx) => idx !== i));
-  const updateOverride = (i: number, updates: Partial<LevelOverride>) =>
-    onChange(overrides.map((o, idx) => idx === i ? { ...o, ...updates } : o));
-
-  const updateOverrideDice = (i: number, diceIdx: number, field: keyof DamageDiceEntry, value: string) => {
-    const current = overrides[i].damageDice ?? [];
-    const updated = current.map((d, di) => di === diceIdx ? { ...d, [field]: value } : d);
-    updateOverride(i, { damageDice: updated });
-  };
-  const addOverrideDice = (i: number) => {
-    const current = overrides[i].damageDice ?? [];
-    updateOverride(i, { damageDice: [...current, { formula: '', damageType: '' }] });
-  };
-  const removeOverrideDice = (i: number, diceIdx: number) => {
-    const current = overrides[i].damageDice ?? [];
-    const updated = current.filter((_, di) => di !== diceIdx);
-    updateOverride(i, { damageDice: updated.length > 0 ? updated : undefined });
-  };
-
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] text-muted-foreground font-medium">Level Overrides (explicit per-level config)</label>
-      {overrides.map((ov, i) => (
-        <div key={i} className="border border-border rounded p-1.5 space-y-1">
-          <div className="flex flex-wrap items-center gap-1">
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">L{ov.level}</Badge>
-            <div className="w-12">
-              <NumericInput
-                value={ov.level}
-                onChange={(v) => updateOverride(i, { level: Math.max(baseLevel + 1, v) })}
-                className="h-5 text-[10px]"
-                min={baseLevel + 1}
-                max={9}
-              />
-            </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5 ml-auto flex-shrink-0" onClick={() => removeOverride(i)}>
-              <X className="w-3 h-3 text-destructive" />
-            </Button>
-          </div>
-          {/* Override damage dice */}
-          <div className="space-y-0.5">
-            <span className="text-[9px] text-muted-foreground">Damage Dice (leave empty to use scaling)</span>
-            {(ov.damageDice ?? []).map((d, di) => (
-              <div key={di} className="flex flex-wrap gap-1 items-center">
-                <Input
-                  value={d.formula}
-                  onChange={(e) => updateOverrideDice(i, di, 'formula', e.target.value)}
-                  placeholder="e.g. 12d6"
-                  className="h-5 text-[10px] font-mono flex-1"
-                />
-                <Input
-                  value={d.damageType}
-                  onChange={(e) => updateOverrideDice(i, di, 'damageType', e.target.value)}
-                  placeholder="fire"
-                  className="h-5 text-[10px] flex-1"
-                />
-                <Button variant="ghost" size="icon" className="h-4 w-4 flex-shrink-0" onClick={() => removeOverrideDice(i, di)}>
-                  <X className="w-2.5 h-2.5 text-destructive" />
-                </Button>
-              </div>
-            ))}
-            <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => addOverrideDice(i)}>
-              <Plus className="w-2.5 h-2.5 mr-0.5" /> Dice
-            </Button>
-          </div>
-          {/* Override dimensions */}
-          <div className="flex flex-wrap gap-1">
-            <div className="flex-1">
-              <label className="text-[9px] text-muted-foreground">Radius</label>
-              <NumericInput
-                value={ov.radius ?? 0}
-                onChange={(v) => updateOverride(i, { radius: v > 0 ? v : undefined })}
-                className="h-5 text-[10px]"
-                min={0}
-                fallback={0}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-[9px] text-muted-foreground">Width</label>
-              <NumericInput
-                value={ov.width ?? 0}
-                onChange={(v) => updateOverride(i, { width: v > 0 ? v : undefined })}
-                className="h-5 text-[10px]"
-                min={0}
-                fallback={0}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-[9px] text-muted-foreground">Length</label>
-              <NumericInput
-                value={ov.length ?? 0}
-                onChange={(v) => updateOverride(i, { length: v > 0 ? v : undefined })}
-                className="h-5 text-[10px]"
-                min={0}
-                fallback={0}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-[9px] text-muted-foreground">Qty</label>
-              <NumericInput
-                value={ov.multiDropCount ?? 0}
-                onChange={(v) => updateOverride(i, { multiDropCount: v > 0 ? v : undefined })}
-                className="h-5 text-[10px]"
-                min={0}
-                fallback={0}
-              />
-            </div>
-          </div>
-          <span className="text-[8px] text-muted-foreground italic">0 = use computed/default value</span>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addOverride} disabled={overrides.length >= (9 - baseLevel)}>
-        <Plus className="w-3 h-3 mr-1" /> Add Level Override
-      </Button>
-    </div>
-  );
-}
-
-// --- Shared Form Fields Component ---
-
-// --- Tab types ---
-type FormTab = 'shape' | 'damage' | 'level' | 'modifiers' | 'conditions' | 'grants' | 'duration';
+type FormTab = 'shape' | 'duration';
 
 const FORM_TABS: { value: FormTab; label: string; icon: React.ElementType }[] = [
   { value: 'shape', label: 'Shape', icon: Wand2 },
-  { value: 'damage', label: 'Dmg', icon: Swords },
-  { value: 'level', label: 'Level', icon: TrendingUp },
-  { value: 'modifiers', label: 'Mods', icon: Shield },
-  { value: 'conditions', label: 'Conds', icon: AlertCircle },
-  { value: 'grants', label: 'Grants', icon: Gift },
   { value: 'duration', label: 'Dur', icon: Timer },
 ];
-
-// --- Modifiers Editor ---
-
-function ModifiersEditor({
-  modifiers,
-  onChange,
-}: {
-  modifiers: EffectModifier[];
-  onChange: (mods: EffectModifier[]) => void;
-}) {
-  const addMod = () => onChange([...modifiers, {
-    id: `mod-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-    target: 'armorClass',
-    operation: 'add',
-    value: 0,
-  }]);
-  const removeMod = (i: number) => onChange(modifiers.filter((_, idx) => idx !== i));
-  const updateMod = (i: number, updates: Partial<EffectModifier>) =>
-    onChange(modifiers.map((m, idx) => idx === i ? { ...m, ...updates } : m));
-
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] text-muted-foreground font-medium">Stat Modifiers</label>
-      {modifiers.map((mod, i) => (
-        <div key={mod.id} className="space-y-0.5">
-          <div className="flex flex-wrap gap-1 items-center">
-            <Select value={mod.target} onValueChange={(v) => updateMod(i, { target: v })}>
-              <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {EFFECT_MODIFIER_TARGETS.map(t => (
-                  <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={mod.operation} onValueChange={(v) => updateMod(i, { operation: v as EffectModifierOperation })}>
-              <SelectTrigger className="h-6 text-[10px] w-14"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="add">+</SelectItem>
-                <SelectItem value="set">=</SelectItem>
-                <SelectItem value="multiply">×</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="w-14">
-              <NumericInput
-                value={mod.value}
-                onChange={(v) => updateMod(i, { value: v })}
-                className="h-6 text-[10px]"
-                float={mod.operation === 'multiply'}
-                step={mod.operation === 'multiply' ? 0.5 : 1}
-              />
-            </div>
-            <Select value={mod.timing ?? 'on-enter'} onValueChange={(v) => updateMod(i, { timing: v as EffectTriggerTiming })}>
-              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="on-enter">Enter</SelectItem>
-                <SelectItem value="on-exit">Exit</SelectItem>
-                <SelectItem value="on-stay">Stay</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeMod(i)}>
-              <X className="w-3 h-3 text-destructive" />
-            </Button>
-          </div>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addMod}>
-        <Plus className="w-3 h-3 mr-1" /> Add Modifier
-      </Button>
-    </div>
-  );
-}
-
-// --- Conditions Editor ---
-
-function ConditionsEditor({
-  conditions,
-  onChange,
-}: {
-  conditions: EffectCondition[];
-  onChange: (conds: EffectCondition[]) => void;
-}) {
-  const toggleCondition = (condition: string) => {
-    const existing = conditions.find(c => c.condition === condition);
-    if (existing) {
-      onChange(conditions.filter(c => c.condition !== condition));
-    } else {
-      onChange([...conditions, { condition, apply: true, timing: 'on-enter' }]);
-    }
-  };
-
-  const toggleApply = (condition: string) => {
-    onChange(conditions.map(c => c.condition === condition ? { ...c, apply: !c.apply } : c));
-  };
-
-  const cycleTiming = (condition: string) => {
-    const timings: EffectTriggerTiming[] = ['on-enter', 'on-exit', 'on-stay'];
-    onChange(conditions.map(c => {
-      if (c.condition !== condition) return c;
-      const current = c.timing ?? 'on-enter';
-      const next = timings[(timings.indexOf(current) + 1) % timings.length];
-      return { ...c, timing: next };
-    }));
-  };
-
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] text-muted-foreground font-medium">Conditions</label>
-      <div className="grid grid-cols-2 gap-1">
-        {DND_5E_CONDITIONS.map(cond => {
-          const active = conditions.find(c => c.condition === cond);
-          return (
-            <div key={cond} className="flex items-center gap-1">
-              <Checkbox
-                checked={!!active}
-                onCheckedChange={() => toggleCondition(cond)}
-                className="h-3.5 w-3.5"
-              />
-              <span className={`text-[10px] capitalize ${active ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {cond}
-              </span>
-              {active && (
-                <>
-                  <button
-                    className={`text-[8px] px-1 rounded ${active.apply ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}
-                    onClick={() => toggleApply(cond)}
-                  >
-                    {active.apply ? 'Apply' : 'Remove'}
-                  </button>
-                  <button
-                    className="text-[8px] px-1 rounded bg-muted text-muted-foreground hover:text-foreground"
-                    onClick={() => cycleTiming(cond)}
-                  >
-                    {(active.timing ?? 'on-enter').replace('on-', '')}
-                  </button>
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// --- Granted Actions Editor ---
-
-function GrantedActionsEditor({
-  actions,
-  onChange,
-}: {
-  actions: EffectGrantedAction[];
-  onChange: (actions: EffectGrantedAction[]) => void;
-}) {
-  const addAction = () => onChange([...actions, { name: '', type: 'attack', description: '' }]);
-  const removeAction = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
-  const updateAction = (i: number, updates: Partial<EffectGrantedAction>) =>
-    onChange(actions.map((a, idx) => idx === i ? { ...a, ...updates } : a));
-
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] text-muted-foreground font-medium">Granted Actions</label>
-      {actions.map((action, i) => (
-        <div key={i} className="border border-border rounded p-1.5 space-y-1">
-          <div className="flex flex-wrap gap-1 items-center">
-            <Select value={action.type ?? 'attack'} onValueChange={(v) => updateAction(i, { type: v as EffectGrantedAction['type'] })}>
-              <SelectTrigger className="h-5 text-[10px] w-20"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="attack">Attack</SelectItem>
-                <SelectItem value="spell">Spell</SelectItem>
-                <SelectItem value="trait">Trait</SelectItem>
-                <SelectItem value="feature">Feature</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              value={action.name}
-              onChange={(e) => updateAction(i, { name: e.target.value })}
-              placeholder="Action name"
-              className="h-5 text-[10px] flex-1"
-            />
-            <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" onClick={() => removeAction(i)}>
-              <X className="w-3 h-3 text-destructive" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            <Input
-              value={action.damageFormula ?? ''}
-              onChange={(e) => updateAction(i, { damageFormula: e.target.value || undefined })}
-              placeholder="Damage"
-              className="h-5 text-[10px] font-mono flex-1"
-            />
-            <Input
-              value={action.damageType ?? ''}
-              onChange={(e) => updateAction(i, { damageType: e.target.value || undefined })}
-              placeholder="Type"
-              className="h-5 text-[10px] flex-1"
-            />
-          </div>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addAction}>
-        <Plus className="w-3 h-3 mr-1" /> Add Granted Action
-      </Button>
-    </div>
-  );
-}
-
-// --- Shared Form Fields Component (tabbed) ---
 
 function TemplateFormFields({
   form,
@@ -700,13 +194,6 @@ function TemplateFormFields({
   const needsWidth = form.shape === 'line' || form.shape === 'rectangle' || form.shape === 'rectangle-burst';
   const needsAngle = form.shape === 'cone';
   const needsPolyline = form.shape === 'polyline';
-
-  // Count items on each tab for badges
-  const modCount = form.modifiers.length;
-  const condCount = form.conditions.length;
-  const dmgCount = form.damageDice.length + (form.attackRoll.enabled ? 1 : 0);
-  const levelCount = form.scaling.length + form.levelOverrides.length;
-  const grantsCount = form.grantedActions.length;
 
   return (
     <>
@@ -735,13 +222,6 @@ function TemplateFormFields({
         {FORM_TABS.map(tab => {
           const isActive = activeTab === tab.value;
           const Icon = tab.icon;
-          const count =
-            tab.value === 'modifiers' ? modCount :
-            tab.value === 'conditions' ? condCount :
-            tab.value === 'damage' ? dmgCount :
-            tab.value === 'level' ? levelCount :
-            tab.value === 'grants' ? grantsCount :
-            0;
           return (
             <button
               key={tab.value}
@@ -752,9 +232,6 @@ function TemplateFormFields({
             >
               <Icon className="w-3 h-3" />
               {tab.label}
-              {count > 0 && (
-                <Badge variant="secondary" className="text-[7px] px-1 py-0 h-3 ml-0.5">{count}</Badge>
-              )}
             </button>
           );
         })}
@@ -979,124 +456,6 @@ function TemplateFormFields({
         </>
       )}
 
-      {/* --- Damage Tab --- */}
-      {activeTab === 'damage' && (
-        <>
-          <DamageDiceRows
-            rows={form.damageDice}
-            onChange={(rows) => update('damageDice', rows)}
-          />
-
-          {/* Attack Roll */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <Switch
-                checked={form.attackRoll.enabled}
-                onCheckedChange={(v) => update('attackRoll', { ...form.attackRoll, enabled: v })}
-                className="scale-75"
-              />
-              <span className="text-[10px] text-muted-foreground font-medium">Requires Attack Roll</span>
-            </div>
-            {form.attackRoll.enabled && (
-              <div className="flex gap-1 items-center pl-4">
-                <Select
-                  value={form.attackRoll.abilitySource}
-                  onValueChange={(v) => update('attackRoll', { ...form.attackRoll, abilitySource: v })}
-                >
-                  <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="spellcasting">Spellcasting</SelectItem>
-                    <SelectItem value="str">Strength</SelectItem>
-                    <SelectItem value="dex">Dexterity</SelectItem>
-                    <SelectItem value="con">Constitution</SelectItem>
-                    <SelectItem value="int">Intelligence</SelectItem>
-                    <SelectItem value="wis">Wisdom</SelectItem>
-                    <SelectItem value="cha">Charisma</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="w-14">
-                  <NumericInput
-                    value={form.attackRoll.fixedBonus ?? 0}
-                    onChange={(v) => update('attackRoll', { ...form.attackRoll, fixedBonus: v })}
-                    className="h-6 text-[10px]"
-                  />
-                </div>
-                <span className="text-[9px] text-muted-foreground">bonus</span>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* --- Level Tab --- */}
-      {activeTab === 'level' && (
-        <>
-          <div className="flex gap-2 items-end">
-            <div className="w-20">
-              <label className="text-[10px] text-muted-foreground">Spell Level</label>
-              <NumericInput
-                value={form.level ? Number(form.level) : 0}
-                onChange={(v) => update('level', String(v))}
-                className="h-7 text-xs"
-                min={0}
-                max={9}
-              />
-            </div>
-            <div className="w-20">
-              <label className="text-[10px] text-muted-foreground">Base Level</label>
-              <NumericInput
-                value={form.baseLevel ? Number(form.baseLevel) : 0}
-                onChange={(v) => update('baseLevel', v > 0 ? String(v) : '')}
-                className="h-7 text-xs"
-                min={0}
-                max={9}
-              />
-            </div>
-            <span className="text-[10px] text-muted-foreground pb-1.5">
-              {form.baseLevel ? `Scalable from L${form.baseLevel}` : 'No scaling'}
-            </span>
-          </div>
-          {form.baseLevel && (
-            <>
-              <ScalingRulesEditor
-                rules={form.scaling}
-                onChange={(rules) => update('scaling', rules)}
-                damageDiceCount={form.damageDice.length}
-              />
-              <Separator className="my-1" />
-              <LevelOverridesEditor
-                overrides={form.levelOverrides}
-                onChange={(overrides) => update('levelOverrides', overrides)}
-                baseLevel={Number(form.baseLevel)}
-              />
-            </>
-          )}
-        </>
-      )}
-
-      {/* --- Modifiers Tab --- */}
-      {activeTab === 'modifiers' && (
-        <ModifiersEditor
-          modifiers={form.modifiers}
-          onChange={(mods) => update('modifiers', mods)}
-        />
-      )}
-
-      {/* --- Conditions Tab --- */}
-      {activeTab === 'conditions' && (
-        <ConditionsEditor
-          conditions={form.conditions}
-          onChange={(conds) => update('conditions', conds)}
-        />
-      )}
-
-      {/* --- Grants Tab --- */}
-      {activeTab === 'grants' && (
-        <GrantedActionsEditor
-          actions={form.grantedActions}
-          onChange={(acts) => update('grantedActions', acts)}
-        />
-      )}
 
       {/* --- Duration Tab --- */}
       {activeTab === 'duration' && (
@@ -1177,7 +536,6 @@ function TemplateFormFields({
 }
 
 function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' | 'isBuiltIn'> {
-  const cleanedDice = form.damageDice.filter(d => d.formula.trim());
   return {
     name: form.name.trim(),
     shape: form.shape,
@@ -1209,17 +567,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
     animationSpeed: form.animationSpeed,
     rotateDirection: form.animation === 'rotate' && form.rotateDirection !== 'cw' ? form.rotateDirection : undefined,
     category: form.category,
-    damageType: cleanedDice.length > 0 ? cleanedDice[0].damageType : undefined,
-    damageDice: cleanedDice.length > 0 ? cleanedDice : undefined,
-    level: form.level ? Number(form.level) : undefined,
     multiDrop: form.multiDropCount > 1 ? { count: form.multiDropCount } : undefined,
-    baseLevel: form.baseLevel ? Number(form.baseLevel) : undefined,
-    scaling: form.scaling.length > 0 ? form.scaling : undefined,
-    levelOverrides: form.levelOverrides.length > 0 ? form.levelOverrides : undefined,
-    attackRoll: form.attackRoll.enabled ? form.attackRoll : undefined,
-    modifiers: form.modifiers.length > 0 ? form.modifiers : undefined,
-    conditions: form.conditions.length > 0 ? form.conditions : undefined,
-    grantedActions: form.grantedActions.length > 0 ? form.grantedActions : undefined,
     aura: form.isAura ? {
       affectSelf: form.auraAffectSelf || undefined,
       wallBlocked: form.auraWallBlocked === false ? false : undefined,
@@ -1308,20 +656,7 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         <div className="text-xs font-medium truncate">{template.name}</div>
         <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
           <span className="capitalize">{template.shape}</span>
-          {template.damageDice && template.damageDice.length > 0 ? (
-            template.damageDice.map((d, i) => (
-              <React.Fragment key={i}>
-                <span>·</span>
-                <span className="font-mono">{d.formula}</span>
-                <span className="capitalize">{d.damageType}</span>
-              </React.Fragment>
-            ))
-          ) : template.damageType ? (
-            <>
-              <span>·</span>
-              <span className="capitalize">{template.damageType}</span>
-            </>
-          ) : null}
+
           {template.animation !== 'none' && (
             <>
               <span>·</span>
@@ -1347,11 +682,7 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         </Badge>
       )}
 
-      {template.level !== undefined && (
-        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
-          L{template.level}
-        </Badge>
-      )}
+
 
       {template.ranged && (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-accent-foreground border-accent">
@@ -1365,12 +696,7 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
         </Badge>
       )}
 
-      {template.scaling && template.scaling.length > 0 && (
-        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary/50 text-primary">
-          <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
-          Scale
-        </Badge>
-      )}
+
 
       <Button
         variant="ghost"
@@ -1436,36 +762,10 @@ export function EffectsCatalog() {
   const tokens = useSessionStore((s) => s.tokens);
   const { getCharacterById } = useCreatureStore();
 
-  const [damageFormula, setDamageFormula] = useState('');
-  const [castLevelInput, setCastLevelInput] = useState<number | null>(null);
-  const [useTokenLevel, setUseTokenLevel] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const getTemplate = useEffectStore((s) => s.getTemplate);
-
-  // Derive selected token's level from linked character data
-  const selectedTokenLevel = useMemo(() => {
-    if (selectedTokenIds.length !== 1) return null;
-    const token = tokens.find(t => t.id === selectedTokenIds[0]);
-    if (!token?.entityRef?.entityId) return null;
-    const character = getCharacterById(token.entityRef.entityId);
-    return character?.level ?? null;
-  }, [selectedTokenIds, tokens, getCharacterById]);
-
-  const canUseTokenLevel = selectedTokenIds.length === 1 && selectedTokenLevel !== null;
-
-  // When toggle is on and we have a valid token level, override the cast level input
-  const effectiveCastLevel = (useTokenLevel && canUseTokenLevel && selectedTokenLevel)
-    ? selectedTokenLevel
-    : castLevelInput;
-
-  // Turn off toggle if token deselected or loses level
-  React.useEffect(() => {
-    if (useTokenLevel && !canUseTokenLevel) {
-      setUseTokenLevel(false);
-    }
-  }, [useTokenLevel, canUseTokenLevel]);
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'trait', 'custom'];
@@ -1481,9 +781,7 @@ export function EffectsCatalog() {
 
   const handleSelect = (templateId: string) => {
     if (editingTemplateId) return;
-    const tmpl = getTemplate(templateId);
-    const level = tmpl?.baseLevel && effectiveCastLevel ? effectiveCastLevel : undefined;
-    startPlacement(templateId, undefined, damageFormula || undefined, undefined, level);
+    startPlacement(templateId);
   };
 
   const handleEdit = (templateId: string) => {
@@ -1513,65 +811,7 @@ export function EffectsCatalog() {
 
         <Separator />
 
-        {/* Cast at Level selector */}
-        <div className="flex gap-2 items-center">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5">
-                  <Switch
-                    checked={useTokenLevel}
-                    onCheckedChange={setUseTokenLevel}
-                    disabled={!canUseTokenLevel}
-                    className="scale-75"
-                  />
-                  <User className={`w-3.5 h-3.5 ${canUseTokenLevel ? 'text-foreground' : 'text-muted-foreground/40'}`} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs max-w-[200px]">
-                {canUseTokenLevel
-                  ? `Use selected token's level (L${selectedTokenLevel})`
-                  : 'Select a token with a linked character to use its level'}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <div className="w-20">
-            <label className="text-[10px] text-muted-foreground">Cast at Level</label>
-            <NumericInput
-              value={(useTokenLevel && canUseTokenLevel ? selectedTokenLevel : castLevelInput) ?? 0}
-              onChange={(v) => {
-                if (!useTokenLevel) setCastLevelInput(v > 0 ? v : null);
-              }}
-              className="h-7 text-xs"
-              min={0}
-              max={9}
-              disabled={useTokenLevel && canUseTokenLevel}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground pb-1.5 self-end">
-            {useTokenLevel && canUseTokenLevel
-              ? `Token L${selectedTokenLevel}`
-              : effectiveCastLevel ? `Upcast to L${effectiveCastLevel}` : 'Base level (no scaling)'}
-          </span>
-        </div>
 
-        {/* Damage formula input */}
-        <div className="space-y-1">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Damage Dice Override
-          </label>
-          <Input
-            value={damageFormula}
-            onChange={(e) => setDamageFormula(e.target.value)}
-            placeholder="e.g. 8d6, 2d10+4"
-            className="h-7 text-xs font-mono"
-          />
-          <p className="text-[10px] text-muted-foreground">
-            Overrides template dice when placing
-          </p>
-        </div>
-
-        <Separator />
       </div>
 
       {/* Scrollable content: placement status, template library, active effects */}
@@ -1581,21 +821,6 @@ export function EffectsCatalog() {
           {placement && (
             <div className="bg-primary/10 border border-primary/30 rounded p-2 text-xs">
               <span className="font-medium">Placing:</span> {placement.template.name}
-              {placement.castLevel && (
-                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-1">
-                  L{placement.castLevel}
-                </Badge>
-              )}
-              {placement.damageFormula && (
-                <span className="ml-1 font-mono text-muted-foreground">
-                  ({placement.damageFormula})
-                </span>
-              )}
-              {placement.template.damageDice && placement.template.damageDice.length > 0 && !placement.damageFormula && (
-                <span className="ml-1 font-mono text-muted-foreground">
-                  ({placement.template.damageDice.map(d => `${d.formula} ${d.damageType}`).join(' + ')})
-                </span>
-              )}
               {placement.multiDropTotal && placement.multiDropTotal > 1 && (
                 <div className="text-primary font-medium mt-0.5">
                   Drop {(placement.multiDropPlaced ?? 0) + 1} of {placement.multiDropTotal}

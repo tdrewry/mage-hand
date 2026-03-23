@@ -22,7 +22,7 @@ import { useMapObjectStore } from "@/stores/mapObjectStore";
 import { useEffectStore } from "@/stores/effectStore";
 import type { MapObject } from "@/types/mapObjectTypes";
 import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
-import { computeScaledTemplate } from "@/types/effectTypes";
+
 import { getBuiltInTemplate, BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
@@ -700,7 +700,6 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
     direction: e.direction,
     casterId: e.casterId,
     mapId: e.mapId,
-    castLevel: e.castLevel,
     roundsRemaining: e.roundsRemaining,
     groupId: e.groupId,
     animationPaused: e.animationPaused,
@@ -716,8 +715,8 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
 }
 
 /** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
-function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLevel?: number) => EffectTemplate | undefined): PlacedEffect | null {
-  let template = templateLookup(je.templateId, je.castLevel);
+function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string) => EffectTemplate | undefined): PlacedEffect | null {
+  let template = templateLookup(je.templateId);
 
   // Fallback: use embedded template snapshot if local lookup fails
   // (custom template CoList may not have synced yet)
@@ -725,7 +724,7 @@ function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLev
     try {
       const embedded = JSON.parse(je.templateJson);
       if (embedded && embedded.id) {
-        template = computeScaledTemplate(embedded, je.castLevel);
+        template = embedded;
         console.log(`[jazz-bridge] Using embedded template snapshot for effect ${je.effectId} (templateId: ${je.templateId})`);
       }
     } catch { /* invalid JSON */ }
@@ -760,7 +759,6 @@ function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLev
     placedAt: performance.now(),
     roundsRemaining: je.roundsRemaining,
     mapId: je.mapId,
-    castLevel: je.castLevel,
     animationPaused: je.animationPaused,
     impactedTargets,
     triggeredTokenIds,
@@ -773,15 +771,15 @@ function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string, castLev
 }
 
 /** Build a template lookup function using custom templates + built-ins */
-function buildTemplateLookup(customTemplates: EffectTemplate[]): (id: string, castLevel?: number) => EffectTemplate | undefined {
+function buildTemplateLookup(customTemplates: EffectTemplate[]): (id: string) => EffectTemplate | undefined {
   const customById = new Map<string, EffectTemplate>();
   for (const t of customTemplates) {
     if (t?.id) customById.set(t.id, t);
   }
-  return (id: string, castLevel?: number) => {
+  return (id: string) => {
     const base = customById.get(id) ?? getBuiltInTemplate(id);
     if (!base) return undefined;
-    return computeScaledTemplate(base, castLevel);
+    return base;
   };
 }
 

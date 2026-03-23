@@ -7,7 +7,7 @@ import type {
   EffectImpact,
   EffectPlacementState,
 } from '@/types/effectTypes';
-import { createEffectId, computeScaledTemplate } from '@/types/effectTypes';
+import { createEffectId } from '@/types/effectTypes';
 import { cancelEffectModifiers } from '@/lib/effectModifierEngine';
 import {
   BUILT_IN_EFFECT_TEMPLATES,
@@ -151,7 +151,7 @@ interface EffectState {
   getTemplate: (id: string) => EffectTemplate | undefined;
 
   // --- Placement mode ---
-  startPlacement: (templateId: string, casterId?: string, damageFormula?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }, castLevel?: number) => void;
+  startPlacement: (templateId: string, casterId?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }) => void;
   setPlacementOrigin: (origin: { x: number; y: number }) => void;
   updatePlacementPreview: (origin: { x: number; y: number }, direction: number) => void;
   cancelPlacement: () => void;
@@ -166,7 +166,6 @@ interface EffectState {
       casterId?: string;
       impactedTargets?: EffectImpact[];
       groupId?: string;
-      castLevel?: number;
       waypoints?: { x: number; y: number }[];
     },
   ) => PlacedEffect;
@@ -307,7 +306,7 @@ export const useEffectStore = create<EffectState>()(
     // Placement mode
     // ------------------------------------------------------------------
 
-    startPlacement: (templateId, casterId, damageFormula, casterToken, castLevel) => {
+    startPlacement: (templateId, casterId, casterToken) => {
       const template = get().getTemplate(templateId);
       if (!template) return;
 
@@ -341,15 +340,13 @@ export const useEffectStore = create<EffectState>()(
       }
 
       // Compute the scaled template for the cast level
-      const scaledTemplate = computeScaledTemplate(template, castLevel);
+      const scaledTemplate = template;
 
       set({
         placement: {
           templateId,
           template: scaledTemplate,
           casterId,
-          damageFormula,
-          castLevel,
           step: initialStep,
           origin: skipToDirection ? tokenOrigin : null,
           previewOrigin: tokenOrigin,
@@ -417,7 +414,7 @@ export const useEffectStore = create<EffectState>()(
       }
 
       // Apply level scaling if castLevel provided
-      const scaledTemplate = computeScaledTemplate(template, options.castLevel);
+      const scaledTemplate = template;
 
       // Auto-detect aura: link to caster token when template has aura config
       const isAura = !!scaledTemplate.aura;
@@ -439,7 +436,6 @@ export const useEffectStore = create<EffectState>()(
         impactedTargets: options.impactedTargets ?? [],
         triggeredTokenIds: [],
         groupId: options.groupId,
-        castLevel: options.castLevel,
         waypoints: options.waypoints,
         ...(isAura ? { isAura: true, anchorTokenId, tokensInsideArea: [] } : {}),
       };
@@ -465,7 +461,6 @@ export const useEffectStore = create<EffectState>()(
             mapId: effect.mapId,
             impactedTargets: effect.impactedTargets,
             groupId: effect.groupId,
-            castLevel: effect.castLevel,
             waypoints: effect.waypoints,
             isAura: effect.isAura,
             anchorTokenId: effect.anchorTokenId,

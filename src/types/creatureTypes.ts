@@ -1,3 +1,32 @@
+// Creature Action / Spell definitions
+export interface CreatureAction {
+  name: string;
+  attackBonus?: number;
+  damage?: string;
+  damageType?: string;
+  range?: string;
+  description: string;
+  effectTemplateId?: string;
+  
+  // Routing Rules
+  targetingMode?: 'manual' | 'template';
+  templateId?: string;
+  pipelineId?: string;
+  executionPolicy?: 'shared' | 'per-target';
+}
+
+export interface CreatureSpell {
+  name: string;
+  prepared?: boolean;
+  effectTemplateId?: string;
+  
+  // Routing Rules
+  targetingMode?: 'manual' | 'template';
+  templateId?: string;
+  pipelineId?: string;
+  executionPolicy?: 'shared' | 'per-target';
+}
+
 // D&D Beyond Character Data Structure
 export interface DndBeyondCharacter {
   id: string;
@@ -42,25 +71,17 @@ export interface DndBeyondCharacter {
   
   // Features & Actions
   features: Array<{ name: string; description: string; source: string }>;
-  actions: Array<{ 
-    name: string; 
-    attackBonus?: number; 
-    damage?: string; 
-    damageType?: string;
-    range?: string;
-    description: string;
-    effectTemplateId?: string;
-  }>;
+  actions: CreatureAction[];
   spells?: {
     spellcastingAbility?: string;
     spellSaveDC?: number;
     spellAttackBonus?: number;
-    cantrips: Array<{ name: string; effectTemplateId?: string }>;
+    cantrips: CreatureSpell[];
     spellsByLevel: Array<{
       level: number;
       slots: number;
       slotsUsed: number;
-      spells: Array<{ name: string; prepared: boolean; effectTemplateId?: string }>;
+      spells: CreatureSpell[];
     }>;
   };
   

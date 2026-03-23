@@ -11,7 +11,7 @@
  */
 
 import { DurableObjectRegistry } from './durableObjects';
-import { computeScaledTemplate } from '@/types/effectTypes';
+
 import { getBuiltInTemplate } from '@/lib/effectTemplateLibrary';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -534,7 +534,7 @@ DurableObjectRegistry.register({
           if (!template && e.templateId) {
             const base = customById.get(e.templateId) ?? getBuiltInTemplate(e.templateId);
             if (base) {
-              template = computeScaledTemplate(base, e.castLevel);
+              template = base;
             }
           }
           return {

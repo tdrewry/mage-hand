@@ -59,43 +59,11 @@ export interface AuraConfig {
   wallBlocked?: boolean;
 }
 
-// Damage dice entry (supports multiple damage types, e.g. Flame Strike)
-export interface DamageDiceEntry {
-  formula: string;     // e.g. "4d6", "2d10+4"
-  damageType: string;  // e.g. "fire", "radiant"
-}
-
 // Multi-drop configuration (e.g. Storm of Vengeance, Meteor Swarm)
 export interface MultiDropConfig {
   count: number;                // how many instances to place
   perDropShape?: EffectShape;   // override shape per drop (defaults to template shape)
   perDropRadius?: number;       // override radius per drop
-}
-
-// ---------------------------------------------------------------------------
-// Level-scaling types
-// ---------------------------------------------------------------------------
-
-/** Describes how a template property scales per upcast level above baseLevel. */
-export interface ScalingRule {
-  /** Which property to scale */
-  property: 'damageDice' | 'radius' | 'width' | 'length' | 'multiDropCount';
-  /** Amount added per scaling step */
-  perLevel: number;
-  /** How many levels constitute one scaling step (default 1). E.g. 2 = scales every 2 levels. */
-  perLevels?: number;
-  /** For damageDice scaling: which damageDice entry index to modify (default 0) */
-  diceIndex?: number;
-}
-
-/** Full override of template values at a specific cast level. Fields present replace computed values. */
-export interface LevelOverride {
-  level: number;
-  damageDice?: DamageDiceEntry[];
-  radius?: number;
-  width?: number;
-  length?: number;
-  multiDropCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,10 +118,6 @@ export interface EffectTemplate {
 
   // Metadata
   category: EffectCategory;
-  level?: number;          // spell level
-  damageType?: string;     // fire, cold, lightning, etc. (legacy single type)
-  /** Multiple damage dice entries — e.g. Flame Strike: 4d6 fire + 4d6 radiant */
-  damageDice?: DamageDiceEntry[];
   description?: string;
 
   /** If true this is a built-in template that cannot be deleted */
@@ -174,23 +138,6 @@ export interface EffectTemplate {
   /** Multi-drop configuration for effects that place multiple instances */
   multiDrop?: MultiDropConfig;
 
-  // Level-scaling
-  /** Lowest level this effect can be cast at (e.g. 3 for Fireball) */
-  baseLevel?: number;
-  /** Rules describing how properties scale per upcast level */
-  scaling?: ScalingRule[];
-  /** Explicit overrides for specific cast levels */
-  levelOverrides?: LevelOverride[];
-
-  // Extended impact types
-  /** Attack roll configuration (e.g. spell attack) */
-  attackRoll?: EffectAttackRoll;
-  /** Stat modifiers to apply to targets */
-  modifiers?: EffectModifier[];
-  /** Conditions to apply/remove on targets */
-  conditions?: EffectCondition[];
-  /** Temporary actions granted to targets */
-  grantedActions?: EffectGrantedAction[];
 
   // Aura
   /** If set, this effect is an aura: it locks to a token and continuously hit-tests with wall-blocking */
@@ -225,9 +172,6 @@ export interface PlacedEffect {
 
   /** When set, the effect has been cancelled — all non-damage impacts reverted */
   cancelledAt?: number;
-
-  /** The level this effect was cast at (for display/history) */
-  castLevel?: number;
 
   /** When true, the effect's animation is paused (renders static) */
   animationPaused?: boolean;
@@ -277,10 +221,7 @@ export interface EffectPlacementState {
   templateId: string;
   template: EffectTemplate;
   casterId?: string;
-  /** Override damage formula for this placement (e.g. "8d6") */
-  damageFormula?: string;
-  /** The level this effect is being cast at (for scaling) */
-  castLevel?: number;
+
   /** Current step in the two-step placement flow */
   step: EffectPlacementStep;
   /** Locked origin point (set after first click) */
@@ -314,100 +255,6 @@ export interface EffectPlacementState {
 }
 
 // ---------------------------------------------------------------------------
-// Attack roll configuration
-// ---------------------------------------------------------------------------
-
-export interface EffectAttackRoll {
-  enabled: boolean;
-  /** Which ability mod to use: 'spellcasting' | 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' */
-  abilitySource: string;
-  /** Fixed bonus override (if not using token's data) */
-  fixedBonus?: number;
-  /** Whether to add proficiency bonus */
-  addProficiency?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Effect modifiers (non-damage impacts)
-// ---------------------------------------------------------------------------
-
-export type EffectModifierTarget =
-  | 'armorClass'
-  | 'speed'
-  | 'hitPoints.temp'
-  | 'abilities.strength.score'
-  | 'abilities.dexterity.score'
-  | 'abilities.constitution.score'
-  | 'abilities.intelligence.score'
-  | 'abilities.wisdom.score'
-  | 'abilities.charisma.score'
-  | 'proficiencyBonus'
-  | 'initiative'
-  | string;
-
-/** Known modifier targets with human-readable labels */
-export const EFFECT_MODIFIER_TARGETS: { value: EffectModifierTarget; label: string; group: string }[] = [
-  { value: 'armorClass', label: 'Armor Class', group: 'Combat' },
-  { value: 'speed', label: 'Speed', group: 'Combat' },
-  { value: 'initiative', label: 'Initiative', group: 'Combat' },
-  { value: 'proficiencyBonus', label: 'Proficiency Bonus', group: 'Combat' },
-  { value: 'hitPoints.temp', label: 'Temp HP', group: 'Hit Points' },
-  { value: 'abilities.strength.score', label: 'Strength', group: 'Ability Scores' },
-  { value: 'abilities.dexterity.score', label: 'Dexterity', group: 'Ability Scores' },
-  { value: 'abilities.constitution.score', label: 'Constitution', group: 'Ability Scores' },
-  { value: 'abilities.intelligence.score', label: 'Intelligence', group: 'Ability Scores' },
-  { value: 'abilities.wisdom.score', label: 'Wisdom', group: 'Ability Scores' },
-  { value: 'abilities.charisma.score', label: 'Charisma', group: 'Ability Scores' },
-];
-
-export type EffectModifierOperation = 'add' | 'set' | 'multiply';
-
-export interface EffectModifier {
-  id: string;
-  /** The character property path to modify */
-  target: EffectModifierTarget;
-  /** How to apply */
-  operation: EffectModifierOperation;
-  /** The numeric value */
-  value: number;
-  /** Human-readable label */
-  label?: string;
-  /** When this modifier triggers relative to token position in the effect area */
-  timing?: EffectTriggerTiming;
-}
-
-// ---------------------------------------------------------------------------
-// Conditions
-// ---------------------------------------------------------------------------
-
-/** Standard D&D 5e conditions */
-export const DND_5E_CONDITIONS = [
-  'blinded', 'charmed', 'deafened', 'frightened', 'grappled',
-  'incapacitated', 'invisible', 'paralyzed', 'petrified', 'poisoned',
-  'prone', 'restrained', 'stunned', 'unconscious', 'exhaustion',
-] as const;
-
-export interface EffectCondition {
-  condition: string;
-  apply: boolean; // true = add, false = remove
-  /** When this condition triggers relative to token position in the effect area */
-  timing?: EffectTriggerTiming;
-}
-
-// ---------------------------------------------------------------------------
-// Granted temporary actions
-// ---------------------------------------------------------------------------
-
-export interface EffectGrantedAction {
-  name: string;
-  type?: 'attack' | 'spell' | 'trait' | 'feature';
-  attackBonus?: number;
-  damageFormula?: string;
-  damageType?: string;
-  description?: string;
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -436,90 +283,3 @@ export function isPolylineShape(shape: EffectShape): boolean {
   return shape === 'polyline';
 }
 
-// ---------------------------------------------------------------------------
-// Level-scaling computation
-// ---------------------------------------------------------------------------
-
-/**
- * Scale a dice formula by adding `increment` to the dice count.
- * e.g. scaleDiceFormula("8d6", 2) → "10d6"
- *      scaleDiceFormula("2d10+4", 1) → "3d10+4"
- */
-function scaleDiceFormula(formula: string, increment: number): string {
-  // Match the first NdX group
-  const match = formula.match(/^(\d+)(d\d+.*)$/);
-  if (!match) return formula; // can't parse, return as-is
-  const currentCount = parseInt(match[1]);
-  return `${currentCount + increment}${match[2]}`;
-}
-
-/**
- * Compute a scaled version of a template for a given cast level.
- * Returns a new EffectTemplate with adjusted values.
- * If castLevel is undefined or equal to baseLevel, returns the template unchanged.
- */
-export function computeScaledTemplate(template: EffectTemplate, castLevel?: number): EffectTemplate {
-  if (castLevel === undefined || !template.baseLevel || castLevel <= template.baseLevel) {
-    return template;
-  }
-
-  const rawDelta = castLevel - template.baseLevel;
-  let scaled = { ...template };
-
-  // Deep-clone damageDice so we can mutate
-  if (scaled.damageDice) {
-    scaled.damageDice = scaled.damageDice.map(d => ({ ...d }));
-  }
-
-  // Apply scaling rules
-  if (template.scaling) {
-    for (const rule of template.scaling) {
-      const step = rule.perLevels ?? 1;
-      const steps = Math.floor(rawDelta / step);
-      if (steps <= 0) continue;
-      const increment = steps * rule.perLevel;
-      switch (rule.property) {
-        case 'damageDice': {
-          const idx = rule.diceIndex ?? 0;
-          if (scaled.damageDice && scaled.damageDice[idx]) {
-            scaled.damageDice[idx] = {
-              ...scaled.damageDice[idx],
-              formula: scaleDiceFormula(scaled.damageDice[idx].formula, increment),
-            };
-          }
-          break;
-        }
-        case 'radius':
-          scaled.radius = (scaled.radius ?? 0) + increment;
-          break;
-        case 'width':
-          scaled.width = (scaled.width ?? 0) + increment;
-          break;
-        case 'length':
-          scaled.length = (scaled.length ?? 0) + increment;
-          break;
-        case 'multiDropCount':
-          if (scaled.multiDrop) {
-            scaled.multiDrop = { ...scaled.multiDrop, count: scaled.multiDrop.count + increment };
-          }
-          break;
-      }
-    }
-  }
-
-  // Apply level overrides (replace computed values)
-  if (template.levelOverrides) {
-    const override = template.levelOverrides.find(o => o.level === castLevel);
-    if (override) {
-      if (override.damageDice) scaled.damageDice = override.damageDice.map(d => ({ ...d }));
-      if (override.radius !== undefined) scaled.radius = override.radius;
-      if (override.width !== undefined) scaled.width = override.width;
-      if (override.length !== undefined) scaled.length = override.length;
-      if (override.multiDropCount !== undefined) {
-        scaled.multiDrop = { ...(scaled.multiDrop ?? { count: 1 }), count: override.multiDropCount };
-      }
-    }
-  }
-
-  return scaled;
-}
