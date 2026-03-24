@@ -1263,6 +1263,15 @@ export const MapTreeCardContent: React.FC = () => {
   const [expandedMapNodes, setExpandedMapNodes] = useState<Set<string>>(new Set());
   const [unassignedExpanded, setUnassignedExpanded] = useState(false);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+  const [collapsedLayers, setCollapsedLayers] = useState<Set<string>>(new Set());
+
+  const toggleLayerOpen = useCallback((layerId: string) => {
+    setCollapsedLayers(prev => {
+      const next = new Set(prev);
+      next.has(layerId) ? next.delete(layerId) : next.add(layerId);
+      return next;
+    });
+  }, []);
 
   const toggleGroupOpen = useCallback((groupId: string) => {
     setExpandedGroupIds(prev => {
@@ -1311,6 +1320,15 @@ export const MapTreeCardContent: React.FC = () => {
       g.members.some(m => entityIds.has(m.id))
     );
 
+    const contextId = entitySet.length > 0 ? (entitySet[0].mapId || 'unassigned') : 'unassigned';
+    
+    // Group ungrouped by type securely matching intended nominal rendering order
+    const typesOrder: Array<TreeEntity['type']> = ['token', 'light', 'mapObject', 'region'];
+    const groupedByType = setUngrouped.reduce((acc, entity) => {
+      (acc[entity.type] ??= []).push(entity);
+      return acc;
+    }, {} as Record<string, TreeEntity[]>);
+
     return (
       <>
         {relevantGroups.map(group => (
@@ -1347,28 +1365,63 @@ export const MapTreeCardContent: React.FC = () => {
             }}
           />
         ))}
-        {setUngrouped.map(entity => (
-          <EntityRow
-            key={`${entity.type}-${entity.id}`}
-            entity={entity}
-            selected={allSelectedIds.has(entity.id)}
-            renamingId={renamingId}
-            onToggleLock={handleToggleEntityLock}
-            onAddToNewGroup={handleAddToNewGroup}
-            onSelect={handleSelect}
-            onSelectAdditive={handleSelectAdditive}
-            onRenameCommit={handleRenameCommit}
-            onRenameCancel={handleRenameCancel}
-            draggable
-            dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            contextActions={contextActions}
-            mapObjects={mapObjectsForContext}
-          />
-        ))}
+
+        {typesOrder.map(type => {
+          const items = groupedByType[type];
+          if (!items || items.length === 0) return null;
+          
+          const layerId = `${contextId}-${type}`;
+          const isCollapsed = collapsedLayers.has(layerId);
+          
+          const labels: Record<string, string> = {
+            token: 'Tokens',
+            light: 'Lights',
+            mapObject: 'Map Objects',
+            region: 'Regions'
+          };
+          
+          return (
+            <Collapsible key={layerId} open={!isCollapsed} onOpenChange={() => toggleLayerOpen(layerId)}>
+              <div className="flex items-center gap-1.5 px-1 py-1 group/layer">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center gap-1.5 flex-1 min-w-0 text-muted-foreground hover:text-foreground outline-none">
+                    {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider truncate flex-1 text-left">{labels[type]}</span>
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 shrink-0 opacity-60 group-hover/layer:opacity-100 transition-opacity">
+                      {items.length}
+                    </Badge>
+                  </button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <div className="pl-3 border-l border-border/40 ml-[7px] space-y-0.5">
+                  {items.map(entity => (
+                    <EntityRow
+                      key={`${entity.type}-${entity.id}`}
+                      entity={entity}
+                      selected={allSelectedIds.has(entity.id)}
+                      renamingId={renamingId}
+                      onToggleLock={handleToggleEntityLock}
+                      onAddToNewGroup={handleAddToNewGroup}
+                      onSelect={handleSelect}
+                      onSelectAdditive={handleSelectAdditive}
+                      onRenameCommit={handleRenameCommit}
+                      onRenameCancel={handleRenameCancel}
+                      draggable
+                      dropIndicator={dropTarget?.id === entity.id ? dropTarget.position : null}
+                      onDragStart={handleDragStart}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      contextActions={contextActions}
+                      mapObjects={mapObjectsForContext}
+                    />
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        })}
       </>
     );
   };

@@ -512,7 +512,7 @@ const defaultCardConfigs: Record<CardType, Omit<CardConfig, 'type'>> = {
     isClosable: true,
     defaultVisible: true,
     defaultMinimized: true,
-    dockPosition: 'left',
+    dockPosition: 'right',
   },
 };
 
