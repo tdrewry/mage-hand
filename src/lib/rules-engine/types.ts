@@ -22,6 +22,7 @@ export interface IntentPayload {
   actionType: 'attack' | 'spell' | 'skill' | 'trait';
   targets: string[];
   modifiers: Record<string, any>;
+  placedEffectId?: string;
 }
 
 export interface ResolutionPayload {

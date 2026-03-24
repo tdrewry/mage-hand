@@ -6,10 +6,11 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Swords, Sparkles, Dices, BookOpen, Target, Send } from 'lucide-react';
+import { Swords, Sparkles, Dices, BookOpen, Target, Send, Focus } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useActionStore } from '@/stores/actionStore';
+import { useEffectStore } from '@/stores/effectStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 import type { IntentPayload } from '@/lib/rules-engine/types';
 import { evaluateIntent } from '@/lib/rules-engine/evaluator';
@@ -45,6 +46,11 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
   const [castLevel, setCastLevel] = useState<string>('base');
   const [sneakAttack, setSneakAttack] = useState(false);
   const [smite, setSmite] = useState(false);
+  const [waitingForPlacement, setWaitingForPlacement] = useState(false);
+
+  const placedEffects = useEffectStore(s => s.placedEffects);
+  const draftingIntents = useActionStore(s => s.draftingIntents);
+  const currentDraft = draftingIntents.find(d => d.id === draftId);
 
   // Get available actions for the selected category
   const actions = useMemo(() => {
@@ -98,6 +104,36 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
     }
   }, [actions, selectedActionId]);
 
+  const handlePlaceTemplate = () => {
+    if (!currentAction?.effectTemplateId || !token) return;
+    setWaitingForPlacement(true);
+    // If there is already a template placed for this draft, cancel the old one
+    if (currentDraft?.placedEffectId) {
+      useEffectStore.getState().cancelEffect(currentDraft.placedEffectId, () => ({}));
+    }
+    useEffectStore.getState().startPlacement(currentAction.effectTemplateId, token.id);
+  };
+
+  React.useEffect(() => {
+    if (waitingForPlacement && currentAction?.effectTemplateId && token) {
+      // Find the most recently placed effect matching this template and caster
+      const recentEffect = [...placedEffects].reverse().find(
+        e => e.templateId === currentAction.effectTemplateId && e.casterId === token.id
+      );
+      if (recentEffect && currentDraft?.placedEffectId !== recentEffect.id) {
+        setWaitingForPlacement(false);
+        useActionStore.getState().setDraftPlacedEffectId(draftId, recentEffect.id);
+        
+        // Auto-select the targets hit by the collision calculation
+        if (recentEffect.impactedTargets && recentEffect.impactedTargets.length > 0) {
+          useSessionStore.getState().setSelectedTokens(
+            recentEffect.impactedTargets.map(t => t.targetId)
+          );
+        }
+      }
+    }
+  }, [placedEffects, waitingForPlacement, currentAction, token, draftId, currentDraft?.placedEffectId]);
+
   const handleSubmit = async () => {
     if (!token || !currentAction) return;
     
@@ -110,7 +146,8 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
         castLevel: castLevel !== 'base' ? parseInt(castLevel, 10) : currentAction.spellLevel || 0,
         sneakAttack,
         smite,
-      }
+      },
+      placedEffectId: currentDraft?.placedEffectId,
     };
     
     // Evaluate the intent to produce a resolution payload
@@ -221,8 +258,27 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
             <Separator className="bg-slate-800" />
 
             {/* Targeting Summary */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="space-y-4">
+              {currentAction.effectTemplateId && (
+                <div className="bg-indigo-900/30 border border-indigo-500/30 p-3 rounded-md space-y-2">
+                  <Label className="text-xs font-semibold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                    <Focus className="w-3.5 h-3.5" /> Area of Effect
+                  </Label>
+                  <p className="text-xs text-indigo-200/70">This action uses an area of effect template. Place it on the canvas to automatically target tokens.</p>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white"
+                    onClick={handlePlaceTemplate}
+                  >
+                    <Focus className="w-4 h-4 mr-2" />
+                    {currentDraft?.placedEffectId ? 'Replace Template' : 'Place Template'}
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <Target className="w-3.5 h-3.5" /> Targets Selected ({selectedTargetsCount})
               </Label>
               {selectedTargetsCount === 0 ? (
@@ -238,6 +294,7 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
                   ))}
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}

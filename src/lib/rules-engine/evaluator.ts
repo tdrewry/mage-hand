@@ -101,6 +101,8 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
     targetResults: {}
   };
 
+  const sharedNodeResults: Record<string, any> = {};
+
   for (const target of targetTokens) {
     let targetBackingData: any = null;
     let targetSourceId = 'any';
@@ -135,7 +137,7 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
     
     if (compiledNodes.length > 0) {
       const { executePipeline } = await import('./compiler');
-      const compiledState = executePipeline(compiledNodes, microContext);
+      const compiledState = executePipeline(compiledNodes, microContext, sharedNodeResults);
       if (compiledState && compiledState.targetResult) {
         targetResult = compiledState.targetResult as TargetResult;
       }

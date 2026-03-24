@@ -175,8 +175,10 @@ export function compilePipeline(nodes: RuleNode[], startNodeId?: string): RuleNo
 
 /**
  * Executes a pre-compiled array of RuleNodes sequentially against a state object.
+ * When evaluating multiple targets, `sharedNodeResults` can cache execution of nodes
+ * that do not belong to a specific target, ensuring exactly-once evaluation for dice rolls.
  */
-export function executePipeline(compiledNodes: RuleNode[], initialState: any): any {
+export function executePipeline(compiledNodes: RuleNode[], initialState: any, sharedNodeResults?: Record<string, any>): any {
   // Deep clone to prevent mutating the original passed-in mock state directly
   const state = JSON.parse(JSON.stringify(initialState || {}));
 
@@ -185,8 +187,21 @@ export function executePipeline(compiledNodes: RuleNode[], initialState: any): a
     if (!logic || Object.keys(logic).length === 0) continue;
 
     try {
-      // Evaluate current node
-      const result = jsonLogic.apply(logic, state);
+      let result;
+      // If evaluating multiple targets (AoE), deterministic nodes (no `target.` dependency) should only roll once
+      const vars = extractVariables(logic);
+      const isTargetIndependent = !vars.some(v => v.startsWith('target.'));
+      
+      if (sharedNodeResults && isTargetIndependent && sharedNodeResults.hasOwnProperty(node.id)) {
+        result = sharedNodeResults[node.id];
+      } else {
+        // Evaluate current node
+        result = jsonLogic.apply(logic, state);
+        
+        if (sharedNodeResults && isTargetIndependent) {
+          sharedNodeResults[node.id] = result;
+        }
+      }
 
       // If there is an output target, assign the returned value back into state
       if (node.nodeData.outputTarget) {

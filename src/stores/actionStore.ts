@@ -143,7 +143,7 @@ interface ActionState {
   resolutionFlashes: ResolutionFlash[];
 
   /** The current intents being drafted by the player, before they are submitted to the pipeline. */
-  draftingIntents: { id: string; actorId: string; category: string }[];
+  draftingIntents: { id: string; actorId: string; category: string; placedEffectId?: string }[];
 }
 
 interface ActionActions {
@@ -158,6 +158,9 @@ interface ActionActions {
 
   /** Cancel drafting an intent */
   cancelDrafting: (draftId: string) => void;
+
+  /** Link a placed template effect ID to the current draft so it can be passed to the resolver or canceled */
+  setDraftPlacedEffectId: (draftId: string, effectId: string) => void;
 
   /** Start an effect-based action with pre-populated targets (skips targeting phase) */
   startEffectAction: (params: {
@@ -242,7 +245,19 @@ export const useActionStore = create<ActionStore>()(
     set({ draftingIntents: [...get().draftingIntents, { id, actorId, category }] });
   },
 
+  setDraftPlacedEffectId: (draftId, effectId) => {
+    set((state) => ({
+      draftingIntents: state.draftingIntents.map(d => d.id === draftId ? { ...d, placedEffectId: effectId } : d)
+    }));
+  },
+
   cancelDrafting: (draftId) => {
+    const draft = get().draftingIntents.find(d => d.id === draftId);
+    if (draft && draft.placedEffectId) {
+      import('./effectStore').then(({ useEffectStore }) => {
+        useEffectStore.getState().cancelEffect(draft.placedEffectId!, () => ({}));
+      });
+    }
     set({ draftingIntents: get().draftingIntents.filter(d => d.id !== draftId) });
   },
 
