@@ -60,6 +60,20 @@ jsonLogic.add_operation("vocab_match", (category: string, varToCheck: string, ex
 });
 
 /**
+ * Gets a deeply nested property from an object safely.
+ */
+export function getNestedProperty(obj: any, path: string): any {
+  if (!obj || !path) return undefined;
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+/**
  * Safely sets a deeply nested property on an object (like lodash/set).
  */
 export function setNestedProperty(obj: any, path: string, value: any): void {
@@ -205,7 +219,31 @@ export function executePipeline(compiledNodes: RuleNode[], initialState: any, sh
 
       // If there is an output target, assign the returned value back into state
       if (node.nodeData.outputTarget) {
-        setNestedProperty(state, node.nodeData.outputTarget, result);
+        let finalResult = result;
+        
+        // Smart merge for object results to preserve previous state (e.g., pre-calculated modifiers)
+        if (finalResult && typeof finalResult === 'object' && !Array.isArray(finalResult)) {
+          const existing = getNestedProperty(state, node.nodeData.outputTarget);
+          if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+            // Special rule for modifiers: visually accumulate them so separate nodes can stack mods and rolls
+            if ('modifier' in existing && typeof existing.modifier === 'number') {
+              const newMod = typeof finalResult.modifier === 'number' ? finalResult.modifier : 0;
+              const combinedMod = existing.modifier + newMod;
+               
+              finalResult = { ...existing, ...finalResult, modifier: combinedMod };
+               
+              // If there's a total, advance it by the existing modifier
+              if (typeof finalResult.total === 'number' && newMod !== combinedMod) {
+                finalResult.total += existing.modifier;
+              }
+            } else {
+              // Standard shallow merge to preserve sibling props
+              finalResult = { ...existing, ...finalResult };
+            }
+          }
+        }
+        
+        setNestedProperty(state, node.nodeData.outputTarget, finalResult);
       }
     } catch (e) {
       console.warn(`Execution failed at node ${node.id} (${node.nodeData.name})`, e);
