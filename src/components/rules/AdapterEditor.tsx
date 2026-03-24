@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, ArrowRight, Plug, Save } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Plug, Save, Lock, Unlock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generatePathsFromSchema } from '@/lib/rules-engine/schema-paths';
 import { MAGE_HAND_ENTITY_SCHEMA } from '@/lib/rules-engine/schemas';
@@ -23,6 +23,7 @@ export function AdapterEditor() {
   const schemaList = Object.values(schemas);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isTargetUnlocked, setIsTargetUnlocked] = useState(false);
 
   const selectedAdapter = adapters.find(a => a.id === selectedId);
 
@@ -30,13 +31,17 @@ export function AdapterEditor() {
     ? schemas[selectedAdapter.sourceId]?.rootSchema 
     : undefined;
 
+  const selectedTargetSchemaNode = selectedAdapter?.targetId && selectedAdapter.targetId !== 'mage-hand-entity'
+    ? schemas[selectedAdapter.targetId]?.rootSchema
+    : MAGE_HAND_ENTITY_SCHEMA;
+
   const suggestPaths = useMemo(() => {
     return selectedSchemaNode ? generatePathsFromSchema(selectedSchemaNode) : [];
   }, [selectedSchemaNode]);
 
   const targetPaths = useMemo(() => {
-    return generatePathsFromSchema(MAGE_HAND_ENTITY_SCHEMA);
-  }, []);
+    return selectedTargetSchemaNode ? generatePathsFromSchema(selectedTargetSchemaNode) : [];
+  }, [selectedTargetSchemaNode]);
 
   const handleCreateNew = () => {
     addAdapter({
@@ -156,8 +161,38 @@ export function AdapterEditor() {
                 </Select>
 
                 <div className="text-muted-foreground font-medium">Target Context</div>
-                <div>
-                  <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary">Mage-Hand Native Entity</Badge>
+                <div className="flex items-center gap-2">
+                  {isTargetUnlocked ? (
+                    <Select value={selectedAdapter.targetId} onValueChange={(val) => handleUpdate({ targetId: val })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Target Schema..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mage-hand-entity">Mage-Hand Native Entity</SelectItem>
+                        {schemaList.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary">
+                      {selectedAdapter.targetId === 'mage-hand-entity' 
+                        ? 'Mage-Hand Native Entity' 
+                        : schemas[selectedAdapter.targetId]?.label || 'Unknown Schema'}
+                    </Badge>
+                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={() => setIsTargetUnlocked(!isTargetUnlocked)}>
+                          {isTargetUnlocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {isTargetUnlocked ? 'Lock Target Context' : 'Unlock Target Context'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             </div>
