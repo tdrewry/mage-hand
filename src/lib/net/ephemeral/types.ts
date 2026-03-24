@@ -60,6 +60,7 @@ export type EphemeralOpKind =
   | "action.pending"
   | "action.resolved"
   | "action.resolution.claim"
+  | "action.gather.result"
   // Assets
   | "asset.uploadProgress"
   | "asset.submission"
@@ -295,6 +296,8 @@ export interface ActionQueueSyncPayload {
   currentAction: any | null;
   pendingActions: any[];
   actionHistory: any[];
+  activeGatherRequest?: any | null;
+  gatheredResults?: Record<string, { total: number; natural?: number; modifier?: number }>;
 }
 
 /** Broadcast by DM when an action enters resolve phase — visible to all players. */
@@ -326,6 +329,14 @@ export interface ActionResolutionClaimPayload {
   /** null = release claim */
   claimedBy: string | null;
   claimedByName: string | null;
+}
+
+/** Player submits a roll result to the DM for the active Gather Request */
+export interface ActionGatherResultPayload {
+  targetId: string;
+  total: number;
+  natural?: number;
+  modifier?: number;
 }
 
 // -- Assets --
@@ -545,6 +556,7 @@ export interface EphemeralPayloadMap {
   "action.pending": ActionPendingPayload;
   "action.resolved": ActionResolvedPayload;
   "action.resolution.claim": ActionResolutionClaimPayload;
+  "action.gather.result": ActionGatherResultPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
   "asset.submission": AssetSubmissionPayload;
   "asset.accepted": AssetAcceptedPayload;
@@ -649,6 +661,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "action.pending":         { throttleMs: 0,   ttlMs: 15000, keyStrategy: "entityId", dmOnly: true },
   "action.resolved":        { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "entityId", dmOnly: true },
   "action.resolution.claim": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "entityId", dmOnly: true },
+  "action.gather.result":    { throttleMs: 0,  ttlMs: 0,     keyStrategy: "none" },
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },

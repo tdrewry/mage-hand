@@ -233,9 +233,9 @@ function WhisperPicker({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
             <Button
               variant={isWhisperMode ? 'default' : 'ghost'}
               size="sm"
@@ -243,10 +243,10 @@ function WhisperPicker({
             >
               <Eye className="h-3.5 w-3.5" />
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>Whisper to specific players</TooltipContent>
-        </Tooltip>
-      </PopoverTrigger>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">Whisper to specific players</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-56 p-2" align="start" side="top">
         <div className="space-y-2">
           <div className="flex items-center justify-between">

@@ -53,12 +53,14 @@ function ensureActionCardOpen() {
 
 /** Broadcast the current action queue state to other DM sessions */
 function broadcastActionQueue() {
-  const { currentAction, pendingActions, actionHistory } = useActionStore.getState();
+  const { currentAction, pendingActions, actionHistory, activeGatherRequest, gatheredResults } = useActionStore.getState();
   try {
     ephemeralBus.emit('action.queue.sync', {
       currentAction,
       pendingActions,
       actionHistory,
+      activeGatherRequest,
+      gatheredResults,
     });
   } catch {
     // ephemeralBus may not be connected — silently ignore
@@ -222,7 +224,7 @@ interface ActionActions {
   swapToAction: (pendingIndex: number) => void;
 
   /** Hydrate the full action queue from an external source (ephemeral sync) */
-  hydrateQueue: (currentAction: ActionQueueEntry | null, pendingActions: ActionQueueEntry[], actionHistory: ActionHistoryEntry[]) => void;
+  hydrateQueue: (currentAction: ActionQueueEntry | null, pendingActions: ActionQueueEntry[], actionHistory: ActionHistoryEntry[], activeGatherRequest?: RollRequestPayload | null, gatheredResults?: Record<string, { total: number; natural?: number; modifier?: number }>) => void;
 
   /** Apply resolved pipeline outputs to token attributes */
   applyPipelineResolution: (payload: ResolutionPayload) => void;
@@ -1020,11 +1022,13 @@ export const useActionStore = create<ActionStore>()(
     });
   },
 
-  hydrateQueue: (currentAction, pendingActions, actionHistory) => {
+  hydrateQueue: (currentAction, pendingActions, actionHistory, activeGatherRequest, gatheredResults) => {
     set({
       currentAction,
       pendingActions,
       actionHistory,
+      activeGatherRequest: activeGatherRequest || null,
+      gatheredResults: gatheredResults || {},
       isTargeting: currentAction?.phase === 'targeting',
       targetingMousePos: null,
       resolutionFlashes: [],
@@ -1084,6 +1088,8 @@ useActionStore.subscribe((state) => {
     ca: state.currentAction,
     pa: state.pendingActions,
     ah: state.actionHistory,
+    gr: state.activeGatherRequest,
+    res: state.gatheredResults,
   });
   if (snapshot !== _lastBroadcastJson) {
     _lastBroadcastJson = snapshot;

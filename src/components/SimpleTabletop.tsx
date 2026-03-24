@@ -144,6 +144,7 @@ import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
 import { registerEffectHandlers } from "@/lib/net/ephemeral/mapTemplateHandlers";
 import { emitAuraState } from "@/lib/net/ephemeral/mapTemplateHandlers";
+import { emitActionGatherResult } from "@/lib/net/ephemeral/miscHandlers";
 import { registerAmbientHandlers } from "@/lib/net/ephemeral/ambientHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
@@ -714,6 +715,22 @@ export const SimpleTabletop = () => {
     const unsub = useRemoteDragStore.subscribe((state, prevState) => {
       // Only schedule redraw if the drags object actually changed
       if (state.drags !== prevState.drags) {
+        scheduleRedraw();
+      }
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Listen for action store updates to trigger canvas repaint ──
+  useEffect(() => {
+    const unsub = useActionStore.subscribe((state, prevState) => {
+      if (
+        state.activeGatherRequest !== prevState.activeGatherRequest ||
+        state.gatheredResults !== prevState.gatheredResults ||
+        state.isTargeting !== prevState.isTargeting ||
+        state.resolutionFlashes !== prevState.resolutionFlashes
+      ) {
         scheduleRedraw();
       }
     });
@@ -8596,6 +8613,48 @@ export const SimpleTabletop = () => {
       e.preventDefault();
     } else if (e.button === 0) {
       // Left click
+
+      // ── GATHER PHASE: intercept click on ROLL! badge ──
+      const gatherReq = useActionStore.getState().activeGatherRequest;
+      const gatheredResults = useActionStore.getState().gatheredResults;
+      if (gatherReq) {
+        let clickedBadgeTokenId: string | null = null;
+        for (const token of tokens) {
+          if (!gatherReq.targets.includes(token.id) || gatheredResults[token.id] !== undefined) continue;
+          
+          const tokenRegion = regions.find(r => isPointInRegion(token.x, token.y, r));
+          const gridSize = tokenRegion?.gridSize || 40;
+          const maxRadius = Math.max((token.gridWidth * gridSize) / 2, (token.gridHeight * gridSize) / 2);
+          const badgeWidth = 40 / transform.zoom;
+          const badgeHeight = 16 / transform.zoom;
+          const badgeX = token.x - badgeWidth / 2;
+          const badgeY = token.y - maxRadius - badgeHeight - (4 / transform.zoom);
+          
+          if (
+            worldPos.x >= badgeX &&
+            worldPos.x <= badgeX + badgeWidth &&
+            worldPos.y >= badgeY &&
+            worldPos.y <= badgeY + badgeHeight
+          ) {
+            clickedBadgeTokenId = token.id;
+            break;
+          }
+        }
+
+        if (clickedBadgeTokenId) {
+          const natural = Math.floor(Math.random() * 20) + 1;
+          const total = natural;
+          
+          if (isDM) {
+             useActionStore.getState().submitGatherResult(clickedBadgeTokenId, total, natural, 0);
+          } else {
+             emitActionGatherResult(clickedBadgeTokenId, total, natural, 0);
+             useActionStore.getState().submitGatherResult(clickedBadgeTokenId, total, natural, 0);
+          }
+          triggerSound('dice.roll');
+          return; // Consume the click
+        }
+      }
 
       // ── FOG REVEAL BRUSH: intercept click when brush tool is active ──
       if (fogRevealBrushActive && fogEnabled && isDM && renderingMode === 'play') {

@@ -34,6 +34,7 @@ import type {
   ActionPendingPayload,
   ActionResolvedPayload,
   ActionResolutionClaimPayload,
+  ActionGatherResultPayload,
 } from "./types";
 
 let registered = false;
@@ -139,7 +140,7 @@ export function registerMiscHandlers(): void {
   // ── Actions (DM queue sync) ──
   ephemeralBus.on("action.queue.sync", (data: ActionQueueSyncPayload, _userId) => {
     const hadAction = !!useActionStore.getState().currentAction;
-    useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory);
+    useActionStore.getState().hydrateQueue(data.currentAction, data.pendingActions, data.actionHistory, data.activeGatherRequest, data.gatheredResults);
 
     // Auto-open Action Card for DMs when a new action arrives
     if (!hadAction && data.currentAction) {
@@ -193,6 +194,16 @@ export function registerMiscHandlers(): void {
       });
     } else {
       useActionPendingStore.getState().setClaim(data.actionId, null);
+    }
+  });
+
+  // ── Action Gather Result (Player → DM) ──
+  ephemeralBus.on("action.gather.result", (data: ActionGatherResultPayload, userId) => {
+    const roles = useMultiplayerStore.getState().roles;
+    if (roles.includes("dm")) {
+      useActionStore.getState().submitGatherResult(data.targetId, data.total, data.natural, data.modifier);
+      triggerSound('ui.success');
+      toast.info(`Received roll from a player`);
     }
   });
 
@@ -374,3 +385,11 @@ export function emitArtAccepted(submission: {
 export function emitArtRejected(submissionId: string, reason?: string): void {
   ephemeralBus.emit("asset.rejected", { submissionId, reason });
 }
+
+/**
+ * Submit a gather request roll result (Player → DM)
+ */
+export function emitActionGatherResult(targetId: string, total: number, natural?: number, modifier?: number): void {
+  ephemeralBus.emit("action.gather.result", { targetId, total, natural, modifier });
+}
+
