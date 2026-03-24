@@ -633,11 +633,11 @@ export function RuleInspector({
 
         <div className="flex-1 min-h-0 mt-2 border-t border-border flex flex-col">
           {isFunctionNode ? (
-            <FunctionNodeInspector node={selectedNode} setNodes={setNodes} setJsonValue={setJsonValue} />
+            <FunctionNodeInspector key={`func-${selectedNode.id}`} node={selectedNode} setNodes={setNodes} setJsonValue={setJsonValue} />
           ) : mode === 'Visual' ? (
-            <VisualModeRenderer node={selectedNode} setNodes={setNodes} setJsonValue={setJsonValue} />
+            <VisualModeRenderer key={`vis-${selectedNode.id}`} node={selectedNode} setNodes={setNodes} setJsonValue={setJsonValue} />
           ) : (
-            <Suspense fallback={<div className="p-4 text-xs text-muted-foreground text-center">Loading Monaco Editor...</div>}>
+            <Suspense key={`monaco-${selectedNode.id}`} fallback={<div className="p-4 text-xs text-muted-foreground text-center">Loading Monaco Editor...</div>}>
               <MonacoEditor
                  height="100%"
                  language="json"

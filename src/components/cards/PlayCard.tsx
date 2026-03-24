@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCardStore } from '@/stores/cardStore';
 import { ChatCardContent } from './ChatCard';
@@ -18,6 +18,15 @@ export function PlayCardContent({ cardId }: PlayCardContentProps) {
   const isDocked = card?.dockPosition !== 'floating';
 
   const [activeTab, setActiveTab] = useState<'chat' | 'history' | 'dice' | 'initiative' | 'action'>('chat');
+
+  useEffect(() => {
+    const handleOpenActionsTab = () => {
+      setActiveTab('action');
+    };
+    
+    window.addEventListener('openActionsTab', handleOpenActionsTab);
+    return () => window.removeEventListener('openActionsTab', handleOpenActionsTab);
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full">

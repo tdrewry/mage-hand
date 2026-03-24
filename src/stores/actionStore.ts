@@ -21,6 +21,35 @@ import { createEmptyEntitySheet } from '@/types/entitySheet';
 import type { ResolutionPayload, IntentPayload } from '@/lib/rules-engine/types';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
+import { useCardStore } from '@/stores/cardStore';
+import { CardType } from '@/types/cardTypes';
+
+function ensureActionCardOpen() {
+  const cardStore = useCardStore.getState();
+  
+  // 1. Try to open the bundled Play Card dock which houses the Action tab
+  const playCard = cardStore.getCardByType(CardType.PLAY);
+  if (playCard) {
+    cardStore.setVisibility(playCard.id, true);
+    cardStore.setMinimize(playCard.id, false);
+    cardStore.bringToFront(playCard.id);
+  } else {
+    // 2. Fallback to standalone Action Card
+    const card = cardStore.getCardByType(CardType.ACTION_CARD);
+    if (card) {
+      cardStore.setVisibility(card.id, true);
+      cardStore.setMinimize(card.id, false);
+      cardStore.bringToFront(card.id);
+    } else {
+      cardStore.registerCard({ type: CardType.ACTION_CARD, defaultVisible: true, defaultMinimized: false } as any);
+    }
+  }
+
+  // 3. Dispatch event so the PlayCard (if active) knows to switch its active tab to 'action'
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('openActionsTab'));
+  }
+}
 
 /** Broadcast the current action queue state to other DM sessions */
 function broadcastActionQueue() {
@@ -241,6 +270,8 @@ export const useActionStore = create<ActionStore>()(
       set({ currentAction: entry, isTargeting: true, targetingMousePos: null });
       broadcastActionInProgress('targeting', sourceTokenId);
     }
+    
+    ensureActionCardOpen();
   },
 
   startSkillCheck: (sourceTokenId, skillName, modifier) => {
@@ -306,6 +337,8 @@ export const useActionStore = create<ActionStore>()(
     } else {
       set({ currentAction: entry, isTargeting: false, targetingMousePos: null });
     }
+    
+    ensureActionCardOpen();
   },
 
   startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts, attackRoll }) => {
@@ -458,6 +491,8 @@ export const useActionStore = create<ActionStore>()(
       broadcastActionPending(entry);
       broadcastActionInProgress('resolve', sourceTokenId);
     }
+    
+    ensureActionCardOpen();
   },
 
   submitIntentResolution: (intent, resolutionPayload) => {
@@ -577,6 +612,8 @@ export const useActionStore = create<ActionStore>()(
       broadcastActionPending(entry);
       broadcastActionInProgress('resolve', intent.actorId);
     }
+    
+    ensureActionCardOpen();
   },
 
   addTarget: (target) => {
