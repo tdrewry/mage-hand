@@ -60,6 +60,10 @@ The bridge is the core translation layer between Zustand and Jazz.
 #### Drag Optimization & Echo Prevention
 To prevent "rubber-banding" during fast local updates (like dragging a token), the bridge implements a drag-grace period. Inbound position updates are suppressed while a token is actively being dragged locally (`markTokenDragStart`/`markTokenDragEnd`).
 
+## Key Shared Components
+
+*   **`PathSuggestInput`** (`src/components/rules/PathSuggestInput.tsx`): A reusable text input with an autocomplete dropdown designed for JSON path exploration. Used across tools like the Rule Inspector and Adapter Editor to provide intellisense from dynamic schemas.
+
 ## File Structure (src/)
 *   **`components/`**: React UI components organized by domain (ui, modals, toolbar, cards).
 *   **`lib/`**: Core engine logic, importers, rendering helpers, and the `jazz` transport module.

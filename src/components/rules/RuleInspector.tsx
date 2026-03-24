@@ -8,86 +8,10 @@ import { toast } from 'sonner';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
-// ---------- OUTPUT TARGET INPUT ----------
-
-const OutputTargetInput = ({
-  value,
-  onChange
-}: {
-  value: string;
-  onChange: (val: string) => void;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filteredPaths = getV3SchemaPaths().filter(p => p.toLowerCase().includes((value || '').toLowerCase()));
-
-  const handleSelect = (path: string) => {
-    onChange(path);
-    setIsOpen(false);
-    
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        const typeIndex = path.indexOf('<type>');
-        if (typeIndex !== -1) {
-          inputRef.current.setSelectionRange(typeIndex, typeIndex + 6);
-        }
-      }
-    }, 0);
-  };
-
-  return (
-    <div className="relative flex flex-col gap-1.5" ref={containerRef}>
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output Target (Optional)</label>
-      <input 
-        ref={inputRef}
-        type="text" 
-        value={value} 
-        onChange={(e) => {
-          onChange(e.target.value);
-          setIsOpen(true);
-        }}
-        onFocus={() => setIsOpen(true)}
-        className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        placeholder="e.g. damage.amount"
-        autoComplete="off"
-      />
-      {isOpen && filteredPaths.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 max-h-48 overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md p-1 top-[calc(100%+4px)] left-0">
-          {filteredPaths.map((path) => (
-            <li 
-              key={path}
-              onMouseDown={(e) => {
-                 e.preventDefault();
-                 handleSelect(path);
-              }}
-              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-            >
-              {path}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-        Select a contract path (e.g., targetResult.damage.fire.amount) or type a temporary variable.
-      </p>
-    </div>
-  );
-};
+import { PathSuggestInput } from './PathSuggestInput';
 
 // ---------- FUNCTION NODE INSPECTOR ----------
+
 
 const FunctionNodeInspector = ({ 
   node, 
@@ -654,16 +578,24 @@ export function RuleInspector({
             />
           </div>
 
-          <OutputTargetInput 
-            value={selectedNode.nodeData.outputTarget || ''} 
-            onChange={(newTarget) => {
-              setNodes(curr => curr.map(n => 
-                n.id === selectedNode.id 
-                  ? { ...n, nodeData: { ...n.nodeData, outputTarget: newTarget } } 
-                  : n
-              ));
-            }}
-          />
+          <div className="relative flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output Target (Optional)</label>
+            <PathSuggestInput 
+              value={selectedNode.nodeData.outputTarget || ''} 
+              onChange={(newTarget) => {
+                setNodes(curr => curr.map(n => 
+                  n.id === selectedNode.id 
+                    ? { ...n, nodeData: { ...n.nodeData, outputTarget: newTarget } } 
+                    : n
+                ));
+              }}
+              options={getV3SchemaPaths()}
+              placeholder="e.g. damage.amount"
+            />
+            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+              Select a contract path (e.g., targetResult.damage.fire.amount) or type a temporary variable.
+            </p>
+          </div>
         </div>
 
         {/* Mode Toggle for normal nodes */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAdapterStore, type AdapterDefinition } from '@/stores/adapterStore';
 import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, ArrowRight, Plug } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { generatePathsFromSchema } from '@/lib/rules-engine/schema-paths';
+import { PathSuggestInput } from './PathSuggestInput';
 
 export function AdapterEditor() {
   const adapters = useAdapterStore(s => s.adapters);
@@ -21,6 +23,14 @@ export function AdapterEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedAdapter = adapters.find(a => a.id === selectedId);
+
+  const selectedSchemaNode = selectedAdapter?.sourceId && selectedAdapter.sourceId !== 'any' 
+    ? schemas[selectedAdapter.sourceId]?.rootSchema 
+    : undefined;
+
+  const suggestPaths = useMemo(() => {
+    return selectedSchemaNode ? generatePathsFromSchema(selectedSchemaNode) : [];
+  }, [selectedSchemaNode]);
 
   const handleCreateNew = () => {
     addAdapter({
@@ -160,11 +170,12 @@ export function AdapterEditor() {
                   
                   {selectedAdapter.mappings.map((mapping, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_auto_1fr_auto] gap-4 items-center bg-card border border-border rounded-md p-3 hover:border-primary/50 transition-colors group shadow-sm">
-                      <Input 
+                      <PathSuggestInput 
                         placeholder="e.g. system.attributes.hp" 
                         value={mapping.sourcePath}
-                        onChange={(e) => updateMapping(idx, 'sourcePath', e.target.value)}
-                        className="font-mono text-sm focus-visible:ring-primary/50"
+                        onChange={(val) => updateMapping(idx, 'sourcePath', val)}
+                        options={suggestPaths}
+                        className="font-mono text-sm focus-visible:ring-primary/50 w-full"
                       />
                       <ArrowRight className="w-4 h-4 text-muted-foreground" />
                       <Input 
