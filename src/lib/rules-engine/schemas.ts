@@ -4,6 +4,7 @@ export interface SchemaNode {
   properties?: Record<string, SchemaNode>;
   items?: SchemaNode;
   enumValues?: string[];
+  modifiers?: string[];
 }
 
 export const TOKEN_ACTION_SCHEMA: SchemaNode = {
@@ -22,6 +23,9 @@ export const TOKEN_ACTION_SCHEMA: SchemaNode = {
     modifier: { type: 'number', description: 'Flat modifier for skills' },
     proficient: { type: 'boolean', description: 'Whether the actor is proficient in this' },
     pipelineId: { type: 'string', description: 'Bound Rules Engine pipeline UUID' },
+    isSneakAttack: { type: 'boolean', description: 'Sneak Attack (+2d6)' },
+    isDivineSmite: { type: 'boolean', description: 'Divine Smite' },
+    rollState: { type: 'enum', enumValues: ['normal', 'advantage', 'disadvantage'], description: 'Roll State' },
   }
 };
 
@@ -133,9 +137,26 @@ export const TARGET_RESULT_SCHEMA: SchemaNode = {
       type: 'object',
       description: 'Outcome of an attack or save',
       properties: {
+        type: { type: 'enum', enumValues: ['attack', 'save', 'skill', 'none'] },
         rolls: { type: 'array', items: { type: 'number' }, description: 'Raw d20 rolls' },
+        modifier: { type: 'number' },
         total: { type: 'number', description: 'Total modified roll amount' },
-        isSuccess: { type: 'boolean', description: 'Did the target pass the save?' }
+        targetValue: { type: 'number' },
+        isSuccess: { type: 'boolean', description: 'Did the target pass or get hit?' },
+        isCriticalHit: { type: 'boolean' },
+        isCriticalMiss: { type: 'boolean' },
+        targetProp: { type: 'string' }
+      }
+    },
+    resistances: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          type: { type: 'string' },
+          multiplier: { type: 'number' },
+          reason: { type: 'string' }
+        }
       }
     },
     damage: {
@@ -161,6 +182,75 @@ export const TARGET_RESULT_SCHEMA: SchemaNode = {
       enumValues: ['hit', 'miss', 'critical_hit', 'critical_miss', 'half', 'none'],
       description: 'The automatically calculated resolution of the attack or save'
     }
+  }
+};
+
+export const ACTIVE_EFFECT_OUTPUT_SCHEMA: SchemaNode = {
+  type: 'object',
+  description: 'The final aggregated payload sent to the Resolution Card, managing outcome evaluation.',
+  properties: {
+    source: {
+      type: 'object',
+      properties: { name: { type: 'string' }, type: { type: 'string' } }
+    },
+    targets: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' } } }
+    },
+    challenge: {
+      type: 'object',
+      properties: { type: { type: 'string' }, versus: { type: 'string' }, target: { type: 'number' } }
+    },
+    rawResults: {
+      type: 'object',
+      properties: {
+        damage: { type: 'any' },
+        effects: { type: 'any' }
+      }
+    },
+    targetResults: {
+      type: 'object',
+      description: 'Record mapping target IDs to their individual Pipeline Output arrays'
+    }
+  }
+};
+
+export const ACTIVE_EFFECT_SCHEMA: SchemaNode = {
+  type: 'object',
+  description: 'The orchestrator entity that sequences pipelines and manages durations.',
+  properties: {
+    id: { type: 'string', description: 'Unique identifier for the effect' },
+    name: { type: 'string', description: 'Display name of the effect' },
+    description: { type: 'string', description: 'Renderable Markdown for the effect or spell text' },
+    tags: { type: 'array', items: { type: 'string' }, description: 'Array of strings for fast searching/sorting' },
+    duration: { 
+      type: 'object', 
+      properties: {
+        value: { type: 'number' },
+        unit: { type: 'enum', enumValues: ['rounds', 'minutes', 'hours', 'instant'] }
+      }
+    },
+    triggers: {
+      type: 'object',
+      properties: {
+        onApply: { type: 'boolean' },
+        onTurnStart: { type: 'boolean' },
+        onTurnEnd: { type: 'boolean' },
+        onRemove: { type: 'boolean' }
+      }
+    },
+    steps: {
+      type: 'array',
+      description: 'The sequenced array of actions or references',
+      items: {
+        type: 'object',
+        properties: {
+          type: { type: 'enum', enumValues: ['pipeline', 'maptemplate'] },
+          targetId: { type: 'string' }
+        }
+      }
+    },
+    sharedContext: { type: 'any', description: 'Dictionary to pass state between downstream steps' }
   }
 };
 
@@ -380,22 +470,34 @@ export const CONTEXT_REGISTRY_SEED: Record<string, { id: string, label: string, 
     rootSchema: MAGE_HAND_ENTITY_SCHEMA,
     role: 'system'
   },
+  activeEffect: {
+    id: 'activeEffect',
+    label: '3. Active Effect Orchestrator',
+    rootSchema: ACTIVE_EFFECT_SCHEMA,
+    role: 'system'
+  },
   action: {
     id: 'action',
-    label: '3. Action Data',
+    label: '4. Action Data',
     rootSchema: TOKEN_ACTION_SCHEMA,
     role: 'system'
   },
   target: {
     id: 'target',
-    label: '4. Target (Defender Entity)',
+    label: '5. Target (Defender Entity)',
     rootSchema: MAGE_HAND_ENTITY_SCHEMA,
     role: 'system'
   },
   targetResult: {
     id: 'targetResult',
-    label: '5. Pipeline Output (Target Result)',
+    label: '6. Pipeline Output (Target Result)',
     rootSchema: TARGET_RESULT_SCHEMA,
+    role: 'system'
+  },
+  activeEffectOutput: {
+    id: 'activeEffectOutput',
+    label: '7. Active Effect Output',
+    rootSchema: ACTIVE_EFFECT_OUTPUT_SCHEMA,
     role: 'system'
   },
   '5e-character': {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CONTEXT_REGISTRY_SEED, type SchemaNode } from '@/lib/rules-engine/schemas';
+import { applySystemSeeds } from '@/lib/utils/stateMerge';
 
 export interface ConfigItem {
   value: string;
@@ -180,7 +181,13 @@ export const useGlobalConfigStore = create<GlobalConfigState>()(
       })
     }),
     {
-      name: 'vtt-global-config-v4', // version bump to include schemas state
+      name: 'vtt-rules-storage',
+      merge: (persistedState: any, currentState: GlobalConfigState) => {
+        // Enforce the system schemas from the code seed over the persisted schemas
+        return applySystemSeeds(persistedState, currentState, {
+          schemas: CONTEXT_REGISTRY_SEED
+        });
+      }
     }
   )
 );

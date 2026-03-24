@@ -1756,36 +1756,6 @@ export const SimpleTabletop = () => {
             });
             effectS.cancelPlacement();
 
-            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-            if (tokenImpacts.length > 0) {
-              const cardStore = useCardStore.getState();
-              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-              if (actionCard) {
-                cardStore.setVisibility(actionCard.id, true);
-              } else {
-                cardStore.registerCard({
-                  type: CardType.ACTION_CARD,
-                  title: 'Action',
-                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
-                  defaultSize: { width: 400, height: 500 },
-                  minSize: { width: 340, height: 400 },
-                  isResizable: true,
-                  isClosable: true,
-                  defaultVisible: true,
-                });
-              }
-              useActionStore.getState().startEffectAction({
-                sourceTokenId: pl.casterId,
-                templateId: pl.template.id,
-                templateName: pl.template.name,
-                damageType: pl.template.damageType,
-                damageFormula: pl.damageFormula,
-                damageDice: pl.template.damageDice,
-                placedMapTemplateId: placed.id,
-                castLevel: pl.castLevel,
-                impacts,
-              });
-            }
           } else {
             effectS.cancelPlacement();
           }
@@ -2071,38 +2041,6 @@ export const SimpleTabletop = () => {
             });
 
             useMapTemplateStore.getState().cancelPlacement();
-
-            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-            if (tokenImpacts.length > 0) {
-              const cardStore = useCardStore.getState();
-              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-              if (actionCard) {
-                cardStore.setVisibility(actionCard.id, true);
-              } else {
-                cardStore.registerCard({
-                  type: CardType.ACTION_CARD,
-                  title: 'Action',
-                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
-                  defaultSize: { width: 400, height: 500 },
-                  minSize: { width: 340, height: 400 },
-                  isResizable: true,
-                  isClosable: true,
-                  defaultVisible: true,
-                });
-              }
-
-              useActionStore.getState().startEffectAction({
-                sourceTokenId: token.id,
-                templateId: placement.template.id,
-                templateName: placement.template.name,
-                damageType: placement.template.damageType,
-                damageFormula: placement.damageFormula,
-                damageDice: placement.template.damageDice,
-                placedMapTemplateId: placed.id,
-                castLevel: placement.castLevel,
-                impacts,
-              });
-            }
 
             redrawCanvas();
           } else {
@@ -7914,38 +7852,6 @@ export const SimpleTabletop = () => {
 
         useMapTemplateStore.getState().cancelPlacement();
 
-        // Open Action Card if tokens were hit
-        const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-        if (tokenImpacts.length > 0) {
-          const cardStore = useCardStore.getState();
-          const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-          if (actionCard) {
-            cardStore.setVisibility(actionCard.id, true);
-          } else {
-            cardStore.registerCard({
-              type: CardType.ACTION_CARD,
-              title: 'Action',
-              defaultPosition: { x: window.innerWidth - 420, y: 80 },
-              defaultSize: { width: 400, height: 500 },
-              minSize: { width: 340, height: 400 },
-              isResizable: true,
-              isClosable: true,
-              defaultVisible: true,
-            });
-          }
-
-          useActionStore.getState().startEffectAction({
-            sourceTokenId: pl.casterId,
-            templateId: template.id,
-            templateName: template.name,
-            damageType: template.damageType,
-            damageFormula: pl.damageFormula,
-            damageDice: template.damageDice,
-            placedMapTemplateId: placed.id,
-            castLevel: pl.castLevel,
-            impacts,
-          });
-        }
       };
 
       // ── EFFECT PLACEMENT: two-step flow (1. origin, 2. direction) ──
@@ -8067,44 +7973,6 @@ export const SimpleTabletop = () => {
 
               effectState.cancelPlacement();
 
-              // Open Action Card with merged impacts
-              const tokenImpacts = mergedImpacts.filter(i => i.targetType === 'token');
-              if (tokenImpacts.length > 0) {
-                const cardStore = useCardStore.getState();
-                const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-                if (actionCard) {
-                  cardStore.setVisibility(actionCard.id, true);
-                } else {
-                  cardStore.registerCard({
-                    type: CardType.ACTION_CARD,
-                    title: 'Action',
-                    defaultPosition: { x: window.innerWidth - 420, y: 80 },
-                    defaultSize: { width: 400, height: 500 },
-                    minSize: { width: 340, height: 400 },
-                    isResizable: true,
-                    isClosable: true,
-                    defaultVisible: true,
-                  });
-                }
-
-                // Create separate action entries per drop for independent resolution
-                for (const groupEffect of allGroupEffects) {
-                  const dropImpacts = groupEffect.impactedTargets.filter(i => i.targetType === 'token');
-                  if (dropImpacts.length === 0) continue;
-                  useActionStore.getState().startEffectAction({
-                    sourceTokenId: placement.casterId,
-                    templateId: template.id,
-                    templateName: template.name,
-                    damageType: template.damageType,
-                    damageFormula: placement.damageFormula,
-                    damageDice: template.damageDice,
-                    placedMapTemplateId: groupEffect.id,
-                    groupId: placement.multiDropGroupId,
-                    castLevel: placement.castLevel,
-                    impacts: dropImpacts,
-                  });
-                }
-              }
             } else {
               // More drops to place — reset for next click
               useMapTemplateStore.setState({
@@ -8148,38 +8016,6 @@ export const SimpleTabletop = () => {
             });
 
             effectState.cancelPlacement();
-
-            const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-            if (tokenImpacts.length > 0) {
-              const cardStore = useCardStore.getState();
-              const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-              if (actionCard) {
-                cardStore.setVisibility(actionCard.id, true);
-              } else {
-                cardStore.registerCard({
-                  type: CardType.ACTION_CARD,
-                  title: 'Action',
-                  defaultPosition: { x: window.innerWidth - 420, y: 80 },
-                  defaultSize: { width: 400, height: 500 },
-                  minSize: { width: 340, height: 400 },
-                  isResizable: true,
-                  isClosable: true,
-                  defaultVisible: true,
-                });
-              }
-
-              useActionStore.getState().startEffectAction({
-                sourceTokenId: placement.casterId,
-                templateId: template.id,
-                templateName: template.name,
-                damageType: template.damageType,
-                damageFormula: placement.damageFormula,
-                damageDice: template.damageDice,
-                placedMapTemplateId: placed.id,
-                castLevel: placement.castLevel,
-                impacts,
-              });
-            }
 
             redrawCanvas();
             return;
@@ -8237,41 +8073,6 @@ export const SimpleTabletop = () => {
 
         // Exit placement mode
         effectState.cancelPlacement();
-
-        // Auto-open Action Card with impacted targets if any token impacts exist
-        const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-        if (tokenImpacts.length > 0) {
-          // Open the Action Card
-          const cardStore = useCardStore.getState();
-          const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-          if (actionCard) {
-            cardStore.setVisibility(actionCard.id, true);
-          } else {
-            cardStore.registerCard({
-              type: CardType.ACTION_CARD,
-              title: 'Action',
-              defaultPosition: { x: window.innerWidth - 420, y: 80 },
-              defaultSize: { width: 400, height: 500 },
-              minSize: { width: 340, height: 400 },
-              isResizable: true,
-              isClosable: true,
-              defaultVisible: true,
-            });
-          }
-
-          // Start effect action with pre-populated targets
-          useActionStore.getState().startEffectAction({
-            sourceTokenId: placement.casterId,
-            templateId: template.id,
-            templateName: template.name,
-            damageType: template.damageType,
-            damageFormula: placement.damageFormula,
-            damageDice: template.damageDice,
-            placedMapTemplateId: placed.id,
-            castLevel: placement.castLevel,
-            impacts,
-          });
-        }
 
         redrawCanvas();
         return;
@@ -12673,36 +12474,6 @@ export const SimpleTabletop = () => {
                 });
                 effectS.cancelPlacement();
 
-                const tokenImpacts = impacts.filter(i => i.targetType === 'token');
-                if (tokenImpacts.length > 0) {
-                  const cardStore = useCardStore.getState();
-                  const actionCard = cardStore.cards.find(c => c.type === CardType.ACTION_CARD);
-                  if (actionCard) {
-                    cardStore.setVisibility(actionCard.id, true);
-                  } else {
-                    cardStore.registerCard({
-                      type: CardType.ACTION_CARD,
-                      title: 'Action',
-                      defaultPosition: { x: window.innerWidth - 420, y: 80 },
-                      defaultSize: { width: 400, height: 500 },
-                      minSize: { width: 340, height: 400 },
-                      isResizable: true,
-                      isClosable: true,
-                      defaultVisible: true,
-                    });
-                  }
-                  useActionStore.getState().startEffectAction({
-                    sourceTokenId: pl.casterId,
-                    templateId: pl.template.id,
-                    templateName: pl.template.name,
-                    damageType: pl.template.damageType,
-                    damageFormula: pl.damageFormula,
-                    damageDice: pl.template.damageDice,
-                    placedMapTemplateId: placed.id,
-                    castLevel: pl.castLevel,
-                    impacts,
-                  });
-                }
               } else {
                 effectS.cancelPlacement();
               }

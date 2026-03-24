@@ -12,6 +12,7 @@ export interface CreatureAction {
   targetingMode?: 'manual' | 'template' | 'self';
   templateId?: string;
   pipelineId?: string;
+  activeEffectId?: string;
   executionPolicy?: 'shared' | 'per-target';
 }
 
@@ -24,6 +25,7 @@ export interface CreatureSpell {
   targetingMode?: 'manual' | 'template' | 'self';
   templateId?: string;
   pipelineId?: string;
+  activeEffectId?: string;
   executionPolicy?: 'shared' | 'per-target';
 }
 
@@ -70,7 +72,7 @@ export interface DndBeyondCharacter {
   passiveInsight?: number;
   
   // Features & Actions
-  features: Array<{ name: string; description: string; source: string }>;
+  features: Array<{ name: string; description: string; source: string; pipelineId?: string; activeEffectId?: string }>;
   actions: CreatureAction[];
   spells?: {
     spellcastingAbility?: string;

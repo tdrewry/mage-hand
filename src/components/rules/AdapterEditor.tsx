@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, ArrowRight, Plug, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generatePathsFromSchema } from '@/lib/rules-engine/schema-paths';
+import { MAGE_HAND_ENTITY_SCHEMA } from '@/lib/rules-engine/schemas';
 import { PathSuggestInput } from './PathSuggestInput';
 import { toast } from 'sonner';
 
@@ -32,6 +33,10 @@ export function AdapterEditor() {
   const suggestPaths = useMemo(() => {
     return selectedSchemaNode ? generatePathsFromSchema(selectedSchemaNode) : [];
   }, [selectedSchemaNode]);
+
+  const targetPaths = useMemo(() => {
+    return generatePathsFromSchema(MAGE_HAND_ENTITY_SCHEMA);
+  }, []);
 
   const handleCreateNew = () => {
     addAdapter({
@@ -184,11 +189,12 @@ export function AdapterEditor() {
                         className="font-mono text-sm focus-visible:ring-primary/50 w-full"
                       />
                       <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="e.g. hp" 
+                      <PathSuggestInput 
+                        placeholder="e.g. hp.max" 
                         value={mapping.mountPoint}
-                        onChange={(e) => updateMapping(idx, 'mountPoint', e.target.value)}
-                        className="font-mono text-sm focus-visible:ring-primary/50"
+                        onChange={(val) => updateMapping(idx, 'mountPoint', val)}
+                        options={targetPaths}
+                        className="font-mono text-sm focus-visible:ring-primary/50 w-full"
                       />
                       <TooltipProvider>
                         <Tooltip>

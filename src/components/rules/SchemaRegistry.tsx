@@ -11,7 +11,9 @@ import { toast } from 'sonner';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
-const BUILT_IN_SCHEMAS = ['intent', 'actor', 'action', 'target', 'targetResult'];
+import { CONTEXT_REGISTRY_SEED } from '@/lib/rules-engine/schemas';
+
+const BUILT_IN_SCHEMAS = ['intent', 'actor', 'activeEffect', 'action', 'target', 'targetResult', 'activeEffectOutput'];
 
 // Basic JSON Schema Draft to validate against our internal SchemaNode AST struct
 const INTERNAL_SCHEMA_NODE_VALIDATOR = {
@@ -24,6 +26,7 @@ const INTERNAL_SCHEMA_NODE_VALIDATOR = {
       description: { type: "string" },
       enumValues: { type: "array", items: { type: "string" } },
       items: { $ref: "#" },
+      modifiers: { type: "array", items: { type: "string" } },
       properties: { 
         type: "object", 
         additionalProperties: { $ref: "#" }
@@ -60,7 +63,8 @@ export function SchemaRegistry() {
   const [pendingSourceUrl, setPendingSourceUrl] = useState('');
 
   const activeSchema = isCreatingNew ? null : (schemas[activeSchemaId || ''] || null);
-  const isReadOnly = activeSchema && BUILT_IN_SCHEMAS.includes(activeSchema.id);
+  const isSystemSchema = activeSchema && BUILT_IN_SCHEMAS.includes(activeSchema.id);
+  const isReadOnly = false; // User requested removing read-only block
   
   useEffect(() => {
     if (activeSchema && !isCreatingNew) {
@@ -87,6 +91,15 @@ export function SchemaRegistry() {
         validate: true,
         schemas: [INTERNAL_SCHEMA_NODE_VALIDATOR]
       });
+    }
+  };
+
+  const handleRestoreDefault = () => {
+    if (!activeSchema || !isSystemSchema) return;
+    const defaultSchema = CONTEXT_REGISTRY_SEED[activeSchema.id];
+    if (defaultSchema) {
+      setEditorState(JSON.stringify(defaultSchema.rootSchema, null, 2));
+      toast.success(`Restored ${activeSchema.id} to defaults. Click Save!`);
     }
   };
 
@@ -267,18 +280,18 @@ export function SchemaRegistry() {
             )}
 
             <div className="flex items-center gap-2">
-              {!isCreatingNew && isReadOnly && (
+              {!isCreatingNew && isSystemSchema && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-rose-500/10 text-rose-400 rounded-sm border border-rose-500/20 mr-2 flex items-center gap-1.5 cursor-not-allowed">
-                      <Lock className="w-3 h-3" /> System Managed (Read-Only)
+                    <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-sm border border-indigo-500/20 mr-2 flex items-center gap-1.5 cursor-help">
+                      <Network className="w-3 h-3" /> System Managed
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent>System schemas cannot be altered directly to prevent crashing engine pipelines</TooltipContent>
+                  <TooltipContent>You are editing a core schema! You can add UI properties, but do not delete required core fields.</TooltipContent>
                 </Tooltip>
               )}
 
-              {!isCreatingNew && !isReadOnly && activeSchema && (
+              {!isCreatingNew && !isSystemSchema && activeSchema && (
                 <Button onClick={handleDelete} variant="ghost" size="sm" className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="w-4 h-4 mr-1.5" /> Delete
                 </Button>
@@ -287,6 +300,12 @@ export function SchemaRegistry() {
               {isCreatingNew && (
                 <Button onClick={() => setIsCreatingNew(false)} variant="ghost" size="sm" className="h-8 text-muted-foreground">
                   Cancel
+                </Button>
+              )}
+
+              {!isCreatingNew && isSystemSchema && (
+                <Button onClick={handleRestoreDefault} size="sm" variant="outline" className="h-8 border-slate-700 bg-slate-900 border-dashed text-slate-300 hover:text-white mr-2">
+                  Restore Defaults
                 </Button>
               )}
 

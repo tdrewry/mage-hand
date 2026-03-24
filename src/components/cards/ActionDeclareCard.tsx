@@ -5,15 +5,19 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Swords, Sparkles, Dices, BookOpen, Target, Send, Focus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Swords, Sparkles, Dices, BookOpen, Target, Send, Focus, Minus, Plus } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useActionStore } from '@/stores/actionStore';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
 import type { IntentPayload } from '@/lib/rules-engine/types';
 import { evaluateIntent } from '@/lib/rules-engine/evaluator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 
 interface ActionDeclareCardProps {
   draftId: string;
@@ -43,10 +47,17 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
   
   // Local state for the action config
   const [selectedActionId, setSelectedActionId] = useState<string>('');
-  const [castLevel, setCastLevel] = useState<string>('base');
-  const [sneakAttack, setSneakAttack] = useState(false);
-  const [smite, setSmite] = useState(false);
+  const [castLevelOverride, setCastLevelOverride] = useState<number | null>(null);
   const [waitingForPlacement, setWaitingForPlacement] = useState(false);
+  const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({});
+
+  const actionSchema = useGlobalConfigStore(s => s.schemas['action']?.rootSchema);
+  
+  const coreFields = useMemo(() => [
+    'id', 'name', 'category', 'attackBonus', 'damageFormula', 'damageType', 
+    'range', 'description', 'spellLevel', 'modifier', 'proficient', 
+    'pipelineId', 'activeEffectId'
+  ], []);
 
   const placedEffects = useMapTemplateStore(s => s.placedEffects);
   const allTemplates = useMapTemplateStore(s => s.allTemplates);
@@ -98,13 +109,47 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
   // Find the detail for the currently selected action
   const currentAction = actions.find(a => a.id === selectedActionId) || actions[0];
 
+  const dynamicOptions = useMemo(() => {
+    if (!actionSchema?.properties) return [];
+    
+    // Explicit array of UI modifier keys assigned by the specific action or global schema
+    const explicitKeys = currentAction?.modifiers || actionSchema.modifiers;
+    if (explicitKeys && Array.isArray(explicitKeys)) {
+      return explicitKeys
+        .map(key => ({ key, node: actionSchema.properties![key] }))
+        .filter(opt => opt.node);
+    }
+
+    // Default Fallback: exclude core
+    return Object.entries(actionSchema.properties)
+      .filter(([key]) => !coreFields.includes(key))
+      .map(([key, node]) => ({ key, node }));
+  }, [actionSchema, coreFields, currentAction]);
+
+  const selectedEffect = useMemo(() => {
+    if (!currentAction?.activeEffectId) return null;
+    return useActiveEffectStore.getState().effects.find(e => e.id === currentAction.activeEffectId) || null;
+  }, [currentAction]);
+
   const matchedTemplate = useMemo(() => {
     if (!currentAction) return null;
-    if (currentAction.mapTemplateId) {
-      return allTemplates.find(t => t.id === currentAction.mapTemplateId) || null;
+    let templateId = currentAction.mapTemplateId || (currentAction as any).templateId;
+    
+    // If no explicit template, check the orchestrator for a maptemplate step
+    if (!templateId && currentAction.activeEffectId) {
+      const orchestrator = useActiveEffectStore.getState().effects.find(e => e.id === currentAction.activeEffectId);
+      if (orchestrator && orchestrator.steps) {
+        const tStep = orchestrator.steps.find(s => s.type === 'maptemplate');
+        if (tStep) templateId = tStep.targetId;
+      }
     }
-    // Attempt name match
-    return allTemplates.find(t => t.name.toLowerCase() === currentAction.name.toLowerCase()) || null;
+
+    if (templateId) {
+      return allTemplates.find(t => t.id === templateId) || null;
+    }
+    
+    // Explicitly removed text/name-matching heuristic as per request.
+    return null;
   }, [currentAction, allTemplates]);
 
   const [useTemplate, setUseTemplate] = useState(false);
@@ -121,6 +166,18 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
     }
   }, [actions, selectedActionId]);
 
+  React.useEffect(() => {
+    setCastLevelOverride(null);
+    const initial: Record<string, any> = {};
+    for (const { key, node } of dynamicOptions) {
+      if (node.type === 'boolean') initial[key] = false;
+      if (node.type === 'enum' && node.enumValues?.length) initial[key] = node.enumValues[0];
+      if (node.type === 'number') initial[key] = 0;
+      if (node.type === 'string') initial[key] = '';
+    }
+    setDynamicValues(initial);
+  }, [selectedActionId, dynamicOptions]);
+
   const handlePlaceTemplate = () => {
     if (!matchedTemplate || !token) return;
     setWaitingForPlacement(true);
@@ -128,7 +185,12 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
     if (currentDraft?.placedMapTemplateId) {
       useMapTemplateStore.getState().cancelEffect(currentDraft.placedMapTemplateId, () => ({}));
     }
-    useMapTemplateStore.getState().startPlacement(matchedTemplate.id, token.id);
+    useMapTemplateStore.getState().startPlacement(matchedTemplate.id, token.id, {
+      x: token.x,
+      y: token.y,
+      gridWidth: token.gridWidth,
+      gridHeight: token.gridHeight
+    });
   };
 
   React.useEffect(() => {
@@ -160,11 +222,11 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
       actionType: category as IntentPayload['actionType'],
       targets: selectedTokenIds,
       modifiers: {
-        castLevel: castLevel !== 'base' ? parseInt(castLevel, 10) : currentAction.spellLevel || 0,
-        sneakAttack,
-        smite,
+        castLevel: castLevelOverride !== null ? castLevelOverride : (currentAction.spellLevel || 0),
+        ...dynamicValues,
       },
       placedMapTemplateId: useTemplate ? currentDraft?.placedMapTemplateId : undefined,
+      activeEffectId: currentAction.activeEffectId,
     };
     
     // Evaluate the intent to produce a resolution payload
@@ -230,6 +292,22 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
                   {currentAction.description}
                 </p>
               )}
+              {selectedEffect && selectedEffect.description && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="mt-2 text-xs w-full bg-slate-900 border-slate-700 hover:bg-slate-800 h-7">
+                      <BookOpen className="w-3.5 h-3.5 mr-2 text-emerald-400" />
+                      Inspect Orchestrator Rules
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96 max-h-[400px] overflow-y-auto bg-slate-900 border-slate-700 p-4 shadow-xl z-[60]">
+                    <h4 className="font-semibold text-sm mb-2 text-emerald-400">{selectedEffect.name}</h4>
+                    <div className="text-xs text-slate-300">
+                       <MarkdownRenderer content={selectedEffect.description} />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
             <Separator className="bg-slate-800" />
@@ -241,35 +319,156 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
               {/* Fake spell level scaling if category is spell */}
               {category === 'spell' && (
                 <div className="space-y-3 bg-slate-900/50 p-3 rounded-md border border-slate-800">
-                  <Label className="text-xs text-slate-300">Cast at Level</Label>
-                  <RadioGroup value={castLevel} onValueChange={setCastLevel} className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="base" id="l-base" className="border-slate-600" />
-                      <Label htmlFor="l-base" className="text-xs">Base ({currentAction?.spellLevel || 1})</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-slate-300">Cast at Level</Label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                        onClick={() => {
+                          const base = currentAction?.spellLevel || 1;
+                          const current = castLevelOverride !== null ? castLevelOverride : base;
+                          if (current > 0) {
+                            setCastLevelOverride(current - 1);
+                          }
+                        }}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Input 
+                        type="number"
+                        max={100}
+                        value={castLevelOverride !== null ? castLevelOverride : (currentAction?.spellLevel || 1)}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) setCastLevelOverride(val);
+                        }}
+                        className={`w-14 h-7 text-xs bg-slate-950 border-slate-700 text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          (castLevelOverride !== null && castLevelOverride > (currentAction?.spellLevel || 1)) ? 'text-emerald-500' : 
+                          (castLevelOverride !== null && castLevelOverride < (currentAction?.spellLevel || 1)) ? 'text-amber-500' : 'text-slate-200'
+                        }`}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                        onClick={() => {
+                          const base = currentAction?.spellLevel || 1;
+                          const current = castLevelOverride !== null ? castLevelOverride : base;
+                          if (current < 100) {
+                            setCastLevelOverride(current + 1);
+                          }
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value={(currentAction?.spellLevel || 1) + 1 + ''} id="l-up1" className="border-slate-600" />
-                      <Label htmlFor="l-up1" className="text-xs">+1 Level</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value={(currentAction?.spellLevel || 1) + 2 + ''} id="l-up2" className="border-slate-600" />
-                      <Label htmlFor="l-up2" className="text-xs">+2 Levels</Label>
-                    </div>
-                  </RadioGroup>
+                  </div>
                 </div>
               )}
 
-              {/* Optional Switches */}
-              <div className="space-y-3 bg-slate-900/50 p-3 rounded-md border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="sneak-attack" className="text-xs font-medium cursor-pointer">Sneak Attack (+2d6)</Label>
-                  <Switch id="sneak-attack" checked={sneakAttack} onCheckedChange={setSneakAttack} />
+              {/* Dynamic Modifiers */}
+              {dynamicOptions.length > 0 && (
+                <div className="space-y-3 bg-slate-900/50 p-3 rounded-md border border-slate-800">
+                  {dynamicOptions.map(({ key, node }) => {
+                    // We render 'castLevel' or 'castAtLevel' manually outside this loop if it's a spell.
+                    if (key === 'castLevel' || key === 'castAtLevel') return null;
+                    
+                    if (node.type === 'boolean') {
+                      return (
+                        <div key={key} className="flex items-center justify-between">
+                          <Label htmlFor={`dyn-${key}`} className="text-xs font-medium cursor-pointer">
+                            {node.description || key}
+                          </Label>
+                          <Switch 
+                            id={`dyn-${key}`} 
+                            checked={!!dynamicValues[key]} 
+                            onCheckedChange={(c) => setDynamicValues(p => ({ ...p, [key]: c }))} 
+                          />
+                        </div>
+                      );
+                    }
+                    if (node.type === 'enum') {
+                      return (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <Label className="text-xs font-medium text-slate-300">
+                            {node.description || key}
+                          </Label>
+                          <Select 
+                            value={dynamicValues[key] || node.enumValues?.[0]} 
+                            onValueChange={(v) => setDynamicValues(p => ({ ...p, [key]: v }))}
+                          >
+                            <SelectTrigger className="h-7 text-xs bg-slate-950 border-slate-700 flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-700">
+                              {node.enumValues?.map((ev: string) => (
+                                <SelectItem key={ev} value={ev} className="text-xs focus:bg-slate-800 capitalize">
+                                  {ev}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    }
+                    if (node.type === 'string') {
+                      return (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <Label className="text-xs font-medium text-slate-300">
+                            {node.description || key}
+                          </Label>
+                          <Input 
+                            value={dynamicValues[key] ?? ''}
+                            onChange={(e) => setDynamicValues(p => ({ ...p, [key]: e.target.value }))}
+                            className="h-7 text-xs bg-slate-950 border-slate-700 flex-1"
+                            placeholder={node.description || key}
+                          />
+                        </div>
+                      );
+                    }
+                    if (node.type === 'number') {
+                      const currentVal = dynamicValues[key] ?? 0;
+                      return (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <Label className="text-xs font-medium text-slate-300">
+                            {node.description || key}
+                          </Label>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                              onClick={() => setDynamicValues(p => ({ ...p, [key]: (p[key] ?? 0) - 1 }))}
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <Input 
+                              type="number"
+                              value={currentVal}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val)) setDynamicValues(p => ({ ...p, [key]: val }));
+                              }}
+                              className="w-14 h-7 text-xs bg-slate-950 border-slate-700 text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                              onClick={() => setDynamicValues(p => ({ ...p, [key]: (p[key] ?? 0) + 1 }))}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="divine-smite" className="text-xs font-medium cursor-pointer">Divine Smite</Label>
-                  <Switch id="divine-smite" checked={smite} onCheckedChange={setSmite} />
-                </div>
-              </div>
+              )}
             </div>
 
             <Separator className="bg-slate-800" />

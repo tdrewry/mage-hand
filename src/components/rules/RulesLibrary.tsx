@@ -5,9 +5,10 @@ import { RuleGraphEditor } from './RuleGraphEditor';
 import { LexiconEditor } from './LexiconEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy, Map, Plug, Database } from 'lucide-react';
+import { Sparkles, GitMerge, Plus, Pencil, Trash2, FileCode2, Settings2, Upload, Download, Copy, Map, Plug, Database, Wand2 } from 'lucide-react';
 import { AdapterEditor } from './AdapterEditor';
 import { SchemaRegistry } from './SchemaRegistry';
+import { ActiveEffectsCatalog } from './ActiveEffectsCatalog';
 import { useRuleStore } from '@/stores/ruleStore';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,7 +44,7 @@ export function RulesLibrary() {
   const updatePipeline = useRuleStore(s => s.updatePipeline);
   const deletePipeline = useRuleStore(s => s.deletePipeline);
   
-  const [activeTab, setActiveTab] = useState<'templates' | 'pipelines' | 'adapters' | 'schema' | 'vocabulary'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'pipelines' | 'adapters' | 'schema' | 'vocabulary' | 'activeEffects'>('templates');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -202,7 +203,7 @@ export function RulesLibrary() {
       />
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0 p-4">
         <TooltipProvider delayDuration={300}>
-          <TabsList className="grid w-full max-w-[24rem] grid-cols-5 mb-4 h-auto py-1">
+          <TabsList className="grid w-full max-w-[28rem] grid-cols-6 mb-4 h-auto py-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <TabsTrigger value="templates" className="p-2 flex items-center justify-center">
@@ -210,6 +211,14 @@ export function RulesLibrary() {
                 </TabsTrigger>
               </TooltipTrigger>
               <TooltipContent side="top">Map Templates</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="activeEffects" className="p-2 flex items-center justify-center">
+                  <Wand2 className="w-5 h-5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Active Effects Orchestrator</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -385,6 +394,10 @@ export function RulesLibrary() {
               </div>
             )}
           </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="activeEffects" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
+          <ActiveEffectsCatalog />
         </TabsContent>
         
         <TabsContent value="adapters" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">

@@ -537,6 +537,8 @@ function ResolvePhase() {
             const total = tokenDropTotal.get(target.tokenId) || 1;
             const dropLabel = total > 1 ? `Drop ${dropIdx} of ${total}` : undefined;
 
+            const v3TargetResult = currentAction.resolutionPayload?.targetResults[target.tokenId];
+
             return (
               <TargetResolveCard
                 key={target.targetKey}
@@ -550,6 +552,8 @@ function ResolvePhase() {
                 damageType={damage?.damageType || currentAction.attack!.damageType}
                 dropLabel={dropLabel}
                 disabled={claimedByOther}
+                v3Challenge={v3TargetResult?.challengeResult as any}
+                v3Resistances={v3TargetResult?.resistances as any}
                 onSetResolution={(r) => claimAndResolve(target.targetKey, r)}
                 onOverrideDamage={(v) => claimAndOverride(target.targetKey, v)}
                 onDismiss={() => removeTarget(target.targetKey)}
@@ -617,9 +621,13 @@ interface TargetResolveCardProps {
   onOverrideDamage: (v: number) => void;
   onDismiss: () => void;
   /** Whether controls are disabled (another DM has claimed this action) */
+  /** Whether controls are disabled (another DM has claimed this action) */
   disabled?: boolean;
   /** Whether this is an effect-based action (shows breakdown if available) */
   isEffect?: boolean;
+  /** Deep V3 context for rendering saves/skills dynamically */
+  v3Challenge?: import('@/lib/rules-engine/types').TargetResult['challengeResult'];
+  v3Resistances?: import('@/lib/rules-engine/types').TargetResult['resistances'];
 }
 
 function TargetResolveCard({
@@ -637,6 +645,8 @@ function TargetResolveCard({
   onDismiss,
   disabled,
   isEffect,
+  v3Challenge,
+  v3Resistances,
 }: TargetResolveCardProps) {
   const [damageOverride, setDamageOverride] = useState<string>('');
   const safeRoll = roll || { totalRoll: 0, naturalRoll: 0, attackBonus: 0, formula: 'rules-engine' };
@@ -691,32 +701,98 @@ function TargetResolveCard({
         </div>
       </div>
 
-      {/* Attack roll vs defense */}
-      <div className="flex items-center justify-between bg-muted/30 rounded p-2">
-        <div className="text-center flex-1">
-          <p className="text-xs text-muted-foreground">Attack Roll</p>
-          <p className="text-lg font-bold font-mono">
-            <span className={isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : ''}>
-              {safeRoll.totalRoll}
+      {/* Challenge Resolution Block */}
+      {(!v3Challenge || v3Challenge.type === 'attack') && (
+        <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">Attack Roll</p>
+            <p className="text-lg font-bold font-mono">
+              <span className={isNat20 ? 'text-green-400' : isNat1 ? 'text-red-400' : ''}>
+                {safeRoll.totalRoll}
+              </span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {safeRoll.formula === 'rules-engine' ? 'rules-engine' : `d20(${safeRoll.naturalRoll}) + ${safeRoll.attackBonus}`}
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <span className={`text-sm font-bold ${isHit ? 'text-green-400' : 'text-red-400'}`}>
+              {isHit ? '≥' : '<'}
             </span>
-          </p>
-          <p className="text-[10px] text-muted-foreground">
-            {safeRoll.formula === 'rules-engine' ? 'rules-engine' : `d20(${safeRoll.naturalRoll}) + ${safeRoll.attackBonus}`}
-          </p>
+          </div>
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">{defenseLabel}</p>
+            <p className="text-lg font-bold font-mono">{defenseValue}</p>
+          </div>
         </div>
-        <div className="text-center px-2">
-          <span className={`text-sm font-bold ${isHit ? 'text-green-400' : 'text-red-400'}`}>
-            {isHit ? '≥' : '<'}
-          </span>
+      )}
+
+      {v3Challenge?.type === 'save' && (
+        <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">{v3Challenge.targetProp ? `${v3Challenge.targetProp.replace('_', ' ').toUpperCase()}` : 'Saving Throw'}</p>
+            <p className="text-lg font-bold font-mono">
+              <span className={v3Challenge.isSuccess ? 'text-green-400' : 'text-red-400'}>
+                {v3Challenge.total}
+              </span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              d20({v3Challenge.rolls[0] || v3Challenge.total}) + {v3Challenge.modifier}
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <span className={`text-sm font-bold ${v3Challenge.isSuccess ? 'text-green-400' : 'text-red-400'}`}>
+              {v3Challenge.isSuccess ? '≥' : '<'}
+            </span>
+          </div>
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">Save DC</p>
+            <p className="text-lg font-bold font-mono">{v3Challenge.targetValue}</p>
+          </div>
         </div>
-        <div className="text-center flex-1">
-          <p className="text-xs text-muted-foreground">{defenseLabel}</p>
-          <p className="text-lg font-bold font-mono">{defenseValue}</p>
+      )}
+
+      {v3Challenge?.type === 'skill' && (
+        <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">{v3Challenge.targetProp ? `${v3Challenge.targetProp.replace('_', ' ').toUpperCase()}` : 'Contest/Skill'}</p>
+            <p className="text-lg font-bold font-mono">
+              <span className={v3Challenge.isSuccess ? 'text-green-400' : 'text-red-400'}>
+                {v3Challenge.total}
+              </span>
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <span className={`text-sm font-bold text-muted-foreground`}>
+              vs
+            </span>
+          </div>
+          <div className="text-center flex-1">
+            <p className="text-xs text-muted-foreground">Difficulty</p>
+            <p className="text-lg font-bold font-mono">{v3Challenge.targetValue}</p>
+          </div>
         </div>
-      </div>
+      )}
+
+      {v3Challenge?.type === 'none' && (
+        <div className="flex items-center justify-center bg-muted/30 text-muted-foreground rounded p-3 text-xs uppercase tracking-widest font-semibold border border-dashed border-border/50">
+          Automatic Matrix
+        </div>
+      )}
 
       {/* Damage display */}
       <div className="bg-muted/30 rounded p-2 space-y-1">
+        
+        {v3Resistances && v3Resistances.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {v3Resistances.map((res, idx) => (
+              <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-500 border border-amber-800">
+                {res.reason} ({res.multiplier}x {res.type})
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Show breakdown rows if multi-type damage */}
         {safeDamage.breakdown && safeDamage.breakdown.length > 1 ? (
           <>

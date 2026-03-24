@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 import type { CreatureAction } from '@/types/creatureTypes';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useRuleStore } from '@/stores/ruleStore';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
 
 interface ActionEditorProps {
   action: CreatureAction;
@@ -17,6 +18,7 @@ interface ActionEditorProps {
 export function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) {
   const allTemplates = useMapTemplateStore(s => s.allTemplates);
   const pipelines = useRuleStore(s => s.pipelines);
+  const effects = useActiveEffectStore(s => s.effects);
 
   return (
     <div className="border border-border rounded p-2 space-y-1.5 bg-muted/20">
@@ -142,21 +144,41 @@ export function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) 
 
           {/* Dynamic Logic Pipeline */}
           <div className="space-y-0.5 col-span-2">
-            <label className="text-[9px] text-muted-foreground uppercase">Pipeline ID</label>
-            <Select 
-              value={action.pipelineId || 'none'} 
-              onValueChange={v => onChange({ ...action, pipelineId: v === 'none' ? undefined : v })}
-            >
-              <SelectTrigger className="h-6 text-[10px]">
-                <SelectValue placeholder="Default Attack" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none" className="text-[10px]">Default Attack</SelectItem>
-                {pipelines.map(p => (
-                  <SelectItem key={p.id} value={p.id} className="text-[10px]">{p.name || 'Untitled'}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-[9px] text-muted-foreground uppercase flex items-center gap-1">
+              Pipeline / Orchestrator
+              {action.activeEffectId && <div className="ml-2 px-1 text-[8px] bg-emerald-500/10 text-emerald-400 rounded-sm">ORCHESTRATED</div>}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Select 
+                value={action.pipelineId || 'none'} 
+                onValueChange={v => onChange({ ...action, pipelineId: v === 'none' ? undefined : v, activeEffectId: undefined })}
+              >
+                <SelectTrigger className="h-6 text-[10px]">
+                  <SelectValue placeholder="Static Pipeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-[10px]">No Pipeline</SelectItem>
+                  {pipelines.map(p => (
+                    <SelectItem key={p.id} value={p.id} className="text-[10px]">{p.name || 'Untitled'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select 
+                value={action.activeEffectId || 'none'} 
+                onValueChange={v => onChange({ ...action, activeEffectId: v === 'none' ? undefined : v, pipelineId: undefined })}
+              >
+                <SelectTrigger className="h-6 text-[10px] border-emerald-500/30">
+                  <SelectValue placeholder="Active Effect" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-[10px]">No Orchestrator</SelectItem>
+                  {effects.map(e => (
+                    <SelectItem key={e.id} value={e.id} className="text-[10px] text-emerald-400 font-semibold">{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>

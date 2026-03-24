@@ -181,6 +181,29 @@ export type JazzPlacedEffect = co.loaded<typeof JazzPlacedEffect>;
 export const JazzPlacedEffectList = co.list(JazzPlacedEffect);
 export type JazzPlacedEffectList = co.loaded<typeof JazzPlacedEffectList>;
 
+// ── Active Effect ──────────────────────────────────────────────────────────
+// The orchestrator entity that sequences pipelines, Map Templates, and time.
+
+export const JazzActiveEffect = co.map({
+  effectId: z.string(),
+  name: z.string(),
+  description: z.optional(z.string()),
+  /** JSON: string[] */
+  tagsJson: z.optional(z.string()),
+  /** JSON: { value: number, unit: string } */
+  durationJson: z.optional(z.string()),
+  /** JSON: { onApply: boolean, onTurnStart: boolean, etc. } */
+  triggersJson: z.optional(z.string()),
+  /** JSON: { type: string, targetId: string }[] */
+  stepsJson: z.optional(z.string()),
+  /** JSON: Record<string, any> */
+  sharedContextJson: z.optional(z.string())
+});
+export type JazzActiveEffect = co.loaded<typeof JazzActiveEffect>;
+
+export const JazzActiveEffectList = co.list(JazzActiveEffect);
+export type JazzActiveEffectList = co.loaded<typeof JazzActiveEffectList>;
+
 // ── Custom Effect Template ─────────────────────────────────────────────────
 // Stripped of large data URIs (texture/icon) — those sync via FileStreams.
 
@@ -340,6 +363,7 @@ export const JazzSessionRoot = co.map({
   regions: co.optional(JazzRegionList),
   mapObjects: co.optional(JazzMapObjectList),
   effects: co.optional(JazzEffectState),
+  activeEffects: co.optional(JazzActiveEffectList),
   blobs: JazzDOBlobList,
   textures: co.optional(JazzTextureList),
   illuminationSources: co.optional(JazzIlluminationSourceList),
@@ -400,6 +424,7 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
   const placedEffects = JazzPlacedEffectList.create([], group);
   const customTemplates = JazzCustomTemplateList.create([], group);
   const effects = JazzEffectState.create({ placedEffects, customTemplates }, group);
+  const activeEffects = JazzActiveEffectList.create([], group);
   const blobs = JazzDOBlobList.create([], group);
   const textures = JazzTextureList.create([], group);
   const illuminationSources = JazzIlluminationSourceList.create([], group);
@@ -420,6 +445,7 @@ export function createSessionRoot(sessionName: string, owner?: any): JazzSession
       regions: regions as any, 
       mapObjects: mapObjects as any, 
       effects: effects as any, 
+      activeEffects: activeEffects as any,
       blobs: blobs as any, 
       textures: textures as any, 
       illuminationSources: illuminationSources as any,

@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Shield, Star, Dices, Link2 } from 'lucide-react';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
 import { ActionEditor } from './ActionEditor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -311,6 +313,15 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                 className="text-[10px] min-h-[40px] resize-none"
                 placeholder="Description"
               />
+              <EngineRoutingSelects 
+                pipelineId={feat.pipelineId} 
+                activeEffectId={feat.activeEffectId}
+                onChange={(u) => {
+                  const features = [...character.features];
+                  features[i] = { ...feat, ...u };
+                  update({ features });
+                }}
+              />
             </div>
           ))}
           <Button variant="outline" size="sm" className="w-full h-6 text-[10px]" onClick={() => {
@@ -359,31 +370,42 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-muted-foreground uppercase">Cantrips</label>
               {character.spells.cantrips.map((cantrip, i) => (
-                <div key={i} className="flex gap-1 items-center">
-                  <Input
-                    value={cantrip.name}
-                    onChange={e => {
+                <div key={i} className="flex flex-col gap-1 border border-border/40 rounded p-1 mb-1">
+                  <div className="flex gap-1 items-center">
+                    <Input
+                      value={cantrip.name}
+                      onChange={e => {
+                        const cantrips = [...character.spells!.cantrips];
+                        cantrips[i] = { ...cantrips[i], name: e.target.value };
+                        update({ spells: { ...character.spells!, cantrips } });
+                      }}
+                      className="h-6 text-[10px] flex-1"
+                    />
+                    <EffectTemplatePicker
+                      value={cantrip.mapTemplateId}
+                      templates={allTemplates}
+                      onChange={templateId => {
+                        const cantrips = [...character.spells!.cantrips];
+                        cantrips[i] = { ...cantrips[i], mapTemplateId: templateId };
+                        update({ spells: { ...character.spells!, cantrips } });
+                      }}
+                    />
+                    <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => {
+                      const cantrips = character.spells!.cantrips.filter((_, j) => j !== i);
+                      update({ spells: { ...character.spells!, cantrips } });
+                    }}>
+                      <Trash2 className="w-2.5 h-2.5 text-destructive" />
+                    </Button>
+                  </div>
+                  <EngineRoutingSelects
+                    pipelineId={cantrip.pipelineId}
+                    activeEffectId={cantrip.activeEffectId}
+                    onChange={(u) => {
                       const cantrips = [...character.spells!.cantrips];
-                      cantrips[i] = { ...cantrips[i], name: e.target.value };
+                      cantrips[i] = { ...cantrips[i], ...u };
                       update({ spells: { ...character.spells!, cantrips } });
                     }}
-                    className="h-6 text-[10px] flex-1"
                   />
-                  <EffectTemplatePicker
-                    value={cantrip.mapTemplateId}
-                    templates={allTemplates}
-                    onChange={templateId => {
-                      const cantrips = [...character.spells!.cantrips];
-                      cantrips[i] = { ...cantrips[i], mapTemplateId: templateId };
-                      update({ spells: { ...character.spells!, cantrips } });
-                    }}
-                  />
-                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => {
-                    const cantrips = character.spells!.cantrips.filter((_, j) => j !== i);
-                    update({ spells: { ...character.spells!, cantrips } });
-                  }}>
-                    <Trash2 className="w-2.5 h-2.5 text-destructive" />
-                  </Button>
                 </div>
               ))}
               <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => {
@@ -425,51 +447,64 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                   </div>
                 </div>
                 {lvl.spells.map((spell, si) => (
-                  <div key={si} className="flex gap-1 items-center pl-2">
-                    <Switch
-                      checked={spell.prepared}
-                      onCheckedChange={checked => {
+                  <div key={si} className="flex flex-col gap-1 border border-border/40 rounded p-1 mb-1 pl-2">
+                    <div className="flex gap-1 items-center">
+                      <Switch
+                        checked={spell.prepared}
+                        onCheckedChange={checked => {
+                          const spellsByLevel = [...character.spells!.spellsByLevel];
+                          const spells = [...lvl.spells];
+                          spells[si] = { ...spell, prepared: checked };
+                          spellsByLevel[li] = { ...lvl, spells };
+                          update({ spells: { ...character.spells!, spellsByLevel } });
+                        }}
+                        className="scale-[0.5]"
+                      />
+                      <Input
+                        value={spell.name}
+                        onChange={e => {
+                          const spellsByLevel = [...character.spells!.spellsByLevel];
+                          const spells = [...lvl.spells];
+                          spells[si] = { ...spell, name: e.target.value };
+                          spellsByLevel[li] = { ...lvl, spells };
+                          update({ spells: { ...character.spells!, spellsByLevel } });
+                        }}
+                        className="h-5 text-[10px] flex-1"
+                      />
+                      <EffectTemplatePicker
+                        value={spell.mapTemplateId}
+                        templates={allTemplates}
+                        onChange={templateId => {
+                          const spellsByLevel = [...character.spells!.spellsByLevel];
+                          const spells = [...lvl.spells];
+                          spells[si] = { ...spell, mapTemplateId: templateId };
+                          spellsByLevel[li] = { ...lvl, spells };
+                          update({ spells: { ...character.spells!, spellsByLevel } });
+                        }}
+                      />
+                      <Badge variant={spell.prepared ? 'default' : 'outline'} className="text-[8px] px-1 h-4 shrink-0">
+                        {spell.prepared ? 'P' : '—'}
+                      </Badge>
+                      <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0" onClick={() => {
+                        const spellsByLevel = [...character.spells!.spellsByLevel];
+                        const spells = lvl.spells.filter((_, j) => j !== si);
+                        spellsByLevel[li] = { ...lvl, spells };
+                        update({ spells: { ...character.spells!, spellsByLevel } });
+                      }}>
+                        <Trash2 className="w-2.5 h-2.5 text-destructive" />
+                      </Button>
+                    </div>
+                    <EngineRoutingSelects
+                      pipelineId={spell.pipelineId}
+                      activeEffectId={spell.activeEffectId}
+                      onChange={(u) => {
                         const spellsByLevel = [...character.spells!.spellsByLevel];
                         const spells = [...lvl.spells];
-                        spells[si] = { ...spell, prepared: checked };
+                        spells[si] = { ...spell, ...u };
                         spellsByLevel[li] = { ...lvl, spells };
                         update({ spells: { ...character.spells!, spellsByLevel } });
                       }}
-                      className="scale-[0.5]"
                     />
-                    <Input
-                      value={spell.name}
-                      onChange={e => {
-                        const spellsByLevel = [...character.spells!.spellsByLevel];
-                        const spells = [...lvl.spells];
-                        spells[si] = { ...spell, name: e.target.value };
-                        spellsByLevel[li] = { ...lvl, spells };
-                        update({ spells: { ...character.spells!, spellsByLevel } });
-                      }}
-                      className="h-5 text-[10px] flex-1"
-                    />
-                    <EffectTemplatePicker
-                      value={spell.mapTemplateId}
-                      templates={allTemplates}
-                      onChange={templateId => {
-                        const spellsByLevel = [...character.spells!.spellsByLevel];
-                        const spells = [...lvl.spells];
-                        spells[si] = { ...spell, mapTemplateId: templateId };
-                        spellsByLevel[li] = { ...lvl, spells };
-                        update({ spells: { ...character.spells!, spellsByLevel } });
-                      }}
-                    />
-                    <Badge variant={spell.prepared ? 'default' : 'outline'} className="text-[8px] px-1 h-4 shrink-0">
-                      {spell.prepared ? 'P' : '—'}
-                    </Badge>
-                    <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0" onClick={() => {
-                      const spellsByLevel = [...character.spells!.spellsByLevel];
-                      const spells = lvl.spells.filter((_, j) => j !== si);
-                      spellsByLevel[li] = { ...lvl, spells };
-                      update({ spells: { ...character.spells!, spellsByLevel } });
-                    }}>
-                      <Trash2 className="w-2.5 h-2.5 text-destructive" />
-                    </Button>
                   </div>
                 ))}
                 <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => {
@@ -618,5 +653,50 @@ function EffectTemplatePicker({ value, templates, onChange }: {
         {matched ? `Linked: ${matched.name}` : 'Assign effect template'}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+// ─── Shared Engine Routing Selects ────────────────────────────────────────────
+
+function EngineRoutingSelects({ pipelineId, activeEffectId, onChange }: { 
+  pipelineId?: string; 
+  activeEffectId?: string; 
+  onChange: (updates: { pipelineId?: string; activeEffectId?: string }) => void 
+}) {
+  const pipelines = useRuleStore(s => s.pipelines);
+  const effects = useActiveEffectStore(s => s.effects);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 mt-1 px-1">
+      <Select 
+        value={pipelineId || 'none'} 
+        onValueChange={v => onChange({ pipelineId: v === 'none' ? undefined : v, activeEffectId: undefined })}
+      >
+        <SelectTrigger className="h-6 text-[9px] bg-background">
+          <SelectValue placeholder="Static Pipeline" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none" className="text-[9px]">No Pipeline</SelectItem>
+          {pipelines.map(p => (
+            <SelectItem key={p.id} value={p.id} className="text-[9px]">{p.name || 'Untitled'}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select 
+        value={activeEffectId || 'none'} 
+        onValueChange={v => onChange({ activeEffectId: v === 'none' ? undefined : v, pipelineId: undefined })}
+      >
+        <SelectTrigger className="h-6 text-[9px] bg-background border-emerald-500/30">
+          <SelectValue placeholder="Orchestrator" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none" className="text-[9px]">No Orchestrator</SelectItem>
+          {effects.map(e => (
+            <SelectItem key={e.id} value={e.id} className="text-[9px] text-emerald-400">{e.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

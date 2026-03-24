@@ -34,6 +34,10 @@ export interface TokenActionItem {
   mapTemplateId?: string;
   /** Custom pipeline ID linked from rules engine */
   pipelineId?: string;
+  /** Custom Orchestrator ID linked from rules engine */
+  activeEffectId?: string;
+  /** Explicit UI modifiers for the declare card */
+  modifiers?: string[];
 }
 
 // ─── Collect all actions from any data source ─────────────────────────────────
@@ -217,6 +221,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
       range: action.range,
       description: action.description,
       pipelineId: (action as any).pipelineId,
+      activeEffectId: action.activeEffectId,
       asAttack: atk,
     });
   }
@@ -239,6 +244,8 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
       name: feat.name,
       category: 'trait',
       description: feat.description,
+      pipelineId: feat.pipelineId,
+      activeEffectId: feat.activeEffectId,
     });
   }
 
@@ -252,6 +259,8 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
         spellLevel: 0,
         description: 'Cantrip',
         mapTemplateId: cantrip.mapTemplateId,
+        pipelineId: cantrip.pipelineId,
+        activeEffectId: cantrip.activeEffectId,
       });
     }
     for (const lvl of character.spells.spellsByLevel) {
@@ -264,6 +273,8 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
           proficient: spell.prepared,
           description: `Level ${lvl.level}${spell.prepared ? ' (prepared)' : ''}`,
           mapTemplateId: spell.mapTemplateId,
+          pipelineId: spell.pipelineId,
+          activeEffectId: spell.activeEffectId,
         });
       }
     }

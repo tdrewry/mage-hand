@@ -10,7 +10,18 @@ export interface RuleNode extends BaseFlowNode<RuleNodeData> {
 }
 
 export interface TargetResult {
-  challengeResult?: { rolls: number[]; modifier: number; total: number; isSuccess: boolean };
+  challengeResult?: {
+    type: 'attack' | 'save' | 'skill' | 'none';
+    rolls: number[];
+    modifier: number;
+    total: number;
+    targetValue: number;
+    isSuccess: boolean;
+    isCriticalHit?: boolean;
+    isCriticalMiss?: boolean;
+    targetProp?: string;
+  };
+  resistances?: Array<{ type: string; multiplier: number; reason: string }>;
   damage: Record<string, { amount: number | { formula?: string; rolls?: number[]; total: number; modifier?: number } }>;
   effectsApplied: Record<string, { duration: number; unit: string; trigger?: string; pipelineId?: string }>;
   suggestedResolution: string;
@@ -23,6 +34,7 @@ export interface IntentPayload {
   targets: string[];
   modifiers: Record<string, any>;
   placedMapTemplateId?: string;
+  activeEffectId?: string;
 }
 
 export interface ResolutionPayload {

@@ -38,6 +38,10 @@ Mage-Hand uses multiple granular Zustand stores instead of one monolithic store.
 
 Stores use a custom `syncPatch` middleware (from `src/lib/sync/index.ts`) which hooks into store updates to serialize and broadcast changes.
 
+### Schema & System Entity Merging (`applySystemSeeds`)
+Because the VTT is heavily schema-driven and persists data via Zustand's `persist` middleware to `localStorage`, system-provided entities (like base blueprints for Actions or Intents) can become stale after application code updates.
+To solve this, Mage-Hand utilizes a standard state merge helper: `applySystemSeeds` (in `src/lib/utils/stateMerge.ts`). This is invoked within the store's `merge` function and guarantees that any **system-seeded** keys perfectly overwrite their localStorage counterparts on load, while safely preserving user-created custom entities. Any newly standardized schema properties automatically propagate to the client without forcing a cache wipe.
+
 ## Jazz Transport Implementation
 
 Jazz provides Multi-Writer CRDTs (Conflict-free Replicated Data Types) via `CoValues`. Mage-Hand integrates Jazz as a transport layer rather than replacing its entire state architecture.

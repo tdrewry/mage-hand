@@ -7,6 +7,7 @@ import type { MageHandEntity } from '@/types/native-schema';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 import { useAdapterStore } from '@/stores/adapterStore';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
 
 function pathGet(obj: any, path: string) {
   if (path === '.') return obj;
@@ -82,14 +83,35 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
   }
 
   const declaredAction = allActions.find(a => a.id === intent.actionId);
-  const pipelineId = (declaredAction as any)?.pipelineId;
+  const explicitPipelineId = (declaredAction as any)?.pipelineId;
+  const activeEffectId = intent.activeEffectId || (declaredAction as any)?.activeEffectId;
 
-  let compiledNodes: any[] = [];
-  if (pipelineId) {
-    const pipeline = useRuleStore.getState().pipelines.find(p => p.id === pipelineId);
-    if (pipeline) {
-      const { compilePipeline } = await import('./compiler');
-      compiledNodes = compilePipeline(pipeline.nodes as any, pipeline.entryNodeId);
+  let pipelineIdsToRun: string[] = [];
+  let orchestratorMetadata: { name?: string, duration?: any, triggers?: any } = {};
+
+  if (activeEffectId) {
+    const effect = useActiveEffectStore.getState().effects.find(e => e.id === activeEffectId);
+    if (effect) {
+      orchestratorMetadata = { name: effect.name, duration: effect.duration, triggers: effect.triggers };
+      if (effect.steps) {
+        pipelineIdsToRun = effect.steps
+          .filter(s => ['pipeline', 'challenge_pipeline', 'damage_pipeline'].includes(s.type))
+          .map(s => s.targetId);
+      }
+    }
+  } else if (explicitPipelineId) {
+    pipelineIdsToRun = [explicitPipelineId];
+  }
+
+  // Pre-compile all requested pipelines
+  const compiledSequences: any[][] = [];
+  if (pipelineIdsToRun.length > 0) {
+    const { compilePipeline } = await import('./compiler');
+    for (const pid of pipelineIdsToRun) {
+      const pipeline = useRuleStore.getState().pipelines.find(p => p.id === pid);
+      if (pipeline) {
+        compiledSequences.push(compilePipeline(pipeline.nodes as any, pipeline.entryNodeId));
+      }
     }
   }
 
@@ -131,19 +153,52 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
       mountAdapterData(target, targetBackingData, targetSourceId);
     }
 
-    const microContext = { actor, target, intent, action: declaredAction };
-    
-    let targetResult: TargetResult | undefined;
-    
-    if (compiledNodes.length > 0) {
-      const { executePipeline } = await import('./compiler');
-      const compiledState = executePipeline(compiledNodes, microContext, sharedNodeResults);
-      if (compiledState && compiledState.targetResult) {
-        targetResult = compiledState.targetResult as TargetResult;
+    const actionClone = declaredAction ? { ...declaredAction } : undefined;
+    if (actionClone) {
+      for (const [key, val] of Object.entries(intent.modifiers || {})) {
+        if (key === 'castLevel') {
+          (actionClone as any).spellLevel = val;
+        } else {
+          (actionClone as any)[key] = val;
+        }
       }
     }
 
-    if (!targetResult) {
+    const microContext = { actor, target, intent, action: actionClone };
+    
+    // Accumulator for multiple pipeline runs
+    let finalTargetResult: TargetResult = {
+      challengeResult: undefined,
+      damage: {},
+      effectsApplied: {},
+      suggestedResolution: 'miss'
+    };
+    
+    let ranAnyPipeline = false;
+    
+    if (compiledSequences.length > 0) {
+      const { executePipeline } = await import('./compiler');
+      for (const compiledNodes of compiledSequences) {
+        const compiledState = executePipeline(compiledNodes, microContext, sharedNodeResults);
+        const trData = compiledState?.targetResult || compiledState?.TargetResult;
+        
+        if (trData) {
+          ranAnyPipeline = true;
+          const tr = trData as TargetResult;
+          
+          if (tr.challengeResult) finalTargetResult.challengeResult = tr.challengeResult;
+          if (tr.suggestedResolution && tr.suggestedResolution !== 'miss') finalTargetResult.suggestedResolution = tr.suggestedResolution;
+          if (tr.resistances) {
+             finalTargetResult.resistances = [...(finalTargetResult.resistances || []), ...tr.resistances];
+          }
+          
+          Object.assign(finalTargetResult.damage, tr.damage || {});
+          Object.assign(finalTargetResult.effectsApplied, tr.effectsApplied || {});
+        }
+      }
+    }
+
+    if (!ranAnyPipeline) {
       // Fallback: If pipeline did not execute or yielded nothing, provide a basic mock result
       // Construct the actual singular TargetResult based on mock rolling and the pipeline's conceptual output
       // Assuming attacking using actor's strength modifier vs target's AC as mock logic:
@@ -158,7 +213,7 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
       
       const damageRollResult = rollDice('1d8+3');
       
-      targetResult = {
+      finalTargetResult = {
         challengeResult: {
           rolls: attackRollResult.groups[0]?.keptResults || [0],
           modifier: actorStrMod,
@@ -173,7 +228,17 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
       };
     }
 
-    payload.targetResults[target.id] = targetResult;
+    // If an Orchestrator explicitly bound duration/triggers on this resolution, attach it to effectsApplied!
+    if (activeEffectId && orchestratorMetadata.duration) {
+      finalTargetResult.effectsApplied[activeEffectId] = {
+        duration: orchestratorMetadata.duration.value || 1,
+        unit: orchestratorMetadata.duration.unit || 'rounds',
+        trigger: Object.keys(orchestratorMetadata.triggers || {}).join(','),
+        pipelineId: activeEffectId // The orchestrator ID serves as the condition tracker
+      };
+    }
+
+    payload.targetResults[target.id] = finalTargetResult;
   }
 
   return payload;
