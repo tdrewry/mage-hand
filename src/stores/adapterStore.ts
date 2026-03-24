@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface AdapterMapping {
   /** The path on the source user-resource JSON (e.g. ".", "system.attributes.hp", "classes[0]") */
@@ -46,8 +47,10 @@ const SEED_ADAPTERS: AdapterDefinition[] = [
   }
 ];
 
-export const useAdapterStore = create<AdapterStore>((set, get) => ({
-  adapters: [...SEED_ADAPTERS],
+export const useAdapterStore = create<AdapterStore>()(
+  persist(
+    (set, get) => ({
+      adapters: [...SEED_ADAPTERS],
 
   addAdapter: (adapter) => {
     set((state) => ({
@@ -74,7 +77,11 @@ export const useAdapterStore = create<AdapterStore>((set, get) => ({
     }));
   },
 
-  getAdaptersForSource: (sourceId) => {
-    return get().adapters.filter(a => a.sourceId === sourceId || a.sourceId === 'any');
+    getAdaptersForSource: (sourceId) => {
+      return get().adapters.filter(a => a.sourceId === sourceId || a.sourceId === 'any');
+    }
+  }),
+  {
+    name: 'vtt-adapter-store',
   }
-}));
+));

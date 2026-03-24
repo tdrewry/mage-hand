@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, ArrowRight, Plug } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Plug, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generatePathsFromSchema } from '@/lib/rules-engine/schema-paths';
 import { PathSuggestInput } from './PathSuggestInput';
+import { toast } from 'sonner';
 
 export function AdapterEditor() {
   const adapters = useAdapterStore(s => s.adapters);
@@ -125,9 +126,14 @@ export function AdapterEditor() {
                   onChange={(e) => handleUpdate({ name: e.target.value })}
                   className="text-2xl font-bold border-none shadow-none h-auto px-1 py-1 focus-visible:ring-1 max-w-sm bg-transparent"
                 />
-                <Button variant="destructive" size="sm" onClick={() => { removeAdapter(selectedId!); setSelectedId(null); }}>
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete Adapter
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => toast.success('Adapter Saved', { description: 'All changes are automatically persisted to local storage.' })}>
+                    <Save className="w-4 h-4 mr-2" /> Save Adapter
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => { removeAdapter(selectedId!); setSelectedId(null); }}>
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete Adapter
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-[auto_1fr] items-center gap-4 text-sm max-w-2xl bg-card p-4 rounded-lg border border-border mt-2 shadow-sm">

@@ -142,8 +142,8 @@ interface ActionState {
   /** Active resolution flash effects on canvas */
   resolutionFlashes: ResolutionFlash[];
 
-  /** The current intent being drafted by the player, before it's submitted to the pipeline. */
-  draftingIntent: { actorId: string; category: string } | null;
+  /** The current intents being drafted by the player, before they are submitted to the pipeline. */
+  draftingIntents: { id: string; actorId: string; category: string }[];
 }
 
 interface ActionActions {
@@ -157,7 +157,7 @@ interface ActionActions {
   startDrafting: (actorId: string, category: string) => void;
 
   /** Cancel drafting an intent */
-  cancelDrafting: () => void;
+  cancelDrafting: (draftId: string) => void;
 
   /** Start an effect-based action with pre-populated targets (skips targeting phase) */
   startEffectAction: (params: {
@@ -231,18 +231,19 @@ export const useActionStore = create<ActionStore>()(
   targetingMousePos: null,
   actionHistory: [],
   resolutionFlashes: [],
-  draftingIntent: null,
+  draftingIntents: [],
 
   startDrafting: (actorId, category) => {
     // Optionally open the PlayCard dock action tab by dispatching an event
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('openActionsTab'));
     }
-    set({ draftingIntent: { actorId, category } });
+    const id = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    set({ draftingIntents: [...get().draftingIntents, { id, actorId, category }] });
   },
 
-  cancelDrafting: () => {
-    set({ draftingIntent: null });
+  cancelDrafting: (draftId) => {
+    set({ draftingIntents: get().draftingIntents.filter(d => d.id !== draftId) });
   },
 
   startAttack: (sourceTokenId, attack) => {
@@ -837,7 +838,6 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: remainingActions,
       isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
-      draftingIntent: null,
       actionHistory: [historyEntry, ...actionHistory].slice(0, 100),
       resolutionFlashes: [...get().resolutionFlashes, ...flashes],
     });
@@ -905,7 +905,6 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: remainingActions,
       isTargeting: nextAction?.phase === 'targeting',
       targetingMousePos: null,
-      draftingIntent: null,
     });
   },
 
@@ -937,7 +936,7 @@ export const useActionStore = create<ActionStore>()(
       pendingActions: [],
       isTargeting: false,
       targetingMousePos: null,
-      draftingIntent: null,
+      draftingIntents: [],
     });
   },
 
@@ -976,7 +975,7 @@ export const useActionStore = create<ActionStore>()(
       isTargeting: currentAction?.phase === 'targeting',
       targetingMousePos: null,
       resolutionFlashes: [],
-      draftingIntent: null,
+      draftingIntents: [],
     });
   },
 

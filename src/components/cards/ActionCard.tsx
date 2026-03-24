@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,83 +55,120 @@ function actionTabLabel(action: ActionQueueEntry, index: number, allActions: Act
   return baseName;
 }
 
+type TabItem = 
+  | { type: 'draft', id: string, draft: { id: string, actorId: string, category: string } }
+  | { type: 'resolve', id: string, action: ActionQueueEntry };
+
 export function ActionCardContent() {
-  const { currentAction, pendingActions, swapToAction, draftingIntent, cancelDrafting } = useActionStore();
+  const { currentAction, pendingActions, swapToAction, draftingIntents, cancelDrafting } = useActionStore();
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
   // Maintain stable tab ordering — new actions append, removed actions get pruned
   const stableOrderRef = useRef<string[]>([]);
 
-  if (!currentAction) {
-    stableOrderRef.current = [];
-    if (draftingIntent) {
-      return (
-        <ActionDeclareCardContent 
-          actorId={draftingIntent.actorId}
-          category={draftingIntent.category}
-          onCancel={cancelDrafting}
-        />
-      );
-    }
-    return <EmptyState />;
-  }
+  const allResolves = [currentAction, ...pendingActions].filter(Boolean) as ActionQueueEntry[];
+  const allDrafts = draftingIntents || [];
+  
+  const allItems: TabItem[] = [
+    ...allDrafts.map(d => ({ type: 'draft' as const, id: d.id, draft: d })),
+    ...allResolves.map(r => ({ type: 'resolve' as const, id: r.id, action: r }))
+  ];
 
-  const allActions = [currentAction, ...pendingActions];
-  const actionMap = new Map(allActions.map(a => [a.id, a]));
-  const currentIds = new Set(allActions.map(a => a.id));
+  const currentIds = new Set(allItems.map(i => i.id));
 
   // Prune removed IDs, then append any new IDs
   stableOrderRef.current = stableOrderRef.current.filter(id => currentIds.has(id));
-  for (const a of allActions) {
-    if (!stableOrderRef.current.includes(a.id)) {
-      stableOrderRef.current.push(a.id);
+  for (const item of allItems) {
+    if (!stableOrderRef.current.includes(item.id)) {
+      stableOrderRef.current.push(item.id);
     }
   }
 
-  const orderedActions = stableOrderRef.current
-    .map(id => actionMap.get(id))
-    .filter(Boolean) as typeof allActions;
+  const orderedItems = stableOrderRef.current
+    .map(id => allItems.find(i => i.id === id))
+    .filter(Boolean) as TabItem[];
 
-  const hasTabs = orderedActions.length > 1;
-
-  if (!hasTabs) {
-    return <SingleActionView action={currentAction} />;
+  // 1. Resolve effective active item during render
+  let activeItem = orderedItems.find(i => i.id === activeTabId);
+  if (!activeItem && orderedItems.length > 0) {
+    // Fallback if activeTabId is invalid: prefer the currentAction, else first item
+    activeItem = orderedItems.find(i => i.type === 'resolve' && currentAction && i.action.id === currentAction.id) || orderedItems[0];
   }
+
+  // 2. Synchronize active state
+  useEffect(() => {
+    if (activeItem && activeTabId !== activeItem.id) {
+       setActiveTabId(activeItem.id);
+    }
+  }, [activeItem, activeTabId]);
+
+  // 3. Auto-focus new items
+  const previousItemCount = useRef(allItems.length);
+  useEffect(() => {
+    if (allItems.length > previousItemCount.current && orderedItems.length > 0) {
+      // Something was added! Focus the newest item (at the end of orderedItems)
+      setActiveTabId(orderedItems[orderedItems.length - 1].id);
+    }
+    previousItemCount.current = allItems.length;
+  }, [allItems.length, orderedItems]);
+
+  if (orderedItems.length === 0) {
+    return <EmptyState />;
+  }
+
+  const hasTabs = orderedItems.length > 1;
 
   return (
     <div className="h-full flex flex-col">
-      <div
-        className="shrink-0 overflow-x-auto overflow-y-hidden"
-        style={{ scrollbarWidth: 'none' }}
-        onWheel={(e) => {
-          if (e.deltaY !== 0) {
-            e.currentTarget.scrollLeft += e.deltaY;
-            e.preventDefault();
-          }
-        }}
-      >
-        <div className="inline-flex w-max gap-0 flex-nowrap p-0 border-b border-border">
-          {orderedActions.map((action, idx) => {
-            const isActive = action.id === currentAction.id;
-            return (
-              <button
-                key={action.id}
-                onClick={() => {
-                  if (!isActive) {
-                    const pendingIdx = pendingActions.findIndex(a => a.id === action.id);
-                    if (pendingIdx >= 0) swapToAction(pendingIdx);
-                  }
-                }}
-                className={`text-xs px-4 py-2 whitespace-nowrap shrink-0 -mb-px border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-primary text-foreground font-medium'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {actionTabLabel(action, idx, orderedActions)}
-              </button>
-            );
-          })}
+      {hasTabs && (
+        <div
+          className="shrink-0 overflow-x-auto overflow-y-hidden"
+          style={{ scrollbarWidth: 'none' }}
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+              e.preventDefault();
+            }
+          }}
+        >
+          <div className="inline-flex w-max gap-0 flex-nowrap p-0 border-b border-border">
+            {orderedItems.map((item, idx) => {
+              const isActive = activeItem && item.id === activeItem.id;
+              
+              let label = '';
+              if (item.type === 'draft') {
+                const sessionTokens = useSessionStore.getState().tokens;
+                const token = sessionTokens.find(t => t.id === item.draft.actorId);
+                const tokenName = token?.name || token?.label || 'Unknown';
+                label = `Declare: ${tokenName}`;
+              } else {
+                const allActionEntries = orderedItems.filter(i => i.type === 'resolve').map(i => (i as any).action);
+                label = actionTabLabel(item.action, idx, allActionEntries);
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTabId(item.id);
+                    if (item.type === 'resolve' && currentAction && item.action.id !== currentAction.id) {
+                      const pendingIdx = pendingActions.findIndex(a => a.id === item.action.id);
+                      if (pendingIdx >= 0) swapToAction(pendingIdx);
+                    }
+                  }}
+                  className={`text-xs px-4 py-2 whitespace-nowrap shrink-0 -mb-px border-b-2 transition-colors ${
+                    isActive
+                      ? 'border-primary text-foreground font-medium'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
       <div className="flex-1 min-h-0 relative">
         <div className="absolute top-2 right-2 z-50">
           <Tooltip>
@@ -148,7 +185,16 @@ export function ActionCardContent() {
             <TooltipContent>Emergency Clear Actions</TooltipContent>
           </Tooltip>
         </div>
-        <SingleActionView action={currentAction} />
+        {activeItem?.type === 'draft' ? (
+          <ActionDeclareCardContent 
+            draftId={activeItem.draft.id}
+            actorId={activeItem.draft.actorId}
+            category={activeItem.draft.category}
+            onCancel={(draftId) => cancelDrafting(draftId)}
+          />
+        ) : activeItem?.type === 'resolve' ? (
+          <SingleActionView action={activeItem.action} />
+        ) : null}
       </div>
     </div>
   );

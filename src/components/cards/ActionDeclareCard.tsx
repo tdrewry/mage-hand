@@ -15,9 +15,10 @@ import type { IntentPayload } from '@/lib/rules-engine/types';
 import { evaluateIntent } from '@/lib/rules-engine/evaluator';
 
 interface ActionDeclareCardProps {
+  draftId: string;
   actorId: string;
   category: string;
-  onCancel?: () => void;
+  onCancel?: (draftId: string) => void;
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -34,7 +35,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   trait: 'Traits & Features',
 };
 
-export function ActionDeclareCardContent({ actorId, category, onCancel }: ActionDeclareCardProps) {
+export function ActionDeclareCardContent({ draftId, actorId, category, onCancel }: ActionDeclareCardProps) {
   const tokens = useSessionStore((s) => s.tokens);
   const selectedTokenIds = useSessionStore((s) => s.selectedTokenIds);
   const token = tokens.find((t) => t.id === actorId);
@@ -119,7 +120,7 @@ export function ActionDeclareCardContent({ actorId, category, onCancel }: Action
     useActionStore.getState().submitIntentResolution(payload, resolutionPayload);
     
     // Clear drafting intent so ui switches
-    useActionStore.getState().cancelDrafting();
+    useActionStore.getState().cancelDrafting(draftId);
   };
 
   if (!token) {
@@ -248,7 +249,7 @@ export function ActionDeclareCardContent({ actorId, category, onCancel }: Action
           <Button 
             variant="outline"
             className="flex-1 bg-slate-800 border-slate-700 hover:bg-slate-700" 
-            onClick={onCancel}
+            onClick={() => onCancel(draftId)}
           >
             Cancel
           </Button>
