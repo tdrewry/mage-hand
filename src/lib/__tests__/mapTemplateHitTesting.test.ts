@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeEffectImpacts, type HitTestParams } from '@/lib/effectHitTesting';
-import type { EffectTemplate } from '@/types/effectTypes';
+import { computeEffectImpacts, type HitTestParams } from '@/lib/mapTemplateHitTesting';
+import type { MapTemplateDefinition } from '@/types/effectTypes';
 import type { Token } from '@/stores/sessionStore';
 
 // Helper to build a minimal token at a position
@@ -18,7 +18,7 @@ const GRID = 50; // 50px per grid cell
 // Circle
 // ---------------------------------------------------------------------------
 describe('Circle effect hit-testing', () => {
-  const circleTemplate: EffectTemplate = {
+  const circleTemplate: MapTemplateDefinition = {
     id: 't1', name: 'Fireball', shape: 'circle', radius: 4,
     placementMode: 'free', persistence: 'instant',
     color: '#FF0000', opacity: 0.5, animation: 'none', animationSpeed: 1,
@@ -57,7 +57,7 @@ describe('Circle effect hit-testing', () => {
 // Line
 // ---------------------------------------------------------------------------
 describe('Line effect hit-testing', () => {
-  const lineTemplate: EffectTemplate = {
+  const lineTemplate: MapTemplateDefinition = {
     id: 't2', name: 'Lightning Bolt', shape: 'line', length: 10, width: 1,
     placementMode: 'caster', persistence: 'instant',
     color: '#00F', opacity: 0.5, animation: 'none', animationSpeed: 1,
@@ -94,7 +94,7 @@ describe('Line effect hit-testing', () => {
 // Cone
 // ---------------------------------------------------------------------------
 describe('Cone effect hit-testing', () => {
-  const coneTemplate: EffectTemplate = {
+  const coneTemplate: MapTemplateDefinition = {
     id: 't3', name: 'Cone of Cold', shape: 'cone', length: 6, angle: 90,
     placementMode: 'caster', persistence: 'instant',
     color: '#0FF', opacity: 0.5, animation: 'none', animationSpeed: 1,
@@ -131,7 +131,7 @@ describe('Cone effect hit-testing', () => {
 // Burst exclusion
 // ---------------------------------------------------------------------------
 describe('Burst caster exclusion', () => {
-  const burstTemplate: EffectTemplate = {
+  const burstTemplate: MapTemplateDefinition = {
     id: 't4', name: 'Spirit Guardians', shape: 'circle-burst', radius: 3,
     placementMode: 'caster', persistence: 'persistent',
     color: '#FFD700', opacity: 0.5, animation: 'none', animationSpeed: 1,
@@ -159,7 +159,7 @@ describe('Burst caster exclusion', () => {
 // Rectangle
 // ---------------------------------------------------------------------------
 describe('Rectangle effect hit-testing', () => {
-  const rectTemplate: EffectTemplate = {
+  const rectTemplate: MapTemplateDefinition = {
     id: 't5', name: 'Grease', shape: 'rectangle', width: 4, length: 4,
     placementMode: 'free', persistence: 'persistent',
     color: '#8B7355', opacity: 0.4, animation: 'none', animationSpeed: 1,
@@ -183,7 +183,7 @@ describe('Rectangle effect hit-testing', () => {
 // Sorting
 // ---------------------------------------------------------------------------
 describe('Impact sorting by distance', () => {
-  const circleTemplate: EffectTemplate = {
+  const circleTemplate: MapTemplateDefinition = {
     id: 't6', name: 'Big', shape: 'circle', radius: 20,
     placementMode: 'free', persistence: 'instant',
     color: '#F00', opacity: 0.5, animation: 'none', animationSpeed: 1,

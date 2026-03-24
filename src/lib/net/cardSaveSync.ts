@@ -9,7 +9,7 @@ import { CardSaveEvent, type CardSaveEventDetail } from '@/components/cards/Card
 import { opBridge } from './OpBridge';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRegionStore } from '@/stores/regionStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 
 function handleCardSave(e: Event) {
@@ -87,7 +87,7 @@ function handleCardSave(e: Event) {
     }
     case 'effect': {
       if (!id) break;
-      const template = useEffectStore.getState().allTemplates.find(t => t.id === id);
+      const template = useMapTemplateStore.getState().allTemplates.find(t => t.id === id);
       if (!template) break;
       // Strip large texture data — send hash only
       const { texture, ...rest } = template;

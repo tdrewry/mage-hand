@@ -20,7 +20,7 @@ import { CharacterSheetCardContent } from '@/components/cards/CharacterSheetCard
 import { DiceCardContent } from '@/components/cards/DiceCard';
 import { ActionCardContent } from '@/components/cards/ActionCard';
 import { NetworkDemoCardContent } from '@/components/cards/NetworkDemoCard';
-import { EffectsCatalog } from '@/components/rules/EffectsCatalog';
+import { EffectsCatalog } from '@/components/rules/MapTemplatesCatalog';
 import { ChatCardContent } from '@/components/cards/ChatCard';
 import { ArtApprovalCardContent } from '@/components/cards/ArtApprovalCard';
 import { SoundSettingsCardContent } from '@/components/cards/SoundSettingsCard';

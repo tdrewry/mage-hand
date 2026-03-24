@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { triggerSound } from '@/lib/soundEngine';
 import type {
-  EffectTemplate,
-  PlacedEffect,
+  MapTemplateDefinition,
+  PlacedMapTemplate,
   EffectImpact,
   EffectPlacementState,
 } from '@/types/effectTypes';
@@ -12,7 +12,7 @@ import { cancelEffectModifiers } from '@/lib/effectModifierEngine';
 import {
   BUILT_IN_EFFECT_TEMPLATES,
   getBuiltInTemplate,
-} from '@/lib/effectTemplateLibrary';
+} from '@/lib/mapTemplateLibrary';
 import {
   hashImageData,
   saveTextureByHash,
@@ -42,7 +42,7 @@ function fastHash(str: string): string {
  * Strip large texture data URIs from a template, keeping only the textureHash.
  * This prevents blowing the ~5MB localStorage quota.
  */
-function stripTextureData(template: EffectTemplate): EffectTemplate {
+function stripTextureData(template: MapTemplateDefinition): MapTemplateDefinition {
   if (!template.texture || template.texture.length < 200) return template;
   // Ensure textureHash is set before stripping
   const hash = template.textureHash || fastHash(template.texture);
@@ -53,7 +53,7 @@ function stripTextureData(template: EffectTemplate): EffectTemplate {
  * Persist a template's texture to IndexedDB and set textureHash synchronously.
  * The IndexedDB write is fire-and-forget; the hash is set immediately.
  */
-function persistTemplateTexture(template: EffectTemplate): void {
+function persistTemplateTexture(template: MapTemplateDefinition): void {
   if (!template.texture || template.texture.length < 200) return;
   // Set hash synchronously so it's available for localStorage
   const syncHash = fastHash(template.texture);
@@ -65,7 +65,7 @@ function persistTemplateTexture(template: EffectTemplate): void {
     // Update to the stronger hash
     template.textureHash = sha;
   }).catch(e => {
-    console.warn('[effectStore] Failed to persist texture to IndexedDB:', e);
+    console.warn('[mapTemplateStore] Failed to persist texture to IndexedDB:', e);
     // Fallback: save with sync hash
     saveTextureByHash(syncHash, textureData).catch(() => {});
   });
@@ -74,7 +74,7 @@ function persistTemplateTexture(template: EffectTemplate): void {
 /**
  * Reload a template's texture from IndexedDB using its textureHash.
  */
-async function rehydrateTemplateTexture(template: EffectTemplate): Promise<EffectTemplate> {
+async function rehydrateTemplateTexture(template: MapTemplateDefinition): Promise<MapTemplateDefinition> {
   const hash = template.textureHash;
   if (!hash) return template;
   if (template.texture && template.texture.length > 200) return template; // already loaded
@@ -84,12 +84,12 @@ async function rehydrateTemplateTexture(template: EffectTemplate): Promise<Effec
       return { ...template, texture: dataUrl };
     }
   } catch (e) {
-    console.warn('[effectStore] Failed to rehydrate texture from IndexedDB:', e);
+    console.warn('[mapTemplateStore] Failed to rehydrate texture from IndexedDB:', e);
   }
   return template;
 }
 
-function loadCustomTemplates(): EffectTemplate[] {
+function loadCustomTemplates(): MapTemplateDefinition[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TEMPLATES_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -98,7 +98,7 @@ function loadCustomTemplates(): EffectTemplate[] {
   }
 }
 
-function saveCustomTemplates(templates: EffectTemplate[]): void {
+function saveCustomTemplates(templates: MapTemplateDefinition[]): void {
   // Strip texture data URIs before writing to localStorage
   const stripped = templates.map(t => stripTextureData(t));
   localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(stripped));
@@ -117,7 +117,7 @@ function saveHiddenBuiltIns(ids: string[]): void {
   localStorage.setItem(HIDDEN_BUILTINS_KEY, JSON.stringify(ids));
 }
 
-function buildAllTemplates(customTemplates: EffectTemplate[], hiddenIds: string[]): EffectTemplate[] {
+function buildAllTemplates(customTemplates: MapTemplateDefinition[], hiddenIds: string[]): MapTemplateDefinition[] {
   const customIds = new Set(customTemplates.map(t => t.id));
   const hiddenSet = new Set(hiddenIds);
   // Built-ins that aren't hidden and haven't been overridden by a custom copy
@@ -131,11 +131,11 @@ function buildAllTemplates(customTemplates: EffectTemplate[], hiddenIds: string[
 
 interface EffectState {
   // Template library
-  customTemplates: EffectTemplate[];
-  allTemplates: EffectTemplate[];
+  customTemplates: MapTemplateDefinition[];
+  allTemplates: MapTemplateDefinition[];
 
   // Placed effects on the current map
-  placedEffects: PlacedEffect[];
+  placedEffects: PlacedMapTemplate[];
 
   // Placement mode (null = not placing)
   placement: EffectPlacementState | null;
@@ -143,12 +143,12 @@ interface EffectState {
   hiddenBuiltInIds: string[];
 
   // --- Template CRUD ---
-  addCustomTemplate: (template: Omit<EffectTemplate, 'id' | 'isBuiltIn'>) => EffectTemplate;
-  updateCustomTemplate: (id: string, updates: Partial<EffectTemplate>) => void;
+  addCustomTemplate: (template: Omit<MapTemplateDefinition, 'id' | 'isBuiltIn'>) => MapTemplateDefinition;
+  updateCustomTemplate: (id: string, updates: Partial<MapTemplateDefinition>) => void;
   deleteTemplate: (id: string) => void;
   /** Restore all hidden built-in templates */
   restoreBuiltInTemplates: () => void;
-  getTemplate: (id: string) => EffectTemplate | undefined;
+  getTemplate: (id: string) => MapTemplateDefinition | undefined;
 
   // --- Placement mode ---
   startPlacement: (templateId: string, casterId?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }) => void;
@@ -168,7 +168,7 @@ interface EffectState {
       groupId?: string;
       waypoints?: { x: number; y: number }[];
     },
-  ) => PlacedEffect;
+  ) => PlacedMapTemplate;
   removeEffect: (effectId: string) => void;
   /** Start a fade-out dismiss animation; effect auto-removes after fade completes */
   dismissEffect: (effectId: string) => void;
@@ -194,7 +194,7 @@ interface EffectState {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useEffectStore = create<EffectState>()(
+export const useMapTemplateStore = create<EffectState>()(
   persist(
     (set, get) => {
   const customTemplates = loadCustomTemplates();
@@ -213,7 +213,7 @@ export const useEffectStore = create<EffectState>()(
     // ------------------------------------------------------------------
 
     addCustomTemplate: (draft) => {
-      const template: EffectTemplate = {
+      const template: MapTemplateDefinition = {
         ...draft,
         id: `custom-fx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         isBuiltIn: false,
@@ -244,7 +244,7 @@ export const useEffectStore = create<EffectState>()(
     updateCustomTemplate: (id, updates) => {
       set((s) => {
         const isBuiltIn = BUILT_IN_EFFECT_TEMPLATES.some(t => t.id === id);
-        let newCustom: EffectTemplate[];
+        let newCustom: MapTemplateDefinition[];
         if (isBuiltIn) {
           const original = BUILT_IN_EFFECT_TEMPLATES.find(t => t.id === id)!;
           const overridden = { ...original, ...updates, id, isBuiltIn: false };
@@ -420,7 +420,7 @@ export const useEffectStore = create<EffectState>()(
       const isAura = !!scaledTemplate.aura;
       const anchorTokenId = isAura ? options.casterId : undefined;
 
-      const effect: PlacedEffect = {
+      const effect: PlacedMapTemplate = {
         id: createEffectId(),
         templateId,
         template: { ...scaledTemplate }, // snapshot with scaling applied
@@ -643,7 +643,7 @@ export const useEffectStore = create<EffectState>()(
             })
           ).then(() => {
             // Trigger a re-render by setting state
-            useEffectStore.setState({ placedEffects: [...state.placedEffects] });
+            useMapTemplateStore.setState({ placedEffects: [...state.placedEffects] });
           });
         }
 
@@ -652,7 +652,7 @@ export const useEffectStore = create<EffectState>()(
         if (customTemplates.length > 0) {
           Promise.all(customTemplates.map(t => rehydrateTemplateTexture(t))).then(rehydrated => {
             const hiddenIds = loadHiddenBuiltIns();
-            useEffectStore.setState({
+            useMapTemplateStore.setState({
               customTemplates: rehydrated,
               allTemplates: buildAllTemplates(rehydrated, hiddenIds),
             });

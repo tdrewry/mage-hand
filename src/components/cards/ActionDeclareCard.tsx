@@ -10,7 +10,7 @@ import { Swords, Sparkles, Dices, BookOpen, Target, Send, Focus } from 'lucide-r
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useActionStore } from '@/stores/actionStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 import type { IntentPayload } from '@/lib/rules-engine/types';
 import { evaluateIntent } from '@/lib/rules-engine/evaluator';
@@ -48,7 +48,8 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
   const [smite, setSmite] = useState(false);
   const [waitingForPlacement, setWaitingForPlacement] = useState(false);
 
-  const placedEffects = useEffectStore(s => s.placedEffects);
+  const placedEffects = useMapTemplateStore(s => s.placedEffects);
+  const allTemplates = useMapTemplateStore(s => s.allTemplates);
   const draftingIntents = useActionStore(s => s.draftingIntents);
   const currentDraft = draftingIntents.find(d => d.id === draftId);
 
@@ -96,7 +97,23 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
 
   // Find the detail for the currently selected action
   const currentAction = actions.find(a => a.id === selectedActionId) || actions[0];
-  
+
+  const matchedTemplate = useMemo(() => {
+    if (!currentAction) return null;
+    if (currentAction.mapTemplateId) {
+      return allTemplates.find(t => t.id === currentAction.mapTemplateId) || null;
+    }
+    // Attempt name match
+    return allTemplates.find(t => t.name.toLowerCase() === currentAction.name.toLowerCase()) || null;
+  }, [currentAction, allTemplates]);
+
+  const [useTemplate, setUseTemplate] = useState(false);
+
+  // Auto-enable template if one matched
+  React.useEffect(() => {
+    setUseTemplate(!!matchedTemplate);
+  }, [matchedTemplate]);
+
   // Auto-select first action if not set, but do it safely
   React.useEffect(() => {
     if (actions.length > 0 && !actions.find(a => a.id === selectedActionId)) {
@@ -105,22 +122,22 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
   }, [actions, selectedActionId]);
 
   const handlePlaceTemplate = () => {
-    if (!currentAction?.effectTemplateId || !token) return;
+    if (!matchedTemplate || !token) return;
     setWaitingForPlacement(true);
     // If there is already a template placed for this draft, cancel the old one
-    if (currentDraft?.placedEffectId) {
-      useEffectStore.getState().cancelEffect(currentDraft.placedEffectId, () => ({}));
+    if (currentDraft?.placedMapTemplateId) {
+      useMapTemplateStore.getState().cancelEffect(currentDraft.placedMapTemplateId, () => ({}));
     }
-    useEffectStore.getState().startPlacement(currentAction.effectTemplateId, token.id);
+    useMapTemplateStore.getState().startPlacement(matchedTemplate.id, token.id);
   };
 
   React.useEffect(() => {
-    if (waitingForPlacement && currentAction?.effectTemplateId && token) {
+    if (waitingForPlacement && matchedTemplate && token) {
       // Find the most recently placed effect matching this template and caster
       const recentEffect = [...placedEffects].reverse().find(
-        e => e.templateId === currentAction.effectTemplateId && e.casterId === token.id
+        e => e.templateId === matchedTemplate.id && e.casterId === token.id
       );
-      if (recentEffect && currentDraft?.placedEffectId !== recentEffect.id) {
+      if (recentEffect && currentDraft?.placedMapTemplateId !== recentEffect.id) {
         setWaitingForPlacement(false);
         useActionStore.getState().setDraftPlacedEffectId(draftId, recentEffect.id);
         
@@ -132,7 +149,7 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
         }
       }
     }
-  }, [placedEffects, waitingForPlacement, currentAction, token, draftId, currentDraft?.placedEffectId]);
+  }, [placedEffects, waitingForPlacement, matchedTemplate, token, draftId, currentDraft?.placedMapTemplateId]);
 
   const handleSubmit = async () => {
     if (!token || !currentAction) return;
@@ -147,7 +164,7 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
         sneakAttack,
         smite,
       },
-      placedEffectId: currentDraft?.placedEffectId,
+      placedMapTemplateId: useTemplate ? currentDraft?.placedMapTemplateId : undefined,
     };
     
     // Evaluate the intent to produce a resolution payload
@@ -259,21 +276,29 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
 
             {/* Targeting Summary */}
             <div className="space-y-4">
-              {currentAction.effectTemplateId && (
-                <div className="bg-indigo-900/30 border border-indigo-500/30 p-3 rounded-md space-y-2">
-                  <Label className="text-xs font-semibold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
-                    <Focus className="w-3.5 h-3.5" /> Area of Effect
-                  </Label>
-                  <p className="text-xs text-indigo-200/70">This action uses an area of effect template. Place it on the canvas to automatically target tokens.</p>
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white"
-                    onClick={handlePlaceTemplate}
-                  >
-                    <Focus className="w-4 h-4 mr-2" />
-                    {currentDraft?.placedEffectId ? 'Replace Template' : 'Place Template'}
-                  </Button>
+              {matchedTemplate && (
+                <div className="bg-indigo-900/30 border border-indigo-500/30 p-3 rounded-md space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                        <Focus className="w-3.5 h-3.5" /> Area of Effect
+                      </Label>
+                      <p className="text-xs text-indigo-200/70 mt-1">Found template: {matchedTemplate.name}</p>
+                    </div>
+                    <Switch checked={useTemplate} onCheckedChange={setUseTemplate} />
+                  </div>
+                  
+                  {useTemplate && (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white"
+                      onClick={handlePlaceTemplate}
+                    >
+                      <Focus className="w-4 h-4 mr-2" />
+                      {currentDraft?.placedMapTemplateId ? 'Replace Template' : 'Place Template'}
+                    </Button>
+                  )}
                 </div>
               )}
 

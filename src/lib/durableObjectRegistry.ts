@@ -12,7 +12,7 @@
 
 import { DurableObjectRegistry } from './durableObjects';
 
-import { getBuiltInTemplate } from '@/lib/effectTemplateLibrary';
+import { getBuiltInTemplate } from '@/lib/mapTemplateLibrary';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMapStore } from '@/stores/mapStore';
 import { useRegionStore } from '@/stores/regionStore';
@@ -31,7 +31,7 @@ import { useCreatureStore } from '@/stores/creatureStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useDiceStore } from '@/stores/diceStore';
 import { useActionStore } from '@/stores/actionStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useMapFocusStore } from '@/stores/mapFocusStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
@@ -491,7 +491,7 @@ DurableObjectRegistry.register({
   version: 1,
   label: 'Effects',
   extractor: () => {
-    const state = useEffectStore.getState();
+    const state = useMapTemplateStore.getState();
     // Strip the entire template snapshot from placed effects.
     // Templates are reconstructed from templateId + castLevel on hydration.
     // This keeps the blob well under Jazz's 1MB limit.
@@ -512,7 +512,7 @@ DurableObjectRegistry.register({
     };
   },
   hydrator: (state: any) => {
-    const store = useEffectStore.getState();
+    const store = useMapTemplateStore.getState();
     // Clear placed effects on all maps
     const mapIds = new Set(store.placedEffects.map(e => e.mapId));
     mapIds.forEach(id => store.clearEffectsForMap(id));
@@ -546,11 +546,11 @@ DurableObjectRegistry.register({
           };
         })
         .filter((e: any) => e.template); // Drop effects whose template can't be found
-      useEffectStore.setState({ placedEffects: restored });
+      useMapTemplateStore.setState({ placedEffects: restored });
     }
   },
   summarizer: () => {
-    const s = useEffectStore.getState();
+    const s = useMapTemplateStore.getState();
     return `${s.placedEffects.length} placed, ${s.customTemplates.length} custom templates`;
   },
 });

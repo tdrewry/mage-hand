@@ -114,7 +114,7 @@ export interface ActionQueueEntry {
     templateId: string;
     templateName: string;
     damageType?: string;
-    placedEffectId: string;
+    placedMapTemplateId: string;
     /** Group ID linking multi-drop effect instances */
     groupId?: string;
     /** The level this effect was cast at */

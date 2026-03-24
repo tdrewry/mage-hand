@@ -25,7 +25,7 @@ import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { useItemStore } from '@/stores/itemStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useUiModeStore } from '@/stores/uiModeStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
@@ -59,7 +59,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
   const illuminationStore = useIlluminationStore.getState();
   const creatureStore = useCreatureStore.getState();
   const hatchingStore = useHatchingStore.getState();
-  const effectStore = useEffectStore.getState();
+  const mapTemplateStore = useMapTemplateStore.getState();
   const uiModeStore = useUiModeStore.getState();
   const campaignStore = useCampaignStore.getState();
   const ruleStore = useRuleStore.getState();
@@ -135,8 +135,8 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
     },
     viewportTransforms: sessionStore.viewportTransforms,
     effects: {
-      placedEffects: effectStore.placedEffects,
-      customTemplates: effectStore.customTemplates,
+      placedEffects: mapTemplateStore.placedEffects,
+      customTemplates: mapTemplateStore.customTemplates,
     },
     uiMode: uiModeStore.currentMode === 'dm' ? 'dm' : 'play',
     campaigns: {
@@ -175,7 +175,7 @@ export function clearAllStores(): void {
   const groupStore = useGroupStore.getState();
   const initiativeStore = useInitiativeStore.getState();
   const fogStore = useFogStore.getState();
-  const effectStore = useEffectStore.getState();
+  const mapTemplateStore = useMapTemplateStore.getState();
 
   sessionStore.clearAllTokens();
   sessionStore.setTokens([]);
@@ -186,8 +186,8 @@ export function clearAllStores(): void {
   useIlluminationStore.getState().clearAllLights();
   fogStore.resetFog();
 
-  const effectMapIds = new Set(effectStore.placedEffects.map(e => e.mapId));
-  effectMapIds.forEach(id => effectStore.clearEffectsForMap(id));
+  const effectMapIds = new Set(mapTemplateStore.placedEffects.map(e => e.mapId));
+  effectMapIds.forEach(id => mapTemplateStore.clearEffectsForMap(id));
   useTokenGroupStore.getState().clearAllGroups();
   useRuleStore.setState({ pipelines: [] });
 }
@@ -339,7 +339,7 @@ export function applyProjectData(data: ProjectData): void {
     });
   }
   if (data.effects) {
-    const es = useEffectStore.getState();
+    const es = useMapTemplateStore.getState();
     (data.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
     if (data.effects.placedEffects?.length) {
       const now = performance.now();
@@ -351,7 +351,7 @@ export function applyProjectData(data: ProjectData): void {
           dismissedAt: undefined,
           ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
         }));
-      useEffectStore.setState({ placedEffects: restored });
+      useMapTemplateStore.setState({ placedEffects: restored });
     }
   }
 

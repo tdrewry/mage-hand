@@ -19,7 +19,7 @@ import { JazzTextureList } from "./schema";
 import { loadTextureByHash, saveTextureByHash } from "@/lib/textureStorage";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
-import { useEffectStore } from "@/stores/effectStore";
+import { useMapTemplateStore } from "@/stores/mapTemplateStore";
 import { useMapStore } from "@/stores/mapStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
 import {
@@ -68,12 +68,12 @@ export function collectAllTextureHashes(): Set<string> {
   }
 
   // Placed effects (snapshot template texture)
-  for (const e of useEffectStore.getState().placedEffects) {
+  for (const e of useMapTemplateStore.getState().placedEffects) {
     if (e.template?.textureHash) hashes.add(e.template.textureHash);
   }
 
   // Custom effect templates
-  for (const t of useEffectStore.getState().customTemplates) {
+  for (const t of useMapTemplateStore.getState().customTemplates) {
     if (t.textureHash) hashes.add(t.textureHash);
   }
 

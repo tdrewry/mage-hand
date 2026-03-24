@@ -9,15 +9,15 @@
  */
 
 import type {
-  EffectTemplate,
+  MapTemplateDefinition,
   EffectAnimationType,
-  PlacedEffect,
+  PlacedMapTemplate,
   EffectPlacementState,
 } from '@/types/effectTypes';
 import { isBurstShape } from '@/types/effectTypes';
 import { useMiscEphemeralStore } from '@/stores/miscEphemeralStore';
-import { useEffectStore } from '@/stores/effectStore';
-import { getBuiltInTemplate } from '@/lib/effectTemplateLibrary';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
+import { getBuiltInTemplate } from '@/lib/mapTemplateLibrary';
 import type { LineSegment, Point } from '@/lib/visibilityEngine';
 import { computeVisibilityFromSegments } from '@/lib/visibilityEngine';
 import { animatedTextureManager } from '@/lib/animatedTextureManager';
@@ -47,7 +47,7 @@ export interface EffectRenderContext {
  */
 export function renderPlacedEffects(
   rc: EffectRenderContext,
-  effects: PlacedEffect[],
+  effects: PlacedMapTemplate[],
 ): void {
   for (const effect of effects) {
     // Skip aura effects — they are rendered separately by renderAuraEffects
@@ -75,11 +75,11 @@ export function renderPlacedEffects(
  * Returns the first (topmost) effect whose shape contains the point, or null.
  */
 export function hitTestEffectAtPoint(
-  effects: PlacedEffect[],
+  effects: PlacedMapTemplate[],
   worldX: number,
   worldY: number,
   gridSize: number,
-): PlacedEffect | null {
+): PlacedMapTemplate | null {
   for (let i = effects.length - 1; i >= 0; i--) {
     const effect = effects[i];
     if (effect.dismissedAt) continue;
@@ -105,7 +105,7 @@ export function computeTokenSourcedOrigin(
   casterToken: { x: number; y: number; gridWidth: number; gridHeight: number },
   direction: number,
   gridSize: number,
-  shape: EffectTemplate['shape'],
+  shape: MapTemplateDefinition['shape'],
 ): { x: number; y: number } {
   // Burst shapes center on the token
   if (isBurstShape(shape)) {
@@ -287,7 +287,7 @@ function renderSpellIntentLine(
 
 function renderEffect(
   rc: EffectRenderContext,
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
   fadeMul: number = 1.0,
@@ -361,7 +361,7 @@ function getTextureImage(url: string): TextureSource | null {
   textureImageCache.set(url, 'loading');
   img.onload = () => textureImageCache.set(url, img);
   img.onerror = (e) => {
-    console.warn('[effectRenderer] Failed to load texture:', url.substring(0, 80), e);
+    console.warn('[mapTemplateRenderer] Failed to load texture:', url.substring(0, 80), e);
     textureImageCache.set(url, 'error');
   };
   img.src = url;
@@ -374,7 +374,7 @@ function getTextureImage(url: string): TextureSource | null {
 
 function drawShape(
   rc: EffectRenderContext,
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
   _colorShift: number,
@@ -405,7 +405,7 @@ function drawTextureInPath(
   ctx: CanvasRenderingContext2D,
   img: TextureSource,
   path: Path2D,
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
   gridSize: number,
@@ -494,7 +494,7 @@ function drawTextureInPath(
 
 function strokeShape(
   rc: EffectRenderContext,
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
 ): void {
@@ -508,7 +508,7 @@ function strokeShape(
 }
 
 function buildPath(
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
   gridSize: number,
@@ -683,7 +683,7 @@ function clamp(v: number, min: number, max: number): number {
  */
 function renderPolylineEffect(
   rc: EffectRenderContext,
-  effect: PlacedEffect,
+  effect: PlacedMapTemplate,
   fadeMul: number,
 ): void {
   const { ctx, time, gridSize } = rc;
@@ -856,7 +856,7 @@ export interface AuraRenderContext extends EffectRenderContext {
  */
 export function renderAuraEffects(
   rc: AuraRenderContext,
-  effects: PlacedEffect[],
+  effects: PlacedMapTemplate[],
 ): void {
   const auraEffects = effects.filter(e => e.isAura && e.anchorTokenId && e.template.aura);
   if (auraEffects.length === 0) return;
@@ -973,12 +973,12 @@ export function renderRemoteEffectPreviews(rc: EffectRenderContext): void {
   const entries = Object.entries(previews);
   if (entries.length === 0) return;
 
-  const effectStore = useEffectStore.getState();
+  const mapTemplateStore = useMapTemplateStore.getState();
 
   for (const [_userId, preview] of entries) {
     // Resolve the template — check custom store templates first, then built-ins
-    let template: EffectTemplate | undefined =
-      effectStore.allTemplates.find((t) => t.id === preview.templateId) ??
+    let template: MapTemplateDefinition | undefined =
+      mapTemplateStore.allTemplates.find((t) => t.id === preview.templateId) ??
       getBuiltInTemplate(preview.templateId);
 
     if (!template) continue;

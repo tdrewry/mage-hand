@@ -7,7 +7,7 @@
  * - Continuous re-evaluation when tokens or the aura source move
  */
 
-import type { PlacedEffect, EffectImpact } from '@/types/effectTypes';
+import type { PlacedMapTemplate, EffectImpact } from '@/types/effectTypes';
 import type { Token } from '@/stores/sessionStore';
 import type { LineSegment, Point } from '@/lib/visibilityEngine';
 import { computeVisibilityFromSegments } from '@/lib/visibilityEngine';
@@ -123,7 +123,7 @@ export function diffAuraTokens(
  * @returns AuraUpdateResult with enter/exit info and updated impacts
  */
 export function updateAura(
-  effect: PlacedEffect,
+  effect: PlacedMapTemplate,
   anchorToken: Token,
   allTokens: Token[],
   wallSegments: LineSegment[],
@@ -188,7 +188,7 @@ export function updateAura(
  * Called once per round during tickRound.
  */
 export function applyAuraStayEffects(
-  effect: PlacedEffect,
+  effect: PlacedMapTemplate,
   getCharacter: (tokenId: string) => DndBeyondCharacter | undefined,
 ): void {
   const insideIds = effect.tokensInsideArea ?? [];
@@ -218,7 +218,7 @@ export function applyAuraStayEffects(
  * It does NOT apply/remove modifiers (those require character data).
  */
 export function tickAuras(
-  auraEffects: PlacedEffect[],
+  auraEffects: PlacedMapTemplate[],
   tokens: Token[],
   wallSegments: LineSegment[],
   gridSize: number,

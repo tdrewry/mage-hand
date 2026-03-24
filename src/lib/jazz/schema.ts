@@ -165,7 +165,7 @@ export const JazzPlacedEffect = co.map({
   isAura: z.optional(z.boolean()),
   anchorTokenId: z.optional(z.string()),
   recurring: z.optional(z.boolean()),
-  /** JSON: stripped EffectTemplate snapshot (fallback for template reconstruction) */
+  /** JSON: stripped MapTemplateDefinition snapshot (fallback for template reconstruction) */
   templateJson: z.optional(z.string()),
   /** JSON: EffectImpact[] */
   impactedTargetsJson: z.optional(z.string()),
@@ -186,7 +186,7 @@ export type JazzPlacedEffectList = co.loaded<typeof JazzPlacedEffectList>;
 
 export const JazzCustomTemplate = co.map({
   templateId: z.string(),
-  /** JSON.stringify of the full EffectTemplate (minus texture/icon data URIs) */
+  /** JSON.stringify of the full MapTemplateDefinition (minus texture/icon data URIs) */
   templateJson: z.string(),
 });
 export type JazzCustomTemplate = co.loaded<typeof JazzCustomTemplate>;

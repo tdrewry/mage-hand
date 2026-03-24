@@ -7,9 +7,9 @@ import { toast } from "sonner";
 import { triggerSound } from "@/lib/soundEngine";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useRegionStore } from "@/stores/regionStore";
-import { useEffectStore } from "@/stores/effectStore";
+import { useMapTemplateStore } from "@/stores/mapTemplateStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
-import { BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
+import { BUILT_IN_EFFECT_TEMPLATES } from "@/lib/mapTemplateLibrary";
 // dragPreviewStore handlers moved to ephemeral tokenHandlers.ts
 
 /** Handler for a specific op kind. Receives the op data and the userId who sent it. */
@@ -129,7 +129,7 @@ class OpBridgeImpl {
     this.register("effect.update", (data) => {
       const d = data as Record<string, unknown>;
       if (!d || typeof d.id !== 'string') return;
-      const store = useEffectStore.getState();
+      const store = useMapTemplateStore.getState();
       // Effect templates are synced via customTemplates
       const existing = store.allTemplates.find(t => t.id === d.id);
       if (!existing) {
@@ -159,7 +159,7 @@ class OpBridgeImpl {
         anchorTokenId?: string;
       };
       if (!d || !d.id || !d.templateId) return;
-      const store = useEffectStore.getState();
+      const store = useMapTemplateStore.getState();
       // Skip if effect already exists locally (echo from our own placement)
       if (store.placedEffects.some(e => e.id === d.id)) return;
 
@@ -188,7 +188,7 @@ class OpBridgeImpl {
         ...(d.isAura ? { isAura: true, anchorTokenId: d.anchorTokenId, tokensInsideArea: [] } : {}),
       };
 
-      useEffectStore.setState((s) => ({
+      useMapTemplateStore.setState((s) => ({
         placedEffects: [...s.placedEffects, effect],
       }));
       triggerSound('effect.placed');
@@ -198,10 +198,10 @@ class OpBridgeImpl {
     this.register("effect.dismiss", (data) => {
       const d = data as { effectId: string };
       if (!d?.effectId) return;
-      const store = useEffectStore.getState();
+      const store = useMapTemplateStore.getState();
       const existing = store.placedEffects.find(e => e.id === d.effectId);
       if (!existing || existing.dismissedAt) return;
-      useEffectStore.setState((s) => ({
+      useMapTemplateStore.setState((s) => ({
         placedEffects: s.placedEffects.map(e =>
           e.id === d.effectId ? { ...e, dismissedAt: performance.now() } : e
         ),
@@ -213,10 +213,10 @@ class OpBridgeImpl {
     this.register("effect.cancel", (data) => {
       const d = data as { effectId: string };
       if (!d?.effectId) return;
-      const store = useEffectStore.getState();
+      const store = useMapTemplateStore.getState();
       const existing = store.placedEffects.find(e => e.id === d.effectId);
       if (!existing || existing.cancelledAt) return;
-      useEffectStore.setState((s) => ({
+      useMapTemplateStore.setState((s) => ({
         placedEffects: s.placedEffects.map(e =>
           e.id === d.effectId
             ? { ...e, cancelledAt: performance.now(), dismissedAt: e.dismissedAt ?? performance.now() }
@@ -229,14 +229,14 @@ class OpBridgeImpl {
     this.register("effect.template.add", (data) => {
       const d = data as { template: any };
       if (!d?.template?.id) return;
-      const store = useEffectStore.getState();
+      const store = useMapTemplateStore.getState();
       // Skip if template already exists
       if (store.customTemplates.some(t => t.id === d.template.id)) {
         // Update instead
         store.updateCustomTemplate(d.template.id, d.template);
       } else {
         // Direct setState to preserve the original ID (addCustomTemplate generates new ones)
-        useEffectStore.setState((s) => {
+        useMapTemplateStore.setState((s) => {
           const newCustom = [...s.customTemplates, { ...d.template, isBuiltIn: false }];
           const customIds = new Set(newCustom.map(t => t.id));
           const hiddenSet = new Set(s.hiddenBuiltInIds);

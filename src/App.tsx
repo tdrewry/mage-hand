@@ -61,7 +61,7 @@ const AppInner = () => {
         const { registerPresenceHandlers } = await import("@/lib/net/ephemeral/presenceHandlers");
         const { registerMiscHandlers } = await import("@/lib/net/ephemeral/miscHandlers");
         const { registerMapHandlers } = await import("@/lib/net/ephemeral/mapHandlers");
-        const { registerEffectHandlers } = await import("@/lib/net/ephemeral/effectHandlers");
+        const { registerEffectHandlers } = await import("@/lib/net/ephemeral/mapTemplateHandlers");
         const { registerAmbientHandlers } = await import("@/lib/net/ephemeral/ambientHandlers");
         
         registerTokenHandlers();

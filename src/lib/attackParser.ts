@@ -31,7 +31,7 @@ export interface TokenActionItem {
   /** Can be used as an AttackDefinition for the action system */
   asAttack?: AttackDefinition;
   /** Explicitly assigned effect template ID */
-  effectTemplateId?: string;
+  mapTemplateId?: string;
   /** Custom pipeline ID linked from rules engine */
   pipelineId?: string;
 }
@@ -251,7 +251,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
         category: 'spell',
         spellLevel: 0,
         description: 'Cantrip',
-        effectTemplateId: cantrip.effectTemplateId,
+        mapTemplateId: cantrip.mapTemplateId,
       });
     }
     for (const lvl of character.spells.spellsByLevel) {
@@ -263,7 +263,7 @@ function collectCharacterActions(character: DndBeyondCharacter): TokenActionItem
           spellLevel: lvl.level,
           proficient: spell.prepared,
           description: `Level ${lvl.level}${spell.prepared ? ' (prepared)' : ''}`,
-          effectTemplateId: spell.effectTemplateId,
+          mapTemplateId: spell.mapTemplateId,
         });
       }
     }

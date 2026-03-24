@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
 import type { CreatureAction } from '@/types/creatureTypes';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useRuleStore } from '@/stores/ruleStore';
 
 interface ActionEditorProps {
@@ -15,7 +15,7 @@ interface ActionEditorProps {
 }
 
 export function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) {
-  const allTemplates = useEffectStore(s => s.allTemplates);
+  const allTemplates = useMapTemplateStore(s => s.allTemplates);
   const pipelines = useRuleStore(s => s.pipelines);
 
   return (

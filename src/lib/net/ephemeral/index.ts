@@ -44,7 +44,7 @@ export type {
   PortalTeleportDeniedPayload,
 } from "./types";
 export { EPHEMERAL_OP_CONFIG } from "./types";
-export { registerEffectHandlers, emitAuraState } from "./effectHandlers";
+export { registerEffectHandlers, emitAuraState } from "./mapTemplateHandlers";
 export { emitChatTyping, emitChatMessage, emitAssetUploadProgress, emitArtSubmission, emitArtAccepted, emitArtRejected } from "./miscHandlers";
 export { emitMapSelectMap, emitMapTreeSync, emitPortalActivate, emitRegionDragUpdate, emitPortalTeleportRequest, emitPortalTeleportApproved, emitPortalTeleportDenied } from "./mapHandlers";
 export { registerAmbientHandlers, emitAmbientLoopPlay, emitAmbientLoopStop } from "./ambientHandlers";

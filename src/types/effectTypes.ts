@@ -70,7 +70,7 @@ export interface MultiDropConfig {
 // Template (library definition — reusable blueprint)
 // ---------------------------------------------------------------------------
 
-export interface EffectTemplate {
+export interface MapTemplateDefinition {
   id: string;
   name: string;
 
@@ -148,11 +148,11 @@ export interface EffectTemplate {
 // Placed instance (on the map)
 // ---------------------------------------------------------------------------
 
-export interface PlacedEffect {
+export interface PlacedMapTemplate {
   id: string;
   templateId: string;
   /** Snapshot of the template at placement time */
-  template: EffectTemplate;
+  template: MapTemplateDefinition;
 
   // World-coordinate origin
   origin: { x: number; y: number };
@@ -219,7 +219,7 @@ export type EffectPlacementStep = 'origin' | 'direction' | 'polyline';
 
 export interface EffectPlacementState {
   templateId: string;
-  template: EffectTemplate;
+  template: MapTemplateDefinition;
   casterId?: string;
 
   /** Current step in the two-step placement flow */

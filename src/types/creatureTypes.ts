@@ -6,7 +6,7 @@ export interface CreatureAction {
   damageType?: string;
   range?: string;
   description: string;
-  effectTemplateId?: string;
+  mapTemplateId?: string;
   
   // Routing Rules
   targetingMode?: 'manual' | 'template' | 'self';
@@ -18,7 +18,7 @@ export interface CreatureAction {
 export interface CreatureSpell {
   name: string;
   prepared?: boolean;
-  effectTemplateId?: string;
+  mapTemplateId?: string;
   
   // Routing Rules
   targetingMode?: 'manual' | 'template' | 'self';

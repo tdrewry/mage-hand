@@ -142,8 +142,8 @@ import { WaitingRoomOverlay } from "./WaitingRoomOverlay";
 import { FEATURE_CANVAS_FORCE_REDRAW, FEATURE_CANVAS_DRAG_LIVE_PREVIEW, CANVAS_DRAG_BROADCAST_FPS } from "@/lib/featureFlags";
 import { useMapTreeSync } from "@/hooks/useMapTreeSync";
 import { registerMiscHandlers } from "@/lib/net/ephemeral/miscHandlers";
-import { registerEffectHandlers } from "@/lib/net/ephemeral/effectHandlers";
-import { emitAuraState } from "@/lib/net/ephemeral/effectHandlers";
+import { registerEffectHandlers } from "@/lib/net/ephemeral/mapTemplateHandlers";
+import { emitAuraState } from "@/lib/net/ephemeral/mapTemplateHandlers";
 import { registerAmbientHandlers } from "@/lib/net/ephemeral/ambientHandlers";
 import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useActiveMapFilter } from "@/hooks/useActiveMapFilter";
@@ -172,10 +172,10 @@ import {
   calculateTokenHexOccupancy,
   calculateTokenSquareOccupancy,
 } from "../lib/gridOccupancy";
-import { useEffectStore } from "../stores/effectStore";
-import { renderPlacedEffects, renderPlacementPreview, renderRemoteEffectPreviews, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/effectRenderer";
-import { EffectContextMenu } from "./EffectContextMenu";
-import { computeEffectImpacts } from "../lib/effectHitTesting";
+import { useMapTemplateStore } from "../stores/mapTemplateStore";
+import { renderPlacedEffects, renderPlacementPreview, renderRemoteEffectPreviews, hitTestEffectAtPoint, computeTokenSourcedOrigin, renderAuraEffects } from "../lib/mapTemplateRenderer";
+import { EffectContextMenu } from "./MapTemplateContextMenu";
+import { computeEffectImpacts } from "../lib/mapTemplateHitTesting";
 import { tickAuras } from "../lib/auraEngine";
 
 
@@ -803,7 +803,7 @@ export const SimpleTabletop = () => {
   // re-entrancy hazard. Moving it here keeps the render loop side-effect-free.
   useEffect(() => {
     const id = setInterval(() => {
-      useEffectStore.getState().cleanupDismissedEffects();
+      useMapTemplateStore.getState().cleanupDismissedEffects();
     }, 1500);
     return () => clearInterval(id);
   }, []);
@@ -811,7 +811,7 @@ export const SimpleTabletop = () => {
   // ── Block 2C: tickAuras — run at ~5Hz via interval instead of throttle-ref inside rAF ──
   useEffect(() => {
     const id = setInterval(() => {
-      const effectState = useEffectStore.getState();
+      const effectState = useMapTemplateStore.getState();
       const activeMapId = selectedMapId || 'default-map';
       const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
       const auraEffects = mapEffects.filter(e => e.isAura);
@@ -1456,7 +1456,7 @@ export const SimpleTabletop = () => {
     const token = tokens.find(t => t.id === tokenId);
     if (!token) return;
 
-    const effectState = useEffectStore.getState();
+    const effectState = useMapTemplateStore.getState();
     const tokenMapId = token.mapId ?? useMapStore.getState().selectedMapId;
 
     // Only check persistent effects on the same map
@@ -1497,7 +1497,7 @@ export const SimpleTabletop = () => {
       if (!tokenHit) continue;
 
       // Mark this token as triggered for this effect
-      useEffectStore.getState().markTokenTriggered(effect.id, tokenId);
+      useMapTemplateStore.getState().markTokenTriggered(effect.id, tokenId);
       triggerSound('effect.triggered');
 
       // Token entered a trap/persistent effect — open Action Card
@@ -1525,7 +1525,7 @@ export const SimpleTabletop = () => {
         damageType: effect.template.damageType,
         damageDice: effect.template.damageDice,
         damageFormula: undefined, // DM resolves damage manually for traps
-        placedEffectId: effect.id,
+        placedMapTemplateId: effect.id,
         castLevel: effect.castLevel,
         impacts: [tokenHit],
       });
@@ -1727,7 +1727,7 @@ export const SimpleTabletop = () => {
       }
       // Enter to finalize polyline placement
       else if (e.key === 'Enter') {
-        const effectS = useEffectStore.getState();
+        const effectS = useMapTemplateStore.getState();
         if (effectS.placement?.step === 'polyline') {
           e.preventDefault();
           const pl = effectS.placement;
@@ -1781,7 +1781,7 @@ export const SimpleTabletop = () => {
                 damageType: pl.template.damageType,
                 damageFormula: pl.damageFormula,
                 damageDice: pl.template.damageDice,
-                placedEffectId: placed.id,
+                placedMapTemplateId: placed.id,
                 castLevel: pl.castLevel,
                 impacts,
               });
@@ -1804,7 +1804,7 @@ export const SimpleTabletop = () => {
           return;
         }
         // Cancel effect placement if active
-        const effectS = useEffectStore.getState();
+        const effectS = useMapTemplateStore.getState();
         if (effectS.placement) {
           effectS.cancelPlacement();
           redrawCanvas();
@@ -2031,7 +2031,7 @@ export const SimpleTabletop = () => {
 
   // ── Token-sourced effect placement: auto-inject selected token as caster ──
   useEffect(() => {
-    const unsub = useEffectStore.subscribe((state, prevState) => {
+    const unsub = useMapTemplateStore.subscribe((state, prevState) => {
       const placement = state.placement;
       const prevPlacement = prevState.placement;
       // Detect new placement that just started (step='origin' means no caster token yet)
@@ -2064,13 +2064,13 @@ export const SimpleTabletop = () => {
               activeMapIds,
             });
 
-            const placed = useEffectStore.getState().placeEffect(placement.template.id, { x: token.x, y: token.y }, activeMapId, {
+            const placed = useMapTemplateStore.getState().placeEffect(placement.template.id, { x: token.x, y: token.y }, activeMapId, {
               direction: 0,
               casterId: token.id,
               impactedTargets: impacts,
             });
 
-            useEffectStore.getState().cancelPlacement();
+            useMapTemplateStore.getState().cancelPlacement();
 
             const tokenImpacts = impacts.filter(i => i.targetType === 'token');
             if (tokenImpacts.length > 0) {
@@ -2098,7 +2098,7 @@ export const SimpleTabletop = () => {
                 damageType: placement.template.damageType,
                 damageFormula: placement.damageFormula,
                 damageDice: placement.template.damageDice,
-                placedEffectId: placed.id,
+                placedMapTemplateId: placed.id,
                 castLevel: placement.castLevel,
                 impacts,
               });
@@ -2108,7 +2108,7 @@ export const SimpleTabletop = () => {
           } else {
             // Ranged token-sourced: keep step='origin' so user picks placement point
             // Non-ranged: skip to direction step with origin locked to token
-            useEffectStore.setState({
+            useMapTemplateStore.setState({
               placement: {
                 ...placement,
                 casterId: token.id,
@@ -4573,7 +4573,7 @@ export const SimpleTabletop = () => {
     if (!useOverlayForTokens) {
       // ── Placed spell/trap effects BELOW tokens (so tokens are always visible, and fog hides uncountered effects) ──
       {
-        const effectState = useEffectStore.getState();
+        const effectState = useMapTemplateStore.getState();
         const activeMapId = selectedMapId || 'default-map';
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
@@ -4615,7 +4615,7 @@ export const SimpleTabletop = () => {
 
       // ── Pinned above-token effects ──
       {
-        const effectState = useEffectStore.getState();
+        const effectState = useMapTemplateStore.getState();
         const activeMapId = selectedMapId || 'default-map';
         const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
         const effectGridSize = regions[0]?.gridSize || 40;
@@ -4700,7 +4700,7 @@ export const SimpleTabletop = () => {
 
             // ── Placed spell/trap effects BELOW tokens on overlay ──
             {
-              const effectState = useEffectStore.getState();
+              const effectState = useMapTemplateStore.getState();
               const activeMapId = selectedMapId || 'default-map';
               const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
               const effectGridSize = regions[0]?.gridSize || 40;
@@ -4750,7 +4750,7 @@ export const SimpleTabletop = () => {
 
             // ── Pinned above-token effects on overlay ──
             {
-              const effectState = useEffectStore.getState();
+              const effectState = useMapTemplateStore.getState();
               const activeMapId = selectedMapId || 'default-map';
               const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
               const effectGridSize = regions[0]?.gridSize || 40;
@@ -7780,7 +7780,7 @@ export const SimpleTabletop = () => {
     );
 
     // Check for active effect animations or placement preview
-    const effectState = useEffectStore.getState();
+    const effectState = useMapTemplateStore.getState();
     const hasAnimatedEffects = effectState.placedEffects.some(e => e.template.animation !== 'none' || e.template.persistence === 'instant' || !!e.dismissedAt);
     const hasEffectPlacement = !!effectState.placement;
 
@@ -7883,7 +7883,7 @@ export const SimpleTabletop = () => {
         effectGridSize: number,
       ) => {
         if (waypoints.length < 2) {
-          useEffectStore.getState().cancelPlacement();
+          useMapTemplateStore.getState().cancelPlacement();
           redrawCanvas();
           return;
         }
@@ -7905,14 +7905,14 @@ export const SimpleTabletop = () => {
         });
 
         // Place the effect with waypoints
-        const placed = useEffectStore.getState().placeEffect(template.id, waypoints[0], activeMapId, {
+        const placed = useMapTemplateStore.getState().placeEffect(template.id, waypoints[0], activeMapId, {
           direction: 0,
           casterId: pl.casterId,
           impactedTargets: impacts,
           waypoints,
         });
 
-        useEffectStore.getState().cancelPlacement();
+        useMapTemplateStore.getState().cancelPlacement();
 
         // Open Action Card if tokens were hit
         const tokenImpacts = impacts.filter(i => i.targetType === 'token');
@@ -7941,7 +7941,7 @@ export const SimpleTabletop = () => {
             damageType: template.damageType,
             damageFormula: pl.damageFormula,
             damageDice: template.damageDice,
-            placedEffectId: placed.id,
+            placedMapTemplateId: placed.id,
             castLevel: pl.castLevel,
             impacts,
           });
@@ -7950,7 +7950,7 @@ export const SimpleTabletop = () => {
 
       // ── EFFECT PLACEMENT: two-step flow (1. origin, 2. direction) ──
       // Multi-drop effects repeat the origin step `count` times.
-      const effectState = useEffectStore.getState();
+      const effectState = useMapTemplateStore.getState();
       if (effectState.placement) {
         const placement = effectState.placement;
         const isMultiDrop = !!(placement.multiDropTotal && placement.multiDropTotal > 1);
@@ -7965,7 +7965,7 @@ export const SimpleTabletop = () => {
 
           if (currentWaypoints.length === 0) {
             // First click: set first waypoint
-            useEffectStore.setState({
+            useMapTemplateStore.setState({
               placement: {
                 ...placement,
                 polylineWaypoints: [worldPos],
@@ -8003,7 +8003,7 @@ export const SimpleTabletop = () => {
             if (newUsedLen >= maxLen - 0.01) {
               finalizePolylinePlacement(placement, newWaypoints, effectGridSize);
             } else {
-              useEffectStore.setState({
+              useMapTemplateStore.setState({
                 placement: {
                   ...placement,
                   polylineWaypoints: newWaypoints,
@@ -8057,7 +8057,7 @@ export const SimpleTabletop = () => {
 
             if (placedSoFar >= placement.multiDropTotal!) {
               // All drops placed — finalize: collect all group impacts and open Action Card
-              const allGroupEffects = useEffectStore.getState().placedEffects.filter(
+              const allGroupEffects = useMapTemplateStore.getState().placedEffects.filter(
                 e => e.groupId === placement.multiDropGroupId
               );
               const allImpacts = allGroupEffects.flatMap(e => e.impactedTargets);
@@ -8098,7 +8098,7 @@ export const SimpleTabletop = () => {
                     damageType: template.damageType,
                     damageFormula: placement.damageFormula,
                     damageDice: template.damageDice,
-                    placedEffectId: groupEffect.id,
+                    placedMapTemplateId: groupEffect.id,
                     groupId: placement.multiDropGroupId,
                     castLevel: placement.castLevel,
                     impacts: dropImpacts,
@@ -8107,7 +8107,7 @@ export const SimpleTabletop = () => {
               }
             } else {
               // More drops to place — reset for next click
-              useEffectStore.setState({
+              useMapTemplateStore.setState({
                 placement: {
                   ...placement,
                   step: 'origin',
@@ -8175,7 +8175,7 @@ export const SimpleTabletop = () => {
                 damageType: template.damageType,
                 damageFormula: placement.damageFormula,
                 damageDice: template.damageDice,
-                placedEffectId: placed.id,
+                placedMapTemplateId: placed.id,
                 castLevel: placement.castLevel,
                 impacts,
               });
@@ -8267,7 +8267,7 @@ export const SimpleTabletop = () => {
             damageType: template.damageType,
             damageFormula: placement.damageFormula,
             damageDice: template.damageDice,
-            placedEffectId: placed.id,
+            placedMapTemplateId: placed.id,
             castLevel: placement.castLevel,
             impacts,
           });
@@ -8523,7 +8523,7 @@ export const SimpleTabletop = () => {
 
     // Check if DM right-clicked on a placed effect (after token check)
     if (isDM) {
-      const effectState = useEffectStore.getState();
+      const effectState = useMapTemplateStore.getState();
       const activeMapId = selectedMapId || 'default-map';
       const mapEffects = effectState.placedEffects.filter(e => e.mapId === activeMapId);
       const effectGridSize = regions[0]?.gridSize || 40;
@@ -8751,7 +8751,7 @@ export const SimpleTabletop = () => {
     const worldPos = screenToWorld(mouseX, mouseY);
 
     // ── EFFECT PLACEMENT MODE: disable all entity selection/interaction ──
-    const effectPlacementActive = !!useEffectStore.getState().placement;
+    const effectPlacementActive = !!useMapTemplateStore.getState().placement;
 
     if (e.button === 1) {
       // Middle click — canvas pan (always allowed)
@@ -9638,16 +9638,16 @@ export const SimpleTabletop = () => {
     const mouseY = e.clientY - rect.top;
 
     // ── EFFECT PLACEMENT PREVIEW: update preview origin/direction ──
-    const effectPlacement = useEffectStore.getState().placement;
+    const effectPlacement = useMapTemplateStore.getState().placement;
     if (effectPlacement) {
       const worldPos = screenToWorld(mouseX, mouseY);
 
       if (effectPlacement.step === 'polyline') {
         // Polyline: preview follows mouse for the next segment
-        useEffectStore.getState().updatePlacementPreview(worldPos, 0);
+        useMapTemplateStore.getState().updatePlacementPreview(worldPos, 0);
       } else if (effectPlacement.step === 'origin') {
         // Step 1: preview follows mouse as the origin point
-        useEffectStore.getState().updatePlacementPreview(worldPos, 0);
+        useMapTemplateStore.getState().updatePlacementPreview(worldPos, 0);
       } else {
         // Step 2: origin is locked, compute direction from origin to mouse
         // For ranged token-sourced, direction is from the locked origin (not token center)
@@ -9672,9 +9672,9 @@ export const SimpleTabletop = () => {
             effectGridSize,
             effectPlacement.template.shape,
           );
-          useEffectStore.getState().updatePlacementPreview(perimeterOrigin, direction);
+          useMapTemplateStore.getState().updatePlacementPreview(perimeterOrigin, direction);
         } else {
-          useEffectStore.getState().updatePlacementPreview(effectPlacement.origin!, direction);
+          useMapTemplateStore.getState().updatePlacementPreview(effectPlacement.origin!, direction);
         }
       }
 
@@ -12646,7 +12646,7 @@ export const SimpleTabletop = () => {
           onMouseUp={handleMouseUp}
           onDoubleClick={(e) => {
             // Polyline finalization on double-click
-            const effectS = useEffectStore.getState();
+            const effectS = useMapTemplateStore.getState();
             if (effectS.placement?.step === 'polyline') {
               const pl = effectS.placement;
               const waypoints = pl.polylineWaypoints ?? [];
@@ -12698,7 +12698,7 @@ export const SimpleTabletop = () => {
                     damageType: pl.template.damageType,
                     damageFormula: pl.damageFormula,
                     damageDice: pl.template.damageDice,
-                    placedEffectId: placed.id,
+                    placedMapTemplateId: placed.id,
                     castLevel: pl.castLevel,
                     impacts,
                   });

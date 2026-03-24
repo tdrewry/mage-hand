@@ -1,8 +1,8 @@
-// src/lib/net/ephemeral/effectHandlers.ts
+// src/lib/net/ephemeral/mapTemplateHandlers.ts
 // Registers ephemeral handlers for effect.aura.state and effect.placement.preview.
 
 import { ephemeralBus } from "@/lib/net";
-import { useEffectStore } from "@/stores/effectStore";
+import { useMapTemplateStore } from "@/stores/mapTemplateStore";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { triggerSound } from "@/lib/soundEngine";
 import type { EffectImpact } from "@/types/effectTypes";
@@ -19,7 +19,7 @@ export function registerEffectHandlers(): void {
 
   // ── Aura State (inbound from DM/owner) ──
   ephemeralBus.on("effect.aura.state", (data: EffectAuraStatePayload, _userId) => {
-    useEffectStore.getState().updateAuraState(
+    useMapTemplateStore.getState().updateAuraState(
       data.effectId,
       data.origin,
       data.impacts as EffectImpact[],

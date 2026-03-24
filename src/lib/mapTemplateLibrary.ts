@@ -5,13 +5,13 @@
  * All dimensions are in grid units (1 unit = 5 ft by default).
  */
 
-import type { EffectTemplate } from '@/types/effectTypes';
+import type { MapTemplateDefinition } from '@/types/effectTypes';
 
 // ---------------------------------------------------------------------------
 // Spell templates
 // ---------------------------------------------------------------------------
 
-export const FIREBALL: EffectTemplate = {
+export const FIREBALL: MapTemplateDefinition = {
   id: 'builtin-fireball',
   name: 'Fireball',
   shape: 'circle',
@@ -34,7 +34,7 @@ export const FIREBALL: EffectTemplate = {
   scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
-export const LIGHTNING_BOLT: EffectTemplate = {
+export const LIGHTNING_BOLT: MapTemplateDefinition = {
   id: 'builtin-lightning-bolt',
   name: 'Lightning Bolt',
   shape: 'line',
@@ -57,7 +57,7 @@ export const LIGHTNING_BOLT: EffectTemplate = {
   scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
-export const CONE_OF_COLD: EffectTemplate = {
+export const CONE_OF_COLD: MapTemplateDefinition = {
   id: 'builtin-cone-of-cold',
   name: 'Cone of Cold',
   shape: 'cone',
@@ -80,7 +80,7 @@ export const CONE_OF_COLD: EffectTemplate = {
   scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
-export const WALL_OF_FIRE: EffectTemplate = {
+export const WALL_OF_FIRE: MapTemplateDefinition = {
   id: 'builtin-wall-of-fire',
   name: 'Wall of Fire',
   shape: 'polyline',
@@ -103,7 +103,7 @@ export const WALL_OF_FIRE: EffectTemplate = {
   ranged: true,
 };
 
-export const GREASE: EffectTemplate = {
+export const GREASE: MapTemplateDefinition = {
   id: 'builtin-grease',
   name: 'Grease',
   shape: 'rectangle',
@@ -125,7 +125,7 @@ export const GREASE: EffectTemplate = {
   ranged: true,
 };
 
-export const WEB: EffectTemplate = {
+export const WEB: MapTemplateDefinition = {
   id: 'builtin-web',
   name: 'Web',
   shape: 'rectangle',
@@ -147,7 +147,7 @@ export const WEB: EffectTemplate = {
   ranged: true,
 };
 
-export const BURNING_HANDS: EffectTemplate = {
+export const BURNING_HANDS: MapTemplateDefinition = {
   id: 'builtin-burning-hands',
   name: 'Burning Hands',
   shape: 'cone',
@@ -170,7 +170,7 @@ export const BURNING_HANDS: EffectTemplate = {
   scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
-export const DARKNESS: EffectTemplate = {
+export const DARKNESS: MapTemplateDefinition = {
   id: 'builtin-darkness',
   name: 'Darkness',
   shape: 'circle',
@@ -191,7 +191,7 @@ export const DARKNESS: EffectTemplate = {
   ranged: true,
 };
 
-export const SPIRIT_GUARDIANS: EffectTemplate = {
+export const SPIRIT_GUARDIANS: MapTemplateDefinition = {
   id: 'builtin-spirit-guardians',
   name: 'Spirit Guardians',
   shape: 'circle-burst',
@@ -215,7 +215,7 @@ export const SPIRIT_GUARDIANS: EffectTemplate = {
   scaling: [{ property: 'damageDice', perLevel: 1, diceIndex: 0 }],
 };
 
-export const THUNDERWAVE: EffectTemplate = {
+export const THUNDERWAVE: MapTemplateDefinition = {
   id: 'builtin-thunderwave',
   name: 'Thunderwave',
   shape: 'rectangle-burst',
@@ -242,7 +242,7 @@ export const THUNDERWAVE: EffectTemplate = {
 // Trap / hazard templates
 // ---------------------------------------------------------------------------
 
-export const PIT_TRAP: EffectTemplate = {
+export const PIT_TRAP: MapTemplateDefinition = {
   id: 'builtin-pit-trap',
   name: 'Pit Trap',
   shape: 'rectangle',
@@ -262,7 +262,7 @@ export const PIT_TRAP: EffectTemplate = {
   isBuiltIn: true,
 };
 
-export const POISON_GAS_CLOUD: EffectTemplate = {
+export const POISON_GAS_CLOUD: MapTemplateDefinition = {
   id: 'builtin-poison-gas',
   name: 'Poison Gas Cloud',
   shape: 'circle',
@@ -285,7 +285,7 @@ export const POISON_GAS_CLOUD: EffectTemplate = {
 // Multi-drop spell templates
 // ---------------------------------------------------------------------------
 
-export const STORM_OF_VENGEANCE_BOLTS: EffectTemplate = {
+export const STORM_OF_VENGEANCE_BOLTS: MapTemplateDefinition = {
   id: 'builtin-storm-vengeance-bolts',
   name: 'Storm of Vengeance (Bolts)',
   shape: 'circle',
@@ -310,7 +310,7 @@ export const STORM_OF_VENGEANCE_BOLTS: EffectTemplate = {
   },
 };
 
-export const METEOR_SWARM: EffectTemplate = {
+export const METEOR_SWARM: MapTemplateDefinition = {
   id: 'builtin-meteor-swarm',
   name: 'Meteor Swarm',
   shape: 'circle',
@@ -342,7 +342,7 @@ export const METEOR_SWARM: EffectTemplate = {
 // Multi-damage-type spell templates
 // ---------------------------------------------------------------------------
 
-export const FLAME_STRIKE: EffectTemplate = {
+export const FLAME_STRIKE: MapTemplateDefinition = {
   id: 'builtin-flame-strike',
   name: 'Flame Strike',
   shape: 'circle',
@@ -375,7 +375,7 @@ export const FLAME_STRIKE: EffectTemplate = {
 // Polyline wall spell templates
 // ---------------------------------------------------------------------------
 
-export const WALL_OF_FORCE: EffectTemplate = {
+export const WALL_OF_FORCE: MapTemplateDefinition = {
   id: 'builtin-wall-of-force',
   name: 'Wall of Force',
   shape: 'polyline',
@@ -397,7 +397,7 @@ export const WALL_OF_FORCE: EffectTemplate = {
   ranged: true,
 };
 
-export const WALL_OF_THORNS: EffectTemplate = {
+export const WALL_OF_THORNS: MapTemplateDefinition = {
   id: 'builtin-wall-of-thorns',
   name: 'Wall of Thorns',
   shape: 'polyline',
@@ -423,7 +423,7 @@ export const WALL_OF_THORNS: EffectTemplate = {
 // Buff / modifier spell templates
 // ---------------------------------------------------------------------------
 
-export const SHIELD_OF_FAITH: EffectTemplate = {
+export const SHIELD_OF_FAITH: MapTemplateDefinition = {
   id: 'builtin-shield-of-faith',
   name: 'Shield of Faith',
   shape: 'circle',
@@ -446,7 +446,7 @@ export const SHIELD_OF_FAITH: EffectTemplate = {
   ],
 };
 
-export const HASTE: EffectTemplate = {
+export const HASTE: MapTemplateDefinition = {
   id: 'builtin-haste',
   name: 'Haste',
   shape: 'circle',
@@ -470,7 +470,7 @@ export const HASTE: EffectTemplate = {
   ],
 };
 
-export const BLESS: EffectTemplate = {
+export const BLESS: MapTemplateDefinition = {
   id: 'builtin-bless',
   name: 'Bless',
   shape: 'circle',
@@ -491,7 +491,7 @@ export const BLESS: EffectTemplate = {
   multiDrop: { count: 3 },
 };
 
-export const HOLD_PERSON: EffectTemplate = {
+export const HOLD_PERSON: MapTemplateDefinition = {
   id: 'builtin-hold-person',
   name: 'Hold Person',
   shape: 'circle',
@@ -519,7 +519,7 @@ export const HOLD_PERSON: EffectTemplate = {
 // Attack-roll spell templates
 // ---------------------------------------------------------------------------
 
-export const MAGIC_MISSILE: EffectTemplate = {
+export const MAGIC_MISSILE: MapTemplateDefinition = {
   id: 'builtin-magic-missile',
   name: 'Magic Missile',
   shape: 'circle',
@@ -548,7 +548,7 @@ export const MAGIC_MISSILE: EffectTemplate = {
 // Aura templates
 // ---------------------------------------------------------------------------
 
-export const AURA_OF_PROTECTION: EffectTemplate = {
+export const AURA_OF_PROTECTION: MapTemplateDefinition = {
   id: 'builtin-aura-of-protection',
   name: 'Aura of Protection',
   shape: 'circle',
@@ -574,7 +574,7 @@ export const AURA_OF_PROTECTION: EffectTemplate = {
   ],
 };
 
-export const FRIGHTFUL_PRESENCE: EffectTemplate = {
+export const FRIGHTFUL_PRESENCE: MapTemplateDefinition = {
   id: 'builtin-frightful-presence',
   name: 'Frightful Presence',
   shape: 'circle',
@@ -604,7 +604,7 @@ export const FRIGHTFUL_PRESENCE: EffectTemplate = {
 // Aggregate collections
 // ---------------------------------------------------------------------------
 
-export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
+export const BUILT_IN_EFFECT_TEMPLATES: MapTemplateDefinition[] = [
   FIREBALL,
   LIGHTNING_BOLT,
   CONE_OF_COLD,
@@ -634,6 +634,6 @@ export const BUILT_IN_EFFECT_TEMPLATES: EffectTemplate[] = [
 /**
  * Lookup a built-in template by ID.
  */
-export function getBuiltInTemplate(id: string): EffectTemplate | undefined {
+export function getBuiltInTemplate(id: string): MapTemplateDefinition | undefined {
   return BUILT_IN_EFFECT_TEMPLATES.find(t => t.id === id);
 }

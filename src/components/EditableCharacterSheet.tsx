@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Shield, Star, Dices, Link2 } from 'lucide-react';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { ActionEditor } from './ActionEditor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 
 export function EditableCharacterSheet({ character, onChange }: EditableCharacterSheetProps) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['core', 'abilities', 'actions']));
-  const allTemplates = useEffectStore(s => s.allTemplates);
+  const allTemplates = useMapTemplateStore(s => s.allTemplates);
 
   const toggle = (key: string) => {
     setOpenSections(prev => {
@@ -370,11 +370,11 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                     className="h-6 text-[10px] flex-1"
                   />
                   <EffectTemplatePicker
-                    value={cantrip.effectTemplateId}
+                    value={cantrip.mapTemplateId}
                     templates={allTemplates}
                     onChange={templateId => {
                       const cantrips = [...character.spells!.cantrips];
-                      cantrips[i] = { ...cantrips[i], effectTemplateId: templateId };
+                      cantrips[i] = { ...cantrips[i], mapTemplateId: templateId };
                       update({ spells: { ...character.spells!, cantrips } });
                     }}
                   />
@@ -449,12 +449,12 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                       className="h-5 text-[10px] flex-1"
                     />
                     <EffectTemplatePicker
-                      value={spell.effectTemplateId}
+                      value={spell.mapTemplateId}
                       templates={allTemplates}
                       onChange={templateId => {
                         const spellsByLevel = [...character.spells!.spellsByLevel];
                         const spells = [...lvl.spells];
-                        spells[si] = { ...spell, effectTemplateId: templateId };
+                        spells[si] = { ...spell, mapTemplateId: templateId };
                         spellsByLevel[li] = { ...lvl, spells };
                         update({ spells: { ...character.spells!, spellsByLevel } });
                       }}
@@ -583,11 +583,11 @@ function Field({ label, children, compact }: { label: string; children: React.Re
 
 // ─── Effect Template Picker (inline) ──────────────────────────────────────────
 
-import type { EffectTemplate } from '@/types/effectTypes';
+import type { MapTemplateDefinition } from '@/types/effectTypes';
 
 function EffectTemplatePicker({ value, templates, onChange }: {
   value?: string;
-  templates: EffectTemplate[];
+  templates: MapTemplateDefinition[];
   onChange: (templateId: string | undefined) => void;
 }) {
   const matched = value ? templates.find(t => t.id === value) : null;

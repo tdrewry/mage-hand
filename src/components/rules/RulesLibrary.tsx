@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EffectsCatalog } from './EffectsCatalog';
+import { EffectsCatalog } from './MapTemplatesCatalog';
 import { RuleGraphEditor } from './RuleGraphEditor';
 import { LexiconEditor } from './LexiconEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';

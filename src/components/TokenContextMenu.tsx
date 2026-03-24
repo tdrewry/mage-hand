@@ -61,7 +61,7 @@ import { collectAllActions, parseAttacksFromJson, type TokenActionItem, type Tok
 import { DEFAULT_SLAM_ATTACK } from '@/types/actionTypes';
 import type { AttackDefinition } from '@/types/actionTypes';
 import { useMapStore } from '@/stores/mapStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 
 
 /** Submenu for transferring tokens to a different map */

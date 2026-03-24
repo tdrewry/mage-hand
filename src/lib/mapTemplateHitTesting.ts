@@ -10,7 +10,7 @@
  */
 
 import type {
-  EffectTemplate,
+  MapTemplateDefinition,
   EffectImpact,
   EffectShape,
 } from '@/types/effectTypes';
@@ -23,7 +23,7 @@ import type { MapObject } from '@/types/mapObjectTypes';
 // ---------------------------------------------------------------------------
 
 export interface HitTestParams {
-  template: EffectTemplate;
+  template: MapTemplateDefinition;
   origin: { x: number; y: number };
   /** Direction in radians (from +X axis). Required for cone/line shapes. */
   direction: number;
@@ -155,7 +155,7 @@ interface ConvexPoly {
 // ---------------------------------------------------------------------------
 
 function buildEffectGeometry(
-  template: EffectTemplate,
+  template: MapTemplateDefinition,
   origin: { x: number; y: number },
   direction: number,
   gridSize: number,

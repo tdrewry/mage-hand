@@ -29,7 +29,7 @@ export interface ItemAttack {
   damageType?: string;    // e.g. "slashing", "fire"
   range?: string;         // e.g. "5 ft." or "30/120 ft."
   description?: string;
-  effectTemplateId?: string;
+  mapTemplateId?: string;
 }
 
 export interface ItemSpell {
@@ -37,7 +37,7 @@ export interface ItemSpell {
   level?: number;
   charges?: number;       // How many charges used per cast
   description?: string;
-  effectTemplateId?: string;
+  mapTemplateId?: string;
 }
 
 export interface ItemTrait {

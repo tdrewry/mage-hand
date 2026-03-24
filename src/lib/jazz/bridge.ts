@@ -19,11 +19,11 @@ import { JAZZ_SYNC_THROTTLE_MS } from "@/lib/featureFlags";
 import { useSessionStore, type Token } from "@/stores/sessionStore";
 import { useRegionStore, type CanvasRegion } from "@/stores/regionStore";
 import { useMapObjectStore } from "@/stores/mapObjectStore";
-import { useEffectStore } from "@/stores/effectStore";
+import { useMapTemplateStore } from "@/stores/mapTemplateStore";
 import type { MapObject } from "@/types/mapObjectTypes";
-import type { PlacedEffect, EffectTemplate } from "@/types/effectTypes";
+import type { PlacedMapTemplate, MapTemplateDefinition } from "@/types/effectTypes";
 
-import { getBuiltInTemplate, BUILT_IN_EFFECT_TEMPLATES } from "@/lib/effectTemplateLibrary";
+import { getBuiltInTemplate, BUILT_IN_EFFECT_TEMPLATES } from "@/lib/mapTemplateLibrary";
 import {
   JazzToken as JazzTokenSchema,
   JazzRegion as JazzRegionSchema,
@@ -216,7 +216,7 @@ async function _resolveMapTextures(entries: { id: string; hash: string }[]): Pro
  * Async texture resolution for effect templates: when a custom template arrives with a textureHash
  * but no texture data, try to load from local IndexedDB. If found, update the template's texture field.
  */
-async function _resolveEffectTextures(customTemplates: EffectTemplate[]): Promise<void> {
+async function _resolveEffectTextures(customTemplates: MapTemplateDefinition[]): Promise<void> {
   const { loadTextureByHash } = await import("@/lib/textureStorage");
   const needsResolve = customTemplates.filter(t => t.textureHash && (!t.texture || t.texture.length < 200));
   if (needsResolve.length === 0) return;
@@ -226,7 +226,7 @@ async function _resolveEffectTextures(customTemplates: EffectTemplate[]): Promis
     const dataUrl = await loadTextureByHash(t.textureHash!);
     if (dataUrl) {
       console.log(`[jazz-bridge] 🎨 Resolved texture for effect template ${t.id} from local IDB (hash: ${t.textureHash})`);
-      useEffectStore.getState().updateCustomTemplate(t.id, { texture: dataUrl });
+      useMapTemplateStore.getState().updateCustomTemplate(t.id, { texture: dataUrl });
     } else {
       console.log(`[jazz-bridge] 🎨 Effect template ${t.id} needs hash ${t.textureHash} — not in local IDB yet, waiting for FileStream`);
       // Try Jazz FileStream fallback
@@ -682,8 +682,8 @@ function stripTemplateForSync(t: any): any {
   return copy;
 }
 
-/** Convert a PlacedEffect to a JazzPlacedEffect-compatible init */
-function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
+/** Convert a PlacedMapTemplate to a JazzPlacedEffect-compatible init */
+function placedEffectToJazzInit(e: PlacedMapTemplate): Record<string, any> {
   // Embed a stripped template snapshot so remote clients can reconstruct
   // even if the custom template CoList hasn't synced yet.
   let templateJson: string | undefined;
@@ -714,8 +714,8 @@ function placedEffectToJazzInit(e: PlacedEffect): Record<string, any> {
   };
 }
 
-/** Convert a JazzPlacedEffect CoValue to a partial PlacedEffect (template reconstructed separately) */
-function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string) => EffectTemplate | undefined): PlacedEffect | null {
+/** Convert a JazzPlacedEffect CoValue to a partial PlacedMapTemplate (template reconstructed separately) */
+function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string) => MapTemplateDefinition | undefined): PlacedMapTemplate | null {
   let template = templateLookup(je.templateId);
 
   // Fallback: use embedded template snapshot if local lookup fails
@@ -771,8 +771,8 @@ function jazzToZustandPlacedEffect(je: any, templateLookup: (id: string) => Effe
 }
 
 /** Build a template lookup function using custom templates + built-ins */
-function buildTemplateLookup(customTemplates: EffectTemplate[]): (id: string) => EffectTemplate | undefined {
-  const customById = new Map<string, EffectTemplate>();
+function buildTemplateLookup(customTemplates: MapTemplateDefinition[]): (id: string) => MapTemplateDefinition | undefined {
+  const customById = new Map<string, MapTemplateDefinition>();
   for (const t of customTemplates) {
     if (t?.id) customById.set(t.id, t);
   }
@@ -1244,7 +1244,7 @@ export function pushEffectsToJazz(sessionRoot: any): void {
     return;
   }
 
-  const store = useEffectStore.getState();
+  const store = useMapTemplateStore.getState();
 
   // Push custom templates (upsert by templateId)
   const jazzTemplates = effectState.customTemplates;
@@ -1492,7 +1492,7 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
 
   // Pull custom templates first (needed for template reconstruction)
   const jazzCustomTemplates = effectState.customTemplates;
-  const customTemplates: EffectTemplate[] = [];
+  const customTemplates: MapTemplateDefinition[] = [];
   if (jazzCustomTemplates) {
     const ctLen = jazzCustomTemplates.length ?? 0;
     for (let i = 0; i < ctLen; i++) {
@@ -1508,7 +1508,7 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
   // Pull placed effects
   const jazzPlaced = effectState.placedEffects;
   const placedLen = jazzPlaced?.length ?? 0;
-  const localPlacedCount = useEffectStore.getState().placedEffects.length;
+  const localPlacedCount = useMapTemplateStore.getState().placedEffects.length;
 
   if (placedLen === 0 && customTemplates.length === 0 && localPlacedCount > 0 && _isCreator) {
     console.warn(`[jazz-bridge] ✋ Blocked effects pull — Jazz has 0 but local has ${localPlacedCount} (creator guard)`);
@@ -1520,7 +1520,7 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
   const lookup = buildTemplateLookup(customTemplates);
 
   runFromJazz(() => {
-    const store = useEffectStore.getState();
+    const store = useMapTemplateStore.getState();
     // Clear existing
     const mapIds = new Set(store.placedEffects.map(e => e.mapId));
     mapIds.forEach(id => store.clearEffectsForMap(id));
@@ -1531,7 +1531,7 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
     }
 
     // Restore placed effects
-    const restored: PlacedEffect[] = [];
+    const restored: PlacedMapTemplate[] = [];
     for (let i = 0; i < placedLen; i++) {
       const je = jazzPlaced[i];
       if (!je) continue;
@@ -1544,7 +1544,7 @@ export function pullEffectsFromJazz(sessionRoot: any): void {
       }
     }
     if (restored.length > 0) {
-      useEffectStore.setState({ placedEffects: restored });
+      useMapTemplateStore.setState({ placedEffects: restored });
     }
   });
 
@@ -1994,7 +1994,7 @@ function syncMapObjectsToJazz(objects: MapObject[], prevObjects: MapObject[]): v
 }
 
 /** Sync placed effects from Zustand → Jazz (diff-based, mirrors regions/mapObjects pattern) */
-function syncEffectsToJazz(effects: PlacedEffect[], prevEffects: PlacedEffect[]): void {
+function syncEffectsToJazz(effects: PlacedMapTemplate[], prevEffects: PlacedMapTemplate[]): void {
   const effectState = _cachedEffects ?? _sessionRoot?.effects;
   if (!effectState?.placedEffects) return;
   const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
@@ -2764,8 +2764,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   }
 
   // ── Effect sync: Zustand → Jazz (diff-based) ──
-  let prevEffects = useEffectStore.getState().placedEffects;
-  const unsubEffectsZustand = useEffectStore.subscribe((state) => {
+  let prevEffects = useMapTemplateStore.getState().placedEffects;
+  const unsubEffectsZustand = useMapTemplateStore.subscribe((state) => {
     const effects = state.placedEffects;
     if (effects === prevEffects) return;
     if (_fromJazz) { prevEffects = effects; return; }
@@ -2773,7 +2773,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
     const capturedPrev = prevEffects;
     prevEffects = effects;
     throttledPushFineGrained('effects', () => {
-      const currentEffects = useEffectStore.getState().placedEffects;
+      const currentEffects = useMapTemplateStore.getState().placedEffects;
       syncEffectsToJazz(currentEffects, capturedPrev);
       prevEffects = currentEffects;
     });
@@ -2789,7 +2789,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
         (placedEffects: any) => {
           if (!placedEffects) return;
           const len = placedEffects.length ?? 0;
-          const localCount = useEffectStore.getState().placedEffects.length;
+          const localCount = useMapTemplateStore.getState().placedEffects.length;
 
           // Guard: if outbound throttle is active for effects, skip inbound
           // (we're likely seeing our own intermediate state)
@@ -2803,10 +2803,10 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           }
 
           // Rebuild template lookup from current custom templates
-          const customTemplates = useEffectStore.getState().customTemplates;
+          const customTemplates = useMapTemplateStore.getState().customTemplates;
           const lookup = buildTemplateLookup(customTemplates);
 
-          const restored: PlacedEffect[] = [];
+          const restored: PlacedMapTemplate[] = [];
           for (let i = 0; i < len; i++) {
             const je = placedEffects[i];
             if (!je) continue;
@@ -2815,7 +2815,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           }
 
           // Deep compare to avoid redundant store writes
-          const currentLocal = useEffectStore.getState().placedEffects;
+          const currentLocal = useMapTemplateStore.getState().placedEffects;
           const restoredIds = restored.map(e => e.id).sort().join(',');
           const localIds = currentLocal.map(e => e.id).sort().join(',');
           if (restoredIds === localIds) {
@@ -2839,9 +2839,9 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           }
 
           runFromJazz(() => {
-            useEffectStore.setState({ placedEffects: restored });
+            useMapTemplateStore.setState({ placedEffects: restored });
           });
-          prevEffects = useEffectStore.getState().placedEffects;
+          prevEffects = useMapTemplateStore.getState().placedEffects;
         },
       );
       activeSubscriptions.push(unsubEffectsJazz);
@@ -2862,7 +2862,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           // Guard: if outbound throttle is active, skip inbound
           if (_fineGrainedTimers.has('customTemplates')) return;
 
-          const parsed: EffectTemplate[] = [];
+          const parsed: MapTemplateDefinition[] = [];
           for (let i = 0; i < len; i++) {
             const jct = templates[i];
             if (!jct?.templateJson) continue;
@@ -2874,7 +2874,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           // Use setState directly to avoid side effects from store CRUD methods
           // (addCustomTemplate generates new IDs, deleteTemplate hides built-ins)
           runFromJazz(() => {
-            const store = useEffectStore.getState();
+            const store = useMapTemplateStore.getState();
             const localIds = new Set(store.customTemplates.map(t => t.id));
             const jazzIds = new Set(parsed.map(t => t.id));
 
@@ -2910,13 +2910,13 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             }
 
             if (changed) {
-              // Rebuild allTemplates inline (mirrors effectStore's buildAllTemplates)
+              // Rebuild allTemplates inline (mirrors mapTemplateStore's buildAllTemplates)
               const customIds = new Set(newCustom.map((t: any) => t.id));
               const hiddenSet = new Set(store.hiddenBuiltInIds);
               const visibleBuiltIns = BUILT_IN_EFFECT_TEMPLATES.filter((t: any) => !hiddenSet.has(t.id) && !customIds.has(t.id));
               const allTemplates = [...visibleBuiltIns, ...newCustom];
 
-              useEffectStore.setState({
+              useMapTemplateStore.setState({
                 customTemplates: newCustom,
                 allTemplates,
               });
@@ -2934,8 +2934,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
   }
 
   // ── Custom template sync: Zustand → Jazz (outbound, diff-based) ──
-  let prevCustomTemplates = useEffectStore.getState().customTemplates;
-  const unsubCustomTemplatesZustand = useEffectStore.subscribe((state) => {
+  let prevCustomTemplates = useMapTemplateStore.getState().customTemplates;
+  const unsubCustomTemplatesZustand = useMapTemplateStore.subscribe((state) => {
     const templates = state.customTemplates;
     if (templates === prevCustomTemplates) return;
     if (_fromJazz) { prevCustomTemplates = templates; return; }
@@ -2946,7 +2946,7 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
       if (!effectState?.customTemplates) return;
       const group = _cachedGroup ?? _sessionRoot?.$jazz?.owner ?? _sessionRoot?._owner;
       const jazzTemplates = effectState.customTemplates;
-      const currentTemplates = useEffectStore.getState().customTemplates;
+      const currentTemplates = useMapTemplateStore.getState().customTemplates;
 
       const prevIds = new Set(capturedPrev.map(t => t.id));
       const currentIds = new Set(currentTemplates.map(t => t.id));

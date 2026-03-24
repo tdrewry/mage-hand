@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { X, Pause, Play } from 'lucide-react';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { Z_INDEX } from '@/lib/zIndex';
 
 interface EffectContextMenuProps {
@@ -30,13 +30,13 @@ export const EffectContextMenu: React.FC<EffectContextMenuProps> = ({
   onRedraw,
 }) => {
   const handleDismiss = () => {
-    useEffectStore.getState().dismissEffect(effectId);
+    useMapTemplateStore.getState().dismissEffect(effectId);
     onClose();
     onRedraw();
   };
 
   const handleToggleAnimation = () => {
-    useEffectStore.getState().toggleAnimationPaused(effectId);
+    useMapTemplateStore.getState().toggleAnimationPaused(effectId);
     onClose();
     onRedraw();
   };

@@ -14,7 +14,7 @@ import type {
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 import { createEmptyEntitySheet } from '@/types/entitySheet';
@@ -143,7 +143,7 @@ interface ActionState {
   resolutionFlashes: ResolutionFlash[];
 
   /** The current intents being drafted by the player, before they are submitted to the pipeline. */
-  draftingIntents: { id: string; actorId: string; category: string; placedEffectId?: string }[];
+  draftingIntents: { id: string; actorId: string; category: string; placedMapTemplateId?: string }[];
 }
 
 interface ActionActions {
@@ -170,7 +170,7 @@ interface ActionActions {
     damageType?: string;
     damageFormula?: string;
     damageDice?: DamageDiceEntry[];
-    placedEffectId: string;
+    placedMapTemplateId: string;
     groupId?: string;
     castLevel?: number;
     impacts: EffectImpact[];
@@ -247,15 +247,15 @@ export const useActionStore = create<ActionStore>()(
 
   setDraftPlacedEffectId: (draftId, effectId) => {
     set((state) => ({
-      draftingIntents: state.draftingIntents.map(d => d.id === draftId ? { ...d, placedEffectId: effectId } : d)
+      draftingIntents: state.draftingIntents.map(d => d.id === draftId ? { ...d, placedMapTemplateId: effectId } : d)
     }));
   },
 
   cancelDrafting: (draftId) => {
     const draft = get().draftingIntents.find(d => d.id === draftId);
-    if (draft && draft.placedEffectId) {
-      import('./effectStore').then(({ useEffectStore }) => {
-        useEffectStore.getState().cancelEffect(draft.placedEffectId!, () => ({}));
+    if (draft && draft.placedMapTemplateId) {
+      import('./mapTemplateStore').then(({ useMapTemplateStore }) => {
+        useMapTemplateStore.getState().cancelEffect(draft.placedMapTemplateId!, () => ({}));
       });
     }
     set({ draftingIntents: get().draftingIntents.filter(d => d.id !== draftId) });
@@ -357,7 +357,7 @@ export const useActionStore = create<ActionStore>()(
     ensureActionCardOpen();
   },
 
-  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedEffectId, groupId, castLevel, impacts, attackRoll }) => {
+  startEffectAction: ({ sourceTokenId, templateId, templateName, damageType, damageFormula, damageDice, placedMapTemplateId, groupId, castLevel, impacts, attackRoll }) => {
     const sessionTokens = useSessionStore.getState().tokens;
     const sourceToken = sourceTokenId ? sessionTokens.find(t => t.id === sourceTokenId) : null;
 
@@ -491,7 +491,7 @@ export const useActionStore = create<ActionStore>()(
         templateId,
         templateName,
         damageType,
-        placedEffectId,
+        placedMapTemplateId,
         groupId,
         castLevel,
       },
@@ -792,19 +792,19 @@ export const useActionStore = create<ActionStore>()(
 
     // Remove placed effects for instant effect actions (including all multi-drop group members)
     if (currentAction.category === 'effect' && currentAction.effectInfo) {
-      const effectStore = useEffectStore.getState();
-      const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
+      const mapTemplateStore = useMapTemplateStore.getState();
+      const tpl = mapTemplateStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
         if (currentAction.effectInfo.groupId) {
           // Dismiss all effects in this multi-drop group
-          const groupEffects = effectStore.placedEffects.filter(
+          const groupEffects = mapTemplateStore.placedEffects.filter(
             e => e.groupId === currentAction.effectInfo!.groupId
           );
           for (const fx of groupEffects) {
-            effectStore.dismissEffect(fx.id);
+            mapTemplateStore.dismissEffect(fx.id);
           }
         } else {
-          effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+          mapTemplateStore.dismissEffect(currentAction.effectInfo.placedMapTemplateId);
         }
       }
     }
@@ -891,18 +891,18 @@ export const useActionStore = create<ActionStore>()(
 
     // Remove placed effects for instant effect actions (including all multi-drop group members)
     if (currentAction?.category === 'effect' && currentAction.effectInfo) {
-      const effectStore = useEffectStore.getState();
-      const tpl = effectStore.getTemplate(currentAction.effectInfo.templateId);
+      const mapTemplateStore = useMapTemplateStore.getState();
+      const tpl = mapTemplateStore.getTemplate(currentAction.effectInfo.templateId);
       if (tpl?.persistence === 'instant') {
         if (currentAction.effectInfo.groupId) {
-          const groupEffects = effectStore.placedEffects.filter(
+          const groupEffects = mapTemplateStore.placedEffects.filter(
             e => e.groupId === currentAction.effectInfo!.groupId
           );
           for (const fx of groupEffects) {
-            effectStore.dismissEffect(fx.id);
+            mapTemplateStore.dismissEffect(fx.id);
           }
         } else {
-          effectStore.dismissEffect(currentAction.effectInfo.placedEffectId);
+          mapTemplateStore.dismissEffect(currentAction.effectInfo.placedMapTemplateId);
         }
       }
     }
@@ -926,21 +926,21 @@ export const useActionStore = create<ActionStore>()(
   cancelAllActions: () => {
     const { currentAction, pendingActions } = get();
     const allActions = [currentAction, ...pendingActions].filter(Boolean) as ActionQueueEntry[];
-    const effectStore = useEffectStore.getState();
+    const mapTemplateStore = useMapTemplateStore.getState();
 
     for (const action of allActions) {
       if (action.category === 'effect' && action.effectInfo) {
-        const tpl = effectStore.getTemplate(action.effectInfo.templateId);
+        const tpl = mapTemplateStore.getTemplate(action.effectInfo.templateId);
         if (tpl?.persistence === 'instant') {
           if (action.effectInfo.groupId) {
-            const groupEffects = effectStore.placedEffects.filter(
+            const groupEffects = mapTemplateStore.placedEffects.filter(
               e => e.groupId === action.effectInfo!.groupId
             );
             for (const fx of groupEffects) {
-              effectStore.dismissEffect(fx.id);
+              mapTemplateStore.dismissEffect(fx.id);
             }
           } else {
-            effectStore.dismissEffect(action.effectInfo.placedEffectId);
+            mapTemplateStore.dismissEffect(action.effectInfo.placedMapTemplateId);
           }
         }
       }

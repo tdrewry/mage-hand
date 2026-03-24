@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { CardSaveEvent } from '@/components/cards/CardSaveButton';
-import { useEffectStore } from '@/stores/effectStore';
+import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
-import type { EffectTemplate, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, AuraConfig } from '@/types/effectTypes';
+import type { MapTemplateDefinition, EffectCategory, EffectShape, EffectAnimationType, EffectPersistence, EffectDurationType, EffectTemplateMode, EffectTriggerTiming, EffectRotateDirection, AuraConfig } from '@/types/effectTypes';
 import { Flame, Zap, Cloud, Skull, Wand2, Trash2, Play, RotateCcw, Repeat, Ban, Plus, ChevronDown, ChevronRight, Pencil, Check, X, RotateCw, TrendingUp, User, Shield, Swords, Sparkles, AlertCircle, Timer, Gift, Image } from 'lucide-react';
 import { ImageImportModal, type ImageImportResult, type ShapeConfig } from '@/components/modals/ImageImportModal';
 import { Button } from '@/components/ui/button';
@@ -47,8 +47,8 @@ const ANIMATION_ICONS: Record<string, React.ElementType> = {
   rotate: RotateCw,
 };
 
-function groupByCategory(templates: EffectTemplate[]): Record<string, EffectTemplate[]> {
-  const groups: Record<string, EffectTemplate[]> = {};
+function groupByCategory(templates: MapTemplateDefinition[]): Record<string, MapTemplateDefinition[]> {
+  const groups: Record<string, MapTemplateDefinition[]> = {};
   for (const t of templates) {
     const cat = t.category || 'custom';
     if (!groups[cat]) groups[cat] = [];
@@ -132,7 +132,7 @@ const INITIAL_FORM: TemplateFormData = {
   auraWallBlocked: true,
 };
 
-function templateToForm(t: EffectTemplate): TemplateFormData {
+function templateToForm(t: MapTemplateDefinition): TemplateFormData {
   return {
     name: t.name,
     shape: t.shape,
@@ -535,7 +535,7 @@ function TemplateFormFields({
   );
 }
 
-function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' | 'isBuiltIn'> {
+function formToTemplateData(form: TemplateFormData): Omit<MapTemplateDefinition, 'id' | 'isBuiltIn'> {
   return {
     name: form.name.trim(),
     shape: form.shape,
@@ -578,7 +578,7 @@ function formToTemplateData(form: TemplateFormData): Omit<EffectTemplate, 'id' |
 // --- Create Template Form ---
 
 function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
-  const addCustomTemplate = useEffectStore((s) => s.addCustomTemplate);
+  const addCustomTemplate = useMapTemplateStore((s) => s.addCustomTemplate);
   const [form, setForm] = useState<TemplateFormData>({ ...INITIAL_FORM });
 
   const update = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
@@ -603,8 +603,8 @@ function CreateTemplateForm({ onCreated }: { onCreated: () => void }) {
 
 // --- Edit Template Form ---
 
-function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDone: () => void }) {
-  const updateCustomTemplate = useEffectStore((s) => s.updateCustomTemplate);
+function EditTemplateForm({ template, onDone }: { template: MapTemplateDefinition; onDone: () => void }) {
+  const updateCustomTemplate = useMapTemplateStore((s) => s.updateCustomTemplate);
   const [form, setForm] = useState<TemplateFormData>(() => templateToForm(template));
 
   const update = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
@@ -635,7 +635,7 @@ function EditTemplateForm({ template, onDone }: { template: EffectTemplate; onDo
 // --- Template Row ---
 
 interface EffectTemplateRowProps {
-  template: EffectTemplate;
+  template: MapTemplateDefinition;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
@@ -756,16 +756,16 @@ function EffectTemplateRow({ template, onSelect, onDelete, onEdit }: EffectTempl
 // --- Main Card Content ---
 
 export function EffectsCatalog() {
-  const allTemplates = useEffectStore((s) => s.allTemplates);
-  const placedEffects = useEffectStore((s) => s.placedEffects);
-  const hiddenBuiltInIds = useEffectStore((s) => s.hiddenBuiltInIds);
-  const startPlacement = useEffectStore((s) => s.startPlacement);
-  const removeEffect = useEffectStore((s) => s.removeEffect);
-  const resetTriggeredTokens = useEffectStore((s) => s.resetTriggeredTokens);
-  const toggleRecurring = useEffectStore((s) => s.toggleRecurring);
-  const deleteTemplate = useEffectStore((s) => s.deleteTemplate);
-  const restoreBuiltInTemplates = useEffectStore((s) => s.restoreBuiltInTemplates);
-  const placement = useEffectStore((s) => s.placement);
+  const allTemplates = useMapTemplateStore((s) => s.allTemplates);
+  const placedEffects = useMapTemplateStore((s) => s.placedEffects);
+  const hiddenBuiltInIds = useMapTemplateStore((s) => s.hiddenBuiltInIds);
+  const startPlacement = useMapTemplateStore((s) => s.startPlacement);
+  const removeEffect = useMapTemplateStore((s) => s.removeEffect);
+  const resetTriggeredTokens = useMapTemplateStore((s) => s.resetTriggeredTokens);
+  const toggleRecurring = useMapTemplateStore((s) => s.toggleRecurring);
+  const deleteTemplate = useMapTemplateStore((s) => s.deleteTemplate);
+  const restoreBuiltInTemplates = useMapTemplateStore((s) => s.restoreBuiltInTemplates);
+  const placement = useMapTemplateStore((s) => s.placement);
 
   const selectedTokenIds = useSessionStore((s) => s.selectedTokenIds);
   const tokens = useSessionStore((s) => s.tokens);
@@ -774,7 +774,7 @@ export function EffectsCatalog() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const getTemplate = useEffectStore((s) => s.getTemplate);
+  const getTemplate = useMapTemplateStore((s) => s.getTemplate);
 
   const groups = groupByCategory(allTemplates);
   const categoryOrder: EffectCategory[] = ['spell', 'trap', 'hazard', 'trait', 'custom'];

@@ -67,7 +67,7 @@ import { useLightStore } from '../../stores/lightStore';
 import { useCardStore } from '../../stores/cardStore';
 import { useDungeonStore } from '../../stores/dungeonStore';
 import { useMapObjectStore } from '../../stores/mapObjectStore';
-import { useEffectStore } from '../../stores/effectStore';
+import { useMapTemplateStore } from '../../stores/mapTemplateStore';
 import { useUiModeStore } from '../../stores/uiModeStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useSessionTemplates } from '../../hooks/useSessionTemplates';
@@ -640,7 +640,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       // Step 17: Apply effects
       setLoadingProgress('Loading effects...');
       if (projectData.effects) {
-        const es = useEffectStore.getState();
+        const es = useMapTemplateStore.getState();
         const existingMapIds = new Set(es.placedEffects.map(e => e.mapId));
         existingMapIds.forEach(id => es.clearEffectsForMap(id));
         (projectData.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
@@ -654,7 +654,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
               dismissedAt: undefined,
               ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
             }));
-          useEffectStore.setState({ placedEffects: restored });
+          useMapTemplateStore.setState({ placedEffects: restored });
         }
       }
 
@@ -781,7 +781,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
     // Effects
     if (projectData.effects) {
-      const es = useEffectStore.getState();
+      const es = useMapTemplateStore.getState();
       const existingMapIds = new Set(es.placedEffects.map(e => e.mapId));
       existingMapIds.forEach(id => es.clearEffectsForMap(id));
       (projectData.effects.customTemplates || []).forEach((t: any) => es.addCustomTemplate(t));
@@ -795,7 +795,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
             dismissedAt: undefined,
             ...(e.isAura ? { tokensInsideArea: e.tokensInsideArea ?? [] } : {}),
           }));
-        useEffectStore.setState({ placedEffects: restored });
+        useMapTemplateStore.setState({ placedEffects: restored });
       }
     }
 
