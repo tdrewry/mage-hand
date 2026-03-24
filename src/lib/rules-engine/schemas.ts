@@ -97,7 +97,8 @@ export const MAGE_HAND_ENTITY_SCHEMA: SchemaNode = {
     resistances: { type: 'array', items: { type: 'string' }, description: 'List of damage types this entity resists' },
     vulnerabilities: { type: 'array', items: { type: 'string' }, description: 'List of damage types this entity is vulnerable to' },
     immunities: { type: 'array', items: { type: 'string' }, description: 'List of damage types this entity is immune to' },
-    conditionImmunities: { type: 'array', items: { type: 'string' }, description: 'List of conditions this entity cannot suffer' }
+    conditionImmunities: { type: 'array', items: { type: 'string' }, description: 'List of conditions this entity cannot suffer' },
+    adapter: { type: 'any', description: 'Dynamically mounted raw data from external adapters (e.g. 5e character JSON)' }
   }
 };
 
@@ -163,30 +164,299 @@ export const TARGET_RESULT_SCHEMA: SchemaNode = {
   }
 };
 
-export const CONTEXT_REGISTRY_SEED: Record<string, { id: string, label: string, rootSchema: SchemaNode }> = {
+export const FIFTH_EDITION_CHARACTER_SCHEMA: SchemaNode = {
+  type: 'object',
+  description: 'Native Character JSON structure.',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    level: { type: 'number' },
+    classes: {
+      type: 'array',
+      items: { type: 'object', properties: { name: { type: 'string' }, level: { type: 'number' } } }
+    },
+    race: { type: 'string' },
+    background: { type: 'string' },
+    abilities: {
+      type: 'object',
+      properties: {
+        strength: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } },
+        dexterity: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } },
+        constitution: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } },
+        intelligence: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } },
+        wisdom: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } },
+        charisma: { type: 'object', properties: { score: { type: 'number' }, modifier: { type: 'number' } } }
+      }
+    },
+    armorClass: { type: 'number' },
+    hitPoints: {
+      type: 'object',
+      properties: { current: { type: 'number' }, max: { type: 'number' }, temp: { type: 'number' } }
+    },
+    speed: { type: 'number' },
+    initiative: { type: 'number' },
+    proficiencyBonus: { type: 'number' },
+    skills: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, modifier: { type: 'number' }, proficient: { type: 'boolean' } }
+      }
+    },
+    savingThrows: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { ability: { type: 'string' }, modifier: { type: 'number' }, proficient: { type: 'boolean' } }
+      }
+    },
+    proficiencies: {
+      type: 'object',
+      properties: {
+        armor: { type: 'array', items: { type: 'string' } },
+        weapons: { type: 'array', items: { type: 'string' } },
+        tools: { type: 'array', items: { type: 'string' } },
+        languages: { type: 'array', items: { type: 'string' } }
+      }
+    },
+    passivePerception: { type: 'number' },
+    features: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, description: { type: 'string' }, source: { type: 'string' } }
+      }
+    },
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          attackBonus: { type: 'number' },
+          damage: { type: 'string' },
+          damageType: { type: 'string' },
+          range: { type: 'string' },
+          description: { type: 'string' },
+          targetingMode: { type: 'string' },
+          executionPolicy: { type: 'string' }
+        }
+      }
+    },
+    conditions: {
+      type: 'array',
+      items: { type: 'string' }
+    },
+    sourceUrl: { type: 'string' },
+    lastUpdated: { type: 'string' },
+    spells: {
+      type: 'object',
+      properties: {
+        spellcastingAbility: { type: 'string' },
+        spellSaveDC: { type: 'number' },
+        spellAttackBonus: { type: 'number' },
+        cantrips: {
+          type: 'array',
+          items: { type: 'object', properties: { name: { type: 'string' } } }
+        },
+        spellsByLevel: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              level: { type: 'number' },
+              slots: { type: 'number' },
+              slotsUsed: { type: 'number' },
+              spells: {
+                type: 'array',
+                items: { type: 'object', properties: { name: { type: 'string' }, prepared: { type: 'boolean' } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+export const FIFTH_EDITION_CREATURE_SCHEMA: SchemaNode = {
+  type: 'object',
+  description: 'A 5e.tools aligned Monster JSON structure.',
+  properties: {
+    name: { type: 'string' },
+    group: { type: 'array', items: { type: 'string' } },
+    source: { type: 'string' },
+    page: { type: 'number' },
+    srd: { type: 'boolean' },
+    otherSources: { type: 'array', items: { type: 'object', properties: { source: { type: 'string' } } } },
+    reprintedAs: { type: 'array', items: { type: 'string' } },
+    size: { type: 'array', items: { type: 'string' } },
+    type: { type: 'any' },
+    alignment: { type: 'array', items: { type: 'string' } },
+    ac: {
+      type: 'array',
+      items: { type: 'object', properties: { ac: { type: 'number' }, from: { type: 'array', items: { type: 'string' } } } }
+    },
+    hp: {
+      type: 'object',
+      properties: { average: { type: 'number' }, formula: { type: 'string' } }
+    },
+    speed: { type: 'object', properties: { walk: { type: 'number' }, fly: { type: 'number' }, swim: { type: 'number' }, burrow: { type: 'number' }, climb: { type: 'number' } } },
+    str: { type: 'number' },
+    dex: { type: 'number' },
+    con: { type: 'number' },
+    int: { type: 'number' },
+    wis: { type: 'number' },
+    cha: { type: 'number' },
+    save: { type: 'any' },
+    skill: { type: 'any' },
+    senses: { type: 'array', items: { type: 'string' } },
+    passive: { type: 'number' },
+    immune: { type: 'array', items: { type: 'any' } },
+    vulnerable: { type: 'array', items: { type: 'any' } },
+    resist: { type: 'array', items: { type: 'any' } },
+    conditionImmune: { type: 'array', items: { type: 'any' } },
+    languages: { type: 'array', items: { type: 'string' } },
+    cr: { type: 'any' },
+    trait: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, entries: { type: 'array', items: { type: 'any' } } } } },
+    action: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, entries: { type: 'array', items: { type: 'any' } } } } },
+    bonus: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, entries: { type: 'array', items: { type: 'any' } } } } },
+    reaction: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, entries: { type: 'array', items: { type: 'any' } } } } },
+    legendary: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, entries: { type: 'array', items: { type: 'any' } } } } },
+    legendaryGroup: { type: 'object', properties: { name: { type: 'string' }, source: { type: 'string' } } },
+    variant: { type: 'array', items: { type: 'any' } },
+    environment: { type: 'array', items: { type: 'string' } },
+    dragonCastingColor: { type: 'string' },
+    dragonAge: { type: 'string' },
+    soundClip: { type: 'object', properties: { type: { type: 'string' }, path: { type: 'string' } } },
+    traitTags: { type: 'array', items: { type: 'string' } },
+    senseTags: { type: 'array', items: { type: 'string' } },
+    actionTags: { type: 'array', items: { type: 'string' } },
+    languageTags: { type: 'array', items: { type: 'string' } },
+    damageTags: { type: 'array', items: { type: 'string' } },
+    damageTagsLegendary: { type: 'array', items: { type: 'string' } },
+    miscTags: { type: 'array', items: { type: 'string' } },
+    conditionInflict: { type: 'array', items: { type: 'string' } },
+    conditionInflictLegendary: { type: 'array', items: { type: 'string' } },
+    savingThrowForced: { type: 'array', items: { type: 'string' } },
+    savingThrowForcedLegendary: { type: 'array', items: { type: 'string' } },
+    hasToken: { type: 'boolean' },
+    hasFluff: { type: 'boolean' },
+    hasFluffImages: { type: 'boolean' },
+    id: { type: 'string' }
+  }
+};
+
+export const FIFTH_EDITION_ITEM_SCHEMA: SchemaNode = {
+  type: 'object',
+  description: 'A 5e.tools aligned Item JSON structure.',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    source: { type: 'string' },
+    baseItem: { type: 'string' },
+    type: { type: 'string', description: 'Item type (e.g. M, R, W)' },
+    rarity: { type: 'string' },
+    reqAttune: { type: 'boolean' },
+    weight: { type: 'number' },
+    value: { type: 'number' },
+    dmg1: { type: 'string' },
+    dmgType: { type: 'string' },
+    weaponCategory: { type: 'string' },
+    property: { type: 'array', items: { type: 'string' } }
+  }
+};
+
+export const CONTEXT_REGISTRY_SEED: Record<string, { id: string, label: string, rootSchema: SchemaNode, role: 'system' | 'character' | 'creature' | 'item' | 'custom', sourceUrl?: string, version?: string }> = {
   intent: {
     id: 'intent',
     label: '1. Execution Intent',
-    rootSchema: INTENT_PAYLOAD_SCHEMA
+    rootSchema: INTENT_PAYLOAD_SCHEMA,
+    role: 'system'
   },
   actor: {
     id: 'actor',
     label: '2. Actor (Source Entity)',
-    rootSchema: MAGE_HAND_ENTITY_SCHEMA
+    rootSchema: MAGE_HAND_ENTITY_SCHEMA,
+    role: 'system'
   },
   action: {
     id: 'action',
     label: '3. Action Data',
-    rootSchema: TOKEN_ACTION_SCHEMA
+    rootSchema: TOKEN_ACTION_SCHEMA,
+    role: 'system'
   },
   target: {
     id: 'target',
     label: '4. Target (Defender Entity)',
-    rootSchema: MAGE_HAND_ENTITY_SCHEMA
+    rootSchema: MAGE_HAND_ENTITY_SCHEMA,
+    role: 'system'
   },
   targetResult: {
     id: 'targetResult',
     label: '5. Pipeline Output (Target Result)',
-    rootSchema: TARGET_RESULT_SCHEMA
+    rootSchema: TARGET_RESULT_SCHEMA,
+    role: 'system'
+  },
+  '5e-character': {
+    id: '5e-character',
+    label: 'Native Character',
+    rootSchema: FIFTH_EDITION_CHARACTER_SCHEMA,
+    role: 'character',
+    sourceUrl: 'Mage Hand Examples',
+    version: '1.0.0'
+  },
+  '5e-creature': {
+    id: '5e-creature',
+    label: '5e.tools Creature',
+    rootSchema: FIFTH_EDITION_CREATURE_SCHEMA,
+    role: 'creature',
+    sourceUrl: 'https://5e.tools/bestiary.schema.json',
+    version: '1.0.0'
+  },
+  '5e-item': {
+    id: '5e-item',
+    label: '5e.tools Item',
+    rootSchema: FIFTH_EDITION_ITEM_SCHEMA,
+    role: 'item',
+    sourceUrl: 'https://5e.tools/items.schema.json',
+    version: '1.0.0'
   }
 };
+
+/**
+ * Compiles a native Mage-Hand SchemaNode AST into a valid JSON Schema Draft-07 object
+ * suitable for Monaco Editor diagnostics formatting and validation.
+ */
+export function compileToMonacoSchema(node: SchemaNode): any {
+  if (!node) return {};
+  
+  const schema: any = {};
+  
+  if (node.description) schema.description = node.description;
+  
+  if (node.type === 'any') {
+    // "any" in JSON Schema doesn't strictly need a 'type' property
+  } else if (node.type === 'enum') {
+    schema.type = 'string'; 
+    if (node.enumValues) {
+      schema.enum = node.enumValues;
+    }
+  } else {
+    schema.type = node.type;
+  }
+  
+  if (node.type === 'object' && node.properties) {
+    schema.properties = {};
+    for (const [key, childNode] of Object.entries(node.properties)) {
+      schema.properties[key] = compileToMonacoSchema(childNode);
+    }
+    schema.additionalProperties = false; // Strictly enforce schema shape
+  }
+  
+  if (node.type === 'array' && node.items) {
+    schema.items = compileToMonacoSchema(node.items);
+  }
+  
+  return schema;
+}

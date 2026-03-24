@@ -83,14 +83,6 @@ export function BaseCard({
 
     const handleMouseUp = (e: MouseEvent) => {
       if (isDragging) {
-        if (card) {
-          const dropX = e.clientX - dragOffset.x;
-          if (dropX < 50) {
-            dockCard(id, 'left');
-          } else if (dropX > window.innerWidth - card.size.width - 50) {
-            dockCard(id, 'right');
-          }
-        }
         saveLayout();
       } else if (isResizing) {
         saveLayout();
@@ -124,33 +116,19 @@ export function BaseCard({
     
     bringToFront(id);
 
-    if (card.dockPosition !== 'floating') {
-      // Calculate exact screen position of the docked element
-      const el = e.currentTarget as HTMLElement;
-      const cardEl = el.closest('.w-full') || el;
-      const rect = cardEl.getBoundingClientRect();
-      
-      updateCardPosition(id, { x: rect.left, y: rect.top });
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-      dockCard(id, 'floating');
-    } else {
-      const rect = cardRef.current?.getBoundingClientRect();
-      const currentX = rect ? rect.left : card.position.x;
-      const currentY = rect ? rect.top : card.position.y;
+    const rect = cardRef.current?.getBoundingClientRect();
+    const currentX = rect ? rect.left : card.position.x;
+    const currentY = rect ? rect.top : card.position.y;
 
-      if (card.autoCenter) {
-        updateCardPosition(id, { x: currentX, y: currentY });
-        disableAutoCenter(id);
-      }
-
-      setDragOffset({
-        x: e.clientX - currentX,
-        y: e.clientY - currentY,
-      });
+    if (card.autoCenter) {
+      updateCardPosition(id, { x: currentX, y: currentY });
+      disableAutoCenter(id);
     }
+
+    setDragOffset({
+      x: e.clientX - currentX,
+      y: e.clientY - currentY,
+    });
 
     setIsDragging(true);
   };
@@ -217,9 +195,8 @@ export function BaseCard({
         <Card className="flex flex-col flex-1 min-h-0 rounded-none border-x-0 border-t-0 border-b border-border bg-transparent shadow-none">
           {!hideHeader && (
             <CardHeader
-              className="flex flex-row items-center justify-between space-y-0 p-3 bg-transparent cursor-grab hover:bg-accent/30 transition-colors shrink-0"
+              className="flex flex-row items-center justify-between space-y-0 p-3 bg-transparent cursor-pointer hover:bg-accent/30 transition-colors shrink-0"
               onClick={handleMinimize}
-              onMouseDown={handleMouseDown}
             >
               <div className="flex items-center gap-1 min-w-0">
                 <Tooltip>
@@ -233,9 +210,9 @@ export function BaseCard({
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">detach</TooltipContent>
+                  <TooltipContent side="bottom">Detach Card</TooltipContent>
                 </Tooltip>
-                <h3 className="text-sm font-semibold text-card-foreground select-none truncate">{title}</h3>
+                <h3 className="text-sm font-semibold text-card-foreground select-none truncate ml-1">{title}</h3>
               </div>
               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleMinimize}>

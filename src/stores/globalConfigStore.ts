@@ -17,6 +17,9 @@ export interface SchemaSpec {
   id: string;
   label: string;
   rootSchema: SchemaNode;
+  sourceUrl?: string;
+  version?: string;
+  role?: 'character' | 'creature' | 'item' | 'system' | 'custom';
 }
 
 export interface GlobalConfigState {
@@ -34,7 +37,7 @@ export interface GlobalConfigState {
   addAlias: (categoryId: string, itemIndex: number, alias: string) => void;
   removeAlias: (categoryId: string, itemIndex: number, aliasIndex: number) => void;
 
-  addSchema: (id: string, label: string, rootSchema: SchemaNode) => void;
+  addSchema: (id: string, label: string, rootSchema: SchemaNode, options?: { sourceUrl?: string, version?: string, role?: SchemaSpec['role'] }) => void;
   removeSchema: (id: string) => void;
 }
 
@@ -164,10 +167,9 @@ export const useGlobalConfigStore = create<GlobalConfigState>()(
         };
       }),
 
-      addSchema: (id, label, rootSchema) => set((state) => {
-        if (state.schemas[id]) return state;
+      addSchema: (id, label, rootSchema, options) => set((state) => {
         return {
-          schemas: { ...state.schemas, [id]: { id, label, rootSchema } }
+          schemas: { ...state.schemas, [id]: { id, label, rootSchema, ...options } }
         };
       }),
 

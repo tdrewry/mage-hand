@@ -346,22 +346,22 @@ export function RulesLibrary() {
                           <TooltipContent>Edit</TooltipContent>
                         </Tooltip>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete</TooltipContent>
-                              </Tooltip>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete</TooltipContent>
+                          </Tooltip>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
                               <AlertDialogTitle>Delete Pipeline</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Are you sure you want to delete the pipeline "{p.name || 'Untitled Pipeline'}"? This action cannot be undone.

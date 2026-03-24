@@ -1260,14 +1260,12 @@ export const MapTreeCardContent: React.FC = () => {
   }, [allEntities]);
 
   // ── Expanded map nodes state ──────────────────────────────────────────────
-  const [expandedMapNodes, setExpandedMapNodes] = useState<Set<string>>(
-    () => new Set(maps.map(m => m.id))
-  );
-  const [unassignedExpanded, setUnassignedExpanded] = useState(true);
-  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+  const [expandedMapNodes, setExpandedMapNodes] = useState<Set<string>>(new Set());
+  const [unassignedExpanded, setUnassignedExpanded] = useState(false);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
 
   const toggleGroupOpen = useCallback((groupId: string) => {
-    setCollapsedGroupIds(prev => {
+    setExpandedGroupIds(prev => {
       const next = new Set(prev);
       next.has(groupId) ? next.delete(groupId) : next.add(groupId);
       return next;
@@ -1281,13 +1279,13 @@ export const MapTreeCardContent: React.FC = () => {
       .map(g => g.id);
     if (relevantGroupIds.length === 0) return;
     // If any are expanded, collapse all; otherwise expand all
-    const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
-    setCollapsedGroupIds(prev => {
+    const anyExpanded = relevantGroupIds.some(id => expandedGroupIds.has(id));
+    setExpandedGroupIds(prev => {
       const next = new Set(prev);
-      relevantGroupIds.forEach(id => anyExpanded ? next.add(id) : next.delete(id));
+      relevantGroupIds.forEach(id => anyExpanded ? next.delete(id) : next.add(id));
       return next;
     });
-  }, [groups, entitiesByMap, collapsedGroupIds]);
+  }, [groups, entitiesByMap, expandedGroupIds]);
 
   const toggleMapNode = useCallback((mapId: string) => {
     setExpandedMapNodes(prev => {
@@ -1339,11 +1337,11 @@ export const MapTreeCardContent: React.FC = () => {
             onDragLeaveGroup={handleDragLeaveGroup}
             onDragStartGroup={handleDragStartGroup}
             onDragEndGroup={handleDragEnd}
-            open={!collapsedGroupIds.has(group.id)}
+            open={expandedGroupIds.has(group.id)}
             onOpenChange={(isOpen) => {
-              setCollapsedGroupIds(prev => {
+              setExpandedGroupIds(prev => {
                 const next = new Set(prev);
-                isOpen ? next.delete(group.id) : next.add(group.id);
+                isOpen ? next.add(group.id) : next.delete(group.id);
                 return next;
               });
             }}
@@ -1667,7 +1665,7 @@ export const MapTreeCardContent: React.FC = () => {
                         const hasGroups = groups.some(g => g.members.some(m => entityIds.has(m.id)));
                         if (!hasGroups) return null;
                         const relevantGroupIds = groups.filter(g => g.members.some(m => entityIds.has(m.id))).map(g => g.id);
-                        const anyExpanded = relevantGroupIds.some(id => !collapsedGroupIds.has(id));
+                        const anyExpanded = relevantGroupIds.some(id => expandedGroupIds.has(id));
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>

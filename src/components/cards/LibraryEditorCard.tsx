@@ -19,6 +19,8 @@ import { generateBlankTemplate } from '@/lib/characterTemplateGenerator';
 import { CardSaveButton } from '@/components/cards/CardSaveButton';
 import type { DndBeyondCharacter, Monster5eTools } from '@/types/creatureTypes';
 import { toast } from 'sonner';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
+import { compileToMonacoSchema } from '@/lib/rules-engine/schemas';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
@@ -99,9 +101,12 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
     return entity ? JSON.stringify(entity, null, 2) : '';
   }, []); // Only compute once on mount
 
+  const schemas = useGlobalConfigStore(s => s.schemas);
+
   const [activeTab, setActiveTab] = useState<'form' | 'json'>('form');
   const [jsonValue, setJsonValue] = useState(initialJson);
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [jsonSyntaxError, setJsonSyntaxError] = useState<string | null>(null);
+  const [jsonSchemaError, setJsonSchemaError] = useState<string | null>(null);
   const [tokenIconUrl, setTokenIconUrl] = useState(
     entityType === 'character'
       ? (entity as DndBeyondCharacter)?.tokenIconUrl ?? (entity as DndBeyondCharacter)?.portraitUrl ?? ''
@@ -121,29 +126,60 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
 
   // Validate JSON
   useMemo(() => {
-    if (!jsonValue.trim()) { setJsonError(null); return; }
-    try { JSON.parse(jsonValue); setJsonError(null); }
-    catch (e: any) { setJsonError(e.message); }
+    if (!jsonValue.trim()) { setJsonSyntaxError(null); return; }
+    try { JSON.parse(jsonValue); setJsonSyntaxError(null); }
+    catch (e: any) { setJsonSyntaxError(e.message); }
   }, [jsonValue]);
 
   const handleJsonChange = useCallback((value: string | undefined) => {
     const val = value ?? '';
     setJsonValue(val);
-    try { JSON.parse(val); setJsonError(null); }
-    catch (e: any) { setJsonError(e.message); }
+    try { JSON.parse(val); setJsonSyntaxError(null); }
+    catch (e: any) { setJsonSyntaxError(e.message); }
   }, []);
+
+  const handleEditorMount = useCallback((editor: any, monaco: any) => {
+    const matchingSchemaConfig = Object.values(schemas).find(s => s.role === entityType);
+    if (matchingSchemaConfig) {
+      const compiledJsonSchema = compileToMonacoSchema(matchingSchemaConfig.rootSchema);
+      const monacoLangs = monaco.languages as any;
+      if (monacoLangs.json) {
+        monacoLangs.json.jsonDefaults.setDiagnosticsOptions({
+          validate: true,
+          schemas: [{
+            uri: `inmemory://${entityId}-schema.json`,
+            fileMatch: [`inmemory://${entityId}.json`],
+            schema: compiledJsonSchema
+          }]
+        });
+      }
+    }
+
+    monaco.editor.onDidChangeMarkers((uris: any[]) => {
+      const activeUri = editor.getModel()?.uri;
+      if (activeUri && uris.find((u: any) => u.toString() === activeUri.toString())) {
+        const markers = monaco.editor.getModelMarkers({ resource: activeUri });
+        const errors = markers.filter((m: any) => m.severity === monaco.MarkerSeverity.Error);
+        if (errors.length > 0) {
+          setJsonSchemaError(`Schema Error (Line ${errors[0].startLineNumber}): ${errors[0].message}`);
+        } else {
+          setJsonSchemaError(null);
+        }
+      }
+    });
+  }, [entityId, entityType, schemas]);
 
   // Character form → JSON sync
   const handleCharacterChange = useCallback((updated: DndBeyondCharacter) => {
     // Preserve tokenIconUrl in JSON
     updated.tokenIconUrl = tokenIconUrl || undefined;
     setJsonValue(JSON.stringify(updated, null, 2));
-    setJsonError(null);
+    setJsonSyntaxError(null);
   }, [tokenIconUrl]);
 
   // Save to store
   const handleSave = useCallback(() => {
-    if (jsonError) {
+    if (jsonSyntaxError || jsonSchemaError) {
       toast.error('Fix JSON errors before saving');
       return;
     }
@@ -169,7 +205,7 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
     } catch {
       toast.error('Invalid JSON');
     }
-  }, [jsonValue, jsonError, entityId, entityType, tokenIconUrl, updateCharacter, updateMonster]);
+  }, [jsonValue, jsonSyntaxError, jsonSchemaError, entityId, entityType, tokenIconUrl, updateCharacter, updateMonster]);
 
   if (!entity) {
     return (
@@ -247,7 +283,7 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
               <StatBlockFromJson data={parsedMonster} />
             ) : (
               <div className="p-6 text-center text-muted-foreground text-sm space-y-3">
-                {jsonError ? (
+                {(jsonSyntaxError || jsonSchemaError) ? (
                   <>
                     <AlertCircle className="w-8 h-8 mx-auto text-destructive/50" />
                     <p>Fix the JSON errors to view the {entityType}.</p>
@@ -262,10 +298,10 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
 
         {/* JSON tab */}
         <TabsContent value="json" className="mt-0 data-[state=inactive]:hidden flex-1 min-h-0 flex flex-col">
-          {jsonError && (
+          {(jsonSyntaxError || jsonSchemaError) && (
             <div className="mx-4 mt-2 mb-1 flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive shrink-0">
               <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span className="font-mono break-all">{jsonError}</span>
+              <span className="font-mono break-all">{jsonSyntaxError || jsonSchemaError}</span>
             </div>
           )}
           <div className="flex-1 min-h-0 border-y border-border overflow-hidden mt-2" onKeyDown={e => e.stopPropagation()} onKeyUp={e => e.stopPropagation()}>
@@ -278,18 +314,20 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
                 height="100%"
                 language="json"
                 value={jsonValue}
+                path={`inmemory://${entityId}.json`}
                 onChange={handleJsonChange}
+                onMount={handleEditorMount}
                 theme="vs-dark"
                 options={{
                   minimap: { enabled: false },
-                  fontSize: 11,
-                  lineNumbers: 'off',
+                  fontSize: 12,
+                  lineNumbers: 'on',
                   wordWrap: 'on',
                   scrollBeyondLastLine: false,
                   folding: true,
-                  renderLineHighlight: 'none',
+                  renderLineHighlight: 'all',
                   overviewRulerLanes: 0,
-                  padding: { top: 8, bottom: 8 },
+                  padding: { top: 16, bottom: 16 },
                 }}
               />
             </Suspense>
@@ -302,7 +340,7 @@ export function LibraryEditorCardContent({ entityId, entityType }: LibraryEditor
         <CardSaveButton
           context={{ type: entityType === 'character' ? 'character' : 'monster', id: entityId }}
           onSave={handleSave}
-          disabled={!!jsonError}
+          disabled={!!(jsonSyntaxError || jsonSchemaError)}
         />
       </div>
     </div>

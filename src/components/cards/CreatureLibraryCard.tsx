@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,8 @@ import {
   Gem,
   Package,
   Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useCreatureStore } from '@/stores/creatureStore';
@@ -197,6 +199,26 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
   const [itemRarityFilter, setItemRarityFilter] = useState<string>('all');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+
+  const [pageSize, setPageSize] = useState(10);
+  const [characterPage, setCharacterPage] = useState(1);
+  const [monsterPage, setMonsterPage] = useState(1);
+  const [itemPage, setItemPage] = useState(1);
+
+  // Reset pages when filters change
+  useEffect(() => {
+    setCharacterPage(1);
+    setMonsterPage(1);
+    setItemPage(1);
+  }, [searchQuery, pageSize]);
+
+  useEffect(() => {
+    setMonsterPage(1);
+  }, [sizeFilter, typeFilter, crMinFilter, crMaxFilter]);
+
+  useEffect(() => {
+    setItemPage(1);
+  }, [itemCategoryFilter, itemRarityFilter]);
   
   // 5e.tools import dialog state
   const [showSourceDialog, setShowSourceDialog] = useState(false);
@@ -471,6 +493,18 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
       rarity: itemRarityFilter !== 'all' ? itemRarityFilter as ItemRarity : undefined,
     });
   }, [searchQuery, itemCategoryFilter, itemRarityFilter, searchItems, items]);
+
+  const pagedCharacters = useMemo(() => {
+    return filteredCharacters.slice((characterPage - 1) * pageSize, characterPage * pageSize);
+  }, [filteredCharacters, characterPage, pageSize]);
+
+  const pagedMonsters = useMemo(() => {
+    return filteredMonsters.slice((monsterPage - 1) * pageSize, monsterPage * pageSize);
+  }, [filteredMonsters, monsterPage, pageSize]);
+
+  const pagedItems = useMemo(() => {
+    return filteredItems.slice((itemPage - 1) * pageSize, itemPage * pageSize);
+  }, [filteredItems, itemPage, pageSize]);
 
   // Character import modal state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -770,9 +804,8 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
           </TabsTrigger>
         </TabsList>
 
-        {/* Characters Tab */}
-        <TabsContent value="characters" className="flex-1 flex flex-col gap-3 mt-3">
-          <div className="grid grid-cols-2 gap-2">
+        <TabsContent value="characters" className="flex-1 flex flex-col gap-3 mt-3 min-h-0">
+          <div className="grid grid-cols-2 gap-2 shrink-0">
             <Button 
               variant="outline" 
               size="sm" 
@@ -793,6 +826,16 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
             </Button>
           </div>
 
+          {filteredCharacters.length > 0 && (
+            <ListPaginator 
+              page={characterPage} 
+              totalItems={filteredCharacters.length} 
+              pageSize={pageSize} 
+              onPageChange={setCharacterPage} 
+              onPageSizeChange={setPageSize}
+            />
+          )}
+
           <ScrollArea className="flex-1 min-h-0">
             {filteredCharacters.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
@@ -801,29 +844,29 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
                 <p className="text-xs mt-1">Import from D&D Beyond to get started</p>
               </div>
             ) : (
-              <div className="space-y-2 pr-4">
-                {filteredCharacters.map((char) => (
+              <div className="pr-4 pb-2 space-y-2">
+                {pagedCharacters.map((char) => (
                   <CharacterListItem
-                    key={char.id}
-                    character={char}
-                    onEdit={() => handleOpenCharacterSheet(char)}
-                    onCreateToken={() => handleCreateCharacterToken(char)}
-                    isCreating={creatingToken === char.id}
-                    onRemove={() => {
-                      removeCharacter(char.id);
-                      toast.success(`Removed ${char.name}`);
-                    }}
-                  />
-                ))}
+                      key={char.id}
+                      character={char}
+                      onEdit={() => handleOpenCharacterSheet(char)}
+                      onCreateToken={() => handleCreateCharacterToken(char)}
+                      isCreating={creatingToken === char.id}
+                      onRemove={() => {
+                        removeCharacter(char.id);
+                        toast.success(`Removed ${char.name}`);
+                      }}
+                    />
+                  ))}
               </div>
             )}
           </ScrollArea>
         </TabsContent>
 
         {/* Monsters Tab */}
-        <TabsContent value="monsters" className="flex-1 flex flex-col gap-3 mt-3">
+        <TabsContent value="monsters" className="flex-1 flex flex-col gap-3 mt-3 min-h-0">
           {/* Import Buttons */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 shrink-0">
             <Button 
               variant="outline" 
               size="sm" 
@@ -859,7 +902,7 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 shrink-0">
             <Select value={sizeFilter} onValueChange={setSizeFilter}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Size" />
@@ -917,6 +960,16 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
             </Select>
           </div>
 
+          {filteredMonsters.length > 0 && (
+            <ListPaginator 
+              page={monsterPage} 
+              totalItems={filteredMonsters.length} 
+              pageSize={pageSize} 
+              onPageChange={setMonsterPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
+
           {/* Monster List */}
           <ScrollArea className="flex-1 min-h-0">
             {filteredMonsters.length === 0 ? (
@@ -926,35 +979,30 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
                 <p className="text-xs mt-1">Import a 5e.tools bestiary JSON to get started</p>
               </div>
             ) : (
-              <div className="space-y-2 pr-4">
-                {filteredMonsters.slice(0, 100).map((monster) => (
+              <div className="pr-4 pb-2 space-y-2">
+                {pagedMonsters.map((monster) => (
                   <MonsterListItem
-                    key={monster.id}
-                    monster={monster}
-                    onEdit={() => handleOpenMonsterStatBlock(monster)}
-                    onCreateToken={() => handleCreateMonsterToken(monster)}
-                    isCreating={creatingToken === monster.id}
-                    onRemove={() => {
-                      removeMonster(monster.id);
-                      toast.success(`Removed ${monster.name}`);
-                    }}
-                    getMonsterTypeString={getMonsterTypeString}
-                    formatCR={formatCR}
-                  />
-                ))}
-                {filteredMonsters.length > 100 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Showing 100 of {filteredMonsters.length} results. Refine your search.
-                  </p>
-                )}
+                      key={monster.id}
+                      monster={monster}
+                      onEdit={() => handleOpenMonsterStatBlock(monster)}
+                      onCreateToken={() => handleCreateMonsterToken(monster)}
+                      isCreating={creatingToken === monster.id}
+                      onRemove={() => {
+                        removeMonster(monster.id);
+                        toast.success(`Removed ${monster.name}`);
+                      }}
+                      getMonsterTypeString={getMonsterTypeString}
+                      formatCR={formatCR}
+                    />
+                  ))}
               </div>
             )}
           </ScrollArea>
         </TabsContent>
 
         {/* Items Tab */}
-        <TabsContent value="items" className="flex-1 flex flex-col gap-3 mt-3">
-          <div className="grid grid-cols-2 gap-2">
+        <TabsContent value="items" className="flex-1 flex flex-col gap-3 mt-3 min-h-0">
+          <div className="grid grid-cols-2 gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={handleCreateItem} className="gap-1">
               <Plus className="h-4 w-4" />
               New Item
@@ -966,7 +1014,7 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
           </div>
 
           {/* Filters */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
               <SelectTrigger className="h-8 text-xs flex-1">
                 <SelectValue placeholder="Category" />
@@ -999,28 +1047,23 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
                 <p className="text-xs mt-1">Create or import JSON items to get started</p>
               </div>
             ) : (
-              <div className="space-y-2 pr-4">
-                {filteredItems.slice(0, 100).map((item) => (
+              <div className="pr-4 pb-2 space-y-2">
+                {pagedItems.map((item) => (
                   <ItemListEntry
-                    key={item.id}
-                    item={item}
-                    isEditing={editingItemId === item.id}
-                    onEdit={() => setEditingItemId(editingItemId === item.id ? null : item.id)}
-                    onUpdate={(updates) => {
-                      useItemStore.getState().updateItem(item.id, updates);
-                    }}
-                    onRemove={() => {
-                      removeItem(item.id);
-                      if (editingItemId === item.id) setEditingItemId(null);
-                      toast.success(`Removed ${item.name}`);
-                    }}
-                  />
-                ))}
-                {filteredItems.length > 100 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Showing 100 of {filteredItems.length} results. Refine your search.
-                  </p>
-                )}
+                      key={item.id}
+                      item={item}
+                      isEditing={editingItemId === item.id}
+                      onEdit={() => setEditingItemId(editingItemId === item.id ? null : item.id)}
+                      onUpdate={(updates) => {
+                        useItemStore.getState().updateItem(item.id, updates);
+                      }}
+                      onRemove={() => {
+                        removeItem(item.id);
+                        if (editingItemId === item.id) setEditingItemId(null);
+                        toast.success(`Removed ${item.name}`);
+                      }}
+                    />
+                  ))}
               </div>
             )}
           </ScrollArea>
@@ -1089,6 +1132,65 @@ export function CreatureLibraryCardContent({ cardId, onSelectEntity, forcedTab }
         open={showImportModal} 
         onOpenChange={setShowImportModal} 
       />
+    </div>
+  );
+}
+
+interface ListPaginatorProps {
+  page: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+  onPageSizeChange: (s: number) => void;
+}
+
+function ListPaginator({ page, totalItems, pageSize, onPageChange, onPageSizeChange }: ListPaginatorProps) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  
+  if (totalItems === 0) return null;
+
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-border shrink-0 gap-2 mb-1">
+      <div className="flex items-center gap-1">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => onPageChange(page - 1)} 
+          disabled={page <= 1} 
+          className="h-6 w-6 p-0"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </Button>
+        <span className="text-[10px] text-muted-foreground min-w-[36px] text-center">
+          {page} / {totalPages}
+        </span>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => onPageChange(page + 1)} 
+          disabled={page >= totalPages} 
+          className="h-6 w-6 p-0"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          {totalItems} total
+        </span>
+        <Select value={String(pageSize)} onValueChange={(val) => onPageSizeChange(Number(val))}>
+          <SelectTrigger className="h-6 w-[70px] text-[10px] px-2 bg-transparent">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5">5 / pg</SelectItem>
+            <SelectItem value="10">10 / pg</SelectItem>
+            <SelectItem value="20">20 / pg</SelectItem>
+            <SelectItem value="50">50 / pg</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
