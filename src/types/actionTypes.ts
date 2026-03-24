@@ -81,7 +81,7 @@ export interface DamageResult {
 export interface ActionQueueEntry {
   id: string;
   /** Which phase the action is in */
-  phase: 'select_attack' | 'targeting' | 'resolve' | 'complete';
+  phase: 'select_attack' | 'targeting' | 'gather' | 'resolve' | 'complete';
   category: ActionCategory;
   
   /** The source token performing the action */

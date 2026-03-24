@@ -4201,6 +4201,38 @@ export const SimpleTabletop = () => {
         targetCtx.restore();
       }
 
+      // --- Gather Phase Roll Indicator ---
+      const gatherReq = useActionStore.getState().activeGatherRequest;
+      const gatheredResults = useActionStore.getState().gatheredResults;
+      if (gatherReq && gatherReq.targets.includes(token.id) && gatheredResults[token.id] === undefined) {
+        targetCtx.save();
+        
+        const badgeWidth = 40 / transform.zoom;
+        const badgeHeight = 16 / transform.zoom;
+        const badgeX = token.x - badgeWidth / 2;
+        // Position it just above the token top edge
+        const badgeY = token.y - maxRadius - badgeHeight - (4 / transform.zoom);
+        
+        // Background box
+        targetCtx.fillStyle = "#10b981"; // emerald-500
+        targetCtx.strokeStyle = "#047857"; // emerald-700
+        targetCtx.lineWidth = 1.5 / transform.zoom;
+        
+        targetCtx.beginPath();
+        targetCtx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 4 / transform.zoom);
+        targetCtx.fill();
+        targetCtx.stroke();
+        
+        // Text
+        targetCtx.fillStyle = "white";
+        targetCtx.font = `bold ${10 / transform.zoom}px Inter, sans-serif`;
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText("ROLL!", token.x, badgeY + badgeHeight / 2 + (1 / transform.zoom));
+        
+        targetCtx.restore();
+      }
+
       // Draw token label based on position setting
       const displayText = token.label || token.name;
       if (displayText) {

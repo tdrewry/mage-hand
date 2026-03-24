@@ -18,7 +18,7 @@ import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 import { createEmptyEntitySheet } from '@/types/entitySheet';
-import type { ResolutionPayload, IntentPayload } from '@/lib/rules-engine/types';
+import type { ResolutionPayload, IntentPayload, RollRequestPayload } from '@/lib/rules-engine/types';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
 import { useCardStore } from '@/stores/cardStore';
@@ -144,6 +144,14 @@ interface ActionState {
 
   /** The current intents being drafted by the player, before they are submitted to the pipeline. */
   draftingIntents: { id: string; actorId: string; category: string; placedMapTemplateId?: string }[];
+
+  /** The currently active gather request waiting for human input */
+  activeGatherRequest: RollRequestPayload | null;
+  /** The original intent that triggered the gather request */
+  activeGatherIntent: IntentPayload | null;
+  
+  /** The aggregated results for the active gather request (mapping targetId to result) */
+  gatheredResults: Record<string, { total: number; natural?: number; modifier?: number }>;
 }
 
 interface ActionActions {
@@ -221,6 +229,12 @@ interface ActionActions {
 
   /** Submit an intent directly to the resolve phase with its evaluated payload */
   submitIntentResolution: (intent: IntentPayload, resolutionPayload: ResolutionPayload) => void;
+
+  /** Sets a gather request to pause the action and wait for rolls */
+  setGatherRequest: (request: RollRequestPayload | null, intent: IntentPayload | null) => void;
+
+  /** Submits a single player's roll to the current gather request */
+  submitGatherResult: (targetId: string, total: number, natural?: number, modifier?: number) => void;
 }
 
 type ActionStore = ActionState & ActionActions;
@@ -235,6 +249,9 @@ export const useActionStore = create<ActionStore>()(
   actionHistory: [],
   resolutionFlashes: [],
   draftingIntents: [],
+  activeGatherRequest: null,
+  activeGatherIntent: null,
+  gatheredResults: {},
 
   startDrafting: (actorId, category) => {
     // Optionally open the PlayCard dock action tab by dispatching an event
@@ -259,6 +276,27 @@ export const useActionStore = create<ActionStore>()(
       });
     }
     set({ draftingIntents: get().draftingIntents.filter(d => d.id !== draftId) });
+  },
+
+  setGatherRequest: (request, intent) => {
+    set({
+      activeGatherRequest: request,
+      activeGatherIntent: intent,
+      gatheredResults: request ? {} : get().gatheredResults // Clear results when new request starts
+    });
+    // Ensure the Action Panel is open to see the gather card
+    if (request && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('openActionsTab'));
+    }
+  },
+
+  submitGatherResult: (targetId, total, natural, modifier) => {
+    set((state) => ({
+      gatheredResults: {
+        ...state.gatheredResults,
+        [targetId]: { total, natural, modifier }
+      }
+    }));
   },
 
   startAttack: (sourceTokenId, attack) => {

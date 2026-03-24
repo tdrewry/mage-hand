@@ -47,3 +47,15 @@ export interface ResolutionPayload {
   };
   targetResults: Record<string, TargetResult>;
 }
+
+export interface RollRequestPayload {
+  challengeType: 'attack' | 'save' | 'skill' | 'initiative' | 'none';
+  targets: string[];
+  dc?: number;
+  versus?: string;
+  sourceId?: string;
+}
+
+export interface RollResultPayload {
+  results: Record<string, { total: number; natural?: number; modifier?: number }>;
+}

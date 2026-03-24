@@ -229,11 +229,16 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
       activeEffectId: currentAction.activeEffectId,
     };
     
-    // Evaluate the intent to produce a resolution payload
-    const resolutionPayload = await evaluateIntent(payload);
+    // Evaluate the intent to produce a resolution payload (or a gather request)
+    const evaluation = await evaluateIntent(payload);
     
-    // Submit evaluated intent directly to resolve phase
-    useActionStore.getState().submitIntentResolution(payload, resolutionPayload);
+    if (evaluation.type === 'gather') {
+      // Pause execution and wait for rolls
+      useActionStore.getState().setGatherRequest(evaluation.request, payload);
+    } else {
+      // Submit evaluated intent directly to resolve phase
+      useActionStore.getState().submitIntentResolution(payload, evaluation.payload);
+    }
     
     // Clear drafting intent so ui switches
     useActionStore.getState().cancelDrafting(draftId);

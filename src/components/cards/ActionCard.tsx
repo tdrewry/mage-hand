@@ -15,6 +15,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import type { AttackResolution, ActionQueueEntry } from '@/types/actionTypes';
 import type { ResolutionPayload } from '@/lib/rules-engine/types';
 import { ActionDeclareCardContent } from './ActionDeclareCard';
+import { GatherCollectionCard } from './GatherCollectionCard';
 
 const RESOLUTION_CONFIG: Record<AttackResolution, { label: string; color: string; icon: typeof Check }> = {
   critical_miss: { label: 'Critical Miss', color: 'bg-red-900/50 text-red-300 border-red-700', icon: Skull },
@@ -60,7 +61,7 @@ type TabItem =
   | { type: 'resolve', id: string, action: ActionQueueEntry };
 
 export function ActionCardContent() {
-  const { currentAction, pendingActions, swapToAction, draftingIntents, cancelDrafting } = useActionStore();
+  const { currentAction, pendingActions, swapToAction, draftingIntents, cancelDrafting, activeGatherRequest } = useActionStore();
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   // Maintain stable tab ordering — new actions append, removed actions get pruned
@@ -111,6 +112,10 @@ export function ActionCardContent() {
     }
     previousItemCount.current = allItems.length;
   }, [allItems.length, orderedItems]);
+
+  if (activeGatherRequest) {
+    return <GatherCollectionCard />;
+  }
 
   if (orderedItems.length === 0) {
     return <EmptyState />;

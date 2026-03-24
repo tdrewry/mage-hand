@@ -2,7 +2,7 @@ import * as jsonLogic from 'json-logic-js';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useRuleStore } from '@/stores/ruleStore';
 import { rollDice } from '@/lib/diceEngine';
-import type { IntentPayload, ResolutionPayload, TargetResult } from './types';
+import type { IntentPayload, ResolutionPayload, TargetResult, RollRequestPayload } from './types';
 import type { MageHandEntity } from '@/types/native-schema';
 import { useCreatureStore } from '@/stores/creatureStore';
 import { collectAllActions, type TokenActionItem } from '@/lib/attackParser';
@@ -39,11 +39,19 @@ function mountAdapterData(token: any, backingData: any, sourceId: string) {
   }
 }
 
+export type EvaluationOutcome = 
+  | { type: 'resolution'; payload: ResolutionPayload }
+  | { type: 'gather'; request: RollRequestPayload; state: any };
+
 /**
- * Evaluates a player's declared intent and produces a standard V3 ResolutionPayload
- * to be dispatched to the DM.
+ * Evaluates a player's declared intent. If a gather phase is required (e.g. for saves/initiative)
+ * and no results are provided, it returns a RollRequestPayload to pause execution.
+ * Otherwise, it produces a standard V3 ResolutionPayload to be dispatched to the DM.
  */
-export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionPayload> {
+export async function evaluateIntent(
+  intent: IntentPayload, 
+  gatheredResults?: Record<string, { total: number; natural?: number; modifier?: number }>
+): Promise<EvaluationOutcome> {
   const sessionStore = useSessionStore.getState();
   
   // We cast the session tokens locally to the authoritative MageHandEntity schema
@@ -88,10 +96,12 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
 
   let pipelineIdsToRun: string[] = [];
   let orchestratorMetadata: { name?: string, duration?: any, triggers?: any } = {};
+  let currentEffect: any = null;
 
   if (activeEffectId) {
     const effect = useActiveEffectStore.getState().effects.find(e => e.id === activeEffectId);
     if (effect) {
+      currentEffect = effect;
       orchestratorMetadata = { name: effect.name, duration: effect.duration, triggers: effect.triggers };
       if (effect.steps) {
         pipelineIdsToRun = effect.steps
@@ -113,6 +123,65 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
         compiledSequences.push(compilePipeline(pipeline.nodes as any, pipeline.entryNodeId));
       }
     }
+  }
+
+  // --- Proof of Concept: Gather Interception ---
+
+  const isInitiativeAction = intent.actionId === 'system-initiative';
+
+  if (isInitiativeAction) {
+    if (!gatheredResults) {
+      return {
+        type: 'gather',
+        request: {
+          challengeType: 'initiative',
+          targets: intent.targets,
+          dc: 0,
+          versus: 'dex',
+          sourceId: intent.actorId
+        },
+        state: { intent }
+      };
+    } else {
+      // Compute & Apply directly for the PoC
+      const { useInitiativeStore } = await import('@/stores/initiativeStore');
+      const initStore = useInitiativeStore.getState();
+      
+      for (const [tokenId, result] of Object.entries(gatheredResults)) {
+         initStore.addToInitiative(tokenId, result.total);
+      }
+
+      // Return a dummy payload so the system knows it resolved
+      return {
+        type: 'resolution',
+        payload: {
+          source: { name: 'System', type: 'skill' },
+          targets: [],
+          challenge: { type: 'none', versus: 'none', target: 0 },
+          rawResults: { damage: {}, effects: {} },
+          targetResults: {}
+        }
+      };
+    }
+  }
+
+  // If the active effect has a "challenge_pipeline" step and we haven't gathered results yet
+  if (currentEffect && currentEffect.steps?.some((s: any) => s.type === 'challenge_pipeline' || s.type === 'initiative') && !gatheredResults) {
+    // Determine what type of check this is from the pipeline or action
+    // For now we mock based on the actionType or an explicit flag
+    const challengeType = intent.actionType === 'spell' ? 'save' : 'attack';
+    
+    return {
+      type: 'gather',
+      request: {
+        challengeType,
+        targets: intent.targets,
+        dc: 15, // Mock DC, would usually come from actor stats
+        versus: 'dex',
+        sourceId: intent.actorId
+      },
+      state: { intent, pipelineIdsToRun } // Save state to resume later
+    };
   }
 
   const payload: ResolutionPayload = {
@@ -215,6 +284,8 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
       
       finalTargetResult = {
         challengeResult: {
+          type: 'attack',
+          targetValue: targetAc,
           rolls: attackRollResult.groups[0]?.keptResults || [0],
           modifier: actorStrMod,
           total: attackTotal,
@@ -241,5 +312,5 @@ export async function evaluateIntent(intent: IntentPayload): Promise<ResolutionP
     payload.targetResults[target.id] = finalTargetResult;
   }
 
-  return payload;
+  return { type: 'resolution', payload };
 }

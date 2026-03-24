@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { InitiativeCard } from '@/components/InitiativeCard';
 import { useInitiativeStore } from '@/stores/initiativeStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useActionStore } from '@/stores/actionStore';
+import { evaluateIntent } from '@/lib/rules-engine/evaluator';
 import { useRoleStore } from '@/stores/roleStore';
 import { ChevronUp, ChevronDown, Swords, Dices, AlignVerticalJustifyStart, AlignHorizontalJustifyStart, Minimize2 } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -124,29 +126,21 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
     ? selectedTokenIds.map(id => tokens.find(t => t.id === id)).filter(Boolean)
     : [];
 
-  const rollD20 = () => Math.floor(Math.random() * 20) + 1;
-
-  const handleRollAll = () => {
-    multiSelectedTokens.forEach(token => {
-      if (!token) return;
-      const roll = rollD20();
-      setMultiInitValues(prev => ({ ...prev, [token.id]: String(roll) }));
-    });
-  };
-
-  const handleCommitAll = () => {
-    let count = 0;
-    multiSelectedTokens.forEach(token => {
-      if (!token) return;
-      const raw = multiInitValues[token.id];
-      const value = raw !== undefined ? parseInt(raw) : rollD20();
-      if (!isNaN(value)) {
-        addToInitiative(token.id, value);
-        count++;
-      }
-    });
-    setMultiInitValues({});
-    if (count > 0) toast.success(`Added ${count} token${count !== 1 ? 's' : ''} to initiative`);
+  const handleRequestInitiative = async () => {
+    const payload = {
+      actorId: currentPlayer?.id || multiSelectedTokens[0]?.id || 'dm',
+      actionId: 'system-initiative',
+      actionType: 'skill' as any,
+      targets: multiSelectedTokens.map(t => t.id),
+      modifiers: {}
+    };
+    
+    // Evaluate the intent to produce a gather request
+    const evaluation = await evaluateIntent(payload);
+    
+    if (evaluation.type === 'gather') {
+      useActionStore.getState().setGatherRequest(evaluation.request, payload);
+    }
   };
 
   return (
@@ -158,54 +152,19 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
             <Swords className="h-4 w-4 text-[#e2a899]" />
             <span className="text-lg font-bold text-[#e2a899] font-serif tracking-wide">Group Initiative</span>
           </div>
-          <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
-            {multiSelectedTokens.map(token => {
-              if (!token) return null;
-              const currentEntry = initiativeOrder.find(e => e.tokenId === token.id);
-              return (
-                <div key={token.id} className="flex items-center gap-3 bg-white/5 p-1.5 rounded-lg border border-white/5">
-                  <div
-                    className="w-8 h-8 rounded-full flex-shrink-0 border-2 border-white/10"
-                    style={{
-                      backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : undefined,
-                      backgroundColor: !token.imageUrl ? (token.color || '#888') : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
-                  <span className="text-sm font-semibold text-[#8bb4ba] flex-1 min-w-0 truncate">
-                    {token.label || token.name}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-[#e85d75]" />
-                    <Input
-                      type="number"
-                      placeholder="d20"
-                      value={multiInitValues[token.id] ?? ''}
-                      onChange={e => setMultiInitValues(prev => ({ ...prev, [token.id]: e.target.value }))}
-                      className="w-12 h-7 text-center text-sm font-bold p-0 px-1 bg-transparent border-none text-[#38bdf8] focus-visible:ring-0 focus-visible:ring-offset-0"
-                    />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-col gap-2 pr-1">
+            <p className="text-xs text-white/60">
+              {multiSelectedTokens.length} tokens selected. Send a roll request to gather their initiative.
+            </p>
           </div>
           <div className="flex gap-1 mt-1.5">
             <Button
               size="sm"
-              variant="outline"
-              className="flex-1 h-6 text-xs"
-              onClick={handleRollAll}
+              className="flex-1 h-8 text-xs bg-[#10b981] hover:bg-[#059669] text-white"
+              onClick={handleRequestInitiative}
             >
-              <Dices className="h-3 w-3 mr-1" />
-              Roll All
-            </Button>
-            <Button
-              size="sm"
-              className="flex-1 h-6 text-xs"
-              onClick={handleCommitAll}
-            >
-              Add to Init
+              <Dices className="h-4 w-4 mr-2" />
+              Request Initiative Rolls
             </Button>
           </div>
         </div>
