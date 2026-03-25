@@ -23,7 +23,7 @@ import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useRoleStore } from '@/stores/roleStore';
 import { useInitiativeStore } from '@/stores/initiativeStore';
-import { canAssignTokenRoles } from '@/lib/rolePermissions';
+import { canAssignTokenRoles, canManageInitiative } from '@/lib/rolePermissions';
 import { GroupMember, EntityGeometry } from '@/lib/groupTransforms';
 import { exportGroupToPrefab, downloadPrefab } from '@/lib/groupSerializer';
 import { toast } from 'sonner';
@@ -85,6 +85,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   const selectedTokens = tokens.filter(t => selectedTokenIds.includes(t.id));
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const canAssignRoles = currentPlayer && canAssignTokenRoles(currentPlayer, roles);
+  const canManageInit = currentPlayer && canManageInitiative(currentPlayer, roles);
 
   const activeGroups = useMemo(() => {
     const allSelectedIds = [...selectedTokenIds, ...selectedRegionIds, ...selectedMapObjectIds, ...selectedLightIds];
@@ -621,9 +622,11 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 </Button>
               )}
               
-              <Button variant="ghost" size="sm" onClick={() => setShowInitiativeModal(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Init
-              </Button>
+              {canManageInit && (
+                <Button variant="ghost" size="sm" onClick={() => setShowInitiativeModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Init
+                </Button>
+              )}
               
               <div className="h-4 w-px bg-white/10 mx-2" />
             </>

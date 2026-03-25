@@ -11,7 +11,7 @@ import { ChevronUp, ChevronDown, Swords, Dices, AlignVerticalJustifyStart, Align
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
+import { canSeeToken, hasPermission, canManageInitiative } from '@/lib/rolePermissions';
 import { ephemeralBus } from '@/lib/net';
 
 interface InitiativeTrackerCardContentProps {
@@ -43,6 +43,7 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
 
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const isDM = currentPlayer ? hasPermission(currentPlayer, roles, 'canSeeAllFog') : false;
+  const canInit = currentPlayer ? canManageInitiative(currentPlayer, roles) : false;
 
   const handleNextTurn = () => {
     nextTurn();
@@ -146,7 +147,7 @@ export function InitiativeTrackerCardContent(_props: InitiativeTrackerCardConten
   return (
     <div className="flex flex-col gap-3 p-3 bg-[#161a1d] text-muted-foreground w-full max-w-[340px] rounded-2xl border border-white/5 shadow-2xl overflow-hidden h-full">
       {/* Multi-select initiative panel — only visible when 2+ tokens are selected */}
-      {multiSelectedTokens.length > 1 && (
+      {multiSelectedTokens.length > 1 && canInit && (
         <div className="flex flex-col gap-2 pb-3 border-b border-white/10">
           <div className="flex items-center gap-2 mb-1">
             <Swords className="h-4 w-4 text-[#e2a899]" />

@@ -5,7 +5,7 @@ import { useRoleStore } from '@/stores/roleStore';
 import { useUiStateStore } from '@/stores/uiStateStore';
 import { Z_INDEX } from '@/lib/zIndex';
 import { InitiativeCard } from './InitiativeCard';
-import { canSeeToken, hasPermission } from '@/lib/rolePermissions';
+import { canSeeToken, hasPermission, canManageInitiative } from '@/lib/rolePermissions';
 import { ephemeralBus } from '@/lib/net';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Swords, Dices } from 'lucide-react';
@@ -51,6 +51,7 @@ export const InitiativePanel: React.FC = () => {
 
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const isDM = currentPlayer ? hasPermission(currentPlayer, roles, 'canSeeAllFog') : false;
+  const canInit = currentPlayer ? canManageInitiative(currentPlayer, roles) : false;
 
   const visibleInitiativeOrder = initiativeOrder.filter(entry => {
     const token = tokens.find(t => t.id === entry.tokenId);
@@ -152,7 +153,7 @@ export const InitiativePanel: React.FC = () => {
         layoutFormat === 'mini' ? "rounded-full p-1.5 px-3 gap-2" : ""
       )}>
         {/* MULTI-SELECT GROUP INITIATIVE */}
-        {layoutFormat === 'vertical' && multiSelectedTokens.length > 1 && (
+        {layoutFormat === 'vertical' && multiSelectedTokens.length > 1 && canInit && (
           <div className="flex flex-col gap-2 pb-3 border-b border-[#333333]">
             <div className="flex items-center gap-2 mb-1">
               <Swords className="h-4 w-4 text-[#e2a899]" />
