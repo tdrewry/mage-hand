@@ -153,7 +153,14 @@ export function renderPlacementPreview(
     );
   }
 
-  // Draw spell intent line for token-sourced placements
+  // Draw the effect shape preview
+  rc.ctx.globalAlpha = 0.4 + Math.sin(rc.time * 0.004) * 0.15;
+  drawShape(rc, template, effectOrigin, previewDirection, 1.0);
+  // Outline
+  rc.ctx.globalAlpha = 0.8;
+  strokeShape(rc, template, effectOrigin, previewDirection);
+
+  // Draw spell intent line ON TOP of effect shape for token-sourced placements
   // For non-ranged: only during direction step; for ranged: during both steps
   if (placement.casterToken && (
     (placement.step === 'direction' && !isRangedTokenSourced) ||
@@ -161,13 +168,6 @@ export function renderPlacementPreview(
   )) {
     renderSpellIntentLine(rc, placement.casterToken, effectOrigin, template.color);
   }
-
-  // Draw the effect shape preview
-  rc.ctx.globalAlpha = 0.4 + Math.sin(rc.time * 0.004) * 0.15;
-  drawShape(rc, template, effectOrigin, previewDirection, 1.0);
-  // Outline
-  rc.ctx.globalAlpha = 0.8;
-  strokeShape(rc, template, effectOrigin, previewDirection);
 
   // In direction step without caster token, draw origin crosshair
   if (placement.step === 'direction' && !placement.casterToken && placement.origin) {
@@ -200,7 +200,7 @@ export function renderPlacementPreview(
 
 function renderSpellIntentLine(
   rc: EffectRenderContext,
-  casterToken: { x: number; y: number },
+  casterToken: { x: number; y: number; gridWidth?: number; gridHeight?: number },
   targetOrigin: { x: number; y: number },
   color: string,
 ): void {
@@ -276,6 +276,41 @@ function renderSpellIntentLine(
   ctx.beginPath();
   ctx.arc(cx, cy, 6, 0, Math.PI * 2);
   ctx.stroke();
+
+  // Grid Distance Text
+  const radius = Math.max(casterToken.gridWidth ?? 1, casterToken.gridHeight ?? 1) * rc.gridSize / 2;
+  const edgeDist = Math.max(0, dist - radius);
+  const distUnits = (edgeDist / rc.gridSize).toFixed(1);
+
+  ctx.globalAlpha = 0.9;
+  ctx.font = `bold ${Math.max(10, rc.gridSize * 0.3)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  const midX = cx + dx / 2;
+  const midY = cy + dy / 2;
+  
+  const text = `${distUnits} units`;
+  const textMetrics = ctx.measureText(text);
+  const paddingX = 6;
+  const paddingY = 4;
+  const textWidth = textMetrics.width;
+  // Approximation for text height
+  const textHeight = Math.max(10, rc.gridSize * 0.3);
+  
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.beginPath();
+  ctx.roundRect(
+    midX - textWidth / 2 - paddingX,
+    midY - textHeight / 2 - paddingY,
+    textWidth + paddingX * 2,
+    textHeight + paddingY * 2,
+    4
+  );
+  ctx.fill();
+  
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, midX, midY + 1); // slight visual offset for baseline
 
   ctx.setLineDash([]);
   ctx.restore();
@@ -995,6 +1030,10 @@ export function renderRemoteEffectPreviews(rc: EffectRenderContext): void {
     // Ghost outline — dashed, slightly brighter
     rc.ctx.globalAlpha = 0.45 + Math.sin(rc.time * 0.004) * 0.1;
     strokeShape(rc, template, origin, direction);
+
+    if (preview.casterToken) {
+      renderSpellIntentLine(rc, preview.casterToken, origin, template.color);
+    }
 
     rc.ctx.restore();
   }

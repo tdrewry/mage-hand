@@ -149,6 +149,7 @@ interface EffectState {
   /** Restore all hidden built-in templates */
   restoreBuiltInTemplates: () => void;
   getTemplate: (id: string) => MapTemplateDefinition | undefined;
+  updateTemplateTexture: (hash: string, dataUrl: string) => void;
 
   // --- Placement mode ---
   startPlacement: (templateId: string, casterId?: string, casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number }) => void;
@@ -302,6 +303,28 @@ export const useMapTemplateStore = create<EffectState>()(
       );
     },
 
+    updateTemplateTexture: (hash, dataUrl) => {
+      set((s) => {
+        let changed = false;
+        const newCustom = s.customTemplates.map((t) => {
+          if (t.textureHash === hash && t.texture !== dataUrl) {
+            changed = true;
+            return { ...t, texture: dataUrl };
+          }
+          return t;
+        });
+
+        if (changed) {
+          saveCustomTemplates(newCustom);
+          return {
+            customTemplates: newCustom,
+            allTemplates: buildAllTemplates(newCustom, s.hiddenBuiltInIds),
+          };
+        }
+        return s;
+      });
+    },
+
     // ------------------------------------------------------------------
     // Placement mode
     // ------------------------------------------------------------------
@@ -387,6 +410,7 @@ export const useMapTemplateStore = create<EffectState>()(
             templateId: placement.templateId,
             origin,
             direction,
+            casterToken: placement.casterToken,
           });
         }).catch(() => { /* net not available */ });
       }

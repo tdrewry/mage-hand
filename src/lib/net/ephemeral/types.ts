@@ -393,6 +393,7 @@ export interface EffectPlacementPreviewPayload {
   templateId: string;
   origin: Vec2;
   direction?: number;
+  casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number };
 }
 
 // -- Portal & Map Activation --

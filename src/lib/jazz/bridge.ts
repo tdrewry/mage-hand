@@ -2815,15 +2815,32 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
           const lookup = buildTemplateLookup(customTemplates);
 
           const restored: PlacedMapTemplate[] = [];
+          const restoredIdsSet = new Set<string>();
           for (let i = 0; i < len; i++) {
             const je = placedEffects[i];
             if (!je) continue;
             const effect = jazzToZustandPlacedEffect(je, lookup);
-            if (effect) restored.push(effect);
+            if (effect) {
+              restored.push(effect);
+              restoredIdsSet.add(effect.id);
+            }
           }
 
           // Deep compare to avoid redundant store writes
           const currentLocal = useMapTemplateStore.getState().placedEffects;
+          
+          // Preserve local optimistic effects that haven't round-tripped yet (5s grace period)
+          const now = performance.now();
+          const OPTIMISTIC_GRACE_MS = 5000;
+          const localOptimistic = currentLocal.filter(e => 
+            !restoredIdsSet.has(e.id) && 
+            e.placedAt && (now - e.placedAt) < OPTIMISTIC_GRACE_MS
+          );
+          
+          if (localOptimistic.length > 0) {
+            restored.push(...localOptimistic);
+          }
+
           const restoredIds = restored.map(e => e.id).sort().join(',');
           const localIds = currentLocal.map(e => e.id).sort().join(',');
           if (restoredIds === localIds) {

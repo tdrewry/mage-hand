@@ -55,6 +55,7 @@ export interface RemoteEffectPlacementPreview {
   templateId: string;
   origin: { x: number; y: number };
   direction?: number;
+  casterToken?: { x: number; y: number; gridWidth: number; gridHeight: number };
 }
 
 interface MiscEphemeralState {

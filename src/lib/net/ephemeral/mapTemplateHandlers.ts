@@ -39,6 +39,7 @@ export function registerEffectHandlers(): void {
       templateId: data.templateId,
       origin: data.origin,
       direction: data.direction,
+      casterToken: data.casterToken,
     });
   });
 }

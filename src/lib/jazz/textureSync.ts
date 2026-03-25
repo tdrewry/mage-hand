@@ -294,7 +294,7 @@ export async function pullTexturesFromJazz(sessionRoot: any): Promise<void> {
 // ── Apply textures to in-memory entities ──────────────────────────────────
 
 /**
- * After downloading a texture, apply it to all tokens/regions/mapObjects
+ * After downloading a texture, apply it to all tokens/regions/mapObjects/templates
  * that reference this hash but don't have the image data loaded yet.
  */
 function _applyTextureToEntities(hash: string, dataUrl: string): void {
@@ -344,6 +344,16 @@ function _applyTextureToEntities(hash: string, dataUrl: string): void {
       mapStore.updateMap(m.id, { imageUrl: dataUrl });
     }
     console.log(`[jazz-texture] Applied texture ${hash} to ${mapsNeedingTexture.length} map(s)`);
+  }
+
+  // Custom Map Templates
+  const templateStore = useMapTemplateStore.getState();
+  const templatesNeedingTexture = templateStore.customTemplates.filter(
+    (t) => t.textureHash === hash && (!t.texture || t.texture.length < 200)
+  );
+  if (templatesNeedingTexture.length > 0) {
+    templateStore.updateTemplateTexture(hash, dataUrl);
+    console.log(`[jazz-texture] Applied texture ${hash} to map template(s)`);
   }
 }
 
