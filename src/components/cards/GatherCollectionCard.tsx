@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Dices, Check, X, ShieldAlert } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useActionStore } from '@/stores/actionStore';
+import { useRoleStore } from '@/stores/roleStore';
 import { evaluateIntent } from '@/lib/rules-engine/evaluator';
 import { rollDice } from '@/lib/diceEngine';
+import { canControlToken } from '@/lib/rolePermissions';
 
 export function GatherCollectionCard() {
   const tokens = useSessionStore((s) => s.tokens);
@@ -19,9 +21,20 @@ export function GatherCollectionCard() {
   const submitGatherResult = useActionStore((s) => s.submitGatherResult);
   const submitIntentResolution = useActionStore((s) => s.submitIntentResolution);
 
-  if (!activeGatherRequest || !activeGatherIntent) return null;
+  if (!activeGatherRequest) return null;
 
-  const targetTokens = tokens.filter(t => activeGatherRequest.targets.includes(t.id));
+  const currentPlayerId = useSessionStore((s) => s.currentPlayerId);
+  const players = useSessionStore((s) => s.players);
+  const roles = useRoleStore((s) => s.roles);
+  
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+
+  const targetTokens = tokens.filter(t => {
+    if (!activeGatherRequest.targets.includes(t.id)) return false;
+    if (!currentPlayer) return false;
+    return canControlToken(t, currentPlayer, roles);
+  });
+
   const isComplete = targetTokens.every(t => gatheredResults[t.id] !== undefined);
 
   const handleRollForTarget = (targetId: string) => {
@@ -135,23 +148,25 @@ export function GatherCollectionCard() {
         </div>
       </ScrollArea>
 
-      {/* Footer */}
-      <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0 flex gap-3">
-        <Button 
-          variant="outline"
-          className="flex-1 bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300" 
-          onClick={handleCancel}
-        >
-          <X className="w-4 h-4 mr-1" /> Cancel Action
-        </Button>
-        <Button 
-          className={`flex-1 font-bold gap-2 text-white ${isComplete ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-700 hover:bg-slate-600'}`} 
-          size="lg"
-          onClick={handleApply}
-        >
-          <Check className="w-4 h-4" /> {isComplete ? 'Apply Results' : 'Force Apply'}
-        </Button>
-      </div>
+      {/* Footer - Only the orchestrating DM has the active intent to apply results */}
+      {activeGatherIntent && (
+        <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0 flex gap-3">
+          <Button 
+            variant="outline"
+            className="flex-1 bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300" 
+            onClick={handleCancel}
+          >
+            <X className="w-4 h-4 mr-1" /> Cancel Action
+          </Button>
+          <Button 
+            className={`flex-1 font-bold gap-2 text-white ${isComplete ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-700 hover:bg-slate-600'}`} 
+            size="lg"
+            onClick={handleApply}
+          >
+            <Check className="w-4 h-4" /> {isComplete ? 'Apply Results' : 'Force Apply'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

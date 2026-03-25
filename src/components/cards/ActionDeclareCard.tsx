@@ -6,6 +6,8 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { Swords, Sparkles, Dices, BookOpen, Target, Send, Focus, Minus, Plus } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useCreatureStore } from '@/stores/creatureStore';
@@ -126,10 +128,12 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
       .map(([key, node]) => ({ key, node }));
   }, [actionSchema, coreFields, currentAction]);
 
+  const activeEffects = useActiveEffectStore(s => s.effects);
+
   const selectedEffect = useMemo(() => {
     if (!currentAction?.activeEffectId) return null;
-    return useActiveEffectStore.getState().effects.find(e => e.id === currentAction.activeEffectId) || null;
-  }, [currentAction]);
+    return activeEffects.find(e => e.id === currentAction.activeEffectId) || null;
+  }, [currentAction, activeEffects]);
 
   const matchedTemplate = useMemo(() => {
     if (!currentAction) return null;
@@ -137,7 +141,7 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
     
     // If no explicit template, check the orchestrator for a maptemplate step
     if (!templateId && currentAction.activeEffectId) {
-      const orchestrator = useActiveEffectStore.getState().effects.find(e => e.id === currentAction.activeEffectId);
+      const orchestrator = activeEffects.find(e => e.id === currentAction.activeEffectId);
       if (orchestrator && orchestrator.steps) {
         const tStep = orchestrator.steps.find(s => s.type === 'maptemplate');
         if (tStep) templateId = tStep.targetId;
@@ -150,7 +154,7 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
     
     // Explicitly removed text/name-matching heuristic as per request.
     return null;
-  }, [currentAction, allTemplates]);
+  }, [currentAction, allTemplates, activeEffects]);
 
   const [useTemplate, setUseTemplate] = useState(false);
 
@@ -229,15 +233,25 @@ export function ActionDeclareCardContent({ draftId, actorId, category, onCancel 
       activeEffectId: currentAction.activeEffectId,
     };
     
-    // Evaluate the intent to produce a resolution payload (or a gather request)
-    const evaluation = await evaluateIntent(payload);
+    const isHost = useMultiplayerStore.getState().roles.some(r => r === 'dm' || r === 'host');
     
-    if (evaluation.type === 'gather') {
-      // Pause execution and wait for rolls
-      useActionStore.getState().setGatherRequest(evaluation.request, payload);
+    if (isHost) {
+      // Host immediately evaluates intents
+      const evaluation = await evaluateIntent(payload);
+      
+      if (evaluation.type === 'gather') {
+        // Pause execution and wait for rolls
+        useActionStore.getState().setGatherRequest(evaluation.request, payload);
+      } else {
+        // Submit evaluated intent directly to resolve phase
+        useActionStore.getState().submitIntentResolution(payload, evaluation.payload);
+      }
     } else {
-      // Submit evaluated intent directly to resolve phase
-      useActionStore.getState().submitIntentResolution(payload, evaluation.payload);
+      // Player transmits intent up to the DM for evaluation
+      import('@/lib/net/ephemeral').then(({ emitIntentSubmit }) => {
+        emitIntentSubmit(payload);
+        toast.info("Action submitted to DM");
+      });
     }
     
     // Clear drafting intent so ui switches

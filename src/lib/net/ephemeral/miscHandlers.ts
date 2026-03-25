@@ -1,6 +1,8 @@
 // src/lib/net/ephemeral/miscHandlers.ts
 // Registers ephemeral handlers for fog, dice, initiative, groups, roles, actions, and assets.
 
+import { evaluateIntent } from "@/lib/rules-engine/evaluator";
+
 import { ephemeralBus } from "@/lib/net";
 import { useMiscEphemeralStore } from "@/stores/miscEphemeralStore";
 import { useFogStore } from "@/stores/fogStore";
@@ -23,18 +25,20 @@ import type {
   InitiativeDragPreviewPayload,
   InitiativeHoverPayload,
   GroupSelectPreviewPayload,
-  GroupDragPreviewPayload,
   RoleHandRaisePayload,
-  RoleAssignPayload,
-  AssetUploadProgressPayload,
-  AssetSubmissionPayload,
-  AssetAcceptedPayload,
-  AssetRejectedPayload,
-  ActionQueueSyncPayload,
+  PresenceActivityPayload,
   ActionPendingPayload,
   ActionResolvedPayload,
   ActionResolutionClaimPayload,
   ActionGatherResultPayload,
+  ActionIntentSubmitPayload,
+  AssetUploadProgressPayload,
+  GroupDragPreviewPayload,
+  RoleAssignPayload,
+  AssetSubmissionPayload,
+  AssetAcceptedPayload,
+  AssetRejectedPayload,
+  ActionQueueSyncPayload,
 } from "./types";
 
 let registered = false;
@@ -204,6 +208,24 @@ export function registerMiscHandlers(): void {
       useActionStore.getState().submitGatherResult(data.targetId, data.total, data.natural, data.modifier);
       triggerSound('ui.success');
       toast.info(`Received roll from a player`);
+    }
+  });
+
+  // ── Action Intent Submit (Player → DM) ──
+  ephemeralBus.on("action.intent.submit", async (data: ActionIntentSubmitPayload, userId) => {
+    // Only the DM evaluates raw intents from players
+    const roles = useMultiplayerStore.getState().roles;
+    if (!roles.includes("dm")) return;
+    
+    // Evaluate the intent to produce a resolution payload (or a gather request)
+    const evaluation = await evaluateIntent(data);
+    
+    if (evaluation.type === 'gather') {
+      // Pause execution and wait for rolls
+      useActionStore.getState().setGatherRequest(evaluation.request, data);
+    } else {
+      // Submit evaluated intent directly to resolve phase
+      useActionStore.getState().submitIntentResolution(data, evaluation.payload);
     }
   });
 
@@ -391,5 +413,12 @@ export function emitArtRejected(submissionId: string, reason?: string): void {
  */
 export function emitActionGatherResult(targetId: string, total: number, natural?: number, modifier?: number): void {
   ephemeralBus.emit("action.gather.result", { targetId, total, natural, modifier });
+}
+
+/**
+ * Submit an action intent for rules engine evaluation (Player → DM)
+ */
+export function emitIntentSubmit(intent: ActionIntentSubmitPayload): void {
+  ephemeralBus.emit("action.intent.submit", intent);
 }
 

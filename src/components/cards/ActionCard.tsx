@@ -209,15 +209,29 @@ export function ActionCardContent() {
 }
 
 function SingleActionView({ action }: { action: ActionQueueEntry }) {
+  const roles = useMultiplayerStore((s) => s.roles);
+  const isHost = roles.includes('dm') || roles.includes('host');
+
   switch (action.phase) {
     case 'targeting':
       return <TargetingPhase />;
     case 'resolve':
+      if (!isHost) return <PlayerWaitingState />;
       if (action.category === 'skill') return <SkillCheckResolvePhase />;
       return <ResolvePhase />;
     default:
       return <EmptyState />;
   }
+}
+
+function PlayerWaitingState() {
+  return (
+    <div className="flex flex-col items-center justify-center p-8 text-center h-full text-muted-foreground">
+      <Swords className="w-10 h-10 mb-4 opacity-50 animate-pulse text-primary" />
+      <h3 className="font-semibold text-lg text-foreground mb-1">Resolving Action</h3>
+      <p className="text-sm">The Dungeon Master is determining the results...</p>
+    </div>
+  );
 }
 
 function EmptyState() {
@@ -758,7 +772,7 @@ function TargetResolveCard({
               </span>
             </p>
             <p className="text-[10px] text-muted-foreground">
-              d20({v3Challenge.rolls[0] || v3Challenge.total}) + {v3Challenge.modifier}
+              d20({v3Challenge.rolls?.[0] || v3Challenge.total}) + {v3Challenge.modifier}
             </p>
           </div>
           <div className="text-center px-2">

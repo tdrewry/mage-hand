@@ -23,6 +23,7 @@ import { useDungeonStore } from '@/stores/dungeonStore';
 import { useMapObjectStore } from '@/stores/mapObjectStore';
 import { useIlluminationStore } from '@/stores/illuminationStore';
 import { useCreatureStore } from '@/stores/creatureStore';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
 import { useItemStore } from '@/stores/itemStore';
 import { useHatchingStore } from '@/stores/hatchingStore';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
@@ -160,6 +161,7 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
       vocabularyCategories: globalConfigStore.categories,
       pipelines: ruleStore.pipelines,
       schemas: globalConfigStore.schemas,
+      activeEffects: useActiveEffectStore.getState().effects,
     },
   };
 }
@@ -190,6 +192,7 @@ export function clearAllStores(): void {
   effectMapIds.forEach(id => mapTemplateStore.clearEffectsForMap(id));
   useTokenGroupStore.getState().clearAllGroups();
   useRuleStore.setState({ pipelines: [] });
+  useActiveEffectStore.setState({ effects: [] });
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +383,9 @@ export function applyProjectData(data: ProjectData): void {
     }
     if (data.rulesEngine.pipelines) {
       useRuleStore.setState({ pipelines: data.rulesEngine.pipelines });
+    }
+    if (data.rulesEngine.activeEffects) {
+      useActiveEffectStore.setState({ effects: data.rulesEngine.activeEffects });
     }
   }
 }

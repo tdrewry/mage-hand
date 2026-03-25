@@ -36,6 +36,9 @@ import { useMapFocusStore } from '@/stores/mapFocusStore';
 import { useCampaignStore } from '@/stores/campaignStore';
 import { normalizeImportedTokenGroups, useTokenGroupStore } from '@/stores/tokenGroupStore';
 import { useCanvasItemStore } from '@/stores/canvasItemStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 // ── Tokens ─────────────────────────────────────────────────────────────────
 DurableObjectRegistry.register({
   kind: 'tokens',
@@ -636,4 +639,47 @@ DurableObjectRegistry.register({
     useTokenGroupStore.setState({ groups: normalizedGroups });
   },
   summarizer: () => `${useTokenGroupStore.getState().groups.length} token groups`,
+});
+
+// ── Rules Engine ──────────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'rules',
+  version: 1,
+  label: 'Rules Engine',
+  extractor: () => ({ pipelines: useRuleStore.getState().pipelines }),
+  hydrator: (state: any) => {
+    if (!state?.pipelines) return;
+    useRuleStore.setState({ pipelines: state.pipelines });
+  },
+  summarizer: () => `${useRuleStore.getState().pipelines.length} pipelines`,
+});
+
+// ── Active Effects ────────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'activeEffects',
+  version: 1,
+  label: 'Active Effects',
+  extractor: () => ({ effects: useActiveEffectStore.getState().effects }),
+  hydrator: (state: any) => {
+    if (!state?.effects) return;
+    useActiveEffectStore.setState({ effects: state.effects });
+  },
+  summarizer: () => `${useActiveEffectStore.getState().effects.length} effects`,
+});
+
+// ── Global Config ─────────────────────────────────────────────────────────
+DurableObjectRegistry.register({
+  kind: 'globalConfig',
+  version: 1,
+  label: 'Global Config',
+  extractor: () => ({
+    schemas: useGlobalConfigStore.getState().schemas,
+    categories: useGlobalConfigStore.getState().categories,
+  }),
+  hydrator: (state: any) => {
+    if (!state) return;
+    if (state.schemas) useGlobalConfigStore.setState({ schemas: state.schemas });
+    if (state.categories) useGlobalConfigStore.setState({ categories: state.categories });
+  },
+  summarizer: () => `${Object.keys(useGlobalConfigStore.getState().schemas).length} schemas`,
 });

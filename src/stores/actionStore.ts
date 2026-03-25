@@ -11,11 +11,12 @@ import type {
   ActionHistoryEntry,
   DEFAULT_SLAM_ATTACK,
 } from '@/types/actionTypes';
+import { useMultiplayerStore } from '@/stores/multiplayerStore';
 import { rollDice } from '@/lib/diceEngine';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
-import type { EffectImpact, DamageDiceEntry } from '@/types/effectTypes';
+import type { EffectImpact } from '@/types/effectTypes';
 import { ephemeralBus } from '@/lib/net';
 import { createEmptyEntitySheet } from '@/types/entitySheet';
 import type { ResolutionPayload, IntentPayload, RollRequestPayload } from '@/lib/rules-engine/types';
@@ -179,7 +180,7 @@ interface ActionActions {
     templateName: string;
     damageType?: string;
     damageFormula?: string;
-    damageDice?: DamageDiceEntry[];
+    damageDice?: { formula: string; damageType: string }[];
     placedMapTemplateId: string;
     groupId?: string;
     castLevel?: number;
@@ -299,6 +300,13 @@ export const useActionStore = create<ActionStore>()(
         [targetId]: { total, natural, modifier }
       }
     }));
+
+    const roles = useMultiplayerStore.getState().roles;
+    if (!roles.includes('dm') && !roles.includes('host')) {
+      import('@/lib/net/ephemeral/miscHandlers').then(({ emitActionGatherResult }) => {
+        emitActionGatherResult(targetId, total, natural, Math.floor(modifier || 0));
+      });
+    }
   },
 
   startAttack: (sourceTokenId, attack) => {
@@ -435,7 +443,7 @@ export const useActionStore = create<ActionStore>()(
     }
 
     // Determine effective damage dice rows
-    const effectiveDamageDice: DamageDiceEntry[] = (damageDice && damageDice.length > 0)
+    const effectiveDamageDice: { formula: string; damageType: string }[] = (damageDice && damageDice.length > 0)
       ? damageDice
       : (damageFormula && damageFormula !== '0')
         ? [{ formula: damageFormula, damageType: damageType || 'untyped' }]
@@ -1084,16 +1092,22 @@ let _lastBroadcastJson = '';
 let _lastHistoryLength = 0;
 useActionStore.subscribe((state) => {
   // Only broadcast meaningful queue state changes (skip flashes, mouse pos)
-  const snapshot = JSON.stringify({
-    ca: state.currentAction,
-    pa: state.pendingActions,
-    ah: state.actionHistory,
-    gr: state.activeGatherRequest,
-    res: state.gatheredResults,
-  });
-  if (snapshot !== _lastBroadcastJson) {
-    _lastBroadcastJson = snapshot;
-    broadcastActionQueue();
+  // Ensure ONLY the host broadcasts queue syncs to prevent players from overwriting orchestrator transitions.
+  const roles = useMultiplayerStore.getState().roles;
+  const isHost = roles.includes('dm') || roles.includes('host');
+
+  if (isHost) {
+    const snapshot = JSON.stringify({
+      ca: state.currentAction,
+      pa: state.pendingActions,
+      ah: state.actionHistory,
+      gr: state.activeGatherRequest,
+      res: state.gatheredResults,
+    });
+    if (snapshot !== _lastBroadcastJson) {
+      _lastBroadcastJson = snapshot;
+      broadcastActionQueue();
+    }
   }
 
   // Feed new history entries into the chat log

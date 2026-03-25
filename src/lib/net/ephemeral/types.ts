@@ -2,6 +2,7 @@
 // Typed payload definitions for all Ephemeral ops from NETWORKING-MATRIX.md.
 
 import type { UserId } from "../../../../networking/contract/v1";
+import type { IntentPayload } from "@/lib/rules-engine/types";
 
 // ── Ephemeral Op Kind Union ─────────────────────────────────────
 
@@ -61,6 +62,7 @@ export type EphemeralOpKind =
   | "action.resolved"
   | "action.resolution.claim"
   | "action.gather.result"
+  | "action.intent.submit"
   // Assets
   | "asset.uploadProgress"
   | "asset.submission"
@@ -339,6 +341,9 @@ export interface ActionGatherResultPayload {
   modifier?: number;
 }
 
+/** Player submits an action intent to the DM for rules engine evaluation */
+export type ActionIntentSubmitPayload = IntentPayload;
+
 // -- Assets --
 
 export interface AssetUploadProgressPayload {
@@ -557,6 +562,7 @@ export interface EphemeralPayloadMap {
   "action.resolved": ActionResolvedPayload;
   "action.resolution.claim": ActionResolutionClaimPayload;
   "action.gather.result": ActionGatherResultPayload;
+  "action.intent.submit": ActionIntentSubmitPayload;
   "asset.uploadProgress": AssetUploadProgressPayload;
   "asset.submission": AssetSubmissionPayload;
   "asset.accepted": AssetAcceptedPayload;
@@ -662,6 +668,7 @@ export const EPHEMERAL_OP_CONFIG: Record<EphemeralOpKind, EphemeralOpConfig> = {
   "action.resolved":        { throttleMs: 0,   ttlMs: 5000,  keyStrategy: "entityId", dmOnly: true },
   "action.resolution.claim": { throttleMs: 0,  ttlMs: 30000, keyStrategy: "entityId", dmOnly: true },
   "action.gather.result":    { throttleMs: 0,  ttlMs: 0,     keyStrategy: "none" },
+  "action.intent.submit":    { throttleMs: 0,  ttlMs: 0,     keyStrategy: "none" },
 
   // Assets
   "asset.uploadProgress":   { throttleMs: 200, ttlMs: 5000, keyStrategy: "userId" },

@@ -59,6 +59,10 @@ import { useCampaignStore } from "@/stores/campaignStore";
 import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useBroadcastPauseStore } from "@/stores/useBroadcastPauseStore";
+// Added Rule Engine Stores
+import { useActiveEffectStore } from '@/stores/activeEffectStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { useGlobalConfigStore } from '@/stores/globalConfigStore';
 
 // (Effect texture stripping removed — effects now use fine-grained CoValue sync)
 
@@ -344,6 +348,7 @@ const BLOB_SYNC_KINDS = [
   'maps', 'groups', 'initiative', 'roles', 'visionProfiles',
   'fog', 'lights', 'dungeon', 'creatures',
   'hatching', 'actions', 'dice', 'mapFocus', 'campaigns', 'tokenGroups',
+  'activeEffects', 'rules', 'globalConfig',
 ];
 
 // Kinds excluded from blob sync (fine-grained CoValue sync):
@@ -1695,6 +1700,9 @@ const STORE_FOR_KIND: Record<string, () => any> = {
   mapFocus: () => useMapFocusStore,
   campaigns: () => useCampaignStore,
   tokenGroups: () => useTokenGroupStore,
+  activeEffects: () => useActiveEffectStore,
+  rules: () => useRuleStore,
+  globalConfig: () => useGlobalConfigStore,
 };
 
 /** Throttle timers per kind */
