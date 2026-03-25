@@ -182,12 +182,15 @@ export function ActionCardContent() {
                 variant="destructive"
                 size="sm"
                 className="h-6 px-2 text-[10px] opacity-20 hover:opacity-100 transition-opacity"
-                onClick={() => useActionStore.getState().cancelAllActions()}
+                onClick={() => {
+                  useActionStore.getState().cancelAllActions();
+                  useActionStore.getState().clearHistory();
+                }}
               >
-                Bail Out
+                Clear All
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Emergency Clear Actions</TooltipContent>
+            <TooltipContent>Clear Actions & History</TooltipContent>
           </Tooltip>
         </div>
         {activeItem?.type === 'draft' ? (
@@ -233,7 +236,20 @@ function EmptyState() {
           <>
             <Separator />
             <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recent Actions</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Actions</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  onClick={() => {
+                    useActionStore.getState().cancelAllActions();
+                    useActionStore.getState().clearHistory();
+                  }}
+                >
+                  Clear All
+                </Button>
+              </div>
               <div className="space-y-2">
                 {actionHistory.slice(0, 10).map(entry => (
                   <div key={entry.id} className="text-xs p-2 rounded bg-muted/30 border border-border/50">

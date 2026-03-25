@@ -2552,7 +2552,9 @@ export const SimpleTabletop = () => {
             if (combinedVisibility.remove) combinedVisibility.remove();
 
             // Serialize for persistence (Host only to prevent State Authority Leaks)
-            const isHost = roles.includes('dm') || roles.includes('host');
+            const sessionStateFog = useSessionStore.getState();
+            const currentPlayerFog = sessionStateFog.players.find(p => p.id === sessionStateFog.currentPlayerId);
+            const isHost = currentPlayerFog?.roleIds.includes('dm') || currentPlayerFog?.roleIds.includes('host');
             if (isHost) {
               const currentMapId = selectedMapId || 'default-map';
               const serialized = serializeFogGeometry(getActiveExploredArea());
@@ -4221,7 +4223,14 @@ export const SimpleTabletop = () => {
       // --- Gather Phase Roll Indicator ---
       const gatherReq = useActionStore.getState().activeGatherRequest;
       const gatheredResults = useActionStore.getState().gatheredResults;
-      if (gatherReq && gatherReq.targets.includes(token.id) && gatheredResults[token.id] === undefined) {
+      
+      const sessionState = useSessionStore.getState();
+      const cpId = sessionState.currentPlayerId;
+      const cp = sessionState.players.find(p => p.id === cpId);
+      const roles = useRoleStore.getState().roles;
+      const canRoll = cp ? canControlToken(token, cp, roles) : false;
+
+      if (canRoll && gatherReq && gatherReq.targets.includes(token.id) && gatheredResults[token.id] === undefined) {
         targetCtx.save();
         
         const badgeWidth = 40 / transform.zoom;
@@ -8619,8 +8628,15 @@ export const SimpleTabletop = () => {
       const gatheredResults = useActionStore.getState().gatheredResults;
       if (gatherReq) {
         let clickedBadgeTokenId: string | null = null;
+        
+        const sessionState = useSessionStore.getState();
+        const cpId = sessionState.currentPlayerId;
+        const cp = sessionState.players.find(p => p.id === cpId);
+        const roles = useRoleStore.getState().roles;
+
         for (const token of tokens) {
-          if (!gatherReq.targets.includes(token.id) || gatheredResults[token.id] !== undefined) continue;
+          const canRoll = cp ? canControlToken(token, cp, roles) : false;
+          if (!canRoll || !gatherReq.targets.includes(token.id) || gatheredResults[token.id] !== undefined) continue;
           
           const tokenRegion = regions.find(r => isPointInRegion(token.x, token.y, r));
           const gridSize = tokenRegion?.gridSize || 40;
