@@ -10,6 +10,9 @@ import { AdapterEditor } from './AdapterEditor';
 import { SchemaRegistry } from './SchemaRegistry';
 import { ActiveEffectsCatalog } from './ActiveEffectsCatalog';
 import { useRuleStore } from '@/stores/ruleStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { canManageRules } from '@/lib/rolePermissions';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -44,6 +47,13 @@ export function RulesLibrary() {
   const updatePipeline = useRuleStore(s => s.updatePipeline);
   const deletePipeline = useRuleStore(s => s.deletePipeline);
   
+  const currentPlayerId = useSessionStore(s => s.currentPlayerId);
+  const players = useSessionStore(s => s.players);
+  const roles = useRoleStore(s => s.roles);
+  
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const hasRulesPermission = currentPlayer ? canManageRules(currentPlayer, roles) : false;
+
   const [activeTab, setActiveTab] = useState<'templates' | 'pipelines' | 'adapters' | 'schema' | 'vocabulary' | 'activeEffects'>('templates');
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -203,7 +213,7 @@ export function RulesLibrary() {
       />
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0 p-4">
         <TooltipProvider delayDuration={300}>
-          <TabsList className="grid w-full max-w-[28rem] grid-cols-6 mb-4 h-auto py-1">
+          <TabsList className={`grid w-full mb-4 h-auto py-1 ${hasRulesPermission ? 'max-w-[28rem] grid-cols-6' : 'max-w-[4rem] grid-cols-1'}`}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <TabsTrigger value="templates" className="p-2 flex items-center justify-center">
@@ -212,46 +222,50 @@ export function RulesLibrary() {
               </TooltipTrigger>
               <TooltipContent side="top">Map Templates</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="activeEffects" className="p-2 flex items-center justify-center">
-                  <Wand2 className="w-5 h-5" />
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Active Effects Orchestrator</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="pipelines" className="p-2 flex items-center justify-center">
-                  <GitMerge className="w-5 h-5" />
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Rules Pipeline</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="adapters" className="p-2 flex items-center justify-center">
-                  <Plug className="w-5 h-5" />
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Adapters</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="schema" className="p-2 flex items-center justify-center">
-                  <Database className="w-5 h-5" />
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Schema Registry</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="vocabulary" className="p-2 flex items-center justify-center">
-                  <Settings2 className="w-5 h-5" />
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Vocabulary</TooltipContent>
-            </Tooltip>
+            {hasRulesPermission && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="activeEffects" className="p-2 flex items-center justify-center">
+                      <Wand2 className="w-5 h-5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Active Effects Orchestrator</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="pipelines" className="p-2 flex items-center justify-center">
+                      <GitMerge className="w-5 h-5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Rules Pipeline</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="adapters" className="p-2 flex items-center justify-center">
+                      <Plug className="w-5 h-5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Adapters</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="schema" className="p-2 flex items-center justify-center">
+                      <Database className="w-5 h-5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Schema Registry</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="vocabulary" className="p-2 flex items-center justify-center">
+                      <Settings2 className="w-5 h-5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Vocabulary</TooltipContent>
+                </Tooltip>
+              </>
+            )}
           </TabsList>
         </TooltipProvider>
         
@@ -259,7 +273,9 @@ export function RulesLibrary() {
           <EffectsCatalog />
         </TabsContent>
 
-        <TabsContent value="pipelines" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
+        {hasRulesPermission && (
+          <>
+            <TabsContent value="pipelines" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0">
           <ScrollArea className="flex-1 h-full pr-4">
             {pipelines.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-border rounded-lg bg-background/50">
@@ -408,9 +424,11 @@ export function RulesLibrary() {
           <SchemaRegistry />
         </TabsContent>
 
-        <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
-          <LexiconEditor />
-        </TabsContent>
+            <TabsContent value="vocabulary" className="flex-1 min-h-0 h-full data-[state=active]:flex flex-col m-0 p-0 border border-border rounded-md">
+              <LexiconEditor />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
 
       <Dialog open={isBulkExportOpen} onOpenChange={setIsBulkExportOpen}>

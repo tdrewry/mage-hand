@@ -264,6 +264,13 @@ export function canManageInitiative(player: Player, allRoles: Role[]): boolean {
 }
 
 /**
+ * Check if player can manage rules engine (pipelines, active effects, schemas)
+ */
+export function canManageRules(player: Player, allRoles: Role[]): boolean {
+  return hasPermission(player, allRoles, 'canManageRules');
+}
+
+/**
  * Check if player can see all fog of war
  */
 export function canSeeAllFog(player: Player, allRoles: Role[]): boolean {

@@ -42,6 +42,9 @@ export interface Role {
     canEditMap: boolean;
     canManageFog: boolean;
     canManageInitiative: boolean;
+    
+    // Rules Engine
+    canManageRules: boolean;
   };
 }
 
@@ -83,6 +86,7 @@ const DEFAULT_DM_ROLE: Role = {
     canEditMap: true,
     canManageFog: true,
     canManageInitiative: true,
+    canManageRules: true,
   },
 };
 
@@ -112,6 +116,7 @@ const DEFAULT_PLAYER_ROLE: Role = {
     canEditMap: false,
     canManageFog: false,
     canManageInitiative: false,
+    canManageRules: false,
   },
 };
 

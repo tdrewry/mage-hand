@@ -8,6 +8,9 @@ import type { CreatureAction } from '@/types/creatureTypes';
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useRuleStore } from '@/stores/ruleStore';
 import { useActiveEffectStore } from '@/stores/activeEffectStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { canManageRules } from '@/lib/rolePermissions';
 
 interface ActionEditorProps {
   action: CreatureAction;
@@ -19,6 +22,13 @@ export function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) 
   const allTemplates = useMapTemplateStore(s => s.allTemplates);
   const pipelines = useRuleStore(s => s.pipelines);
   const effects = useActiveEffectStore(s => s.effects);
+
+  const currentPlayerId = useSessionStore(s => s.currentPlayerId);
+  const players = useSessionStore(s => s.players);
+  const roles = useRoleStore(s => s.roles);
+  
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const hasRulesPermission = currentPlayer ? canManageRules(currentPlayer, roles) : false;
 
   return (
     <div className="border border-border rounded p-2 space-y-1.5 bg-muted/20">
@@ -83,105 +93,107 @@ export function ActionEditor({ action, onChange, onDelete }: ActionEditorProps) 
         />
       </div>
 
-      <div className="pt-2 mt-2 border-t border-border/50">
-        <label className="text-[9px] font-semibold text-muted-foreground uppercase mb-1.5 block">Engine Routing</label>
-        <div className="grid grid-cols-2 gap-2">
-          {/* Targeting Mode */}
-          <div className="space-y-0.5">
-            <label className="text-[9px] text-muted-foreground uppercase">Targeting Mode</label>
-            <Select 
-              value={action.targetingMode || 'manual'} 
-              onValueChange={(v: 'manual' | 'template' | 'self') => onChange({ ...action, targetingMode: v })}
-            >
-              <SelectTrigger className="h-6 text-[10px]">
-                <SelectValue placeholder="Manual Selection" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual" className="text-[10px]">Manual Selection</SelectItem>
-                <SelectItem value="template" className="text-[10px]">Map Template</SelectItem>
-                <SelectItem value="self" className="text-[10px]">Self</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Execution Policy */}
-          <div className="space-y-0.5">
-            <label className="text-[9px] text-muted-foreground uppercase">Execution Policy</label>
-            <Select 
-              value={action.executionPolicy || 'per-target'} 
-              onValueChange={(v: 'shared' | 'per-target') => onChange({ ...action, executionPolicy: v })}
-            >
-              <SelectTrigger className="h-6 text-[10px]">
-                <SelectValue placeholder="Per-Target" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shared" className="text-[10px]">Shared Roll (AoE)</SelectItem>
-                <SelectItem value="per-target" className="text-[10px]">Per-Target (Multi-attack)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Dynamic Map Template */}
-          {action.targetingMode === 'template' && (
-            <div className="space-y-0.5 col-span-2">
-              <label className="text-[9px] text-muted-foreground uppercase">Template ID</label>
+      {hasRulesPermission && (
+        <div className="pt-2 mt-2 border-t border-border/50">
+          <label className="text-[9px] font-semibold text-muted-foreground uppercase mb-1.5 block">Engine Routing</label>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Targeting Mode */}
+            <div className="space-y-0.5">
+              <label className="text-[9px] text-muted-foreground uppercase">Targeting Mode</label>
               <Select 
-                value={action.templateId || 'none'} 
-                onValueChange={v => onChange({ ...action, templateId: v === 'none' ? undefined : v })}
+                value={action.targetingMode || 'manual'} 
+                onValueChange={(v: 'manual' | 'template' | 'self') => onChange({ ...action, targetingMode: v })}
               >
                 <SelectTrigger className="h-6 text-[10px]">
-                  <SelectValue placeholder="Select Template" />
+                  <SelectValue placeholder="Manual Selection" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none" className="text-[10px]">None</SelectItem>
-                  {allTemplates.map(t => (
-                    <SelectItem key={t.id} value={t.id} className="text-[10px]">{t.name}</SelectItem>
-                  ))}
+                  <SelectItem value="manual" className="text-[10px]">Manual Selection</SelectItem>
+                  <SelectItem value="template" className="text-[10px]">Map Template</SelectItem>
+                  <SelectItem value="self" className="text-[10px]">Self</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Dynamic Logic Pipeline */}
-          <div className="space-y-0.5 col-span-2">
-            <label className="text-[9px] text-muted-foreground uppercase flex items-center gap-1">
-              Pipeline / Orchestrator
-              {action.activeEffectId && <div className="ml-2 px-1 text-[8px] bg-emerald-500/10 text-emerald-400 rounded-sm">ORCHESTRATED</div>}
-            </label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Execution Policy */}
+            <div className="space-y-0.5">
+              <label className="text-[9px] text-muted-foreground uppercase">Execution Policy</label>
               <Select 
-                value={action.pipelineId || 'none'} 
-                onValueChange={v => onChange({ ...action, pipelineId: v === 'none' ? undefined : v, activeEffectId: undefined })}
+                value={action.executionPolicy || 'per-target'} 
+                onValueChange={(v: 'shared' | 'per-target') => onChange({ ...action, executionPolicy: v })}
               >
                 <SelectTrigger className="h-6 text-[10px]">
-                  <SelectValue placeholder="Static Pipeline" />
+                  <SelectValue placeholder="Per-Target" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none" className="text-[10px]">No Pipeline</SelectItem>
-                  {pipelines.map(p => (
-                    <SelectItem key={p.id} value={p.id} className="text-[10px]">{p.name || 'Untitled'}</SelectItem>
-                  ))}
+                  <SelectItem value="shared" className="text-[10px]">Shared Roll (AoE)</SelectItem>
+                  <SelectItem value="per-target" className="text-[10px]">Per-Target (Multi-attack)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
-              <Select 
-                value={action.activeEffectId || 'none'} 
-                onValueChange={v => onChange({ ...action, activeEffectId: v === 'none' ? undefined : v, pipelineId: undefined })}
-              >
-                <SelectTrigger className="h-6 text-[10px] border-emerald-500/30">
-                  <SelectValue placeholder="Active Effect" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none" className="text-[10px]">No Orchestrator</SelectItem>
-                  {effects.map(e => (
-                    <SelectItem key={e.id} value={e.id} className="text-[10px] text-emerald-400 font-semibold">{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Dynamic Map Template */}
+            {action.targetingMode === 'template' && (
+              <div className="space-y-0.5 col-span-2">
+                <label className="text-[9px] text-muted-foreground uppercase">Template ID</label>
+                <Select 
+                  value={action.templateId || 'none'} 
+                  onValueChange={v => onChange({ ...action, templateId: v === 'none' ? undefined : v })}
+                >
+                  <SelectTrigger className="h-6 text-[10px]">
+                    <SelectValue placeholder="Select Template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-[10px]">None</SelectItem>
+                    {allTemplates.map(t => (
+                      <SelectItem key={t.id} value={t.id} className="text-[10px]">{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Dynamic Logic Pipeline */}
+            <div className="space-y-0.5 col-span-2">
+              <label className="text-[9px] text-muted-foreground uppercase flex items-center gap-1">
+                Pipeline / Orchestrator
+                {action.activeEffectId && <div className="ml-2 px-1 text-[8px] bg-emerald-500/10 text-emerald-400 rounded-sm">ORCHESTRATED</div>}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Select 
+                  value={action.pipelineId || 'none'} 
+                  onValueChange={v => onChange({ ...action, pipelineId: v === 'none' ? undefined : v, activeEffectId: undefined })}
+                >
+                  <SelectTrigger className="h-6 text-[10px]">
+                    <SelectValue placeholder="Static Pipeline" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-[10px]">No Pipeline</SelectItem>
+                    {pipelines.map(p => (
+                      <SelectItem key={p.id} value={p.id} className="text-[10px]">{p.name || 'Untitled'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select 
+                  value={action.activeEffectId || 'none'} 
+                  onValueChange={v => onChange({ ...action, activeEffectId: v === 'none' ? undefined : v, pipelineId: undefined })}
+                >
+                  <SelectTrigger className="h-6 text-[10px] border-emerald-500/30">
+                    <SelectValue placeholder="Active Effect" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-[10px]">No Orchestrator</SelectItem>
+                    {effects.map(e => (
+                      <SelectItem key={e.id} value={e.id} className="text-[10px] text-emerald-400 font-semibold">{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

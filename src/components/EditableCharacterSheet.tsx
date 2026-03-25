@@ -15,6 +15,9 @@ import { Plus, Trash2, ChevronDown, ChevronRight, Swords, BookOpen, Sparkles, Sh
 import { useMapTemplateStore } from '@/stores/mapTemplateStore';
 import { useRuleStore } from '@/stores/ruleStore';
 import { useActiveEffectStore } from '@/stores/activeEffectStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useRoleStore } from '@/stores/roleStore';
+import { canManageRules } from '@/lib/rolePermissions';
 import { ActionEditor } from './ActionEditor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,6 +39,13 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 export function EditableCharacterSheet({ character, onChange }: EditableCharacterSheetProps) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['core', 'abilities', 'actions']));
   const allTemplates = useMapTemplateStore(s => s.allTemplates);
+
+  const currentPlayerId = useSessionStore(s => s.currentPlayerId);
+  const players = useSessionStore(s => s.players);
+  const roles = useRoleStore(s => s.roles);
+  
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const hasRulesPermission = currentPlayer ? canManageRules(currentPlayer, roles) : false;
 
   const toggle = (key: string) => {
     setOpenSections(prev => {
@@ -313,15 +323,17 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                 className="text-[10px] min-h-[40px] resize-none"
                 placeholder="Description"
               />
-              <EngineRoutingSelects 
-                pipelineId={feat.pipelineId} 
-                activeEffectId={feat.activeEffectId}
-                onChange={(u) => {
-                  const features = [...character.features];
-                  features[i] = { ...feat, ...u };
-                  update({ features });
-                }}
-              />
+              {hasRulesPermission && (
+                <EngineRoutingSelects 
+                  pipelineId={feat.pipelineId} 
+                  activeEffectId={feat.activeEffectId}
+                  onChange={(u) => {
+                    const features = [...character.features];
+                    features[i] = { ...feat, ...u };
+                    update({ features });
+                  }}
+                />
+              )}
             </div>
           ))}
           <Button variant="outline" size="sm" className="w-full h-6 text-[10px]" onClick={() => {
@@ -397,15 +409,17 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                       <Trash2 className="w-2.5 h-2.5 text-destructive" />
                     </Button>
                   </div>
-                  <EngineRoutingSelects
-                    pipelineId={cantrip.pipelineId}
-                    activeEffectId={cantrip.activeEffectId}
-                    onChange={(u) => {
-                      const cantrips = [...character.spells!.cantrips];
-                      cantrips[i] = { ...cantrips[i], ...u };
-                      update({ spells: { ...character.spells!, cantrips } });
-                    }}
-                  />
+                  {hasRulesPermission && (
+                    <EngineRoutingSelects
+                      pipelineId={cantrip.pipelineId}
+                      activeEffectId={cantrip.activeEffectId}
+                      onChange={(u) => {
+                        const cantrips = [...character.spells!.cantrips];
+                        cantrips[i] = { ...cantrips[i], ...u };
+                        update({ spells: { ...character.spells!, cantrips } });
+                      }}
+                    />
+                  )}
                 </div>
               ))}
               <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => {
@@ -494,17 +508,19 @@ export function EditableCharacterSheet({ character, onChange }: EditableCharacte
                         <Trash2 className="w-2.5 h-2.5 text-destructive" />
                       </Button>
                     </div>
-                    <EngineRoutingSelects
-                      pipelineId={spell.pipelineId}
-                      activeEffectId={spell.activeEffectId}
-                      onChange={(u) => {
-                        const spellsByLevel = [...character.spells!.spellsByLevel];
-                        const spells = [...lvl.spells];
-                        spells[si] = { ...spell, ...u };
-                        spellsByLevel[li] = { ...lvl, spells };
-                        update({ spells: { ...character.spells!, spellsByLevel } });
-                      }}
-                    />
+                    {hasRulesPermission && (
+                      <EngineRoutingSelects
+                        pipelineId={spell.pipelineId}
+                        activeEffectId={spell.activeEffectId}
+                        onChange={(u) => {
+                          const spellsByLevel = [...character.spells!.spellsByLevel];
+                          const spells = [...lvl.spells];
+                          spells[si] = { ...spell, ...u };
+                          spellsByLevel[li] = { ...lvl, spells };
+                          update({ spells: { ...character.spells!, spellsByLevel } });
+                        }}
+                      />
+                    )}
                   </div>
                 ))}
                 <Button variant="ghost" size="sm" className="h-5 text-[9px] w-full" onClick={() => {
