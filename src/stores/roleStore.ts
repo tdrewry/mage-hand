@@ -2,8 +2,9 @@
  * Role-based permission system store
  * Phase 1: Core Role System Foundation
  */
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create, StateCreator } from 'zustand';
+import { persist, PersistOptions } from 'zustand/middleware';
+import { syncPatch } from '@/lib/sync';
 import { netManager } from '@/lib/net';
 
 export interface Role {
@@ -122,145 +123,167 @@ const DEFAULT_PLAYER_ROLE: Role = {
 
 export const DEFAULT_ROLES: Role[] = [DEFAULT_DM_ROLE, DEFAULT_PLAYER_ROLE];
 
-export const useRoleStore = create<RoleState>()(
-  persist(
-    (set, get) => ({
-      roles: [],
-      
-      addRole: (role) => {
-        const existing = get().roles;
-        // Reject if a role with the same id or name already exists
-        if (existing.some(r => r.id === role.id || r.name === role.name)) {
-          console.warn(`[Role] Role already exists (id: ${role.id}, name: ${role.name}), skipping add`);
-          return;
-        }
-        
-        set((state) => ({
-          roles: [...state.roles, role],
-        }));
-        
-        // Sync to multiplayer
-        if (netManager.isConnected) {
-          console.log('[Role] Role added, sync not yet implemented', role);
-        }
-      },
-      
-      updateRole: (roleId, updates) => {
-        set((state) => ({
-          roles: state.roles.map((role) =>
-            role.id === roleId ? { ...role, ...updates } : role
-          ),
-        }));
-        
-        // Sync to multiplayer
-        if (netManager.isConnected) {
-          // TODO: Implement role sync
-          console.log('[Role] Role updated, sync not yet implemented', roleId, updates);
-        }
-      },
-      
-      removeRole: (roleId) => {
-        const role = get().getRoleById(roleId);
-        if (role?.isSystem) {
-          console.warn(`Cannot remove system role: ${role.name}`);
-          return;
-        }
-        
-        set((state) => ({
-          roles: state.roles.filter((r) => r.id !== roleId),
-        }));
-      },
-      
-      clearRoles: () => {
-        set({ roles: [] });
-      },
-      
-      setHostility: (roleId, targetRoleId, isHostile, bidirectional = false) => {
-        set((state) => {
-          const updatedRoles = state.roles.map((role) => {
-            if (role.id === roleId) {
-              const hostileToRoleIds = isHostile
-                ? [...role.hostileToRoleIds, targetRoleId].filter((id, index, self) => self.indexOf(id) === index)
-                : role.hostileToRoleIds.filter((id) => id !== targetRoleId);
-              return { ...role, hostileToRoleIds };
-            }
-            
-            // Handle bidirectional hostility
-            if (bidirectional && role.id === targetRoleId) {
-              const hostileToRoleIds = isHostile
-                ? [...role.hostileToRoleIds, roleId].filter((id, index, self) => self.indexOf(id) === index)
-                : role.hostileToRoleIds.filter((id) => id !== roleId);
-              return { ...role, hostileToRoleIds };
-            }
-            
-            return role;
-          });
-          
-          return { roles: updatedRoles };
-        });
-        
-        // Sync to multiplayer
-        if (netManager.isConnected) {
-          // TODO: Implement hostility sync
-          console.log('[Role] Hostility changed, sync not yet implemented', roleId, targetRoleId, isHostile);
-        }
-      },
-      
-      areRolesHostile: (roleId1, roleId2) => {
-        const role1 = get().getRoleById(roleId1);
-        const role2 = get().getRoleById(roleId2);
-        
-        if (!role1 || !role2) return false;
-        
-        return (
-          role1.hostileToRoleIds.includes(roleId2) ||
-          role2.hostileToRoleIds.includes(roleId1)
-        );
-      },
-      
-      getRoleById: (roleId) => {
-        return get().roles.find((role) => role.id === roleId);
-      },
-      
-      initializeDefaultRoles: () => {
-        const state = get();
-        if (state.roles.length === 0) {
-          set({ roles: [...DEFAULT_ROLES] });
-        } else {
-          // Deduplicate on initialize
-          const seen = new Set<string>();
-          const uniqueRoles = state.roles.filter((role) => {
-            if (seen.has(role.id)) return false;
-            seen.add(role.id);
-            return true;
-          });
-          if (uniqueRoles.length !== state.roles.length) {
-            set({ roles: uniqueRoles });
-          }
-        }
-      },
-    }),
-    {
-      name: 'vtt-role-storage',
-      partialize: (state) => ({
-        roles: state.roles,
-      }),
-      onRehydrateStorage: () => (state) => {
-        if (state && state.roles.length === 0) {
-          state.initializeDefaultRoles();
-        } else if (state) {
-          // Deduplicate roles by id
-          const seen = new Set<string>();
-          const uniqueRoles = state.roles.filter((role) => {
-            if (seen.has(role.id)) return false;
-            seen.add(role.id);
-            return true;
-          });
-          if (uniqueRoles.length !== state.roles.length) {
-            useRoleStore.setState({ roles: uniqueRoles });
-          }
-        }
-      },
+const roleStoreCreator: StateCreator<RoleState> = (set, get) => ({
+  roles: [],
+  
+  addRole: (role) => {
+    const existing = get().roles;
+    // Reject if a role with the same id or name already exists
+    if (existing.some(r => r.id === role.id || r.name === role.name)) {
+      console.warn(`[Role] Role already exists (id: ${role.id}, name: ${role.name}), skipping add`);
+      return;
     }
-  )
+    
+    set((state) => ({
+      roles: [...state.roles, role],
+    }));
+    
+    // Sync to multiplayer
+    if (netManager.isConnected) {
+      console.log('[Role] Role added, sync should happen via syncPatch', role.name);
+    }
+  },
+  
+  updateRole: (roleId, updates) => {
+    set((state) => ({
+      roles: state.roles.map((role) =>
+        role.id === roleId ? { ...role, ...updates } : role
+      ),
+    }));
+    
+    // Sync to multiplayer
+    if (netManager.isConnected) {
+      console.log('[Role] Role updated, sync should happen via syncPatch', roleId);
+    }
+  },
+  
+  removeRole: (roleId) => {
+    const role = get().getRoleById(roleId);
+    if (role?.isSystem) {
+      console.warn(`Cannot remove system role: ${role.name}`);
+      return;
+    }
+    
+    set((state) => ({
+      roles: state.roles.filter((r) => r.id !== roleId),
+    }));
+  },
+  
+  clearRoles: () => {
+    set({ roles: [] });
+  },
+  
+  setHostility: (roleId, targetRoleId, isHostile, bidirectional = false) => {
+    set((state) => {
+      const updatedRoles = state.roles.map((role) => {
+        if (role.id === roleId) {
+          const hostileToRoleIds = isHostile
+            ? [...role.hostileToRoleIds, targetRoleId].filter((id, index, self) => self.indexOf(id) === index)
+            : role.hostileToRoleIds.filter((id) => id !== targetRoleId);
+          return { ...role, hostileToRoleIds };
+        }
+        
+        // Handle bidirectional hostility
+        if (bidirectional && role.id === targetRoleId) {
+          const hostileToRoleIds = isHostile
+            ? [...role.hostileToRoleIds, roleId].filter((id, index, self) => self.indexOf(id) === index)
+            : role.hostileToRoleIds.filter((id) => id !== roleId);
+          return { ...role, hostileToRoleIds };
+        }
+        
+        return role;
+      });
+      
+      return { roles: updatedRoles };
+    });
+    
+    // Sync to multiplayer
+    if (netManager.isConnected) {
+      console.log('[Role] Hostility changed, sync should happen via syncPatch');
+    }
+  },
+  
+  areRolesHostile: (roleId1, roleId2) => {
+    const role1 = get().getRoleById(roleId1);
+    const role2 = get().getRoleById(roleId2);
+    
+    if (!role1 || !role2) return false;
+    
+    return (
+      role1.hostileToRoleIds.includes(roleId2) ||
+      role2.hostileToRoleIds.includes(roleId1)
+    );
+  },
+  
+  getRoleById: (roleId) => {
+    return get().roles.find((role) => role.id === roleId);
+  },
+  
+  initializeDefaultRoles: () => {
+    const state = get();
+    if (state.roles.length === 0) {
+      set({ roles: [...DEFAULT_ROLES] });
+    } else {
+      // Deduplicate on initialize
+      const seen = new Set<string>();
+      const uniqueRoles = state.roles.filter((role) => {
+        if (seen.has(role.id)) return false;
+        seen.add(role.id);
+        return true;
+      });
+      if (uniqueRoles.length !== state.roles.length) {
+        set({ roles: uniqueRoles });
+      }
+    }
+  },
+});
+
+// Wrap with syncPatch middleware, then persist
+const withSyncPatch = syncPatch<RoleState>({ 
+  channel: 'roles',
+  throttleMs: 100, // Debounce sync patches
+  excludePaths: [], // Everything in roles should sync
+  debug: false,
+})(roleStoreCreator);
+
+const persistOptions: PersistOptions<RoleState, Partial<RoleState>> = {
+  name: 'vtt-role-storage',
+  partialize: (state) => ({
+    roles: state.roles,
+  }),
+  onRehydrateStorage: () => (state) => {
+    if (state && state.roles.length === 0) {
+      state.initializeDefaultRoles();
+    } else if (state) {
+      // Deduplicate roles by id and migrate legacy permissions
+      const seen = new Set<string>();
+      let needsMigration = false;
+      const uniqueRoles = state.roles.filter((role) => {
+        if (seen.has(role.id)) return false;
+        seen.add(role.id);
+        return true;
+      }).map(role => {
+        // Migration: explicitly set canManageRules if missing from legacy cache
+        if (role.permissions.canManageRules === undefined) {
+          needsMigration = true;
+          return {
+            ...role,
+            permissions: {
+              ...role.permissions,
+              canManageRules: role.id === 'dm' || role.permissions.canManageRoles || false
+            }
+          };
+        }
+        return role;
+      });
+      
+      if (uniqueRoles.length !== state.roles.length || needsMigration) {
+        useRoleStore.setState({ roles: uniqueRoles });
+      }
+    }
+  },
+};
+
+export const useRoleStore = create<RoleState>()(
+  persist(withSyncPatch as StateCreator<RoleState, [], []>, persistOptions)
 );

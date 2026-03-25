@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRoleStore, Role } from '@/stores/roleStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +26,15 @@ const RoleManagerCard = () => {
   const [editingRole, setEditingRole] = useState<EditingRole | null>(null);
   const [selectedRoleForHostility, setSelectedRoleForHostility] = useState<Role | null>(null);
 
+  const currentPlayerId = useSessionStore(s => s.currentPlayerId);
+  const players = useSessionStore(s => s.players);
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const isSelfLockoutRisk = (roleId?: string) => {
+    // Determine if this exact role currently grants the player manage Roles permission.
+    if (!roleId || !currentPlayer) return false;
+    return currentPlayer.roleIds.includes(roleId);
+  };
+
   const startCreateRole = () => {
     setEditingRole({
       name: '',
@@ -49,16 +59,13 @@ const RoleManagerCard = () => {
         canEditMap: false,
         canManageFog: false,
         canManageInitiative: false,
+        canManageRules: false,
       },
     });
     setEditDialogOpen(true);
   };
 
   const startEditRole = (role: Role) => {
-    if (role.isSystem) {
-      toast.error('Cannot edit system roles');
-      return;
-    }
     setEditingRole({ ...role });
     setEditDialogOpen(true);
   };
@@ -155,6 +162,7 @@ const RoleManagerCard = () => {
             canEditMap: false,
             canManageFog: false,
             canManageInitiative: false,
+            canManageRules: false,
           },
         };
 
@@ -203,6 +211,7 @@ const RoleManagerCard = () => {
               canEditMap: false,
               canManageFog: false,
               canManageInitiative: false,
+              canManageRules: false,
             },
           };
           addRole(role);
@@ -241,6 +250,7 @@ const RoleManagerCard = () => {
             canEditMap: true,
             canManageFog: true,
             canManageInitiative: true,
+            canManageRules: false,
           },
         };
         addRole(coDM);
@@ -271,6 +281,7 @@ const RoleManagerCard = () => {
     canEditMap: 'Edit Map',
     canManageFog: 'Manage Fog',
     canManageInitiative: 'Manage Initiative',
+    canManageRules: 'Manage Engine Rules',
   };
 
   return (
@@ -324,25 +335,23 @@ const RoleManagerCard = () => {
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => startEditRole(role)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
                     {!role.isSystem && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => startEditRole(role)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => deleteRole(role.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => deleteRole(role.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -387,6 +396,7 @@ const RoleManagerCard = () => {
                     value={editingRole.name}
                     onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
                     placeholder="Enter role name"
+                    disabled={editingRole.isSystem}
                   />
                 </div>
                 <div className="space-y-2">
@@ -413,26 +423,33 @@ const RoleManagerCard = () => {
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm">Permissions</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(permissionLabels).map(([key, label]) => (
-                    <div key={key} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={key}
-                        checked={editingRole.permissions[key as keyof Role['permissions']]}
-                        onCheckedChange={(checked) => 
-                          setEditingRole({
-                            ...editingRole,
-                            permissions: {
-                              ...editingRole.permissions,
-                              [key]: checked === true,
-                            },
-                          })
-                        }
-                      />
-                      <Label htmlFor={key} className="text-sm font-normal cursor-pointer">
-                        {label}
-                      </Label>
-                    </div>
-                  ))}
+                  {Object.entries(permissionLabels).map(([key, label]) => {
+                    const isManageRoles = key === 'canManageRoles';
+                    const isRisk = editingRole.id ? isSelfLockoutRisk(editingRole.id) : false;
+                    const isDisabled = isManageRoles && isRisk && editingRole.permissions.canManageRoles;
+                    
+                    return (
+                      <div key={key} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={key}
+                          checked={editingRole.permissions[key as keyof Role['permissions']]}
+                          disabled={isDisabled}
+                          onCheckedChange={(checked) => 
+                            setEditingRole({
+                              ...editingRole,
+                              permissions: {
+                                ...editingRole.permissions,
+                                [key]: checked === true,
+                              },
+                            })
+                          }
+                        />
+                        <Label htmlFor={key} className={`text-sm font-normal ${isDisabled ? 'text-muted-foreground' : 'cursor-pointer'}`}>
+                          {label}
+                        </Label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
