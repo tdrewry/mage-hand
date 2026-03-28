@@ -68,9 +68,9 @@ export function createCurrentProjectData(opts: CreateProjectOpts = {}): ProjectD
 
   return {
     metadata: createProjectMetadata(
-      opts.projectName || `Session-${Date.now()}`,
-      opts.projectDescription,
-      opts.authorName,
+      opts.projectName || sessionStore.projectName || `Session-${Date.now()}`,
+      opts.projectDescription ?? sessionStore.projectDescription,
+      opts.authorName ?? sessionStore.authorName,
     ),
     tokens: sessionStore.tokens,
     players: sessionStore.players,
@@ -365,6 +365,11 @@ export function applyProjectData(data: ProjectData): void {
   if (data.settings) {
     if (data.settings.tokenVisibility) sessionStore.setTokenVisibility(data.settings.tokenVisibility);
     if (data.settings.labelVisibility) sessionStore.setLabelVisibility(data.settings.labelVisibility);
+  }
+  if (data.metadata) {
+    if (data.metadata.name) sessionStore.setProjectName(data.metadata.name);
+    if (data.metadata.description !== undefined) sessionStore.setProjectDescription(data.metadata.description);
+    if (data.metadata.author !== undefined) sessionStore.setAuthorName(data.metadata.author);
   }
   if (data.mapFocus) {
     const mf = useMapFocusStore.getState();

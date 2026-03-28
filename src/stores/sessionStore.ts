@@ -137,8 +137,12 @@ export interface SessionState {
   labelVisibility: LabelVisibility;
   viewportTransforms: Record<string, ViewportTransform>;
   projectName: string;
+  projectDescription: string;
+  authorName: string;
 
   setProjectName: (name: string) => void;
+  setProjectDescription: (description: string) => void;
+  setAuthorName: (author: string) => void;
   addToken: (token: Token) => void;
   setTokens: (tokens: Token[]) => void;
   updateTokenPosition: (tokenId: string, x: number, y: number) => void;
@@ -194,8 +198,12 @@ const sessionStoreCreator: StateCreator<SessionState> = (set, get) => ({
   labelVisibility: 'show',
   viewportTransforms: {},
   projectName: '',
+  projectDescription: '',
+  authorName: '',
 
   setProjectName: (name) => set({ projectName: name }),
+  setProjectDescription: (description) => set({ projectDescription: description }),
+  setAuthorName: (author) => set({ authorName: author }),
   
   addToken: (token) => {
     set((state) => {
@@ -630,6 +638,9 @@ const persistOptions: PersistOptions<SessionState, Partial<SessionState>> = {
     tokenVisibility: state.tokenVisibility,
     labelVisibility: state.labelVisibility,
     viewportTransforms: state.viewportTransforms,
+    projectName: state.projectName,
+    projectDescription: state.projectDescription,
+    authorName: state.authorName,
   }),
 };
 

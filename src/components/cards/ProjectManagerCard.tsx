@@ -88,8 +88,10 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
   const [activeTab, setActiveTab] = useState('save');
   const projectName = useSessionStore(s => s.projectName);
   const setProjectName = useSessionStore(s => s.setProjectName);
-  const [projectDescription, setProjectDescription] = useState('');
-  const [authorName, setAuthorName] = useState('');
+  const projectDescription = useSessionStore(s => s.projectDescription);
+  const setProjectDescription = useSessionStore(s => s.setProjectDescription);
+  const authorName = useSessionStore(s => s.authorName);
+  const setAuthorName = useSessionStore(s => s.setAuthorName);
   const [savedProjects, setSavedProjects] = useState<ProjectMetadata[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
@@ -379,6 +381,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
       setLoadingProgress('Applying session settings...');
       sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
       sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
+      if (projectData.metadata) {
+        if (projectData.metadata.name) setProjectName(projectData.metadata.name);
+        if (projectData.metadata.description !== undefined) setProjectDescription(projectData.metadata.description);
+        if (projectData.metadata.author !== undefined) setAuthorName(projectData.metadata.author);
+      }
       await new Promise(resolve => setTimeout(resolve, 0));
       if (cancelRequested) throw new Error('Import cancelled by user');
       
@@ -697,6 +704,11 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     (projectData.players || []).forEach(player => sessionStore.addPlayer(player));
     sessionStore.setTokenVisibility(projectData.settings.tokenVisibility);
     sessionStore.setLabelVisibility(projectData.settings.labelVisibility);
+    if (projectData.metadata) {
+      if (projectData.metadata.name) setProjectName(projectData.metadata.name);
+      if (projectData.metadata.description !== undefined) setProjectDescription(projectData.metadata.description);
+      if (projectData.metadata.author !== undefined) setAuthorName(projectData.metadata.author);
+    }
 
     // Maps
     const existingMaps = [...mapStore.maps];
