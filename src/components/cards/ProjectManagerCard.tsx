@@ -560,7 +560,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         await processInChunks(
           projectData.lights,
           10,
-          (light) => lightStore.addLight(light),
+          (light) => lightStore.addLight(light as any),
           (processed, total) => setLoadingProgress(`Loading lights (${processed}/${total})...`)
         );
       }
