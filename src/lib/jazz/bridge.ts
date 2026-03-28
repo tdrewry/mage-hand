@@ -58,6 +58,7 @@ import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
 import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { useRemoteDragStore } from "@/stores/remoteDragStore";
 import { useBroadcastPauseStore } from "@/stores/useBroadcastPauseStore";
 // Added Rule Engine Stores
 import { useActiveEffectStore } from '@/stores/activeEffectStore';
