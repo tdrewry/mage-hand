@@ -34,8 +34,9 @@ interface RemoteDragStore {
   clearAll: () => void;
 }
 
-export const useRemoteDragStore = create<RemoteDragStore>((set) => ({
+export const useRemoteDragStore = create<RemoteDragStore>((set, get) => ({
   drags: {},
+  recentlyEndedDrags: {},
 
   beginDrag: (tokenId, startPos, mode, userId) =>
     set((state) => ({
