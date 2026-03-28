@@ -59,6 +59,7 @@ import {
   clearAllStores,
   applyProjectData,
 } from '@/lib/sessionIO';
+import { DocsFooter } from '@/components/DocsFooter';
 
 interface LandingScreenProps {
   onLaunch: () => void;
@@ -374,59 +375,66 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
         <div className="bg-background/40 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/5">
 
           {setupStep === 0 && (
-            <div className="p-10 space-y-8">
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold">Welcome to the Table</h2>
-                <p className="text-muted-foreground">Identify yourself before entering the session.</p>
-              </div>
-
-              <div className="space-y-6 max-w-sm mx-auto">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground/80 ml-1">What is your name?</label>
-                  <Input
-                    type="text"
-                    placeholder="Enter your character or real name"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    maxLength={50}
-                    className="bg-background/50 h-12 text-lg px-4 border-white/10 focus-visible:ring-primary"
-                    onKeyDown={(e) => { if (e.key === 'Enter') commitIdentity(); }}
-                  />
+            <div className="flex flex-col">
+              {/* Padded content area */}
+              <div className="p-10 space-y-8">
+                <div className="text-center space-y-2">
+                  <h2 className="text-2xl font-bold">Welcome to the Table</h2>
+                  <p className="text-muted-foreground">Identify yourself before entering the session.</p>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground/80 ml-1">Role</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {roles.map((role) => (
-                      <button
-                        key={role.id}
-                        onClick={() => setSingleRole(role.id)}
-                        className={`
-                          flex flex-col items-center justify-center p-4 rounded-xl border transition-all
-                          ${selectedRoleIds.includes(role.id)
-                            ? 'bg-primary/20 border-primary shadow-[0_0_15px_rgba(var(--primary),0.3)]'
-                            : 'bg-background/30 border-white/5 hover:bg-background/50 hover:border-white/20'}
-                        `}
-                      >
-                        {role.id === 'dm' ? <ScrollText className={`w-6 h-6 mb-2 ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-muted-foreground'}`} /> : <Sword className={`w-6 h-6 mb-2 ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-muted-foreground'}`} />}
-                        <span className={`font-semibold ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-foreground'}`}>
-                          {role.name}
-                        </span>
-                      </button>
-                    ))}
+                <div className="space-y-6 max-w-sm mx-auto">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground/80 ml-1">What is your name?</label>
+                    <Input
+                      type="text"
+                      placeholder="Enter your character or real name"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      maxLength={50}
+                      className="bg-background/50 h-12 text-lg px-4 border-white/10 focus-visible:ring-primary"
+                      onKeyDown={(e) => { if (e.key === 'Enter') commitIdentity(); }}
+                    />
                   </div>
-                </div>
 
-                <Button
-                  className="w-full h-12 text-lg font-bold shadow-lg"
-                  onClick={commitIdentity}
-                  disabled={!isIdentityReady}
-                >
-                  Continue
-                </Button>
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-foreground/80 ml-1">Role</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {roles.map((role) => (
+                        <button
+                          key={role.id}
+                          onClick={() => setSingleRole(role.id)}
+                          className={`
+                            flex flex-col items-center justify-center p-4 rounded-xl border transition-all
+                            ${selectedRoleIds.includes(role.id)
+                              ? 'bg-primary/20 border-primary shadow-[0_0_15px_rgba(var(--primary),0.3)]'
+                              : 'bg-background/30 border-white/5 hover:bg-background/50 hover:border-white/20'}
+                          `}
+                        >
+                          {role.id === 'dm' ? <ScrollText className={`w-6 h-6 mb-2 ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-muted-foreground'}`} /> : <Sword className={`w-6 h-6 mb-2 ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-muted-foreground'}`} />}
+                          <span className={`font-semibold ${selectedRoleIds.includes(role.id) ? 'text-primary' : 'text-foreground'}`}>
+                            {role.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    className="w-full h-12 text-lg font-bold shadow-lg"
+                    onClick={commitIdentity}
+                    disabled={!isIdentityReady}
+                  >
+                    Continue
+                  </Button>
+                </div>
               </div>
+
+              {/* Identity step footer — doc links only, no save/delete */}
+              <DocsFooter />
             </div>
           )}
+
 
           {setupStep === 1 && (
             <div className="flex flex-col h-full">
@@ -609,25 +617,32 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onLaunch, hasSessi
               </div>
 
               {/* Secondary Utility Footer */}
-              <div className="mt-auto bg-black/20 border-t border-white/5 p-4 flex flex-wrap gap-2 justify-center">
-                <Button variant="ghost" size="sm" onClick={handleSaveSession} disabled={!hasSession || isSaving} className="text-xs text-muted-foreground hover:text-foreground">
-                  <Save className="w-3.5 h-3.5 mr-1.5" /> Save to Disk
-                </Button>
-                <div className="w-px h-6 bg-white/10 hidden sm:block"></div>
-                {!isDMSelected && (
-                  <Button variant="ghost" size="sm" onClick={handleLoadSession} disabled={isLoading} className="text-xs text-muted-foreground hover:text-foreground">
-                    <FolderOpen className="w-3.5 h-3.5 mr-1.5" /> Load Local
+              <DocsFooter
+                leftSlot={
+                  <>
+                    <Button variant="ghost" size="sm" onClick={handleSaveSession} disabled={!hasSession || isSaving} className="text-xs text-muted-foreground hover:text-foreground">
+                      <Save className="w-3.5 h-3.5 mr-1.5" /> Save to Disk
+                    </Button>
+                    {!isDMSelected && (
+                      <>
+                        <div className="w-px h-5 bg-white/10 hidden sm:block mx-1" />
+                        <Button variant="ghost" size="sm" onClick={handleLoadSession} disabled={isLoading} className="text-xs text-muted-foreground hover:text-foreground">
+                          <FolderOpen className="w-3.5 h-3.5 mr-1.5" /> Load Local
+                        </Button>
+                      </>
+                    )}
+                    <div className="w-px h-5 bg-white/10 hidden sm:block mx-1" />
+                    <Button variant="ghost" size="sm" onClick={() => setShowAbout(true)} className="text-xs text-muted-foreground hover:text-foreground">
+                      <Info className="w-3.5 h-3.5 mr-1.5" /> About
+                    </Button>
+                  </>
+                }
+                rightSlot={
+                  <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete App Data
                   </Button>
-                )}
-                {/* <div className="w-px h-6 bg-white/10 hidden sm:block"></div> */}
-                <Button variant="ghost" size="sm" onClick={() => setShowAbout(true)} className="text-xs text-muted-foreground hover:text-foreground">
-                  <Info className="w-3.5 h-3.5 mr-1.5" /> About
-                </Button>
-                <div className="flex-1 min-w-[20px]"></div>
-                <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10">
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete App Data
-                </Button>
-              </div>
+                }
+              />
 
             </div>
           )}
