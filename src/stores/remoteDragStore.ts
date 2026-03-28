@@ -61,8 +61,27 @@ export const useRemoteDragStore = create<RemoteDragStore>((set, get) => ({
   endDrag: (tokenId) =>
     set((state) => {
       const { [tokenId]: _, ...rest } = state.drags;
-      return { drags: rest };
+      const now = Date.now();
+      // Move to grace period instead of immediate clear
+      const newRecentlyEnded = { ...state.recentlyEndedDrags, [tokenId]: now };
+      // Schedule cleanup after grace period
+      setTimeout(() => {
+        const s = useRemoteDragStore.getState();
+        if (s.recentlyEndedDrags[tokenId] === now) {
+          const { [tokenId]: _ts, ...remaining } = s.recentlyEndedDrags;
+          useRemoteDragStore.setState({ recentlyEndedDrags: remaining });
+        }
+      }, REMOTE_DRAG_GRACE_MS);
+      return { drags: rest, recentlyEndedDrags: newRecentlyEnded };
     }),
+
+  isRemoteDragSuppressed: (tokenId) => {
+    const state = get();
+    if (state.drags[tokenId]) return true;
+    const endTs = state.recentlyEndedDrags[tokenId];
+    if (endTs && Date.now() - endTs < REMOTE_DRAG_GRACE_MS) return true;
+    return false;
+  },
 
   expireStale: (maxAgeMs) =>
     set((state) => {
