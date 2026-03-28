@@ -1,6 +1,6 @@
 # Mage Hand — Virtual Tabletop
 
-A browser-based Virtual Tabletop (VTT) for D&D 5e and compatible systems, built with React, Pixi.js, and a layered real-time networking stack.
+A browser-based Virtual Tabletop (VTT) for RPGS, preconfigured for D&D 5e-like systems, built with React, Pixi.js, and a layered real-time networking stack.
 
 ---
 
@@ -11,14 +11,14 @@ Mage Hand uses a **three-layer networking model**:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 1 — Jazz CoValues (Durable State / CRDT)             │
-│  Tokens, maps, regions, effects, textures, fog               │
-│  Transport: jazz-tools → ws://localhost:4200 (Jazz Sync)     │
+│  Tokens, maps, regions, effects, textures, fog              │
+│  Transport: jazz-tools → ws://localhost:4200 (Jazz Sync)    │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 2 — JazzTransport (Presence / Session Protocol)       │
-│  Synthesizes NetManager welcome/presence events from CRDT    │
+│  Layer 2 — JazzTransport (Presence / Session Protocol)      │
+│  Synthesizes NetManager welcome/presence events from CRDT   │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 3 — WebRTCTransport (Ephemeral / Low-Latency P2P)     │
-│  Cursors, drag previews, pings, chat — signaled via Jazz     │
+│  Layer 3 — WebRTCTransport (Ephemeral / Low-Latency P2P)    │
+│  Cursors, drag previews, pings, chat — signaled via Jazz    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
