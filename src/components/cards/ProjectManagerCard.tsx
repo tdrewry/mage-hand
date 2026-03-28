@@ -560,7 +560,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         await processInChunks(
           projectData.lights,
           10,
-          (light) => lightStore.addLight(light),
+          (light) => lightStore.addLight(light as any),
           (processed, total) => setLoadingProgress(`Loading lights (${processed}/${total})...`)
         );
       }
@@ -729,7 +729,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     // Lights
     if (projectData.lights) {
       lightStore.clearAllLights();
-      (projectData.lights).forEach(light => lightStore.addLight(light));
+      (projectData.lights).forEach(light => lightStore.addLight(light as any));
     }
 
     // Fog

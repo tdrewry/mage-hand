@@ -64,6 +64,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: true,
           canManageFog: true,
           canManageInitiative: true,
+          canManageRules: true,
         },
       },
       {
@@ -91,6 +92,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: false,
           canManageFog: false,
           canManageInitiative: false,
+          canManageRules: false,
         },
       },
     ],
@@ -173,6 +175,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: true,
           canManageFog: true,
           canManageInitiative: true,
+          canManageRules: true,
         },
       },
       {
@@ -200,6 +203,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: false,
           canManageFog: false,
           canManageInitiative: false,
+          canManageRules: false,
         },
       },
     ],
@@ -314,6 +318,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: true,
           canManageFog: true,
           canManageInitiative: true,
+          canManageRules: true,
         },
       },
       {
@@ -341,6 +346,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: false,
           canManageFog: false,
           canManageInitiative: false,
+          canManageRules: false,
         },
       },
     ],
@@ -406,6 +412,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: true,
           canManageFog: true,
           canManageInitiative: true,
+          canManageRules: true,
         },
       },
       {
@@ -433,6 +440,7 @@ export const BUILT_IN_TEMPLATES: SessionTemplate[] = [
           canEditMap: false,
           canManageFog: false,
           canManageInitiative: false,
+          canManageRules: false,
         },
       },
     ],
