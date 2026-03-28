@@ -1026,6 +1026,37 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         <TabsContent value="save" className="mt-4">
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">Save Project</CardTitle>
+              <CardDescription className="text-xs">
+                Export to file for backup or sharing
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="export-name" className="text-xs">Project Name *</Label>
+                <Input
+                  id="export-name"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="My Campaign"
+                  className="text-xs"
+                />
+              </div>
+              
+              <Button 
+                onClick={handleExportToFile}
+                disabled={!projectName.trim()}
+                className="w-full text-xs"
+                size="sm"
+              >
+                <Download className="w-3 h-3 mr-2" />
+                Export to File (.mhsession)
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
               <CardTitle className="text-base">Save Current Project</CardTitle>
               <CardDescription className="text-xs">
                 Save your current session to local storage
@@ -1162,6 +1193,35 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
         </TabsContent>
 
         <TabsContent value="load" className="mt-4">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-base">Load Project</CardTitle>
+              <CardDescription className="text-xs">
+                Import from a .mhsession file
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={handleImportFromFile}
+                disabled={loading}
+                className="w-full text-xs"
+                variant="outline"
+                size="sm"
+              >
+                <Upload className="w-3 h-3 mr-2" />
+                Select File to Import
+              </Button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".mhsession,.json"
+                onChange={handleFileSelected}
+                style={{ display: 'none' }}
+              />
+            </CardContent>
+          </Card>
+
           {/* Auto-Save Recovery */}
           {autoSave.hasAutoSave && (
             <Card className="mb-4 border-primary/50">
@@ -1443,66 +1503,6 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
 
         <TabsContent value="export" className="mt-4">
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Export Project</CardTitle>
-                <CardDescription className="text-xs">
-                  Export to file for backup or sharing
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="export-name" className="text-xs">Project Name *</Label>
-                  <Input
-                    id="export-name"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="My Campaign"
-                    className="text-xs"
-                  />
-                </div>
-                
-                <Button 
-                  onClick={handleExportToFile}
-                  disabled={!projectName.trim()}
-                  className="w-full text-xs"
-                  size="sm"
-                >
-                  <Download className="w-3 h-3 mr-2" />
-                  Export to File (.mhsession)
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Import Project</CardTitle>
-                <CardDescription className="text-xs">
-                  Import from a .mhsession file
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={handleImportFromFile}
-                  disabled={loading}
-                  className="w-full text-xs"
-                  variant="outline"
-                  size="sm"
-                >
-                  <Upload className="w-3 h-3 mr-2" />
-                  Select File to Import
-                </Button>
-                
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".mhsession,.json"
-                  onChange={handleFileSelected}
-                  style={{ display: 'none' }}
-                />
-              </CardContent>
-            </Card>
-
             {/* Durable Objects Section */}
             <Card className="border-dashed border-accent/50">
               <CardHeader>
