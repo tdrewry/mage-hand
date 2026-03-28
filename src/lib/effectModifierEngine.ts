@@ -91,7 +91,7 @@ export function applyEffectModifiers(
   // Apply stat modifiers
   for (const mod of timedModifiers) {
     const currentValue = getNestedValue(character, mod.target);
-    if (typeof currentValue === 'number') {
+    if (typeof currentValue === 'number' && typeof mod.value === 'number') {
       originalValues[mod.target] = currentValue;
       let newValue: number;
       switch (mod.operation) {
