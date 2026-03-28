@@ -91,6 +91,51 @@ On join, the system:
 
 ---
 
+## Linking a Personal jazz.tools Account
+
+By default the app uses **Demo Auth** (`useDemoAuth`) which creates a temporary local-only Jazz identity. To persist your identity and data across devices and browsers, link a personal [jazz.tools](https://jazz.tools) account.
+
+### 1. Register an account
+
+Go to **[jazz.tools](https://jazz.tools)** and create a free account. You will receive a **Jazz Cloud sync URL** of the form:
+
+```
+wss://cloud.jazz.tools/?key=YOUR_API_KEY
+```
+
+### 2. Set the sync URL
+
+There are two ways to point Mage Hand at your Jazz Cloud endpoint:
+
+**Option A — Environment variable (recommended):**
+
+Create a `.env` file in the project root (copy from `.env.example` if it exists):
+
+```
+VITE_JAZZ_SYNC_URL=wss://cloud.jazz.tools/?key=YOUR_API_KEY
+```
+
+Then restart the dev server (`npm run dev`). The provider in `src/lib/jazz/provider.tsx` reads this env var as its default peer URL.
+
+**Option B — Runtime override (no rebuild needed):**
+
+Open **Menu → Network → Advanced → Custom Jazz URL** inside the running app and paste your cloud URL there. This is stored in the multiplayer store and takes precedence over the env var.
+
+### 3. Account identity
+
+Jazz identities are tied to the sync server that created them. If you switch from a local server (`ws://localhost:4200`) to a Jazz Cloud URL:
+
+- Your previous local sessions will **not** be visible under the cloud account — local CoValues were created under a different peer
+- Start a fresh session after switching to create CoValues owned by your cloud identity
+- To migrate existing session data, export it via **Menu → Storage → Export Session** before switching
+
+### Notes
+
+- The `JazzReactProvider` in `src/lib/jazz/provider.tsx` currently uses `useDemoAuth`. To replace it with a proper Jazz account (passphrase / OAuth), follow the [jazz-tools auth docs](https://jazz.tools/docs/auth) and swap `useDemoAuth` for the appropriate auth method in `provider.tsx`
+- The `AuthWrapper` component in `provider.tsx` renders `DemoAuthBasicUI` when no account is loaded — replace this with your own UI if using a custom auth flow
+
+---
+
 ## Networking Deep Dive
 
 ### Durable State (Jazz CoValues)
@@ -157,6 +202,156 @@ In the app's **Network** panel, select **"LAN Server"** mode and enter:
 
 ---
 
+## Desktop Build (Tauri)
+
+Mage Hand ships a [Tauri](https://tauri.app) wrapper that bundles the app as a native desktop binary (Windows `.msi`/`.exe`, macOS `.dmg`/`.app`, Linux `.deb`/`.AppImage`). The desktop build includes an embedded `jazz-sync-server` binary so users get a self-contained VTT with no external dependencies.
+
+### Prerequisites
+
+1. **Rust toolchain** — install via [rustup](https://rustup.rs/):
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+2. **Tauri CLI** (already in devDependencies):
+   ```bash
+   npm install   # installs @tauri-apps/cli
+   ```
+3. Platform-specific requirements — see the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/):
+   - **Windows**: Microsoft C++ Build Tools or Visual Studio
+   - **macOS**: Xcode Command Line Tools
+   - **Linux**: `libwebkit2gtk`, `libssl`, etc.
+
+### Development (hot-reload)
+
+```bash
+npm run desktop
+# Alias for: tauri dev
+```
+
+This starts the Vite dev server on `http://localhost:8080` and opens the Tauri window pointed at it. The Tauri `devUrl` in `src-tauri/tauri.conf.json` is `http://localhost:5173` — if you change the Vite port, update this field to match.
+
+> **Note:** The `base` path in `vite.config.ts` is `"/"` in development mode, which is correct for Tauri's `devUrl`.
+
+### Production build
+
+```bash
+npm run build          # builds Vite → dist/
+npm run tauri build    # packages dist/ into a native binary
+```
+
+Tauri reads `src-tauri/tauri.conf.json → build.frontendDist` (`../dist`) to bundle the Vite output. The production build sets `base: "/mage-hand/"` via `vite.config.ts`; **this base path must be `"/"` for desktop use**, because Tauri loads the app from the filesystem, not a web server sub-path.
+
+**To build for desktop, change `vite.config.ts` before running `npm run tauri build`:**
+
+```diff
+-  base: mode === "production" ? "/mage-hand/" : "/",
++  base: "/",
+```
+
+Or set the mode explicitly:
+
+```bash
+# Build with base "/" for Tauri (bypasses the production mode check)
+VITE_BASE_PATH=/ npx vite build
+```
+
+Alternatively, add a dedicated Tauri build script to `package.json`:
+
+```json
+"build:desktop": "vite build --base / && tauri build"
+```
+
+### Key config files
+
+| File | Relevant Setting |
+|------|-----------------|
+| `src-tauri/tauri.conf.json` | `build.devUrl` — must match the Vite dev server port |
+| `src-tauri/tauri.conf.json` | `build.frontendDist` — path to Vite output (`../dist`) |
+| `src-tauri/tauri.conf.json` | `bundle.externalBin` — bundles `bin/jazz-sync-server` into the installer |
+| `vite.config.ts` | `base` — **must be `"/"` for desktop builds** |
+
+### Embedded Jazz sync server
+
+The Tauri bundle includes a pre-built `jazz-sync-server` binary at `src-tauri/bin/` (platform-specific suffixes like `jazz-sync-server-x86_64-pc-windows-msvc.exe`). The app spawns it on startup via the Tauri sidecar API so desktop users don't need to run a separate sync process.
+
+---
+
+## GitHub Pages Hosting
+
+The repository includes a GitHub Actions workflow that automatically builds and deploys to GitHub Pages on every push to `main`.
+
+### How it works
+
+1. Push to `main` triggers `.github/workflows/deploy-pages.yml`
+2. The workflow runs `npm install && npm run build`
+3. The `dist/` directory is published to the `github-pages` environment
+
+### Path configuration
+
+GitHub Pages serves the app from `https://<username>.github.io/<repo-name>/`. The app must be aware of this sub-path prefix.
+
+#### Files that must be updated when changing the repo name or Pages path:
+
+| File | Setting | Current Value | Notes |
+|------|---------|---------------|-------|
+| `vite.config.ts` | `base` (production) | `"/mage-hand/"` | Must match the GitHub repo name exactly — e.g. if your repo is `my-vtt`, set `"/my-vtt/"` |
+| `src-tauri/tauri.conf.json` | `build.devUrl` | `"http://localhost:5173"` | **Not** needed for Pages; only affects the Tauri desktop dev build |
+
+**`vite.config.ts` — the critical file:**
+
+```ts
+base: mode === "production" ? "/mage-hand/" : "/",
+//                            ^^^^^^^^^^^^
+//  Change this to match your GitHub repo name
+//  e.g. "/my-vtt/" if hosted at github.com/you/my-vtt
+```
+
+> The `/` at both the start and end of the path are **required** by Vite.
+
+#### If you are hosting on a custom domain (not a sub-path):
+
+Set `base: "/"` unconditionally — the sub-path prefix is only needed for the default `*.github.io/<repo>` URL:
+
+```ts
+base: "/",
+```
+
+Also add a `CNAME` file to the `public/` directory containing your domain:
+
+```
+# public/CNAME
+vtt.example.com
+```
+
+### Enabling GitHub Pages
+
+1. Push the repo to GitHub
+2. Go to **Settings → Pages**
+3. Set **Source** to **"GitHub Actions"**
+4. Push to `main` — the workflow will deploy automatically
+
+The live URL will be shown under **Settings → Pages** once the first deployment completes.
+
+### Jazz sync server for Pages deployments
+
+The self-hosted `jazz-run sync` server only runs locally. For a Pages deployment accessible from multiple machines, you need a cloud-accessible sync server:
+
+- **Jazz Cloud** (recommended): Register at [jazz.tools](https://jazz.tools), get your `wss://cloud.jazz.tools/?key=...` URL, and set it as a GitHub Actions secret:
+  ```
+  # In GitHub repo → Settings → Secrets → Actions
+  VITE_JAZZ_SYNC_URL = wss://cloud.jazz.tools/?key=YOUR_API_KEY
+  ```
+  Then update `.github/workflows/deploy-pages.yml` to pass it through:
+  ```yaml
+  - run: npm run build
+    env:
+      VITE_JAZZ_SYNC_URL: ${{ secrets.VITE_JAZZ_SYNC_URL }}
+  ```
+- **Self-hosted Jazz Server**: Deploy `jazz-run sync` on a VPS with a domain and TLS, then set `VITE_JAZZ_SYNC_URL=wss://your-server.example.com`.
+- **Runtime override**: Users can override the sync URL at runtime via **Menu → Network → Advanced → Custom Jazz URL** — useful when you don't control the build.
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -181,7 +376,8 @@ The sync server URL can also be overridden at runtime via **Menu → Network →
 | `npm run dev:jazz` | Start Jazz sync server on `ws://localhost:4200` |
 | `npm run build` | Production build (outputs to `dist/`) |
 | `npm run preview` | Preview the production build locally |
-| `npm run desktop` | Launch the Tauri desktop app (requires Rust toolchain) |
+| `npm run desktop` | Launch the Tauri desktop app in dev mode (requires Rust toolchain) |
+| `npm run tauri build` | Package the desktop app as a native installer |
 | `npm run lint` | Run ESLint |
 
 ---
@@ -198,6 +394,7 @@ The sync server URL can also be overridden at runtime via **Menu → Network →
 | `react-router-dom` | Client-side routing |
 | `@radix-ui/*` | Accessible UI primitives |
 | `fabric` | Image/canvas manipulation |
+| `@tauri-apps/cli` | Desktop app packaging (Tauri v2) |
 
 ---
 
@@ -205,7 +402,11 @@ The sync server URL can also be overridden at runtime via **Menu → Network →
 
 ### GitHub Pages (built-in)
 
-The Vite config sets `base: "/mage-hand/"` in production mode. Push to `main` and GitHub Actions will build and deploy to Pages automatically.
+The Vite config sets `base: "/mage-hand/"` in production mode. Push to `main` and GitHub Actions will build and deploy to Pages automatically. See [GitHub Pages Hosting](#github-pages-hosting) for path configuration details.
+
+### Desktop (Tauri)
+
+Run `npm run build:desktop` (or `npm run build` + `npm run tauri build`) to produce a native installer. See [Desktop Build (Tauri)](#desktop-build-tauri) for full instructions.
 
 ### Self-Hosted
 
