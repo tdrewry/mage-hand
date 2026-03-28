@@ -138,10 +138,45 @@ export interface MapTemplateDefinition {
   /** Multi-drop configuration for effects that place multiple instances */
   multiDrop?: MultiDropConfig;
 
+  // Spell/trap game data
+  /** Spell level or trap CR */
+  level?: number;
+  /** Base spell level for scaling */
+  baseLevel?: number;
+  /** Damage type (e.g. 'fire', 'bludgeoning') */
+  damageType?: string;
+  /** Damage dice formulas */
+  damageDice?: Array<{ formula: string; damageType: string }>;
+  /** Scaling rules per level */
+  scaling?: Array<{ property: string; perLevel: number; diceIndex?: number }>;
+
+  // Effect modifiers & conditions
+  /** Stat modifiers applied to tokens in the effect area */
+  modifiers?: EffectModifier[];
+  /** Conditions applied to tokens in the effect area */
+  conditions?: EffectCondition[];
 
   // Aura
   /** If set, this effect is an aura: it locks to a token and continuously hit-tests with wall-blocking */
   aura?: AuraConfig;
+}
+
+// ---------------------------------------------------------------------------
+// Effect Modifiers & Conditions
+// ---------------------------------------------------------------------------
+
+export interface EffectModifier {
+  id: string;
+  target: string;
+  operation: 'add' | 'subtract' | 'set' | 'multiply';
+  value: number | string;
+  label?: string;
+}
+
+export interface EffectCondition {
+  condition: string;
+  apply: boolean;
+  timing: EffectTriggerTiming;
 }
 
 // ---------------------------------------------------------------------------
