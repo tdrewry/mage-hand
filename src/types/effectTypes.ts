@@ -171,12 +171,13 @@ export interface EffectModifier {
   operation: 'add' | 'subtract' | 'set' | 'multiply';
   value: number | string;
   label?: string;
+  timing?: EffectTriggerTiming;
 }
 
 export interface EffectCondition {
   condition: string;
   apply: boolean;
-  timing: EffectTriggerTiming;
+  timing?: EffectTriggerTiming;
 }
 
 // ---------------------------------------------------------------------------

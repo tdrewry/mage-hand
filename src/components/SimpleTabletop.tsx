@@ -37,7 +37,7 @@ import { useDungeonStore } from "../stores/dungeonStore";
 import { useInitiativeStore } from "../stores/initiativeStore";
 import { useCardStore } from "../stores/cardStore";
 import { useMapObjectStore } from "../stores/mapObjectStore";
-import { CardType } from "@/types/cardTypes";
+import { CardType, type CardConfig } from "@/types/cardTypes";
 import {
   renderDoors,
   renderDungeonMapRegions,
