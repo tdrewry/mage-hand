@@ -525,7 +525,7 @@ export interface EphemeralPayloadMap {
   "selection.preview": SelectionPreviewPayload;
   "token.drag.begin": { tokenId: string; startPos: Vec2; mode?: "freehand" | "directLine" };
   "token.drag.update": { tokenId: string; pos: Vec2; path?: Vec2[] };
-  "token.drag.end": { tokenId: string };
+  "token.drag.end": { tokenId: string; finalPos: { x: number; y: number } };
   "token.position.sync": TokenPositionSyncPayload;
   "token.meta.sync": TokenMetaSyncPayload;
   "map.dm.viewport": DmViewportPayload;

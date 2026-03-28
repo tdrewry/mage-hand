@@ -11409,13 +11409,17 @@ export const SimpleTabletop = () => {
       // Apply final token positions to store (only once at the end)
       if (tempTokenPositionsRef.current) {
         Object.entries(tempTokenPositionsRef.current).forEach(([tokenId, position]) => {
-          updateTokenPosition(tokenId, position.x, position.y);
+          // Token snapping block already handled manually dragged tokens.
+          // We only want to apply raw temp positions to tokens being carried by a region.
+          if (tokensMovedByRegion.includes(tokenId)) {
+            updateTokenPosition(tokenId, position.x, position.y);
+          }
         });
       }
 
-      // Clear grouped tokens and temp positions
+      // Clear grouped tokens 
       setGroupedTokens([]);
-      tempTokenPositionsRef.current = undefined;
+      // NOTE: tempTokenPositionsRef is cleared defensively after 1000ms by the timeout above to prevent visual flashing
     }
 
     // Handle rotation completion

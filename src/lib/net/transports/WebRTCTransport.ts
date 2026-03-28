@@ -4,6 +4,8 @@ import type { JazzSessionRoot, JazzSignalingRoom } from "../../jazz/schema";
 import type { ClientToServerMessage, ServerToClientMessage } from "../../../../networking/contract/v1";
 import { useMultiplayerStore } from "../../../stores/multiplayerStore";
 import { useNetworkDiagnosticsStore, registerPeerConnection, unregisterPeerConnection } from "@/stores/networkDiagnosticsStore";
+import { useRemoteDragStore } from "@/stores/remoteDragStore";
+import { ephemeralBus } from "@/lib/net";
 
 const STUN_SERVERS = {
   iceServers: [
@@ -216,6 +218,9 @@ export class WebRTCTransport implements ITransport {
 
                  if (explicitlyDisconnected) {
                    console.log(`[WebRTCTransport] Client ${clientId} explicitly disconnected from Jazz. Tearing down peer connection.`);
+                   // Resolve any orphaned drags owned by this disconnected client
+                   // so remaining clients do not hang showing a stale drag-in-progress.
+                   this.resolveOrphanedDrags(clientId);
                    const pc = this.peerConnections.get(clientId);
                    if (pc) {
                      pc.close();
@@ -483,6 +488,27 @@ export class WebRTCTransport implements ITransport {
               channel.send(message);
           }
       }
+  }
+
+  /**
+   * Host-only: when a client disconnects mid-drag, synthesize a `token.drag.end`
+   * for every token that client was actively dragging, so remaining observers
+   * can clear their ephemeral drag state and snap to the last-known position.
+   *
+   * Called from the explicit-disconnect teardown path so that drag decorations
+   * don't persist indefinitely after the source peer leaves.
+   */
+  private resolveOrphanedDrags(disconnectedUserId: string): void {
+    if (!this.isHost) return;
+    const drags = useRemoteDragStore.getState().drags;
+    for (const [tokenId, drag] of Object.entries(drags)) {
+      if (drag.userId !== disconnectedUserId) continue;
+      const lastPos = drag.pos ?? drag.startPos;
+      console.log(`[WebRTCTransport] Resolving orphaned drag for token ${tokenId} (peer ${disconnectedUserId} disconnected) at`, lastPos);
+      // Apply position locally via ephemeralBus so all local listeners fire,
+      // then broadcast the synthetic drag.end to all remaining clients.
+      ephemeralBus.emit("token.drag.end", { tokenId, finalPos: lastPos });
+    }
   }
 
   // ==== Client Logic ====

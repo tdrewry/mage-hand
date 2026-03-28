@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 scratch.md
 /sync-db
-example/vdo
+/example
+/contracts
+/docs

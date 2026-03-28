@@ -4,6 +4,7 @@
 
 import { ephemeralBus } from "@/lib/net";
 import { useSessionStore } from "@/stores/sessionStore";
+import { FEATURE_EPHEMERAL_TOKEN_DRAG } from "@/lib/featureFlags";
 
 export interface DragBeginPayload {
   tokenId: string;
@@ -24,6 +25,7 @@ export interface DragEndPayload {
 
 /** Emit drag begin via ephemeral bus (unthrottled — fires once). */
 export function emitDragBegin(payload: DragBeginPayload): void {
+  if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return; // ephemeral token drag disabled
   ephemeralBus.emit("token.drag.begin", {
     tokenId: payload.tokenId,
     startPos: payload.startPos,
@@ -33,6 +35,7 @@ export function emitDragBegin(payload: DragBeginPayload): void {
 
 /** Emit drag update via ephemeral bus (throttled by EphemeralBus config at 50ms). */
 export function emitDragUpdate(payload: DragUpdatePayload): void {
+  if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return; // ephemeral token drag disabled
   ephemeralBus.emit("token.drag.update", {
     tokenId: payload.tokenId,
     pos: payload.pos,
@@ -42,8 +45,10 @@ export function emitDragUpdate(payload: DragUpdatePayload): void {
 
 /** Emit drag end via ephemeral bus (unthrottled — fires once). */
 export function emitDragEnd(payload: DragEndPayload): void {
+  if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return; // ephemeral token drag disabled
   ephemeralBus.emit("token.drag.end", {
     tokenId: payload.tokenId,
+    finalPos: payload.finalPos,
   });
 }
 

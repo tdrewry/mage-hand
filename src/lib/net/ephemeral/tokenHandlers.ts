@@ -8,6 +8,7 @@ import { useTokenEphemeralStore } from "@/stores/tokenEphemeralStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
 import { useRemoteDragStore } from "@/stores/remoteDragStore";
+import { FEATURE_EPHEMERAL_TOKEN_DRAG } from "@/lib/featureFlags";
 import type {
   TokenHoverPayload,
   TokenHandlePreviewPayload,
@@ -62,10 +63,12 @@ export function registerTokenHandlers(): void {
   });
 
   // ── Token drag preview ops ──
-  // Remote drags move the real token sprite AND track decoration metadata
-  // (start position + path) so remote clients render the same ghost/path visuals.
+  // Gated by FEATURE_EPHEMERAL_TOKEN_DRAG. When false, no drag events are
+  // processed ephemerally — Jazz CRDT durable sync on drag end is the sole
+  // mechanism for propagating token positions to remote clients.
 
   ephemeralBus.on("token.drag.begin", (data: { tokenId: string; startPos: { x: number; y: number }; mode?: "freehand" | "directLine" }, userId) => {
+    if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     useRemoteDragStore.getState().beginDrag(
       data.tokenId,
@@ -73,23 +76,46 @@ export function registerTokenHandlers(): void {
       data.mode || "freehand",
       userId,
     );
+    // Tell the Jazz bridge to suppress inbound CRDT position updates for this
+    // token while the remote drag is in flight — prevents Jazz callbacks from
+    // fighting the ephemeral drag preview and causing flicker.
+    import("@/lib/jazz/bridge").then(({ markTokenDragStart }) => {
+      markTokenDragStart(data.tokenId);
+      console.log(`[tokenHandlers] token.drag.begin: suppressing Jazz inbound for ${data.tokenId}`);
+    });
   });
 
   ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
+    if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     // Write exclusively to the remote drag state; do NOT mutate durable sessionStore here
     useRemoteDragStore.getState().updateDrag(data.tokenId, data.pos, data.path || []);
   });
 
-  ephemeralBus.on("token.drag.end", (data: { tokenId: string }, userId) => {
+  ephemeralBus.on("token.drag.end", (data: { tokenId: string; finalPos?: { x: number; y: number } }, userId) => {
+    if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
     useRemoteDragStore.getState().endDrag(data.tokenId);
+
+    // Apply the authoritative final position immediately so the remote client
+    // snaps to the correct landing spot without waiting for the Jazz CRDT cycle.
+    // finalPos may be absent from older peers — degrade gracefully by letting Jazz catch up.
+    if (data.finalPos) {
+      useSessionStore.getState().updateTokenPosition(data.tokenId, data.finalPos.x, data.finalPos.y);
+      console.log(`[tokenHandlers] token.drag.end: applying finalPos ${JSON.stringify(data.finalPos)} for ${data.tokenId}`);
+    }
+
+    // Signal the Jazz bridge to enter its post-drag grace period for this token.
+    // This prevents any stale CRDT update arriving in the next ~600 ms from
+    // snapping the token back to its pre-drag position.
+    import("@/lib/jazz/bridge").then(({ markTokenDragEnd }) => {
+      markTokenDragEnd(data.tokenId);
+    });
   });
 
   // ── Staleness auto-clear ──
-  // Safety net: if token.drag.end is lost over the network, remote decorations
-  // will auto-expire after REMOTE_DRAG_STALE_MS of no updates.
-  if (!staleCheckInterval) {
+  // Only needed when ephemeral drag is active. Skipped otherwise.
+  if (FEATURE_EPHEMERAL_TOKEN_DRAG && !staleCheckInterval) {
     staleCheckInterval = setInterval(() => {
       useRemoteDragStore.getState().expireStale(REMOTE_DRAG_STALE_MS);
     }, 1000);

@@ -62,3 +62,18 @@ export const JAZZ_SYNC_THROTTLE_MS: Record<string, number> = {
     illumination: 200,   // light changes
     customTemplates: 500,   // rarely updated
 };
+/**
+ * EPHEMERAL TOKEN DRAG: Live broadcast of token drag positions to connected clients.
+ *
+ * When TRUE — all clients receive token.drag.begin / token.drag.update / token.drag.end
+ * via the WebRTC ephemeral bus and see a live drag preview. The remote client's Jazz
+ * inbound position subscription is suppressed for the dragged token during this window.
+ *
+ * When FALSE (default) — ephemeral drag events are not emitted or processed. Token
+ * positions are committed exclusively via the Jazz CRDT durable layer on drag end.
+ * Remote clients see the new position as soon as Jazz propagates the write (~P2P RTT).
+ *
+ * Set to FALSE to eliminate flicker caused by ephemeral drag state conflicting with
+ * Jazz CoValue subscription callbacks on remote clients.
+ */
+export const FEATURE_EPHEMERAL_TOKEN_DRAG = false;
