@@ -2355,22 +2355,28 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Check position change
                 const posChanged = !isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y);
 
-                // Check non-position changes (deep-compare objects/arrays to avoid
-                // false positives from parsed JSON extras like illuminationSources)
+                // Check non-position changes — during active remote drag, only process
+                // imageHash changes to avoid false-positive re-renders from JSON instability
                 let hasNonPosChange = false;
-                for (const key of Object.keys(incoming) as (keyof Token)[]) {
-                  if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
-                  const inVal = incoming[key];
-                  const exVal = existing[key];
-                  if (inVal === exVal) continue;
-                  // Both null/undefined → equal
-                  if (inVal == null && exVal == null) continue;
-                  // Deep-compare objects/arrays via JSON to avoid false positives
-                  if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
-                    if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+                const isRemotelyDragged = useRemoteDragStore.getState().isRemoteDragSuppressed(tokenId);
+                if (isRemotelyDragged) {
+                  // Only check imageHash during remote drag — skip all other metadata
+                  hasNonPosChange = !!(incoming.imageHash && incoming.imageHash !== existing.imageHash);
+                } else {
+                  for (const key of Object.keys(incoming) as (keyof Token)[]) {
+                    if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
+                    const inVal = incoming[key];
+                    const exVal = existing[key];
+                    if (inVal === exVal) continue;
+                    // Both null/undefined → equal
+                    if (inVal == null && exVal == null) continue;
+                    // Deep-compare objects/arrays via JSON to avoid false positives
+                    if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
+                      if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+                    }
+                    hasNonPosChange = true;
+                    break;
                   }
-                  hasNonPosChange = true;
-                  break;
                 }
 
                 // Track if illumination specifically changed
