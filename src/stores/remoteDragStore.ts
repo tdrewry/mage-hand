@@ -15,20 +15,28 @@ export interface RemoteDragState {
   lastUpdateMs: number;
 }
 
+/** Grace period (ms) after remote drag ends — suppresses Jazz position updates */
+const REMOTE_DRAG_GRACE_MS = 600;
+
 interface RemoteDragStore {
   /** Active remote drags keyed by tokenId */
   drags: Record<string, RemoteDragState>;
+  /** Recently ended remote drags keyed by tokenId → end timestamp */
+  recentlyEndedDrags: Record<string, number>;
 
   beginDrag: (tokenId: string, startPos: { x: number; y: number }, mode: 'freehand' | 'directLine', userId: string) => void;
   updateDrag: (tokenId: string, pos: { x: number; y: number }, path: { x: number; y: number }[]) => void;
   endDrag: (tokenId: string) => void;
+  /** Check if a token is actively being remotely dragged or in grace period */
+  isRemoteDragSuppressed: (tokenId: string) => boolean;
   /** Remove any drags older than maxAgeMs with no updates */
   expireStale: (maxAgeMs: number) => void;
   clearAll: () => void;
 }
 
-export const useRemoteDragStore = create<RemoteDragStore>((set) => ({
+export const useRemoteDragStore = create<RemoteDragStore>((set, get) => ({
   drags: {},
+  recentlyEndedDrags: {},
 
   beginDrag: (tokenId, startPos, mode, userId) =>
     set((state) => ({
@@ -53,8 +61,27 @@ export const useRemoteDragStore = create<RemoteDragStore>((set) => ({
   endDrag: (tokenId) =>
     set((state) => {
       const { [tokenId]: _, ...rest } = state.drags;
-      return { drags: rest };
+      const now = Date.now();
+      // Move to grace period instead of immediate clear
+      const newRecentlyEnded = { ...state.recentlyEndedDrags, [tokenId]: now };
+      // Schedule cleanup after grace period
+      setTimeout(() => {
+        const s = useRemoteDragStore.getState();
+        if (s.recentlyEndedDrags[tokenId] === now) {
+          const { [tokenId]: _ts, ...remaining } = s.recentlyEndedDrags;
+          useRemoteDragStore.setState({ recentlyEndedDrags: remaining });
+        }
+      }, REMOTE_DRAG_GRACE_MS);
+      return { drags: rest, recentlyEndedDrags: newRecentlyEnded };
     }),
+
+  isRemoteDragSuppressed: (tokenId) => {
+    const state = get();
+    if (state.drags[tokenId]) return true;
+    const endTs = state.recentlyEndedDrags[tokenId];
+    if (endTs && Date.now() - endTs < REMOTE_DRAG_GRACE_MS) return true;
+    return false;
+  },
 
   expireStale: (maxAgeMs) =>
     set((state) => {

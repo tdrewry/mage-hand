@@ -58,6 +58,7 @@ import { useMapFocusStore } from "@/stores/mapFocusStore";
 import { useCampaignStore } from "@/stores/campaignStore";
 import { useTokenGroupStore } from "@/stores/tokenGroupStore";
 import { useMultiplayerStore } from "@/stores/multiplayerStore";
+import { useRemoteDragStore } from "@/stores/remoteDragStore";
 import { useBroadcastPauseStore } from "@/stores/useBroadcastPauseStore";
 // Added Rule Engine Stores
 import { useActiveEffectStore } from '@/stores/activeEffectStore';
@@ -104,9 +105,13 @@ export function markTokenDragEnd(tokenId: string): void {
   _dragGraceTimers.set(tokenId, timer);
 }
 
-/** Check if a token's inbound position should be suppressed (dragging or grace period) */
+/** Check if a token's inbound position should be suppressed (dragging or grace period).
+ *  Now also checks remote drags so observer clients don't get stale Jazz positions
+ *  fighting the ephemeral drag preview. */
 function _isPositionSuppressed(tokenId: string): boolean {
-  return _localDragTokens.has(tokenId) || _dragGraceTokens.has(tokenId);
+  return _localDragTokens.has(tokenId)
+    || _dragGraceTokens.has(tokenId)
+    || useRemoteDragStore.getState().isRemoteDragSuppressed(tokenId);
 }
 
 /**
@@ -2244,6 +2249,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             try {
               const init = tokenToJazzInit(t);
               for (const [key, val] of Object.entries(init)) {
+                // Skip position fields during active local drag — ephemeral handles it
+                if (isBeingDragged && (key === 'x' || key === 'y')) continue;
                 if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
               }
               console.log(`[jazz-bridge] ✅ Pushed token ${t.id} update to Jazz (imageHash: ${t.imageHash})`);
@@ -2348,22 +2355,28 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
                 // Check position change
                 const posChanged = !isLocallyDragged && (existing.x !== jt.x || existing.y !== jt.y);
 
-                // Check non-position changes (deep-compare objects/arrays to avoid
-                // false positives from parsed JSON extras like illuminationSources)
+                // Check non-position changes — during active remote drag, only process
+                // imageHash changes to avoid false-positive re-renders from JSON instability
                 let hasNonPosChange = false;
-                for (const key of Object.keys(incoming) as (keyof Token)[]) {
-                  if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
-                  const inVal = incoming[key];
-                  const exVal = existing[key];
-                  if (inVal === exVal) continue;
-                  // Both null/undefined → equal
-                  if (inVal == null && exVal == null) continue;
-                  // Deep-compare objects/arrays via JSON to avoid false positives
-                  if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
-                    if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+                const isRemotelyDragged = useRemoteDragStore.getState().isRemoteDragSuppressed(tokenId);
+                if (isRemotelyDragged) {
+                  // Only check imageHash during remote drag — skip all other metadata
+                  hasNonPosChange = !!(incoming.imageHash && incoming.imageHash !== existing.imageHash);
+                } else {
+                  for (const key of Object.keys(incoming) as (keyof Token)[]) {
+                    if (key === 'id' || key === 'x' || key === 'y' || key === 'imageUrl') continue;
+                    const inVal = incoming[key];
+                    const exVal = existing[key];
+                    if (inVal === exVal) continue;
+                    // Both null/undefined → equal
+                    if (inVal == null && exVal == null) continue;
+                    // Deep-compare objects/arrays via JSON to avoid false positives
+                    if (typeof inVal === 'object' && inVal !== null && typeof exVal === 'object' && exVal !== null) {
+                      if (JSON.stringify(inVal) === JSON.stringify(exVal)) continue;
+                    }
+                    hasNonPosChange = true;
+                    break;
                   }
-                  hasNonPosChange = true;
-                  break;
                 }
 
                 // Track if illumination specifically changed
