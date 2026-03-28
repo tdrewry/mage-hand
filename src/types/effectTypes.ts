@@ -196,6 +196,8 @@ export interface PlacedMapTemplate {
 
   // Caster
   casterId?: string; // token ID
+  /** Spell cast level (may differ from template level due to upcasting) */
+  castLevel?: number;
 
   // Lifecycle
   placedAt: number;         // performance.now() or Date.now()

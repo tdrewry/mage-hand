@@ -549,6 +549,7 @@ export interface EphemeralPayloadMap {
   "initiative.hover": InitiativeHoverPayload;
   "group.select.preview": GroupSelectPreviewPayload;
   "group.drag.preview": GroupDragPreviewPayload;
+  "group.drag.end": GroupDragPreviewPayload;
   "role.handRaise": RoleHandRaisePayload;
   "role.assign": RoleAssignPayload;
   "presence.activity": PresenceActivityPayload;

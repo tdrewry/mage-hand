@@ -289,7 +289,7 @@ function renderCardContent(
     case CardType.ACTION_CARD:
       return <ActionCardContent />;
     case CardType.ACTION_DECLARE_CARD:
-      return <ActionDeclareCardContent cardId={cardId} />;
+      return <ActionDeclareCardContent draftId={cardId} actorId="" category="" />;
     case CardType.NETWORK_DEMO:
       return <NetworkDemoCardContent />;
     case CardType.EFFECTS:

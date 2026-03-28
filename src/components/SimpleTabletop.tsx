@@ -1305,16 +1305,16 @@ export const SimpleTabletop = () => {
     // Small delay to ensure layout is loaded first
     const timer = setTimeout(() => {
       if (!getCardByType(CardType.ENVIRONMENT)) {
-        registerCard({ type: CardType.ENVIRONMENT, title: 'Environment' });
+        registerCard({ type: CardType.ENVIRONMENT, title: 'Environment' } as CardConfig);
       }
       if (!getCardByType(CardType.COMPENDIUM)) {
-        registerCard({ type: CardType.COMPENDIUM, title: 'Compendium' });
+        registerCard({ type: CardType.COMPENDIUM, title: 'Compendium' } as CardConfig);
       }
       if (!getCardByType(CardType.PLAY)) {
-        registerCard({ type: CardType.PLAY, title: 'Play' });
+        registerCard({ type: CardType.PLAY, title: 'Play' } as CardConfig);
       }
       if (!getCardByType(CardType.CAMPAIGN)) {
-        registerCard({ type: CardType.CAMPAIGN, title: 'Campaign' });
+        registerCard({ type: CardType.CAMPAIGN, title: 'Campaign' } as CardConfig);
       }
     }, 100);
 

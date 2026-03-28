@@ -729,7 +729,7 @@ export const ProjectManagerCardContent: React.FC<ProjectManagerCardContentProps>
     // Lights
     if (projectData.lights) {
       lightStore.clearAllLights();
-      (projectData.lights).forEach(light => lightStore.addLight(light));
+      (projectData.lights).forEach(light => lightStore.addLight(light as any));
     }
 
     // Fog
