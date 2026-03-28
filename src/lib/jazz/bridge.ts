@@ -110,8 +110,7 @@ export function markTokenDragEnd(tokenId: string): void {
  *  fighting the ephemeral drag preview. */
 function _isPositionSuppressed(tokenId: string): boolean {
   return _localDragTokens.has(tokenId)
-    || _dragGraceTokens.has(tokenId)
-    || useRemoteDragStore.getState().isRemoteDragSuppressed(tokenId);
+    || _dragGraceTokens.has(tokenId);
 }
 
 /**

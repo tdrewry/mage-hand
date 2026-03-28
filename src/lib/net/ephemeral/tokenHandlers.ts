@@ -76,13 +76,6 @@ export function registerTokenHandlers(): void {
       data.mode || "freehand",
       userId,
     );
-    // Tell the Jazz bridge to suppress inbound CRDT position updates for this
-    // token while the remote drag is in flight — prevents Jazz callbacks from
-    // fighting the ephemeral drag preview and causing flicker.
-    import("@/lib/jazz/bridge").then(({ markTokenDragStart }) => {
-      markTokenDragStart(data.tokenId);
-      console.log(`[tokenHandlers] token.drag.begin: suppressing Jazz inbound for ${data.tokenId}`);
-    });
   });
 
   ephemeralBus.on("token.drag.update", (data: { tokenId: string; pos: { x: number; y: number }; path?: { x: number; y: number }[] }, userId) => {
@@ -95,22 +88,44 @@ export function registerTokenHandlers(): void {
   ephemeralBus.on("token.drag.end", (data: { tokenId: string; finalPos?: { x: number; y: number } }, userId) => {
     if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
     if (!userId || userId === useMultiplayerStore.getState().currentUserId) return;
-    useRemoteDragStore.getState().endDrag(data.tokenId);
-
-    // Apply the authoritative final position immediately so the remote client
-    // snaps to the correct landing spot without waiting for the Jazz CRDT cycle.
-    // finalPos may be absent from older peers — degrade gracefully by letting Jazz catch up.
+    
+    // Hold the ephemeral drag visualization on screen until the durable CRDT update arrives.
     if (data.finalPos) {
-      useSessionStore.getState().updateTokenPosition(data.tokenId, data.finalPos.x, data.finalPos.y);
-      console.log(`[tokenHandlers] token.drag.end: applying finalPos ${JSON.stringify(data.finalPos)} for ${data.tokenId}`);
-    }
+      let isSettled = false;
+      const finalX = data.finalPos.x;
+      const finalY = data.finalPos.y;
 
-    // Signal the Jazz bridge to enter its post-drag grace period for this token.
-    // This prevents any stale CRDT update arriving in the next ~600 ms from
-    // snapping the token back to its pre-drag position.
-    import("@/lib/jazz/bridge").then(({ markTokenDragEnd }) => {
-      markTokenDragEnd(data.tokenId);
-    });
+      const checkSettled = (state = useSessionStore.getState()) => {
+        if (isSettled) return true;
+        const t = state.tokens.find(tk => tk.id === data.tokenId);
+        if (t && Math.abs(t.x - finalX) < 1 && Math.abs(t.y - finalY) < 1) {
+          isSettled = true;
+          useRemoteDragStore.getState().endDrag(data.tokenId);
+          return true;
+        }
+        return false;
+      };
+
+      // Check immediately in case the durable CRDT update arrived before this ephemeral message
+      if (checkSettled()) return;
+
+      const unsub = useSessionStore.subscribe((state) => {
+        if (checkSettled(state)) {
+          unsub();
+        }
+      });
+
+      // Fallback in case the CRDT update never arrives or is superseded
+      setTimeout(() => {
+        if (!isSettled) {
+          isSettled = true;
+          useRemoteDragStore.getState().endDrag(data.tokenId);
+          unsub();
+        }
+      }, 2000);
+    } else {
+      useRemoteDragStore.getState().endDrag(data.tokenId);
+    }
   });
 
   // ── Staleness auto-clear ──

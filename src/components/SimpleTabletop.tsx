@@ -3901,11 +3901,6 @@ export const SimpleTabletop = () => {
       visibleTokens.forEach((token) => {
         // Use temporary position if available (during local drag)
         let tempPos = tempTokenPositionsRef.current?.[token.id];
-        
-        // Alternatively, use remote drag position if available (during remote drag)
-        if (!tempPos && remoteDrags[token.id]?.pos) {
-          tempPos = remoteDrags[token.id].pos;
-        }
 
         const renderToken = tempPos ? { ...token, x: tempPos.x, y: tempPos.y } : token;
 
@@ -4950,8 +4945,9 @@ export const SimpleTabletop = () => {
       if (!token) continue;
 
       if (phase === 'ghost') {
-        // Draw ghost at start position (same as local drawGhostToken)
-        drawGhostToken(ctx, dragState.startPos.x, dragState.startPos.y, token);
+        // Draw ghost trailing the remote cursor, while primary token stays anchored
+        const currentPos = dragState.pos || dragState.startPos;
+        drawGhostToken(ctx, currentPos.x, currentPos.y, token);
       } else {
         // phase === 'path': draw path + distance decorations (same as local drawDragPath)
         const gridSize = 40;
@@ -4965,10 +4961,8 @@ export const SimpleTabletop = () => {
         // Use real-time ephemeral position from remote user, fallback to durable token pos
         const currentPos = dragState.pos || { x: token.x, y: token.y };
 
-        // Hide decorations if the token has actually been dropped here natively
-        // (This prevents the path from lingering for a split second after the durable CoValue updates)
-        const isDroppedAtPos = currentPos.x === dragState.startPos.x && currentPos.y === dragState.startPos.y;
-        if (isDroppedAtPos) continue;
+        // The ghost and path stay rendered dynamically until the remoteDrag is explicitly cleared
+        // via our new CRDT sync coordinate matching subscription (or fallback timeout).
 
         ctx.save();
 

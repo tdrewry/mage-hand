@@ -76,4 +76,4 @@ export const JAZZ_SYNC_THROTTLE_MS: Record<string, number> = {
  * Set to FALSE to eliminate flicker caused by ephemeral drag state conflicting with
  * Jazz CoValue subscription callbacks on remote clients.
  */
-export const FEATURE_EPHEMERAL_TOKEN_DRAG = false;
+export const FEATURE_EPHEMERAL_TOKEN_DRAG = true;
