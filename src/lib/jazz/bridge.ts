@@ -2249,6 +2249,8 @@ export function startBridge(sessionRoot: any, isCreator = false): void {
             try {
               const init = tokenToJazzInit(t);
               for (const [key, val] of Object.entries(init)) {
+                // Skip position fields during active local drag — ephemeral handles it
+                if (isBeingDragged && (key === 'x' || key === 'y')) continue;
                 if (key !== 'tokenId') jt.$jazz.set(key, val ?? undefined);
               }
               console.log(`[jazz-bridge] ✅ Pushed token ${t.id} update to Jazz (imageHash: ${t.imageHash})`);
