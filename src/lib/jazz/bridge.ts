@@ -105,9 +105,13 @@ export function markTokenDragEnd(tokenId: string): void {
   _dragGraceTimers.set(tokenId, timer);
 }
 
-/** Check if a token's inbound position should be suppressed (dragging or grace period) */
+/** Check if a token's inbound position should be suppressed (dragging or grace period).
+ *  Now also checks remote drags so observer clients don't get stale Jazz positions
+ *  fighting the ephemeral drag preview. */
 function _isPositionSuppressed(tokenId: string): boolean {
-  return _localDragTokens.has(tokenId) || _dragGraceTokens.has(tokenId);
+  return _localDragTokens.has(tokenId)
+    || _dragGraceTokens.has(tokenId)
+    || useRemoteDragStore.getState().isRemoteDragSuppressed(tokenId);
 }
 
 /**
