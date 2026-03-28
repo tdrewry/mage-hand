@@ -15,13 +15,20 @@ export interface RemoteDragState {
   lastUpdateMs: number;
 }
 
+/** Grace period (ms) after remote drag ends — suppresses Jazz position updates */
+const REMOTE_DRAG_GRACE_MS = 600;
+
 interface RemoteDragStore {
   /** Active remote drags keyed by tokenId */
   drags: Record<string, RemoteDragState>;
+  /** Recently ended remote drags keyed by tokenId → end timestamp */
+  recentlyEndedDrags: Record<string, number>;
 
   beginDrag: (tokenId: string, startPos: { x: number; y: number }, mode: 'freehand' | 'directLine', userId: string) => void;
   updateDrag: (tokenId: string, pos: { x: number; y: number }, path: { x: number; y: number }[]) => void;
   endDrag: (tokenId: string) => void;
+  /** Check if a token is actively being remotely dragged or in grace period */
+  isRemoteDragSuppressed: (tokenId: string) => boolean;
   /** Remove any drags older than maxAgeMs with no updates */
   expireStale: (maxAgeMs: number) => void;
   clearAll: () => void;
