@@ -19,6 +19,7 @@ import {
   ShieldX,
   Fence,
   Paintbrush,
+  MousePointer2,
 } from 'lucide-react';
 import { useFogStore } from '@/stores/fogStore';
 import { useMapStore } from '@/stores/mapStore';
@@ -33,6 +34,8 @@ import { toast } from 'sonner';
 import { Toolbar, ToolbarButton, ToolbarSeparator } from '@/components/toolbar';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { ClearDataDialog } from '@/components/modals/ClearDataDialog';
+import { useRemoteDragStore } from '@/stores/remoteDragStore';
+import { emitClearAllDrags } from '@/lib/net/dragOps';
 
 interface VerticalToolbarProps {
   mode: 'edit' | 'play';
@@ -119,6 +122,12 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
     }
   };
 
+  const handleClearDrags = () => {
+    useRemoteDragStore.getState().clearAll();
+    emitClearAllDrags();
+    toast.success('Remote drags cleared!');
+  };
+
   return (
     <Toolbar position="left" className="gap-0.5 px-1.5 py-2">
       {mode === 'edit' ? (
@@ -202,6 +211,15 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             className="text-orange-600 hover:bg-orange-600/10"
           />
 
+          <ToolbarButton
+            icon={MousePointer2}
+            label="Clear Stuck Drags"
+            onClick={handleClearDrags}
+            variant="ghost"
+            size="xs"
+            className="text-orange-600 hover:bg-orange-600/10"
+          />
+
           <ToolbarSeparator orientation="horizontal" />
 
           <ToolbarButton
@@ -279,6 +297,17 @@ export const VerticalToolbar: React.FC<VerticalToolbarProps> = ({
             variant="ghost"
             size="xs"
           />
+
+          {isDM && (
+            <ToolbarButton
+              icon={MousePointer2}
+              label="Clear Stuck Drags"
+              onClick={handleClearDrags}
+              variant="ghost"
+              size="xs"
+              className="text-orange-600 hover:bg-orange-600/10"
+            />
+          )}
 
           <ToolbarSeparator orientation="horizontal" />
 

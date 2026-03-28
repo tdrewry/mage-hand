@@ -19,12 +19,6 @@ import type {
 } from "./types";
 
 let registered = false;
-/** Interval handle for staleness auto-clear of remote drags */
-let staleCheckInterval: ReturnType<typeof setInterval> | null = null;
-
-/** Max age (ms) before a remote drag with no updates is auto-cleared.
- *  Acts as a safety net if token.drag.end is lost. */
-const REMOTE_DRAG_STALE_MS = 3000;
 
 export function registerTokenHandlers(): void {
   if (registered) return;
@@ -128,13 +122,10 @@ export function registerTokenHandlers(): void {
     }
   });
 
-  // ── Staleness auto-clear ──
-  // Only needed when ephemeral drag is active. Skipped otherwise.
-  if (FEATURE_EPHEMERAL_TOKEN_DRAG && !staleCheckInterval) {
-    staleCheckInterval = setInterval(() => {
-      useRemoteDragStore.getState().expireStale(REMOTE_DRAG_STALE_MS);
-    }, 1000);
-  }
+  ephemeralBus.on("token.drag.clear_all", () => {
+    if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
+    useRemoteDragStore.getState().clearAll();
+  });
 
   // ── Token position sync (10Hz delta broadcast) ──
   // When Jazz is active, position sync is handled by Jazz CoValue subscriptions.

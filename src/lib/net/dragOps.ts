@@ -52,6 +52,12 @@ export function emitDragEnd(payload: DragEndPayload): void {
   });
 }
 
+/** Emit clear all drags via ephemeral bus (unthrottled). */
+export function emitClearAllDrags(): void {
+  if (!FEATURE_EPHEMERAL_TOKEN_DRAG) return;
+  ephemeralBus.emit("token.drag.clear_all", {});
+}
+
 /**
  * Emit token metadata sync via ephemeral bus (throttled at 200ms per token).
  * Broadcasts label, color, pathStyle, appearance, size, etc. for live preview

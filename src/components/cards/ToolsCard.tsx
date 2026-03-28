@@ -28,6 +28,7 @@ import {
   Users,
   ShieldX,
   Fence,
+  MousePointer2,
 } from 'lucide-react';
 import { useRegionStore } from '@/stores/regionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -39,6 +40,8 @@ import { useCardStore } from '@/stores/cardStore';
 import { CardType } from '@/types/cardTypes';
 import { Canvas as FabricCanvas } from 'fabric';
 import { toast } from 'sonner';
+import { emitClearAllDrags } from '@/lib/net/dragOps';
+import { useRemoteDragStore } from '@/stores/remoteDragStore';
 
 interface ToolsCardContentProps {
   mode: 'edit' | 'play';
@@ -195,6 +198,12 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
   const handleClearRegions = () => {
     clearRegions();
     toast.success('All regions cleared!');
+  };
+
+  const handleClearDrags = () => {
+    useRemoteDragStore.getState().clearAll();
+    emitClearAllDrags();
+    toast.success('Remote drags cleared!');
   };
 
   const handleCombatToggle = () => {
@@ -377,6 +386,22 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={handleClearDrags}
+                  className="w-10 h-10 text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
+                >
+                  <MousePointer2 className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Clear Stuck Drags</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleClearRegions}
                   className="w-10 h-10 text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
                 >
@@ -472,6 +497,22 @@ export const ToolsCardContent: React.FC<ToolsCardContentProps> = ({
             </Tooltip>
 
             <Separator />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClearDrags}
+                  className="w-10 h-10 text-orange-600 hover:text-orange-600 hover:bg-orange-600/10"
+                >
+                  <MousePointer2 className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Clear Stuck Drags</p>
+              </TooltipContent>
+            </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
